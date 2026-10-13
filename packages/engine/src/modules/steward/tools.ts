@@ -35,7 +35,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
   }
   return {
     recommend(_workspaceId: string, input: Input) { return chooseHandling(input.signals); },
-    async generate(workspaceId: string, input: Input & { name: string; purpose: string; spec: unknown; dataScopes: string[] }) {
+    async generate(workspaceId: string, input: Input & { name: string; purpose: string; spec: unknown; dataScopes: string[]; actorKey: string }) {
       const choice = chooseHandling(input.signals);
       if (choice.mode !== "script" && choice.mode !== "panel") return { created: false as const, choice };
       const spec = toolSpecSchema.parse(input.spec);
@@ -44,7 +44,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       return db.$transaction(async (tx) => {
         if (input.affairId && !await tx.affair.findFirst({ where: { id: input.affairId, workspaceId } })) throw new ToolNotFoundError();
         const row = await tx.managedTool.create({ data: { workspaceId, affairId: input.affairId, ...fields, spec, kind: choice.mode, handlingMode: choice.mode, selectionRationale: choice.rationale, state: "generated", version: 1 } });
-        await audit(tx, workspaceId, row.id, "generated", { choice, version: 1 });
+        await audit(tx, workspaceId, row.id, "generated", { choice, version: 1 }, input.actorKey);
         return { created: true as const, choice, tool: view(row) };
       });
     },
@@ -66,7 +66,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
         return result;
       });
     },
-    async edit(workspaceId: string, id: string, input: { spec: unknown; expectedVersion: number }) {
+    async edit(workspaceId: string, id: string, input: { spec: unknown; expectedVersion: number; actorKey: string }) {
       return db.$transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         if (row.version !== input.expectedVersion) throw new ToolConflictError();
@@ -74,17 +74,17 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
         if ((spec.type === "event_rule" ? "script" : "panel") !== row.kind) throw new Error("Cannot change tool kind.");
         const state = nextToolState(view(row).state, "edit", { version: row.version, validatedVersion: row.validatedVersion });
         const result = await save(tx, row, { spec, version: { increment: 1 }, state, validationSummary: null, validatedVersion: null, authorizedAt: null, enabledAt: null, disabledAt: null, retiredAt: null });
-        await audit(tx, workspaceId, id, "edited", { version: row.version + 1 });
+        await audit(tx, workspaceId, id, "edited", { version: row.version + 1 }, input.actorKey);
         return result;
       });
     },
-    async run(workspaceId: string, id: string, { events }: { events: RuleEvent[] }) {
+    async run(workspaceId: string, id: string, { events, actorKey }: { events: RuleEvent[]; actorKey: string }) {
       // Entire bounded, in-process execution shares the permission snapshot transaction.
       // Return refusals from the transaction, then throw so refusal audits survive.
       const result = await db.$transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         const refuse = async (code: ToolRunRefusedError["code"]) => {
-          await audit(tx, workspaceId, id, "run_refused", { code, version: row.version });
+          await audit(tx, workspaceId, id, "run_refused", { code, version: row.version }, actorKey);
           return { error: code };
         };
         if (row.state !== "enabled") return refuse("TOOL_NOT_ENABLED");
@@ -111,12 +111,12 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
             rows = rows.map((r) => Object.fromEntries(spec.columns.map((c) => [c.key, r[c.key]])));
           }
           await save(tx, row, { lastRunAt: now(), lastSuccessAt: now() });
-          await audit(tx, workspaceId, id, "run_succeeded", { version: row.version, count: spec.type === "event_rule" ? matches.length : rows.length });
+          await audit(tx, workspaceId, id, "run_succeeded", { version: row.version, count: spec.type === "event_rule" ? matches.length : rows.length }, actorKey);
           return { matches, rows };
         } catch (error) {
           if (error instanceof ToolConflictError) throw error;
           await save(tx, row, { lastRunAt: now(), lastFailureAt: now() });
-          await audit(tx, workspaceId, id, "run_failed", { version: row.version });
+          await audit(tx, workspaceId, id, "run_failed", { version: row.version }, actorKey);
           return { error: "TOOL_RUN_FAILED" as const };
         }
       });

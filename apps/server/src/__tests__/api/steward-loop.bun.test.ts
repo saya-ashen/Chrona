@@ -123,6 +123,7 @@ test("m tool selection and lifecycle require explicit run delegation", async () 
   const affair = await request("/affairs", { title: "Tool affair" });
   const signals = { repeatsExpected: "once", rulesStable: true, needsOngoingObservation: false, needsUserInteraction: "none", ambiguity: "clear", existingToolFits: false, risk: "low", valueWorthKeeping: false };
   const input = { affairId: affair.id, name: "Deadline rule", purpose: "Find deadlines", signals, dataScopes: ["affair_events"], spec: { type: "event_rule", match: { anyKeywords: ["deadline"] }, then: { disposition: "digest", note: "Review deadline" }, cases: [{ title: "deadline", body: "", author: "test", expectMatch: true }, { title: "hello", body: "", author: "test", expectMatch: false }] } };
+  expect(await request("/tools", { ...input, spec: { type: "executable_code" } }, 400)).toMatchObject({ code: "INVALID_REQUEST", message: expect.stringContaining("Invalid tool spec:") });
   expect(await request("/tools", input)).toMatchObject({ created: false });
   const generated = await request("/tools", { ...input, signals: { ...signals, repeatsExpected: "recurring" } });
   expect(generated.created).toBe(true); const id = generated.tool.id;
@@ -131,14 +132,64 @@ test("m tool selection and lifecycle require explicit run delegation", async () 
   expect(await request(`/tools/${id}/run`, { events: [] }, 409)).toMatchObject({ code: "TOOL_NOT_PERMITTED" });
   const delegation = await request("/delegations", { affairId: affair.id, purpose: "Run the rule", allowedActions: ["run_tool"] });
   await request(`/delegations/${delegation.id}/transition`, { action: "grant", expectedRevision: 1 });
-  expect(await request(`/tools/${id}/run`, { events: [] })).toEqual({ matches: [], rows: [] });
+  expect(await request(`/tools/${id}/run`, {})).toEqual({ matches: [], rows: [] });
+  const audits = await db.stewardAudit.findMany({ where: { workspaceId, subjectId: id, kind: { in: ["tool.generated", "tool.run_refused", "tool.run_succeeded"] } } });
+  expect(audits).toHaveLength(4);
+  expect(audits.every(a => a.actorKey === "owner:local")).toBe(true);
 });
-test("unsupported delivery channel is visible failure, never success", async () => {
+test("n default channel delivers in-app once and remains unacknowledged until acknowledged", async () => {
   const c = await baseline();
-  const d = await request("/delegations", { connectionId: c.id, purpose: "Unsupported channel", allowedActions: ["notify_user"], notification: { mode: "immediate", channel: "not-connected", cooldownMinutes: 0 } });
+  const d = await request("/delegations", { connectionId: c.id, purpose: "Notify inside Chrona", allowedActions: ["notify_user"], notification: { mode: "immediate", cooldownMinutes: 0 } });
+  expect(d.notification.channel).toBe("in_app");
+  await request(`/delegations/${d.id}/transition`, { action: "grant", expectedRevision: 1 });
+  await incoming(c.id, "in-app-question", "Can you help?");
+  const testSink = runtime.delivery!;
+  process.env.CHRONA_E2E_TEST_ROUTES = "0";
+  runtime = createStewardRuntime(db, { now: () => clock }); app = build();
+  await runtime.service(workspaceId).tick(); await runtime.service(workspaceId).tick();
+  const notifications = (await request("/notifications")).items;
+  expect(notifications).toHaveLength(1);
+  const notification = notifications[0];
+  expect(notification).toMatchObject({ channel: "in_app", status: "sent", attempts: 1, acknowledgedAt: null });
+  const stored = await db.stewardNotification.findUniqueOrThrow({ where: { id: notification.id } });
+  expect(stored.receiptRef).toBe(`in_app:${stored.idempotencyKey}`);
+  expect(await db.stewardAudit.count({ where: { subjectId: notification.id, kind: "notification.sent" } })).toBe(1);
+  const today = await request("/today");
+  expect([...today.decisions, ...today.changes, ...today.commitments, ...today.suggestions, ...today.results]).toContainEqual(expect.objectContaining({ id: notification.attentionItemId, status: "open" }));
+  expect(testSink.sent).toHaveLength(0);
+  expect(await request(`/notifications/${notification.id}/acknowledge`, {})).toMatchObject({ channel: "in_app", status: "acknowledged", acknowledgedAt: clock.toISOString() });
+  await runtime.service(workspaceId).tick();
+  expect((await request("/notifications")).items).toHaveLength(1);
+  expect((await request("/notifications")).items[0].status).toBe("acknowledged");
+  expect((await request("/attention")).items.find((a: any) => a.id === notification.attentionItemId).status).toBe("open");
+});
+test("o disabled test routes leave local_test delivery failed and source seam inaccessible", async () => {
+  const c = await baseline(); await grant(c.id); await incoming(c.id, "queued-before-restart", "Can you help?");
+  const testSink = runtime.delivery!;
+  process.env.CHRONA_E2E_TEST_ROUTES = "0";
+  runtime = createStewardRuntime(db, { now: () => clock }); app = build();
+  expect(runtime.localSource).toBeUndefined(); expect(runtime.delivery).toBeUndefined();
+  expect(Object.keys(runtime.ports.deliveryAdapters!)).toEqual(["in_app"]);
+  expect((await app.request("/api/test/steward/local-source/push", { method: "POST" })).status).toBe(404);
+  const empty = await request("/connections", { kind: "local_test", label: "Empty test data" });
+  expect(await request(`/connections/${empty.id}/sync`, {})).toMatchObject({ baseline: true, received: 0 });
+  await runtime.service(workspaceId).tick(); await runtime.service(workspaceId).tick();
+  const notifications = (await request("/notifications")).items;
+  expect(notifications).toHaveLength(1);
+  expect(notifications[0]).toMatchObject({ channel: "local_test", status: "failed", attempts: 1, sentAt: null, acknowledgedAt: null });
+  const failures = (await request("/attention")).items.filter((a: any) => a.kind === "failure");
+  expect(failures).toHaveLength(1);
+  expect((await request("/today")).changes).toContainEqual(expect.objectContaining({ id: failures[0].id, kind: "failure" }));
+  expect(testSink.sent).toHaveLength(0);
+  expect(await db.stewardNotification.count({ where: { workspaceId, status: "sent" } })).toBe(0);
+});
+test.each(["not-connected", "constructor", "__proto__"])("unsupported delivery channel %s is visible failure, never success", async channel => {
+  const c = await baseline();
+  const d = await request("/delegations", { connectionId: c.id, purpose: "Unsupported channel", allowedActions: ["notify_user"], notification: { mode: "immediate", channel, cooldownMinutes: 0 } });
   await request(`/delegations/${d.id}/transition`, { action: "grant", expectedRevision: 1 });
   await incoming(c.id, "question", "Can you help?"); await tick();
-  expect(["failed", "suppressed"]).toContain((await request("/notifications")).items[0].status);
+  expect((await request("/notifications")).items[0].status).toBe("failed");
+  expect((await request("/attention")).items.filter((a: any) => a.kind === "failure")).toHaveLength(1);
   expect((await request("/test/steward/delivery/sent")).items).toHaveLength(0);
 });
 test("Reddit without credentials reports needs_authorization", async () => {
