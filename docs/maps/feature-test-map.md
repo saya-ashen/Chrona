@@ -16,12 +16,12 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Metric | Value |
 | --- | --- |
-| Source files | 700 |
+| Source files | 704 |
 | Test files | 372 |
-| Directly covered files | 305 (44%) |
-| Transitively covered files | 628 (90%) |
+| Directly covered files | 305 (43%) |
+| Transitively covered files | 632 (90%) |
 | Uncovered files (no test reaches) | 72 (10%) |
-| Exported symbols | 2042 |
+| Exported symbols | 2049 |
 | Symbols referenced by a direct test | 539 (26%) |
 
 ## Workflow coverage summary
@@ -35,9 +35,9 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | Schedule cockpit (time blocks / conflicts / proposals / auto-start) | 20 | 14 (70%) | 20 (100%) | 0 |
 | External calendar (sources / import / sync) | 10 | 3 (30%) | 7 (70%) | 3 |
 | Providers / runtime boundary | 46 | 30 (65%) | 45 (98%) | 1 |
-| Contracts (schemas / DTOs / MCP tool specs) | 58 | 26 (45%) | 58 (100%) | 0 |
+| Contracts (schemas / DTOs / MCP tool specs) | 60 | 26 (43%) | 60 (100%) | 0 |
 | Platform (server routing, db, cli, i18n, shared, ui-protocol) | 104 | 58 (56%) | 93 (89%) | 11 |
-| Unmapped (no workflow bucket) | 202 | 62 (31%) | 153 (76%) | 49 |
+| Unmapped (no workflow bucket) | 204 | 62 (30%) | 155 (76%) | 49 |
 
 ## Drill-down
 
@@ -2694,17 +2694,23 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | --- | --- | --- | --- | --- |
 | `packages/contracts/src/provider-capability-matrix.ts` | 0 | 208 | 0/4 | _(transitive only)_ |
 
+#### contracts :: result-exports.ts  _(1 files, 0 direct-covered)_
+
+| Source file | Direct | Transitive | Symbols (tested/total) | Test names |
+| --- | --- | --- | --- | --- |
+| `packages/contracts/src/result-exports.ts` | 0 | 208 | &mdash; | _(transitive only)_ |
+
 #### contracts :: results  _(7 files, 5 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
 | `packages/contracts/src/results/content.ts` | 1 | 253 | 4/4 | `content.bun.test.ts` |
-| `packages/contracts/src/results/continuation.ts` | 1 | 221 | 1/1 | `continuation.bun.test.ts` |
-| `packages/contracts/src/results/files.ts` | 0 | 220 | 0/10 | _(transitive only)_ |
-| `packages/contracts/src/results/index.ts` | 2 | 221 | &mdash; | `management-work-results.bun.test.ts`<br>`files.bun.test.ts` |
-| `packages/contracts/src/results/pages.ts` | 1 | 220 | 2/7 | `continuation.bun.test.ts` |
-| `packages/contracts/src/results/views.ts` | 0 | 218 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/results/work-result.ts` | 1 | 221 | 4/10 | `work-result.bun.test.ts` |
+| `packages/contracts/src/results/continuation.ts` | 1 | 220 | 1/1 | `continuation.bun.test.ts` |
+| `packages/contracts/src/results/files.ts` | 0 | 219 | 0/10 | _(transitive only)_ |
+| `packages/contracts/src/results/index.ts` | 2 | 218 | &mdash; | `management-work-results.bun.test.ts`<br>`files.bun.test.ts` |
+| `packages/contracts/src/results/pages.ts` | 1 | 219 | 2/7 | `continuation.bun.test.ts` |
+| `packages/contracts/src/results/views.ts` | 0 | 217 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/results/work-result.ts` | 1 | 220 | 4/10 | `work-result.bun.test.ts` |
 
 <details><summary><code>packages/contracts/src/results/content.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -2760,7 +2766,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/steward/index.ts` | 8 | 227 | 11/57 | `handling.bun.test.ts`<br>`permission.bun.test.ts`<br>`schedule.bun.test.ts`<br>`external-assess.bun.test.ts`<br>`delivery.bun.test.ts`<br>`service.bun.test.ts`<br>`unified.bun.test.ts`<br>`adapters.bun.test.ts` |
+| `packages/contracts/src/steward/index.ts` | 8 | 224 | 11/57 | `handling.bun.test.ts`<br>`permission.bun.test.ts`<br>`schedule.bun.test.ts`<br>`external-assess.bun.test.ts`<br>`delivery.bun.test.ts`<br>`service.bun.test.ts`<br>`unified.bun.test.ts`<br>`adapters.bun.test.ts` |
 
 <details><summary><code>packages/contracts/src/steward/index.ts</code> &mdash; 57 exported symbol(s)</summary>
 
@@ -2825,6 +2831,12 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `AssessorUnavailableError` | class | `service.bun.test.ts`<br>`adapters.bun.test.ts` |
 
 </details>
+
+#### contracts :: steward-exports.ts  _(1 files, 0 direct-covered)_
+
+| Source file | Direct | Transitive | Symbols (tested/total) | Test names |
+| --- | --- | --- | --- | --- |
+| `packages/contracts/src/steward-exports.ts` | 0 | 208 | &mdash; | _(transitive only)_ |
 
 #### contracts :: task-orchestrator.ts  _(1 files, 1 direct-covered)_
 
@@ -4326,7 +4338,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-#### engine :: steward  _(17 files, 8 direct-covered)_
+#### engine :: steward  _(19 files, 8 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
@@ -4334,6 +4346,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `packages/engine/src/modules/steward/capture.ts` | 0 | 61 | 0/1 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/connections.ts` | 0 | 61 | 0/4 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/delegations.ts` | 0 | 61 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/steward/delivery-policy.ts` | 0 | 62 | 0/1 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/delivery.ts` | 1 | 62 | 1/1 | `delivery.bun.test.ts` |
 | `packages/engine/src/modules/steward/digest.ts` | 1 | 61 | 1/1 | `digest.bun.test.ts` |
 | `packages/engine/src/modules/steward/external-assess.ts` | 0 | 61 | 0/6 | _(transitive only)_ |
@@ -4341,6 +4354,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `packages/engine/src/modules/steward/index.ts` | 5 | 61 | 1/1 | `external-assess.bun.test.ts`<br>`digest.bun.test.ts`<br>`service.bun.test.ts`<br>`suggest.bun.test.ts`<br>`unified.bun.test.ts` |
 | `packages/engine/src/modules/steward/ingest.ts` | 0 | 61 | 0/1 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/mappers.ts` | 2 | 63 | 1/13 | `digest.bun.test.ts`<br>`suggest.bun.test.ts` |
+| `packages/engine/src/modules/steward/process-effects.ts` | 0 | 61 | 0/6 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/process.ts` | 0 | 61 | 0/2 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/reads.ts` | 0 | 61 | 0/4 | _(transitive only)_ |
 | `packages/engine/src/modules/steward/schedule.ts` | 0 | 61 | 0/1 | _(transitive only)_ |
