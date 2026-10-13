@@ -18,10 +18,10 @@ beforeEach(async () => {
 afterEach(async () => { await db.$disconnect(); rmSync(directory, { recursive: true, force: true }); });
 
 test("due follow-ups raise once across repeated ticks/restarts and remain pending", async () => {
-  const service = createStewardFollowUps({ db, now: () => at });
+  const service = createStewardFollowUps({ db, workspaceId: "ws", now: () => at });
   expect(await service.raiseDueFollowUps({ now: new Date(at.getTime() - 1) })).toEqual({ raised: 0 });
   expect(await service.raiseDueFollowUps({ now: at })).toEqual({ raised: 1 });
-  expect(await createStewardFollowUps({ db }).raiseDueFollowUps({ now: at })).toEqual({ raised: 0 });
+  expect(await createStewardFollowUps({ db, workspaceId: "ws" }).raiseDueFollowUps({ now: at })).toEqual({ raised: 0 });
   expect(await db.attentionItem.findFirstOrThrow()).toMatchObject({ kind: "commitment", dedupeKey: "followup:f", dueAt: at });
   expect((await db.followUp.findUniqueOrThrow({ where: { id: "f" } })).status).toBe("pending");
   expect(await db.stewardAudit.count({ where: { kind: "followup.raised" } })).toBe(1);
@@ -33,15 +33,15 @@ test("due follow-ups raise once across repeated ticks/restarts and remain pendin
 });
 
 test("concurrent ticks raise only one commitment", async () => {
-  const first = createStewardFollowUps({ db, now: () => at });
-  const second = createStewardFollowUps({ db, now: () => at });
+  const first = createStewardFollowUps({ db, workspaceId: "ws", now: () => at });
+  const second = createStewardFollowUps({ db, workspaceId: "ws", now: () => at });
   const results = await Promise.all([first.raiseDueFollowUps({}), second.raiseDueFollowUps({})]);
   expect(results.reduce((sum, result) => sum + result.raised, 0)).toBe(1);
   expect(await db.attentionItem.count()).toBe(1);
 });
 
 test("cancelled follow-ups never raise and cannot become done", async () => {
-  const service = createStewardFollowUps({ db, now: () => at }); await service.cancelFollowUp("f"); await service.completeFollowUp("f");
+  const service = createStewardFollowUps({ db, workspaceId: "ws", now: () => at }); await service.cancelFollowUp("f"); await service.completeFollowUp("f");
   expect(await service.raiseDueFollowUps({ now: at })).toEqual({ raised: 0 }); expect(await db.attentionItem.count()).toBe(0);
   expect((await db.followUp.findUniqueOrThrow({ where: { id: "f" } })).status).toBe("cancelled");
 });
@@ -49,7 +49,7 @@ test("cancelled follow-ups never raise and cannot become done", async () => {
 test("cancellation dismisses only the generated commitment, not original attention", async () => {
   const original = await db.attentionItem.create({ data: { workspaceId: "ws", dedupeKey: "original", kind: "change", title: "Original", whatHappened: "Test", whyItMatters: "Test", nextStep: "Review" } });
   await db.followUp.update({ where: { id: "f" }, data: { attentionItemId: original.id } });
-  const service = createStewardFollowUps({ db, now: () => at }); await service.raiseDueFollowUps({}); await service.cancelFollowUp("f");
+  const service = createStewardFollowUps({ db, workspaceId: "ws", now: () => at }); await service.raiseDueFollowUps({}); await service.cancelFollowUp("f");
   expect((await db.attentionItem.findUniqueOrThrow({ where: { id: original.id } })).status).toBe("open");
   expect((await db.attentionItem.findUniqueOrThrow({ where: { workspaceId_dedupeKey: { workspaceId: "ws", dedupeKey: "followup:f" } } })).status).toBe("dismissed");
 });

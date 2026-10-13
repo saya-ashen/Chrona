@@ -1,7 +1,7 @@
 import * as c from "@chrona/contracts/steward";
 import type { Prisma, PrismaClient } from "@chrona/db";
 export type Actor = { workspaceId: string; actorKey: string; canWrite: boolean };
-export type Ports = { db: PrismaClient; sources: Record<c.ConnectionKind, c.SourceAdapter>; assessor: c.Assessor; now?: () => Date; authorize: (write: boolean) => Promise<Actor> };
+export type Ports = { db: PrismaClient; sources: Record<c.ConnectionKind, c.SourceAdapter>; assessor: c.Assessor; deliveryAdapters?: Record<string, c.DeliveryAdapter & { idempotent?: boolean }>; now?: () => Date; authorize: (write: boolean) => Promise<Actor> };
 export type Context = Ports & { now: () => Date; actor: Actor };
 export type Tx = Prisma.TransactionClient;
 export class StewardError extends Error {
@@ -17,6 +17,7 @@ export const affairView = (row: object, count = 0) => view(c.affairSchema, { ...
 export const eventView = (row: object) => view(c.inboundEventSchema, row);
 export const delegationView = (row: object) => view(c.delegationSchema, row);
 export const attentionView = (row: object & { affair?: { title: string } | null }) => view(c.attentionItemSchema, { ...row, affairTitle: row.affair?.title ?? null });
+export const notificationView = (row: object) => view(c.notificationSchema, row);
 export const followUpView = (row: object) => view(c.followUpSchema, row);
 export const toolView = (row: object) => view(c.managedToolSchema, row);
 export const connectionView = (row: object, pendingEvents: number, failedEvents: number, coverageNote: string) => view(c.connectionSchema, { ...row, pendingEvents, failedEvents, coverageNote });
