@@ -104,7 +104,8 @@ export const notificationPolicySchema = z.object({
   cooldownMinutes: z.number().int().min(0).max(10080).default(60),
   /** Local "HH:MM" bounds; null disables quiet hours. */
   quietHours: z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/), timezone: z.string().min(1).max(80) }).strict().nullable().default(null),
-  channel: short.default("local_test"),
+  /** "in_app" = visible in Chrona itself; the only channel that needs no external account. */
+  channel: short.default("in_app"),
 }).strict();
 
 export const delegationSchema = z.object({
@@ -206,6 +207,21 @@ export const eventLinkSchema = z.object({ decision: z.enum(["confirm", "reject"]
 export const syncResultSchema = z.object({ received: z.number().int().min(0), duplicates: z.number().int().min(0), baseline: z.boolean() }).strict();
 export const toolTransitionSchema = z.object({ action: z.enum(TOOL_TRANSITIONS), expectedVersion: z.number().int().min(1) }).strict();
 
+export const handlingSignalsSchema = z.object({
+  repeatsExpected: z.enum(["once", "few", "recurring"]), rulesStable: z.boolean(), needsOngoingObservation: z.boolean(),
+  needsUserInteraction: z.enum(["none", "read", "compare_or_fill"]), ambiguity: z.enum(["clear", "fuzzy"]),
+  existingToolFits: z.boolean(), risk: z.enum(["low", "high"]), valueWorthKeeping: z.boolean(),
+}).strict();
+export const handlingChoiceSchema = z.object({ mode: z.enum(HANDLING_MODES), rationale: z.string().max(2000), escalatesFrom: z.enum(HANDLING_MODES).optional() }).strict();
+/** `spec` is validated by toolSpecSchema in @chrona/domain; it is declarative data, never code. */
+export const generateToolSchema = z.object({ affairId: id.optional(), name: short, purpose: prose, dataScopes: z.array(short).max(20).default([]), signals: handlingSignalsSchema, spec: z.unknown() }).strict();
+export const generatedToolSchema = z.object({ created: z.boolean(), choice: handlingChoiceSchema, tool: managedToolSchema.optional() }).strict();
+export const runToolSchema = z.object({ events: z.array(z.object({ title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200), connectionKind: z.enum(CONNECTION_KINDS).optional() }).strict()).max(500).default([]) }).strict();
+export const toolRunResultSchema = z.object({
+  matches: z.array(z.object({ index: z.number().int(), matched: z.boolean(), disposition: z.string().optional(), note: z.string().optional() })),
+  rows: z.array(z.record(z.string(), z.string())),
+}).strict();
+
 // ------------------------------------------------------------ HTTP map -----
 /**
  * All under /api/steward. Every request carries `?workspaceId=`; the server
@@ -227,7 +243,11 @@ export const toolTransitionSchema = z.object({ action: z.enum(TOOL_TRANSITIONS),
  *   GET  /notifications                 -> {items: Notification[]}
  *   POST /notifications/:id/acknowledge -> Notification
  *   GET  /tools                         -> {items: ManagedTool[]}
+ *   POST /tools (GenerateTool)          -> GeneratedTool (created=false when no tool is warranted)
  *   POST /tools/:id/transition          -> ManagedTool
+ *   POST /tools/:id/run (RunTool)       -> ToolRunResult (409 unless enabled and permitted)
+ *   POST /notifications/:id/retry       -> Notification
+ *   POST /follow-ups/:id/complete|cancel -> FollowUp
  *   GET  /schedule?from=&to=            -> {items: ScheduleItem[]}
  */
 export const STEWARD_API_BASE = "/api/steward";
@@ -297,5 +317,8 @@ export type ManagedTool = z.infer<typeof managedToolSchema>;
 export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
 export type StewardHealth = z.infer<typeof stewardHealthSchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
+export type HandlingSignalsInput = z.infer<typeof handlingSignalsSchema>;
+export type GeneratedTool = z.infer<typeof generatedToolSchema>;
+export type ToolRunResult = z.infer<typeof toolRunResultSchema>;
 export type SyncResult = z.infer<typeof syncResultSchema>;
 export type AffairDetail = z.infer<typeof affairDetailSchema>;
