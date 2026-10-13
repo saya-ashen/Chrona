@@ -192,9 +192,12 @@ describe("ControlPlaneShell", () => {
 		);
 		expect(screen.getAllByRole("link", { name: "Chrona" })[0]).toHaveAttribute(
 			"href",
-			"/en/home",
+			"/en/today",
 		);
-		await userEvent.click(screen.getByText("More tools", { selector: "summary" }));
+		for (const [name, path] of [["Today", "today"], ["Affairs", "affairs"], ["Schedule", "schedule"], ["Delegations", "delegations"], ["Connections & permissions", "connections"]]) {
+      expect(screen.getByRole("link", { name })).toHaveAttribute("href", `/en/${path}`);
+    }
+    await userEvent.click(screen.getByText("Legacy workspace", { selector: "summary" }));
 		expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute(
 			"href",
 			"/en/tasks",
@@ -248,7 +251,7 @@ describe("ControlPlaneShell", () => {
 				<div>Workspace body</div>
 			</ControlPlaneShell>,
 		);
-		await user.click(screen.getByText("More tools", { selector: "summary" }));
+		await user.click(screen.getByText("Legacy workspace", { selector: "summary" }));
 		await user.click(screen.getByRole("button", { name: "New Task" }));
 		await user.click(screen.getByRole("button", { name: "Submit task" }));
 		await waitFor(() => expect(mocks.createScheduledTask).toHaveBeenCalled());
@@ -266,7 +269,7 @@ describe("ControlPlaneShell", () => {
 				<div>Workspace body</div>
 			</ControlPlaneShell>,
 		);
-		await user.click(screen.getByText("More tools", { selector: "summary" }));
+		await user.click(screen.getByText("Legacy workspace", { selector: "summary" }));
 		await user.click(screen.getByRole("button", { name: "New Task" }));
 		await user.click(screen.getByRole("button", { name: "Submit task" }));
 		await waitFor(() =>

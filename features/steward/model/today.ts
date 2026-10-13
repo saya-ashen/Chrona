@@ -1,4 +1,4 @@
-import { ATTENTION_DECISIONS, type AttentionItem, type AttentionKind, type StewardHealth, type TodayView } from "@chrona/contracts/steward";
+import { ATTENTION_DECISIONS, type AttentionItem, type AttentionKind, type StewardHealth, type TodayView } from "@chrona/contracts";
 
 export const TODAY_SECTIONS = ["decisions", "changes", "commitments", "suggestions", "results"] as const;
 export type AttentionDecision = (typeof ATTENTION_DECISIONS)[number];

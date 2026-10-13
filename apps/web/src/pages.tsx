@@ -7,7 +7,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
-import { TodayPage, StewardListPage, type StewardListKind } from "@features/steward";
+import { TodayPage, StewardListPage, AffairDetailPage, StewardSchedulePanel, type StewardListKind } from "@features/steward";
 import { DashboardPage, type DashboardData } from "@features/dashboard";
 import { SchedulePage } from "@features/schedule";
 import { TaskListPage } from "@features/task-management";
@@ -132,6 +132,12 @@ export function StewardListRoutePage({ kind }: { kind: StewardListKind }) {
   return <StewardListPage key={`${defaultWorkspace.id}:${kind}`} workspaceId={defaultWorkspace.id} kind={kind} />;
 }
 
+export function AffairDetailRoutePage() {
+  const { defaultWorkspace } = useAppBootOutletData();
+  const { affairId } = useParams();
+  return <AffairDetailPage key={`${defaultWorkspace.id}:${affairId}`} workspaceId={defaultWorkspace.id} affairId={affairId!} />;
+}
+
 export function WorkInboxRoutePage() { return <WorkInboxPage />; }
 export function WorkRecordRoutePage() {
   const { task } = useLoaderData() as TaskPageRouteData;
@@ -175,6 +181,8 @@ export function ScheduleRoutePage() {
   const [searchParams] = useSearchParams();
 
   return (
+    <div className="min-w-0 w-full space-y-4" data-ui-surface-kind="product-authored">
+    <StewardSchedulePanel key={defaultWorkspace.id} workspaceId={defaultWorkspace.id} />
     <SchedulePage
       workspaceId={defaultWorkspace.id}
       data={schedule}
@@ -183,6 +191,7 @@ export function ScheduleRoutePage() {
       selectedView={searchParams.get("view") ?? undefined}
       showNewTask={searchParams.get("new") === "1"}
     />
+    </div>
   );
 }
 

@@ -6,6 +6,7 @@ import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
   TodayRoutePage,
+  AffairDetailRoutePage,
   StewardListRoutePage,
   ActionCenterRoutePage,
   DashboardRoutePage,
@@ -79,6 +80,7 @@ export function createAppRouter() {
         },
         { path: "today", element: <TodayRoutePage /> },
         { path: "affairs", element: <StewardListRoutePage kind="affairs" /> },
+        { path: "affairs/:affairId", element: <AffairDetailRoutePage /> },
         { path: "delegations", element: <StewardListRoutePage kind="delegations" /> },
         { path: "connections", element: <StewardListRoutePage kind="connections" /> },
         {

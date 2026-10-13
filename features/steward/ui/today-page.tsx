@@ -1,7 +1,7 @@
 import { useI18n } from "@chrona/i18n";
-import type { AttentionItem } from "@chrona/contracts/steward";
+import type { AttentionItem } from "@chrona/contracts";
 import { Badge, Button, Card, CardHeader, CardTitle, CardContent } from "@shared/ui";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription } from "@shared/ui";
 import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { attentionDecisions, deriveToday, evidenceHref } from "../model/today";
 
@@ -26,7 +26,7 @@ export function TodayPage({ workspaceId }: { workspaceId: string }) {
     </>}
   </div>;
 }
-function AttentionCard({ item, mutation }: { item: AttentionItem; mutation: ReturnType<typeof useAttentionDecision> }) {
+export function AttentionCard({ item, mutation }: { item: AttentionItem; mutation: ReturnType<typeof useAttentionDecision> }) {
   const { messages } = useI18n(), copy = messages.steward;
   return <Card className="min-w-0">
     <CardHeader><CardTitle><h3>{item.title}</h3></CardTitle><div>{copy.status}: <Badge variant="outline">{copy.statuses[item.status]}</Badge></div></CardHeader>

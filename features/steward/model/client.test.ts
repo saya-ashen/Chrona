@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStewardClient } from "./client";
 import { decisionItem, emptyToday } from "./fixtures";
+import { parseKeywords } from "./affairs";
 import { apiJson } from "@shared/http";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
@@ -15,6 +16,12 @@ describe("steward HTTP client", () => {
     vi.mocked(apiJson).mockResolvedValue(decisionItem());
     await createStewardClient("ws").decideAttention("id/1", { decision: "approve" });
     expect(apiJson).toHaveBeenCalledWith("/api/steward/attention/id%2F1/decision?workspaceId=ws", expect.objectContaining({ method: "POST", body: '{"decision":"approve"}' }));
+  });
+  it("posts parsed affair keywords with workspace scope", async () => {
+    const input = { title: "Trip", summary: "Context", goal: "Choose dates", keywords: parseKeywords(" travel, dates, ,travel ") };
+    vi.mocked(apiJson).mockResolvedValue({ ...input, id: "a1", status: "active", taskId: null, openAttentionCount: 0, createdAt: "2026-10-13T00:00:00Z", updatedAt: "2026-10-13T00:00:00Z" });
+    await createStewardClient("ws").createAffair(input);
+    expect(apiJson).toHaveBeenCalledWith("/api/steward/affairs?workspaceId=ws", expect.objectContaining({ method: "POST", body: JSON.stringify({ title: "Trip", summary: "Context", goal: "Choose dates", keywords: ["travel", "dates"] }) }));
   });
   it("rejects malformed server data rather than presenting all-clear", async () => {
     vi.mocked(apiJson).mockResolvedValue({ decisions: [] });

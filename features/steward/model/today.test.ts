@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { attentionDecisions, decisionInput, deriveToday, evidenceHref, TODAY_SECTIONS } from "./today";
 import { decisionItem, emptyToday, timestamp } from "./fixtures";
-import type { AttentionKind, AttentionStatus, StewardHealth } from "@chrona/contracts/steward";
+import type { AttentionKind, AttentionStatus, StewardHealth } from "@chrona/contracts";
 
 describe("Today projection", () => {
   it("orders sections and distinguishes all-clear from no items", () => {

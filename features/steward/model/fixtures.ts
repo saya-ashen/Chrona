@@ -1,4 +1,4 @@
-import type { AttentionItem, TodayView } from "@chrona/contracts/steward";
+import type { AttentionItem, TodayView } from "@chrona/contracts";
 export const timestamp = "2026-10-13T12:00:00.000Z";
 export function emptyToday(): TodayView {
   return { generatedAt: timestamp, decisions: [], changes: [], commitments: [], suggestions: [], results: [], upcoming: [], health: { assessor: { available: true, name: "test", lastError: null }, pendingEvents: 0, failedEvents: 0, oldestPendingAt: null, queuedNotifications: 0, failedNotifications: 0, failingConnections: 0, lastTickAt: timestamp } };
