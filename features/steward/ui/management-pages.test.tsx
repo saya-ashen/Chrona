@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "@chrona/i18n/react";
 import en from "@chrona/i18n/messages/en.json";
-import { delegationSchema, connectionSchema, notificationSchema, NOTIFICATION_STATUSES, PILOT_DENIED_ACTIONS } from "@chrona/contracts/steward";
+import { delegationSchema, connectionSchema, notificationSchema, NOTIFICATION_STATUSES, PILOT_DENIED_ACTIONS } from "@chrona/contracts";
 import { DelegationsPage } from "./delegations-page";
 import { ConnectionsPage } from "./connections-page";
 const mocks = vi.hoisted(() => ({ delegations: vi.fn(), connections: vi.fn(), events: vi.fn(), notifications: vi.fn(), transitionDelegation: vi.fn(), proposeDelegation: vi.fn(), transitionConnection: vi.fn(), syncConnection: vi.fn(), createConnection: vi.fn(), acknowledgeNotification: vi.fn() }));

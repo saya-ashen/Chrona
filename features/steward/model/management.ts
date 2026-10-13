@@ -1,4 +1,4 @@
-import { PILOT_DENIED_ACTIONS, type DelegationStatus, type ConnectionStatus, type StewardAction, type NotificationStatus } from "@chrona/contracts/steward";
+import { PILOT_DENIED_ACTIONS, type DelegationStatus, type ConnectionStatus, type StewardAction, type NotificationStatus } from "@chrona/contracts";
 export type DelegationTransition = "grant" | "pause" | "resume" | "revoke";
 const transitions: Record<DelegationStatus, DelegationTransition[]> = { proposed: ["grant", "revoke"], active: ["pause", "revoke"], paused: ["resume", "revoke"], revoked: [], expired: [] };
 export function delegationTransitions(status: DelegationStatus) { return transitions[status]; }

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useI18n } from "@chrona/i18n";
-import { CONNECTION_KINDS, EVENT_STATUSES, type ConnectionKind, type EventStatus, type SyncResult } from "@chrona/contracts/steward";
+import { CONNECTION_KINDS, EVENT_STATUSES, type ConnectionKind, type EventStatus, type SyncResult } from "@chrona/contracts";
 import { Badge, Button, Card, CardContent, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@shared/ui";
 import { useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";

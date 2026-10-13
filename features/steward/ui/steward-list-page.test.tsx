@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StewardListPage, type StewardListKind } from "./steward-list-page";
@@ -5,7 +6,7 @@ import { I18nProvider } from "@chrona/i18n/react";
 import en from "@chrona/i18n/messages/en.json";
 const mocks = vi.hoisted(() => ({ affairs: vi.fn(), delegations: vi.fn(), connections: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
-function show(kind: StewardListKind) { render(<I18nProvider locale="en" messages={en}><StewardListPage workspaceId="workspace-test" kind={kind} /></I18nProvider>); }
+function show(kind: StewardListKind) { render(<I18nProvider locale="en" messages={en}><MemoryRouter><StewardListPage workspaceId="workspace-test" kind={kind} /></MemoryRouter></I18nProvider>); }
 afterEach(cleanup);
 beforeEach(() => vi.resetAllMocks());
 describe.each<StewardListKind>(["affairs"])("%s list", kind => {

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { STEWARD_ACTIONS, NOTIFICATION_STATUSES } from "@chrona/contracts/steward";
+import { STEWARD_ACTIONS, NOTIFICATION_STATUSES } from "@chrona/contracts";
 import { delegationTransitions, pilotDenied, canAcknowledge, staleResponse, canSync, connectionTransitions } from "./management";
 it.each([ ["proposed", ["grant", "revoke"]], ["active", ["pause", "revoke"]], ["paused", ["resume", "revoke"]], ["revoked", []], ["expired", []] ] as const)("delegation %s transitions", (status, expected) => expect(delegationTransitions(status)).toEqual(expected));
 it.each(STEWARD_ACTIONS)("pilot permission for %s", action => expect(pilotDenied(action)).toBe(["reply_external", "mark_read_external", "delete_external"].includes(action)));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useI18n } from "@chrona/i18n";
-import { STEWARD_ACTIONS, type StewardAction, type Delegation } from "@chrona/contracts/steward";
+import { STEWARD_ACTIONS, type StewardAction, type Delegation } from "@chrona/contracts";
 import { Badge, Button, Card, CardContent, Checkbox, Input, Label, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@shared/ui";
 import { useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiJson } from "@shared/http";
-import * as c from "@chrona/contracts/steward";
+import * as c from "@chrona/contracts";
 
 /** Auth is owned by apiJson; workspace scope is explicit on every request. */
 export function createStewardClient(workspaceId: string) {
