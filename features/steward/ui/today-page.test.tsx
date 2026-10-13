@@ -8,8 +8,8 @@ import en from "@chrona/i18n/messages/en.json";
 const mocks = vi.hoisted(() => ({ today: vi.fn(), decideAttention: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 function show() { render(<I18nProvider locale="en" messages={en}><TodayPage workspaceId="workspace-test" /></I18nProvider>); }
-afterEach(cleanup);
-beforeEach(() => { vi.resetAllMocks(); mocks.today.mockResolvedValue(emptyToday()); mocks.decideAttention.mockResolvedValue(decisionItem()); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+beforeEach(() => { vi.resetAllMocks(); vi.spyOn(Date, "now").mockReturnValue(Date.parse(timestamp)); mocks.today.mockResolvedValue(emptyToday()); mocks.decideAttention.mockResolvedValue(decisionItem()); });
 describe("Today page", () => {
   it("announces loading", () => { mocks.today.mockReturnValue(new Promise(() => {})); show(); expect(screen.getByRole("status")).toHaveTextContent("Loading"); });
   it("shows read errors and reload action", async () => { mocks.today.mockRejectedValue(new Error("offline")); show(); expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.error); expect(screen.getByRole("button", { name: "Reload" })).toBeEnabled(); });

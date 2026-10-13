@@ -7,10 +7,15 @@ export function useStewardResource<T>(load: (signal?: AbortSignal) => Promise<T>
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true), [error, setError] = useState(false);
   const [generation, setGeneration] = useState(0);
+  const previousLoad = useRef(load);
   const refresh = useCallback(() => setGeneration(value => value + 1), []);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(false); setData(null);
+    setLoading(true); setError(false);
+    // Refresh the same resource without unmounting its local answers/results.
+    // A new loader (workspace, affair or filter) must not retain old scoped data.
+    if (previousLoad.current !== load) setData(null);
+    previousLoad.current = load;
     void load(controller.signal).then(value => { if (!controller.signal.aborted) setData(value); })
       .catch(() => { if (!controller.signal.aborted) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
