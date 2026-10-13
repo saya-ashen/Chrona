@@ -73,7 +73,7 @@ test("all added reads, writes and tick are workspace scoped and authorize writes
   expect(await readonly.notifications.list()).toHaveLength(1);
   expect(await s.tick()).toMatchObject({ raised: 1 }); expect(await s.tick()).toMatchObject({ raised: 0 });
   const schedule = await s.schedule("2030-01-01T00:00:00Z", "2032-01-01T00:00:00Z");
-  expect(schedule.map(row => scheduleItemSchema.parse(row).kind).sort()).toEqual(["follow_up", "steward_check"]);
+  expect(schedule.map(row => scheduleItemSchema.parse(row).kind).sort()).toEqual(["deadline", "follow_up", "steward_check"]);
   expect(followUpSchema.parse(await s.followUps.complete("follow")).status).toBe("done");
   expect((await s.today()).commitments).toEqual([]);
   expect(await s.tools.list()).toHaveLength(1);
