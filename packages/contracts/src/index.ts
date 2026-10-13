@@ -1,9 +1,7 @@
 export { managementTools, RESULT_REQUEST_BYTES, type ManagementToolName, type TaskDeleteImpact } from "./api";
-export * as workResults from "./results";
-export type { PageEntry, PageInputsView, PageWrite, WorkResultView } from "./results";
+export { workResults, type PageEntry, type PageInputsView, type PageWrite, type WorkResultView } from "./result-exports";
 export * from "./work";
-export * as steward from "./steward";
-export * from "./steward";
+export * from "./steward-exports";
 
 export { STRUCTURED_RESULT_FORMAT, STRUCTURED_RESULT_SCHEMA_VERSION,
   isStructuredResultAssetContent, type StructuredResultArtifactRef, type StructuredResultAssetContent,
