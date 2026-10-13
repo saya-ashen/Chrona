@@ -25,8 +25,8 @@ afterEach(async () => { await db.$disconnect(); rmSync(directory, { recursive: t
 async function setup() {
   const s = service(); source.push([item("baseline")]);
   const connection = await s.connections.create({ kind: "local_test", label: "Local test", pollIntervalSeconds: 60 });
-  expect(await s.tick()).toMatchObject({ synced: 1, assessed: 0, attempted: 0 });
-  const delegation = await s.delegations.propose({ connectionId: connection.id, purpose: "Watch test messages", cadenceSeconds: 60, allowedActions: ["notify_user"], notification: { mode: "immediate", cooldownMinutes: 0, channel: "local_test", quietHours: null } });
+  expect(await s.syncConnection(connection.id)).toMatchObject({ baseline: true, received: 1 });
+  const delegation = await s.delegations.propose({ connectionId: connection.id, purpose: "Watch test messages", cadenceSeconds: 60, allowedActions: ["read_source", "notify_user"], notification: { mode: "immediate", cooldownMinutes: 0, channel: "local_test", quietHours: null } });
   await s.delegations.transition(delegation.id, { action: "grant", expectedRevision: 1 });
   return { s, connection, delegation };
 }

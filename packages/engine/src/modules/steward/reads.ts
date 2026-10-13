@@ -1,4 +1,4 @@
-import { attentionDecisionSchema, type AttentionStatus, type TodayView, type StewardHealth } from "@chrona/contracts/steward";
+import { notificationPolicySchema, attentionDecisionSchema, type AttentionStatus, type TodayView, type StewardHealth } from "@chrona/contracts/steward";
 import { attentionView, audit, StewardError, type Context } from "./mappers";
 import { DISMISS_COOLDOWN_MS, LESS_OFTEN_COOLDOWN_MS } from "@chrona/domain/steward/suggestions";
 
@@ -41,6 +41,7 @@ export async function decideAttention(ctx: Context, id: string, raw: unknown) {
           workspaceId: ctx.actor.workspaceId, affairId: row.affairId, status: "proposed",
           purpose: `${row.title}: ${row.whatHappened}`.slice(0, 4000), originalWording: row.nextStep,
           allowedActions: ["read_source", "summarize"], askFirstActions: ["notify_user"],
+          notification: notificationPolicySchema.parse({}),
         } });
         delegationId = delegation.id;
         nextStep = "Review the proposed delegation. Granting it is a separate explicit step.";
@@ -52,6 +53,14 @@ export async function decideAttention(ctx: Context, id: string, raw: unknown) {
     const cooldownMs = input.decision === "less_often" ? (row.kind === "suggestion" ? LESS_OFTEN_COOLDOWN_MS : 7 * 86400_000)
       : row.kind === "suggestion" && ["dismiss", "decline"].includes(input.decision) ? DISMISS_COOLDOWN_MS : null;
     const updated = await tx.attentionItem.update({ where: { id }, data: { status, delegationId, nextStep, decision: input.decision, decidedAt: now, snoozedUntil: input.decision === "snooze" ? new Date(input.snoozeUntil!) : null, ...(cooldownMs !== null ? { cooldownUntil: new Date(now.getTime() + cooldownMs) } : {}) }, include: { affair: true } });
+    if (row.kind === "decision" && row.dueAt && input.decision === "approve") {
+      // Stable primary key fences repeated approvals without a schema change.
+      const existing = await tx.followUp.findFirst({ where: { workspaceId: ctx.actor.workspaceId, attentionItemId: id } });
+      if (!existing) await tx.followUp.upsert({ where: { id: `attention:${id}` }, update: {}, create: {
+        id: `attention:${id}`, workspaceId: ctx.actor.workspaceId, affairId: row.affairId,
+        attentionItemId: id, note: row.nextStep || row.title, dueAt: row.dueAt, createdAt: now,
+      } });
+    }
     if (input.decision === "less_often") {
       const family = row.dedupeKey.slice(0, row.dedupeKey.lastIndexOf(":") + 1);
       await tx.attentionItem.updateMany({ where: { workspaceId: ctx.actor.workspaceId, dedupeKey: { startsWith: family || row.dedupeKey } }, data: { cooldownUntil: new Date(now.getTime() + cooldownMs!) } });
