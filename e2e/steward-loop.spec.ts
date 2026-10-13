@@ -227,15 +227,14 @@ test("owner completes the steward loop", async ({ page, request }, info) => {
     expect(response.ok()).toBe(true);
     const { items } = await response.json() as { items: { title: string; channel: string; status: string }[] };
     const notification = items.find(item => item.title === `Preference ${suffix}`);
-    test.fixme(notification?.channel === "local_test", `Outside scope: POST /api/steward/delegations without notification policy persists the database default instead of contract defaults. GET /api/steward/notifications returned ${JSON.stringify(notification)}; expected channel=in_app, status=sent. UI correctly labels actual local_test as Test sink. Fix engine/schema default, not the delivery label.`);
     await expect(receipt).toContainText("Channel: In Chrona");
     await receipt.getByRole("button", { name: "Acknowledge", exact: true }).click();
     await expect(receipt.getByText("Acknowledged", { exact: true })).toBeVisible();
     await expect(receipt.getByRole("button", { name: "Acknowledge", exact: true })).toHaveCount(0);
     await noOverflow(page);
     await today();
-    const item = page.getByRole("article").filter({ has: page.getByRole("heading", { name: `Preference ${suffix}`, exact: true }) });
-    await expect(item).toBeVisible();
-    await expect(item.getByText("Open", { exact: true })).toBeVisible();
+    const changes = page.getByRole("region", { name: "Changes", exact: true });
+    await expect(changes.getByRole("heading", { name: `Preference ${suffix}`, exact: true })).toBeVisible();
+    await expect(changes.getByText("Status: Open", { exact: true })).toBeVisible();
   });
 });
