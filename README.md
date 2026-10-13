@@ -7,11 +7,11 @@ English | [中文](./README.zh.md)
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>A lasting home for your work and results.</strong>
+  <strong>A proactive personal steward for your affairs.</strong>
 </p>
 
 <p align="center">
-  Keep tasks, progress, evidence, and results together. Use managed AI execution when needed.
+  Keep context, notice authorized changes, surface decisions, and act within explicit boundaries.
 </p>
 
 <p align="center">
@@ -39,19 +39,26 @@ English | [中文](./README.zh.md)
 
 ---
 
-Chrona is evolving into a local-first, **executor-independent work and results
-workspace**: work may be performed by a person, an external agent, or the optional
-Chrona-managed executor. Durable records, results, review, and reuse are the
-product center—not control over every agent.
+Chrona is being rebuilt as a **proactive personal steward**: Today / Affairs /
+Schedule / Delegations / Connections over a durable event loop. The canonical
+[personal-steward direction](./docs/zh/personal-steward.md) (2026-10-13) replaces
+earlier product goals. Read the [English direction, implementation and gaps](./docs/en/personal-steward.md)
+before designing changes. Work/results remain the result layer; managed execution
+is secondary.
 
-> **Implemented; one authorized instance deployed and integrated:** independent
+> **Current checkout, unreleased:** local event loop, deterministic built-in
+> assessor, declarative tools, restrained suggestions and in-app delivery. Reddit
+> credentials/transport and external-Agent assessment are not wired; no real
+> external notification channel exists. This rebuild is not deployed and has not
+> migrated real user data.
+
+> **Earlier result-layer history, not steward deployment:** independent
 > text/file results and version/review UI were verified with an external Pi Agent.
 > Human acceptance is pending; other installs still default writes off. See
 > [Agent integration](./docs/en/work-results-integration.md). Managed-result and
 > Goal Inbox convergence remain next-stage work.
-> Read the canonical
-> [Product Architecture](./docs/zh/product-architecture.md) and its
-> [English technical summary](./docs/en/architecture.md) before designing changes.
+> The earlier [Product Architecture](./docs/zh/product-architecture.md) remains
+> historical/result-layer design reference, not current product direction.
 
 The current managed-execution path creates reviewable plans, runs them manually
 or on a schedule, pauses for input/approval, and preserves evidence and results.
@@ -163,6 +170,14 @@ payloads.
 
 ## Core Workflow
 
+Current steward: authorized source → durable event/baseline/dedupe → assessment
+and deterministic permission check → attention/follow-up/outbox → user decision
+and audited delivery. Start at Today; manage Affairs, Delegations and Connections.
+See [how it works](./docs/en/personal-steward.md).
+
+The workflow below is the retained managed-execution path, not a prerequisite
+for the steward. The demo above also shows that retained path.
+
 1. **Capture work** — create a task with priority, estimates, due dates,
    dependencies, and schedule metadata.
 2. **Generate a plan** — turn rough context into a structured plan graph.
@@ -210,6 +225,11 @@ Chrona is designed to start local and explicit.
 | Automatic execution | Requires explicit provider/feature configuration and remains visible through task workspace state, approvals, blockers, and run records. |
 
 ## Features
+
+- **Personal steward (local rebuild)** — Today, affairs, scoped delegations,
+  connection coverage, proactive suggestions, declarative tools and in-app delivery.
+- **Retained result/execution layer** — the capabilities below remain available
+  through secondary surfaces; they no longer define the product centre.
 
 - **Real schedules** — tasks carry priority, estimates, due dates,
   dependencies, and schedule metadata.
@@ -277,6 +297,10 @@ React SPA
 | CLI and binary entrypoints           | `packages/cli/`           |
 | Shared schemas and runtime contracts | `packages/contracts/`     |
 | Database layer                       | `packages/db/`            |
+| Steward UI                           | `features/steward/` |
+| Steward use cases                    | `packages/engine/src/modules/steward/` |
+| Steward pure rules                   | `packages/domain/src/steward/` |
+| Steward adapters                     | `packages/integrations/src/steward/` |
 | Product engine                       | `packages/engine/`        |
 | Plan graph runtime                   | `packages/graph-runtime/` |
 | Provider adapters                    | `packages/providers/`     |
@@ -361,7 +385,7 @@ schema-first contract rules, and testing expectations.
 | ---------------------- | ---------------------------------------------------------------------- |
 | Documentation index    | [docs/README.md](./docs/README.md)                                     |
 | Quick start            | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md) |
-| Product direction      | [Product Architecture](./docs/zh/product-architecture.md) — canonical target |
+| Product direction      | [Personal steward (English)](./docs/en/personal-steward.md) / [中文（权威）](./docs/zh/personal-steward.md) |
 | Architecture           | [docs/en/architecture.md](./docs/en/architecture.md)                         |
 | API reference          | [docs/en/api-reference.md](./docs/en/api-reference.md)                       |
 | Data model             | [docs/en/data-model.md](./docs/en/data-model.md)                             |

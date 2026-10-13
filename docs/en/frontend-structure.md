@@ -7,6 +7,13 @@ of browser-safe feature public entrypoints. For backend placement, see
 [Package Boundaries](./package-boundaries.md); for the whole system, see
 [Architecture](./architecture.md).
 
+The product centre is the [personal steward](personal-steward.md), not the
+legacy task execution workspace. `features/steward` owns Today, Affairs,
+Delegations, Connections and the steward Schedule panel; its hooks/client use
+workspace-scoped `/api/steward` requests. The engine/domain/integration owners are
+`packages/engine/src/modules/steward`, `packages/domain/src/steward` and
+`packages/integrations/src/steward`; none belongs in the browser graph.
+
 ## Entry and shell
 
 | File | Role |
@@ -17,7 +24,9 @@ of browser-safe feature public entrypoints. For backend placement, see
 | `src/pages.tsx` | Route-level composition of feature public APIs; it does not own product UI |
 | `src/app-shell.tsx` | `AppShell` layout (nav/chrome) wrapping locale routes |
 
-Working-tree routes: `/:lang` → `home`, `dashboard`, `schedule`, `tasks`,
+Working-tree routes: `/:lang` redirects to `today`; primary routes are `today`,
+`affairs`, `affairs/:affairId`, `schedule`, `delegations`, `connections`.
+Retained routes include `home`, `dashboard`, `tasks`,
 `tasks/:taskId` (manual content page or managed task workspace),
 `tasks/:taskId/page` (explicit content page), `tasks/:taskId/work` (follow-through),
 `tasks/:taskId/results` (independent results),
@@ -39,7 +48,8 @@ schemas and deterministic value rules come from `@chrona/ui-protocol`'s work-pag
 catalog, not the runtime-control registry. Input persistence uses existing owner
 results routes; frontend components cannot grant authority. Product-owned work
 context is composed by `apps/web/pages.tsx` using the work-record public entrypoint.
-Calendar remains primary navigation; advanced tools live behind More tools.
+Today/Affairs/Schedule/Delegations/Connections are primary navigation; this
+content library and advanced tools remain secondary.
 See [page contracts and demo](./work-pages.md) and [content-library contracts](./content-library.md).
 
 ## Independent results
@@ -66,7 +76,7 @@ DB with the execution orchestrator/debug Provider disabled and loopback servers.
 
 ### Feature UI
 
-Product UI is grouped by root feature: `features/dashboard`,
+Product UI is grouped by root feature: `features/steward` (product centre), `features/dashboard`,
 `features/action-center`, `features/task-management`, `features/task-workspace`,
 `features/schedule`, and the other vertical slices documented in
 [Package Boundaries](./package-boundaries.md#feature-slices). Each feature

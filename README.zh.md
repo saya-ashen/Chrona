@@ -7,11 +7,11 @@
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>让工作与成果有一个持续存在的地方。</strong>
+  <strong>主动照看你的事务的个人管家。</strong>
 </p>
 
 <p align="center">
-  保存任务、进展、证据与成果；需要时，再交给 AI 托管执行。
+  记住背景，看见授权范围内的变化，提醒决定与承诺，守住行动边界。
 </p>
 
 <p align="center">
@@ -39,9 +39,11 @@
 
 ---
 
-Chrona 正在演进为 local-first、**独立于执行者的任务与成果工作台**：工作可以由人、外部 Agent 或可选的 Chrona 托管执行器完成；产品中心是持久记录、成果、审阅与复用，而不是控制所有 Agent。
+Chrona 正在重构为**主动个人管家**：今日 / 事务 / 日程 / 委托 / 连接与权限，建立在持久事件闭环之上。[个人管家方向](./docs/zh/personal-steward.md)自 2026-10-13 起替代旧产品目标；[英文实现说明](./docs/en/personal-steward.md)对应当前源码。工作与成果是成果层，托管执行是次级能力。
 
-> **已实现；一个授权实例已部署接入：** 不依赖 Chrona Run 的文字／附件成果、版本与审阅界面已通过真实外部 Pi 联调，待用户验收；其他安装仍默认关闭新写入。参见[日常 Agent 接入](./docs/en/work-results-integration.md)。托管成果收敛及 Goal Inbox 接续仍属下一阶段。后续开发先读[产品架构](./docs/zh/product-architecture.md)，再读[当前系统架构](./docs/en/architecture.md)。
+> **当前 checkout，未发布：** 已实现本地事件闭环、确定性内置 assessor、声明式工具、克制建议和 `in_app` 投递。Reddit 凭据/传输与外部 Agent assessor 未接线，没有真实外部通知通道；本重构未部署、未迁移真实用户数据。
+
+> **旧成果层历史，不代表管家部署：** 不依赖 Chrona Run 的文字／附件成果、版本与审阅界面的历史接入见[日常 Agent 接入](./docs/en/work-results-integration.md)。旧[产品架构](./docs/zh/product-architecture.md)仅保留为成果层历史／设计参考；当前结构见[系统架构](./docs/en/architecture.md)。
 
 当前已支持的托管路径仍保留：创建任务、安排日程、审查 AI 生成的计划，再手动或自动执行，并记录 checkpoint、审批、失败、工具动作和输出：
 
@@ -144,6 +146,10 @@ Web 应用。
 
 ## 核心工作流
 
+当前管家：授权来源 → 持久接收/基线/去重 → 判断与确定性权限校验 → 待处理/跟进/发件箱 → 用户决定与审计投递。今日为首页，事务、日程、委托和连接为主入口；详情见[个人管家](./docs/zh/personal-steward.md)。
+
+下述流程与上方动图是保留的托管执行路径，不是管家使用的前置条件。
+
 1. **记录工作** — 创建带优先级、估时、截止时间、依赖和日程信息的任务。
 2. **生成计划** — 把粗略上下文整理成结构化计划图。
 3. **执行前审查** — 计划变成可执行节点前，先修改、接受或重新生成。
@@ -187,6 +193,9 @@ Chrona 默认从本机运行和显式配置开始。
 | 自动执行       | 必须显式配置 provider/feature；状态、审批、阻塞和 run records 都会在任务工作区中可见。     |
 
 ## 功能
+
+- **个人管家（本地重构）** — 今日、事务、明确委托、连接覆盖、主动建议、声明式工具与应用内通知。
+- **保留的成果/执行层** — 下列功能仍可通过次级入口使用，不再定义产品中心。
 
 - **真正的日程** — 任务带优先级、估时、截止时间、依赖和日程元数据。
 - **可编辑计划图** — 生成的计划可审查、可修改、可接受、可重新执行，并转换为类型化图节点。
@@ -244,6 +253,10 @@ React SPA
 | CLI 和二进制入口      | `packages/cli/`           |
 | 共享 schema 和合约    | `packages/contracts/`     |
 | 数据库层              | `packages/db/`            |
+| 管家界面              | `features/steward/` |
+| 管家用例              | `packages/engine/src/modules/steward/` |
+| 管家纯规则            | `packages/domain/src/steward/` |
+| 管家适配器            | `packages/integrations/src/steward/` |
 | 产品引擎              | `packages/engine/`        |
 | 计划图运行时          | `packages/graph-runtime/` |
 | Provider adapters     | `packages/providers/`     |
@@ -311,6 +324,8 @@ bun run analyze
 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## 文档
+
+当前产品方向：[个人管家](./docs/zh/personal-steward.md) / [英文实现说明](./docs/en/personal-steward.md)。
 
 | 主题               | 文档                                                                     |
 | ------------------ | ------------------------------------------------------------------------ |

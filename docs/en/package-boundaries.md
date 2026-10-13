@@ -4,10 +4,11 @@ This document explains where code belongs in Chrona's monorepo.
 
 ## Product direction and target dependency boundary
 
-Read the canonical [Product Architecture](../zh/product-architecture.md) before
-adding capabilities. Chrona is moving toward executor-independent work records,
-results, and review. The external-result path is a target, not shipped merely
-because these packages exist.
+Read the canonical [Personal steward direction](../zh/personal-steward.md)
+(2026-10-13) and [current implementation](personal-steward.md) before adding
+capabilities. Chrona's product centre is the proactive steward; executor-independent
+work/results remain its result layer. The constraints below describe that layer,
+not an execution-first product goal.
 
 - `packages/engine` remains the application layer, not a synonym for an AI
   executor. Record, result, artifact, review, and projection use cases belong
@@ -39,6 +40,10 @@ is already fully decoupled, and do not authorize broad cleanup or schema changes
 | `packages/domain` | Pure domain rules with no IO, HTTP, Prisma, provider, or React dependency |
 | `packages/db` | Prisma client/bootstrap/repositories and SQLite access |
 | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
+| `features/steward` | Today, Affairs, Delegations, Connections and steward Schedule UI/browser models |
+| `packages/engine/src/modules/steward` | Durable event loop, scoped use cases, permissions orchestration and outbox delivery |
+| `packages/domain/src/steward` | Pure permission, handling/tool lifecycle, schedule and suggestion rules |
+| `packages/integrations/src/steward` | Read-only source adapters, built-in rule assessor, in-app/test delivery |
 | `features/goals` | Goal list/workspace UI, Goal browser actions, and browser-safe Goal read models |
 | `packages/graph-runtime` | Graph construction, resolution, transitions, and execution-command primitives |
 | `packages/providers/*` | External AI/runtime protocol adapters |
@@ -56,7 +61,7 @@ is already fully decoupled, and do not authorize broad cleanup or schema changes
 Root `features/` is the active product architecture. `apps/web` and
 `apps/server` are composition/transport layers: they select routes and compose
 browser-safe or server feature public APIs, but do not own feature UI or product
-workflows. The current slices are `dashboard`, `action-center`,
+workflows. The current slices include `steward` (product centre), `dashboard`, `action-center`,
 `task-management`, `task-workspace`, `schedule`, `plan-generation`,
 `execution-monitoring`, `ai-clients`, `assistant-surface`, `external-calendar`,
 and `mcp-control-plane`.

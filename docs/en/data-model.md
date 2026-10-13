@@ -1,10 +1,40 @@
 # Data Model
 
-Chrona persists goal, task, schedule, execution, memory, and AI-client state in SQLite through Prisma 7.
+Chrona's product centre is the [personal steward](personal-steward.md). It persists affairs, events, delegations, attention and delivery state alongside retained goal, task, schedule, execution, memory and AI-client state in SQLite through Prisma 7.
 
 Schema source: `prisma/schema.prisma`.
 
-## Target evolution: work-owned results
+## Steward models (current checkout)
+
+Verified against [schema.prisma](../../prisma/schema.prisma). All models below
+carry `workspaceId` and a Workspace relation with cascade deletion. All except
+StewardState have UUID `id` primary keys. Workspace scoping is enforced by the
+application; foreign keys are not composite workspace/ID membership checks.
+This inventory does not authorize deleting or migrating real data.
+
+| Model | Key columns / purpose | Uniqueness beyond primary key |
+| --- | --- | --- |
+| `Affair` | `title`, `summary`, `goal`, `status` (active default), JSON `keywords`, optional `taskId`, timestamps; durable affair context | None; `taskId` is indexed, not a declared Task foreign key |
+| `SourceConnection` | `kind`, `label`, `mode`, `status`, JSON `config`, `cursor`, JSON read/write scopes, `pollIntervalSeconds`, `baselineAt`, success/failure/error, `nextCheckAt`, coverage and timestamps; source readiness and polling state | None |
+| `InboundEvent` | `connectionId`, `externalId`, content/author/URL, occurrence/receipt times, `status`, optional `affairId`, `linkStatus`, `threadId`, attempts/error/next attempt; durable baseline/pending input | `(connectionId, externalId)` |
+| `EventAssessment` | `eventId`, assessor, disposition, what/why/next step, proposed action, JSON permission, creation time; proposal and deterministic permission record | None; multiple assessment rows are schema-valid |
+| `Delegation` | `revision`, status (proposed default), optional affair/connection scope, purpose/original wording, cadence, JSON allowed/ask-first actions, notification policy/limits, grant/expiry/check/health timestamps; explicit authority | None; revision is application CAS, not a unique constraint |
+| `AttentionItem` | `dedupeKey`, kind/status, optional affair/event/delegation, what/why/next step, JSON evidence, due/snooze/cooldown times, decision/time and timestamps; user-facing attention | `(workspaceId, dedupeKey)` |
+| `StewardNotification` | optional attention/delegation, `idempotencyKey`, channel/status (generated default), payload, attempts/error/next attempt, receipt, generated/sent/acknowledged times; durable outbox | Global unique `idempotencyKey` |
+| `FollowUp` | optional affair/attention, note, due date, pending/done/cancelled status, creation time; commitments raised once through attention dedupe | None; no `updatedAt` column |
+| `ManagedTool` | optional affair, kind/name/purpose, handling mode/rationale, JSON data scopes/spec, version/state, validation summary/version, authorization/enable/disable/retire/run/success/failure times and timestamps; declarative tool lifecycle | None; state/version CAS enforced by service |
+| `StewardAudit` | kind, optional subject ID, actor key, JSON details, creation time; append-style application audit writes | None; schema itself does not enforce append-only writes |
+| `StewardState` | `workspaceId` primary key, last tick, assessor name/availability/error; per-workspace loop health | One row per workspace |
+
+Indexes support workspace/status/due scans, event thread association and scoped
+audit history. Connection→event and event→assessment relations cascade;
+optional affair/event/delegation/attention references use SetNull as specified
+in the schema. See [delivery and authority semantics](personal-steward.md).
+**Default caveat:** Prisma's Delegation notification JSON defaults to `local_test`,
+while the contract defaults a supplied notification policy's channel to `in_app`.
+Omitting the entire policy is not equivalent to supplying an empty policy.
+
+## Result-layer evolution: work-owned results
 
 The [Product Architecture](../zh/product-architecture.md) requires results and
 version-bound review to exist independently of managed execution. B1–B3 provide

@@ -1,25 +1,21 @@
 # Chrona Documentation
 
-Chrona is evolving into an open-source, local-first, executor-independent work
-and results workspace. Its implementation includes managed planning, scheduling,
-execution, and review; B1–B3 external result intake is integrated on the authorized
-instance. Work records and meeting follow-through are also deployed and connected
-to Pi on that authorized instance; writes remain opt-in elsewhere. Human workflow
-acceptance, Goal reuse and legacy-result convergence remain pending. The working
-tree now adds content-first work pages with persistent notes/forms; this newer
-slice is **not deployed** and does not expand existing credentials.
+Chrona is a proactive personal steward: Today / Affairs / Schedule / Delegations /
+Connections over a durable event loop. The current local rebuild uses a deterministic
+rule assessor and in-app delivery; Reddit authorization and external integrations
+remain blocked/unwired. It is **not deployed**, and no real user data was migrated.
+Work/results and retained managed execution serve the steward, not the reverse.
 
 Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records are removed once their lasting content is merged into stable docs.
 
 ## Design authority and reading order
 
-1. [Product Architecture / 产品架构](./zh/product-architecture.md): canonical
-   product destination, ownership, non-goals, and acceptance gates. The canonical
-   document is in Chinese; [System Architecture](./en/architecture.md) provides
-   the English technical summary.
+1. [Personal steward / 个人管家](./zh/personal-steward.md): canonical direction
+   from 2026-10-13; [English counterpart and implementation](./en/personal-steward.md).
+   Earlier product architecture and assistant plans are historical/result-layer references.
 2. [System Architecture](./en/architecture.md) and
    [Package Boundaries](./en/package-boundaries.md): current structure and where
-   the target should evolve without a repository-wide rewrite.
+   current steward and retained result/execution layers belong.
 3. [Data Model](./en/data-model.md), [Execution Flow](./en/backend-execution-flow.md),
    and [API Reference](./en/api-reference.md): current implementation contracts.
 4. [Roadmap](./en/roadmap.md): staged priorities and implementation status.
@@ -35,7 +31,8 @@ their scope and status instead of silently redefining the whole product.
 | Install and run Chrona | [Quick Start](./en/quick-start.md) |
 | Understand local data, external providers, and deletion | [Privacy](./en/privacy.md) |
 | Understand the product surface | [Product Guide](./en/README.md) |
-| Decide what Chrona should become | [Product Architecture (canonical, Chinese)](./zh/product-architecture.md) — target, not shipped |
+| Decide what Chrona should become | [Personal steward](./en/personal-steward.md) · [canonical Chinese](./zh/personal-steward.md) — direction, current loop and gaps |
+| Consult historical result-layer design | [Product Architecture](./zh/product-architecture.md) — superseded as product direction |
 | Implement executor-independent results | [Contracts and implementation (Chinese)](./zh/work-results-phase-a.md) — B1–B3 implemented; authorized instance integrated, human review and phase C pending |
 | See shipped and planned product areas | [Roadmap](./en/roadmap.md) |
 | Build an optional proactive-assistant workflow | [Proactive Personal Assistant Plan](./en/proactive-personal-assistant-plan.md) — capture/edit deployed; unimplemented execution-first sequence superseded |
@@ -63,7 +60,8 @@ their scope and status instead of silently redefining the whole product.
 | --- | --- |
 | 安装并运行 Chrona | [快速开始](./zh/quick-start.md) |
 | 理解当前产品界面 | [中文指南](./zh/README.md) |
-| 确定 Chrona 要成为什么、职责边界与验收标准 | [产品架构](./zh/product-architecture.md) — 后续开发基线，非已交付能力 |
+| 确定 Chrona 要成为什么、职责边界与验收标准 | [个人管家](./zh/personal-steward.md) — 当前方向、现状与差距、运行方式 |
+| 查阅成果层历史设计 | [产品架构](./zh/product-architecture.md) — 已不再是产品方向 |
 | 开始实施不依赖执行者的成果闭环 | [契约、兼容设计与实现](./zh/work-results-phase-a.md) — B1–B3 已实现且授权实例已接入，人工验收与阶段 C 待完成 |
 | 使用内容优先的页面、笔记与版本绑定表单 | [页面契约与本地演示（英文）](./en/work-pages.md) · [本版实施记录](./zh/work-pages-v1-implementation.md) — 未部署 |
 | 把保存的意见交给 Agent，并查看更新说明 | [页面反馈与接续](./zh/page-continuation.md) · [Agent 技能](../packages/skills/chrona-pages/SKILL.md) — 未部署 |
@@ -87,12 +85,10 @@ their scope and status instead of silently redefining the whole product.
 
 ## Current product areas
 
-In the working-tree UI, Home (`/:lang/home`) provides an organized, searchable
-library of all content with user-defined classification groups and folders, not
-a recent-items selection. Calendar and Action Center remain primary; More tools reveals the
-existing dashboard, work inbox, Goals, Tasks and Settings. Manual Tasks open their
-content page; managed Tasks retain execution controls. This navigation is not yet
-deployed. The underlying advanced surfaces remain:
+In the working-tree UI, Today (`/:lang/today`) is the landing page. Affairs,
+Schedule, Delegations and Connections are primary. The content-library Home,
+Action Center, dashboard, Goals and Tasks remain secondary; managed Tasks retain
+execution controls. This steward navigation is not deployed. Retained surfaces include:
 
 1. Dashboard: review today’s focus, attention items, active work, latest results, and recoverable execution state.
 2. Schedule: arrange time blocks, inspect conflicts, accept schedule proposals, and make schedule-driven automation visible.
@@ -112,6 +108,10 @@ Chrona is a Bun/TypeScript monorepo:
 
 | Area | Path | Role |
 | --- | --- | --- |
+| Steward UI | `features/steward` | Primary pages and scoped browser models |
+| Steward engine | `packages/engine/src/modules/steward` | Durable event loop and use cases |
+| Steward domain | `packages/domain/src/steward` | Pure permissions, handling, schedule and suggestions |
+| Steward adapters | `packages/integrations/src/steward` | Sources, built-in assessor and delivery |
 | Web app | `apps/web` | Vite + React 19 + React Router SPA |
 | API server | `apps/server` | Hono routes on Bun |
 | CLI | `packages/cli` | Packaged entry point for starting Chrona |

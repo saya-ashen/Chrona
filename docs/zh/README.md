@@ -1,8 +1,15 @@
 # Chrona 文档 — 中文
 
-Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计划，放入日程，通过 AI/运行时 provider 执行，并在任务工作区和 Dashboard 中审查结果。
+Chrona 是主动个人管家：今日 / 事务 / 日程 / 委托 / 连接与权限，建立在持久事件闭环之上。[个人管家](personal-steward.md)自 2026-10-13 起是当前产品方向；[英文实现说明](../en/personal-steward.md)逐步对应源码。本重构未部署，未迁移真实用户数据。
 
-## 当前能做什么
+## 当前管家能力
+
+- 今日聚合决定、变化、承诺、建议与健康状态；事务保存背景、证据及下一步。
+- 委托提出与授权分开，连接显示覆盖与同步状态；工具采用声明式验证/授权/启用生命周期。
+- 当前只有确定性内置 assessor 与 `in_app` 非测试投递；Reddit 真实账号授权、外部 Agent assessor 和真实外部通知尚未接线。
+- 完整现状、差距与运行方法见[个人管家](personal-steward.md)。
+
+## 保留的任务/成果与托管执行能力
 
 - 任务管理：创建、编辑、完成、重开、删除、优先级、标签、父子任务、依赖关系。
 - AI 计划生成：从任务生成 PlanBlueprint，流式查看进度，审查、编辑并接受计划。
@@ -18,7 +25,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 | 目标 | 文档 |
 | --- | --- |
 | 安装并运行 Chrona | [快速开始](./quick-start.md) |
-| 查看当前产品方向 | [路线图](./roadmap.md) |
+| 查看当前产品方向 | [个人管家](./personal-steward.md) |
 | 优化任务工作区交互链路 | [任务工作区交互优化方案](./task-workspace-interaction-improvements.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./goal-workbench-product-design.md) |
 | 通过 HTTP 或 MCP 集成 | [API 参考（英文）](../en/api-reference.md) |
@@ -30,7 +37,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 | 理解已接受的长期目标、Trigger 与任务实例设计 | [长期目标与 Trigger 设计（英文）](../en/long-horizon-goals-and-triggers.md) |
 | 设计 AI Feature 的 Observation、Action、Result 与 Completion | [AI Feature Runtime 架构与实施规范](./ai-feature-runtime-architecture.md) |
 
-## 主要用户流程
+## 保留的托管执行流程（次级入口）
 
 ### 1. 任务 → 计划 → 执行
 
@@ -58,6 +65,10 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 
 | 区域 | 路径 | 职责 |
 | --- | --- | --- |
+| 管家界面 | `features/steward` | 主页面与浏览器模型 |
+| 管家用例 | `packages/engine/src/modules/steward` | 持久事件闭环 |
+| 管家领域 | `packages/domain/src/steward` | 权限、工具选择、日程与建议纯规则 |
+| 管家适配器 | `packages/integrations/src/steward` | 来源、规则判断与投递 |
 | Web 应用 | `apps/web` | Vite + React 19 + React Router UI |
 | Server | `apps/server` | Bun 上的 Hono API 路由与静态资源服务 |
 | CLI | `packages/cli` | 用于启动 Chrona 的打包入口 |

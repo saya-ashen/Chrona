@@ -1,3 +1,5 @@
+> **Superseded as product direction (2026-10-13):** [Personal steward](../zh/personal-steward.md) is authoritative. This document remains historical/design reference for the result layer; its phase order and compatibility-first restrictions do not govern the authorized rebuild. Safety requirements remain.
+
 # Proactive Personal Assistant: Development Plan
 
 Status: Goal capture and existing-Goal editing deployed with explicit approval; scoped Pi assistant connection and skill updated. Live automation, permission grants and real notification sends remain unapproved.
