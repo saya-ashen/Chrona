@@ -12,7 +12,7 @@ let directory: string, url: string, db: PrismaClient, at: Date;
 let sink: ReturnType<typeof createTestDelivery>;
 const clients: PrismaClient[] = [];
 function connect() { const client = new PrismaClient({ adapter: new PrismaBunSqlite({ url }) }); clients.push(client); return client; }
-function service(adapter: DeliveryAdapter & { idempotent?: boolean } = sink.adapter, client = db) { return createStewardDelivery({ db: client, adapters: { local_test: adapter }, now: () => at }); }
+function service(adapter: DeliveryAdapter & { idempotent?: boolean } = sink.adapter, client = db) { return createStewardDelivery({ db: client, workspaceId: "ws", adapters: { local_test: adapter }, now: () => at }); }
 async function row(id = "n") { return db.stewardNotification.findUniqueOrThrow({ where: { id } }); }
 async function queue(id = "n") { return db.stewardNotification.create({ data: { id, workspaceId: "ws", delegationId: "d", attentionItemId: "a", idempotencyKey: `key:${id}`, channel: "local_test", status: "queued", title: "Test notification", body: "Test data" } }); }
 async function policy(notification: Partial<NotificationPolicy>) { await db.delegation.update({ where: { id: "d" }, data: { notification: { mode: "immediate", cooldownMinutes: 0, quietHours: null, channel: "local_test", ...notification } } }); }

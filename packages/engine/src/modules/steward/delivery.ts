@@ -1,6 +1,7 @@
 import { delegationSchema, type DeliveryAdapter, type DeliveryOutcome } from "@chrona/contracts/steward";
 import type { PrismaClient, Prisma, StewardNotification } from "@chrona/db/generated/prisma/client";
 import { decidePermission } from "@chrona/domain/steward/permission";
+import { StewardError } from "./mappers";
 
 // A claim is deliberately uncertain until the adapter supplies a receipt. No new
 // schema status is needed. nextAttemptAt is the lease deadline while claimed.
@@ -40,13 +41,14 @@ async function failure(tx: Tx, row: StewardNotification) {
   } });
 }
 
-/** Internal application service. Transports must authorize workspace access before ID actions. */
-export function createStewardDelivery({ db, adapters, now = () => new Date() }: {
-  db: PrismaClient; adapters: Record<string, Adapter>; now?: () => Date;
+/** Internal application service. The caller supplies its authorized workspace. */
+export function createStewardDelivery({ db, adapters, workspaceId, actorKey = "system:steward", now = () => new Date() }: {
+  db: PrismaClient; adapters: Record<string, Adapter>; workspaceId: string; actorKey?: string; now?: () => Date;
 }) {
+  if (!workspaceId) throw new StewardError("FORBIDDEN", "Workspace access required");
   async function recover() {
     const at = now();
-    const stale = await db.stewardNotification.findMany({ where: { status: "uncertain", lastError: CLAIM, nextAttemptAt: { lte: at } } });
+    const stale = await db.stewardNotification.findMany({ where: { workspaceId, status: "uncertain", lastError: CLAIM, nextAttemptAt: { lte: at } } });
     for (const row of stale) await db.$transaction(async (tx) => {
       const retry = adapters[row.channel]?.idempotent === true;
       const status = retry ? (row.attempts >= 6 ? "failed" : "queued") : "uncertain";
@@ -63,7 +65,7 @@ export function createStewardDelivery({ db, adapters, now = () => new Date() }: 
       const at = now();
       // First statement acquires SQLite's write lock; policy checks and reservations
       // are serialized across workers, not merely across this service instance.
-      const changed = await tx.stewardNotification.updateMany({ where: { id, status: "queued", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: at } }] }, data: { status: "uncertain" } });
+      const changed = await tx.stewardNotification.updateMany({ where: { id, workspaceId, status: "queued", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: at } }] }, data: { status: "uncertain" } });
       if (!changed.count) return null;
       const row = await tx.stewardNotification.findUniqueOrThrow({ where: { id }, include: { delegation: true, attentionItem: true } });
       const suppress = async (reason: string) => {
@@ -78,6 +80,10 @@ export function createStewardDelivery({ db, adapters, now = () => new Date() }: 
       };
       const raw = row.delegation;
       if (!raw || raw.workspaceId !== row.workspaceId || (row.attentionItem && row.attentionItem.workspaceId !== row.workspaceId)) return suppress("An owning delegation in this workspace is required.");
+      if (raw.connectionId) {
+        const connection = await tx.sourceConnection.findFirst({ where: { id: raw.connectionId, workspaceId } });
+        if (!connection || !["active", "failing"].includes(connection.status)) return suppress("Source connection is not active.");
+      }
       const { workspaceId: _workspaceId, ...contractFields } = raw;
       const parsed = delegationSchema.safeParse({ ...contractFields, ...Object.fromEntries(["grantedAt", "expiresAt", "lastCheckAt", "lastSuccessAt", "lastFailureAt", "createdAt", "updatedAt"].map((key) => [key, (raw[key as keyof typeof raw] as Date | null)?.toISOString() ?? null])) });
       // Pick contract fields explicitly: Prisma includes persistence-only workspaceId.
@@ -122,7 +128,7 @@ export function createStewardDelivery({ db, adapters, now = () => new Date() }: 
     async deliverDue({ limit = 100 }: { limit?: number } = {}) {
       if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("Invalid delivery limit");
       await recover();
-      const rows = await db.stewardNotification.findMany({ where: { status: "queued", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now() } }] }, orderBy: [{ generatedAt: "asc" }, { id: "asc" }], take: limit });
+      const rows = await db.stewardNotification.findMany({ where: { workspaceId, status: "queued", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now() } }] }, orderBy: [{ generatedAt: "asc" }, { id: "asc" }], take: limit });
       let attempted = 0;
       for (const candidate of rows) {
         const row = await claim(candidate.id);
@@ -149,22 +155,24 @@ export function createStewardDelivery({ db, adapters, now = () => new Date() }: 
       }
       return { attempted };
     },
-    list() { return db.stewardNotification.findMany({ orderBy: [{ generatedAt: "desc" }, { id: "asc" }] }); },
+    list() { return db.stewardNotification.findMany({ where: { workspaceId }, orderBy: [{ generatedAt: "desc" }, { id: "asc" }] }); },
     async acknowledge(id: string) {
       return db.$transaction(async (tx) => {
         const at = now();
-        const changed = await tx.stewardNotification.updateMany({ where: { id, status: { in: ["sent", "uncertain"] } }, data: { status: "acknowledged", acknowledgedAt: at, nextAttemptAt: null } });
-        const row = await tx.stewardNotification.findUniqueOrThrow({ where: { id } });
-        if (changed.count) await audit(tx, row, "notification.acknowledged", "User acknowledged notification, not attention resolution.", at, "user");
+        const changed = await tx.stewardNotification.updateMany({ where: { id, workspaceId, status: { in: ["sent", "uncertain"] } }, data: { status: "acknowledged", acknowledgedAt: at, nextAttemptAt: null } });
+        const row = await tx.stewardNotification.findFirst({ where: { id, workspaceId } });
+        if (!row) throw new StewardError("NOT_FOUND", "Notification not found");
+        if (changed.count) await audit(tx, row, "notification.acknowledged", "User acknowledged notification, not attention resolution.", at, actorKey);
         return row;
       });
     },
     async retryFailed(id: string) {
       return db.$transaction(async (tx) => {
         const at = now();
-        const changed = await tx.stewardNotification.updateMany({ where: { id, status: "failed" }, data: { status: "queued", attempts: 0, nextAttemptAt: at, lastError: "Explicit user retry requested." } });
-        const row = await tx.stewardNotification.findUniqueOrThrow({ where: { id } });
-        if (changed.count) await audit(tx, row, "notification.retry_requested", "Explicit user retry; idempotency key preserved.", at, "user");
+        const changed = await tx.stewardNotification.updateMany({ where: { id, workspaceId, status: "failed" }, data: { status: "queued", attempts: 0, nextAttemptAt: at, lastError: "Explicit user retry requested." } });
+        const row = await tx.stewardNotification.findFirst({ where: { id, workspaceId } });
+        if (!row) throw new StewardError("NOT_FOUND", "Notification not found");
+        if (changed.count) await audit(tx, row, "notification.retry_requested", "Explicit user retry; idempotency key preserved.", at, actorKey);
         return row;
       });
     },
