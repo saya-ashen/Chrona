@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { db } from "@chrona/db";
+import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 import { createChronaEngine } from "@chrona/engine";
 
@@ -46,10 +48,10 @@ function wantsHtml(acceptHeader: string | undefined) {
  *   import { hc } from "hono/client";
  *   const client = hc<AppType>("/api");
  */
-export async function createServerApp() {
+export async function createServerApp(options: { steward?: StewardRuntime } = {}) {
   const app = new Hono();
   const engine = createChronaEngine({ logger: log });
-  const api = createApiRouter(engine, { mcpApiKey: readEnv().API_KEY });
+  const api = createApiRouter(engine, { mcpApiKey: readEnv().API_KEY, steward: options.steward ?? createStewardRuntime(db) });
   const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 

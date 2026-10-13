@@ -19,7 +19,11 @@ import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
 import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar/server";
 import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
 
+import { createStewardRoutes } from "./steward.routes";
+import type { StewardRuntime } from "../steward-runtime";
+
 export type ApiRouterOptions = {
+  steward?: StewardRuntime;
   calendarSources?: CalendarSourceRouteOptions;
   /** Passed from the server composition root; MCP owns scoped run-token auth. */
   mcpApiKey?: string;
@@ -51,10 +55,12 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createManagementMcpRoutes(engine))
     .route("/", createAgentControlRoutes());
 
+  if (options.steward) router.route("/steward", createStewardRoutes(options.steward.ports));
+
   // Env-gated E2E test seam — only ever mounted when the Playwright webServer
   // sets CHRONA_E2E_TEST_ROUTES=1. Keeps the production surface unchanged.
   if (areE2eTestRoutesEnabled()) {
-    router.route("/", createTestSupportRoutes(engine));
+    router.route("/", createTestSupportRoutes(engine, options.steward));
   }
 
   return router;
