@@ -25,7 +25,7 @@ export async function raiseSuggestions(ctx: Context) {
     followUps: followUps.map(row => followUpView(row)),
     activeDelegations: delegations, managedTools: tools.map(row => toolView(row)), recentDecisions,
     assessedEvents: events.flatMap(event => {
-      const assessment = event.assessments[0];
+      const assessment = event.assessments.at(0);
       if (!assessment) return [];
       const disposition = assessmentSchema.shape.disposition.parse(assessment.disposition);
       const text = `${assessment.whatHappened} ${assessment.whyItMatters} ${event.title} ${event.body}`.toLowerCase();

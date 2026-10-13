@@ -20,6 +20,15 @@ import { callManagementAssessment, callManagementSteward, isStewardTool } from "
 
 import { commandReceipt, managementJson } from "./receipts";
 export { commandReceipt, managementJson } from "./receipts";
+async function previewTaskDeletion(client: ManagementIdentity, raw: unknown, deps: ManagementDeps) {
+  const value = managementDeleteSchema.parse(raw);
+  requireScopes(client, ["tasks:delete"]);
+  const task = await scopedTask(client, value.taskId);
+  const impact = await deps.tasks.getDeleteImpact({ taskId: value.taskId, workspaceId: client.workspaceId });
+  await assertDeleteScope(client, impact.taskIds, impact.assets.map((asset) => asset.id));
+  return managementSuccess({ ...(await managementTaskSnapshot(client, task.id)), impact });
+}
+
 export function createManagementService(deps: ManagementDeps) {
   return {
     authorize: requireManagementClient,
@@ -58,12 +67,7 @@ export function createManagementService(deps: ManagementDeps) {
         if (name === "chrona_task_search") return managementSuccess(await searchManagementTasks(client, managementSearchSchema.parse(raw)));
         if (name === "chrona_task_read") return managementSuccess(await readManagementTask(client, managementReadSchema.parse(raw)));
         if (name === "chrona_task_delete" && managementDeleteSchema.parse(raw).mode === "preview") {
-          const value = managementDeleteSchema.parse(raw);
-          requireScopes(client, ["tasks:delete"]);
-          const task = await scopedTask(client, value.taskId);
-          const impact = await deps.tasks.getDeleteImpact({ taskId: value.taskId, workspaceId: client.workspaceId });
-          await assertDeleteScope(client, impact.taskIds, impact.assets.map((asset) => asset.id));
-          return managementSuccess({ ...(await managementTaskSnapshot(client, task.id)), impact });
+          return await previewTaskDeletion(client, raw, deps);
         }
         if (name === "chrona_task_create" && managementCreateSchema.parse(raw).dryRun) return managementSuccess({ dryRun: true, normalized: await validateCreation(client, managementCreateSchema.parse(raw)) });
         if (name === "chrona_task_update" && managementUpdateSchema.parse(raw).dryRun) {

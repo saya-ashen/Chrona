@@ -18,20 +18,23 @@ function view(row: ToolRow): ManagedTool {
 const policySchema = z.object({ id: z.string(), revision: z.number().int(), status: z.enum(DELEGATION_STATUSES), allowedActions: z.array(z.enum(STEWARD_ACTIONS)), askFirstActions: z.array(z.enum(STEWARD_ACTIONS)), expiresAt: z.date().nullable() });
 const eventSchema = z.object({ title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200), connectionKind: z.enum(["local_test", "reddit_inbox"]).optional() });
 type Input = { affairId?: string; signals: HandlingSignals };
-/** Internal service: transports must authenticate workspace membership and user actorKey. */
-export function createStewardTools({ db, now = () => new Date() }: { db: PrismaClient; now?: () => Date }) {
-  async function get(tx: Tx, workspaceId: string, id: string) {
+function assertAuthorizationActor(input: { action: string; actorKey?: string }) {
+  if (input.action === "authorize" && !input.actorKey?.trim()) throw new Error("Explicit user actorKey required for authorization.");
+}
+async function get(tx: Tx, workspaceId: string, id: string) {
     const row = await tx.managedTool.findFirst({ where: { workspaceId, id } });
     if (!row) throw new ToolNotFoundError();
     return row;
-  }
-  async function audit(tx: Tx, workspaceId: string, id: string, kind: string, details: Prisma.InputJsonObject, actorKey = "system:steward") {
-    await tx.stewardAudit.create({ data: { workspaceId, subjectId: id, kind: `tool.${kind}`, actorKey, details, createdAt: now() } });
   }
   async function save(tx: Tx, row: ToolRow, data: Prisma.ManagedToolUpdateManyMutationInput) {
     const changed = await tx.managedTool.updateMany({ where: { workspaceId: row.workspaceId, id: row.id, version: row.version, state: row.state }, data });
     if (!changed.count) throw new ToolConflictError();
     return view(await get(tx, row.workspaceId, row.id));
+  }
+/** Internal service: transports must authenticate workspace membership and user actorKey. */
+export function createStewardTools({ db, now = () => new Date() }: { db: PrismaClient; now?: () => Date }) {
+  async function audit(tx: Tx, subject: { workspaceId: string; id: string }, kind: string, details: Prisma.InputJsonObject, actorKey = "system:steward") {
+    await tx.stewardAudit.create({ data: { workspaceId: subject.workspaceId, subjectId: subject.id, kind: `tool.${kind}`, actorKey, details, createdAt: now() } });
   }
   return {
     recommend(_workspaceId: string, input: Input) { return chooseHandling(input.signals); },
@@ -44,7 +47,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       return db.$transaction(async (tx) => {
         if (input.affairId && !await tx.affair.findFirst({ where: { id: input.affairId, workspaceId } })) throw new ToolNotFoundError();
         const row = await tx.managedTool.create({ data: { workspaceId, affairId: input.affairId, ...fields, spec, kind: choice.mode, handlingMode: choice.mode, selectionRationale: choice.rationale, state: "generated", version: 1 } });
-        await audit(tx, workspaceId, row.id, "generated", { choice, version: 1 }, input.actorKey);
+        await audit(tx, { workspaceId, id: row.id }, "generated", { choice, version: 1 }, input.actorKey);
         return { created: true as const, choice, tool: view(row) };
       });
     },
@@ -54,7 +57,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
         if (row.version !== input.expectedVersion) throw new ToolConflictError();
         const validation = input.action === "validate" ? validateToolSpec(row.spec) : undefined;
         const state = nextToolState(view(row).state, input.action, { version: row.version, validatedVersion: row.validatedVersion, validationPassed: validation?.passed });
-        if (input.action === "authorize" && !input.actorKey?.trim()) throw new Error("Explicit user actorKey required for authorization.");
+        assertAuthorizationActor(input);
         const result = await save(tx, row, { state,
           ...(validation ? { validationSummary: validation.summary, validatedVersion: validation.passed ? row.version : null } : {}),
           ...(input.action === "authorize" ? { authorizedAt: now() } : {}),
@@ -62,7 +65,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
           ...(input.action === "disable" ? { disabledAt: now() } : {}),
           ...(input.action === "retire" ? { retiredAt: now() } : {}),
         });
-        await audit(tx, workspaceId, id, input.action, { state, version: row.version }, input.actorKey);
+        await audit(tx, { workspaceId, id }, input.action, { state, version: row.version }, input.actorKey);
         return result;
       });
     },
@@ -74,7 +77,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
         if ((spec.type === "event_rule" ? "script" : "panel") !== row.kind) throw new Error("Cannot change tool kind.");
         const state = nextToolState(view(row).state, "edit", { version: row.version, validatedVersion: row.validatedVersion });
         const result = await save(tx, row, { spec, version: { increment: 1 }, state, validationSummary: null, validatedVersion: null, authorizedAt: null, enabledAt: null, disabledAt: null, retiredAt: null });
-        await audit(tx, workspaceId, id, "edited", { version: row.version + 1 }, input.actorKey);
+        await audit(tx, { workspaceId, id }, "edited", { version: row.version + 1 }, input.actorKey);
         return result;
       });
     },
@@ -84,7 +87,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       const result = await db.$transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         const refuse = async (code: ToolRunRefusedError["code"]) => {
-          await audit(tx, workspaceId, id, "run_refused", { code, version: row.version }, actorKey);
+          await audit(tx, { workspaceId, id }, "run_refused", { code, version: row.version }, actorKey);
           return { error: code };
         };
         if (row.state !== "enabled") return refuse("TOOL_NOT_ENABLED");
@@ -111,12 +114,12 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
             rows = rows.map((r) => Object.fromEntries(spec.columns.map((c) => [c.key, r[c.key]])));
           }
           await save(tx, row, { lastRunAt: now(), lastSuccessAt: now() });
-          await audit(tx, workspaceId, id, "run_succeeded", { version: row.version, count: spec.type === "event_rule" ? matches.length : rows.length }, actorKey);
+          await audit(tx, { workspaceId, id }, "run_succeeded", { version: row.version, count: spec.type === "event_rule" ? matches.length : rows.length }, actorKey);
           return { matches, rows };
         } catch (error) {
           if (error instanceof ToolConflictError) throw error;
           await save(tx, row, { lastRunAt: now(), lastFailureAt: now() });
-          await audit(tx, workspaceId, id, "run_failed", { version: row.version }, actorKey);
+          await audit(tx, { workspaceId, id }, "run_failed", { version: row.version }, actorKey);
           return { error: "TOOL_RUN_FAILED" as const };
         }
       });
