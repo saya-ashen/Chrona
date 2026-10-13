@@ -25,6 +25,8 @@ export function createStewardRoutes(ports: StewardRoutePorts) {
     return c.json({ code }, status);
   });
   const items = <T extends z.ZodType>(schema: T) => z.object({ items: z.array(schema) });
+  router.get("/assessment-mode", async c => c.json(await c.get("steward").getAssessmentMode()));
+  router.put("/assessment-mode", async c => { const { mode } = z.object({ mode: z.enum(["builtin", "external"]) }).strict().parse(await c.req.json()); return c.json(await c.get("steward").setAssessmentMode(mode)); });
   router.get("/today", async c => c.json(s.todayViewSchema.parse(await c.get("steward").today())));
   router.get("/health", async c => c.json(s.stewardHealthSchema.parse(await c.get("steward").health())));
   router.get("/affairs", async c => c.json(items(s.affairSchema).parse({ items: await c.get("steward").affairs.list() })));

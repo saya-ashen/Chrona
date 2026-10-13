@@ -2,6 +2,7 @@ import type { AttentionStatus, EventStatus } from "@chrona/contracts/steward";
 import { type Ports, type Context, serial, StewardError, delegationView, affairView, eventView, notificationView, followUpView } from "./mappers";
 import { createConnection, transitionConnection, mappedConnection } from "./connections";
 import { syncConnection } from "./ingest";
+import { getAssessmentMode, setAssessmentMode, refreshExternalHealth } from "./external-assess";
 import { processPendingEvents } from "./process";
 import { createAffair, updateAffair, affairDetail, linkEvent } from "./affairs";
 import { proposeDelegation, transitionDelegation } from "./delegations";
@@ -23,6 +24,8 @@ export function createStewardService(ports: Ports) {
     return serial(ports.db, () => fn(ctx));
   }
   return {
+    getAssessmentMode: () => run(false, async ctx => ({ mode: await getAssessmentMode(ctx) })),
+    setAssessmentMode: (mode: "builtin" | "external") => run(true, ctx => setAssessmentMode(ctx, mode)),
     connections: {
       create: (raw: unknown) => run(true, ctx => createConnection(ctx, raw)),
       transition: (id: string, raw: unknown) => run(true, ctx => transitionConnection(ctx, id, raw)),
@@ -63,7 +66,7 @@ export function createStewardService(ports: Ports) {
       list: () => run(false, async ctx => (await ctx.db.delegation.findMany({ where: { workspaceId: ctx.actor.workspaceId } })).map(delegationView)),
     },
     attention: { list: (status?: AttentionStatus) => run(false, ctx => listAttention(ctx, status)), decide: (id: string, raw: unknown) => run(true, ctx => decideAttention(ctx, id, raw)) },
-    today: () => run(false, today), health: () => run(false, health),
+    today: () => run(false, async ctx => { await refreshExternalHealth(ctx); return today(ctx); }), health: () => run(false, async ctx => { await refreshExternalHealth(ctx); return health(ctx); }),
   };
 }
 function tools(ctx: Context) {

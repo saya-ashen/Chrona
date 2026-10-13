@@ -9,6 +9,36 @@ import { requireScopes } from "./reads";
 import { ManagementError } from "./errors";
 import { commandReceipt, managementJson } from "./receipts";
 
+import { managementStewardPendingSchema, managementStewardAssessmentSchema } from "@chrona/contracts/api";
+import { pendingAssessments, submitAssessment } from "../steward/external-assess";
+
+export async function callManagementAssessment(client: ManagementIdentity, name: string, raw: unknown) {
+  requireScopes(client, ["steward:assess"]);
+  try {
+    return await withDatabaseTransaction(async () => {
+      const authorized = await refreshManagementClient(client);
+      requireScopes(authorized, ["steward:assess"]);
+      const ctx = { db, actor: { workspaceId: authorized.workspaceId, actorKey: authorized.id, canWrite: true }, now: () => new Date() };
+      if (name === "chrona_steward_events_pending") {
+        managementStewardPendingSchema.parse(raw);
+        return pendingAssessments(ctx);
+      }
+      const input = managementStewardAssessmentSchema.parse(raw), payloadHash = stableJsonHash(input);
+      const prior = await db.managementCommand.findUnique({ where: { clientId_toolName_requestId: { clientId: authorized.id, toolName: name, requestId: input.requestId } } });
+      if (prior) {
+        if (prior.payloadHash !== payloadHash) throw new ManagementError("IDEMPOTENCY_CONFLICT", "requestId already identifies a different command");
+        return commandReceipt(prior, true);
+      }
+      const result = await submitAssessment(ctx, input.eventId, input.proposal, authorized.name);
+      const command = await db.managementCommand.create({ data: { clientId: authorized.id, workspaceId: authorized.workspaceId, toolName: name, requestId: input.requestId, payloadHash, input: managementJson(input), state: "completed", phase: "completed", result: managementJson(result) } });
+      return commandReceipt(command);
+    });
+  } catch (error) {
+    if (error instanceof StewardError) throw new ManagementError(error.code === "NOT_FOUND" ? "NOT_FOUND" : error.code === "FORBIDDEN" ? "FORBIDDEN" : "VALIDATION_ERROR", error.message);
+    throw error;
+  }
+}
+
 export const isStewardTool = (name: string) => name.startsWith("chrona_steward_");
 async function assertReferences(workspaceId: string, input: { affairId?: string; connectionId?: string }) {
   if (input.affairId && !await db.affair.findFirst({ where: { id: input.affairId, workspaceId }, select: { id: true } })) throw new ManagementError("NOT_FOUND", "Affair not found");

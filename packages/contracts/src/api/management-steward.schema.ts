@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AFFAIR_STATUSES, createAffairSchema, evidenceSchema, PILOT_DENIED_ACTIONS, proposeDelegationSchema } from "../steward";
+import { AFFAIR_STATUSES, assessmentSchema, createAffairSchema, evidenceSchema, PILOT_DENIED_ACTIONS, proposeDelegationSchema } from "../steward";
 
 const id = z.string().trim().min(1).max(128);
 export const managementStewardTodaySchema = z.object({}).strict();
@@ -17,4 +17,7 @@ export const managementStewardDelegationSchema = proposeDelegationSchema.extend(
     if (value[field].some(action => (PILOT_DENIED_ACTIONS as readonly string[]).includes(action))) ctx.addIssue({ code: "custom", path: [field], message: "Pilot-denied actions cannot be proposed: reply_external, mark_read_external, delete_external" });
   }
 });
+export const stewardAssessmentProposalSchema = assessmentSchema.pick({ disposition: true, whatHappened: true, whyItMatters: true, nextStep: true, proposedAction: true }).extend({ affairId: z.string().min(1).max(128).nullable(), followUp: z.object({ note: z.string().min(1).max(4000), dueAt: z.string().datetime({ offset: true }) }).strict().nullable() }).strict();
+export const managementStewardPendingSchema = z.object({}).strict();
+export const managementStewardAssessmentSchema = z.object({ requestId: z.string().uuid(), eventId: id, proposal: stewardAssessmentProposalSchema }).strict();
 export type ManagementStewardCapture = z.infer<typeof managementStewardCaptureSchema>;

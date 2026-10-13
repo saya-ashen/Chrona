@@ -1,11 +1,12 @@
-import { AssessorUnavailableError, assessmentSchema, type AssessmentProposal, type ConnectionKind, type AttentionKind } from "@chrona/contracts/steward";
-import { z } from "zod";
-const proposalSchema = assessmentSchema.pick({ disposition: true, whatHappened: true, whyItMatters: true, nextStep: true, proposedAction: true }).extend({ affairId: z.string().min(1).max(128).nullable(), followUp: z.object({ note: z.string().min(1).max(4000), dueAt: z.string().datetime({ offset: true }) }).strict().nullable() }).strict();
+import { AssessorUnavailableError, type AssessmentProposal, type ConnectionKind, type AttentionKind } from "@chrona/contracts/steward";
+import { stewardAssessmentProposalSchema as proposalSchema } from "@chrona/contracts/api";
+import type { Prisma } from "@chrona/db";
 import { decidePermission } from "@chrona/domain/steward/permission";
-import { audit, delegationView, json, type Context } from "./mappers";
+import { delegationView, json, type Context } from "./mappers";
 export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit?: number } = {}) {
   const workspaceId = ctx.actor.workspaceId, now = ctx.now();
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError("limit must be 1..500");
+  if ((await ctx.db.stewardState.findUnique({ where: { workspaceId } }))?.assessorName === "external-agent") return { assessed: 0 };
   const events = await ctx.db.inboundEvent.findMany({ where: { workspaceId, status: "pending", connection: { status: { in: ["active", "failing"] } }, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] }, orderBy: [{ receivedAt: "asc" }, { id: "asc" }], take: limit, include: { connection: true } });
   let assessed = 0;
   for (const event of events) {
@@ -18,6 +19,7 @@ export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit
     } catch (error) {
       const unavailable = error instanceof AssessorUnavailableError, attempts = event.attempts + 1;
       await ctx.db.$transaction(async tx => {
+        if ((await tx.stewardState.findUnique({ where: { workspaceId } }))?.assessorName === "external-agent") return;
         const changed = await tx.inboundEvent.updateMany({ where: { id: event.id, status: "pending", attempts: event.attempts }, data: { attempts, nextAttemptAt: new Date(now.getTime() + Math.min(30 * 60_000, 30_000 * 2 ** Math.min(attempts - 1, 10))), lastError: unavailable ? "Assessor unavailable" : "Assessment failed", status: !unavailable && attempts >= 5 ? "failed" : "pending" } });
         if (!changed.count) return;
         await tx.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, assessorName: ctx.assessor.name, assessorAvailable: !unavailable, assessorLastError: unavailable ? "Assessor unavailable" : "Assessment failed", lastTickAt: now }, update: { assessorName: ctx.assessor.name, assessorAvailable: !unavailable, assessorLastError: unavailable ? "Assessor unavailable" : "Assessment failed", lastTickAt: now } });
@@ -25,10 +27,27 @@ export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit
       });
       if (unavailable) break; else continue;
     }
-    await ctx.db.$transaction(async tx => {
+    if (await applyAssessment(ctx, event, proposal, ctx.assessor.name)) assessed++;
+  }
+  return { assessed };
+}
+
+export type AssessmentContext = Pick<Context, "db" | "actor" | "now">;
+export async function applyAssessment(ctx: AssessmentContext, event: Prisma.InboundEventGetPayload<object>, raw: AssessmentProposal, assessorName: string) {
+  const proposal = proposalSchema.parse(raw), workspaceId = ctx.actor.workspaceId, now = ctx.now();
+  return ctx.db.$transaction(async tx => {
+      const state = await tx.stewardState.findUnique({ where: { workspaceId } });
+      if ((state?.assessorName === "external-agent") !== assessorName.startsWith("agent:")) return false;
+      const current = await tx.inboundEvent.findFirst({ where: { id: event.id, workspaceId } });
+      if (!current || current.status !== "pending") return false;
+      event = current;
+      const confirmed = event.threadId ? await tx.inboundEvent.findFirst({ where: { workspaceId, connectionId: event.connectionId, threadId: event.threadId, linkStatus: "confirmed", affairId: { not: null } }, orderBy: { receivedAt: "asc" } }) : null;
+      const affairId = event.linkStatus === "confirmed" ? event.affairId : event.linkStatus === "rejected" ? null : confirmed?.affairId ?? null;
+      const affairs = await tx.affair.findMany({ where: { workspaceId } });
+      const audit = async (kind: string, subjectId: string, details: unknown) => tx.stewardAudit.create({ data: { workspaceId, actorKey: ctx.actor.actorKey, kind, subjectId, details: json(details), createdAt: now } });
       // Pause/revoke also wins when it happens while the assessor is running.
       const source = await tx.sourceConnection.findUniqueOrThrow({ where: { id: event.connectionId } });
-      if (!["active", "failing"].includes(source.status)) return;
+      if (!(assessorName.startsWith("agent:") ? ["active"] : ["active", "failing"]).includes(source.status)) return false;
       // Claim and all resulting writes commit together; crash rollback leaves pending.
       const claim = await tx.inboundEvent.updateMany({ where: { id: event.id, status: "pending", attempts: event.attempts }, data: { status: "assessed", nextAttemptAt: null, lastError: null } });
       if (!claim.count) return;
@@ -42,9 +61,9 @@ export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit
       const authority = delegation ? delegationView(delegation) : null;
       const permission = action ? decidePermission({ action, delegation: authority, now }) : null;
       const notificationPermission = proposal.disposition === "notify_now" ? decidePermission({ action: "notify_user", delegation: authority, now }) : null;
-      await tx.eventAssessment.create({ data: { workspaceId, eventId: event.id, assessor: ctx.assessor.name, disposition: proposal.disposition, whatHappened: proposal.whatHappened, whyItMatters: proposal.whyItMatters, nextStep: proposal.nextStep, proposedAction: action, ...(permission ? { permission: json(permission) } : {}) } });
-      if (permission) await audit(tx, ctx, "permission_decision", event.id, permission);
-      if (notificationPermission && action !== "notify_user") await audit(tx, ctx, "permission_decision", event.id, notificationPermission);
+      await tx.eventAssessment.create({ data: { workspaceId, eventId: event.id, assessor: assessorName, createdAt: now, disposition: proposal.disposition, whatHappened: proposal.whatHappened, whyItMatters: proposal.whyItMatters, nextStep: proposal.nextStep, proposedAction: action, ...(permission ? { permission: json(permission) } : {}) } });
+      if (permission) await audit("permission_decision", event.id, permission);
+      if (notificationPermission && action !== "notify_user") await audit("permission_decision", event.id, notificationPermission);
       let kind: AttentionKind | null = proposal.disposition === "digest" || proposal.disposition === "notify_now" ? "change" : proposal.disposition === "await_decision" ? "decision" : null;
       if (proposal.disposition === "act") {
         if (permission?.outcome === "ask_first") kind = "decision";
@@ -66,9 +85,8 @@ export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit
         if (action === "create_follow_up" && proposal.followUp) await tx.followUp.create({ data: { workspaceId, affairId: linked, attentionItemId: attentionId, note: proposal.followUp.note, dueAt: new Date(proposal.followUp.dueAt) } });
         // link_affair remains suggested until a human confirms; summarize is the persisted assessment.
       }
-      await tx.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, assessorName: ctx.assessor.name, assessorAvailable: true, assessorLastError: null, lastTickAt: now }, update: { assessorName: ctx.assessor.name, assessorAvailable: true, assessorLastError: null, lastTickAt: now } });
-      assessed++;
+      const stateName = assessorName.startsWith("agent:") ? "external-agent" : assessorName;
+      await tx.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, assessorName: stateName, assessorAvailable: true, assessorLastError: null, lastTickAt: now }, update: { assessorName: stateName, assessorAvailable: true, assessorLastError: null, lastTickAt: now } });
+      return true;
     });
-  }
-  return { assessed };
 }
