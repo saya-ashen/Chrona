@@ -1,5 +1,5 @@
 import type { AttentionStatus, EventStatus } from "@chrona/contracts/steward";
-import { type Ports, type Context, serial, StewardError, delegationView, affairView, eventView, notificationView, followUpView, toolView } from "./mappers";
+import { type Ports, type Context, serial, StewardError, delegationView, affairView, eventView, notificationView, followUpView } from "./mappers";
 import { createConnection, transitionConnection, mappedConnection } from "./connections";
 import { syncConnection } from "./ingest";
 import { processPendingEvents } from "./process";
@@ -10,6 +10,8 @@ import { createStewardDelivery } from "./delivery";
 import { createStewardFollowUps } from "./follow-ups";
 import { schedule } from "./schedule";
 import { tick } from "./tick";
+import { createStewardTools } from "./tools";
+type Tools = ReturnType<typeof createStewardTools>;
 export { StewardError } from "./mappers";
 export type { Ports as StewardPorts, Actor as StewardActor } from "./mappers";
 export function createStewardService(ports: Ports) {
@@ -44,7 +46,14 @@ export function createStewardService(ports: Ports) {
       complete: (id: string) => run(true, async ctx => followUpView(await followUps(ctx).completeFollowUp(id))),
       cancel: (id: string) => run(true, async ctx => followUpView(await followUps(ctx).cancelFollowUp(id))),
     },
-    tools: { list: () => run(false, async ctx => (await ctx.db.managedTool.findMany({ where: { workspaceId: ctx.actor.workspaceId }, orderBy: { createdAt: "desc" } })).map(toolView)) },
+    tools: {
+      list: (filters: Parameters<Tools["list"]>[1] = {}) => run(false, ctx => tools(ctx).list(ctx.actor.workspaceId, filters)),
+      recommend: (input: Parameters<Tools["recommend"]>[1]) => run(false, async ctx => tools(ctx).recommend(ctx.actor.workspaceId, input)),
+      generate: (input: Parameters<Tools["generate"]>[1]) => run(true, ctx => tools(ctx).generate(ctx.actor.workspaceId, input)),
+      transition: (id: string, input: Omit<Parameters<Tools["transition"]>[2], "actorKey">) => run(true, ctx => tools(ctx).transition(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
+      edit: (id: string, input: Parameters<Tools["edit"]>[2]) => run(true, ctx => tools(ctx).edit(ctx.actor.workspaceId, id, input)),
+      run: (id: string, input: Parameters<Tools["run"]>[2]) => run(true, ctx => tools(ctx).run(ctx.actor.workspaceId, id, input)),
+    },
     schedule: (from: string, to: string) => run(false, ctx => schedule(ctx, from, to)),
     tick: () => run(true, tick),
     delegations: {
@@ -55,6 +64,9 @@ export function createStewardService(ports: Ports) {
     attention: { list: (status?: AttentionStatus) => run(false, ctx => listAttention(ctx, status)), decide: (id: string, raw: unknown) => run(true, ctx => decideAttention(ctx, id, raw)) },
     today: () => run(false, today), health: () => run(false, health),
   };
+}
+function tools(ctx: Context) {
+  return createStewardTools({ db: ctx.db, now: ctx.now });
 }
 function delivery(ctx: Context) {
   return createStewardDelivery({ db: ctx.db, workspaceId: ctx.actor.workspaceId, actorKey: ctx.actor.actorKey, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now });

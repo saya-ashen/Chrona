@@ -20,7 +20,9 @@ async function loadApplicationGraph(databaseUrl: string) {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
   await db.$queryRawUnsafe("SELECT 1");
   secureGeneratedSqliteSidecars(databaseUrl);
-  return { bootstrapServerRuntime, createServerApp };
+  const { createStewardRuntime } = await import("./steward-runtime");
+  const steward = createStewardRuntime(db, { onError: () => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED" }) });
+  return { bootstrapServerRuntime, createServerApp, steward };
 }
 
 export async function startBunServer() {
@@ -51,11 +53,11 @@ export async function startBunServer() {
     databaseLock.release();
     throw error;
   }
-  const { bootstrapServerRuntime, createServerApp } = applicationGraph;
+  const { bootstrapServerRuntime, createServerApp, steward } = applicationGraph;
   const runtimeLifecycle = bootstrapServerRuntime();
   let app: Awaited<ReturnType<typeof createServerApp>>;
   try {
-    app = await createServerApp();
+    app = await createServerApp({ steward });
   } catch (error) {
     await runtimeLifecycle.stop().catch(() => undefined);
     databaseLock.release();
@@ -98,6 +100,7 @@ export async function startBunServer() {
     },
   });
 
+  steward.start();
   log.info("listening", { host, port });
 
   async function shutdown(signal: string) {
@@ -107,6 +110,7 @@ export async function startBunServer() {
 
     server.stop(true);
     try {
+      await steward.stop();
       await runtimeLifecycle.stop();
     } catch (err) {
       log.error("runtime shutdown failed", { error: String(err) });
