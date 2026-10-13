@@ -1,8 +1,15 @@
 # Chrona Documentation — English
 
-Chrona is a local-first AI schedule app. It helps you turn tasks into editable plans, place work on a schedule, execute through AI/runtime providers, and review results from the task workspace and Dashboard.
+Chrona is a proactive personal steward: Today / Affairs / Schedule / Delegations / Connections over a durable event loop. Read [current direction and implementation](personal-steward.md), with the [canonical Chinese direction](../zh/personal-steward.md) authoritative since 2026-10-13. The local rebuild is not deployed; real user data was not migrated.
 
-## What you can do today
+## Current steward surface
+
+- Review decisions, changes, commitments, suggestions and health in Today.
+- Manage affairs, scoped delegations and source connections; distinguish proposed authority from grants.
+- Use declarative tools and in-app notifications. Reddit is not authorized, external-Agent assessment is not wired, and no real external delivery channel exists.
+- See [how the loop works and what remains](personal-steward.md).
+
+## Retained task/result and managed-execution capabilities
 
 - Manage tasks: create, edit, complete, reopen, delete, prioritize, tag, nest, and relate tasks.
 - Generate plans: ask AI for a PlanBlueprint, stream generation progress, review the plan, edit it, and accept it.
@@ -19,7 +26,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 | --- | --- |
 | Install and run Chrona | [Quick Start](./quick-start.md) |
 | Back up, restore, and operate locally | [Local Operations](./operations.md) |
-| See current product direction | [Roadmap](./roadmap.md) |
+| See current product direction | [Personal steward](./personal-steward.md) |
 | Integrate over HTTP or MCP | [API Reference](./api-reference.md) |
 | Understand the architecture | [Architecture](./architecture.md) |
 | Trace execution internals | [Backend Execution Flow](./backend-execution-flow.md) |
@@ -28,7 +35,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 | Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
 | Understand the accepted Goal, trigger, and occurrence target design | [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md) |
 
-## Main user workflows
+## Retained managed-execution workflows (secondary)
 
 ### 1. Task → plan → execution
 
@@ -56,6 +63,10 @@ External agents call Chrona through MCP tools such as `chrona_plan_read`, `chron
 
 | Area | Path | Role |
 | --- | --- | --- |
+| Steward UI | `features/steward` | Primary pages and browser models |
+| Steward use cases | `packages/engine/src/modules/steward` | Durable event loop |
+| Steward domain | `packages/domain/src/steward` | Pure rules |
+| Steward adapters | `packages/integrations/src/steward` | Sources, rule assessor and delivery |
 | Web app | `apps/web` | Vite + React 19 + React Router UI |
 | Server | `apps/server` | Hono API routes and static app serving on Bun |
 | CLI | `packages/cli` | Packaged entry point for starting Chrona |

@@ -1,11 +1,14 @@
 # System Architecture
 
-Chrona's target is a **local-first, executor-independent work and results
-workspace**. People, external agents, and the optional Chrona-managed executor
-contribute work; Chrona owns durable records, result versions, review, and reuse.
+Chrona is a **proactive personal steward**: Today / Affairs / Schedule /
+Delegations / Connections over a durable event loop. The canonical
+[Personal steward direction](../zh/personal-steward.md) (2026-10-13) supersedes
+older product goals; [English direction and implementation](personal-steward.md)
+distinguishes implemented behavior from gaps. The rebuild is local and unreleased,
+not deployed; no real user data was migrated.
 
-The canonical [Product Architecture](../zh/product-architecture.md) defines
-product direction and acceptance gates. This document describes the current
+The earlier [Product Architecture](../zh/product-architecture.md) remains a
+historical/design reference for the result layer, not the product centre. This document describes the current
 Bun/TypeScript system and its transition boundaries. External management MCP is
 available. B1–B3 provide work-owned versions/reviews, authenticated text/file
 MCP and owner HTTP entries, and a deterministic task results page. New writes
@@ -15,10 +18,30 @@ executor still uses its existing managed-result pipeline.
 See [Work Result Entries](./work-results.md) for exact authority and limits.
 The local [work-pages slice](./work-pages.md) adds restricted json-render content
 inside result versions and independent append-only owner input. It uses no managed
-execution records. Home/manual work is content-first; calendar and advanced
-execution/Goal/review surfaces remain. This newer slice is not deployed.
+execution records. The retained Home/manual-work surfaces are content-first; Today is now the landing
+page, while calendar and advanced execution/Goal/review surfaces remain. This newer slice is not deployed.
 
-## Target dependency direction
+## Steward runtime (current)
+
+`apps/server/src/steward-runtime.ts` composes the built-in deterministic assessor,
+read-only source ports and in-app delivery. A single steward tick coordinates
+polling, persistence/dedupe, assessment/permissions, due follow-ups, restrained
+suggestions and leased outbox delivery. Reddit has no injected credentials or
+transport; external-Agent assessment and real external notification delivery are
+not wired. Owner-only routes scope all operations by workspace.
+
+| Area | Current owner |
+| --- | --- |
+| Product UI and browser models | `features/steward` |
+| Durable use cases and tick | `packages/engine/src/modules/steward` |
+| Pure permission, handling, schedule and suggestion rules | `packages/domain/src/steward` |
+| Source, assessor and delivery adapters | `packages/integrations/src/steward` |
+| Shared schemas and ports | `packages/contracts/src/steward/index.ts` |
+
+Legacy Plan/Run/managed execution and its schedulers remain; secondary navigation
+still reaches them. The steward does not manufacture runs to process events.
+
+## Result-layer target dependency direction
 
 ```text
 Human / external agent -> Web or MCP -> deterministic work/result/review use cases
@@ -96,7 +119,7 @@ per-package "put here / don't put here" rules, dependency direction, and enforce
 ### Feature slices
 
 Product ownership lives in root `features/`, not in `apps/web/src/components` or
-`apps/server` internals. The active slices are `dashboard`, `action-center`,
+`apps/server` internals. The active slices include `steward` (the product centre), `dashboard`, `action-center`,
 `task-management`, `task-workspace`, `schedule`, `plan-generation`,
 `execution-monitoring`, `ai-clients`, `assistant-surface`, `external-calendar`,
 and `mcp-control-plane`. A feature's public API is its `index.ts`; apps compose
@@ -105,7 +128,14 @@ feature's internals.
 
 ## Product surfaces
 
-### Task workspace
+### Personal steward
+
+Today is the landing page; Affairs, Schedule, Delegations and Connections are
+primary navigation. `features/steward` owns these steward views. Schedule composes
+the steward read-only projection alongside retained scheduling controls. See
+[page behavior and gaps](personal-steward.md).
+
+### Retained task workspace
 
 Manual Tasks default to their content-first work page with persistent notes and
 version-bound forms. Managed Tasks retain the planning/editing workspace: task

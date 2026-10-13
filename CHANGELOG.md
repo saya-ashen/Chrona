@@ -3,7 +3,13 @@
 ## Unreleased
 
 ### Added
+- Local personal-steward loop: affairs, source events/baselines, deterministic assessments and permissions, delegations, attention, follow-ups, audited declarative tools, restrained suggestions and leased notification delivery.
+- Today / Affairs / Delegations / Connections UI, steward Schedule projection, owner/workspace-scoped HTTP API, in-app delivery and env-gated test seams with local test coverage. Reddit remains an unwired read-only adapter boundary; no real external notification channel or external-Agent assessor is connected.
 - Added experimental official Pi CLI provider alongside OMP, with local Pi resource reuse for execution, isolated planning/review/result tools, scoped execution control, yes/no approvals and Chrona-owned session-history resume. Requires separately installed Pi ≥ 0.85.0; Codex remains the recommended stable default. See [setup and compatibility limits](docs/en/pi-provider.md).
+
+### Changed
+- Product centre is now the [personal steward](docs/en/personal-steward.md), following the 2026-10-13 direction. Earlier work/results architecture remains a result-layer reference; legacy Plan/Run/managed execution remains reachable through secondary navigation.
+- This steward rebuild is unreleased and not deployed; no real user data was migrated.
 
 ## 0.3.1 — Provider parity and product demo polish
 

@@ -7,6 +7,84 @@ Base URL: `http://localhost:3101/api`
 - Default bind: `127.0.0.1`. Use `HOST=0.0.0.0` only intentionally and protect it with `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
 - IDs shown here are examples. Agents should use AI-visible refs from MCP tool results, not backend IDs.
 
+## Steward API
+
+Current local implementation: [personal steward](personal-steward.md). Registered by
+[steward.routes.ts](../../apps/server/src/routes/steward.routes.ts); schemas below
+are exported from [contracts/steward](../../packages/contracts/src/steward/index.ts).
+All paths in this table are prefixed `/api/steward`. Every request requires
+`?workspaceId=`. Authentication is single-local-owner, not membership/RBAC:
+matching `API_KEY` Bearer when configured, otherwise no Authorization header.
+Scoped MCP bearers are rejected. Responses use `Cache-Control: no-store`.
+`items(S)` means the route-local `{ items: S[] }` wrapper; `—` means no parsed body.
+
+Common errors on all routes: `401 UNAUTHORIZED`, `400 WORKSPACE_REQUIRED`,
+`404 NOT_FOUND` (unknown workspace), `400 INVALID_REQUEST` (Zod/JSON errors),
+`403 FORBIDDEN` (service authorization), and `500 INTERNAL_ERROR` for unexpected
+failures. Row lookup failures also use `404 NOT_FOUND`, or `404 TOOL_NOT_FOUND`.
+Additional route-specific codes are listed below; success uses HTTP 200.
+
+| Method | Path | Body schema | Response schema | Additional errors |
+| --- | --- | --- | --- | --- |
+| GET | `/today` | — | `todayViewSchema` | — |
+| GET | `/health` | — | `stewardHealthSchema` | — |
+| GET | `/affairs` | — | `items(affairSchema)` | — |
+| POST | `/affairs` | `createAffairSchema` | `affairSchema` | `404 NOT_FOUND` for referenced Task |
+| GET | `/affairs/:id` | — | `affairDetailSchema` | `404 NOT_FOUND` |
+| PATCH | `/affairs/:id` | `updateAffairSchema` | `affairSchema` | `404 NOT_FOUND` |
+| GET | `/connections` | — | `items(connectionSchema)` | — |
+| POST | `/connections` | `createConnectionSchema` | `connectionSchema` | `409 SYNC_REFUSED` |
+| POST | `/connections/:id/transition` | `connectionTransitionSchema` | `connectionSchema` | `404 NOT_FOUND`, `409 INVALID_TRANSITION` |
+| POST | `/connections/:id/sync` | — | `syncResultSchema` | `404 NOT_FOUND`, `409 SYNC_REFUSED`, `409 REVISION_CONFLICT` |
+| GET | `/delegations` | — | `items(delegationSchema)` | — |
+| POST | `/delegations` | `proposeDelegationSchema` | `delegationSchema` | `404 NOT_FOUND` for scoped references |
+| POST | `/delegations/:id/transition` | `delegationTransitionSchema` | `delegationSchema` | `404 NOT_FOUND`, `409 REVISION_CONFLICT`, `500 INVALID_DELEGATION_TRANSITION` |
+| GET | `/attention` | — | `items(attentionItemSchema)` | Optional `status` validated against `ATTENTION_STATUSES` |
+| POST | `/attention/:id/decision` | `attentionDecisionSchema` | `attentionItemSchema` | `404 NOT_FOUND`; invalid/missing future snooze currently becomes `500 INTERNAL_ERROR` |
+| GET | `/events` | — | `items(inboundEventSchema)` | Optional `status` (`EVENT_STATUSES`), `connectionId` filters |
+| POST | `/events/:id/link` | `eventLinkSchema` | `inboundEventSchema` | `404 NOT_FOUND` |
+| GET | `/notifications` | — | `items(notificationSchema)` | — |
+| POST | `/notifications/:id/acknowledge` | — | `notificationSchema` | `404 NOT_FOUND` |
+| POST | `/notifications/:id/retry` | — | `notificationSchema` | `404 NOT_FOUND` |
+| POST | `/follow-ups/:id/complete` | — | `followUpSchema` | `404 NOT_FOUND` |
+| POST | `/follow-ups/:id/cancel` | — | `followUpSchema` | `404 NOT_FOUND` |
+| GET | `/tools` | — | `items(managedToolSchema)` | — |
+| POST | `/tools` | `generateToolSchema` plus domain `toolSpecSchema` | `generatedToolSchema` | `400 INVALID_REQUEST` with spec validation message; `404 TOOL_NOT_FOUND`; choice/spec kind mismatch currently `500 INTERNAL_ERROR` |
+| POST | `/tools/:id/transition` | `toolTransitionSchema` | `managedToolSchema` | `404 TOOL_NOT_FOUND`, `409 TOOL_CONFLICT`, `409 INVALID_TRANSITION` |
+| POST | `/tools/:id/run` | `runToolSchema` | `toolRunResultSchema` | `404 TOOL_NOT_FOUND`, `409 TOOL_CONFLICT`, `409 TOOL_NOT_ENABLED`, `409 TOOL_NOT_PERMITTED`, `409 TOOL_RUN_FAILED` |
+| GET | `/schedule` | — | `items(scheduleItemSchema)` | Required ISO `from`/`to`; `400 INVALID_REQUEST` if reversed/invalid |
+
+Errors generally return `{ code }`; the handler forwards an error's `code`, so
+unexpected persistence errors can also return their own code with HTTP 500.
+Notably, invalid delegation transitions are currently **500**, not the 409 used
+for connection/tool transitions. There is no public steward tick, tool-edit,
+source credential configuration, or arbitrary external-send route.
+
+### Test-only steward seam
+
+[test-support.routes.ts](../../apps/server/src/routes/test-support.routes.ts)
+registers these only when `CHRONA_E2E_TEST_ROUTES` is `1` or `true` (trimmed,
+case-insensitive), with the test runtime present. Otherwise they are absent
+(404). Owner authentication and `no-store` still apply. These are process-local
+fixtures, **not real integration APIs**; only tick requires workspace selection.
+Inline Zod bodies/responses do not have exported schema names.
+
+| Method | Full path | Inline body | Response |
+| --- | --- | --- | --- |
+| POST | `/api/test/steward/local-source/push` | `{ items: SourceItem[] }`, max 500, strict item fields | `{ ok: true }` |
+| POST | `/api/test/steward/assessor` | `{ available: boolean }` | `{ ok: true }` |
+| POST | `/api/test/steward/delivery/script` | `{ outcomes: (accepted/rejected/uncertain)[] }`, max 100 | `{ ok: true }` |
+| GET | `/api/test/steward/delivery/sent` | — | `{ items: delivery.sent }` |
+| POST | `/api/test/steward/tick?workspaceId=...` | — | `{ synced, syncFailed, assessed, raised, suggested, suggestionFailed, attempted, lastTickAt }` |
+
+Seam errors: `401 UNAUTHORIZED`, `400 INVALID_REQUEST`, `500 TEST_SEAM_FAILED`;
+tick also returns `400 WORKSPACE_REQUIRED` / `404 NOT_FOUND`. Accepted scripted
+outcomes optionally carry `receiptRef`; rejected outcomes require `error` and
+`retryable`; uncertain outcomes require `error`. Source push requires
+`externalId`, `title`, `body`, `author`, nullable `url`, `occurredAt`, and optional
+`threadId`. Assessor availability/source log/delivery script are runtime-wide
+test controls, not per-workspace credentials.
+
 ## Health
 
 ### GET /api/health

@@ -109,6 +109,63 @@ Reddit/QQ。Reddit 收件箱只实现只读适配边界；未获账号授权时�
 投递失败重试 · 权限拒绝 · 暂停/撤销 · 来源证据与用户决定 · 工具选择策略及
 生成/验证/启用的区分。
 
+## 现状与差距
+
+以下按本 checkout 源码核对；「有测试」指仓库有对应测试，不表示本文维护时重新运行了全部测试。[英文版与逐步实现说明](../en/personal-steward.md)列出实现文件、权限、投递、工具与建议阈值。
+
+### 已实现并有测试
+
+- 持久接收、首次基线、事件去重、重启后读取同一库、评估积压/退避、权限拒绝、连接暂停/撤销、通知重试与幂等、用户决定、工作区隔离：`apps/server/src/__tests__/api/steward-loop.bun.test.ts` 和 `packages/engine/src/modules/steward/*.bun.test.ts`。
+- 今日/事务/委托/连接页面与日程投影；证据、错误、加载、未确认状态和明确的下一步：`features/steward` 的模型及 UI 测试。旧 Plan/Run/托管执行代码和数据保留，仍从次级导航可达；没有将旧入口改成只读。
+- 确定性内置 `rule-assessor-v1`；权限纯函数；生成→验证→授权→启用的声明式工具；建议检测与克制策略：`packages/domain/src/steward`、`packages/integrations/src/steward`、engine steward 测试。
+- `in_app` 本地通知回执、显式确认及失败可见；发送不等于已读，也不关闭待处理事项。单个 steward tick 串联轮询、评估、跟进、建议与投递；旧执行调度器仍保留。
+
+### 已实现但仅测试适配器
+
+- `local_test` 来源是进程内追加日志，不是真实 Reddit/QQ；重启测试需重放来源日志，数据库记录保持持久。
+- 可脚本化 accepted/rejected/uncertain 的测试投递及 assessor 不可用开关，通过 `CHRONA_E2E_TEST_ROUTES=1`（或 `true`）的测试 seam 暴露；正常运行不注册测试投递通道。
+- Reddit 收件箱的只读映射/游标/错误边界只有注入式模拟测试；运行时未注入凭据或网络传输，没有真实账号验证。
+
+### 未实现或被阻塞
+
+- Reddit 真实读取：阻塞于**明确账号授权**，连接显示 `needs_authorization`；没有接入私人账号、没有 live verification。
+- 真实外部通知通道未实现；非测试通道只有 `in_app`。外部 Agent 的 `Assessor` 端口存在，但未接线；当前并非模型在理解消息。日常聊天接入不是本 steward 已实现能力。
+- 未迁移真实用户数据；本次 steward 重构没有部署或发布。旧成果层的历史部署记录不代表管家已上线。
+- 方向与实现差距：委托暂停/撤销阻止其动作与发送，但不停止仍 active 的连接轮询；轮询本身没有 active 委托或 `read_source` 权限检查；tick 按连接间隔而非委托 cadence/`maxEventsPerCheck` 调度。`digest` 目前生成待处理变化，并无定时聚合摘要投递。
+- 共享契约中的 membership 注释并非实际多用户权限：路由是单一本地 owner + workspace 数据范围。通知契约的 policy channel 默认 `in_app`，但省略整个 policy 时 Prisma 默认仍是 `local_test`（建议创建的委托亦如此）；需显式提供 `in_app` policy。
+- 内置规则的日期是建议；批准该决定不会自动创建 FollowUp。Today 的成果分组尚未接上旧成果版本；工具是声明式规则/表格，不是任意脚本执行环境。
+
+## 如何运行
+
+从仓库根目录运行，先选择独立开发数据目录/数据库，**不要指向真实用户库**。以下是操作说明，本文维护未启动服务、迁移或部署。
+
+```sh
+bun run dev          # scripts/dev.ts：Vite + Bun API
+bun run server:start # 只启动 API/server
+bun run dev:web      # 只启动 Vite
+```
+
+`bun run dev` 的 Vite 子进程使用 `--host 0.0.0.0`；不要把它当作仅回环访问的安全承诺。已有依赖与 Prisma 生成产物不足时先按开发环境要求处理，不要对真实数据库执行 reset。
+
+| 环境变量 | 本实现用途 |
+| --- | --- |
+| `DATABASE_URL` / `CHRONA_DATA_DIR` | 选择独立开发 SQLite 与数据目录；不填真实账号凭据 |
+| `API_KEY` | 本地 owner Bearer 密钥；未配置时 steward 仅接受无 Authorization header 的请求，拒绝 scoped bearer |
+| `CHRONA_STEWARD_TICK_SECONDS` | 默认 60 秒；非正数或非有限数禁用自动 tick |
+| `CHRONA_E2E_TEST_ROUTES` | 仅隔离测试设置 `1`/`true`；启用 `/api/test/steward/*` 和 `local_test` 投递，正常开发/生产勿开 |
+| `NODE_ENV=test` / `BUN_ENV=test` | 不自动启动 steward 定时器；测试显式 tick |
+| `CHRONA_WEB_PORT` / `CHRONA_SERVER_WATCH=false` | 开发脚本的 Vite 端口 / 禁用 server watch |
+
+`package.json` 的 `test:bun` runner 为每个文件创建 `.tmp` 下的独立测试库；不要裸跑需要数据库的 API 测试指向开发库：
+
+```sh
+bun run test:bun apps/server/src/__tests__/api/steward-loop.bun.test.ts
+bun run test:bun packages/domain/src/steward/*.bun.test.ts packages/engine/src/modules/steward/*.bun.test.ts packages/integrations/src/steward/*.bun.test.ts
+bunx vitest run features/steward
+```
+
+更广检查：`bun run test:api` 包含 steward API suite；`bun run test:bun` 收集所有 `*.bun.test.ts`；`bun run test` 为总入口。测试注入来源与投递，不需要真实账号。精确脚本见 `package.json`、`scripts/run-bun-tests.ts`、`scripts/run-api-tests.ts`。
+
 ## 实施分线
 
 | 线 | 范围 | 目录 |
