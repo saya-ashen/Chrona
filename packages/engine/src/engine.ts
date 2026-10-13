@@ -1,4 +1,5 @@
 import type { ChronaEnginePorts } from "./ports";
+import { createStewardService, type StewardPorts } from "./modules/steward";
 import { createManagementService } from "./modules/management/service";
 import { createAiClientsService } from "./services/ai-clients.service";
 import { createGoalsService } from "./services/goals.service";
@@ -16,7 +17,7 @@ import { createTaskTriggersService } from "./services/task-triggers.service";
 import { createWorkspacesService } from "./services/workspaces.service";
 import { aiClientRegistry, getAiClient } from "./modules/ai";
 
-export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
+export function createChronaEngine(_ports: ChronaEnginePorts & { steward?: StewardPorts } = {}) {
   const tasks = createTasksService();
   const schedule = createTaskScheduleService();
   const plan = createTaskPlanService();
@@ -36,6 +37,7 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
       result,
     },
     management,
+    steward: _ports.steward ? createStewardService(_ports.steward) : undefined,
     agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution, goals }),
     pages: createPagesService(),
     goals: {
