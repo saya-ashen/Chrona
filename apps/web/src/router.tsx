@@ -52,6 +52,17 @@ function redirectToDefaultLocale(
   return `${window.location.origin}/${defaultLocale}${localizedPath}${search}${hash}`;
 }
 
+function loadLocaleBootData({ params, request }: Parameters<typeof loadAppBootData>[0]) {
+  if (!params.lang || !hasLocale(params.lang)) {
+    const url = new URL(request.url);
+    throw Response.redirect(
+      redirectToDefaultLocale(url.pathname, url.search, url.hash, params.lang ?? ""),
+      302,
+    );
+  }
+  return loadAppBootData({ params, request } as Parameters<typeof loadAppBootData>[0]);
+}
+
 export function createAppRouter() {
   return createBrowserRouter([
     {
@@ -60,16 +71,7 @@ export function createAppRouter() {
     },
     {
       path: "/:lang",
-      loader: ({ params, request }) => {
-        if (!params.lang || !hasLocale(params.lang)) {
-          const url = new URL(request.url);
-          throw Response.redirect(
-            redirectToDefaultLocale(url.pathname, url.search, url.hash, params.lang ?? ""),
-            302,
-          );
-        }
-        return loadAppBootData({ params, request } as Parameters<typeof loadAppBootData>[0]);
-      },
+      loader: loadLocaleBootData,
       element: <AppShell />,
       errorElement: <AccessKeyRouteError />,
       hydrateFallbackElement: <div aria-hidden="true" />,

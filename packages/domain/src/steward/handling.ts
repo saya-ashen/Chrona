@@ -59,6 +59,36 @@ export class ToolTransitionError extends Error {
   }
 }
 
+function validateDraft(state: ToolState, context: ToolTransitionContext): ToolState {
+  if (state !== "generated" && state !== "validation_failed") {
+    throw new ToolTransitionError(state, "validate", "only drafts can be validated");
+  }
+  if (typeof context.validationPassed !== "boolean") {
+    throw new ToolTransitionError(state, "validate", "validation result is required");
+  }
+  return context.validationPassed ? "validated" : "validation_failed";
+}
+
+function authorizeTool(state: ToolState, context: ToolTransitionContext): ToolState {
+  if (state !== "validated") {
+    throw new ToolTransitionError(state, "authorize", "successful validation is required");
+  }
+  if (context.validatedVersion !== context.version) {
+    throw new ToolTransitionError(state, "authorize", "validation must match the current version");
+  }
+  return "authorized";
+}
+
+function enableTool(state: ToolState, context: ToolTransitionContext): ToolState {
+  if (state !== "authorized" && state !== "disabled") {
+    throw new ToolTransitionError(state, "enable", "authorization is required");
+  }
+  if (context.validatedVersion !== context.version) {
+    throw new ToolTransitionError(state, "enable", "validation and authorization cannot carry across edits");
+  }
+  return "enabled";
+}
+
 /**
  * Caller emits `edit` on every new version and persists the returned state with
  * cleared validation/authorization metadata. Disabled retains authorization for
@@ -71,17 +101,11 @@ export function nextToolState(state: ToolState, transition: ToolTransition, cont
   if (transition === "edit") return "generated";
   switch (transition) {
     case "validate":
-      if (state !== "generated" && state !== "validation_failed") return fail("only drafts can be validated");
-      if (typeof context.validationPassed !== "boolean") return fail("validation result is required");
-      return context.validationPassed ? "validated" : "validation_failed";
+      return validateDraft(state, context);
     case "authorize":
-      if (state !== "validated") return fail("successful validation is required");
-      if (context.validatedVersion !== context.version) return fail("validation must match the current version");
-      return "authorized";
+      return authorizeTool(state, context);
     case "enable":
-      if (state !== "authorized" && state !== "disabled") return fail("authorization is required");
-      if (context.validatedVersion !== context.version) return fail("validation and authorization cannot carry across edits");
-      return "enabled";
+      return enableTool(state, context);
     case "disable":
       if (state !== "enabled") return fail("only an enabled tool can be disabled");
       return "disabled";

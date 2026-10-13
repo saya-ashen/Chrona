@@ -9,6 +9,30 @@ export type ScheduleInput = {
   delegations: readonly (Pick<Delegation, "id" | "purpose" | "affairId" | "status" | "lastCheckAt" | "cadenceSeconds"> & Partial<Pick<Delegation, "expiresAt">>)[];
 };
 
+type ScheduleEntry = Omit<ScheduleItem, "id" | "title" | "sourceRef" | "endsAt"> & {
+  sourceId: string;
+  title: string;
+  endsAt?: string | null;
+};
+
+function scheduleItem({ sourceId, title, endsAt = null, ...entry }: ScheduleEntry): ScheduleItem {
+  return { ...entry, id: `${entry.kind}:${sourceId}`, title: title.slice(0, 200), endsAt, sourceRef: sourceId };
+}
+
+function delegationCheck(delegation: ScheduleInput["delegations"][number], now: string): ScheduleItem[] {
+  if (delegation.status !== "active" || delegation.cadenceSeconds === null
+    || !Number.isFinite(delegation.cadenceSeconds) || delegation.cadenceSeconds <= 0) return [];
+  const next = delegation.lastCheckAt === null
+    ? Date.parse(now)
+    : Date.parse(delegation.lastCheckAt) + delegation.cadenceSeconds * 1000;
+  if (!Number.isFinite(next)) return [];
+  if (delegation.expiresAt && Date.parse(delegation.expiresAt) <= Math.max(Date.parse(now), next)) return [];
+  return [scheduleItem({
+    kind: "steward_check", sourceId: delegation.id, title: delegation.purpose,
+    startsAt: new Date(next).toISOString(), affairId: delegation.affairId, confirmed: true,
+  })];
+}
+
 /**
  * Project starts within [from, to), not overlapping appointments. A null cadence
  * means no scheduled check. Non-commitment attention dates are never promises;
@@ -16,26 +40,25 @@ export type ScheduleInput = {
  */
 export function buildSchedule(input: ScheduleInput, { from, to }: { from: string; to: string }): ScheduleItem[] {
   const items: ScheduleItem[] = [];
-  const add = (kind: ScheduleItem["kind"], sourceId: string, title: string, startsAt: string, affairId: string | null, confirmed: boolean, endsAt: string | null = null) => {
-    items.push({ id: `${kind}:${sourceId}`, kind, title: title.slice(0, 200), startsAt, endsAt, affairId, sourceRef: sourceId, confirmed });
-  };
+  const add = (entry: ScheduleEntry) => { items.push(scheduleItem(entry)); };
   for (const event of input.calendarEvents) {
-    add("appointment", event.id, event.title, event.startsAt, event.affairId, true, event.endsAt);
+    add({ kind: "appointment", sourceId: event.id, title: event.title,
+      startsAt: event.startsAt, affairId: event.affairId, confirmed: true, endsAt: event.endsAt });
   }
   for (const item of input.attentionItems) {
     if (!item.dueAt || (item.status !== "open" && item.status !== "snoozed")) continue;
     const confirmed = item.kind === "commitment";
-    add(confirmed ? "deadline" : "unconfirmed_suggestion", item.id, item.title, item.dueAt, item.affairId, confirmed);
+    add({ kind: confirmed ? "deadline" : "unconfirmed_suggestion", sourceId: item.id,
+      title: item.title, startsAt: item.dueAt, affairId: item.affairId, confirmed });
   }
   for (const followUp of input.followUps) {
-    if (followUp.status === "pending") add("follow_up", followUp.id, followUp.note, followUp.dueAt, followUp.affairId, true);
+    if (followUp.status === "pending") add({
+      kind: "follow_up", sourceId: followUp.id, title: followUp.note,
+      startsAt: followUp.dueAt, affairId: followUp.affairId, confirmed: true,
+    });
   }
   for (const delegation of input.delegations) {
-    if (delegation.status !== "active" || delegation.cadenceSeconds === null || !Number.isFinite(delegation.cadenceSeconds) || delegation.cadenceSeconds <= 0) continue;
-    const next = delegation.lastCheckAt === null ? Date.parse(input.now) : Date.parse(delegation.lastCheckAt) + delegation.cadenceSeconds * 1000;
-    if (!Number.isFinite(next)) continue;
-    if (delegation.expiresAt && Date.parse(delegation.expiresAt) <= Math.max(Date.parse(input.now), next)) continue;
-    add("steward_check", delegation.id, delegation.purpose, new Date(next).toISOString(), delegation.affairId, true);
+    items.push(...delegationCheck(delegation, input.now));
   }
   const start = Date.parse(from);
   const end = Date.parse(to);

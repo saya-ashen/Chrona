@@ -65,7 +65,12 @@ const bucket = (facts: unknown) => encodeURIComponent(JSON.stringify(facts));
 export function suggestionDedupeFamily(dedupeKey: string): string {
   return dedupeKey.slice(0, dedupeKey.lastIndexOf(":"));
 }
-function candidate(detector: Detector, affair: SnapshotAffair, facts: unknown, whatHappened: string, whyItMatters: string, nextStep: string): SuggestionCandidate {
+function candidate(
+  detector: Detector,
+  affair: SnapshotAffair,
+  facts: unknown,
+  [whatHappened, whyItMatters, nextStep]: [string, string, string],
+): SuggestionCandidate {
   return {
     dedupeKey: `suggest:${detector}:${encodeURIComponent(affair.id)}:${bucket(facts)}`,
     kind: "suggestion", affairId: affair.id, title: affair.title,
@@ -90,10 +95,10 @@ export function detectApproachingDeadlines(snapshot: SuggestionSnapshot, now: st
     return due.filter(i => {
       const remaining = i.dueAt === null ? NaN : Date.parse(i.dueAt) - time;
       return remaining >= 0 && remaining <= DEADLINE_HORIZON_MS && open.some(d => d.kind === "decision" && (i.source !== "attention" || d.id !== i.id));
-    }).map(i => candidate("deadline", affair, [i.source, i.id, i.dueAt],
+    }).map(i => candidate("deadline", affair, [i.source, i.id, i.dueAt], [
       "A deadline is within 72 hours while preparation decisions remain open.",
       "Unfinished preparation could prevent meeting the deadline.",
-      "Finish preparation or decide the remaining questions before the deadline."));
+      "Finish preparation or decide the remaining questions before the deadline."]));
   });
 }
 
@@ -116,10 +121,10 @@ export function detectStalledGoals(snapshot: SuggestionSnapshot, now: string): S
     ].filter((date): date is string => typeof date === "string").map(Date.parse);
     // Future or invalid activity cannot establish a period of inactivity.
     if (!activity.every(t => Number.isFinite(t) && time - t >= STALLED_AFTER_MS)) return [];
-    return [candidate("stalled_goal", affair, isoWeek(now),
+    return [candidate("stalled_goal", affair, isoWeek(now), [
       "This active goal has had no recorded activity for at least 14 days.",
       "A check-in can clarify whether the goal still deserves attention.",
-      "Check in on progress, or consider pausing or closing the affair.")];
+      "Check in on progress, or consider pausing or closing the affair."])];
   });
 }
 
@@ -147,10 +152,10 @@ export function detectRepeatedManualWork(snapshot: SuggestionSnapshot, now: stri
         ambiguity: "clear", existingToolFits: false,
         risk: events.some(e => e.disposition === "act") ? "high" : "low", valueWorthKeeping: true,
       });
-      return [{ ...candidate("repeated_manual", affair, pattern,
+      return [{ ...candidate("repeated_manual", affair, pattern, [
         "The same assessed pattern occurred at least three times in 14 days.",
         handling.rationale,
-        "Review this proposal first. Granting access is a separate step; nothing is enabled or authorized by this suggestion."),
+        "Review this proposal first. Granting access is a separate step; nothing is enabled or authorized by this suggestion."]),
         evidenceEventIds: events.map(e => e.id).sort(compare), handling,
         proposes: handling.mode === "delegation" ? "propose_delegation" as const : "propose_tool" as const,
       }];
@@ -167,26 +172,26 @@ export function detectWrapUpAfterAction(snapshot: SuggestionSnapshot, now: strin
     if (!pending.length && !resources.length) return [];
     return [candidate("wrap_up", affair,
       [decisions.map(i => `${i.id}:${i.decidedAt}`).sort(compare), pending.map(f => f.id).sort(compare), resources],
-      "All decisions were resolved within 48 hours, but follow-ups or ongoing services remain.",
+      ["All decisions were resolved within 48 hours, but follow-ups or ongoing services remain.",
       "Loose ends can keep work running after its purpose has been fulfilled.",
-      "Review pending follow-ups, pause the delegation, disable then retire the tool, or mark the affair done as appropriate.")];
+      "Review pending follow-ups, pause the delegation, disable then retire the tool, or mark the affair done as appropriate."])];
   });
 }
 
 export function detectSeasonOver(snapshot: SuggestionSnapshot, _now: string): SuggestionCandidate[] {
   return snapshot.affairs.filter(a => a.status === "closed" || a.status === "paused").flatMap(affair => {
     const resources = coverage(snapshot, affair.id);
-    return resources.length ? [candidate("season_over", affair, [affair.status, resources],
+    return resources.length ? [candidate("season_over", affair, [affair.status, resources], [
       "This paused or closed affair still has active delegations or enabled tools.",
       "Ongoing checks may no longer serve the affair's purpose.",
-      "Review and pause the remaining delegations or disable the enabled tools.")] : [];
+      "Review and pause the remaining delegations or disable the enabled tools."])] : [];
   });
 }
 
 export function applyRestraint(candidates: readonly SuggestionCandidate[], recentDecisions: readonly SuggestionDecision[], now: string, { maxPerRun = DEFAULT_MAX_PER_RUN }: { maxPerRun?: number } = {}): SuggestionCandidate[] {
   if (!Number.isInteger(maxPerRun) || maxPerRun < 0) throw new RangeError("maxPerRun must be a non-negative integer");
   const time = Date.parse(now);
-  const priority = (c: SuggestionCandidate) => priorities[c.dedupeKey.split(":")[1] as Detector] ?? Number.MAX_SAFE_INTEGER;
+  const priority = (c: SuggestionCandidate) => (priorities as Partial<Record<string, number>>)[c.dedupeKey.split(":")[1]] ?? Number.MAX_SAFE_INTEGER;
   const seen = new Set<string>();
   return candidates.filter(c => !recentDecisions.some(d => {
     if (d.dedupeFamily !== suggestionDedupeFamily(c.dedupeKey)) return false;

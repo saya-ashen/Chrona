@@ -51,6 +51,27 @@ function statusError(status: number): RedditInboxError {
     : status === 429 ? "rate_limit" : "http", status);
 }
 
+function transportError(error: unknown): RedditInboxError {
+  // Accept structured HTTP failures from injected transports; never forward their text.
+  const status = typeof error === "object" && error !== null && "status" in error ? error.status : null;
+  return typeof status === "number" ? statusError(status) : new RedditInboxError("transport");
+}
+
+function inboxItems(listing: z.infer<typeof listingSchema>): SourceItem[] {
+  return listing.data.children
+    .filter((child) => child.kind === "t1" || child.kind === "t4")
+    .map((child) => {
+      const data = messageSchema.parse(child.data);
+      if (!data.name.startsWith(`${child.kind}_`)) throw new RedditInboxError("invalid_response");
+      return {
+        externalId: data.name, title: data.subject ?? "", body: data.body,
+        author: data.author ?? "[deleted]",
+        url: evidenceUrl(data.context) ?? evidenceUrl(data.permalink),
+        occurredAt: new Date(data.created_utc * 1000).toISOString(),
+      };
+    });
+}
+
 /** Read-only mapping boundary. No default transport, token lookup, or network calls. */
 export function createRedditInboxSource(deps: RedditInboxDependencies = {}): SourceAdapter {
   async function token(config: RedditInboxConfig): Promise<string> {
@@ -85,26 +106,12 @@ export function createRedditInboxSource(deps: RedditInboxDependencies = {}): Sou
       try {
         response = await deps.fetchInbox({ token: accessToken, userAgent: config.userAgent, cursor });
       } catch (error) {
-        // Accept structured HTTP failures from injected transports; never forward their text.
-        const status = typeof error === "object" && error !== null && "status" in error ? error.status : null;
-        if (typeof status === "number") throw statusError(status);
-        throw new RedditInboxError("transport");
+        throw transportError(error);
       }
       if (response.status < 200 || response.status >= 300) throw statusError(response.status);
       try {
         const listing = listingSchema.parse(await response.json());
-        const newestFirst: SourceItem[] = listing.data.children
-          .filter((child) => child.kind === "t1" || child.kind === "t4")
-          .map((child) => {
-            const data = messageSchema.parse(child.data);
-            if (!data.name.startsWith(`${child.kind}_`)) throw new RedditInboxError("invalid_response");
-            return {
-              externalId: data.name, title: data.subject ?? "", body: data.body,
-              author: data.author ?? "[deleted]",
-              url: evidenceUrl(data.context) ?? evidenceUrl(data.permalink),
-              occurredAt: new Date(data.created_utc * 1000).toISOString(),
-            };
-          });
+        const newestFirst = inboxItems(listing);
         const boundary = cursor === null ? -1 : newestFirst.findIndex((item) => item.externalId === cursor);
         const fresh = boundary < 0 ? newestFirst : newestFirst.slice(0, boundary);
         return {

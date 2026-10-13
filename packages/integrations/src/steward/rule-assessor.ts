@@ -1,5 +1,31 @@
 import { AssessorUnavailableError } from "@chrona/contracts/steward";
-import type { Assessor, AssessmentProposal } from "@chrona/contracts/steward";
+import type { Assessor, AssessmentInput, AssessmentProposal } from "@chrona/contracts/steward";
+
+function matchingAffair(text: string, candidateAffairs: AssessmentInput["candidateAffairs"]): string | null {
+  const normalized = text.toLowerCase();
+  const matches = new Set(candidateAffairs.filter((affair) => affair.keywords.some((keyword) =>
+    keyword.trim().length > 0 && normalized.includes(keyword.trim().toLowerCase()),
+  )).map((affair) => affair.id));
+  return matches.size === 1 ? [...matches][0] : null;
+}
+
+function explicitDueAt(text: string): string | null {
+  const dateText = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  const parsedDate = dateText ? new Date(`${dateText}T00:00:00.000Z`) : null;
+  return parsedDate && Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === dateText
+    ? parsedDate.toISOString() : null;
+}
+
+function datedRequest(proposal: AssessmentProposal, dueAt: string | null, occurredAt: string): AssessmentProposal {
+  const fallback = new Date(Date.parse(occurredAt) + 86_400_000);
+  if (!dueAt && !Number.isFinite(fallback.getTime())) throw new Error("Invalid event occurredAt for follow-up proposal");
+  return {
+    ...proposal, disposition: "await_decision", proposedAction: "notify_user",
+    whyItMatters: "A request includes a date or deadline; user confirmation is required.",
+    nextStep: "Confirm the request and proposed follow-up; no external action has been authorized.",
+    followUp: { note: "Review the dated request; confirm its deadline before acting.", dueAt: dueAt ?? fallback.toISOString() },
+  };
+}
 
 /**
  * Deterministic, deliberately limited English rules, in priority order:
@@ -19,14 +45,8 @@ export function createRuleAssessor({ available }: { available: () => boolean }):
     async assess({ event, candidateAffairs }) {
       if (!available()) throw new AssessorUnavailableError();
       const text = `${event.title}\n${event.body}`;
-      const normalized = text.toLowerCase();
-      const matches = new Set(candidateAffairs.filter((affair) => affair.keywords.some((keyword) =>
-        keyword.trim().length > 0 && normalized.includes(keyword.trim().toLowerCase()),
-      )).map((affair) => affair.id));
-      const dateText = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
-      const parsedDate = dateText ? new Date(`${dateText}T00:00:00.000Z`) : null;
-      const dueAt = parsedDate && Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === dateText
-        ? parsedDate.toISOString() : null;
+      const affairId = matchingAffair(text, candidateAffairs);
+      const dueAt = explicitDueAt(text);
       const deadline = dueAt !== null || /\b(deadline|due|tomorrow)\b/i.test(text);
       const request = /\b(please|request|could you|can you|would you|need you|must|confirm|approve|submit)\b/i.test(text);
       const proposal: AssessmentProposal = {
@@ -34,18 +54,11 @@ export function createRuleAssessor({ available }: { available: () => boolean }):
         whatHappened: (event.title.trim() || event.body.trim() || "Source event received").slice(0, 4000),
         whyItMatters: "No explicit urgent request; include in the digest.",
         nextStep: "Review in the next digest.", proposedAction: "summarize",
-        affairId: matches.size === 1 ? [...matches][0] : null,
+        affairId,
         followUp: null,
       };
       if (deadline && request) {
-        const fallback = new Date(Date.parse(event.occurredAt) + 86_400_000);
-        if (!dueAt && !Number.isFinite(fallback.getTime())) throw new Error("Invalid event occurredAt for follow-up proposal");
-        return {
-          ...proposal, disposition: "await_decision", proposedAction: "notify_user",
-          whyItMatters: "A request includes a date or deadline; user confirmation is required.",
-          nextStep: "Confirm the request and proposed follow-up; no external action has been authorized.",
-          followUp: { note: "Review the dated request; confirm its deadline before acting.", dueAt: dueAt ?? fallback.toISOString() },
-        };
+        return datedRequest(proposal, dueAt, event.occurredAt);
       }
       if (/[?？]/.test(text) && /\b(you|your)\b/i.test(text)) {
         return { ...proposal, disposition: "notify_now", proposedAction: "notify_user",
