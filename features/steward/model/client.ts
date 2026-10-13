@@ -30,8 +30,7 @@ export function createStewardClient(workspaceId: string) {
     connections: (signal?: AbortSignal) => request("/connections", list(c.connectionSchema), { signal }),
     createConnection: (input: z.input<typeof c.createConnectionSchema>) => request("/connections", c.connectionSchema, { method: "POST", body: c.createConnectionSchema.parse(input) }),
     transitionConnection: (connectionId: string, input: z.input<typeof c.connectionTransitionSchema>) => request(`/connections/${id(connectionId)}/transition`, c.connectionSchema, { method: "POST", body: c.connectionTransitionSchema.parse(input) }),
-    // The HTTP map specifies this response, but does not export a sync schema.
-    syncConnection: (connectionId: string) => request(`/connections/${id(connectionId)}/sync`, z.object({ received: z.number().int().min(0), duplicates: z.number().int().min(0), baseline: z.boolean() }).strict(), { method: "POST" }),
+    syncConnection: (connectionId: string) => request(`/connections/${id(connectionId)}/sync`, c.syncResultSchema, { method: "POST" }),
     events: (query: { status?: c.EventStatus; connectionId?: string } = {}, signal?: AbortSignal) => request("/events", list(c.inboundEventSchema), { query, signal }),
     linkEvent: (eventId: string, input: z.input<typeof c.eventLinkSchema>) => request(`/events/${id(eventId)}/link`, c.inboundEventSchema, { method: "POST", body: c.eventLinkSchema.parse(input) }),
     notifications: (signal?: AbortSignal) => request("/notifications", list(c.notificationSchema), { signal }),

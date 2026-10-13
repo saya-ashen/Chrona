@@ -203,12 +203,13 @@ export const proposeDelegationSchema = z.object({
 export const delegationTransitionSchema = z.object({ action: z.enum(DELEGATION_TRANSITIONS), expectedRevision: z.number().int().min(1) }).strict();
 export const attentionDecisionSchema = z.object({ decision: z.enum(ATTENTION_DECISIONS), snoozeUntil: iso.optional(), note: z.string().max(1000).optional() }).strict();
 export const eventLinkSchema = z.object({ decision: z.enum(["confirm", "reject"]), affairId: id.optional() }).strict();
+export const syncResultSchema = z.object({ received: z.number().int().min(0), duplicates: z.number().int().min(0), baseline: z.boolean() }).strict();
 export const toolTransitionSchema = z.object({ action: z.enum(TOOL_TRANSITIONS), expectedVersion: z.number().int().min(1) }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
- * All under /api/steward, workspace resolved the same way as existing
- * workspace-scoped routes. List endpoints return `{ items: T[] }`.
+ * All under /api/steward. Every request carries `?workspaceId=`; the server
+ * verifies membership. List endpoints return `{ items: T[] }`.
  *
  *   GET  /today                         -> TodayView
  *   GET  /health                        -> StewardHealth
@@ -220,7 +221,7 @@ export const toolTransitionSchema = z.object({ action: z.enum(TOOL_TRANSITIONS),
  *   POST /delegations/:id/transition    -> Delegation (409 on stale expectedRevision)
  *   GET  /connections | POST            -> {items: Connection[]} | Connection
  *   POST /connections/:id/transition    -> Connection
- *   POST /connections/:id/sync          -> {received: number, duplicates: number, baseline: boolean}
+ *   POST /connections/:id/sync          -> SyncResult
  *   GET  /events?status=&connectionId=  -> {items: InboundEvent[]}
  *   POST /events/:id/link               -> InboundEvent
  *   GET  /notifications                 -> {items: Notification[]}
@@ -296,4 +297,5 @@ export type ManagedTool = z.infer<typeof managedToolSchema>;
 export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
 export type StewardHealth = z.infer<typeof stewardHealthSchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
+export type SyncResult = z.infer<typeof syncResultSchema>;
 export type AffairDetail = z.infer<typeof affairDetailSchema>;
