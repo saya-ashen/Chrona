@@ -58,6 +58,6 @@ export async function tick(ctx: Context) {
   await raiseDigests(ctx);
   const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now }).deliverDue();
   const lastTickAt = ctx.now();
-  await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name }, update: { lastTickAt } });
+  await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name, assessorAvailable: true }, update: { lastTickAt } });
   return { synced, syncFailed, assessed, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };
 }
