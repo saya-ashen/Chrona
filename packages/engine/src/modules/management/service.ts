@@ -1,6 +1,5 @@
 /* eslint-disable complexity -- Idempotency and all local mutation branches share one atomic command boundary. */
 import { db, withDatabaseTransaction } from "@/lib/db";
-import type { Prisma, ManagementCommand } from "@/generated/prisma/client";
 import { managementTools, managementCreateSchema, managementUpdateSchema, managementActionSchema, managementDeleteSchema, managementSearchSchema, managementReadSchema, managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema, managementGoalUpdateSchema, type ManagementToolName } from "@chrona/contracts/api";
 import { stableJsonHash } from "../ai";
 import { appendCanonicalEvent, withCommandActor } from "../events";
@@ -17,11 +16,10 @@ import { applyGoalUpdate, goalUpdatePreview, prepareGoalUpdate } from "./goal-up
 import { callManagementWorkResult, isWorkResultTool, managementRequestLimit } from "./work-results";
 import { callManagementWorkRecord, isWorkRecordTool } from "./work-records";
 import { callManagementLibrary, isLibraryTool } from "./library";
+import { callManagementSteward, isStewardTool } from "./steward";
 
-export const managementJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-export function commandReceipt(command: ManagementCommand, replayed = false) {
-  return { commandId: command.id, requestId: command.requestId, taskId: command.taskId, phase: command.phase, state: command.state, errorCode: command.errorCode, replayed, recordedAt: command.updatedAt.toISOString(), result: command.result };
-}
+import { commandReceipt, managementJson } from "./receipts";
+export { commandReceipt, managementJson } from "./receipts";
 export function createManagementService(deps: ManagementDeps) {
   return {
     authorize: requireManagementClient,
@@ -36,9 +34,10 @@ export function createManagementService(deps: ManagementDeps) {
         if (isWorkResultTool(name)) return managementSuccess(await callManagementWorkResult(client, name, raw));
         if (isWorkRecordTool(name)) return managementSuccess(await callManagementWorkRecord(client, name, raw));
         if (isLibraryTool(name)) return managementSuccess(await callManagementLibrary(client, name, raw));
+        if (isStewardTool(name)) return managementSuccess(await callManagementSteward(client, name, raw));
         const input = managementTools[name].parse(raw);
         if (name === "chrona_context_read") {
-          requireScopes(client, [client.scopes.includes("goals:read") ? "goals:read" : "tasks:read"]);
+          requireScopes(client, [client.scopes.includes("steward:read") ? "steward:read" : client.scopes.includes("goals:read") ? "goals:read" : "tasks:read"]);
           return managementSuccess(await readManagementContext(client));
         }
         if (name === "chrona_goal_search") return managementSuccess(await searchManagementGoals(client, managementGoalSearchSchema.parse(raw)));
