@@ -575,10 +575,13 @@ model ManagedTool {
   dataScopes Json @default("[]")
   version Int @default(1)
   state String @default("generated")
+  spec Json @default("{}")
   validationSummary String?
   validatedVersion Int?
   authorizedAt DateTime?
   enabledAt DateTime?
+  disabledAt DateTime?
+  retiredAt DateTime?
   lastRunAt DateTime?
   lastSuccessAt DateTime?
   lastFailureAt DateTime?

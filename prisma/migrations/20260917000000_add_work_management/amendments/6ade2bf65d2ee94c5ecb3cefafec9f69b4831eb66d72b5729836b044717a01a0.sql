@@ -577,3 +577,8 @@ BEGIN SELECT RAISE(ABORT, 'Steward reference outside workspace'); END;
 CREATE TRIGGER "StewardState_workspace_immutable" BEFORE UPDATE OF "workspaceId" ON "StewardState"
 WHEN NEW."workspaceId" <> OLD."workspaceId"
 BEGIN SELECT RAISE(ABORT, 'Steward workspace is immutable'); END;
+
+-- Declarative managed-tool definitions and terminal lifecycle timestamps.
+ALTER TABLE "ManagedTool" ADD COLUMN "spec" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "ManagedTool" ADD COLUMN "disabledAt" DATETIME;
+ALTER TABLE "ManagedTool" ADD COLUMN "retiredAt" DATETIME;
