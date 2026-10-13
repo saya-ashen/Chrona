@@ -9,7 +9,7 @@ const line = "20260917000000_add_work_management";
 const sourceChecksum = "ce1507f2ba993846c0217104328faf65b81bda6844d2b4d252974022d5208678";
 const models = ["Affair", "SourceConnection", "InboundEvent", "EventAssessment", "Delegation", "AttentionItem", "StewardNotification", "FollowUp", "ManagedTool", "StewardAudit", "StewardState"];
 
-test("pre-steward checksum amendment preserves rows, matches fresh schema and survives repeated startup", () => {
+test.each([sourceChecksum, "d40b2835c76cf160e2576988c1b07d32d8751f5bf3b5bdddb2127da4ad6f7dc7"])("checksum %s amendment preserves rows, matches fresh schema and survives repeated startup", (sourceChecksum) => {
   const dir = mkdtempSync(join(import.meta.dir, ".steward-migration-"));
   const path = join(dir, "upgrade.sqlite"), fresh = join(dir, "fresh.sqlite");
   try {
@@ -27,6 +27,7 @@ test("pre-steward checksum amendment preserves rows, matches fresh schema and su
       expect(schemaFingerprint(before)).toBe(amendment.fromSchemaFingerprint);
       before.run(`INSERT INTO _prisma_migrations(id,checksum,migration_name,finished_at,applied_steps_count) VALUES('steward-baseline',?,?,CURRENT_TIMESTAMP,1)`, [sourceChecksum, line]);
       before.exec(`INSERT INTO Workspace(id,name,status,updatedAt) VALUES('preserved','Keep','Active',CURRENT_TIMESTAMP)`);
+      if (sourceChecksum.startsWith("d40b")) before.exec(`INSERT INTO ManagedTool(id,workspaceId,kind,name,purpose,handlingMode,selectionRationale,updatedAt) VALUES('kept','preserved','script','Keep','Test','script','Stable',CURRENT_TIMESTAMP)`);
     } finally { before.close(); }
     expect(ensureSqliteDatabase({ databaseUrl: `file:${path}`, migrationsDir }).preUpgradeBackup).toBeTruthy();
     expect(ensureSqliteDatabase({ databaseUrl: `file:${path}`, migrationsDir }).preUpgradeBackup).toBeNull();
@@ -36,7 +37,9 @@ test("pre-steward checksum amendment preserves rows, matches fresh schema and su
       expect(after.query("SELECT name FROM Workspace WHERE id='preserved'").get()).toEqual({ name: "Keep" });
       expect(schemaFingerprint(after)).toBe(schemaFingerprint(installed));
       expect(schemaFingerprint(after)).toBe(metadata.releaseLineSchemaFingerprint);
-      for (const name of models) expect(after.query(`SELECT COUNT(*) AS n FROM "${name}"`).get()).toEqual({ n: 0 });
+      for (const name of models) expect(after.query(`SELECT COUNT(*) AS n FROM "${name}"`).get()).toEqual({ n: name === "ManagedTool" && sourceChecksum.startsWith("d40b") ? 1 : 0 });
+      if (sourceChecksum.startsWith("d40b")) expect(after.query("SELECT spec,disabledAt,retiredAt FROM ManagedTool WHERE id='kept'").get()).toEqual({ spec: "{}", disabledAt: null, retiredAt: null });
+      expect(after.query("PRAGMA table_info('ManagedTool')").all().map((c) => (c as { name: string }).name)).toContain("spec");
       expect(after.query("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(after.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
     } finally { after.close(); installed.close(); }
