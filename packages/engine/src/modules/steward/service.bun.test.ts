@@ -33,6 +33,16 @@ test("baseline never produces attention; concurrent sync and assessed replay are
   expect(await service.attention.list()).toHaveLength(1); expect(await db.eventAssessment.count()).toBe(1);
   expect((await service.attention.list())[0].evidence[0]).toMatchObject({ label: "Message new", excerpt: "evidence" });
 });
+test("first sync stores a current condition as pending while ordinary history remains baseline", async () => {
+  items = [item("history"), { ...item("live-condition"), current: true }];
+  const connection = await service.connections.create({ kind: "local_test", label: "Test current condition" });
+  expect(await service.syncConnection(connection.id)).toEqual({ received: 2, duplicates: 0, baseline: true });
+  expect(await db.inboundEvent.findFirstOrThrow({ where: { externalId: "history" } })).toMatchObject({ status: "baseline" });
+  expect(await db.inboundEvent.findFirstOrThrow({ where: { externalId: "live-condition" } })).toMatchObject({ status: "pending" });
+  expect(await service.syncConnection(connection.id)).toEqual({ received: 0, duplicates: 2, baseline: false });
+  expect(await service.processPendingEvents()).toEqual({ assessed: 1 });
+  expect(await db.inboundEvent.findFirstOrThrow({ where: { externalId: "history" } })).toMatchObject({ status: "baseline" });
+});
 test("separate clients sharing a file cannot duplicate an inbound event", async () => {
   const connection = await baseline(); items.push(item("concurrent")); const second = client();
   try {
