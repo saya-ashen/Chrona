@@ -1,6 +1,7 @@
 import type { Prisma, AttentionItem } from "@chrona/db/generated/prisma/client";
 import { notificationPolicySchema, attentionDecisionSchema, type AttentionStatus, type TodayView, type StewardHealth } from "@chrona/contracts/steward";
 import { attentionView, audit, StewardError, type Context } from "./mappers";
+import { readableResultContent } from "../results/readable-content";
 import { DISMISS_COOLDOWN_MS, LESS_OFTEN_COOLDOWN_MS } from "@chrona/domain/steward/suggestions";
 
 // Repeated-work fact buckets persist the normalized disposition:pattern. The
@@ -85,5 +86,21 @@ async function approveSuggestion(tx: Prisma.TransactionClient, ctx: Context, row
 export async function today(ctx: Context): Promise<TodayView> {
   const items = await listAttention(ctx, "open");
   const follows = await ctx.db.followUp.findMany({ where: { workspaceId: ctx.actor.workspaceId, status: "pending" }, orderBy: { dueAt: "asc" }, take: 50 });
-  return { generatedAt: ctx.now().toISOString(), decisions: items.filter(i => i.kind === "decision"), changes: items.filter(i => i.kind === "change" || i.kind === "failure"), commitments: items.filter(i => i.kind === "commitment"), suggestions: items.filter(i => i.kind === "suggestion"), results: items.filter(i => i.kind === "result"), upcoming: follows.map(f => ({ id: f.id, kind: "follow_up", title: f.note.slice(0, 200), startsAt: f.dueAt.toISOString(), endsAt: null, affairId: f.affairId, sourceRef: f.id, confirmed: true })), health: await health(ctx) };
+  // The result reader is task-scoped; this workspace projection reuses its
+  // semantic-content fallback without reading artifacts or execution records.
+  const versions = await ctx.db.taskResultVersion.findMany({
+    where: { result: { workspaceId: ctx.actor.workspaceId, task: { workspaceId: ctx.actor.workspaceId } } },
+    orderBy: [{ publishedAt: "desc" }, { id: "desc" }], take: 20,
+    select: { id: true, version: true, content: true, publishedAt: true,
+      result: { select: { taskId: true, task: { select: { title: true } } } },
+      reviews: { orderBy: { revision: "desc" }, take: 1, select: { decision: true } },
+    },
+  });
+  const recentResults = versions.map(row => ({
+    id: row.id, taskId: row.result.taskId, taskTitle: row.result.task.title,
+    title: readableResultContent(row.content, false).content.outcome.title,
+    version: row.version, reviewState: row.reviews[0]?.decision ?? "unreviewed",
+    publishedAt: row.publishedAt.toISOString(), href: `/tasks/${row.result.taskId}/results`,
+  }));
+  return { recentResults, generatedAt: ctx.now().toISOString(), decisions: items.filter(i => i.kind === "decision"), changes: items.filter(i => i.kind === "change" || i.kind === "failure"), commitments: items.filter(i => i.kind === "commitment"), suggestions: items.filter(i => i.kind === "suggestion"), results: items.filter(i => i.kind === "result"), upcoming: follows.map(f => ({ id: f.id, kind: "follow_up", title: f.note.slice(0, 200), startsAt: f.dueAt.toISOString(), endsAt: null, affairId: f.affairId, sourceRef: f.id, confirmed: true })), health: await health(ctx) };
 }

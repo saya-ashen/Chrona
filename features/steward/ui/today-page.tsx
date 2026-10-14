@@ -5,6 +5,7 @@ import { Alert, AlertTitle, AlertDescription } from "@shared/ui";
 import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { attentionDecisions, deriveToday, evidenceHref } from "../model/today";
 
+import { LocalizedLink } from "./localized-link";
 import { StewardStatus } from "./steward-status";
 
 export function TodayPage({ workspaceId }: { workspaceId: string }) {
@@ -22,9 +23,18 @@ export function TodayPage({ workspaceId }: { workspaceId: string }) {
     {view && <>
       {view.empty && <p role="status">{view.allClear ? copy.allClear : copy.noAttention}</p>}
       {view.issues.length > 0 && <Alert><AlertTitle>{copy.health}</AlertTitle><AlertDescription><ul className="space-y-1">{view.issues.map(issue => <li key={issue.kind}>{copy[issue.kind]}{issue.count !== null && `: ${issue.count}`}{issue.since && <p>{copy.oldestPending}: <time dateTime={issue.since}>{issue.since}</time></p>}</li>)}</ul></AlertDescription></Alert>}
-      {view.sections.filter(section => section.items.length > 0).map(section => <section key={section.key} aria-labelledby={`steward-${section.key}`} className="space-y-3">
+      {view.sections.filter(section => section.items.length > 0 || section.recentResults.length > 0).map(section => <section key={section.key} aria-labelledby={`steward-${section.key}`} className="space-y-3">
         <h2 id={`steward-${section.key}`} className="text-xl font-semibold">{copy[section.key]}</h2>
         {section.items.map(item => <AttentionCard key={item.id} item={item} mutation={mutation} />)}
+        {section.recentResults.map(result => <Card key={result.id} className="min-w-0">
+          <CardHeader><CardTitle><h3><LocalizedLink className="underline" href={result.href}>{result.title}</LocalizedLink></h3></CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <p>{copy.resultTask}: {result.taskTitle}</p>
+            <p>{copy.resultVersion}: {result.version}</p>
+            <p>{copy.resultReview}: <Badge variant="outline">{Object.hasOwn(copy.resultReviews, result.reviewState) ? copy.resultReviews[result.reviewState as keyof typeof copy.resultReviews] : result.reviewState}</Badge></p>
+            <p>{copy.resultPublished}: <time dateTime={result.publishedAt}>{result.publishedAt}</time></p>
+          </CardContent>
+        </Card>)}
       </section>)}
     </>}
   </div>;

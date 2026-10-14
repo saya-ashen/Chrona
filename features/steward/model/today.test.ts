@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { attentionDecisions, decisionInput, deriveToday, evidenceHref, TODAY_SECTIONS } from "./today";
-import { decisionItem, emptyToday, timestamp } from "./fixtures";
+import { decisionItem, emptyToday, publishedResult, timestamp } from "./fixtures";
 import type { AttentionKind, AttentionStatus, StewardHealth } from "@chrona/contracts";
 
 describe("Today projection", () => {
@@ -10,6 +10,13 @@ describe("Today projection", () => {
     const model = deriveToday(view);
     expect(model.sections.map(section => section.key)).toEqual(TODAY_SECTIONS);
     expect(model.empty).toBe(false); expect(model.allClear).toBe(false);
+  });
+  it("includes published versions in the results section without claiming all-clear", () => {
+    const view = emptyToday(); view.recentResults = [publishedResult()];
+    const model = deriveToday(view);
+    expect(model).toMatchObject({ empty: false, allClear: false });
+    expect(model.sections.find(section => section.key === "results")?.recentResults).toEqual(view.recentResults);
+    expect(model.sections.filter(section => section.key !== "results").every(section => section.recentResults.length === 0)).toBe(true);
   });
   it.each<[string, Partial<StewardHealth>]>([
     ["assessor", { assessor: { available: false, name: "test", lastError: null } }],
