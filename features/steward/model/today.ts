@@ -20,9 +20,9 @@ export function healthIssues(health: StewardHealth) {
   ];
 }
 export function deriveToday(view: TodayView) {
-  const sections = TODAY_SECTIONS.map(key => ({ key, items: view[key] }));
+  const sections = TODAY_SECTIONS.map(key => ({ key, items: view[key], recentResults: key === "results" ? view.recentResults : [] }));
   const issues = healthIssues(view.health);
-  const empty = sections.every(section => section.items.length === 0);
+  const empty = sections.every(section => section.items.length === 0 && section.recentResults.length === 0);
   return { sections, issues, empty, allClear: empty && issues.length === 0 };
 }
 /** Evidence URLs are untrusted. Never make javascript/data URLs navigable. */
