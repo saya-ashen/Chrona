@@ -13,7 +13,7 @@ const prose = z.string().trim().min(1).max(4000);
 // ---------------------------------------------------------------- vocab ----
 
 export const AFFAIR_STATUSES = ["active", "watching", "paused", "closed"] as const;
-export const CONNECTION_KINDS = ["local_test", "reddit_inbox"] as const;
+export const CONNECTION_KINDS = ["local_test", "reddit_inbox", "chino_service_health"] as const;
 /** How events arrive. A callable tool does not imply `webhook`. */
 export const CONNECTION_MODES = ["poll", "webhook", "manual"] as const;
 export const CONNECTION_STATUSES = ["active", "paused", "revoked", "needs_authorization", "failing"] as const;
@@ -174,11 +174,20 @@ export const stewardHealthSchema = z.object({
   failingConnections: z.number().int().min(0), lastTickAt: iso.nullable(),
 }).strict();
 
+/** One published version from the existing results layer; `href` is app-relative without the locale prefix. */
+export const resultSummarySchema = z.object({
+  id, taskId: id, taskTitle: z.string().max(500), title: z.string().max(500), version: z.number().int().min(1),
+  /** Review state as recorded by the results layer; publication is not acceptance. */
+  reviewState: z.string().max(40), publishedAt: iso, href: z.string().max(2048),
+}).strict();
+
 export const todayViewSchema = z.object({
   generatedAt: iso,
   decisions: z.array(attentionItemSchema), changes: z.array(attentionItemSchema),
   commitments: z.array(attentionItemSchema), suggestions: z.array(attentionItemSchema),
   results: z.array(attentionItemSchema), upcoming: z.array(scheduleItemSchema),
+  /** Newest published result versions, read-only; empty when the workspace has none. */
+  recentResults: z.array(resultSummarySchema).max(20).default([]),
   health: stewardHealthSchema,
 }).strict();
 
@@ -259,6 +268,11 @@ export const STEWARD_API_BASE = "/api/steward";
 export type SourceItem = {
   externalId: string; title: string; body: string; author: string;
   url: string | null; occurredAt: string; threadId?: string;
+  /**
+   * The item describes a condition that still holds now (e.g. a service that is
+   * down), not history. It is processed even on the first, baseline-building sync.
+   */
+  current?: boolean;
 };
 export type SourceReadiness =
   | { state: "ready" }
@@ -317,6 +331,7 @@ export type FollowUp = z.infer<typeof followUpSchema>;
 export type ManagedTool = z.infer<typeof managedToolSchema>;
 export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
 export type StewardHealth = z.infer<typeof stewardHealthSchema>;
+export type ResultSummary = z.infer<typeof resultSummarySchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
 export type HandlingSignalsInput = z.infer<typeof handlingSignalsSchema>;
 export type GeneratedTool = z.infer<typeof generatedToolSchema>;

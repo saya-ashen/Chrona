@@ -23,7 +23,7 @@ export async function syncConnection(ctx: Context, id: string, retry = 0): Promi
     const baseline = fresh.baselineAt === null, now = ctx.now(); let received = 0, duplicates = 0;
     for (const item of polled.items) {
       try {
-        await tx.inboundEvent.create({ data: { externalId: item.externalId, title: item.title, body: item.body, author: item.author, url: item.url, threadId: item.threadId, workspaceId: ctx.actor.workspaceId, connectionId: id, occurredAt: new Date(item.occurredAt), receivedAt: now, status: baseline ? "baseline" : "pending" } }); received++;
+        await tx.inboundEvent.create({ data: { externalId: item.externalId, title: item.title, body: item.body, author: item.author, url: item.url, threadId: item.threadId, workspaceId: ctx.actor.workspaceId, connectionId: id, occurredAt: new Date(item.occurredAt), receivedAt: now, status: baseline && !item.current ? "baseline" : "pending" } }); received++;
       } catch (error) {
         if (errorCode(error) === "P2002") duplicates++; else throw error;
       }
