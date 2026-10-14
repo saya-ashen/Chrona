@@ -126,17 +126,25 @@ Reddit/QQ。Reddit 收件箱只实现只读适配边界；未获账号授权时�
 
 ### 已实现但仅测试适配器
 
-- `local_test` 来源是进程内追加日志，不是真实 Reddit/QQ；重启测试需重放来源日志，数据库记录保持持久。
+- `local_test` 来源是进程内追加日志，不是真实来源；重启测试需重放来源日志，数据库记录保持持久。
 - 可脚本化 accepted/rejected/uncertain 的测试投递及 assessor 不可用开关，通过 `CHRONA_E2E_TEST_ROUTES=1`（或 `true`）的测试 seam 暴露；正常运行不注册测试投递通道。
 - Reddit 收件箱的只读映射/游标/错误边界只有注入式模拟测试；运行时未注入凭据或网络传输，没有真实账号验证。
+
+### 已接入真实来源与真实 Agent（2026-10-14）
+
+- `chino_service_health`：只读轮询 Chino 仪表盘 `GET http://127.0.0.1:8082/api/dashboard`（由宿主经 `CHRONA_STEWARD_CHINO_DASHBOARD_URL` 配置，仅限回环、无凭据）。只读取服务 id/名称/分类/状态/HTTP 状态/检查时间与网络状态，不读 `facts`/`insight` 等详情。按状态类别（正常 ↔ 异常）变迁产生事件；首次同步时正常状态只建基线，**当前仍在的异常**以 `SourceItem.current` 标记作为现状处理而非历史。两次轮询之间的短暂故障会漏掉，覆盖说明如实写明。
+- `pi-assessor-v1`：`CHRONA_STEWARD_ASSESSOR=pi` 时，每个待评估事件调用一次主机既有 `pi -p`（禁用工具、会话、扩展、技能、上下文文件），只传有界上下文，并声明其为不可信数据。输出经服务端 schema 严格校验；未知动作即无效，affair 猜测不在候选中则置空。Pi 只有评估权：权限仍由确定性判定决定，`reply_external` 等试点动作恒拒。进程失败/超时 → 事件保持 pending、健康页显示不可用；输出无效 → 计一次失败，五次后进入故障待处理。
+- 唯一调度权威仍是 Chrona 的 steward tick；Pi 不重试、不调度、不执行动作。tick 只把数据库阶段放进服务的串行队列，模型调用期间释放队列，因此慢模型不会阻塞今日页等请求。
+- 默认（未设置环境变量）仍是确定性的 `rule-assessor-v1`，界面标注为「规则评估（非 AI）」。
+- 已部署到 Chino 生产（`https://chrona.saya.love`），备份、恢复演练、迁移演练与上线验收见部署回执 `/var/lib/chrona-pi/deployment/20261014-steward/receipt.json`。
 
 ### 未实现或被阻塞
 
 - Reddit 真实读取：阻塞于**明确账号授权**，连接显示 `needs_authorization`；没有接入私人账号、没有 live verification。
-- 真实外部通知通道未实现；非测试通道只有 `in_app`。外部 Agent 的 `Assessor` 端口存在，但未接线；当前并非模型在理解消息。日常聊天接入不是本 steward 已实现能力。
-- 未迁移真实用户数据；本次 steward 重构没有部署或发布。旧成果层的历史部署记录不代表管家已上线。
+- 真实外部通知通道未实现；非测试通道只有 `in_app`（QQ 等外发未授权）。日常聊天接入不是本 steward 已实现能力。
+- 旧托管 workflow（Plan/Run/编排）尚未在代码中退役，仍在「旧版工作台」二级导航下运行；只完成了旧运行包与旧启动入口的停用归档。
 - 共享契约中的 membership 注释并非实际多用户权限：路由是单一本地 owner + workspace 数据范围。
-- Today 的成果分组尚未接上旧成果版本；工具是声明式规则/表格，不是任意脚本执行环境。
+- 工具是声明式规则/表格，不是任意脚本执行环境。Today 的「已完成成果」只读列出已有成果版本，发布不等于验收。
 
 ## 如何运行
 
@@ -155,6 +163,9 @@ bun run dev:web      # 只启动 Vite
 | `DATABASE_URL` / `CHRONA_DATA_DIR` | 选择独立开发 SQLite 与数据目录；不填真实账号凭据 |
 | `API_KEY` | 本地 owner Bearer 密钥；未配置时 steward 仅接受无 Authorization header 的请求，拒绝 scoped bearer |
 | `CHRONA_STEWARD_TICK_SECONDS` | 默认 60 秒；非正数或非有限数禁用自动 tick |
+| `CHRONA_STEWARD_ASSESSOR` | `pi` 使用主机 Pi 模型；其他值或未设置使用规则评估器 |
+| `CHRONA_STEWARD_PI_COMMAND` / `CHRONA_STEWARD_PI_MODEL` | 可选：Pi 可执行文件与模型；默认 `pi` 与 Pi 已配置的默认模型 |
+| `CHRONA_STEWARD_CHINO_DASHBOARD_URL` | 仅 Chino 宿主配置；回环 HTTP，未配置时该来源为 unsupported |
 | `CHRONA_E2E_TEST_ROUTES` | 仅隔离测试设置 `1`/`true`；启用 `/api/test/steward/*` 和 `local_test` 投递，正常开发/生产勿开 |
 | `NODE_ENV=test` / `BUN_ENV=test` | 不自动启动 steward 定时器；测试显式 tick |
 | `CHRONA_WEB_PORT` / `CHRONA_SERVER_WATCH=false` | 开发脚本的 Vite 端口 / 禁用 server watch |
