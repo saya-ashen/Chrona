@@ -50,28 +50,39 @@ async function recordAssessmentFailure(ctx: Context, event: Event, now: Date, un
   });
 }
 
-export async function processPendingEvents(ctx: Context, { limit = 50 }: { limit?: number } = {}) {
+/** Runs one database step in the service's serial queue; the default runs it directly. */
+export type Serialize = <T>(step: () => Promise<T>) => Promise<T>;
+const direct: Serialize = step => step();
+
+/**
+ * Database steps go through `serialize`; the assessor call does not, so a slow
+ * model never holds the queue that every other steward request waits on. A
+ * concurrent writer is safe: the claim in applyAssessment re-checks status.
+ */
+export async function processPendingEvents(ctx: Context, { limit = 50, serialize = direct }: { limit?: number; serialize?: Serialize } = {}) {
   const workspaceId = ctx.actor.workspaceId, now = ctx.now();
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError("limit must be 1..500");
-  if ((await ctx.db.stewardState.findUnique({ where: { workspaceId } }))?.assessorName === "external-agent") return { assessed: 0 };
-  const events = await ctx.db.inboundEvent.findMany({
-    where: { workspaceId, status: "pending", connection: { status: { in: ["active", "failing"] } }, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
-    orderBy: [{ receivedAt: "asc" }, { id: "asc" }], take: limit, include: { connection: true },
+  const events = await serialize(async () => {
+    if ((await ctx.db.stewardState.findUnique({ where: { workspaceId } }))?.assessorName === "external-agent") return [];
+    return ctx.db.inboundEvent.findMany({
+      where: { workspaceId, status: "pending", connection: { status: { in: ["active", "failing"] } }, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
+      orderBy: [{ receivedAt: "asc" }, { id: "asc" }], take: limit, include: { connection: true },
+    });
   });
   let assessed = 0;
   for (const event of events) {
     // Database context loading remains outside the assessor failure boundary.
-    const context = await loadAssessmentContext(ctx, event);
+    const input = await serialize(async () => assessmentInput(event, await loadAssessmentContext(ctx, event)));
     let proposal: AssessmentProposal;
     try {
-      proposal = proposalSchema.parse(await ctx.assessor.assess(assessmentInput(event, context)));
+      proposal = proposalSchema.parse(await ctx.assessor.assess(input));
     } catch (error) {
       const unavailable = error instanceof AssessorUnavailableError;
-      await recordAssessmentFailure(ctx, event, now, unavailable);
+      await serialize(() => recordAssessmentFailure(ctx, event, now, unavailable));
       if (unavailable) break;
       continue;
     }
-    if (await applyAssessment(ctx, event, proposal, ctx.assessor.name)) assessed++;
+    if (await serialize(() => applyAssessment(ctx, event, proposal, ctx.assessor.name))) assessed++;
   }
   return { assessed };
 }

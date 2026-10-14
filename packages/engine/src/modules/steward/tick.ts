@@ -1,5 +1,5 @@
 import { syncConnection } from "./ingest";
-import { processPendingEvents } from "./process";
+import { processPendingEvents, type Serialize } from "./process";
 import { createStewardDelivery } from "./delivery";
 import { createStewardFollowUps } from "./follow-ups";
 import { delegationView, type Context } from "./mappers";
@@ -15,8 +15,17 @@ function nextCadenceCheck(covering: ReturnType<typeof delegationView>[]) {
     : 0;
 }
 
-/** Chrona owns polling, assessment retries, follow-ups and delivery retries. */
-export async function tick(ctx: Context) {
+/**
+ * Chrona owns polling, assessment retries, follow-ups and delivery retries.
+ * Each database phase runs through `serialize`; model calls run between them.
+ */
+export async function tick(ctx: Context, serialize: Serialize = step => step()) {
+  const { synced, syncFailed, limits } = await serialize(() => syncDueConnections(ctx));
+  const { assessed } = await processPendingEvents(ctx, { serialize, ...(limits.length ? { limit: Math.min(...limits) } : {}) });
+  return serialize(() => afterAssessment(ctx, { synced, syncFailed, assessed }));
+}
+
+async function syncDueConnections(ctx: Context) {
   const workspaceId = ctx.actor.workspaceId;
   const now = ctx.now();
   const delegations = (await ctx.db.delegation.findMany({ where: { workspaceId, status: "active" } })).map(delegationView)
@@ -57,7 +66,11 @@ export async function tick(ctx: Context) {
       } });
     }
   }
-  const { assessed } = await processPendingEvents(ctx, limits.length ? { limit: Math.min(...limits) } : {});
+  return { synced, syncFailed, limits };
+}
+
+async function afterAssessment(ctx: Context, done: { synced: number; syncFailed: number; assessed: number }) {
+  const workspaceId = ctx.actor.workspaceId;
   const { raised } = await createStewardFollowUps({ db: ctx.db, workspaceId, now: ctx.now }).raiseDueFollowUps();
   let suggested = 0, suggestionFailed = 0;
   try { suggested = (await raiseSuggestions(ctx)).raised; }
@@ -66,5 +79,5 @@ export async function tick(ctx: Context) {
   const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now }).deliverDue();
   const lastTickAt = ctx.now();
   await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name, assessorAvailable: true }, update: { lastTickAt } });
-  return { synced, syncFailed, assessed, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };
+  return { ...done, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };
 }

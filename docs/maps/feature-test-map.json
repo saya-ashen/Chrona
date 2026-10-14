@@ -72336,6 +72336,11 @@
       ],
       "symbols": [
         {
+          "name": "Serialize",
+          "kind": "type",
+          "tests": []
+        },
+        {
           "name": "processPendingEvents",
           "kind": "function",
           "tests": []

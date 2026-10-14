@@ -23,6 +23,12 @@ export function createStewardService(ports: Ports) {
     const ctx = { ...ports, actor, now: ports.now ?? (() => new Date()) };
     return serial(ports.db, () => fn(ctx));
   }
+  /** Like run, but `fn` queues its own database phases so model calls do not block other requests. */
+  async function runPhased<T>(fn: (ctx: Context, queue: <R>(step: () => Promise<R>) => Promise<R>) => Promise<T>) {
+    const actor = await ports.authorize(true);
+    if (!actor.workspaceId || !actor.canWrite) throw new StewardError("FORBIDDEN", "Workspace access required");
+    return fn({ ...ports, actor, now: ports.now ?? (() => new Date()) }, step => serial(ports.db, step));
+  }
   return {
     getAssessmentMode: () => run(false, async ctx => ({ mode: await getAssessmentMode(ctx) })),
     setAssessmentMode: (mode: "builtin" | "external") => run(true, ctx => setAssessmentMode(ctx, mode)),
@@ -32,7 +38,7 @@ export function createStewardService(ports: Ports) {
       list: () => run(false, async ctx => { const rows = await ctx.db.sourceConnection.findMany({ where: { workspaceId: ctx.actor.workspaceId } }); return Promise.all(rows.map(r => mappedConnection(ctx, r.id))); }),
     },
     syncConnection: (id: string) => run(true, ctx => syncConnection(ctx, id)),
-    processPendingEvents: (input: { limit?: number } = {}) => run(true, ctx => processPendingEvents(ctx, input)),
+    processPendingEvents: (input: { limit?: number } = {}) => runPhased((ctx, serialize) => processPendingEvents(ctx, { ...input, serialize })),
     affairs: {
       create: (raw: unknown) => run(true, ctx => createAffair(ctx, raw)),
       update: (id: string, raw: unknown) => run(true, ctx => updateAffair(ctx, id, raw)),
@@ -59,7 +65,7 @@ export function createStewardService(ports: Ports) {
       run: (id: string, input: Omit<Parameters<Tools["run"]>[2], "actorKey">) => run(true, ctx => tools(ctx).run(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
     },
     schedule: (from: string, to: string) => run(false, ctx => schedule(ctx, from, to)),
-    tick: () => run(true, tick),
+    tick: () => runPhased(tick),
     delegations: {
       propose: (raw: unknown) => run(true, ctx => proposeDelegation(ctx, raw)),
       transition: (id: string, raw: unknown) => run(true, ctx => transitionDelegation(ctx, id, raw)),

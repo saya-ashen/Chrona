@@ -121,3 +121,17 @@ test("guessed affairs stay suggested; confirmed thread links are deterministic; 
   const attention = (await service.attention.list())[0]; await service.attention.decide(attention.id, { decision: "snooze", snoozeUntil: "2031-01-02T00:00:00Z" }); expect((await service.today()).changes).toHaveLength(1);
   clock = new Date("2031-01-03T00:00:00Z"); expect((await service.today()).changes).toHaveLength(2);
 });
+test("a slow assessor does not block other steward requests, and a concurrent pass applies once", async () => {
+  await incoming();
+  let release!: () => void, calls = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const slow = createStewardService({ ...ports, assessor: { name: "slow", assess: async () => { calls++; await gate; return proposal; } } });
+  const ticking = slow.processPendingEvents();
+  while (calls === 0) await new Promise(resolve => setTimeout(resolve, 5));
+  // The model call is in flight; reads and writes through the same database queue still complete.
+  expect((await service.health()).pendingEvents).toBe(1);
+  expect(await service.processPendingEvents()).toEqual({ assessed: 1 });
+  release();
+  expect(await ticking).toEqual({ assessed: 0 });
+  expect(await db.eventAssessment.count()).toBe(1); expect(await service.attention.list()).toHaveLength(1);
+});
