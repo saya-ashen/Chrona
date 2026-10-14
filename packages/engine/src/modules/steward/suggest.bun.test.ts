@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
-import { createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
+import { createChinoServiceHealthSource, createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
 import { DEFAULT_MAX_PER_RUN, DISMISS_COOLDOWN_MS } from "@chrona/domain/steward/suggestions";
 import { createStewardService } from "./index";
 import type { Context } from "./mappers";
@@ -22,7 +22,7 @@ beforeEach(async () => {
   at = new Date("2031-01-20T00:00:00Z");
   const actor = { workspaceId: "ws", actorKey: "test:owner", canWrite: true };
   ctx = { db, actor, authorize: async () => actor, now: () => at,
-    sources: { local_test: createLocalTestSource().adapter, reddit_inbox: createRedditInboxSource({}) },
+    sources: { local_test: createLocalTestSource().adapter, reddit_inbox: createRedditInboxSource({}), chino_service_health: createChinoServiceHealthSource() },
     assessor: createRuleAssessor({ available: () => true }), deliveryAdapters: { local_test: createTestDelivery().adapter } };
   service = createStewardService(ctx);
 });

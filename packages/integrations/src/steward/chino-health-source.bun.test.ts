@@ -10,7 +10,7 @@ const dashboard = (services = [service("a")], state = "healthy", checkedAt = t1)
 function fixture(initial = dashboard()) {
   let data = initial;
   const requests: RequestInit[] = [];
-  const fakeFetch = (async (_url: unknown, init: RequestInit) => { requests.push(init); return Response.json(data); }) as typeof fetch;
+  const fakeFetch = (async (_url: unknown, init: RequestInit) => { requests.push(init); return Response.json(data); });
   const source = createChinoServiceHealthSource({ url, fetch: fakeFetch });
   return { source, requests, set: (next: typeof initial) => { data = next; }, poll: (cursor: string | null = null) => source.poll(connection, cursor), restart: () => createChinoServiceHealthSource({ url, fetch: fakeFetch }) };
 }
@@ -78,7 +78,7 @@ test("new attention subjects emit; disappeared subjects are dropped silently", a
 
 test("dashboard and cursor fields outside the allowlist never escape", async () => {
   const forbidden = "PRIVATE_SENTINEL";
-  const data = { ...dashboard([{ ...service("a", "offline"), facts: forbidden, insight: forbidden, insightMessage: forbidden, quickActions: forbidden, href: forbidden, description: forbidden }]), layout: forbidden, resources: forbidden };
+  const data = { ...dashboard([Object.assign(service("a", "offline"), { facts: forbidden, insight: forbidden, insightMessage: forbidden, quickActions: forbidden, href: forbidden, description: forbidden })]), layout: forbidden, resources: forbidden };
   Object.assign(data.network, { explanation: forbidden, cause: forbidden });
   const f = fixture(data);
   const first = await f.poll(); expect(JSON.stringify(first)).not.toContain(forbidden);
@@ -96,7 +96,7 @@ for (const cursor of ["not-json", "null", "{}", '{"v":2,"services":{},"network":
 for (const candidate of [undefined, "", "not-url", "https://127.0.0.1:8082/api/dashboard", "http://example.com", "http://127.0.0.2", "http://localhost.evil.test", "http://user:pass@localhost", "http://[::2]"]) {
   test(`unsupported URL never fetches: ${candidate}`, async () => {
     let calls = 0;
-    const source = createChinoServiceHealthSource({ url: candidate, fetch: (async () => { calls++; throw new Error("test-only"); }) as typeof fetch });
+    const source = createChinoServiceHealthSource({ url: candidate, fetch: (async () => { calls++; throw new Error("test-only"); }) });
     expect((await source.readiness(connection)).state).toBe("unsupported");
     if (!candidate) expect(await source.readiness(connection)).toEqual({ state: "unsupported", reason: "Chino dashboard URL is not configured on this host" });
     await expect(source.poll(connection, null)).rejects.toThrow(); expect(calls).toBe(0);
@@ -105,7 +105,7 @@ for (const candidate of [undefined, "", "not-url", "https://127.0.0.1:8082/api/d
 for (const host of ["127.0.0.1", "localhost", "[::1]"]) {
   test(`loopback HTTP URL ready: ${host}`, async () => {
     const f = fixture();
-    const source = createChinoServiceHealthSource({ url: `http://${host}:8082/api/dashboard`, fetch: (async () => Response.json(dashboard())) as typeof fetch });
+    const source = createChinoServiceHealthSource({ url: `http://${host}:8082/api/dashboard`, fetch: (async () => Response.json(dashboard())) });
     expect(await source.readiness(connection)).toEqual({ state: "ready" });
     expect(await source.poll(connection, null)).toEqual(await f.poll());
   });
@@ -126,7 +126,7 @@ const invalidResponses: [string, () => Response][] = [
 ];
 for (const [label, response] of invalidResponses) {
   test(`${label} throws a sanitized failure`, async () => {
-    const source = createChinoServiceHealthSource({ url, fetch: (async () => response()) as typeof fetch });
+    const source = createChinoServiceHealthSource({ url, fetch: (async () => response()) });
     await expect(source.poll(connection, null)).rejects.toThrow("Chino dashboard poll failed");
   });
 }
@@ -138,7 +138,7 @@ test("timeout aborts transport and response body reads", async () => {
       signal = init.signal as AbortSignal;
       if (body) return new Response(new ReadableStream({ start(controller) { signal!.addEventListener("abort", () => controller.error(new Error("test-only body timeout"))); } }), { headers: { "Content-Type": "application/json" } });
       return new Promise<Response>((_resolve, reject) => { signal!.addEventListener("abort", () => reject(new Error("test-only transport timeout"))); });
-    }) as typeof fetch });
+    }) });
     await expect(source.poll(connection, null)).rejects.toThrow("Chino dashboard poll failed");
     expect(signal?.aborted).toBe(true);
   }

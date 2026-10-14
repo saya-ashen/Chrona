@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@chrona/db";
 import { createStewardService } from "@chrona/engine";
-import { createInAppDelivery, createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
+import { createChinoServiceHealthSource, createInAppDelivery, createLocalTestSource, createPiAssessor, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
 import type { StewardRoutePorts } from "./routes/steward.routes";
 import { areE2eTestRoutesEnabled } from "./routes/test-support.routes";
 
@@ -16,8 +16,15 @@ export function createStewardRuntime(db: PrismaClient, options: { now?: () => Da
   let available = true;
   const ports: StewardRoutePorts = {
     db, now: options.now,
-    sources: { local_test: localSource.adapter, reddit_inbox: createRedditInboxSource() },
-    assessor: createRuleAssessor({ available: () => available }),
+    sources: {
+      local_test: localSource.adapter, reddit_inbox: createRedditInboxSource(),
+      // Host-owned: only a host that runs the Chino dashboard configures this.
+      chino_service_health: createChinoServiceHealthSource({ url: process.env.CHRONA_STEWARD_CHINO_DASHBOARD_URL }),
+    },
+    // "pi" asks the host's Pi model; the default is the deterministic rule assessor, which is not AI.
+    assessor: process.env.CHRONA_STEWARD_ASSESSOR === "pi"
+      ? createPiAssessor({ command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL })
+      : createRuleAssessor({ available: () => available }),
     deliveryAdapters,
   };
   const service = (workspaceId: string) => createStewardService({ ...ports, authorize: async () => ({ workspaceId, actorKey: "owner:local", canWrite: true }) });

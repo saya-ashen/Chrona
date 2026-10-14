@@ -18,7 +18,7 @@ beforeEach(async () => {
   clock = new Date("2031-01-01T00:00:00Z"); items = [item("old")]; unavailable = false; pollFailed = false; polls = 0;
   proposal = { disposition: "digest", whatHappened: "New message", whyItMatters: "Needs attention", nextStep: "Review", proposedAction: null, affairId: null, followUp: null };
   const source: SourceAdapter = { kind: "local_test", mode: "poll", supportedActions: ["read_source"], coverageNote: "Test only", readiness: async () => ({ state: "ready" }), poll: async () => { polls++; if (pollFailed) throw new Error("secret must not be stored"); return { items, nextCursor: `cursor:${items.length}` }; } };
-  ports = { db, sources: { local_test: source, reddit_inbox: { ...source, kind: "reddit_inbox", readiness: async () => ({ state: "needs_authorization", reason: "No account" }) } }, assessor: { name: "fake", assess: async () => { if (unavailable) throw new AssessorUnavailableError(); return proposal; } }, now: () => clock, authorize: async () => ({ workspaceId: workspace.id, actorKey: "owner:test", canWrite: true }) };
+  ports = { db, sources: { local_test: source, reddit_inbox: { ...source, kind: "reddit_inbox", readiness: async () => ({ state: "needs_authorization", reason: "No account" }) }, chino_service_health: { ...source, kind: "chino_service_health" } }, assessor: { name: "fake", assess: async () => { if (unavailable) throw new AssessorUnavailableError(); return proposal; } }, now: () => clock, authorize: async () => ({ workspaceId: workspace.id, actorKey: "owner:test", canWrite: true }) };
   service = createStewardService(ports);
 });
 afterEach(async () => { await db.$disconnect(); });

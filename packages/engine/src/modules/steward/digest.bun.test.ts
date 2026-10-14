@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
-import { createLocalTestSource, createRedditInboxSource, createRuleAssessor, createInAppDelivery } from "@chrona/integrations/steward";
+import { createChinoServiceHealthSource, createLocalTestSource, createRedditInboxSource, createRuleAssessor, createInAppDelivery } from "@chrona/integrations/steward";
 import { createStewardService } from "./index";
 import type { Context } from "./mappers";
 import { raiseDigests } from "./digest";
@@ -21,7 +21,7 @@ beforeEach(async () => {
   const actor = { workspaceId: "ws", actorKey: "test:owner", canWrite: true };
   const source = createLocalTestSource().adapter;
   ctx = { db, actor, authorize: async () => actor, now: () => at,
-    sources: { local_test: { ...source, poll: async (...args) => { polls++; if (fail) throw new Error("secret raw adapter text"); return source.poll(...args); } }, reddit_inbox: createRedditInboxSource({}) },
+    sources: { local_test: { ...source, poll: async (...args) => { polls++; if (fail) throw new Error("secret raw adapter text"); return source.poll(...args); } }, reddit_inbox: createRedditInboxSource({}), chino_service_health: createChinoServiceHealthSource() },
     assessor: createRuleAssessor({ available: () => true }), deliveryAdapters: { in_app: createInAppDelivery() } };
   service = createStewardService(ctx);
 });

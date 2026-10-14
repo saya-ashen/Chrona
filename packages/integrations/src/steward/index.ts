@@ -5,4 +5,6 @@ export { createInAppDelivery } from "./in-app-delivery";
 export { createTestDelivery } from "./test-delivery";
 export type { TestDeliveryScriptOutcome, TestDeliveryRecord } from "./test-delivery";
 export { createRuleAssessor } from "./rule-assessor";
+export { createPiAssessor } from "./pi-assessor";
+export { createChinoServiceHealthSource } from "./chino-health-source";
 export { AssessorUnavailableError } from "@chrona/contracts/steward";

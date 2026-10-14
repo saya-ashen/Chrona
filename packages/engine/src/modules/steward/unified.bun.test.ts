@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
-import { createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
+import { createChinoServiceHealthSource, createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
 import { notificationSchema, followUpSchema, scheduleItemSchema } from "@chrona/contracts/steward";
 import { createStewardService, type StewardPorts } from "./index";
 
@@ -19,7 +19,7 @@ beforeEach(async () => {
   db = new PrismaClient({ adapter: new PrismaBunSqlite({ url }) });
   await db.workspace.createMany({ data: ["ws", "other"].map(id => ({ id, name: id, status: "Active" })) });
   at = new Date("2031-01-01T00:00:00Z"); available = true; source = createLocalTestSource(); sink = createTestDelivery();
-  ports = { db, now: () => at, sources: { local_test: source.adapter, reddit_inbox: createRedditInboxSource({}) }, assessor: createRuleAssessor({ available: () => available }), deliveryAdapters: { local_test: sink.adapter }, authorize: async () => ({ workspaceId: "ws", actorKey: "test:owner", canWrite: true }) };
+  ports = { db, now: () => at, sources: { local_test: source.adapter, reddit_inbox: createRedditInboxSource({}), chino_service_health: createChinoServiceHealthSource() }, assessor: createRuleAssessor({ available: () => available }), deliveryAdapters: { local_test: sink.adapter }, authorize: async () => ({ workspaceId: "ws", actorKey: "test:owner", canWrite: true }) };
 });
 afterEach(async () => { await db.$disconnect(); rmSync(directory, { recursive: true, force: true }); });
 async function setup() {

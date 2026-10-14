@@ -1,8 +1,13 @@
-import type { ConnectionKind, SyncResult } from "@chrona/contracts/steward";
+import type { ConnectionKind, SourceItem, SyncResult } from "@chrona/contracts/steward";
 import { connection } from "./connections";
 import { StewardError, type Context } from "./mappers";
 function errorCode(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error ? error.code : null;
+}
+
+/** A baseline sync records history without processing it; a still-current condition is processed. */
+function initialStatus(baseline: boolean, item: SourceItem) {
+  return baseline && !item.current ? "baseline" : "pending";
 }
 
 export async function syncConnection(ctx: Context, id: string, retry = 0): Promise<SyncResult> {
@@ -23,7 +28,7 @@ export async function syncConnection(ctx: Context, id: string, retry = 0): Promi
     const baseline = fresh.baselineAt === null, now = ctx.now(); let received = 0, duplicates = 0;
     for (const item of polled.items) {
       try {
-        await tx.inboundEvent.create({ data: { externalId: item.externalId, title: item.title, body: item.body, author: item.author, url: item.url, threadId: item.threadId, workspaceId: ctx.actor.workspaceId, connectionId: id, occurredAt: new Date(item.occurredAt), receivedAt: now, status: baseline && !item.current ? "baseline" : "pending" } }); received++;
+        await tx.inboundEvent.create({ data: { externalId: item.externalId, title: item.title, body: item.body, author: item.author, url: item.url, threadId: item.threadId, workspaceId: ctx.actor.workspaceId, connectionId: id, occurredAt: new Date(item.occurredAt), receivedAt: now, status: initialStatus(baseline, item) } }); received++;
       } catch (error) {
         if (errorCode(error) === "P2002") duplicates++; else throw error;
       }
