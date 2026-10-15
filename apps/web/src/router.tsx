@@ -6,8 +6,6 @@ import { TodayRoutePage } from "./pages";
 import { SettingsPage } from "@features/steward";
 import { AffairsPage } from "@features/steward/ui/affairs-page";
 import { AffairDetailPage } from "@features/steward/ui/affair-detail-page";
-import { PanelPage } from "@features/steward/ui/panel-page";
-import { ResultPage } from "@features/steward/ui/result-page";
 import { NotFoundPage } from "@/components/not-found-page";
 import { loadAppBootData } from "./loaders";
 
@@ -38,9 +36,7 @@ export function createAppRouter() {
         { path: "today", element: <LocaleRedirect today /> },
         { path: "affairs", element: <AffairsPage /> },
         { path: "affairs/:affairId", element: <AffairDetailPage /> },
-        { path: "affairs/:affairId/results/:version", element: <ResultPage /> },
         { path: "settings", element: <SettingsPage /> },
-        { path: "tools/:toolId", element: <PanelPage /> },
         { path: "*", element: <NotFoundPage /> },
       ],
     },
