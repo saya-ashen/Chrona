@@ -1,0 +1,127 @@
+import { describe, expect, test } from "bun:test";
+import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createPiProvider } from "./pi-provider";
+import type { ProviderRunInput } from "@chrona/contracts/steward";
+
+// Only fake subprocesses, never the installed model runner. Temp artifacts deliberately
+// remain in OS temp (worker task forbids deletions).
+async function fixture(mode = "normal") {
+  const cwd = await mkdtemp(join(tmpdir(), "chrona-pi-rpc-"));
+  const command = join(cwd, "pi");
+  await writeFile(command, `#!${process.execPath}
+import { appendFileSync, writeFileSync } from 'node:fs';
+if (process.argv.includes('--version')) process.exit(0);
+writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),env:process.env}));
+const mode=${JSON.stringify(mode)};
+let streaming=false, queue=0, cycle=0;
+const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
+const reply=(c,data={})=>emit({id:c.id,type:'response',command:c.type,success:true,data});
+function run() {
+ streaming=true; cycle++; emit({type:'agent_start'});
+ setTimeout(()=>{
+  if(mode==='error') emit({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:'failed '+process.env.CHRONA_AGENT_TOKEN}});
+  streaming=false; emit({type:'agent_end'});
+  if(queue) setTimeout(()=>{queue--; run();},45);
+ },100);
+}
+let buffer='';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data',chunk=>{
+ buffer+=chunk;
+ let n;
+ while((n=buffer.indexOf('\\n'))!==-1){
+  const c=JSON.parse(buffer.slice(0,n)); buffer=buffer.slice(n+1);
+  appendFileSync('commands.jsonl',JSON.stringify(c)+'\\n');
+  if(c.type==='get_state') reply(c,{sessionId:'retained-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
+  if(c.type==='prompt') {
+   reply(c);
+   if(mode==='crash'){process.stderr.write('crash '+process.env.CHRONA_AGENT_TOKEN);process.exit(7);}
+   else if(mode==='malformed') process.stdout.write('not-json\\n');
+   else if(mode==='partial') { const data=Buffer.from(JSON.stringify({type:'message_update',text:'你好\\u2028世界'})+'\\n'); process.stdout.write(data.subarray(0,43)); setTimeout(()=>{process.stdout.write(data.subarray(43));run();},10); }
+   else if(mode!=='hang') run();
+  }
+  if(c.type==='steer'||c.type==='follow_up'){queue++;reply(c);}
+  if(c.type==='abort'){reply(c); if(mode!=='hang')process.exit(0);}
+ }
+});
+process.stdin.on('end',()=>process.exit(0));
+`, { mode: 0o755 });
+  const provider = createPiProvider({ command, chronaExtension: join(cwd, "bridge.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+  const input: ProviderRunInput = { runId: "run", token: "private-run-token", lane: "foreground", cwd, sessionDir: join(cwd, ".chrona/sessions"), sessionId: "previous-id", prompt: "hello", deadline: new Date(Date.now() + 4000) };
+  const commands = async () => (await readFile(join(cwd, "commands.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  return { cwd, command, provider, input, commands };
+}
+async function until(check: () => Promise<boolean>) {
+  for (let i = 0; i < 100; i++) { if (await check().catch(() => false)) return; await Bun.sleep(10); }
+  throw new Error("fixture did not reach expected state");
+}
+describe("Pi RPC provider", () => {
+  test("session, tools, images, cwd and filtered environment", async () => {
+    const f = await fixture();
+    const before = process.env.CHRONA_DATABASE_SECRET;
+    process.env.CHRONA_DATABASE_SECRET = "must-not-leak";
+    try {
+      const handle = f.provider.start({ ...f.input, images: [{ mime: "image/png", base64: "YWJj" }] });
+      expect(await handle.done).toEqual({ outcome: "finished", sessionId: "retained-session", error: null });
+      const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+      expect(launch.cwd).toBe(f.cwd);
+      expect(launch.env.CHRONA_DATABASE_SECRET).toBeUndefined();
+      expect(launch.env.CHRONA_AGENT_TOKEN).toBe(f.input.token);
+      expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
+      const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
+      expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).not.toContain("bash"); expect(tools).not.toContain("web_search");
+      expect((await f.commands()).find(c => c.type === "prompt").images).toEqual([{ type: "image", mimeType: "image/png", data: "YWJj" }]);
+      expect(await f.provider.health()).toEqual({ available: true, sandboxed: false, error: null });
+    } finally { if (before === undefined) delete process.env.CHRONA_DATABASE_SECRET; else process.env.CHRONA_DATABASE_SECRET = before; }
+  });
+  test("steers during streaming and waits across agent_end with queued messages", async () => {
+    const f = await fixture(), handle = f.provider.start(f.input);
+    await until(async () => (await f.commands()).some(c => c.type === "prompt"));
+    await Bun.sleep(20);
+    await handle.inject("more", [{ mime: "image/jpeg", base64: "ZA==" }]);
+    expect((await f.commands()).some(c => c.type === "steer")).toBe(true);
+    expect((await handle.done).outcome).toBe("finished");
+    expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThan(2);
+  });
+  test("idle injection uses follow_up", async () => {
+    const f = await fixture(), handle = f.provider.start(f.input);
+    await handle.inject("queued before streaming");
+    expect((await handle.done).outcome).toBe("finished");
+    expect((await f.commands()).some(c => c.type === "follow_up")).toBe(true);
+  });
+  test.each(["partial", "malformed", "error", "crash"])("handles %s output", async mode => {
+    const f = await fixture(mode), result = await f.provider.start(f.input).done;
+    expect(result.outcome).toBe(mode === "partial" ? "finished" : "failed");
+    expect(result.error ?? "").not.toContain(f.input.token);
+    if (mode === "error" || mode === "crash") expect(result.error).toContain("[redacted]");
+  });
+  test("deadline sends abort and returns timed_out; explicit abort waits for exit", async () => {
+    const f = await fixture("hang");
+    expect((await f.provider.start({ ...f.input, deadline: new Date(Date.now() + 200) }).done).outcome).toBe("timed_out");
+    expect((await f.commands()).some(c => c.type === "abort")).toBe(true);
+    const second = f.provider.start(f.input);
+    await second.abort(); expect((await second.done).outcome).toBe("failed");
+    await expect(second.inject("late")).rejects.toThrow();
+  });
+  test("unavailable executable and expired deadline", async () => {
+    const f = await fixture();
+    const provider = createPiProvider({ command: join(f.cwd, "missing"), chronaExtension: "bridge.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    expect((await provider.health()).available).toBe(false);
+    expect((await provider.start(f.input).done).outcome).toBe("unavailable");
+    expect((await provider.start({ ...f.input, deadline: new Date(0) }).done).outcome).toBe("timed_out");
+  });
+  test("bwrap arguments bind cwd and Pi home, share network, and enable bash/web", async () => {
+    const f = await fixture();
+    const bwrap = join(f.cwd, "bwrap");
+    await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
+    const provider = createPiProvider({ command: f.command, bwrap, chronaExtension: "bridge.ts", webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    expect((await provider.start(f.input).done).outcome).toBe("finished");
+    const args = JSON.parse(await readFile(join(f.cwd, "bwrap.json"), "utf8"));
+    expect(args).toContain("--die-with-parent"); expect(args).toContain("--ro-bind"); expect(args).toContain("--tmpfs"); expect(args).not.toContain("--unshare-net");
+    expect(args[args.indexOf("--tools") + 1].split(",")).toContain("bash");
+    expect(args[args.indexOf("--tools") + 1].split(",")).toContain("web_search");
+    expect((await provider.health()).sandboxed).toBe(true);
+  });
+});
