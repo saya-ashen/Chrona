@@ -1,6 +1,6 @@
 import type { FileNode } from "@chrona/contracts";
 import { affairPathSchema } from "@chrona/contracts";
-import { parsePanelBlocks, toggleCheckbox, type PanelBlock } from "@chrona/domain/steward/markdown";
+import { parsePanelBlocks, toggleCheckbox, type PanelBlock } from "@chrona/domain";
 import { validatePanelEntry } from "./panel";
 export { toggleCheckbox };
 

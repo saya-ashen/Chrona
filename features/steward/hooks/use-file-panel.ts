@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { PanelBlock } from "@chrona/domain/steward/markdown";
+import type { PanelBlock } from "@chrona/domain";
 import type { StewardClient } from "../model/client";
 import { initialPanelValues, validatePanelEntry } from "../model/panel";
 import { panelRows } from "../model/affair-file";

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { notificationSchema, type NotifyLevel, type DeliveryOutcome } from "@chrona/contracts/steward";
 import { routeNotification, localDayKey, isDigestDue } from "@chrona/domain/steward/notify-budget";
 import { composeDigest } from "@chrona/domain/steward/digest";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
 import { requireAffair } from "./affairs";
 import { audit } from "./audit";

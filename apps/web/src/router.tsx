@@ -3,9 +3,7 @@ import { defaultLocale, hasLocale, resolveLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import { TodayRoutePage } from "./pages";
-import { SettingsPage } from "@features/steward";
-import { AffairsPage } from "@features/steward/ui/affairs-page";
-import { AffairDetailPage } from "@features/steward/ui/affair-detail-page";
+import { SettingsPage, AffairsPage, AffairDetailPage } from "@features/steward";
 import { NotFoundPage } from "@/components/not-found-page";
 import { loadAppBootData } from "./loaders";
 

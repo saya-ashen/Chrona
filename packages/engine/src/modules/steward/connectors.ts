@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { connectorSchema, inboundItemSchema, createConnectorSchema, updateConnectorSchema, RUN_LIMITS, type SourceItem } from "@chrona/contracts/steward";
 import type { Connector, Prisma } from "@chrona/db";
 import { applyRules } from "@chrona/domain/steward/rules";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { createSecrets } from "./secrets";
 import { createWorkspaceFs, type AffairFs } from "./workspace-fs";
 import { requireAffair } from "./affairs";

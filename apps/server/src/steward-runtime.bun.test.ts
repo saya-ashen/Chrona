@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testDb } from "../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime, stewardDataDir } from "./steward-runtime";
 const bwrapPath = Bun.which("bwrap") ?? undefined;
 const jobTest = createScriptSandbox({ bwrapPath }).health.available ? test : test.skip;

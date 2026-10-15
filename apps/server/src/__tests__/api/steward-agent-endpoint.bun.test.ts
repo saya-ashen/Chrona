@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testDb } from "../../../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";

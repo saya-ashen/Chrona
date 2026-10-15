@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { createSchedules } from "./schedules";
 import { createConnectors } from "./connectors";
 import { createRuns, liveRuns } from "./runs";

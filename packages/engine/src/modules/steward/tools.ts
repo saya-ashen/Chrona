@@ -2,7 +2,7 @@ import { z } from "zod";
 import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { authenticateRun } from "./runs";
 import { createAffairs, requireAffair } from "./affairs";
 import { createWorkspaceFs } from "./workspace-fs";

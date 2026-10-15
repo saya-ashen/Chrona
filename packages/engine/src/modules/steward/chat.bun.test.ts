@@ -3,7 +3,8 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
-import { createStewardService, type StewardPorts } from "./service";
+import { createStewardService } from "./service";
+import type { StewardPorts } from "./ports";
 import { liveRuns } from "./runs";
 import { testDb } from "./test-db";
 

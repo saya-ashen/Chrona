@@ -4,7 +4,7 @@ import { createWorkspaceFs } from "./workspace-fs";
 import { z } from "zod";
 import { attachmentSchema, messageSchema, type ChatReply, type Message } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";

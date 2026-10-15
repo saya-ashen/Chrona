@@ -6,7 +6,7 @@ import { createAppRouter } from "../router";
 import en from "../../../../packages/i18n/src/messages/en.json";
 import zh from "../../../../packages/i18n/src/messages/zh.json";
 import { apiJson } from "@shared/http";
-import { emptyToday, chatFixture, detailFixture, fileFixture } from "../../../../features/steward/model/fixtures";
+import { emptyToday, chatFixture, detailFixture, fileFixture } from "@features/steward/test";
 
 vi.mock("../loaders", () => ({ loadAppBootData: async ({ params }: { params: { lang: string } }) => ({ locale: params.lang, dictionary: params.lang === "zh" ? zh : en, defaultWorkspace: { id: "ws-1", name: "Chrona" } }) }));
 vi.mock("@/components/access-key-gate", () => ({ AccessKeyGate: ({ children }: { children: React.ReactNode }) => children }));

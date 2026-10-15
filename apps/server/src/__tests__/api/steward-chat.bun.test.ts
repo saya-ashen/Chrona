@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testDb } from "../../../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { createStewardRoutes } from "../../routes/steward.routes";
 test("HTTP chat drives a fake provider and returns only chrona_reply messages", async () => {

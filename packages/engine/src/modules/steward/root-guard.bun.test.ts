@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, symlink, readlink } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "./test-db";
-import { createStewardService, type StewardPorts } from "./service";
+import { createStewardService } from "./service";
+import type { StewardPorts } from "./ports";
 import { guardWorkspaceRoot } from "./root-guard";
 
 async function fixture() {

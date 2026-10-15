@@ -1,4 +1,4 @@
-import { testDb } from "../../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 
 /** Disposable OS-temp database only; never reset the application's configured database. */
 export let db: ReturnType<typeof testDb>;

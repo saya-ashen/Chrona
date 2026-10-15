@@ -1,7 +1,6 @@
-import type { PrismaClient } from "@chrona/db";
-import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
+import type { StewardPorts } from "./ports";
 import { createAffairs } from "./affairs";
-import { createApprovals, type OnApproved } from "./approvals";
+import { createApprovals } from "./approvals";
 import { createTools } from "./tools";
 import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
@@ -14,19 +13,6 @@ import { createRuns } from "./runs";
 import { createTick } from "./tick";
 import { createChat } from "./chat";
 import { createConnectors } from "./connectors";
-export type StewardPorts = {
-  db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
-  deliveries: DeliveryAdapter[];
-  chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
-  provider?: ProviderAdapter;
-  chatTimeoutMs?: number;
-  onQueued?: () => Promise<unknown>;
-  onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
-  onApproved?: OnApproved;
-  connectors?: ConnectorAdapter[];
-  sandbox?: { available: boolean; run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }> };
-  gitHealth?: () => Promise<boolean>;
-};
 /** Authenticated owner boundary. */
 export function createStewardService(inputPorts: StewardPorts) {
   const ports: StewardPorts = Object.create(inputPorts);

@@ -11,5 +11,5 @@
     "@chrona/logging": "workspace:*",
     "@chrona/shared": "workspace:*"
   },
-  "exports": { ".": "./src/index.ts" }
+  "exports": { ".": "./src/index.ts", "./test-support": "./src/test-support.ts" }
 }

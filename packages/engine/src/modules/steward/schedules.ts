@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { requireAffair } from "./affairs";
 import { parseInput, StewardError } from "./errors";
 import { toSchedule } from "./store";

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { createWorkspaceFs } from "./workspace-fs";
 import { requireAffair } from "./affairs";
 import { notificationSettings } from "./settings";

@@ -1,5 +1,5 @@
 import { useI18n } from "@chrona/i18n";
-import type { PanelBlock } from "@chrona/domain/steward/markdown";
+import type { PanelBlock } from "@chrona/domain";
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { trendPoints } from "../model/panel";

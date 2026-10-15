@@ -1,4 +1,4 @@
-import { PageColumn } from "@features/steward/ui/layout";
+import { PageColumn } from "@features/steward";
 import { NavLink, Outlet, useLoaderData } from "react-router-dom";
 import { localizeHref, useI18n } from "@chrona/i18n";
 import { I18nProvider } from "@chrona/i18n/react";

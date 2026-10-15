@@ -1,4 +1,4 @@
-import { toolSpecSchema, validatePanelEntry, type ToolSpec } from "@chrona/domain/steward/tool-spec";
+import { toolSpecSchema, validatePanelEntry, type ToolSpec } from "@chrona/domain";
 export { toolSpecSchema, validatePanelEntry };
 export type { ToolSpec };
 export function initialPanelValues(spec: ToolSpec, now = new Date()): Record<string, string> {

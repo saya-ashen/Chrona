@@ -1,10 +1,9 @@
 import { createHash } from "node:crypto";
-import type { StewardService } from "@chrona/engine";
+import type { StewardService, StewardChatTransport } from "@chrona/engine";
 import type { PrismaClient } from "@chrona/db";
 import { attachmentSchema } from "@chrona/contracts/steward";
 import { createChronaQqDelivery, createQqBotHandler, createQqBotState, qqBotConfig, DEDICATED_PLATFORM } from "../../../packages/integrations/src/steward/qq-official-bot";
 import { uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
-import type { StewardChatTransport } from "./steward-runtime";
 
 /** Authenticated web downloads: never expose a local path or invent a public file URL. */
 export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null) {

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService } from "@chrona/engine";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
-import { testDb } from "../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { createQqBotState } from "../../../packages/integrations/src/steward/qq-official-bot";
 import { downloadQqAttachment, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
 import { createStewardQqBot, qqReplyText } from "./steward-qq-bot";

@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testDb } from "../../../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { createStewardRoutes } from "../../routes/steward.routes";
 let db: ReturnType<typeof testDb>, app: ReturnType<typeof createStewardRoutes>, service: ReturnType<typeof createStewardService>;

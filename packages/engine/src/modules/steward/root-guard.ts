@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { StewardPorts } from "./service";
+import type { StewardPorts } from "./ports";
 import { audit } from "./audit";
 
 /** Snapshot before launch; quarantine only newly created non-directory entries after exit.

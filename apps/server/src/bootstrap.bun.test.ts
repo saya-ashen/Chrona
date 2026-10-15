@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { testDb } from "../../../packages/engine/src/modules/steward/test-db";
+import { testDb } from "@chrona/engine/test-support";
 import { ensureDefaultWorkspace } from "./index.bun";
 
 test("fresh database gets default workspace without seed; repeated startup preserves user edits", async () => {
