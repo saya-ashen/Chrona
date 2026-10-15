@@ -9,7 +9,6 @@ test("HTTP chat drives a fake provider and returns only chrona_reply messages", 
   const db = testDb(), saved = process.env.API_KEY; process.env.API_KEY = "test-owner";
   try {
     await db.workspace.create({ data: { id: "w", name: "Test" } });
-    let service: ReturnType<typeof createStewardService>;
     const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-chat-")), now: () => new Date(), publicUrl: null, deliveries: [], chat: null, chatTimeoutMs: 2000,
       provider: { name: "fake", health: async () => ({ available: true, sandboxed: false, error: null }), start(input) {
         return { inject: async () => {}, abort: async () => {}, done: (async () => {
@@ -18,7 +17,7 @@ test("HTTP chat drives a fake provider and returns only chrona_reply messages", 
         })() };
       } },
     };
-    service = createStewardService(ports);
+    const service = createStewardService(ports);
     const app = createStewardRoutes(ports, service);
     const post = (body: unknown) => app.request("http://localhost/chat?workspaceId=w", { method: "POST", headers: { authorization: "Bearer test-owner", "content-type": "application/json" }, body: JSON.stringify(body) });
     const reply = await post({ text: "Hi" });

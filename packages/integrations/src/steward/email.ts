@@ -10,9 +10,20 @@ export type EmailDependencies = {
   smtp?: (options: Parameters<typeof nodemailer.createTransport>[0]) => SmtpClient;
   now?: () => Date; timeoutMs?: number;
 };
+type MailPosition = { validity: string; uid: number };
+function initialSince(settings: Record<string, unknown>, now: () => Date) {
+  const days = Number(settings.sinceDays ?? 3);
+  return new Date(now().getTime() - (Number.isFinite(days) ? Math.max(1, days) : 3) * 86400000);
+}
+async function mailItem(source: Buffer, externalId: string, now: () => Date): Promise<SourceItem> {
+  const parsed = await simpleParser(source, { skipHtmlToText: false, skipTextToHtml: true });
+  return { externalId, from: parsed.from?.text ?? "", subject: parsed.subject ?? "(no subject)", body: Buffer.from(parsed.text ?? "").subarray(0, 200 * 1024).toString("utf8"), receivedAt: (parsed.date ?? now()).toISOString(), url: null,
+    attachments: parsed.attachments.filter(a => a.size <= 10 * 1024 * 1024).map(a => ({ name: a.filename ?? "attachment", mime: a.contentType, bytes: a.content })) };
+}
 /** Read-only UID intake. No logger, flags, move, delete or mark-read operations. */
 export function createEmailConnector(deps: EmailDependencies = {}): ConnectorAdapter {
   const timeoutMs = deps.timeoutMs ?? 30000;
+  const now = deps.now ?? (() => new Date());
   async function timed<T>(action: Promise<T>, close: () => void): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try { return await Promise.race([action, new Promise<never>((_, reject) => { timer = setTimeout(() => { close(); reject(new Error("Mail operation timed out")); }, timeoutMs); })]); }
@@ -29,6 +40,22 @@ export function createEmailConnector(deps: EmailDependencies = {}): ConnectorAda
     const auth = (error as { authenticationFailed?: boolean; responseCode?: number }).authenticationFailed || (error as { responseCode?: number }).responseCode === 535;
     return Object.assign(new Error(auth ? "Mail authorization required" : "Mail operation failed"), { code: auth ? "AUTHENTICATION_FAILED" : "MAIL_FAILED" });
   }
+  async function pollFolder(client: ImapClient, folder: string, position: MailPosition | undefined, since: Date) {
+    const close = () => client.close();
+    const mailbox = await timed(client.mailboxOpen(folder, { readOnly: true }), close);
+    const validity = String(mailbox.uidValidity), previous = position?.validity === validity ? position.uid : 0;
+    const found = await timed(client.search(previous ? { uid: `${previous + 1}:*` } : { since }, { uid: true }), close);
+    const items: SourceItem[] = [];
+    let uid = previous;
+    for (const next of (found || []).filter(n => n > previous).sort((a, b) => a - b).slice(0, 50)) {
+      const message = await timed(client.fetchOne(String(next), { source: true }, { uid: true }), close);
+      if (!message || !message.source) continue;
+      // Bound MIME parsing allocation before parsing (large messages are skipped).
+      if (message.source.byteLength <= 25 * 1024 * 1024) items.push(await mailItem(message.source, `${folder}:${validity}:${next}`, now));
+      uid = next;
+    }
+    return { items, position: { validity, uid } };
+  }
   return {
     kind: "email", coverageNote: "Read-only IMAP UID polling; initial sync defaults to the last 3 days. Attachments and bodies are size limited. SMTP requires Chrona authorization.",
     async test(settings, secret) {
@@ -42,29 +69,16 @@ export function createEmailConnector(deps: EmailDependencies = {}): ConnectorAda
     },
     async poll({ settings, secret, cursor }) {
       const client = imap(settings, secret);
-      const positions: Record<string, { validity: string; uid: number }> = cursor ? JSON.parse(cursor) : {};
+      const positions: Record<string, MailPosition> = cursor ? JSON.parse(cursor) : {};
       const folders = Array.isArray(settings.folders) ? settings.folders.filter((v): v is string => typeof v === "string") : ["INBOX"];
       const items: SourceItem[] = [];
       try {
         await timed(client.connect(), () => client.close());
         for (const folder of folders) {
-          const mailbox = await timed(client.mailboxOpen(folder, { readOnly: true }), () => client.close());
-          const validity = String(mailbox.uidValidity), previous = Object.hasOwn(positions, folder) && positions[folder]?.validity === validity ? positions[folder]!.uid : 0;
-          const days = Number(settings.sinceDays ?? 3);
-          const since = new Date((deps.now?.() ?? new Date()).getTime() - (Number.isFinite(days) ? Math.max(1, days) : 3) * 86400000);
-          const found = await timed(client.search(previous ? { uid: `${previous + 1}:*` } : { since }, { uid: true }), () => client.close());
-          let uid = previous;
-          for (const next of (found || []).filter(n => n > previous).sort((a, b) => a - b).slice(0, 50)) {
-            const message = await timed(client.fetchOne(String(next), { source: true }, { uid: true }), () => client.close());
-            if (!message || !message.source) continue;
-            // Bound MIME parsing allocation before parsing (large messages are skipped).
-            if (message.source.byteLength > 25 * 1024 * 1024) { uid = next; continue; }
-            const parsed = await simpleParser(message.source, { skipHtmlToText: false, skipTextToHtml: true });
-            items.push({ externalId: `${folder}:${validity}:${next}`, from: parsed.from?.text ?? "", subject: parsed.subject ?? "(no subject)", body: Buffer.from(parsed.text ?? "").subarray(0, 200 * 1024).toString("utf8"), receivedAt: (parsed.date ?? deps.now?.() ?? new Date()).toISOString(), url: null,
-              attachments: parsed.attachments.filter(a => a.size <= 10 * 1024 * 1024).map(a => ({ name: a.filename ?? "attachment", mime: a.contentType, bytes: a.content })) });
-            uid = next;
-          }
-          Object.defineProperty(positions, folder, { value: { validity, uid }, enumerable: true, configurable: true, writable: true });
+          const previous = Object.hasOwn(positions, folder) ? positions[folder] : undefined;
+          const result = await pollFolder(client, folder, previous, initialSince(settings, now));
+          items.push(...result.items);
+          Object.defineProperty(positions, folder, { value: result.position, enumerable: true, configurable: true, writable: true });
         }
         return { items, cursor: JSON.stringify(positions) };
       } catch (error) { throw sanitized(error); }

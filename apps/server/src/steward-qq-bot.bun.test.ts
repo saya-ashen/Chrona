@@ -17,7 +17,7 @@ test("QQ attachment-only message: inbox, images, receipt quote focus, affair sto
   await state.redeem("owner", challenge.code, now());
   let incoming!: (m: QqC2cMessage) => void;
   const prompts: ProviderRunInput[] = [], sends: { content: string; mediaFileInfo?: string }[] = [];
-  let affairId: string, replyFiles: string[] = [];
+  let replyFiles: string[] = [];
   const service = createStewardService({ db, dataDir, now, publicUrl: "https://chrona.example", deliveries: [], chat: null,
     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
       prompts.push(input);
@@ -27,7 +27,7 @@ test("QQ attachment-only message: inbox, images, receipt quote focus, affair sto
       })() };
     } },
   });
-  affairId = (await service.forWorkspace("w").affairs.create({ title: "Quoted affair" })).id;
+  const affairId = (await service.forWorkspace("w").affairs.create({ title: "Quoted affair" })).id;
   const bot = createStewardQqBot({ db, now, publicUrl: "https://chrona.example", env: { CHRONA_QQ_APP_ID: "12345", CHRONA_QQ_STATE_DIR: stateDir, CHRONA_QQ_SECRET_FILE: "/not-read" }, transport: {
     send: async input => { sends.push(input); return { outcome: "accepted", messageId: `sent-${sends.length}` }; },
     upload: async () => "uploaded-image",

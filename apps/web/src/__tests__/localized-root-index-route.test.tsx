@@ -6,7 +6,7 @@ import { createAppRouter } from "../router";
 import en from "../../../../packages/i18n/src/messages/en.json";
 import zh from "../../../../packages/i18n/src/messages/zh.json";
 import { apiJson } from "@shared/http";
-import { emptyToday, chatFixture, detailFixture } from "../../../../features/steward/model/fixtures";
+import { emptyToday, chatFixture, detailFixture, fileFixture } from "../../../../features/steward/model/fixtures";
 
 vi.mock("../loaders", () => ({ loadAppBootData: async ({ params }: { params: { lang: string } }) => ({ locale: params.lang, dictionary: params.lang === "zh" ? zh : en, defaultWorkspace: { id: "ws-1", name: "Chrona" } }) }));
 vi.mock("@/components/access-key-gate", () => ({ AccessKeyGate: ({ children }: { children: React.ReactNode }) => children }));
@@ -23,7 +23,7 @@ beforeEach(() => vi.mocked(apiJson).mockImplementation(async url => {
   if (path.endsWith("/settings")) return settings;
   if (path.endsWith("/chat")) return chatFixture;
   if (path.endsWith("/health")) return emptyToday().health;
-  if (path.includes("/results/")) return { ...detailFixture().latestResult, version: 2 };
+  if (path.endsWith("/file")) return fileFixture();
   if (path.endsWith("/affairs/camera")) return detailFixture();
   if (path.endsWith("/today")) return emptyToday();
   return { items: [] };
@@ -33,7 +33,7 @@ afterEach(() => { cleanup(); router?.dispose(); vi.resetAllMocks(); });
 describe("steward routes and shared shell", () => {
   it.each(["/en", "/en/today"])("shows Today at the localized root from %s", async path => {
     show(`${path}?filter=active#attention`);
-    expect(await screen.findByRole("heading", { name: en.steward.foundation.clear })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: en.steward.workspace.today })).toBeVisible();
     await waitFor(() => expect(router.state.location.pathname).toBe("/en"));
     expect(router.state.location.search).toBe("?filter=active");
     expect(router.state.location.hash).toBe("#attention");
@@ -46,7 +46,6 @@ describe("steward routes and shared shell", () => {
   it.each([
     ["affairs", "Affairs", "Affairs"],
     ["affairs/camera", "二手相机选购", "Affairs"],
-    ["affairs/camera/results/2", "相机结论", "Affairs"],
     ["settings", "Settings", "Settings"],
   ])("renders the page at %s", async (path, heading, active) => {
     show(`/en/${path}`);
@@ -55,7 +54,7 @@ describe("steward routes and shared shell", () => {
     expect(screen.getByRole("link", { name: active })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("textbox", { name: en.steward.foundation.composer })).toBeVisible();
   });
-  it.each(["home", "dashboard", "schedule", "action-center", "goals", "tasks", "work", "connections", "delegations"])("does not expose legacy %s", async path => {
+  it.each(["home", "dashboard", "schedule", "action-center", "goals", "tasks", "work", "connections", "delegations", "affairs/camera/results/2"])("does not expose legacy %s", async path => {
     show(`/en/${path}`);
     expect(await screen.findByRole("heading", { name: "404" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/en");
@@ -65,7 +64,7 @@ describe("steward routes and shared shell", () => {
     show("/en/settings");
     await userEvent.type(await screen.findByRole("textbox", { name: en.steward.foundation.composer }), "Budget 6000{Enter}");
     expect(await screen.findByText(/You · Budget 6000/)).toBeVisible();
-    await userEvent.click(screen.getByRole("link", { name: "Affairs" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: en.steward.shell.navigation })).getByRole("link", { name: "Affairs" }));
     expect(await screen.findByRole("heading", { name: "Affairs" })).toBeVisible();
     expect(screen.getByText(/You · Budget 6000/)).toBeVisible();
   });

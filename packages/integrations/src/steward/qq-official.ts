@@ -106,27 +106,38 @@ type WebSocketLike = { readyState: number; send(data: string): void; close(code?
 export type QqAttachment = { url: string; name: string; mime: string; size?: number };
 export type QqC2cMessage = { id: string; openid: string; content: string; quoted: string; timestamp: string; quotedId?: string; attachments?: QqAttachment[] };
 
-/** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
-export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
+const attachmentSizeCap = 20 * 1024 * 1024;
+function attachmentUrl(attachment: QqAttachment): URL {
   const url = new URL(attachment.url);
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !["multimedia.nt.qq.com", "gchat.qpic.cn", "c2cpicdw.qpic.cn", "file.bot.qq.com"].includes(url.hostname)) throw new QqTransportError("Invalid QQ attachment URL");
-  const cap = 20 * 1024 * 1024;
-  if (attachment.size !== undefined && (!Number.isFinite(attachment.size) || attachment.size < 0 || attachment.size > cap)) throw new QqTransportError("Attachment exceeds size limit");
+  if (attachment.size !== undefined && (!Number.isFinite(attachment.size) || attachment.size < 0 || attachment.size > attachmentSizeCap)) throw new QqTransportError("Attachment exceeds size limit");
+  return url;
+}
+function validAttachmentMime(mime: string, expected: string): boolean {
+  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(mime)
+    && (!expected || expected === mime || mime === "application/octet-stream")
+    && (!expected.startsWith("image/") || mime.startsWith("image/"));
+}
+/** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
+export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
+  const url = attachmentUrl(attachment);
+  const cap = attachmentSizeCap;
   const response = await fetch(url.href, { redirect: "error", signal: AbortSignal.timeout(20_000) });
   const mime = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
   const expected = attachment.mime.split(";")[0]!.trim().toLowerCase();
-  if (!response.ok || !response.body || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(mime) || (expected && expected !== mime && mime !== "application/octet-stream") || (expected.startsWith("image/") && !mime.startsWith("image/"))) {
+  if (!response.ok || !response.body || !validAttachmentMime(mime, expected)) {
     await response.body?.cancel(); throw new QqTransportError("Invalid attachment content type");
   }
   if (Number(response.headers.get("content-length")) > cap) { await response.body.cancel(); throw new QqTransportError("Attachment exceeds size limit"); }
   const reader = response.body.getReader(), chunks: Uint8Array[] = [];
   let size = 0;
   try {
-    while (true) {
-      const chunk = await reader.read(); if (chunk.done) break;
+    let chunk = await reader.read();
+    while (!chunk.done) {
       size += chunk.value.byteLength;
       if (size > cap) throw new QqTransportError("Attachment exceeds size limit");
       chunks.push(chunk.value);
+      chunk = await reader.read();
     }
   } finally { await reader.cancel(); reader.releaseLock(); }
   return { name: attachment.name, mime, bytes: Buffer.concat(chunks, size) };
