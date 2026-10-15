@@ -12,27 +12,20 @@ datasource db {
 model Workspace {
   id String @id @default(uuid())
   name String
-  // Prisma 7 SQLite diff requires SQL-quoted JSON defaults.
   settings Json @default(dbgenerated("'{\"notifications\":{\"dailyCap\":5,\"quietHours\":{\"start\":\"23:00\",\"end\":\"08:00\"},\"timezone\":\"Asia/Shanghai\",\"digestAt\":\"09:00\"}}'"))
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   affairs Affair[]
-  entries AffairEntry[]
-  results AffairResult[]
-  runs AffairRun[]
-  asks Ask[]
-  followUps FollowUp[]
+  schedules Schedule[]
+  runs Run[]
+  messages Message[]
+  activities Activity[]
+  approvals Approval[]
   grants Grant[]
-  connections SourceConnection[]
-  events InboundEvent[]
-  assessments EventAssessment[]
-  notifications Notification[]
-  messages ChatMessage[]
   preferences Preference[]
-  tools ManagedTool[]
-  toolVersions ToolVersion[]
-  toolRuns ToolRun[]
-  panelEntries PanelEntry[]
+  notifications Notification[]
+  connectors Connector[]
+  inboundItems InboundItem[]
   audits Audit[]
   stewardState StewardState?
 }
@@ -41,47 +34,99 @@ model Affair {
   id String @id @default(uuid())
   workspaceId String
   title String
-  goal String @default("")
-  summary String @default("")
-  nextStep String @default("")
   status String @default("active")
-  agentState String @default("queued")
-  handling Json?
-  cadenceSeconds Int?
-  notify String @default("digest")
-  connectionId String?
-  lastCheckAt DateTime?
-  nextCheckAt DateTime?
-  ref String?
-  revision Int @default(1)
-  failures Int @default(0)
-  wakeReason String @default("new_request")
-  nextRunAt DateTime?
-  leaseUntil DateTime?
-  lastError String?
+  dirName String
+  sessionId String?
+  lastActivityAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  lastActivityAt DateTime @default(now())
+  revision Int @default(1)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connection SourceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  entries AffairEntry[]
-  results AffairResult[]
-  runs AffairRun[]
-  asks Ask[]
-  followUps FollowUp[]
-  events InboundEvent[]
+  schedules Schedule[]
+  runs Run[]
+  messages Message[]
+  activities Activity[]
+  approvals Approval[]
   notifications Notification[]
-  messages ChatMessage[]
-  tools ManagedTool[]
-  @@unique([workspaceId, ref])
+  connectors Connector[]
+  @@unique([workspaceId, dirName])
   @@index([workspaceId, status, lastActivityAt])
-  @@index([workspaceId, agentState, nextRunAt])
-  @@index([workspaceId, status, nextCheckAt])
-  @@index([workspaceId, agentState, leaseUntil])
-  @@index([connectionId])
 }
 
-model AffairEntry {
+model Schedule {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String
+  mode String
+  rule Json
+  text String
+  command String?
+  until DateTime?
+  status String @default("active")
+  nextAt DateTime?
+  lastAt DateTime?
+  lastResult String?
+  lastOutputHash String?
+  failures Int @default(0)
+  createdBy String
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, status, nextAt])
+  @@index([affairId, status, nextAt])
+}
+
+model Run {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String?
+  lane String
+  trigger String
+  status String @default("queued")
+  provider String
+  tokenHash String @unique
+  leaseUntil DateTime?
+  deadlineAt DateTime?
+  conversationKey String?
+  prompt String
+  summary String?
+  cwd String
+  toolCalls Json @default(dbgenerated("'[]'"))
+  error String?
+  startedAt DateTime?
+  endedAt DateTime?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, lane, status, createdAt])
+  @@index([workspaceId, status, leaseUntil])
+  @@index([workspaceId, status, deadlineAt])
+  @@index([workspaceId, conversationKey, status])
+  @@index([affairId, createdAt])
+}
+
+model Message {
+  id String @id @default(uuid())
+  workspaceId String
+  direction String
+  channel String
+  text String
+  attachments Json @default(dbgenerated("'[]'"))
+  affairId String?
+  quotedMessageId String?
+  externalId String?
+  conversationKey String
+  at DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  quotedMessage Message? @relation("MessageQuote", fields: [quotedMessageId], references: [id], onDelete: SetNull)
+  replies Message[] @relation("MessageQuote")
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId, conversationKey, at])
+  @@index([affairId, at])
+}
+
+model Activity {
   id String @id @default(uuid())
   workspaceId String
   affairId String
@@ -90,105 +135,32 @@ model AffairEntry {
   kind String
   text String
   data Json?
-  idempotencyKey String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
-  @@unique([workspaceId, idempotencyKey])
   @@index([affairId, at])
-  @@index([workspaceId, kind, at])
+  @@index([workspaceId, at])
 }
 
-/// Append-only versions; feedback belongs to AffairEntry, not an edit to this row.
-model AffairResult {
-  id String @id @default(uuid())
-  workspaceId String
-  affairId String
-  version Int
-  title String
-  summary String @default("")
-  body String
-  sources Json @default(dbgenerated("'[]'"))
-  limitations String @default("")
-  nextSteps Json @default(dbgenerated("'[]'"))
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
-  @@unique([affairId, version])
-  @@index([workspaceId, createdAt])
-}
-
-/// Only the hash of the short-lived capability is persisted.
-model AffairRun {
-  id String @id @default(uuid())
-  workspaceId String
-  affairId String
-  number Int
-  wakeReason String
-  status String @default("running")
-  affairRevision Int
-  tokenHash String @unique
-  leaseUntil DateTime
-  deadlineAt DateTime
-  toolCalls Json @default(dbgenerated("'[]'"))
-  webCalls Int @default(0)
-  observedSources Json @default(dbgenerated("'[]'"))
-  error String?
-  startedAt DateTime @default(now())
-  endedAt DateTime?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
-  @@unique([affairId, number])
-  @@index([workspaceId, status, leaseUntil])
-  @@index([workspaceId, status, deadlineAt])
-  @@index([affairId, startedAt])
-}
-
-model Ask {
+model Approval {
   id String @id @default(uuid())
   workspaceId String
   affairId String?
-  kind String
-  status String @default("open")
+  action String
   title String
-  detail String @default("")
-  questions Json @default(dbgenerated("'[]'"))
-  action String?
-  actionPayload Json?
-  affairRevision Int?
-  topic String?
-  answer String?
-  decision String?
-  approvalScope String?
-  ref String?
-  idempotencyKey String?
-  revision Int @default(1)
-  expiresAt DateTime?
-  cooldownUntil DateTime?
+  detail String
+  preview String
+  payload Json
+  scope String @default("once")
+  grantId String?
+  status String @default("open")
   createdAt DateTime @default(now())
   resolvedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   affair Affair? @relation(fields: [affairId], references: [id], onDelete: Cascade)
+  grant Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
   notifications Notification[]
-  @@unique([workspaceId, ref])
-  @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, status, createdAt])
   @@index([affairId, status])
-  @@index([workspaceId, topic, resolvedAt])
-  @@index([workspaceId, status, expiresAt])
-}
-
-model FollowUp {
-  id String @id @default(uuid())
-  workspaceId String
-  affairId String
-  note String
-  dueAt DateTime
-  status String @default("pending")
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
-  @@index([workspaceId, status, dueAt])
-  @@index([affairId, dueAt])
 }
 
 model Grant {
@@ -197,94 +169,32 @@ model Grant {
   action String
   mode String
   scope Json
-  origin String @default("user")
   once Boolean @default(false)
   consumedAt DateTime?
   expiresAt DateTime?
   createdAt DateTime @default(now())
   revokedAt DateTime?
-  revision Int @default(1)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  approvals Approval[]
   @@index([workspaceId, action, revokedAt, expiresAt])
 }
 
-model SourceConnection {
+model Preference {
   id String @id @default(uuid())
   workspaceId String
-  kind String
-  label String
-  mode String @default("poll")
-  status String @default("needs_authorization")
-  config Json @default(dbgenerated("'{}'"))
-  cursor String?
-  readScopes Json @default(dbgenerated("'[]'"))
-  writeScopes Json @default(dbgenerated("'[]'"))
-  revision Int @default(1)
-  pollIntervalSeconds Int?
-  baselineAt DateTime?
-  lastSuccessAt DateTime?
-  lastFailureAt DateTime?
-  lastError String?
-  nextCheckAt DateTime?
-  leaseUntil DateTime?
-  leaseToken String?
-  coverageNote String @default("")
+  text String
+  origin String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastUsedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  events InboundEvent[]
-  affairs Affair[]
-  @@index([workspaceId, status, mode, nextCheckAt])
-}
-
-model InboundEvent {
-  id String @id @default(uuid())
-  workspaceId String
-  connectionId String
-  externalId String
-  status String @default("pending")
-  title String
-  body String
-  url String?
-  occurredAt DateTime
-  receivedAt DateTime @default(now())
-  affairId String?
-  disposition String?
-  attempts Int @default(0)
-  nextAttemptAt DateTime?
-  leaseUntil DateTime?
-  leaseToken String?
-  lastError String?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connection SourceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
-  assessments EventAssessment[]
-  @@unique([connectionId, externalId])
-  @@index([workspaceId, status, nextAttemptAt])
-  @@index([affairId, occurredAt])
-}
-
-model EventAssessment {
-  id String @id @default(uuid())
-  workspaceId String
-  eventId String
-  assessor String
-  disposition String
-  whatHappened String
-  whyItMatters String
-  important Boolean @default(false)
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  event InboundEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   @@index([workspaceId, createdAt])
-  @@index([eventId, createdAt])
 }
 
 model Notification {
   id String @id @default(uuid())
   workspaceId String
   affairId String?
-  askId String?
+  approvalId String?
   level String @default("digest")
   channel String
   status String @default("queued")
@@ -305,116 +215,62 @@ model Notification {
   feedback String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
-  ask Ask? @relation(fields: [askId], references: [id], onDelete: SetNull)
+  approval Approval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
   @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, status, level, nextAttemptAt])
   @@index([workspaceId, channel, sentAt])
   @@index([affairId, createdAt])
-  @@index([askId])
+  @@index([approvalId])
 }
 
-model ChatMessage {
+model Connector {
   id String @id @default(uuid())
   workspaceId String
-  direction String
-  channel String
-  text String
+  kind String
+  label String
+  status String @default("active")
   affairId String?
-  externalId String?
-  at DateTime @default(now())
+  settings Json @default(dbgenerated("'{}'"))
+  cursor String?
+  secretRef String?
+  canSend Boolean @default(false)
+  failures Int @default(0)
+  nextSyncAt DateTime?
+  lastSyncAt DateTime?
+  lastError String?
+  coverageNote String @default("")
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
-  @@unique([workspaceId, channel, externalId])
-  @@index([workspaceId, at])
-  @@index([affairId, at])
-}
-
-model Preference {
-  id String @id @default(uuid())
-  workspaceId String
-  text String
-  origin String
-  createdAt DateTime @default(now())
-  lastUsedAt DateTime?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@index([workspaceId, createdAt])
-}
-
-/// Current version is projected from ToolVersion; never overwrite approved source.
-model ManagedTool {
-  id String @id @default(uuid())
-  workspaceId String
-  affairId String?
-  kind String
-  name String
-  purpose String
-  rationale String @default("")
-  version Int @default(1)
-  state String @default("draft")
-  approvedVersion Int?
-  revision Int @default(1)
-  lastRunAt DateTime?
-  lastRunOk Boolean?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  affair Affair? @relation(fields: [affairId], references: [id], onDelete: Cascade)
-  versions ToolVersion[]
-  runs ToolRun[]
-  entries PanelEntry[]
-  @@index([workspaceId, state])
+  items InboundItem[]
+  @@index([workspaceId, status, nextSyncAt])
   @@index([affairId])
 }
 
-model PanelEntry {
+model InboundItem {
   id String @id @default(uuid())
   workspaceId String
-  toolId String
-  values Json
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tool ManagedTool @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  @@index([toolId, createdAt])
-}
-
-model ToolVersion {
-  id String @id @default(uuid())
-  workspaceId String
-  toolId String
-  version Int
-  script Json?
-  spec Json?
-  contentHash String
-  validationSummary String?
-  approvedAt DateTime?
-  approvedBy String?
-  createdAt DateTime @default(now())
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tool ManagedTool @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  runs ToolRun[]
-  @@unique([toolId, version])
-  @@index([workspaceId, createdAt])
-}
-
-model ToolRun {
-  id String @id @default(uuid())
-  workspaceId String
-  toolId String
-  version Int
-  status String @default("running")
-  idempotencyKey String
-  input Json @default(dbgenerated("'{}'"))
-  output Json?
-  error String?
+  connectorId String
+  externalId String
+  from String
+  subject String
+  receivedAt DateTime
+  path String?
+  status String @default("new")
+  ruleNote String?
+  action String @default("batch")
+  batchId String?
+  deliverAt DateTime?
+  deliveredAt DateTime?
+  attempts Int @default(0)
   leaseUntil DateTime?
-  startedAt DateTime @default(now())
-  endedAt DateTime?
+  leaseToken String?
+  lastError String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tool ManagedTool @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  toolVersion ToolVersion @relation(fields: [toolId, version], references: [toolId, version], onDelete: Cascade)
-  @@unique([workspaceId, idempotencyKey])
-  @@index([workspaceId, status, leaseUntil])
-  @@index([toolId, startedAt])
+  connector Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  @@unique([connectorId, externalId])
+  @@index([workspaceId, status, deliverAt])
+  @@index([connectorId, status, receivedAt])
+  @@index([workspaceId, batchId])
 }
 
 model Audit {
@@ -435,8 +291,9 @@ model StewardState {
   lastTickAt DateTime?
   leaseUntil DateTime?
   leaseToken String?
-  agentName String @default("unconfigured")
-  agentAvailable Boolean @default(false)
-  agentLastError String?
+  providerName String @default("unconfigured")
+  providerAvailable Boolean @default(false)
+  providerSandboxed Boolean @default(false)
+  providerLastError String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

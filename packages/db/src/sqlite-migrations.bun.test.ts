@@ -6,9 +6,8 @@ import { join, resolve } from "node:path";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 const models = [
-  "Workspace", "Affair", "AffairEntry", "AffairResult", "AffairRun", "Ask", "FollowUp", "Grant",
-  "SourceConnection", "InboundEvent", "EventAssessment", "Notification", "ChatMessage", "Preference",
-  "ManagedTool", "ToolVersion", "ToolRun", "PanelEntry", "Audit", "StewardState",
+  "Workspace", "Affair", "Schedule", "Run", "Message", "Activity", "Approval", "Grant",
+  "Preference", "Notification", "Connector", "InboundItem", "Audit", "StewardState",
 ];
 
 function fixture() {
@@ -37,12 +36,34 @@ describe("clean steward SQLite baseline", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
       ).all().map((row) => row.name).sort();
       expect(names).toEqual([...models, "_chrona_migrations"].sort());
-      expect(db.query<{ table: string; from: string; on_delete: string }, []>('PRAGMA foreign_key_list("PanelEntry")').all()).toContainEqual(expect.objectContaining({ table: "ManagedTool", from: "toolId", on_delete: "CASCADE" }));
+      expect(db.query<{ table: string; from: string; on_delete: string }, []>('PRAGMA foreign_key_list("InboundItem")').all()).toContainEqual(expect.objectContaining({ table: "Connector", from: "connectorId", on_delete: "CASCADE" }));
       for (const model of models.filter((name) => name !== "Workspace")) {
         const keys = db.query<{ table: string; from: string; on_delete: string }, []>(
           `PRAGMA foreign_key_list("${model}")`,
         ).all();
         expect(keys.some((key) => key.table === "Workspace" && key.from === "workspaceId" && key.on_delete === "CASCADE")).toBe(true);
+      }
+    });
+  });
+
+  test("workspace scheduling and delivery indexes exist", () => {
+    const options = fixture();
+    ensureSqliteDatabase(options);
+    inspect(options.databasePath, (db) => {
+      for (const [table, columns, unique] of [
+        ["Schedule", ["workspaceId", "status", "nextAt"], false],
+        ["Run", ["workspaceId", "lane", "status", "createdAt"], false],
+        ["Run", ["tokenHash"], true],
+        ["Approval", ["workspaceId", "status", "createdAt"], false],
+        ["Activity", ["affairId", "at"], false],
+        ["Message", ["workspaceId", "externalId"], true],
+        ["InboundItem", ["connectorId", "externalId"], true],
+      ] as const) {
+        const indexes = db.query<{ name: string; unique: number }, []>(`PRAGMA index_list("${table}")`).all();
+        expect(indexes.some(index => {
+          const actual = db.query<{ name: string }, []>(`PRAGMA index_info("${index.name}")`).all().map(column => column.name);
+          return Boolean(index.unique) === unique && JSON.stringify(actual) === JSON.stringify(columns);
+        })).toBe(true);
       }
     });
   });

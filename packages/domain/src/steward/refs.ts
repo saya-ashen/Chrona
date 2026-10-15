@@ -1,4 +1,6 @@
-import { REF_ALPHABET, REF_PATTERN } from "@chrona/contracts/steward";
+// Compact human-readable references; not part of the v3 wire contract.
+const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const REF_PATTERN = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/;
 
 export function generateRef(random: () => number): string {
   return Array.from({ length: 4 }, () => {
