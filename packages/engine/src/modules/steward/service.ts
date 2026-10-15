@@ -8,20 +8,22 @@ import { createSettings } from "./settings";
 import { createNotifications } from "./notify";
 import { createToday } from "./today";
 import { createWorkspaceFs } from "./workspace-fs";
+import { createSchedules } from "./schedules";
+import { createRuns } from "./runs";
+import { createTick } from "./tick";
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   deliveries: DeliveryAdapter[];
   chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
   provider?: ProviderAdapter;
   connectors?: ConnectorAdapter[];
-  sandbox?: { available: boolean };
+  sandbox?: { available: boolean; run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }> };
   gitHealth?: () => Promise<boolean>;
 };
-/** Authenticated owner boundary. V3 will compose schedules/runs/chat/tools here;
- * no execution endpoints are advertised until those modules exist. */
+/** Authenticated owner boundary. */
 export function createStewardService(ports: StewardPorts) {
   const fs = createWorkspaceFs(ports.dataDir);
-  return { forWorkspace(workspaceId: string) {
+  return { tick: createTick(ports), forWorkspace(workspaceId: string) {
     const ctx = { db: ports.db, workspaceId, now: ports.now };
     const projection = createToday(ctx, fs, {
       async provider() {
@@ -34,7 +36,7 @@ export function createStewardService(ports: StewardPorts) {
       }),
       jobsSandbox: () => ports.sandbox?.available ?? false,
     });
-    return { affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
+    return { schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;
