@@ -50,7 +50,7 @@ test("root schedules require an affair, then resolve conversation focus", async 
   const a = await call("chrona_affair_create", { title: "Study", readme: "# Study\n\nProgress" }) as { id: string; path: string };
   expect(a.path).not.toContain("/");
   expect((await service.forWorkspace(workspaceId).affairs.detail(a.id)).affair.summary).toBe("Progress");
-  await call("chrona_focus", { affairId: a.id });
+  expect(await call("chrona_focus", { affairId: a.id })).toEqual({ affairId: a.id, path: a.path });
   expect((await db.audit.findFirstOrThrow({ where: { kind: "conversation_focus" } })).subjectId).toBe("in_app");
   const input = { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "review" };
   const s = await call("chrona_schedule", input) as { id: string };
@@ -91,6 +91,9 @@ test("fake provider calls authenticated tools in-process through tick", async ()
   await service.forWorkspace(workspaceId).runs.finish(runId, { outcome: "finished", sessionId: null, error: null });
   ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start: input => ({ inject: async () => {}, abort: async () => {}, done: (async () => {
     expect(input.prompt).toContain("Context (data)");
+    expect(input.prompt).toContain("root is NOT an affair");
+    expect(input.prompt).toContain("first use chrona_affair_create or chrona_focus");
+    expect(input.prompt).toContain("<dirName>/");
     await service.tools.call(input.token, "chrona_reply", { text: "provider answer" });
     return { outcome: "finished" as const, sessionId: null, error: null };
   })() }) };

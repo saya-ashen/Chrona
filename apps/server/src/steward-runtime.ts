@@ -39,6 +39,7 @@ export function createStewardRuntime(db: PrismaClient, options: {
     chronaExtension: fileURLToPath(new URL("../../../external-plugins/pi-steward-agent/chrona-tools.ts", import.meta.url)),
     command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
+    workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
   }) : null) : options.provider;
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;

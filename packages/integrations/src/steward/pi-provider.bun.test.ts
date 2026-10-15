@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, symlink, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
@@ -112,16 +112,29 @@ describe("Pi RPC provider", () => {
     expect((await provider.start(f.input).done).outcome).toBe("unavailable");
     expect((await provider.start({ ...f.input, deadline: new Date(0) }).done).outcome).toBe("timed_out");
   });
-  test("bwrap arguments bind cwd and Pi home, share network, and enable bash/web", async () => {
+  test.each([false, true])("bwrap mounts (root=%s), share network, and enable bash/web", async rootRun => {
     const f = await fixture();
+    const affair = join(f.cwd, "a".repeat(32));
+    await mkdir(affair);
+    await mkdir(f.input.sessionDir, { recursive: true });
+    await mkdir(join(f.cwd, "unrelated"));
+    await symlink(affair, join(f.cwd, "b".repeat(32)));
     const bwrap = join(f.cwd, "bwrap");
     await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
-    const provider = createPiProvider({ command: f.command, bwrap, chronaExtension: "bridge.ts", webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    const provider = createPiProvider({ command: f.command, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, chronaExtension: "bridge.ts", webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
     expect((await provider.start(f.input).done).outcome).toBe("finished");
     const args = JSON.parse(await readFile(join(f.cwd, "bwrap.json"), "utf8"));
     expect(args).toContain("--die-with-parent"); expect(args).toContain("--ro-bind"); expect(args).toContain("--tmpfs"); expect(args).not.toContain("--unshare-net");
     expect(args[args.indexOf("--tools") + 1].split(",")).toContain("bash");
     expect(args[args.indexOf("--tools") + 1].split(",")).toContain("web_search");
     expect((await provider.health()).sandboxed).toBe(true);
+    const mounts = args.flatMap((arg: string, i: number) => arg === "--bind" || arg === "--ro-bind" ? [{ mode: arg, source: args[i + 1], target: args[i + 2] }] : []);
+    expect(mounts).toContainEqual({ mode: rootRun ? "--ro-bind" : "--bind", source: f.cwd, target: f.cwd });
+    if (rootRun) {
+      expect(mounts).not.toContainEqual({ mode: "--bind", source: f.cwd, target: f.cwd });
+      expect(mounts).toContainEqual({ mode: "--bind", source: affair, target: affair });
+      expect(mounts).toContainEqual({ mode: "--bind", source: f.input.sessionDir, target: f.input.sessionDir });
+      expect(mounts.some((m: { source: string }) => m.source === join(f.cwd, ".chrona") || m.source === join(f.cwd, "unrelated") || m.source === join(f.cwd, "b".repeat(32)))).toBe(false);
+    }
   });
 });

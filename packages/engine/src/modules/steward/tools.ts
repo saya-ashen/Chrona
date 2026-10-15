@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./service";
@@ -137,7 +137,12 @@ export function createTools(ports: StewardPorts) {
             const files = await affairs.files(affair.id), current = await files.read("README.md");
             await files.save("README.md", input.readme, current.revision, "chrona");
           }
-          return { ...(await affairs.detail(affair.id)).affair, path: (await requireAffair(db, workspaceId, affair.id)).dirName };
+          // The conversation now talks about this affair, so later messages and schedules land in it.
+          if (run.conversationKey) await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { affairId: affair.id } });
+          const path = relative(run.cwd, await (await affairs.files(affair.id)).directory()) || ".";
+          // A sandboxed run cannot write into a directory created after it started.
+          const next = run.affairId ? null : "The new affair directory may not be writable in this run. Its README already holds `readme`; to continue working inside it, chrona_schedule a wake at now with a precise instruction (the next run starts inside the affair), reply briefly, and stop.";
+          return { ...(await affairs.detail(affair.id)).affair, path, next };
         }
         case "chrona_affair_update": {
           const { affairId: id, ...input } = parseInput(schemas[tool], raw);
@@ -146,9 +151,9 @@ export function createTools(ports: StewardPorts) {
         case "chrona_focus": {
           const input = parseInput(schemas[tool], raw);
           if (!run.conversationKey) throw new StewardError("invalid", "Focus requires a conversation");
-          await requireAffair(db, workspaceId, input.affairId);
+          const directory = await (await affairs.files(input.affairId)).directory();
           await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: input });
-          return input;
+          return { ...input, path: relative(run.cwd, directory) || "." };
         }
         case "chrona_request_approval": {
           const input = parseInput(schemas[tool], raw);
