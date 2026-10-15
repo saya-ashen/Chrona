@@ -1,7 +1,10 @@
 {
   "steward": {
     "panel": { "add": "添加记录", "choose": "请选择", "invalid": "请检查必填项、数字、日期和选项。", "empty": "还没有记录，在上方添加第一条吧。", "entries": "记录 · 最新在前", "actions": "操作", "delete": "删除", "confirm": "删除这条记录？", "cancel": "取消", "trend": "趋势", "noTrend": "还没有可展示的日期和数值。", "disabled": "此面板尚未启用，暂不能添加记录。", "unavailable": "此工具没有可展示的有效面板。" },
+    "errors": { "title": "出了点问题", "description": "页面遇到了意外错误，请刷新后重试。", "refresh": "刷新页面" },
     "settings": {
+      "agentDisabled": "Agent 未启用",
+      "descriptions": { "chat": "在私聊中随时交代事情、接收进展。", "notifications": "决定 Chrona 什么时候、多久打扰你一次。", "permissions": "决定哪些事可以交给 Chrona，哪些需要先问你。", "preferences": "Chrona 记住的办事习惯，随时可以调整。", "connections": "查看已授权来源的状态与最近同步。", "tools": "查看并管理为事务创建的工具。", "health": "当前事务进度与服务可用情况。" },
       "sandbox": "脚本沙箱", "scriptRuns": "最近脚本运行", "runStates": { "running": "运行中", "succeeded": "成功", "failed": "失败", "timed_out": "超时", "unavailable": "不可用" },
       "title":"设置", "nav":"设置分区", "chat":"聊天", "notifications":"通知", "permissions":"授权", "preferences":"记住的偏好", "connections":"来源", "tools":"工具", "health":"运行状况",
       "bound":"已绑定", "unbound":"未绑定", "bind":"在 Chrona 私聊里发送「绑定 <码>」，码由 `chrona qq bind-code` 生成", "cap":"每天最多推送", "quiet":"启用安静时段", "start":"安静时段开始", "end":"安静时段结束", "digest":"日报时间", "timezone":"时区", "sent":"今日已发送", "recent":"最近通知", "useful":"有用", "notUseful":"没用", "invalid":"请输入 0–50 的整数上限和有效时间，安静时段起止时间不能相同。", "saved":"已保存", "fixed":"不可更改", "builtin":"内置", "custom":"你的规则", "action":"动作", "mode":"方式", "origin":"来源", "add":"添加一条", "delete":"删除", "said":"你说的", "learned":"从反馈学到", "sync":"立即同步", "lastSuccess":"上次成功", "approve":"批准", "enable":"启用", "disable":"停用", "retire":"退役", "source":"查看脚本源码", "available":"可用", "unavailable":"不可用", "queuedAffairs":"排队事务", "runningAffairs":"正在处理的事务", "failedAffairs":"处理失败的事务", "pendingEvents":"待处理来源变化", "failingConnections":"异常来源", "queuedNotifications":"待发通知", "failedNotifications":"发送失败", "lastTick":"上次检查", "global":"全局", "affair":"事务", "connection":"来源", "tool_version":"工具版本",

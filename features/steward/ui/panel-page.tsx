@@ -1,3 +1,4 @@
+import { PageColumn, Section, Surface } from "./layout";
 import { useParams } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import type { ToolDetail } from "@chrona/contracts";
@@ -15,7 +16,7 @@ export function PanelContent({ detail, spec, client, refresh }: { detail: ToolDe
     <h1 className="text-2xl font-semibold break-words">{spec.title}</h1>
     <p className="break-words">{spec.description ?? detail.tool.purpose}</p>
     {!enabled && <p role="status">{c.disabled}</p>}
-    <form onSubmit={e => { e.preventDefault(); void f.save(); }} noValidate>
+    <Surface><form className="p-5" onSubmit={e => { e.preventDefault(); void f.save(); }} noValidate>
       <fieldset disabled={!enabled || f.mutation.pending} className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {spec.fields.map(field => <label key={field.key} className="grid min-w-0 gap-1">{field.label}{field.required ? " *" : ""}
           {field.type === "select" ? <Select value={f.values[field.key]} onValueChange={value => f.setValues({ ...f.values, [field.key]: value })} disabled={!enabled || f.mutation.pending}>
@@ -26,14 +27,14 @@ export function PanelContent({ detail, spec, client, refresh }: { detail: ToolDe
         <div className="flex justify-end sm:col-span-2 lg:col-span-3"><Button type="submit">{c.add}</Button></div>
       </fieldset>
       {f.invalid && <p role="alert">{c.invalid}</p>}
-    </form>
+    </form></Surface>
     <MutationStatus mutation={f.mutation} />
     {detail.entries.length === 0 ? <p>{c.empty}</p> : <>
       {spec.views.map((view, index) => {
         if (view.kind !== "trend") return null;
         const trend = trendPoints(detail.entries, view.x, view.y);
         const label = `${spec.fields.find(f => f.key === view.y)?.label} / ${spec.fields.find(f => f.key === view.x)?.label}`;
-        return <section key={index} className="grid min-w-0 gap-3"><h2 className="text-sm font-semibold text-muted-foreground">{c.trend}: {label}</h2>{!trend ? <p>{c.noTrend}</p> : <div role="img" aria-label={`${c.trend}: ${label}`} className="relative h-[220px] w-full text-sm text-foreground">
+        return <Section key={index} title={`${c.trend}: ${label}`}><Surface><div className="p-4">{!trend ? <p>{c.noTrend}</p> : <div role="img" aria-label={`${c.trend}: ${label}`} className="relative h-[220px] w-full text-sm text-foreground">
           {trend.points.length === 1 ? <div className="flex h-full flex-col items-center justify-center gap-2">
             <span>{trend.points[0]!.value}</span><span className="size-2 rounded-full bg-primary" />
             <span className="text-muted-foreground">{trend.first}</span>
@@ -49,14 +50,14 @@ export function PanelContent({ detail, spec, client, refresh }: { detail: ToolDe
               <span className="absolute top-full right-0 pt-2 text-xs text-muted-foreground">{trend.last}</span>
             </div>
           </>}
-        </div>}</section>;
+        </div>}</div></Surface></Section>;
       })}
-      <section className="grid min-w-0 gap-3"><h2 className="text-sm font-semibold text-muted-foreground">{c.entries}</h2>
-        <div className="min-w-0 overflow-x-auto"><table aria-label={c.entries} className="w-full text-left text-sm"><thead><tr>{spec.fields.map(field => <th className="py-2 pr-4" key={field.key}>{field.label}</th>)}<th>{c.actions}</th></tr></thead>
+      <Section title={c.entries}>
+        <Surface><div className="min-w-0 overflow-x-auto p-4"><table aria-label={c.entries} className="w-full text-left text-sm"><thead><tr>{spec.fields.map(field => <th className="py-2 pr-4" key={field.key}>{field.label}</th>)}<th>{c.actions}</th></tr></thead>
           <tbody>{detail.entries.map(entry => <tr key={entry.id}>{spec.fields.map(field => <td className="py-2 pr-4 break-words" key={field.key}>{String(entry.values[field.key] ?? "—")}</td>)}<td>
             {f.confirm === entry.id ? <div className="flex flex-wrap gap-2"><span>{c.confirm}</span><Button variant="destructive" disabled={f.mutation.pending} onClick={() => void f.remove(entry.id)}>{c.delete}</Button><Button variant="ghost" disabled={f.mutation.pending} onClick={() => f.setConfirm(null)}>{c.cancel}</Button></div> : <Button variant="ghost" disabled={f.mutation.pending} onClick={() => f.setConfirm(entry.id)}>{c.delete}</Button>}
-          </td></tr>)}</tbody></table></div>
-      </section>
+          </td></tr>)}</tbody></table></div></Surface>
+      </Section>
     </>}
   </div>;
 }
@@ -66,5 +67,5 @@ export function PanelPage() {
   const resource = usePanel(client, toolId);
   const c = useI18n().messages.steward.panel;
   const parsed = toolSpecSchema.safeParse(resource.data?.tool.spec);
-  return <main className="mx-auto w-full min-w-0 max-w-5xl p-4 [overflow-wrap:anywhere]"><ResourceStatus resource={resource} />{resource.data && (resource.data.tool.kind === "panel" && parsed.success ? <PanelContent key={`${toolId}:${resource.data.tool.version}`} detail={resource.data} spec={parsed.data} client={client} refresh={resource.refresh} /> : <p role="alert">{c.unavailable}</p>)}</main>;
+  return <PageColumn><ResourceStatus resource={resource} />{resource.data && (resource.data.tool.kind === "panel" && parsed.success ? <PanelContent key={`${toolId}:${resource.data.tool.version}`} detail={resource.data} spec={parsed.data} client={client} refresh={resource.refresh} /> : <p role="alert">{c.unavailable}</p>)}</PageColumn>;
 }

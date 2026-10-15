@@ -57,6 +57,25 @@ it("hides empty sections", async () => {
   expect(await screen.findByRole("heading", { name: en.steward.foundation.clear })).toBeVisible();
   expect(screen.queryByRole("heading", { name: "Waiting for you" })).not.toBeInTheDocument();
 });
+it.each([false, true])("expands a lone result section with decisions=%s", async (decisions) => {
+  const view = { ...emptyToday(), results: todayFixture().results, decisions: decisions ? todayFixture().decisions : [] };
+  vi.mocked(apiJson).mockResolvedValue(view);
+  show();
+  const heading = await screen.findByRole("heading", { name: en.steward.foundation.results });
+  expect(heading.closest("section")).toHaveClass("min-[860px]:col-span-2");
+  expect(screen.getByRole("link", { name: "Read" })).toHaveAttribute("href", "/en/affairs/camera/results/2");
+  expect(screen.queryByRole("heading", { name: en.steward.foundation.changes })).not.toBeInTheDocument();
+});
+it("keeps populated pairs side by side and expands the trailing section", async () => {
+  const view = { ...todayFixture(), suggestions: [] };
+  vi.mocked(apiJson).mockResolvedValue(view);
+  show();
+  await screen.findByRole("heading", { name: en.steward.foundation.results });
+  for (const key of ["changes", "results"] as const) {
+    expect(screen.getByRole("heading", { name: en.steward.foundation[key] }).closest("section")).not.toHaveClass("min-[860px]:col-span-2");
+  }
+  expect(screen.getByRole("heading", { name: en.steward.foundation.upcoming }).closest("section")).toHaveClass("min-[860px]:col-span-2");
+});
 it("answers and approves through scoped endpoints", async () => {
   show();
   await screen.findByRole("heading", { name: "Waiting for you" });

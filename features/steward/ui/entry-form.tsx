@@ -1,3 +1,4 @@
+import { InlineForm } from "./layout";
 import { useI18n } from "@chrona/i18n";
 import { Button, Input } from "@shared/ui";
 import type { StewardClient } from "../model/client";
@@ -18,8 +19,7 @@ export function EntryForm({
   const { messages } = useI18n(),
     form = useEntryForm(client, affairId, kind, refresh);
   return (
-    <form
-      className="grid gap-2"
+    <InlineForm
       onSubmit={(e) => {
         e.preventDefault();
         void form.submit();
@@ -38,6 +38,6 @@ export function EntryForm({
         {messages.steward.foundation.send}
       </Button>
       <MutationStatus mutation={form} />
-    </form>
+    </InlineForm>
   );
 }

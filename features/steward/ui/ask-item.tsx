@@ -1,3 +1,4 @@
+import { InlineForm } from "./layout";
 import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import type { Ask } from "@chrona/contracts";
@@ -19,7 +20,7 @@ export function AskItem({
   const mutation = useAsk(ask, client, refresh);
   return (
     <article
-      className={`grid gap-2 p-4 ${ask.kind !== "suggestion" ? "border-l-2 border-l-primary" : ""}`}
+      className={`grid gap-2 p-4 ${ask.kind !== "suggestion" ? "border-l-2 border-l-warning" : ""}`}
     >
       <h3 className="font-medium">{ask.title}</h3>
       {ask.affairId && (
@@ -37,8 +38,7 @@ export function AskItem({
         </p>
       ))}
       {ask.kind === "question" ? (
-        <form
-          className="flex flex-wrap gap-2"
+        <InlineForm
           onSubmit={(event) => {
             event.preventDefault();
             void mutation.submitAnswer();
@@ -53,9 +53,19 @@ export function AskItem({
             disabled={mutation.pending}
           />
           <Button disabled={mutation.pending || !mutation.answer.trim()}>{copy.answer}</Button>
-        </form>
+        </InlineForm>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <AskActions ask={ask} mutation={mutation} />
+      )}
+      {mutation.pending && <p role="status">{copy.pending}</p>}
+      {mutation.error && <p role="alert">{copy[mutation.error.messageKey]}</p>}
+    </article>
+  );
+}
+
+function AskActions({ ask, mutation }: { ask: Ask; mutation: ReturnType<typeof useAsk> }) {
+  const copy = useI18n().messages.steward.foundation;
+  return <div className="flex flex-wrap gap-2">
           {ask.kind === "approval" ? (
             <>
               <Button
@@ -104,10 +114,5 @@ export function AskItem({
               </Button>
             </>
           )}
-        </div>
-      )}
-      {mutation.pending && <p role="status">{copy.pending}</p>}
-      {mutation.error && <p role="alert">{copy[mutation.error.messageKey]}</p>}
-    </article>
-  );
+        </div>;
 }

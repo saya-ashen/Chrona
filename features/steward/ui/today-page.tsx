@@ -1,3 +1,4 @@
+import { PageColumn, Section, Surface } from "./layout";
 import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import { Alert, AlertDescription, Button, Skeleton } from "@shared/ui";
@@ -43,10 +44,12 @@ export function TodayPage() {
   const copy = messages.steward.foundation;
   const { today: resource } = useStewardSession();
   const view = resource.data;
+  const sections = view ? visibleSections(view) : [];
+  const pairedSectionCount = sections.filter(section => section !== "decisions").length;
   const affairHref = (id: string) => `/${locale}/affairs/${encodeURIComponent(id)}`;
 
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-5xl gap-7 p-4 [overflow-wrap:anywhere]">
+    <PageColumn>
       {resource.loading && !view && <TodayLoading />}
       {resource.error && (
         <Alert variant="destructive">
@@ -60,24 +63,16 @@ export function TodayPage() {
         <>
           <TodayHeader view={view} />
           <div className="grid items-start gap-7 min-[860px]:grid-cols-2">
-            {visibleSections(view).map((section) => (
-              <section
+            {sections.map((section, index) => (
+              <Section
                 key={section}
-                aria-labelledby={`today-${section}`}
+                title={copy[section]}
                 className={
-                  section === "decisions" ? "grid gap-3 min-[860px]:col-span-2" : "grid gap-3"
+                  section === "decisions" || (index === sections.length - 1 && pairedSectionCount % 2 === 1)
+                    ? "grid gap-3 min-[860px]:col-span-2" : "grid gap-3"
                 }
               >
-                <h2 id={`today-${section}`} className="text-sm font-semibold text-muted-foreground">
-                  {copy[section]}
-                </h2>
-                <div
-                  className={
-                    section === "decisions"
-                      ? "divide-y rounded-lg border border-l-4 border-l-warning bg-background"
-                      : "divide-y rounded-lg border bg-background"
-                  }
-                >
+                <Surface>
                   {(section === "decisions" || section === "suggestions") &&
                     view[section].map((ask) => (
                       <AskItem
@@ -127,13 +122,13 @@ export function TodayPage() {
                         </time>
                       </article>
                     ))}
-                </div>
-              </section>
+                </Surface>
+              </Section>
             ))}
           </div>
           <TodayHealth view={view} />
         </>
       )}
-    </div>
+    </PageColumn>
   );
 }

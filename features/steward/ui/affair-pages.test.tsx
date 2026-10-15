@@ -120,6 +120,13 @@ it("shows permissions when this affair has a grant", async () => {
   expect(await screen.findByRole("heading", { name: "Permissions for this affair" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Revoke" })).toBeVisible();
 });
+it.each(["/en/affairs/camera", "/en/affairs/camera/results/2"])("hides empty result sources on %s", async (path) => {
+  detail.latestResult!.sources = [];
+  show(path);
+  await screen.findByRole("heading", { name: detail.latestResult!.title });
+  expect(screen.queryByRole("heading", { name: en.steward.affairs.sources })).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Revision feedback" })).toBeVisible();
+});
 it("renders detail, inline ask, result sources and history", async () => {
   show();
   expect(await screen.findByRole("heading", { name: "二手相机选购" })).toBeVisible();
@@ -133,6 +140,7 @@ it("renders detail, inline ask, result sources and history", async () => {
   expect(screen.getByText("Waiting for your answer")).toBeVisible();
   expect(screen.getByRole("textbox", { name: /Answer:/ })).toBeVisible();
   expect(screen.getByText(/Reviewed/)).toBeVisible();
+  expect(screen.getByRole("heading", { name: en.steward.affairs.sources })).toBeVisible();
   expect(screen.getByText(/Unverified/)).toBeVisible();
   expect(screen.getByText("镜头成本未计入")).toBeVisible();
 });

@@ -1,3 +1,4 @@
+import { PageColumn, Section, Surface } from "./layout";
 import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import { Badge, Button } from "@shared/ui";
@@ -12,12 +13,12 @@ import { AffairSidebar } from "./affair-sidebar";
 export function AffairDetailPage() {
   const resource = useAffair();
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-6xl gap-5 p-4 [overflow-wrap:anywhere]">
+    <PageColumn>
       <ResourceStatus resource={resource} />
       {resource.data && (
         <AffairDetail key={resource.affairId} resource={resource} detail={resource.data} />
       )}
-    </div>
+    </PageColumn>
   );
 }
 function AffairDetail({
@@ -31,7 +32,7 @@ function AffairDetail({
   return (
     <>
       <AffairHeader detail={detail} controls={controls} />
-      <div className="grid min-w-0 items-start gap-8 min-[860px]:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid min-w-0 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <AffairMain resource={resource} detail={detail} controls={controls} />
         <AffairSidebar detail={detail} client={resource.client} refresh={resource.refresh} />
       </div>
@@ -52,7 +53,7 @@ function AffairHeader({ detail, controls }: AffairSectionProps) {
           <Link to={`/${locale}/affairs`}>← {copy.title}</Link>
           <Badge variant="secondary">{stateLabel(a, copy, locale, detail.asks)}</Badge>
           {a.status !== "done" && (
-            <>
+            <div className="ml-auto flex gap-2">
               <Button
                 variant="outline"
                 disabled={controls.pending}
@@ -67,7 +68,7 @@ function AffairHeader({ detail, controls }: AffairSectionProps) {
               >
                 {copy.end}
               </Button>
-            </>
+            </div>
           )}
         </div>
         {controls.confirmEnd && (
@@ -93,7 +94,7 @@ function AffairHeader({ detail, controls }: AffairSectionProps) {
         <MutationStatus mutation={controls} />
         <h1 className="text-2xl font-semibold">{a.title}</h1>
         {a.goal?.trim() && (
-          <p>
+          <p className="max-w-prose text-muted-foreground">
             {copy.goal}: {a.goal}
           </p>
         )}
@@ -105,8 +106,8 @@ function AffairMain({ detail, controls, resource }: AffairSectionProps & { resou
   const { messages, locale } = useI18n(), copy = messages.steward.affairs, a = detail.affair;
   return (
         <main className="grid min-w-0 gap-7">
-          <section className="grid gap-2">
-            <h2 className="font-semibold">{copy.now}</h2>
+          <Section title={copy.now}>
+            <Surface><div className="grid gap-3 p-5">
             <p>{a.summary}</p>
             <p>
               {copy.next}: {a.nextStep || copy.none}
@@ -124,9 +125,10 @@ function AffairMain({ detail, controls, resource }: AffairSectionProps & { resou
                 </Button>
               </div>
             )}
-          </section>
+            </div></Surface>
+          </Section>
           {detail.asks.length > 0 && (
-            <section aria-label={copy.waiting}>
+            <Section title={copy.waiting} aria-label={copy.waiting}><Surface>
               {detail.asks.map((ask) => (
                 <AskItem
                   key={ask.id}
@@ -135,7 +137,7 @@ function AffairMain({ detail, controls, resource }: AffairSectionProps & { resou
                   refresh={resource.refresh}
                 />
               ))}
-            </section>
+            </Surface></Section>
           )}
           {detail.latestResult ? (
             <ResultContent
@@ -147,11 +149,10 @@ function AffairMain({ detail, controls, resource }: AffairSectionProps & { resou
           ) : (
             <p>{copy.noResult}</p>
           )}
-          <section className="grid gap-4">
-            <h2 className="font-semibold">{copy.timeline}</h2>
-            <ol className="grid gap-4">
+          <Section title={copy.timeline}>
+            <ol className="ml-2 grid gap-6 border-l border-border pl-5">
               {detail.entries.map((entry) => (
-                <li key={entry.id}>
+                <li key={entry.id} className="relative grid gap-1 before:absolute before:-left-[25px] before:top-2 before:size-2 before:rounded-full before:bg-muted-foreground">
                   <p className="text-sm text-muted-foreground">
                     <time dateTime={entry.at}>{new Date(entry.at).toLocaleString(locale)}</time> ·{" "}
                     {timelineLabel(entry, copy)}
@@ -166,8 +167,8 @@ function AffairMain({ detail, controls, resource }: AffairSectionProps & { resou
               kind="supplement"
               refresh={resource.refresh}
             />
-          </section>
-          <details>
+          </Section>
+          <details className="text-sm text-muted-foreground">
             <summary>
               {copy.technical} · {copy.toolCalls}: {detail.toolCalls}
             </summary>

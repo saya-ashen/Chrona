@@ -1,7 +1,8 @@
+import { Surface } from "./layout";
 import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import type { AffairDetail } from "@chrona/contracts";
-import { MarkdownContent } from "@shared/ui";
+import { Button, MarkdownContent } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { safeSourceUrl } from "../model/affairs";
 import { EntryForm } from "./entry-form";
@@ -20,23 +21,26 @@ export function ResultContent({
   const { messages, locale } = useI18n(),
     copy = messages.steward.affairs;
   return (
-    <article className="grid min-w-0 gap-4">
-      <h2 className="text-xl font-semibold">{result.title}</h2>
+    <Surface><article className="min-w-0 divide-y [&>section]:p-5">
+      <header className="flex flex-wrap items-center gap-3 p-5">
+      <h2 className="mr-auto text-lg font-semibold">{result.title}</h2>
       <nav aria-label={copy.version} className="flex flex-wrap gap-3">
         {versions.map((v) => (
-          <Link
-            key={v.version}
+          <Button key={v.version} size="sm" variant={v.version === result.version ? "secondary" : "ghost"} asChild><Link
             aria-current={v.version === result.version ? "page" : undefined}
-            className="underline"
             to={`/${locale}/affairs/${encodeURIComponent(result.affairId)}/results/${v.version}`}
           >
             {copy.version} {v.version}
-          </Link>
+          </Link></Button>
         ))}
       </nav>
-      <p>{result.summary}</p>
-      <MarkdownContent>{result.body}</MarkdownContent>
-      <section>
+      <time className="w-full text-xs text-muted-foreground" dateTime={result.createdAt}>{new Date(result.createdAt).toLocaleString(locale)}</time>
+      </header>
+      <div className="grid min-w-0 gap-4 p-5">
+        <p className="text-muted-foreground">{result.summary}</p>
+        <div className="prose prose-sm min-w-0 max-w-none dark:prose-invert"><MarkdownContent>{result.body}</MarkdownContent></div>
+      </div>
+      {result.sources.length > 0 && <section>
         <h3 className="font-semibold">{copy.sources}</h3>
         <ul className="grid gap-2">
           {result.sources.map((s, i) => (
@@ -54,7 +58,7 @@ export function ResultContent({
             </li>
           ))}
         </ul>
-      </section>
+      </section>}
       {result.limitations && (
         <section>
           <h3 className="font-semibold">{copy.limitations}</h3>
@@ -71,13 +75,13 @@ export function ResultContent({
           </ul>
         </section>
       )}
-      <EntryForm
+      <div className="p-5"><EntryForm
         key={result.affairId}
         client={client}
         affairId={result.affairId}
         kind="feedback"
         refresh={refresh}
-      />
-    </article>
+      /></div>
+    </article></Surface>
   );
 }

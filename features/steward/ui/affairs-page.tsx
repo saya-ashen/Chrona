@@ -1,3 +1,4 @@
+import { PageColumn, Section, Surface } from "./layout";
 import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import { Badge } from "@shared/ui";
@@ -13,14 +14,14 @@ export function AffairsPage() {
     copy = messages.steward.affairs;
   const now = new Date().toISOString();
   return (
-    <div className="mx-auto grid min-w-0 max-w-5xl gap-6 p-4 [overflow-wrap:anywhere]">
+    <PageColumn>
       <h1 className="text-2xl font-semibold">{copy.title}</h1>
       <ResourceStatus resource={resource} />
       {resource.data?.items.length === 0 && <p>{copy.empty}</p>}
       {resource.data &&
         groupAffairs(resource.data.items).map((group) => {
           const rows = group.items.map((a) => (
-            <article key={a.id} className="grid min-w-0 gap-2 border-b py-4">
+            <article key={a.id} className="grid min-w-0 gap-2 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   className="font-medium underline"
@@ -73,17 +74,14 @@ export function AffairsPage() {
               <summary>
                 {copy.done} · {group.items.length}
               </summary>
-              {rows}
+              <Surface className="mt-3">{rows}</Surface>
             </details>
           ) : group.items.length > 0 ? (
-            <section key={group.key} aria-label={copy[group.key]}>
-              <h2 className="font-semibold">
-                {copy[group.key]} · {group.items.length}
-              </h2>
-              {rows}
-            </section>
+            <Section key={group.key} title={copy[group.key]} count={group.items.length} aria-label={copy[group.key]}>
+              <Surface>{rows}</Surface>
+            </Section>
           ) : null;
         })}
-    </div>
+    </PageColumn>
   );
 }

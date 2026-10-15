@@ -1,7 +1,5 @@
 import { useRouteError } from "react-router-dom";
-import { defaultLocale } from "@chrona/i18n";
-import { I18nProvider } from "@chrona/i18n/react";
-import { fallbackMessages } from "@chrona/i18n/messages";
+import { ErrorLocaleProvider, ErrorScreen } from "./error-screen";
 
 import { AccessKeyUnlock } from "@/components/access-key-unlock";
 import { NotFoundPage } from "@/components/not-found-page";
@@ -21,18 +19,18 @@ export function AccessKeyRouteError() {
 
 	if (getErrorStatus(error) === 401) {
 		return (
-			<I18nProvider locale={defaultLocale} messages={fallbackMessages}>
+			<ErrorLocaleProvider>
 				<AccessKeyUnlock
 					onUnlock={(key, remember) => {
 						setAccessKey(key, remember);
 						window.location.reload();
 					}}
 				/>
-			</I18nProvider>
+			</ErrorLocaleProvider>
 		);
 	}
 
-	if (getErrorStatus(error) === 404) return <NotFoundPage />;
+	if (getErrorStatus(error) === 404) return <ErrorLocaleProvider><NotFoundPage /></ErrorLocaleProvider>;
 
-	throw error;
+	return <ErrorScreen />;
 }

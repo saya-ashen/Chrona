@@ -50,6 +50,7 @@ const tool = {
   updatedAt: at,
 };
 let fail = false;
+let health = emptyToday().health;
 function show() {
   render(
     <MemoryRouter>
@@ -63,6 +64,7 @@ function show() {
 }
 beforeEach(() => {
   fail = false;
+  health = emptyToday().health;
   vi.mocked(apiJson).mockImplementation(async (url, options) => {
     const path = String(url).split("?")[0]!;
     if (options?.method && options.method !== "GET") {
@@ -76,7 +78,7 @@ beforeEach(() => {
     }
     if (path.endsWith("/settings")) return settings as never;
     if (path.endsWith("/today")) return emptyToday() as never;
-    if (path.endsWith("/health")) return emptyToday().health as never;
+    if (path.endsWith("/health")) return health as never;
     if (path.endsWith("/tools/t")) return { tool, entries: [], runs: [{ id: "r", toolId: "t", version: 2, status: "failed", output: "partial output", error: "script failed", startedAt: at, endedAt: at }] } as never;
     return {
       items: path.endsWith("/grants")
@@ -157,8 +159,25 @@ it("shows script source before version-bound approval and immutable credentials"
     expect.objectContaining({ method: "POST", body: '{"action":"approve","expectedVersion":3}' }),
   );
   const row = screen.getByText("Change credentials").closest("tr")!;
-  expect(within(row).getByText("Cannot be changed")).toBeVisible();
+  const origins = within(row).getAllByText("Cannot be changed");
+  expect(origins).toHaveLength(2);
+  expect(origins[0]).toHaveClass("sm:hidden");
+  expect(origins[0]?.parentElement).toHaveTextContent("Change credentials");
+  expect(origins[1]).toHaveClass("hidden", "sm:table-cell", "whitespace-nowrap", "min-w-24");
+  expect(screen.getByRole("columnheader", { name: en.steward.settings.origin })).toHaveClass("hidden", "sm:table-cell");
   expect(within(row).queryByRole("combobox")).toBeNull();
+});
+it.each(["Pi", "none"])("shows health values and the %s agent label", async (name) => {
+  health = { ...health, agent: { name, available: name === "Pi", lastError: name === "none" ? "Agent not enabled" : null }, queuedAffairs: 2, runningAffairs: 3, failedAffairs: 4, pendingEvents: 5, failingConnections: 6, queuedNotifications: 7, failedNotifications: 8 };
+  show();
+  const region = await screen.findByRole("region", { name: "Health" });
+  expect(await within(region).findAllByText(name === "Pi" ? "Pi · Available" : "Agent not enabled")).toHaveLength(1);
+  for (const [key, value] of Object.entries(health)) {
+    if (typeof value !== "number") continue;
+    const label = en.steward.settings[key as keyof typeof en.steward.settings];
+    if (typeof label === "string") expect(within(region).getByText(label).nextElementSibling).toHaveTextContent(String(value));
+  }
+  expect(within(region).queryByText(/none ·/)).toBeNull();
 });
 it("renders empty collections honestly", async () => {
   vi.mocked(apiJson).mockImplementation(async (url) =>

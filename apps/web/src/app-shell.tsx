@@ -1,3 +1,4 @@
+import { PageColumn } from "@features/steward/ui/layout";
 import { NavLink, Outlet, useLoaderData } from "react-router-dom";
 import { localizeHref, useI18n } from "@chrona/i18n";
 import { I18nProvider } from "@chrona/i18n/react";
@@ -27,7 +28,8 @@ function ShellContent({ data }: { data: AppBootData }) {
     { href: "/settings", label: copy.settings },
   ];
   return <div className="min-h-screen min-w-0 [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
-    <header className="flex min-w-0 flex-wrap items-center gap-4 border-b p-4">
+    <header className="border-b bg-card">
+      <PageColumn className="flex flex-wrap items-center gap-4 py-3">
       <LocalizedLink href="/" className="font-semibold">Chrona</LocalizedLink>
       <nav aria-label={copy.navigation} className="flex flex-wrap gap-4">
         {navigation.map(item => <NavLink key={item.href} to={localizeHref(locale, item.href)} end={item.href === "/"}
@@ -40,11 +42,12 @@ function ShellContent({ data }: { data: AppBootData }) {
           : settings.data ? <span>{settings.data.chat.bound ? `${copy.chatConnected} · ${copy.sentToday.replace("{count}", String(settings.data.chat.sentToday)).replace("{cap}", String(settings.data.notifications.dailyCap))}` : copy.chatDisconnected}</span>
           : <span>{messages.steward.foundation.loading}</span>}
       </div>
+      </PageColumn>
     </header>
     <main className="min-w-0">
-      <div className="mx-auto w-full min-w-0 max-w-5xl p-4">
+      <PageColumn className="pb-0">
         <Composer client={session.today.client} lang={locale} refresh={session.refresh} onPendingChange={session.setChatPending} />
-      </div>
+      </PageColumn>
       <Outlet context={data} />
     </main>
   </div>;
