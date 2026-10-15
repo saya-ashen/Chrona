@@ -9,24 +9,32 @@ Chrona is a proactive personal steward: the user hands over things in natural la
 picks a suitable way to get them done, keeps looking after them, and reports back.
 
 - Goals (highest authority): [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md).
-- Architecture, data model and pages: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
-- Page prototype: [`docs/prototypes/steward-pages.html`](docs/prototypes/steward-pages.html).
+- Current architecture, model and pages: [`docs/zh/steward-workspace.md`](docs/zh/steward-workspace.md).
+- Historical purge record only: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
 
-- Everything the user sees is an **Affair**. Runs, events and assessments are internal
-  records shown only under an affair's technical details. No task/goal/plan/workflow systems.
+- An **Affair** is a git directory under `<dataDir>/affairs`, with `README.md` as its home.
+  Provider and user edits are committed; pages, checkboxes and panels are files, not result tables.
+  Simple questions may receive direct replies without creating an affair. Runs are internal records.
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
-- Chrona owns state, scheduling, permissions, notifications and delivery; the agent (Pi) only
-  reads bounded context and calls Chrona-scoped tools. Model prose never changes state.
+- Providers own file, shell, web and session tools. Chrona supplies scheduling, queues, git history,
+  connectors/credentials, approvals, budgets and delivery. No duplicate Chrona web/sandbox tools
+  for Providers; the separate Chrona sandbox is only for deterministic schedule jobs.
+- Current Provider: Pi RPC. Chrona tools: `chrona_reply`, `chrona_notify`, `chrona_schedule`,
+  `chrona_schedules`, `chrona_schedule_cancel`, `chrona_affairs`, `chrona_affair_create`,
+  `chrona_affair_update`, `chrona_focus`, `chrona_request_approval`, `chrona_send_email`,
+  `chrona_inbound`, `chrona_remember`, `chrona_forget`, `chrona_preferences`.
+  Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
   auto · notify_after · preapproved · ask · never. External text can never grant anything.
 - Notifications go through the budget (`notify-budget.ts`): now / digest / web, daily cap,
   quiet hours. Do not add notification paths that bypass it.
 - Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
-- No backward compatibility with the removed legacy system (tasks, goals, plans, runs,
-  providers, work results, management MCP, Hermes plugin). Do not reintroduce it.
+- No backward compatibility with removed task/goal/plan systems, immutable AffairResult,
+  Ask/suggestions, care/cadence, FollowUp, managed-tool tables, concierge/assessor roles,
+  management MCP or Hermes. Current Provider adapters and Run records are not those legacy systems.
 
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.
@@ -39,13 +47,13 @@ real accounts or external sends, disabling auth, approvals or secret redaction.
 | Path | Role |
 | --- | --- |
 | `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
-| `packages/domain/src/steward` | Pure rules: policy, notification budget, suggestion cooldown, refs, digest, panel spec |
-| `packages/engine/src/modules/steward` | Use cases on Prisma: affairs, asks, grants, notify, sources, runs, agent tools, concierge, tick |
-| `packages/integrations/src/steward` | Adapters: sources, assessors, deliveries, QQ official bot, Pi runner |
+| `packages/domain/src/steward` | Pure policy, budgets, schedule rules, inbound rules, Markdown and refs |
+| `packages/engine/src/modules/steward` | Affairs/files/git, schedules/jobs, approvals, connectors, queues, runs, tools and tick |
+| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, schedule-job sandbox |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
-| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, agent loop, QQ bot) |
-| `apps/web`, `features/steward` | SPA shell and the steward pages (Today, Affairs, Affair, Result, Settings) |
+| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, Provider queues, QQ bot) |
+| `apps/web`, `features/steward` | SPA shell and the steward pages (Today, Affairs, Affair files/history/schedules, Settings) |
 | `packages/cli` | `chrona start / backup / restore / doctor / qq bind-code` |
 
 Dependency direction: `apps → features → packages/engine → packages/domain → packages/contracts`;
@@ -53,10 +61,11 @@ routes validate and delegate; domain has no I/O.
 
 ## Tech stack
 
-- Frontend: Vite + React 19 + React Router 7 (SPA in `apps/web`), shadcn/ui primitives in `shared/ui`, Tailwind.
+- Frontend: Vite + React 19 + React Router 7 (SPA in `apps/web`), shadcn/ui primitives in `apps/web/src/components/ui`, Tailwind.
 - Backend: Hono on Bun (`apps/server`).
 - Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
-- Agent: Pi (`pi -p`) with Chrona's tool extension; web tools from pi-web-access.
+- Provider: Pi RPC with Chrona's tool extension; optional explicit web extension.
+- Storage: SQLite plus `<dataDir>/affairs` and `<dataDir>/secrets`; back up all three while stopped.
 - TypeScript strict everywhere.
 
 ## Database
@@ -90,10 +99,9 @@ routes validate and delegate; domain has no I/O.
 - Chrona wrappers are allowed only when they add product/domain meaning or
   repeated product-specific composition. Wrappers must compose shadcn primitives
   and must not keep legacy compatibility aliases.
-- Before accepting UI foundation changes, run `bun run check:ui-foundation`. If
-  it flags removed imports, consumer `buttonVariants`, reusable field class
-  helpers, generic status badges, or generic surface cards, replace consumers
-  with official shadcn primitives first. Wrapper decision order: use generated
+- Before accepting UI foundation changes, inspect removed imports, consumer `buttonVariants`,
+  reusable field class helpers, generic status badges and generic surface cards; replace consumers
+  with official shadcn primitives first. There is currently no UI-foundation check script. Wrapper decision order: use generated
   shadcn primitive, compose it in the feature component, then create a
   product-named wrapper only when the wrapper carries Chrona domain meaning.
 

@@ -6,11 +6,13 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { Database } from "bun:sqlite";
 
 import { acquireSqliteRuntimeLock, type SqliteRuntimeLock } from "./sqlite-runtime-lock";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
+
+import { backupDataFiles, replaceDataFiles, stageDataFiles } from "./sqlite-backup-files";
 
 const RESTORE_MARKER_VERSION = 1;
 
@@ -30,6 +32,7 @@ type RestoreMarker = {
 
 type RestoreOptions = {
   force?: boolean;
+  dataDir?: string;
   /** Test seam for replacement failures; production uses renameSync. */
   rename?: (from: string, to: string) => void;
   /** Test seam for interruption after old WAL sidecars are retired. */
@@ -82,7 +85,16 @@ function vacuumInto(sourcePath: string, destinationPath: string): void {
   secureGeneratedFile(destinationPath);
 }
 
-export function backupSqliteDatabase(databaseUrl: string, outputPath: string): SqliteBackupResult {
+function assertOutsideDataRoots(dataDir: string, ...paths: string[]): void {
+  for (const root of ["affairs", "secrets"]) {
+    const directory = resolve(dataDir, root);
+    if (paths.some(path => path === directory || path.startsWith(`${directory}${sep}`))) {
+      throw new Error("Database and backup paths must be outside affairs and secrets directories.");
+    }
+  }
+}
+
+export function backupSqliteDatabase(databaseUrl: string, outputPath: string, dataDir?: string): SqliteBackupResult {
   const sourcePath = requireFilePath(databaseUrl);
   const backupPath = resolve(outputPath);
   if (!existsSync(sourcePath)) {
@@ -92,9 +104,17 @@ export function backupSqliteDatabase(databaseUrl: string, outputPath: string): S
     throw new Error("Backup destination must differ from the active Chrona database.");
   }
 
+  if (dataDir) assertOutsideDataRoots(dataDir, sourcePath, backupPath);
   createPrivateDirectory(dirname(backupPath));
-  vacuumInto(sourcePath, backupPath);
-  return { sourcePath, backupPath };
+  const lock = dataDir ? acquireSqliteRuntimeLock(databaseUrl) : null;
+  try {
+    if (dataDir && existsSync(`${backupPath}.tar`)) throw new Error("Backup archive already exists.");
+    vacuumInto(sourcePath, backupPath);
+    if (dataDir) backupDataFiles(dataDir, `${backupPath}.tar`);
+    return { sourcePath, backupPath };
+  } finally {
+    lock?.release();
+  }
 }
 
 function restoreMarkerPath(databasePath: string): string {
@@ -271,9 +291,21 @@ export function restoreSqliteDatabase(
   inputPath: string,
   options: RestoreOptions = {},
 ): SqliteBackupResult & { recoveryPath: string | null } {
+  if (options.dataDir) assertOutsideDataRoots(options.dataDir, requireFilePath(databaseUrl), resolve(inputPath));
   const lock = acquireSqliteRuntimeLock(databaseUrl);
   try {
-    return restoreWithLock(lock, databaseUrl, inputPath, options);
+    if (!options.dataDir) return restoreWithLock(lock, databaseUrl, inputPath, options);
+    // Check SQLite and overwrite guards before staging or replacing any directories.
+    prepareRestore(lock, databaseUrl, inputPath, options.force);
+    if (!options.force && ["affairs", "secrets"].some(root => existsSync(resolve(options.dataDir!, root)))) {
+      throw new Error("Chrona data directories already exist. Pass --force to replace them.");
+    }
+    const stage = stageDataFiles(options.dataDir, `${resolve(inputPath)}.tar`);
+    let result: ReturnType<typeof restoreWithLock> | undefined;
+    replaceDataFiles(options.dataDir, stage, () => {
+      result = restoreWithLock(lock, databaseUrl, inputPath, options);
+    });
+    return result!;
   } finally {
     lock.release();
   }

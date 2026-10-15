@@ -33,12 +33,16 @@ export CHRONA_STEWARD_AGENT=pi
 
 ## 备份与恢复
 
+先停止服务（完整备份会获取数据库运行锁，服务运行时拒绝操作），确认 `CHRONA_DATA_DIR` 与 `DATABASE_URL` 指向同一实例。系统需提供 GNU 兼容的 `tar`。
+
 ```bash
 chrona backup /absolute/private/path/chrona-backup.db
 chrona doctor
 ```
 
-备份命令生成一致性 SQLite 副本，不要用运行中的裸数据库文件复制代替它。备份不包含外部 QQ 状态或模型配置；这些需要单独安全归档。备份目录与文件应仅 owner 可访问。
+备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/affairs`，包括 git 历史，以及 `<dataDir>/secrets`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的事务/凭据目录按空目录恢复。拒绝符号链接和特殊文件；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
+
+不要用运行中的裸数据库复制代替一致性备份。QQ 状态（包括数据目录中的 `qq-bot`）、Provider 配置及其他自定义目录不在此 tar 中，需单独安全归档。
 
 恢复前停止服务，确认目标数据库路径，保留现有数据备份：
 
@@ -46,7 +50,11 @@ chrona doctor
 chrona restore /absolute/private/path/chrona-backup.db
 ```
 
-默认不覆盖已有数据库。只有明确要替换且已有恢复手段时才使用 `chrona restore /absolute/private/path/chrona-backup.db --force`。恢复后运行 `chrona doctor`，再启动服务并检查页面。建议先在独立目录演练恢复，不要首次在真实数据上试验。
+恢复必须同时提供数据库和同名 `.tar`，不会静默退回仅恢复数据库。默认不覆盖已有数据库或事务/凭据目录；`--force` 替换而非合并目录，避免留下旧文件。恢复拒绝不安全路径、链接及非本命令生成的归档格式。只恢复可信来源的备份。
+
+旧数据库恢复副本保留在数据库旁，旧事务/凭据目录保留为数据目录下 `.restore-files-*-prior-affairs` / `-prior-secrets`。普通错误会回滚目录；跨 SQLite 与文件目录的替换不是崩溃原子事务。断电或强制中断后，不要直接重启：保留整个目录，请 owner 检查数据库恢复标记及暂存/旧目录，或在全新目标目录用完整备份对重试。大归档恢复会占用与归档大小相关的内存。
+
+只有明确要替换且已有恢复手段时才使用 `chrona restore /absolute/private/path/chrona-backup.db --force`。恢复后运行 `chrona doctor`，再启动服务并检查页面。建议先在独立目录演练恢复，不要首次在真实数据上试验。
 
 源码环境将上述 `chrona` 替换为 `bun run packages/cli/src/index.ts`，例如：
 
@@ -62,9 +70,9 @@ bun run packages/cli/src/index.ts doctor
 
 - 存储：`DATABASE_URL`、`CHRONA_DATA_DIR`；迁移路径覆盖为 `CHRONA_MIGRATIONS_DIR`。
 - API：`HOST`、`PORT`、`API_KEY`、`ALLOWED_ORIGINS`。保持回环监听；不得靠危险覆盖项替代认证。
-- Agent：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_AGENT_EXTENSION`、`CHRONA_STEWARD_PI_WEB_EXTENSION`。
-- 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 60；`CHRONA_STEWARD_ASSESSOR=pi` 只控制来源评估，不等于启用接待 Agent。
-- 来源：`CHRONA_STEWARD_CHINO_DASHBOARD_URL` 配置 Chino 适配器；还需在设置中管理对应连接和授权。
+- Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
+- 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
+- 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
 - QQ：`CHRONA_QQ_APP_ID`、`CHRONA_QQ_SECRET_FILE`、`CHRONA_QQ_STATE_DIR`；链接用 `CHRONA_PUBLIC_URL`。
 
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本的 Vite 监听所有网卡，不应向不可信网络开放。
@@ -106,4 +114,6 @@ chrona qq bind-code --workspace ws_default
 
 ## 脚本限制
 
-脚本草稿需要按版本批准，批准不等于运行成功。默认没有可用沙箱。当前代码包含可选 bubblewrap 运行器，通过 `CHRONA_STEWARD_SANDBOX_BWRAP` 配置且隔离探测成功才可用；挂载目前假定 `/nix/store`，不能视为通用部署支持。未通过探测时没有回退到宿主执行。具体执行是否成功，以实际工具结果为准，不以模型文字为准。
+Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_SANDBOX_BWRAP` 配置 Provider 的 bubblewrap 包装；未配置时 Pi 关闭 bash，保留文件与可选网页工具。Provider 包装的宿主挂载只读，但不隔离所有宿主读取，不能当成凭据保密边界。
+
+同一变量也配置独立的调度 `job` 沙箱；通过隔离探测后，在事务目录读写执行，保留超时/输出限制，允许联网，其余挂载只读。目前假定 `/nix/store`，不能视为通用部署支持。未通过探测时不回退到宿主执行。以实际执行结果为准，不以模型文字为准。

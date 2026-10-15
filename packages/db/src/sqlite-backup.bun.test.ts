@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -27,6 +27,98 @@ function readValue(path: string): string {
 }
 
 describe("SQLite backup and restore", () => {
+  it("round trips affairs including git history and private connector secrets, replacing stale files", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-files-backup-"));
+    try {
+      const data = join(directory, "data");
+      mkdirSync(join(data, "affairs", "a", ".git"), { recursive: true });
+      mkdirSync(join(data, "secrets"));
+      writeFileSync(join(data, "affairs", "a", "README.md"), "- [x] done");
+      writeFileSync(join(data, "affairs", "a", ".git", "HEAD"), "ref: refs/heads/main\n");
+      writeFileSync(join(data, "secrets", "email.json"), "test-secret");
+      writeFileSync(join(data, "affairs", "a", "check.sh"), "#!/bin/sh\n", { mode: 0o700 });
+      const db = join(directory, "outside-data.db");
+      const backup = join(directory, "backup.db");
+      createDatabase(db, "saved");
+      backupSqliteDatabase(`file:${db}`, backup, data);
+      expect(statSync(`${backup}.tar`).mode & 0o777).toBe(0o600);
+      writeFileSync(join(data, "affairs", "stale.md"), "stale");
+      writeFileSync(join(data, "secrets", "email.json"), "changed");
+      expect(() => restoreSqliteDatabase(`file:${db}`, backup, { dataDir: data })).toThrow("Pass --force");
+      restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
+      expect(readValue(db)).toBe("saved");
+      expect(readFileSync(join(data, "affairs", "a", "README.md"), "utf8")).toBe("- [x] done");
+      expect(readFileSync(join(data, "affairs", "a", ".git", "HEAD"), "utf8")).toContain("refs/heads/main");
+      expect(readFileSync(join(data, "secrets", "email.json"), "utf8")).toBe("test-secret");
+      expect(statSync(join(data, "secrets", "email.json")).mode & 0o777).toBe(0o600);
+      expect(existsSync(join(data, "affairs", "stale.md"))).toBe(false);
+      expect(statSync(join(data, "affairs", "a", "check.sh")).mode & 0o777).toBe(0o700);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("supports absent data roots and rejects missing/corrupt archives before changing the database", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-empty-backup-"));
+    try {
+      const db = join(directory, "active.db");
+      const backup = join(directory, "backup.db");
+      const data = join(directory, "restored");
+      createDatabase(db, "current");
+      backupSqliteDatabase(`file:${db}`, backup, directory);
+      restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
+      expect(existsSync(join(data, "affairs"))).toBe(true);
+      renameSync(`${backup}.tar`, `${backup}.saved.tar`);
+      expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data })).toThrow();
+      writeFileSync(`${backup}.tar`, "corrupt");
+      expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data })).toThrow("Truncated");
+      expect(readValue(db)).toBe("current");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("refuses live full backups and symlinks; rolls directories back on database replacement failure", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-files-safety-"));
+    try {
+      const db = join(directory, "active.db");
+      const backup = join(directory, "backup.db");
+      createDatabase(db, "current");
+      mkdirSync(join(directory, "affairs"));
+      writeFileSync(join(directory, "affairs", "README.md"), "saved");
+      const lock = acquireSqliteRuntimeLock(`file:${db}`);
+      try { expect(() => backupSqliteDatabase(`file:${db}`, backup, directory)).toThrow("already in use"); }
+      finally { lock.release(); }
+      backupSqliteDatabase(`file:${db}`, backup, directory);
+      writeFileSync(join(directory, "affairs", "README.md"), "current");
+      expect(() => restoreSqliteDatabase(`file:${db}`, backup, {
+        force: true, dataDir: directory,
+        rename() { throw new Error("injected failure"); },
+      })).toThrow("injected failure");
+      expect(readFileSync(join(directory, "affairs", "README.md"), "utf8")).toBe("current");
+      symlinkSync(db, join(directory, "affairs", "link"));
+      expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "unsafe.db"), directory)).toThrow("symlinks");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+  it("rejects traversal and link archive entries without replacing data", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-archive-validation-"));
+    try {
+      const db = join(directory, "active.db"), backup = join(directory, "backup.db");
+      createDatabase(db, "current");
+      mkdirSync(join(directory, "affairs"));
+      backupSqliteDatabase(`file:${db}`, backup, directory);
+      const original = readFileSync(`${backup}.tar`);
+      for (const [name, type] of [["affairs/../../escaped", "5"], ["/affairs", "5"], ["affairs/link", "2"]]) {
+        const malicious = Buffer.from(original);
+        malicious.fill(0, 0, 100);
+        malicious.write(name!, 0);
+        malicious.write(type!, 156);
+        malicious.fill(32, 148, 156);
+        const checksum = malicious.subarray(0, 512).reduce((sum, byte) => sum + byte, 0);
+        malicious.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148);
+        writeFileSync(`${backup}.tar`, malicious);
+        expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: directory })).toThrow("unsafe");
+        expect(readValue(db)).toBe("current");
+      }
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it("creates a consistent backup while WAL mode has uncheckpointed data", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-backup-"));
     let live: Database | undefined;

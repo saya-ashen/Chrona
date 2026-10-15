@@ -1,49 +1,25 @@
-[English](./README.md) | 中文
+[English](README.md) | 中文
 
-<p align="center">
-  <img src="apps/web/public/favicon.png" width="80" alt="Chrona logo" />
-</p>
-<h1 align="center">Chrona</h1>
-<p align="center">
-  <a href="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://github.com/saya-ashen/Chrona/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saya-ashen/Chrona" /></a>
-  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
-  <a href="./package.json"><img alt="Bun >= 1.3.11" src="https://img.shields.io/badge/bun-%3E%3D1.3.11-black" /></a>
-</p>
+# Chrona
 
-## Chrona 是什么
+本地优先的个人管家：通过网页或 QQ 私聊交代事情，在持久的事务目录中一起推进。简单问题可直接回答，不必创建事务。
 
-聊天里随时能找的个人管家，网页上可掌控的事务中心，能持续办事的后台 Agent 服务。交代一次，记得住；能做的事情主动推进；有重要变化及时告诉你；回来查看时，清楚发生了什么、成果在哪里、还有什么没解决。
+## 如何工作
 
-交代的事情统一称为**事务**：可以是一次性请求，也可以持续照看。简单问题可以直接回答，不必创建事务。Agent 根据上下文选择处理方式，不按固定关键词菜单分派；选择可见、可纠正。
+**事务是 git 目录**，位于 `<dataDir>/affairs`，`README.md` 是主页。Provider（目前为 Pi）自行组织文件、局部编辑页面、研究并使用自己的工具。Chrona 提供持久调度、前后台排队、git 历史、连接器凭据、审批和送达。模型文字不直接创建调度或发送消息，这些动作必须调用 Chrona 工具。
 
-```text
-QQ 私聊 / 网页 → 接待 → 事务 → Pi Agent → 成果 / 通知
-                └ 直接回答      ↑             ↓
-                         来源 / 定时检查      QQ / 网页
-```
+- **今日**：待批准、调度、最近变化的页面。
+- **事务列表**：摘要与活动。
+- **事务**：文件树、Markdown 编辑器、复选框、上传、面板、调度、修订历史与撤回。
+- **设置**：通知、权限、偏好、连接器、Provider 与运行状况。
 
-Chrona 负责状态、调度、权限与投递。Pi 通过受限工具办事；模型文字本身不会改变状态。
-
-## 页面
-
-- **今日**：待决定、重要变化、成果与临近跟进。
-- **事务**：等你处理、进行中、照看中、已暂停、已结束的事。
-- **事务详情**：背景、现状、处理方式、时间线、照看节奏与操作。
-- **成果**：可阅读正文、版本、来源、局限与反馈。
-- **设置**：聊天绑定、通知、授权、偏好、来源、工具与运行状况。
-
-## 自主权与通知
-
-确定性策略决定 `auto`（直接做）、`notify_after`（做完告知）、`preapproved`（按授权执行）、`ask`（先问）、`never`（交还用户）。只读检索和内部记录通常直接做；设置照看和启用面板做完告知。敏感外部动作需要批准；修改凭据留给用户。批准不会让尚未实现的能力变得可用。外部文本不能授予权限。
-
-主动通知经过 `now` / `digest` / `web` 打扰预算。默认每天最多五条立即推送，23:00–08:00 为安静时段（紧急通知除外），有内容才发日报。超额立即通知合并到日报，可在设置中调整预算。
+调度支持唤醒 Provider、不调用模型的固定提醒、确定性脚本任务。主动通知经过打扰预算、安静时段与汇总。外部文本不能授予权限。经 Chrona 代发邮件需要批准。
 
 ## 快速开始
 
-需要 **Bun ≥ 1.3.11** 和兼容的 **Pi CLI**；为运行 Chrona 的用户配置好模型访问。Pi 必须支持[运行器](packages/integrations/src/steward/pi-agent-runner.ts)使用的参数。网页检索还需要显式配置网页扩展路径。
+需要 **Bun ≥ 1.3.11**、**git** 和兼容的 **Pi CLI**，运行服务的用户须配置模型访问。[Provider 适配器](packages/integrations/src/steward/pi-provider.ts) 使用 Pi RPC。完整备份还需要 GNU 兼容的 `tar`。
 
-在仓库根目录操作，选择全新的空数据目录：
+使用新数据目录，不要复用重构前数据库：
 
 ```bash
 bun install
@@ -53,75 +29,57 @@ export CHRONA_STEWARD_AGENT=pi
 bun run dev
 ```
 
-打开 `http://localhost:3100`；API 默认在 `http://127.0.0.1:3101`。启动会初始化数据库和 `ws_default` 工作区。源码开发需要显式指定 `DATABASE_URL`：仅设置数据目录不会改变其数据库位置。不要复用重构前的数据库。
+打开 `http://localhost:3100`，API 默认 `http://127.0.0.1:3101`。启动自动迁移并创建 `ws_default`。务必显式设置两个存储变量：源码服务的数据库默认 `file:./prisma/dev.db`，不会随 `CHRONA_DATA_DIR` 自动改变。开发 Vite 监听所有网卡，只用于可信开发网络，不是公开部署方案。
 
-只在可信开发网络使用：开发脚本将 Vite 绑定到所有网卡，即使 API 默认只监听回环地址。这不是生产环境对外开放方案。备份与健康检查见[运维说明](docs/zh/operations.md)。
+打包版本使用 `chrona start --no-open`，源码仅启动 API 使用 `bun run server:start`。
 
 ## 配置
 
-在服务进程环境中设置变量。除注明默认值外，均可不设置。
+在服务环境中设置，修改后重启：
 
-| 变量 | 用途 / 默认值 |
+| 变量 | 含义 |
 | --- | --- |
-| `DATABASE_URL` | SQLite URL；源码服务默认 `file:./prisma/dev.db` |
-| `CHRONA_DATA_DIR` | 打包 CLI 数据根目录、QQ 状态目录的后备位置；建议显式设置 |
-| `HOST`, `PORT` | API 监听地址与端口：`127.0.0.1`、`3101` |
-| `API_KEY` | API 认证；对非回环网络开放前必须配置 |
-| `ALLOWED_ORIGINS` | 逗号分隔的额外浏览器来源；默认允许同源 |
-| `CHRONA_WEB_PORT` | 开发网页端口：`3100` |
-| `VITE_API_BASE_URL` | 开发代理目标：`http://127.0.0.1:3101` |
-| `CHRONA_SERVER_WATCH` | 设为 `false` 关闭开发服务自动重启 |
-| `CHRONA_WEB_DIST` | 覆盖构建后的网页资源目录 |
-| `CHRONA_CONFIG_FILE` | 可选运行时 JSON 配置路径；显式环境变量优先 |
-| `CHRONA_MIGRATIONS_DIR` | 覆盖迁移目录；源码启动默认使用 `prisma/migrations` |
-| `CHRONA_STEWARD_AGENT` | 设为 `pi` 启用接待与事务 Agent；否则关闭 |
-| `CHRONA_STEWARD_PI_COMMAND` | Pi 可执行文件路径或名称，默认 `pi`，不是 shell 命令 |
-| `CHRONA_STEWARD_PI_MODEL` | 可选，传给 Pi 的模型 |
-| `CHRONA_STEWARD_PI_AGENT_EXTENSION` | 覆盖 Chrona 工具扩展路径；自动发现仓库内副本 |
-| `CHRONA_STEWARD_PI_WEB_EXTENSION` | 兼容网页扩展（如 pi-web-access）的绝对路径；不设置则无网页工具 |
-| `CHRONA_STEWARD_ASSESSOR` | `pi` 表示用 Pi 评估来源；否则使用确定性规则 |
-| `CHRONA_STEWARD_TICK_SECONDS` | 后台检查间隔：`60` 秒 |
-| `CHRONA_STEWARD_CHINO_DASHBOARD_URL` | 启用 Chino 服务健康来源适配器 |
-| `CHRONA_PUBLIC_URL` | 通知链接使用的 HTTP(S) origin；不可含路径、查询或凭据 |
-| `CHRONA_QQ_APP_ID` | 独立 QQ Bot 的应用 ID |
-| `CHRONA_QQ_SECRET_FILE` | 服务用户拥有的私有应用密钥文件路径 |
-| `CHRONA_QQ_STATE_DIR` | QQ 状态目录；默认回退到 `CHRONA_DATA_DIR/qq-bot/<appId>` |
-| `CHRONA_STEWARD_SANDBOX_BWRAP` | 可选沙箱可执行文件路径；默认不能执行脚本 |
+| `DATABASE_URL` | SQLite URL；源码默认 `file:./prisma/dev.db` |
+| `CHRONA_DATA_DIR` | 事务和凭据根目录；服务与 CLI 都应显式设置 |
+| `HOST`、`PORT` | API 监听，默认 `127.0.0.1`、`3101` |
+| `API_KEY` | API 认证；非回环暴露前必须配置 |
+| `ALLOWED_ORIGINS` | 逗号分隔的额外浏览器来源 |
+| `CHRONA_STEWARD_AGENT` | `pi` 启用 Provider；否则关闭 |
+| `CHRONA_STEWARD_PI_COMMAND` | 可执行文件路径或名称；默认 `pi`，不是 shell 命令 |
+| `CHRONA_STEWARD_PI_MODEL` | 可选 Pi 模型选择 |
+| `CHRONA_STEWARD_PI_WEB_EXTENSION` | 可选显式网页工具扩展路径 |
+| `CHRONA_STEWARD_SANDBOX_BWRAP` | Provider 隔离与调度任务使用的 bubblewrap 可执行文件 |
+| `CHRONA_STEWARD_TICK_SECONDS` | 后台 tick 周期，默认 `30` 秒 |
+| `CHRONA_CHINO_DASHBOARD_URL` | Chino 服务健康来源 URL |
+| `CHRONA_PUBLIC_URL` | 通知链接使用的 HTTP(S) origin |
+| `CHRONA_QQ_APP_ID` | 专用 QQ Bot 应用 ID |
+| `CHRONA_QQ_SECRET_FILE` | 服务用户持有的私有 app-secret 文件 |
+| `CHRONA_QQ_STATE_DIR` | QQ 状态目录；默认 `<dataDir>/qq-bot/<appId>` |
 
-存在危险覆盖项 `CHRONA_UNSAFE_PUBLIC_BIND` 和 `CHRONA_UNSAFE_CORS`，应保持未设置。不要在隔离测试之外启用 `CHRONA_E2E_TEST_ROUTES`。
+没有 bubblewrap 时关闭 Pi 的 bash 工具，保留文件工具及显式配置的网页工具。启用后，Provider 的宿主挂载只读，指定事务与会话目录可写，可联网；这不是阻止所有宿主读取的保密边界。Chrona 不重复提供 Provider 的网页和 shell 工具。独立的调度任务沙箱需通过隔离探测，目前假定 `/nix/store`，失败时不会退回宿主执行。
 
-## QQ Bot 配置
+### 邮箱连接器
 
-使用独立的 QQ 官方 Bot，并在平台为你的账号开放私聊访问。在服务与 CLI 的同一环境中配置应用 ID、密钥文件路径、数据或状态目录。密钥必须是当前用户拥有的私有普通文件（例如权限 `0600`），不要贴进聊天或提交到仓库。
+在 **设置 → 连接器** 填写地址、IMAP 主机/端口（TLS，默认 993）、文件夹（默认 INBOX）、密码或应用密码，并选择已有或新事务。SMTP 主机/端口可选，配置后可代发（默认 465，要求 TLS）。连接器只读同步邮件、入站去重并将材料写入事务。凭据保存在 `<dataDir>/secrets`，不作为 Provider 上下文提供。SMTP 代发需要用户批准。测试真实连接会访问邮件服务器；自动化测试使用假的适配器。
 
-启动 Chrona 后生成一次性绑定码：
+### QQ
+
+配置上表专用 Bot 变量及私有密钥文件后，生成主人绑定码：
 
 ```bash
 chrona qq bind-code --workspace ws_default
 ```
 
-源码环境未安装 `chrona` 可执行文件时：
+源码环境把 `chrona` 替换为 `bun run packages/cli/src/index.ts`。在 Bot 私聊发送 `绑定 <码>`，默认十分钟过期。QQ 平台送达限制和 Chrona 打扰预算仍然有效。
 
-```bash
-bun run packages/cli/src/index.ts qq bind-code --workspace ws_default
-```
+## 备份与安全
 
-在 Bot 私聊中发送 `绑定 <码>`。默认十分钟过期。只有绑定的主人能使用，之后正常交流不需要命令前缀。检查设置 → 聊天，以及[运维说明](docs/zh/operations.md)中的 QQ 状态文件。QQ 平台投递限制仍然适用。
+**必须备份数据目录，不能只备份 SQLite。** 停止服务后运行 `chrona backup /absolute/private/path/backup.db`，生成一致性数据库副本和 `backup.db.tar`，后者包含 `affairs`（包括 git 历史）及 `secrets`。两个文件须一起保存并保护隐私，均未加密。停止状态下执行 `chrona restore /absolute/private/path/backup.db` 恢复两者；默认拒绝已有数据，明确替换才使用 `--force`。QQ 状态和 Provider 配置需另行归档。恢复限制见[运维说明](docs/zh/operations.md)。
 
-## 隐私与安全
+本地优先不等于离线：模型、网页、QQ 和邮件可能访问外部服务。保护备份、审核批准并验证模型结论。Provider 环境过滤 Chrona 凭据，但保留其自身模型访问配置。不兼容重构前数据库；目前只实现 Pi，设计文档中的其他 Provider 不代表已经可用。
 
-本地优先：事务与成果保存在本机 SQLite，但**不等于完全离线**。Pi 模型调用会把有限上下文发送给所配置的模型服务；网页搜索和抓取会访问外部服务；QQ 聊天与通知经过 QQ；Chino 检查会访问配置的服务。数据库备份与 QQ 状态都应作为私人数据保护。
+[文档](docs/README.md) · [目标](docs/zh/steward-goals.md) · [工作区模型](docs/zh/steward-workspace.md) · [贡献](CONTRIBUTING.md)
 
-Agent 运行器关闭内置工具，只加载显式扩展。Chrona 的 API、数据库、QQ 配置会从子进程环境中过滤；Pi 仍需自己的模型凭据。服务环境中不要放无关密钥。检查来源、成果与审批，不要把模型输出直接视为已核实事实。
-
-## 项目状态
-
-重构中的单一 owner 应用，不支持多人协作，也不兼容重构前的数据库。来源适配器为 **Chino 服务健康**和**本地测试**（后者是隔离测试入口，不是生产信息源）。
-
-脚本起初是草稿，需要按版本批准。脚本执行**默认不可用**。当前代码包含可选 bubblewrap 运行器，需要配置可执行文件并通过隔离探测；目前挂载假定存在 `/nix/store`。它不是普遍可用或经部署验证的沙箱。草稿或批准不代表脚本已经运行。
-
-产品目标不代表所有目标能力均已交付。参阅[文档索引](docs/README.md)、[设计目标](docs/zh/steward-goals.md)、[架构](docs/zh/steward-rebuild.md)和[贡献指南](CONTRIBUTING.md)。
-
-## 许可证
+## 许可
 
 [MIT](LICENSE)。
