@@ -1,516 +1,495 @@
 /**
  * Personal-steward shared contract. Owned by the integration supervisor:
- * engine, routes, adapters and web all build against these shapes.
- * See docs/zh/personal-steward.md for the product direction and loop.
+ * engine, routes, adapters, the agent extension and web all build against these shapes.
+ * Product goals: docs/zh/steward-goals.md. Architecture and pages: docs/zh/steward-rebuild.md.
+ *
+ * Everything the user sees is an Affair. Runs, events and assessments are internal records
+ * shown only under an affair's technical details.
  */
 import { z } from "zod";
 
 const id = z.string().trim().min(1).max(128);
 const iso = z.string().datetime({ offset: true }).max(40);
 const short = z.string().trim().min(1).max(200);
-const prose = z.string().trim().min(1).max(4000);
+const text = z.string().trim().min(1);
+const hhmm = z.string().regex(/^\d\d:\d\d$/);
 
 // ---------------------------------------------------------------- vocab ----
 
-export const AFFAIR_STATUSES = ["active", "watching", "paused", "closed"] as const;
-export const CONNECTION_KINDS = ["local_test", "reddit_inbox", "chino_service_health"] as const;
-/** How events arrive. A callable tool does not imply `webhook`. */
+/** `active` 进行中 · `watching` 照看中 (has a check cadence) · `paused` · `done` 已结束. */
+export const AFFAIR_STATUSES = ["active", "watching", "paused", "done"] as const;
+/** Runner state, owned by Chrona; `waiting_user` = at least one open question/approval blocks it. */
+export const AGENT_STATES = ["idle", "queued", "running", "waiting_user", "failed"] as const;
+export const ENTRY_ACTORS = ["user", "chrona", "source"] as const;
+export const ENTRY_KINDS = [
+  "request", "supplement", "feedback", "answer", "decision",
+  "progress", "change", "question", "approval_request", "result", "care", "notification", "status", "note",
+] as const;
+export const ASK_KINDS = ["question", "approval", "suggestion"] as const;
+export const ASK_STATUSES = ["open", "answered", "approved", "denied", "dismissed", "expired"] as const;
+
+/**
+ * Closed action vocabulary the policy layer judges. Text from sources, web pages or the
+ * model can never add an action or a grant.
+ */
+export const ACTIONS = [
+  "read_source", "web_research", "write_chrona", "set_care", "enable_panel", "run_script",
+  "send_external_message", "modify_external", "purchase", "delete_data", "connect_source",
+  "share_third_party", "change_credentials",
+] as const;
+/** 直接做 · 做完告知 · 预先授权后直接做 · 先问再做 · 交还用户（永不做）. */
+export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
+/** Built-in defaults (steward-goals §7). A user grant may only narrow `never`. */
+export const DEFAULT_POLICY = {
+  read_source: "auto", web_research: "auto", write_chrona: "auto",
+  set_care: "notify_after", enable_panel: "notify_after",
+  run_script: "ask", send_external_message: "ask", modify_external: "ask", purchase: "ask",
+  delete_data: "ask", connect_source: "ask", share_third_party: "ask",
+  change_credentials: "never",
+} as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
+/** How long an approval holds when the user picks it in an approval ask. */
+export const APPROVAL_SCOPES = ["once", "affair"] as const;
+
+export const NOTIFY_LEVELS = ["now", "digest", "web"] as const;
+/** generated ≠ sent ≠ acknowledged. `folded` = moved into the digest by the budget. `uncertain` = channel outcome unknown. */
+export const NOTIFICATION_STATUSES = ["queued", "sent", "failed", "uncertain", "folded", "suppressed", "acknowledged"] as const;
+export const DEFAULT_NOTIFICATION_SETTINGS = {
+  dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, timezone: "Asia/Shanghai", digestAt: "09:00",
+} as const;
+export const SUGGESTION_COOLDOWN_DAYS = 30;
+/** A kind of manual work must recur this many times before Chrona proposes automating it. */
+export const AUTOMATION_REPEAT_THRESHOLD = 3;
+
+export const CONNECTION_KINDS = ["local_test", "chino_service_health"] as const;
 export const CONNECTION_MODES = ["poll", "webhook", "manual"] as const;
 export const CONNECTION_STATUSES = ["active", "paused", "revoked", "needs_authorization", "failing"] as const;
 export const EVENT_STATUSES = ["baseline", "pending", "assessed", "failed"] as const;
-export const LINK_STATUSES = ["unlinked", "suggested", "confirmed", "rejected"] as const;
-/** What the steward does with one assessed event. */
-export const DISPOSITIONS = ["retain", "digest", "notify_now", "await_decision", "act"] as const;
-/**
- * Closed action vocabulary. Permission is decided deterministically against a
- * Delegation; text inside an event can never add an action.
- */
-export const STEWARD_ACTIONS = [
-  "read_source", "summarize", "notify_user", "create_follow_up", "link_affair",
-  "propose_delegation", "propose_tool", "run_tool",
-  "reply_external", "mark_read_external", "delete_external",
-] as const;
-/** Never permitted by any delegation during the read-only pilot. */
-export const PILOT_DENIED_ACTIONS = ["reply_external", "mark_read_external", "delete_external"] as const;
-export const PERMISSION_OUTCOMES = ["allowed", "ask_first", "denied"] as const;
-export const DELEGATION_STATUSES = ["proposed", "active", "paused", "revoked", "expired"] as const;
-export const DELEGATION_TRANSITIONS = ["grant", "pause", "resume", "revoke"] as const;
-export const CONNECTION_TRANSITIONS = ["pause", "resume", "revoke"] as const;
-export const ATTENTION_KINDS = ["decision", "change", "commitment", "suggestion", "result", "failure"] as const;
-export const ATTENTION_STATUSES = ["open", "snoozed", "resolved", "dismissed"] as const;
-export const ATTENTION_DECISIONS = ["approve", "decline", "snooze", "dismiss", "less_often", "done"] as const;
-/** generated ≠ sent ≠ acknowledged. `uncertain` = channel outcome unknown. */
-export const NOTIFICATION_STATUSES = ["generated", "queued", "sent", "failed", "uncertain", "suppressed", "acknowledged"] as const;
-export const FOLLOW_UP_STATUSES = ["pending", "done", "cancelled"] as const;
-/** Lightest-first ways to handle a need; see chooseHandling in @chrona/domain. */
-export const HANDLING_MODES = ["direct_answer", "result_page", "reuse_tool", "script", "delegation", "panel", "agent_iteration"] as const;
+/** What the assessor recommends for one source event. */
+export const DISPOSITIONS = ["ignore", "record", "notify", "wake_affair"] as const;
+export const DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"] as const;
+
+export const HANDLING_MODES = ["direct_answer", "result_page", "reuse_tool", "script", "care", "panel", "agent_iteration"] as const;
 export const TOOL_KINDS = ["script", "panel"] as const;
-/** generated ≠ validated ≠ authorized ≠ enabled. */
-export const TOOL_STATES = ["generated", "validation_failed", "validated", "authorized", "enabled", "disabled", "retired"] as const;
-export const TOOL_TRANSITIONS = ["validate", "authorize", "enable", "disable", "retire"] as const;
-export const SCHEDULE_ITEM_KINDS = ["appointment", "deadline", "steward_check", "follow_up", "unconfirmed_suggestion"] as const;
-/**
- * External chat channels. Chrona owns scheduling and the outbox; the transport only
- * carries one message per send. `hermes_qqbot` = legacy Hermes host (`hermes send`,
- * Hermes owns its credentials); `chrona_qqbot` = Chrona's own QQ bot, whose openids are
- * app-scoped and therefore a separate identity namespace (`chrona_qq:<openid>`).
- */
-export const CHAT_CHANNELS = ["hermes_qqbot", "chrona_qqbot"] as const;
-export const CHAT_PLATFORMS = ["qqbot", "chrona_qq"] as const;
-/** The only channel a chat identity of each platform may bind a delegation to. */
-export const CHAT_CHANNEL_BY_PLATFORM = { qqbot: "hermes_qqbot", chrona_qq: "chrona_qqbot" } as const satisfies Record<(typeof CHAT_PLATFORMS)[number], (typeof CHAT_CHANNELS)[number]>;
-/** What a user can do by replying in chat. Every action names a reply ref. */
-export const CHAT_ACTIONS = ["confirm", "decline", "snooze", "done", "dismiss", "less_often", "pause", "resume", "revoke", "ack", "feedback"] as const;
-/** Actions a chat proposal may request; anything else needs the web console. */
-export const CHAT_PROPOSABLE_ACTIONS = ["read_source", "summarize", "notify_user", "create_follow_up", "link_affair"] as const;
-/** Reply refs: 4 characters, no 0/O/1/I/L, unique per workspace across items and delegations. */
-export const REPLY_REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-export const REPLY_REF_PATTERN = /^[2-9A-HJKMNP-Z]{4}$/;
+/** draft ≠ approved ≠ enabled. A script edit creates a new version that needs approval again. */
+export const TOOL_STATES = ["draft", "validation_failed", "approved", "enabled", "disabled", "retired"] as const;
 
 export type AffairStatus = (typeof AFFAIR_STATUSES)[number];
+export type AgentState = (typeof AGENT_STATES)[number];
+export type EntryActor = (typeof ENTRY_ACTORS)[number];
+export type EntryKind = (typeof ENTRY_KINDS)[number];
+export type AskKind = (typeof ASK_KINDS)[number];
+export type AskStatus = (typeof ASK_STATUSES)[number];
+export type Action = (typeof ACTIONS)[number];
+export type GrantMode = (typeof GRANT_MODES)[number];
+export type ApprovalScope = (typeof APPROVAL_SCOPES)[number];
+export type NotifyLevel = (typeof NOTIFY_LEVELS)[number];
+export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
 export type ConnectionMode = (typeof CONNECTION_MODES)[number];
 export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
 export type EventStatus = (typeof EVENT_STATUSES)[number];
-export type LinkStatus = (typeof LINK_STATUSES)[number];
 export type Disposition = (typeof DISPOSITIONS)[number];
-export type StewardAction = (typeof STEWARD_ACTIONS)[number];
-export type PermissionOutcome = (typeof PERMISSION_OUTCOMES)[number];
-export type DelegationStatus = (typeof DELEGATION_STATUSES)[number];
-export type AttentionKind = (typeof ATTENTION_KINDS)[number];
-export type AttentionStatus = (typeof ATTENTION_STATUSES)[number];
-export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
+export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 export type HandlingMode = (typeof HANDLING_MODES)[number];
+export type ToolKind = (typeof TOOL_KINDS)[number];
 export type ToolState = (typeof TOOL_STATES)[number];
-export type ChatChannel = (typeof CHAT_CHANNELS)[number];
-export type ChatPlatform = (typeof CHAT_PLATFORMS)[number];
-export type ChatAction = (typeof CHAT_ACTIONS)[number];
 
 // ---------------------------------------------------------------- views ----
 
-export const evidenceSchema = z.object({
-  eventId: id.optional(), label: short, excerpt: z.string().max(1000).default(""),
-  url: z.string().url().max(2048).optional(), observedAt: iso.optional(),
+export const handlingSchema = z.object({ mode: z.enum(HANDLING_MODES), rationale: text.max(2000) }).strict();
+export const careSchema = z.object({
+  cadenceSeconds: z.number().int().min(300).max(604800),
+  /** Default level for routine findings of this care; important problems may still be `now`. */
+  notify: z.enum(NOTIFY_LEVELS),
+  connectionId: id.nullable(),
+  lastCheckAt: iso.nullable(), nextCheckAt: iso.nullable(),
 }).strict();
 
 export const affairSchema = z.object({
-  id, title: short, summary: z.string().max(4000), goal: z.string().max(2000),
-  status: z.enum(AFFAIR_STATUSES), keywords: z.array(short).max(20),
-  taskId: id.nullable(), openAttentionCount: z.number().int().min(0),
-  createdAt: iso, updatedAt: iso,
+  id, title: short, goal: z.string().max(2000),
+  /** "现在怎么样了": maintained by the agent, plain prose. */
+  summary: z.string().max(4000), nextStep: z.string().max(1000),
+  status: z.enum(AFFAIR_STATUSES), agentState: z.enum(AGENT_STATES),
+  handling: handlingSchema.nullable(), care: careSchema.nullable(),
+  openAsks: z.number().int().min(0),
+  /** Hidden fallback short code for chat (never required in normal use). */
+  ref: z.string().max(16).nullable(),
+  latestResult: z.object({ version: z.number().int().min(1), title: short, createdAt: iso }).strict().nullable(),
+  lastError: z.string().max(500).nullable(),
+  createdAt: iso, updatedAt: iso, lastActivityAt: iso,
 }).strict();
 
-export const connectionSchema = z.object({
-  id, kind: z.enum(CONNECTION_KINDS), label: short, mode: z.enum(CONNECTION_MODES),
-  status: z.enum(CONNECTION_STATUSES),
-  readScopes: z.array(short).max(20), writeScopes: z.array(short).max(20),
-  pollIntervalSeconds: z.number().int().min(60).nullable(),
-  baselineAt: iso.nullable(), lastSuccessAt: iso.nullable(), lastFailureAt: iso.nullable(),
-  lastError: z.string().max(500).nullable(), nextCheckAt: iso.nullable(),
-  /** Honest coverage statement, e.g. "polling only; items older than baseline are not processed". */
-  coverageNote: z.string().max(500), pendingEvents: z.number().int().min(0), failedEvents: z.number().int().min(0),
+export const entrySchema = z.object({
+  id, affairId: id, at: iso, actor: z.enum(ENTRY_ACTORS), kind: z.enum(ENTRY_KINDS),
+  text: z.string().max(8000),
+  /** Small structured payload (e.g. findings, result version, event id); never secrets. */
+  data: z.record(z.string(), z.unknown()).nullable(),
 }).strict();
 
-export const inboundEventSchema = z.object({
-  id, connectionId: id, externalId: z.string().min(1).max(500), status: z.enum(EVENT_STATUSES),
-  title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200),
-  url: z.string().url().max(2048).nullable(), occurredAt: iso, receivedAt: iso,
-  affairId: id.nullable(), linkStatus: z.enum(LINK_STATUSES),
-  attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), nextAttemptAt: iso.nullable(),
+export const resultSourceSchema = z.object({
+  title: text.max(300), url: z.string().url().max(2048), note: z.string().max(500).default(""),
+  /** True when the URL was actually fetched/seen in this affair's runs. */
+  verified: z.boolean().default(false),
 }).strict();
-
-export const notificationPolicySchema = z.object({
-  mode: z.enum(["immediate", "digest", "silent"]).default("digest"),
-  cooldownMinutes: z.number().int().min(0).max(10080).default(60),
-  /** Local "HH:MM" bounds; null disables quiet hours. */
-  quietHours: z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/), timezone: z.string().min(1).max(80) }).strict().nullable().default(null),
-  /** "in_app" = visible in Chrona itself; the only channel that needs no external account. */
-  channel: short.default("in_app"),
-  /**
-   * External destination such as "qqbot:<openid>". Set only from an authenticated
-   * chat binding on the server allowlist, never from event or model text.
-   */
-  recipient: z.string().trim().min(1).max(200).nullable().default(null),
-}).strict();
-
-export const delegationSchema = z.object({
-  id, revision: z.number().int().min(1), status: z.enum(DELEGATION_STATUSES),
-  affairId: id.nullable(), connectionId: id.nullable(),
-  purpose: prose, originalWording: z.string().max(4000),
-  cadenceSeconds: z.number().int().min(60).nullable(),
-  /** Short code the user quotes in chat to act on this delegation. */
-  replyRef: z.string().max(16).nullable(),
-  allowedActions: z.array(z.enum(STEWARD_ACTIONS)), askFirstActions: z.array(z.enum(STEWARD_ACTIONS)),
-  notification: notificationPolicySchema,
-  limits: z.object({ maxEventsPerCheck: z.number().int().min(1).max(500).default(50), maxNotificationsPerDay: z.number().int().min(0).max(200).default(10) }).strict(),
-  grantedAt: iso.nullable(), expiresAt: iso.nullable(),
-  lastCheckAt: iso.nullable(), lastSuccessAt: iso.nullable(), lastFailureAt: iso.nullable(), lastError: z.string().max(500).nullable(),
-  /** Set when this delegation is the bounded authorization of one requested piece of work, not a standing watch. */
-  workId: id.nullable().default(null),
-  createdAt: iso, updatedAt: iso,
-}).strict();
-
-export const permissionDecisionSchema = z.object({
-  action: z.enum(STEWARD_ACTIONS), outcome: z.enum(PERMISSION_OUTCOMES),
-  delegationId: id.nullable(), delegationRevision: z.number().int().nullable(), reason: z.string().max(500),
-}).strict();
-
-export const assessmentSchema = z.object({
-  id, eventId: id, assessor: short, disposition: z.enum(DISPOSITIONS),
-  whatHappened: prose, whyItMatters: z.string().max(4000), nextStep: z.string().max(2000),
-  proposedAction: z.enum(STEWARD_ACTIONS).nullable(), permission: permissionDecisionSchema.nullable(),
+export const resultSchema = z.object({
+  id, affairId: id, version: z.number().int().min(1), title: short, summary: z.string().max(2000),
+  /** Markdown. Rendered as content, never executed. */
+  body: z.string().max(60_000),
+  sources: z.array(resultSourceSchema).max(30), limitations: z.string().max(2000), nextSteps: z.array(text.max(500)).max(10),
   createdAt: iso,
 }).strict();
 
-export const attentionItemSchema = z.object({
-  id, kind: z.enum(ATTENTION_KINDS), status: z.enum(ATTENTION_STATUSES),
-  affairId: id.nullable(), affairTitle: z.string().max(200).nullable(), eventId: id.nullable(), delegationId: id.nullable(),
-  title: short, whatHappened: prose, whyItMatters: z.string().max(4000), nextStep: z.string().max(2000),
-  evidence: z.array(evidenceSchema).max(20), dueAt: iso.nullable(), snoozedUntil: iso.nullable(),
-  decision: z.enum(ATTENTION_DECISIONS).nullable(), decidedAt: iso.nullable(),
-  /** Short code the user quotes in chat to act on this item. */
-  replyRef: z.string().max(16).nullable(),
-  /** Latest free-text feedback the user gave on this item (e.g. a chat reply). */
-  userNote: z.string().max(1000).nullable(),
-  createdAt: iso, updatedAt: iso,
+export const askSchema = z.object({
+  id, affairId: id.nullable(), affairTitle: z.string().max(200).nullable(),
+  kind: z.enum(ASK_KINDS), status: z.enum(ASK_STATUSES),
+  title: short,
+  /** Why this matters / what happens on each answer. */
+  detail: z.string().max(2000),
+  /** Questions: what is being asked. */
+  questions: z.array(z.object({ question: text.max(500), why: z.string().max(500) }).strict()).max(3),
+  /** Approvals: the action and a human description of exactly what will be done. */
+  action: z.enum(ACTIONS).nullable(),
+  /** Suggestions: dedupe/cooldown topic. */
+  topic: z.string().max(80).nullable(),
+  answer: z.string().max(2000).nullable(),
+  /** How it was resolved. `never_again` = status `dismissed` with no cooldown end: the topic is suppressed permanently. */
+  decision: z.enum(["answer", "approve", "deny", "dismiss", "accept_suggestion", "never_again"]).nullable(),
+  /** Suggestions dismissed with `dismiss`: no new suggestion on this topic until then (SUGGESTION_COOLDOWN_DAYS). */
+  cooldownUntil: iso.nullable(),
+  ref: z.string().max(16).nullable(),
+  createdAt: iso, resolvedAt: iso.nullable(),
 }).strict();
 
-export const notificationSchema = z.object({
-  id, attentionItemId: id.nullable(), channel: short, status: z.enum(NOTIFICATION_STATUSES),
-  /** Destination snapshot at claim time; null for in_app. */
-  recipient: z.string().max(200).nullable(),
-  /** Channel receipt, e.g. "qqbot:<message id>". Sent is not read. */
-  receiptRef: z.string().max(200).nullable(),
-  title: short, body: z.string().max(2000), link: z.string().max(2048).nullable(),
-  attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), nextAttemptAt: iso.nullable(),
-  generatedAt: iso, sentAt: iso.nullable(), acknowledgedAt: iso.nullable(),
+export const runSchema = z.object({
+  id, number: z.number().int().min(1),
+  wakeReason: z.enum(["new_request", "user_input", "follow_up_due", "care_check", "source_change", "retry"]),
+  status: z.enum(["running", "published", "asked", "closed", "progressed", "no_outcome", "timed_out", "budget_exhausted", "agent_unavailable", "cancelled", "lease_expired"]),
+  toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean(), note: z.string().max(300) }).strict()).max(80),
+  error: z.string().max(500).nullable(), startedAt: iso, endedAt: iso.nullable(),
 }).strict();
 
 export const followUpSchema = z.object({
-  id, affairId: id.nullable(), attentionItemId: id.nullable(), note: prose, dueAt: iso,
-  status: z.enum(FOLLOW_UP_STATUSES), createdAt: iso,
+  id, affairId: id, note: text.max(1000), dueAt: iso, status: z.enum(["pending", "done", "cancelled"]), createdAt: iso,
 }).strict();
 
-export const managedToolSchema = z.object({
-  id, affairId: id.nullable(), kind: z.enum(TOOL_KINDS), name: short, purpose: prose,
-  handlingMode: z.enum(HANDLING_MODES), selectionRationale: z.string().max(2000),
-  dataScopes: z.array(short).max(20), version: z.number().int().min(1), state: z.enum(TOOL_STATES),
-  validationSummary: z.string().max(2000).nullable(), validatedVersion: z.number().int().nullable(),
-  authorizedAt: iso.nullable(), enabledAt: iso.nullable(),
-  lastRunAt: iso.nullable(), lastSuccessAt: iso.nullable(), lastFailureAt: iso.nullable(), createdAt: iso, updatedAt: iso,
+export const grantScopeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("global") }).strict(),
+  z.object({ kind: z.literal("affair"), affairId: id }).strict(),
+  z.object({ kind: z.literal("connection"), connectionId: id }).strict(),
+  z.object({ kind: z.literal("tool_version"), toolId: id, version: z.number().int().min(1) }).strict(),
+]);
+export const grantSchema = z.object({
+  id, action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema,
+  /** `once` grants are consumed by their first use. */
+  once: z.boolean(), consumedAt: iso.nullable(), expiresAt: iso.nullable(), createdAt: iso, revokedAt: iso.nullable(),
+}).strict();
+export const policyDecisionSchema = z.object({
+  action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), grantId: id.nullable(), reason: z.string().max(500),
 }).strict();
 
-export const scheduleItemSchema = z.object({
-  id, kind: z.enum(SCHEDULE_ITEM_KINDS), title: short, startsAt: iso, endsAt: iso.nullable(),
-  affairId: id.nullable(), sourceRef: z.string().max(200).nullable(), confirmed: z.boolean(),
+export const preferenceSchema = z.object({
+  id, text: text.max(500), origin: z.enum(["said", "learned"]), createdAt: iso, lastUsedAt: iso.nullable(),
 }).strict();
 
-export const stewardHealthSchema = z.object({
-  assessor: z.object({ available: z.boolean(), name: short, lastError: z.string().max(500).nullable() }).strict(),
-  pendingEvents: z.number().int().min(0), failedEvents: z.number().int().min(0), oldestPendingAt: iso.nullable(),
+export const chatMessageSchema = z.object({
+  id, direction: z.enum(["in", "out"]), channel: z.enum(DELIVERY_CHANNELS), text: z.string().max(4000),
+  affairId: id.nullable(), at: iso,
+}).strict();
+
+export const notificationSchema = z.object({
+  id, affairId: id.nullable(), askId: id.nullable(), level: z.enum(NOTIFY_LEVELS),
+  channel: z.enum(DELIVERY_CHANNELS), status: z.enum(NOTIFICATION_STATUSES),
+  title: short, body: z.string().max(2000),
+  attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), nextAttemptAt: iso.nullable(),
+  createdAt: iso, sentAt: iso.nullable(), acknowledgedAt: iso.nullable(),
+  /** "没用" feedback from the user; used to downgrade similar notifications. */
+  feedback: z.enum(["useful", "not_useful"]).nullable(),
+}).strict();
+
+export const connectionSchema = z.object({
+  id, kind: z.enum(CONNECTION_KINDS), label: short, mode: z.enum(CONNECTION_MODES), status: z.enum(CONNECTION_STATUSES),
+  pollIntervalSeconds: z.number().int().min(60).nullable(),
+  baselineAt: iso.nullable(), lastSuccessAt: iso.nullable(), lastFailureAt: iso.nullable(), lastError: z.string().max(500).nullable(),
+  nextCheckAt: iso.nullable(),
+  /** Honest coverage statement, e.g. "polling only; changes between polls can be missed". */
+  coverageNote: z.string().max(500), pendingEvents: z.number().int().min(0), failedEvents: z.number().int().min(0),
+}).strict();
+export const inboundEventSchema = z.object({
+  id, connectionId: id, externalId: z.string().min(1).max(500), status: z.enum(EVENT_STATUSES),
+  title: z.string().max(500), body: z.string().max(8000), url: z.string().url().max(2048).nullable(),
+  occurredAt: iso, receivedAt: iso, affairId: id.nullable(),
+  disposition: z.enum(DISPOSITIONS).nullable(), attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(),
+}).strict();
+
+export const toolSchema = z.object({
+  id, affairId: id.nullable(), kind: z.enum(TOOL_KINDS), name: short, purpose: text.max(2000), rationale: z.string().max(2000),
+  version: z.number().int().min(1), state: z.enum(TOOL_STATES), approvedVersion: z.number().int().nullable(),
+  /** Script tools: language + source of the current version; panels: declarative spec. Never executed outside the sandbox. */
+  script: z.object({ language: z.enum(["python", "typescript", "shell"]), source: z.string().max(20_000), usage: z.string().max(2000) }).strict().nullable(),
+  spec: z.unknown().nullable(),
+  lastRunAt: iso.nullable(), lastRunOk: z.boolean().nullable(), createdAt: iso, updatedAt: iso,
+}).strict();
+
+/** One row a user (or the agent, on the user's behalf) filled into a panel. Values are keyed by the panel spec's field keys. */
+export const panelEntrySchema = z.object({
+  id, toolId: id, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])), createdAt: iso,
+}).strict();
+export const toolRunViewSchema = z.object({
+  id, toolId: id, version: z.number().int().min(1), status: z.enum(["running", "succeeded", "failed", "timed_out", "unavailable"]),
+  output: z.string().max(20_000), error: z.string().max(2000).nullable(), startedAt: iso, endedAt: iso.nullable(),
+}).strict();
+export const toolDetailSchema = z.object({
+  tool: z.lazy(() => toolSchema), entries: z.array(panelEntrySchema).max(500), runs: z.array(toolRunViewSchema).max(20),
+}).strict();
+
+export const notificationSettingsSchema = z.object({
+  dailyCap: z.number().int().min(0).max(50),
+  quietHours: z.object({ start: hhmm, end: hhmm }).strict().nullable(),
+  timezone: z.string().min(1).max(80),
+  digestAt: hhmm,
+}).strict();
+export const settingsSchema = z.object({
+  notifications: notificationSettingsSchema,
+  chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
+}).strict();
+
+export const healthSchema = z.object({
+  agent: z.object({ available: z.boolean(), name: short, lastError: z.string().max(500).nullable() }).strict(),
+  queuedAffairs: z.number().int().min(0), runningAffairs: z.number().int().min(0), failedAffairs: z.number().int().min(0),
+  pendingEvents: z.number().int().min(0), failingConnections: z.number().int().min(0),
   queuedNotifications: z.number().int().min(0), failedNotifications: z.number().int().min(0),
-  failingConnections: z.number().int().min(0), lastTickAt: iso.nullable(),
+  /** Script sandbox: available only when bubblewrap is configured and at least one interpreter exists. */
+  sandbox: z.object({ available: z.boolean(), languages: z.array(z.enum(["python", "typescript", "shell"])) }).strict(),
+  lastTickAt: iso.nullable(),
 }).strict();
 
-/** One published version from the existing results layer; `href` is app-relative without the locale prefix. */
-export const resultSummarySchema = z.object({
-  id, taskId: id, taskTitle: z.string().max(500), title: z.string().max(500), version: z.number().int().min(1),
-  /** Review state as recorded by the results layer; publication is not acceptance. */
-  reviewState: z.string().max(40), publishedAt: iso, href: z.string().max(2048),
+export const upcomingSchema = z.object({
+  kind: z.enum(["follow_up", "care_check"]), affairId: id, affairTitle: short, note: z.string().max(1000), at: iso,
 }).strict();
-
 export const todayViewSchema = z.object({
   generatedAt: iso,
-  decisions: z.array(attentionItemSchema), changes: z.array(attentionItemSchema),
-  commitments: z.array(attentionItemSchema), suggestions: z.array(attentionItemSchema),
-  results: z.array(attentionItemSchema), upcoming: z.array(scheduleItemSchema),
-  /** Newest published result versions, read-only; empty when the workspace has none. */
-  recentResults: z.array(resultSummarySchema).max(20).default([]),
-  health: stewardHealthSchema,
+  counts: z.object({ active: z.number().int(), watching: z.number().int(), waiting: z.number().int(), newResults: z.number().int() }).strict(),
+  /** Open questions and approvals, oldest first. */
+  decisions: z.array(askSchema),
+  /** Important source/agent changes since the user last looked (≤ 48 h). */
+  changes: z.array(entrySchema.extend({ affairTitle: short })),
+  results: z.array(resultSchema.pick({ id: true, affairId: true, version: true, title: true, summary: true, createdAt: true }).extend({ affairTitle: short })),
+  upcoming: z.array(upcomingSchema),
+  suggestions: z.array(askSchema),
+  health: healthSchema,
 }).strict();
 
 export const affairDetailSchema = z.object({
-  affair: affairSchema, attention: z.array(attentionItemSchema), events: z.array(inboundEventSchema),
-  suggestedEvents: z.array(inboundEventSchema), delegations: z.array(delegationSchema),
-  followUps: z.array(followUpSchema), tools: z.array(managedToolSchema),
-  works: z.array(z.lazy(() => workSchema)).default([]),
+  affair: affairSchema,
+  asks: z.array(askSchema),
+  /** Full latest result; older versions via the result endpoint. */
+  latestResult: resultSchema.nullable(),
+  resultVersions: z.array(z.object({ version: z.number().int().min(1), title: short, createdAt: iso }).strict()),
+  entries: z.array(entrySchema),
+  followUps: z.array(followUpSchema),
+  tools: z.array(toolSchema),
+  grants: z.array(grantSchema),
+  runs: z.array(runSchema),
+  events: z.array(inboundEventSchema),
 }).strict();
 
 // ------------------------------------------------------------- requests ----
 
-export const createAffairSchema = z.object({ title: short, summary: z.string().max(4000).default(""), goal: z.string().max(2000).default(""), keywords: z.array(short).max(20).default([]), taskId: id.optional() }).strict();
-export const updateAffairSchema = createAffairSchema.partial().extend({ status: z.enum(AFFAIR_STATUSES).optional() }).strict();
+export const createAffairSchema = z.object({ request: text.max(4000), title: short.optional() }).strict();
+export const updateAffairSchema = z.object({
+  title: short.optional(), goal: z.string().max(2000).optional(),
+  status: z.enum(["active", "paused", "done"]).optional(),
+  care: z.object({ cadenceSeconds: z.number().int().min(300).max(604800), notify: z.enum(NOTIFY_LEVELS) }).strict().nullable().optional(),
+}).strict();
+export const addEntrySchema = z.object({ kind: z.enum(["supplement", "feedback"]), text: text.max(4000) }).strict();
+export const resolveAskSchema = z.object({
+  decision: z.enum(["answer", "approve", "deny", "dismiss", "accept_suggestion", "never_again"]),
+  text: z.string().max(2000).optional(),
+  /** Approvals only. */
+  scope: z.enum(APPROVAL_SCOPES).optional(),
+}).strict();
+export const chatInputSchema = z.object({ text: text.max(4000) }).strict();
+export const chatReplySchema = z.object({
+  reply: z.string().max(4000), affairId: id.nullable(),
+  effects: z.array(z.object({ kind: short, affairId: id.nullable(), label: z.string().max(300) }).strict()).max(10),
+}).strict();
+export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
+export const createPreferenceSchema = z.object({ text: text.max(500) }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial() }).strict();
+export const notificationFeedbackSchema = z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict();
 export const createConnectionSchema = z.object({ kind: z.enum(CONNECTION_KINDS), label: short, pollIntervalSeconds: z.number().int().min(60).max(86400).optional() }).strict();
-export const connectionTransitionSchema = z.object({ action: z.enum(CONNECTION_TRANSITIONS) }).strict();
-export const proposeDelegationSchema = z.object({
-  affairId: id.optional(), connectionId: id.optional(), purpose: prose, originalWording: z.string().max(4000).default(""),
-  cadenceSeconds: z.number().int().min(60).max(604800).optional(),
-  allowedActions: z.array(z.enum(STEWARD_ACTIONS)).max(STEWARD_ACTIONS.length),
-  askFirstActions: z.array(z.enum(STEWARD_ACTIONS)).max(STEWARD_ACTIONS.length).default([]),
-  notification: notificationPolicySchema.optional(), expiresAt: iso.optional(),
-}).strict();
-export const delegationTransitionSchema = z.object({ action: z.enum(DELEGATION_TRANSITIONS), expectedRevision: z.number().int().min(1) }).strict();
-export const attentionDecisionSchema = z.object({ decision: z.enum(ATTENTION_DECISIONS), snoozeUntil: iso.optional(), note: z.string().max(1000).optional() }).strict();
-export const eventLinkSchema = z.object({ decision: z.enum(["confirm", "reject"]), affairId: id.optional() }).strict();
-export const syncResultSchema = z.object({ received: z.number().int().min(0), duplicates: z.number().int().min(0), baseline: z.boolean() }).strict();
-export const toolTransitionSchema = z.object({ action: z.enum(TOOL_TRANSITIONS), expectedVersion: z.number().int().min(1) }).strict();
-
-export const handlingSignalsSchema = z.object({
-  repeatsExpected: z.enum(["once", "few", "recurring"]), rulesStable: z.boolean(), needsOngoingObservation: z.boolean(),
-  needsUserInteraction: z.enum(["none", "read", "compare_or_fill"]), ambiguity: z.enum(["clear", "fuzzy"]),
-  existingToolFits: z.boolean(), risk: z.enum(["low", "high"]), valueWorthKeeping: z.boolean(),
-}).strict();
-export const handlingChoiceSchema = z.object({ mode: z.enum(HANDLING_MODES), rationale: z.string().max(2000), escalatesFrom: z.enum(HANDLING_MODES).optional() }).strict();
-/** `spec` is validated by toolSpecSchema in @chrona/domain; it is declarative data, never code. */
-export const generateToolSchema = z.object({ affairId: id.optional(), name: short, purpose: prose, dataScopes: z.array(short).max(20).default([]), signals: handlingSignalsSchema, spec: z.unknown() }).strict();
-export const generatedToolSchema = z.object({ created: z.boolean(), choice: handlingChoiceSchema, tool: managedToolSchema.optional() }).strict();
-export const runToolSchema = z.object({ events: z.array(z.object({ title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200), connectionKind: z.enum(CONNECTION_KINDS).optional() }).strict()).max(500).default([]) }).strict();
-export const toolRunResultSchema = z.object({
-  matches: z.array(z.object({ index: z.number().int(), matched: z.boolean(), disposition: z.string().optional(), note: z.string().optional() })),
-  rows: z.array(z.record(z.string(), z.string())),
-}).strict();
+export const connectionTransitionSchema = z.object({ action: z.enum(["pause", "resume", "revoke"]) }).strict();
+export const addPanelEntrySchema = z.object({ values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
+export const toolTransitionSchema = z.object({ action: z.enum(["approve", "enable", "disable", "retire"]), expectedVersion: z.number().int().min(1) }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
- * All under /api/steward. Owner-only (single local owner, same check as
- * work-records). Every request carries `?workspaceId=` naming an existing
- * workspace; all rows are scoped to it. List endpoints return `{ items: T[] }`.
+ * All under /api/steward, owner-only, `?workspaceId=` on every request. Lists return `{ items: T[] }`.
  *
- *   GET  /today                         -> TodayView
- *   GET  /health                        -> StewardHealth
- *   GET  /affairs | POST /affairs       -> {items: Affair[]} | Affair
- *   GET  /affairs/:id | PATCH           -> AffairDetail | Affair
- *   GET  /attention?status=             -> {items: AttentionItem[]}
- *   POST /attention/:id/decision        -> AttentionItem
- *   GET  /delegations | POST            -> {items: Delegation[]} | Delegation (status "proposed")
- *   POST /delegations/:id/transition    -> Delegation (409 on stale expectedRevision)
- *   GET  /connections | POST            -> {items: Connection[]} | Connection
- *   POST /connections/:id/transition    -> Connection
- *   POST /connections/:id/sync          -> SyncResult
- *   GET  /events?status=&connectionId=  -> {items: InboundEvent[]}
- *   POST /events/:id/link               -> InboundEvent
- *   GET  /notifications                 -> {items: Notification[]}
- *   POST /notifications/:id/acknowledge -> Notification
- *   GET  /tools                         -> {items: ManagedTool[]}
- *   POST /tools (GenerateTool)          -> GeneratedTool (created=false when no tool is warranted)
- *   POST /tools/:id/transition          -> ManagedTool
- *   POST /tools/:id/run (RunTool)       -> ToolRunResult (409 unless enabled and permitted)
- *   POST /notifications/:id/retry       -> Notification
- *   POST /follow-ups/:id/complete|cancel -> FollowUp
- *   GET  /schedule?from=&to=            -> {items: ScheduleItem[]}
+ *   GET  /today                              -> TodayView
+ *   POST /chat (ChatInput)                   -> ChatReply   (same concierge as the QQ bot)
+ *   GET  /chat/messages?limit=               -> {items: ChatMessage[]}
+ *   GET  /affairs?status=                    -> {items: Affair[]}
+ *   POST /affairs (CreateAffair)             -> Affair      (skips the concierge; queued for the agent)
+ *   GET  /affairs/:id                        -> AffairDetail
+ *   PATCH /affairs/:id (UpdateAffair)        -> Affair
+ *   POST /affairs/:id/entries (AddEntry)     -> Entry       (wakes the agent)
+ *   GET  /affairs/:id/results/:version       -> Result
+ *   POST /asks/:id/resolve (ResolveAsk)      -> Ask
+ *   GET  /settings | PATCH (UpdateSettings)  -> Settings
+ *   GET  /grants | POST (CreateGrant)        -> {items: Grant[]} | Grant ; POST /grants/:id/revoke -> Grant
+ *   GET  /preferences | POST | DELETE /preferences/:id
+ *   GET  /notifications ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
+ *   GET  /connections | POST ; POST /connections/:id/transition ; POST /connections/:id/sync
+ *   GET  /tools ; POST /tools/:id/transition
+ *   GET  /tools/:id                          -> ToolDetail (panel entries newest first, last runs)
+ *   POST /tools/:id/entries (AddPanelEntry)  -> PanelEntry (validated against the enabled panel spec)
+ *   DELETE /tools/:id/entries/:entryId       -> 204
+ *   GET  /health
  */
+/** Fallback short codes: 4 characters, no 0/O/1/I/L. */
+export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+export const REF_PATTERN = /^[2-9A-HJKMNP-Z]{4}$/;
+
 export const STEWARD_API_BASE = "/api/steward";
+
+// ------------------------------------------------------- agent protocol ----
+/**
+ * Two Pi roles, both through Chrona-scoped tools only (capability token per run):
+ *  - concierge: one short run per incoming chat/web message; understands and routes, must end with `concierge_reply`.
+ *  - affair agent: multi-step work on one affair; must end with a terminal tool.
+ * Chrona owns every state change; model prose never changes state.
+ */
+export const RUN_LIMITS = {
+  affairTimeoutMs: 6 * 60_000, conciergeTimeoutMs: 90_000,
+  maxToolCalls: 40, maxWebCalls: 12, conciergeMaxWebCalls: 4,
+  maxFailures: 3, maxRunsPerAffairPerDay: 12,
+} as const;
+export const WEB_TOOLS = ["web_search", "fetch_content"] as const;
+
+const agentQuestion = z.object({ question: text.max(500), why: text.max(500) }).strict();
+export const affairToolInputSchemas = {
+  chrona_get_context: z.object({}).strict(),
+  chrona_read_source: z.object({ connectionKind: z.enum(CONNECTION_KINDS), limit: z.number().int().min(1).max(20).default(10) }).strict(),
+  chrona_save_progress: z.object({
+    summary: text.max(2000), nextStep: z.string().max(500).default(""),
+    findings: z.array(text.max(1000)).max(10).default([]),
+    title: text.max(200).optional(), goal: text.max(2000).optional(), handling: handlingSchema.optional(),
+  }).strict(),
+  chrona_ask_user: z.object({ questions: z.array(agentQuestion).min(1).max(3), partialSummary: z.string().max(2000).default("") }).strict(),
+  chrona_request_approval: z.object({ action: z.enum(ACTIONS), what: text.max(1000), why: text.max(1000) }).strict(),
+  chrona_publish_result: z.object({
+    title: text.max(200), summary: text.max(2000), body: text.max(60_000),
+    sources: z.array(resultSourceSchema.omit({ verified: true })).max(30).default([]),
+    limitations: z.string().max(2000).default(""), nextSteps: z.array(text.max(500)).max(10).default([]),
+    handling: handlingSchema,
+  }).strict(),
+  chrona_set_care: z.object({
+    cadenceMinutes: z.number().int().min(5).max(10080), notify: z.enum(NOTIFY_LEVELS).default("digest"),
+    connectionKind: z.enum(CONNECTION_KINDS).optional(), why: text.max(1000),
+  }).strict(),
+  chrona_follow_up: z.object({ note: text.max(1000), dueAt: iso, reason: text.max(500) }).strict(),
+  chrona_suggest: z.object({ topic: text.max(80), title: text.max(200), why: text.max(1000), nextStep: text.max(500) }).strict(),
+  chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(1500), why: text.max(500) }).strict(),
+  chrona_remember: z.object({ text: text.max(500) }).strict(),
+  chrona_draft_tool: z.object({
+    kind: z.enum(TOOL_KINDS), name: text.max(200), purpose: text.max(2000), rationale: text.max(2000),
+    spec: z.unknown().optional(),
+    script: z.object({ language: z.enum(["python", "typescript", "shell"]), source: text.max(20_000), usage: text.max(2000) }).strict().optional(),
+  }).strict(),
+  /** Record values the user gave (e.g. in chat) into an enabled panel of this affair. */
+  chrona_add_panel_entry: z.object({ toolId: id, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict(),
+  chrona_run_tool: z.object({ toolId: id, input: z.record(z.string(), z.unknown()).default({}) }).strict(),
+  /** Terminal: nothing to publish now. `done` closes a one-off affair; `quiet` = checked, nothing worth saying. */
+  chrona_close: z.object({ outcome: z.enum(["done", "quiet", "continue_later"]), reason: text.max(500) }).strict(),
+} as const;
+export const AFFAIR_TOOLS = Object.keys(affairToolInputSchemas) as (keyof typeof affairToolInputSchemas)[];
+export const AFFAIR_TERMINAL_TOOLS = ["chrona_ask_user", "chrona_request_approval", "chrona_publish_result", "chrona_close"] as const;
+
+export const conciergeToolInputSchemas = {
+  /** Recent chat, open affairs and asks, preferences. Call first. */
+  concierge_context: z.object({}).strict(),
+  concierge_create_affair: z.object({ title: text.max(200), request: text.max(4000) }).strict(),
+  concierge_add_to_affair: z.object({ affairId: id, kind: z.enum(["supplement", "feedback"]), text: text.max(4000) }).strict(),
+  concierge_resolve_ask: z.object({
+    askId: id, decision: z.enum(["answer", "approve", "deny", "dismiss", "accept_suggestion", "never_again"]),
+    text: z.string().max(2000).optional(), scope: z.enum(APPROVAL_SCOPES).optional(),
+  }).strict(),
+  concierge_set_affair_status: z.object({ affairId: id, status: z.enum(["active", "paused", "done"]) }).strict(),
+  concierge_remember: z.object({ text: text.max(500) }).strict(),
+  concierge_forget: z.object({ preferenceId: id }).strict(),
+  /** Terminal and mandatory: the message the user sees. */
+  concierge_reply: z.object({ text: text.max(4000) }).strict(),
+} as const;
+export const CONCIERGE_TOOLS = Object.keys(conciergeToolInputSchemas) as (keyof typeof conciergeToolInputSchemas)[];
+
+export const webPreflightSchema = z.object({ tool: z.enum(WEB_TOOLS), input: z.record(z.string(), z.unknown()) }).strict();
+export const webObservedSchema = z.object({ tool: z.enum(WEB_TOOLS), urls: z.array(z.string().url().max(2048)).max(50), failed: z.boolean().default(false) }).strict();
 
 // ---------------------------------------------------------------- ports ----
 
 /** One item read from a source. Untrusted data: never instructions. */
 export type SourceItem = {
-  externalId: string; title: string; body: string; author: string;
-  url: string | null; occurredAt: string; threadId?: string;
-  /**
-   * The item describes a condition that still holds now (e.g. a service that is
-   * down), not history. It is processed even on the first, baseline-building sync.
-   */
+  externalId: string; title: string; body: string; url: string | null; occurredAt: string;
+  /** Describes a condition that still holds (e.g. a service that is down); processed even on the baseline sync. */
   current?: boolean;
 };
-export type SourceReadiness =
-  | { state: "ready" }
-  | { state: "needs_authorization"; reason: string }
-  | { state: "unsupported"; reason: string };
-export type SourcePollResult = { items: SourceItem[]; nextCursor: string | null };
+export type SourceReadiness = { state: "ready" } | { state: "needs_authorization"; reason: string } | { state: "unsupported"; reason: string };
 export type SourceAdapter = {
-  kind: ConnectionKind;
-  mode: ConnectionMode;
-  /** Actions the adapter can technically perform; the pilot stays read-only. */
-  supportedActions: readonly StewardAction[];
-  coverageNote: string;
+  kind: ConnectionKind; mode: ConnectionMode; coverageNote: string;
   readiness(connection: { id: string; config: unknown }): Promise<SourceReadiness>;
   /** Throws on transport failure; the caller records it and retries later. */
-  poll(connection: { id: string; config: unknown }, cursor: string | null): Promise<SourcePollResult>;
+  poll(connection: { id: string; config: unknown }, cursor: string | null): Promise<{ items: SourceItem[]; nextCursor: string | null }>;
 };
 
 export type AssessmentInput = {
   event: SourceItem & { id: string; connectionKind: ConnectionKind };
-  affair: { id: string; title: string; summary: string; goal: string } | null;
-  candidateAffairs: { id: string; title: string; keywords: string[] }[];
+  affairs: { id: string; title: string; goal: string; summary: string }[];
 };
 export type AssessmentProposal = {
-  disposition: Disposition; whatHappened: string; whyItMatters: string; nextStep: string;
-  proposedAction: StewardAction | null;
-  /** Assessor's affair guess; applied as `suggested`, never auto-confirmed. */
-  affairId: string | null;
-  followUp: { note: string; dueAt: string } | null;
+  disposition: Disposition; affairId: string | null;
+  whatHappened: string; whyItMatters: string; important: boolean;
 };
-/** Throw AssessorUnavailableError when the model cannot be reached: the event stays pending. */
+/** Throw AgentUnavailableError when the model cannot be reached: the event stays pending. */
 export type Assessor = { name: string; assess(input: AssessmentInput): Promise<AssessmentProposal> };
-export class AssessorUnavailableError extends Error {
-  constructor(message = "Assessor unavailable") { super(message); this.name = "AssessorUnavailableError"; }
+export class AgentUnavailableError extends Error {
+  constructor(message = "Agent unavailable") { super(message); this.name = "AgentUnavailableError"; }
 }
 
-export type DeliveryMessage = {
-  idempotencyKey: string; title: string; body: string; link: string | null;
-  /** Destination from the owning delegation's current policy; null for in_app. */
-  recipient: string | null;
-  /** Reply ref of the attention item, so the user can answer in chat. */
-  replyRef: string | null;
-  whyItMatters: string; nextStep: string;
-  /** App-relative page without locale, e.g. "/affairs/<id>" or "/today". */
-  appPath: string | null;
-};
+export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null };
 export type DeliveryOutcome =
   | { outcome: "accepted"; receiptRef: string | null }
   | { outcome: "rejected"; retryable: boolean; error: string }
   | { outcome: "uncertain"; error: string };
-export type DeliveryAdapter = { channel: string; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
-
-// ----------------------------------------------------------------- chat ----
-
-/**
- * Identity of the chat turn, filled by the host plugin from the gateway's
- * authenticated session context, never by the model. `userText` is the user's
- * own message for this turn: Chrona checks reply refs against it and keeps it
- * only as a proposal's original wording (otherwise only a hash is audited).
- */
-export const chatIdentitySchema = z.object({
-  platform: z.literal("qqbot"), chatType: z.literal("dm"),
-  userId: id, chatId: id, messageId: z.string().trim().min(1).max(200).nullable(),
-  userText: z.string().max(2000).default(""),
-  /**
-   * How this turn reached Chrona. Only the explicit `/chrona` slash command, which the
-   * host dispatches before any model turn, may call the chat tools; ordinary chat never does.
-   */
-  route: z.literal("chrona_command"),
-}).strict();
-export type ChatIdentity = z.infer<typeof chatIdentitySchema>;
-/**
- * A private message to Chrona's own QQ bot. Built in-process by the bot adapter from a
- * gateway event, only after the sender's app-scoped openid matched the owner binding;
- * never accepted from the management MCP. Every message there is a Chrona turn.
- */
-export const dedicatedChatIdentitySchema = chatIdentitySchema.extend({ platform: z.literal("chrona_qq"), route: z.literal("dedicated_bot") }).strict();
-export const stewardChatIdentitySchema = z.discriminatedUnion("platform", [chatIdentitySchema, dedicatedChatIdentitySchema]);
-export type StewardChatIdentity = z.infer<typeof stewardChatIdentitySchema>;
-
-// ----------------------------------------------------------------- work ----
-/**
- * Agent work protocol. One StewardWork = one thing the user asked for (via /chrona or the web).
- * Chrona owns the status, leases, budgets, retries, permissions and the outbox; the agent
- * (Pi, through Chrona-scoped tools) only reads bounded context and chooses tools. A status
- * changes only through a server-side tool effect or the runner, never from model prose.
- *
- *   received → running → waiting_input | waiting_authorization | result_ready | received (retry)
- *   waiting_* → received (user input / decision) ; result_ready → accepted (user) | received (feedback)
- *   any open → cancelled (delegation revoked) ; running → failed after MAX failures ; paused delegation = no runs
- */
-export const WORK_STATUSES = ["received", "running", "waiting_input", "waiting_authorization", "result_ready", "accepted", "failed", "cancelled"] as const;
-export const WORK_ATTEMPT_STATUSES = ["running", "result_published", "asked_user", "requested_authorization", "closed_quietly", "no_outcome", "timed_out", "budget_exhausted", "agent_unavailable", "cancelled", "lease_expired"] as const;
-/** Why a run was started. Wakes are bounded; nothing re-asks the model on a bare timer. */
-export const WORK_WAKE_REASONS = ["new_request", "user_input", "follow_up_due", "affair_changed", "retry"] as const;
-export const WORK_TOOLS = [
-  "chrona_get_context", "chrona_read_source", "chrona_save_progress", "chrona_ask_user", "chrona_publish_result",
-  "chrona_request_authorization", "chrona_propose_follow_up", "chrona_propose_delegation",
-  "chrona_suggest", "chrona_draft_tool", "chrona_close_quietly",
-] as const;
-/** Tool calls that end the attempt (the runner stops Pi after one succeeds). */
-export const WORK_TERMINAL_TOOLS = ["chrona_ask_user", "chrona_publish_result", "chrona_request_authorization", "chrona_close_quietly"] as const;
-/** Host-provided web tools (pi-web-access) allowed through Chrona's preflight and budget. */
-export const WORK_WEB_TOOLS = ["web_search", "fetch_content"] as const;
-export const WORK_LIMITS = { attemptTimeoutMs: 6 * 60_000, maxToolCalls: 30, maxWebCalls: 10, maxFailures: 3, maxRunsPerDay: 8, maxProgressNotes: 20, maxInputs: 20 } as const;
-/** Actions a chat request grants for its own work; anything wider is a separate proposal. */
-export const WORK_ALLOWED_ACTIONS = ["summarize", "notify_user", "create_follow_up", "link_affair", "propose_delegation", "propose_tool"] as const;
-
-export type WorkStatus = (typeof WORK_STATUSES)[number];
-export type WorkAttemptStatus = (typeof WORK_ATTEMPT_STATUSES)[number];
-export type WorkWakeReason = (typeof WORK_WAKE_REASONS)[number];
-export type WorkTool = (typeof WORK_TOOLS)[number];
-
-const workText = z.string().trim().min(1);
-export const workResultSourceSchema = z.object({ title: workText.max(300), url: z.string().url().max(2048), note: z.string().max(500).default("") }).strict();
-export const workHandlingSchema = z.object({ mode: z.enum(HANDLING_MODES), rationale: workText.max(2000) }).strict();
-
-export const workToolInputSchemas = {
-  chrona_get_context: z.object({}).strict(),
-  /** Read-only: status and recent events Chrona already holds for one connected source of this workspace (untrusted data). */
-  chrona_read_source: z.object({ connectionKind: z.enum(CONNECTION_KINDS), limit: z.number().int().min(1).max(20).default(10) }).strict(),
-  chrona_save_progress: z.object({
-    summary: workText.max(2000), findings: z.array(workText.max(1000)).max(10).default([]), nextSteps: z.array(workText.max(500)).max(10).default([]),
-    affairTitle: workText.max(200).optional(), affairGoal: workText.max(2000).optional(), handling: workHandlingSchema.optional(),
-  }).strict(),
-  chrona_ask_user: z.object({
-    questions: z.array(z.object({ question: workText.max(500), why: workText.max(500) }).strict()).min(1).max(3),
-    partialSummary: z.string().max(2000).default(""),
-  }).strict(),
-  chrona_publish_result: z.object({
-    title: workText.max(200), summary: workText.max(2000), body: workText.max(20_000),
-    sources: z.array(workResultSourceSchema).max(20).default([]), limitations: z.string().max(2000).default(""),
-    nextSteps: z.array(workText.max(500)).max(10).default([]), handling: workHandlingSchema,
-  }).strict(),
-  chrona_request_authorization: z.object({
-    missing: z.enum(["information", "tool", "permission"]), capability: workText.max(200), why: workText.max(1000), howToGrant: workText.max(1000),
-  }).strict(),
-  chrona_propose_follow_up: z.object({ note: workText.max(1000), dueAt: iso, reason: workText.max(500) }).strict(),
-  chrona_propose_delegation: z.object({
-    purpose: workText.max(2000), connectionKind: z.enum(CONNECTION_KINDS), cadenceMinutes: z.number().int().min(5).max(10080).default(15),
-    notify: z.enum(["immediate", "digest"]).default("immediate"),
-    quietHours: z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/), timezone: z.string().min(1).max(80) }).strict().nullable().default(null),
-    why: workText.max(1000),
-  }).strict(),
-  chrona_suggest: z.object({ topic: workText.max(80), title: workText.max(200), whyItMatters: workText.max(1000), nextStep: workText.max(500), evidence: z.array(workText.max(500)).max(5).default([]) }).strict(),
-  chrona_draft_tool: z.object({
-    kind: z.enum(TOOL_KINDS), name: workText.max(200), purpose: workText.max(2000), rationale: workText.max(2000),
-    signals: handlingSignalsSchema,
-    /** Declarative panel/rule spec (validated by toolSpecSchema); required for panels. */
-    spec: z.unknown().optional(),
-    /** Script DRAFT only: stored and shown, never executed by Chrona (no sandbox yet). */
-    script: z.object({ language: z.enum(["python", "typescript", "shell"]), source: workText.max(20_000), usage: workText.max(2000), validationPlan: workText.max(2000), risks: z.string().max(2000).default("") }).strict().optional(),
-  }).strict(),
-  chrona_close_quietly: z.object({ reason: workText.max(500) }).strict(),
-} satisfies Record<WorkTool, z.ZodTypeAny>;
-/** Web preflight: the agent extension asks before every host web tool call; Chrona enforces budget and URL policy. */
-export const workWebPreflightSchema = z.object({ tool: z.enum(WORK_WEB_TOOLS), input: z.record(z.string(), z.unknown()) }).strict();
-/** After a host web tool returns, the extension reports the URLs it saw so published sources can be checked. */
-export const workWebObservedSchema = z.object({ tool: z.enum(WORK_WEB_TOOLS), urls: z.array(z.string().url().max(2048)).max(50), titles: z.array(z.string().max(300)).max(50).default([]), failed: z.boolean().default(false) }).strict();
-
-export const workAttemptSchema = z.object({
-  id, number: z.number().int().min(1), status: z.enum(WORK_ATTEMPT_STATUSES), wakeReason: z.enum(WORK_WAKE_REASONS),
-  toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean(), note: z.string().max(300) }).strict()).max(60),
-  error: z.string().max(500).nullable(), startedAt: iso, endedAt: iso.nullable(),
-}).strict();
-export const workSchema = z.object({
-  id, affairId: id, delegationId: id, replyRef: z.string().max(16).nullable(), request: z.string().max(4000), status: z.enum(WORK_STATUSES), revision: z.number().int().min(1),
-  question: z.object({ questions: z.array(z.object({ question: z.string(), why: z.string() }).strict()), askedAt: iso }).strict().nullable(),
-  authorization: z.object({ missing: z.enum(["information", "tool", "permission"]), capability: z.string(), why: z.string(), howToGrant: z.string(), askedAt: iso }).strict().nullable(),
-  inputs: z.array(z.object({ at: iso, kind: z.enum(["answer", "feedback", "decision"]), text: z.string().max(1000) }).strict()).max(WORK_LIMITS.maxInputs),
-  progress: z.array(z.object({ at: iso, summary: z.string(), findings: z.array(z.string()), nextSteps: z.array(z.string()) }).strict()).max(WORK_LIMITS.maxProgressNotes),
-  handling: workHandlingSchema.nullable(),
-  /** App-relative link to the published result version (results layer); publication is not acceptance. */
-  resultHref: z.string().max(2048).nullable(), resultVersion: z.number().int().nullable(),
-  attempts: z.array(workAttemptSchema).max(10), failures: z.number().int().min(0), nextRunAt: iso.nullable(), lastError: z.string().max(500).nullable(),
-  createdAt: iso, updatedAt: iso,
-}).strict();
-export type Work = z.infer<typeof workSchema>;
-export type WorkAttempt = z.infer<typeof workAttemptSchema>;
+export type DeliveryAdapter = { channel: DeliveryChannel; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
 
 // ---------------------------------------------------------------- types ----
 
-export type Evidence = z.infer<typeof evidenceSchema>;
+export type Handling = z.infer<typeof handlingSchema>;
+export type Care = z.infer<typeof careSchema>;
 export type Affair = z.infer<typeof affairSchema>;
+export type Entry = z.infer<typeof entrySchema>;
+export type ResultSource = z.infer<typeof resultSourceSchema>;
+export type AffairResult = z.infer<typeof resultSchema>;
+export type Ask = z.infer<typeof askSchema>;
+export type Run = z.infer<typeof runSchema>;
+export type FollowUp = z.infer<typeof followUpSchema>;
+export type GrantScope = z.infer<typeof grantScopeSchema>;
+export type Grant = z.infer<typeof grantSchema>;
+export type PolicyDecision = z.infer<typeof policyDecisionSchema>;
+export type Preference = z.infer<typeof preferenceSchema>;
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type StewardNotification = z.infer<typeof notificationSchema>;
 export type Connection = z.infer<typeof connectionSchema>;
 export type InboundEvent = z.infer<typeof inboundEventSchema>;
-export type NotificationPolicy = z.infer<typeof notificationPolicySchema>;
-export type Delegation = z.infer<typeof delegationSchema>;
-export type PermissionDecision = z.infer<typeof permissionDecisionSchema>;
-export type Assessment = z.infer<typeof assessmentSchema>;
-export type AttentionItem = z.infer<typeof attentionItemSchema>;
-export type StewardNotification = z.infer<typeof notificationSchema>;
-export type FollowUp = z.infer<typeof followUpSchema>;
-export type ManagedTool = z.infer<typeof managedToolSchema>;
-export type ScheduleItem = z.infer<typeof scheduleItemSchema>;
-export type StewardHealth = z.infer<typeof stewardHealthSchema>;
-export type ResultSummary = z.infer<typeof resultSummarySchema>;
+export type Tool = z.infer<typeof toolSchema>;
+export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
+export type Settings = z.infer<typeof settingsSchema>;
+export type Health = z.infer<typeof healthSchema>;
+export type Upcoming = z.infer<typeof upcomingSchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
-export type HandlingSignalsInput = z.infer<typeof handlingSignalsSchema>;
-export type GeneratedTool = z.infer<typeof generatedToolSchema>;
-export type ToolRunResult = z.infer<typeof toolRunResultSchema>;
-export type SyncResult = z.infer<typeof syncResultSchema>;
 export type AffairDetail = z.infer<typeof affairDetailSchema>;
+export type ChatReply = z.infer<typeof chatReplySchema>;
+export type PanelEntry = z.infer<typeof panelEntrySchema>;
+export type ToolRunView = z.infer<typeof toolRunViewSchema>;
+export type ToolDetail = z.infer<typeof toolDetailSchema>;

@@ -1,83 +1,47 @@
-import { syncConnection } from "./ingest";
-import { processPendingEvents, type Serialize } from "./process";
-import { createStewardDelivery } from "./delivery";
-import { createStewardFollowUps } from "./follow-ups";
-import { delegationView, type Context } from "./mappers";
-import { decidePermission } from "@chrona/domain/steward/permission";
-import { raiseDigests } from "./digest";
-import { raiseSuggestions } from "./suggest";
-
-function nextCadenceCheck(covering: ReturnType<typeof delegationView>[]) {
-  const cadence = covering.filter(d => d.cadenceSeconds !== null)
-    .sort((a, b) => a.cadenceSeconds! - b.cadenceSeconds!).at(0);
-  return cadence?.lastCheckAt
-    ? new Date(cadence.lastCheckAt).getTime() + cadence.cadenceSeconds! * 1000
-    : 0;
-}
-
-/**
- * Chrona owns polling, assessment retries, follow-ups and delivery retries.
- * Each database phase runs through `serialize`; model calls run between them.
- */
-export async function tick(ctx: Context, serialize: Serialize = step => step()) {
-  const { synced, syncFailed, limits } = await serialize(() => syncDueConnections(ctx));
-  const { assessed } = await processPendingEvents(ctx, { serialize, ...(limits.length ? { limit: Math.min(...limits) } : {}) });
-  return serialize(() => afterAssessment(ctx, { synced, syncFailed, assessed }));
-}
-
-async function syncDueConnections(ctx: Context) {
-  const workspaceId = ctx.actor.workspaceId;
-  const now = ctx.now();
-  const delegations = (await ctx.db.delegation.findMany({ where: { workspaceId, status: "active", work: { is: null } } })).map(delegationView)
-    .filter(delegation => decidePermission({ action: "read_source", delegation, now }).outcome === "allowed");
-  const connections = await ctx.db.sourceConnection.findMany({ where: {
-    workspaceId, status: { in: ["active", "failing"] }, mode: "poll",
-  }, orderBy: { id: "asc" } });
-  let synced = 0, syncFailed = 0;
-  const limits: number[] = [];
-  for (const connection of connections) {
-    const covering = delegations.filter(d => d.connectionId === null || d.connectionId === connection.id);
-    const coverageNote = ctx.sources[connection.kind as keyof typeof ctx.sources].coverageNote;
-    if (!covering.length) {
-      await ctx.db.sourceConnection.update({ where: { id: connection.id }, data: {
-        nextCheckAt: null, coverageNote: `${coverageNote} Automatic polling idle: no active delegation allows read_source.`.slice(0, 500),
-      } });
-      continue;
+import type { StewardPorts } from "./service";
+import { createConnections } from "./sources";
+import { createNotifications } from "./notify";
+import { queueAffair } from "./affairs";
+import { audit } from "./audit";
+/** No external work inside a transaction. Stage failures are isolated and durable. */
+export function createTick(ports: StewardPorts) {
+  return async function tick(now = ports.now()) {
+    const failures: { workspaceId: string; stage: string }[] = [];
+    for (const workspace of await ports.db.workspace.findMany({ select: { id: true } })) {
+      const workspaceId = workspace.id, sources = createConnections(ports, workspaceId), notifications = createNotifications(ports, workspaceId);
+      const stages: [string, () => Promise<unknown>][] = [
+        ["poll", () => sources.pollDue(now)],
+        ["assess", () => sources.assessPending(now)],
+        ["care", () => ports.db.$transaction(async tx => {
+          const due = await tx.affair.findMany({ where: { workspaceId, status: "watching", agentState: { in: ["idle", "queued"] }, nextCheckAt: { lte: now }, cadenceSeconds: { not: null } } });
+          for (const affair of due) {
+            await queueAffair(tx, affair.id, "care_check", now);
+            const cadence = affair.cadenceSeconds! * 1000, previous = affair.nextCheckAt!.getTime();
+            await tx.affair.update({ where: { id: affair.id }, data: { nextCheckAt: new Date(previous + (Math.floor((now.getTime() - previous) / cadence) + 1) * cadence) } });
+          }
+        })],
+        ["follow_up", () => ports.db.$transaction(async tx => {
+          const due = await tx.followUp.findMany({ where: { workspaceId, status: "pending", dueAt: { lte: now }, affair: { status: { in: ["active", "watching"] }, agentState: { in: ["idle", "queued"] } } } });
+          for (const follow of due) {
+            await queueAffair(tx, follow.affairId, "follow_up_due", now);
+            await tx.followUp.update({ where: { id: follow.id }, data: { status: "done" } });
+            await audit(tx, { workspaceId, kind: "follow_up_due", actor: "chrona", subjectId: follow.id, details: {} });
+          }
+        })],
+        // E4 consumes queued affairs and their wakeReason; no synthetic runs here.
+        ["deliver", () => notifications.deliverDue(now)],
+        ["digest", () => notifications.sendDigestIfDue(now)],
+      ];
+      for (const [stage, run] of stages) {
+        try { await run(); }
+        catch {
+          failures.push({ workspaceId, stage });
+          try { await audit(ports.db, { workspaceId, kind: "tick_stage_failed", actor: "chrona", subjectId: workspaceId, details: { stage, at: now.toISOString() } }); } catch { /* Return failure even when persistence itself is unavailable. */ }
+        }
+      }
+      try { await ports.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt: now }, update: { lastTickAt: now } }); }
+      catch { failures.push({ workspaceId, stage: "lastTickAt" }); }
     }
-    limits.push(...covering.map(d => d.limits.maxEventsPerCheck));
-    const cadenceDue = nextCadenceCheck(covering);
-    const dueAt = Math.max(connection.nextCheckAt?.getTime() ?? 0, cadenceDue);
-    await ctx.db.sourceConnection.update({ where: { id: connection.id }, data: { coverageNote, ...(dueAt > now.getTime() ? { nextCheckAt: new Date(dueAt) } : {}) } });
-    if (dueAt > now.getTime()) continue;
-    const delegationIds = covering.map(d => d.id);
-    await ctx.db.delegation.updateMany({ where: { workspaceId, id: { in: delegationIds } }, data: { lastCheckAt: now } });
-    try {
-      await syncConnection(ctx, connection.id); synced++;
-      await ctx.db.delegation.updateMany({ where: { workspaceId, id: { in: delegationIds } }, data: { lastSuccessAt: now, lastError: null } });
-    }
-    catch {
-      syncFailed++;
-      await ctx.db.delegation.updateMany({ where: { workspaceId, id: { in: delegationIds } }, data: { lastFailureAt: now, lastError: "Source sync failed" } });
-      // Never store adapter exception text. Refusals caused by pause/revoke do
-      // not resurrect the connection; other failures are visible and backed off.
-      await ctx.db.sourceConnection.updateMany({ where: { id: connection.id, workspaceId, status: { in: ["active", "failing"] } }, data: {
-        status: "failing", lastFailureAt: ctx.now(), lastError: "Source sync failed",
-        nextCheckAt: new Date(ctx.now().getTime() + (connection.pollIntervalSeconds ?? 60) * 1000),
-      } });
-    }
-  }
-  return { synced, syncFailed, limits };
-}
-
-async function afterAssessment(ctx: Context, done: { synced: number; syncFailed: number; assessed: number }) {
-  const workspaceId = ctx.actor.workspaceId;
-  const { raised } = await createStewardFollowUps({ db: ctx.db, workspaceId, now: ctx.now }).raiseDueFollowUps();
-  let suggested = 0, suggestionFailed = 0;
-  try { suggested = (await raiseSuggestions(ctx)).raised; }
-  catch { suggestionFailed++; }
-  await raiseDigests(ctx);
-  const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, allowedRecipients: new Set(ctx.chatRecipients ?? []), now: ctx.now }).deliverDue();
-  const lastTickAt = ctx.now();
-  await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name, assessorAvailable: true }, update: { lastTickAt } });
-  return { ...done, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };
+    return { failures };
+  };
 }

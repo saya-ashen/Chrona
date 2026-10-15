@@ -3,18 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./ai": "./src/ai.ts",
-    "./results": "./src/results/index.ts",
-    "./work": "./src/work/index.ts",
-    "./library": "./src/library/index.ts",
-    "./api": "./src/api/index.ts",
-    "./ai-feature-runtime": "./src/ai-feature-runtime/index.ts",
-    "./steward": "./src/steward/index.ts"
-  },
-  "dependencies": {
-    "@chrona/ui-protocol": "workspace:*",
-    "zod": "^4.3.6"
-  }
+  "exports": { ".": "./src/index.ts", "./steward": "./src/steward/index.ts" },
+  "dependencies": { "zod": "^4.3.6" }
 }
