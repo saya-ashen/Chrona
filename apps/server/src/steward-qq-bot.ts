@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { StewardService } from "@chrona/engine";
 import type { PrismaClient } from "@chrona/db";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqGateway, createQqTokenSource, qqBotConfig, readProtectedSecret, sendQqC2c, DEDICATED_PLATFORM, type QqLog, type QqC2cMessage } from "@chrona/integrations/steward";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, qqBotConfig, DEDICATED_PLATFORM } from "../../../packages/integrations/src/steward/qq-official-bot";
+import { createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
 import type { StewardChatTransport } from "./steward-runtime";
 
 /** Injectable transport boundary; tests never read secrets or open a gateway. */
@@ -35,12 +36,22 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
   }
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
-    delivery: { channel: delivery.channel, async send(input) { await refreshBinding(); return delivery.send(input); } },
+    delivery: { channel: delivery.channel, async send(input) {
+      // Conversation replies are collected by handleMessage and sent passively below.
+      // Only notification outbox messages may use proactive delivery.
+      if (input.idempotencyKey.startsWith("reply:")) return { outcome: "accepted", receiptRef: null };
+      await refreshBinding(); return delivery.send(input);
+    } },
     bound: async () => Boolean(await refreshBinding()),
     async start(service: StewardService, wake: () => void) {
       if (handler) return;
       handler = createQqBotHandler({ state, now, log,
-        chat: { async handleMessage(input) { try { return await service.chat.handleMessage(input); } finally { wake(); } } },
+        chat: { async handleMessage(input) {
+          try {
+            const result = await service.chat.handleMessage(input);
+            return { reply: result.messages.map(message => message.text).join("\n\n") || "处理尚未完成，请稍后在网页查看。", affairId: result.messages.at(-1)?.affairId };
+          } finally { wake(); }
+        } },
         reply: async (openid, messageId, text, msgSeq) => {
           const result = await (transport?.send ?? sendQqC2c)({ tokens, openid, content: text, replyTo: messageId, msgSeq });
           if (result.outcome !== "accepted") throw new Error("Passive reply not accepted");

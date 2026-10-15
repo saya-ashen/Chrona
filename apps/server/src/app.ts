@@ -16,12 +16,12 @@ import { apiKeyAuth } from "./middleware/auth";
 import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
 const log = createLogger("apps.server");
-const MAX_HTTP_BODY_BYTES = 1_048_576;
+const MAX_HTTP_BODY_BYTES = 21 * 1024 * 1024;
 
 function isStewardAgentPath(path: string, method: string) {
   // These exact endpoints validate their own narrower credentials. Prefixes stay API-key protected.
   return (method === "GET" && path === "/api/steward-agent/catalog")
-    || (method === "POST" && (/^\/api\/steward-agent\/tools\/[^/]+$/.test(path) || path === "/api/steward-agent/web/preflight" || path === "/api/steward-agent/web/observed"));
+    || (method === "POST" && /^\/api\/steward-agent\/tools\/[^/]+$/.test(path));
 }
 
 function getAllowedOrigins() {
@@ -39,7 +39,7 @@ function wantsHtml(acceptHeader: string | undefined) {
 }
 
 function mountHealthRoutes(app: Hono, steward: StewardRuntime) {
-  app.get("/health", (c) => c.json({ status: "ok", server: "chrona-hono", agent: steward.ports.agentHealth() }));
+  app.get("/health", async (c) => c.json({ status: "ok", server: "chrona-hono", ...await steward.health() }));
   app.get("/ready", async (c) => {
     try {
       await steward.ports.db.$queryRawUnsafe("SELECT 1");
@@ -93,7 +93,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
           method: context.req.method,
           path: new URL(context.req.url).pathname,
         });
-        return context.json({ error: "Request body exceeds the 1 MiB limit." }, 413);
+        return context.json({ error: "Request body exceeds the 21 MiB limit." }, 413);
       },
     }),
   );

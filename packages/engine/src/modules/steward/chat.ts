@@ -12,6 +12,7 @@ const inputSchema = z.object({
   workspaceId: z.string().min(1), channel: messageSchema.shape.channel, text: messageSchema.shape.text,
   attachments: z.array(attachmentSchema.extend({ base64: image.optional() })).max(10).default([]),
   externalId: z.string().min(1).max(1000).optional(), quotedMessageId: z.string().min(1).optional(),
+  affairId: z.string().min(1).max(128).optional(),
 });
 export type ChatInput = z.input<typeof inputSchema>;
 const unavailable = "模型暂时不可用，消息已记下，恢复后会继续处理。";
@@ -77,8 +78,9 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
       const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, direction: "out" } }) : null;
       if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found");
       const focus = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "conversation_focus", subjectId: conversationKey }, orderBy: { createdAt: "desc" } });
-      const focusedId = quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+      const focusedId = input.affairId ?? (quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId);
       const affair = focusedId ? await db.affair.findFirst({ where: { id: focusedId, workspaceId: input.workspaceId, status: "active" } }) : null;
+      if (input.affairId && !affair) throw new StewardError("not_found", "Active affair not found");
       const inbound = existing ?? await db.message.create({ data: { ...input, attachments: input.attachments, conversationKey, affairId: affair?.id, direction: "in", at: ports.now() } });
       // Timestamp ties are common with fake clocks and SQLite; explicitly exclude existing replies.
       const before = (await db.message.findMany({ where: { workspaceId: input.workspaceId, conversationKey, direction: "out", at: { gte: inbound.at } }, select: { id: true } })).map(m => m.id);

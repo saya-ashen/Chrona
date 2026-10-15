@@ -1,12 +1,13 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import * as s from "@chrona/contracts/steward";
 import { createStewardService, StewardError, type StewardPorts, type StewardService } from "@chrona/engine";
+import { parsePanelBlocks } from "@chrona/domain/steward/markdown";
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 
 export type StewardRoutePorts = StewardPorts;
-
-export function createStewardRoutes(ports: StewardRoutePorts, service: StewardService = createStewardService(ports), wake: () => void = () => {}) {
+export function createStewardRoutes(ports: StewardPorts, service: StewardService = createStewardService(ports), wake: () => void = () => {}) {
   const router = new Hono<{ Variables: { steward: ReturnType<StewardService["forWorkspace"]> } }>();
   router.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
@@ -18,47 +19,80 @@ export function createStewardRoutes(ports: StewardRoutePorts, service: StewardSe
     await next();
     if (c.req.method !== "GET" && c.res.ok) wake();
   });
+  router.use("*", bodyLimit({ maxSize: 21 * 1024 * 1024 }));
   router.onError((error, c) => {
-    if (error instanceof SyntaxError) return c.json({ code: "INVALID_REQUEST" }, 400);
-    if (error instanceof StewardError) return c.json({ code: error.code, message: error.message }, { not_found: 404, conflict: 409, invalid: 400, forbidden: 403 }[error.code] as 404 | 409 | 400 | 403);
+    if (error instanceof SyntaxError || error instanceof z.ZodError) return c.json({ code: "INVALID_REQUEST" }, 400);
+    if (error instanceof StewardError) return c.json({ code: error.code }, { not_found: 404, conflict: 409, invalid: 400, forbidden: 403 }[error.code] as 404 | 409 | 400 | 403);
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return c.json({ code: "NOT_FOUND" }, 404);
+    if (code === "EEXIST") return c.json({ code: "CONFLICT" }, 409);
     return c.json({ code: "INTERNAL_ERROR" }, 500);
   });
-  const request = <T extends z.ZodType>(schema: T) => ({ parse(raw: unknown): z.output<T> {
-    const result = schema.safeParse(raw);
-    if (!result.success) throw new StewardError("invalid", "Invalid request");
-    return result.data;
-  } });
-  const items = <T extends z.ZodType>(schema: T) => z.object({ items: z.array(schema) });
-  router.get("/tools", async c => c.json(items(s.toolSchema).parse({ items: await c.get("steward").tools.list() })));
-  router.post("/tools/:id/transition", async c => c.json(s.toolSchema.parse(await c.get("steward").tools.transition(c.req.param("id"), request(s.toolTransitionSchema).parse(await c.req.json())))));
-  router.get("/tools/:id", async c => c.json(s.toolDetailSchema.parse(await c.get("steward").tools.getTool(c.req.param("id")))));
-  router.post("/tools/:id/entries", async c => c.json(s.panelEntrySchema.parse(await c.get("steward").tools.addEntry(c.req.param("id"), request(s.addPanelEntrySchema).parse(await c.req.json()).values))));
-  router.delete("/tools/:id/entries/:entryId", async c => { await c.get("steward").tools.deleteEntry(c.req.param("id"), c.req.param("entryId")); return c.body(null, 204); });
   router.get("/today", async c => c.json(s.todayViewSchema.parse(await c.get("steward").today())));
   router.get("/health", async c => c.json(s.healthSchema.parse(await c.get("steward").health())));
-  router.post("/chat", async c => c.json(s.chatReplySchema.parse(await c.get("steward").chat.handleMessage({ channel: "in_app", ...request(s.chatInputSchema).parse(await c.req.json()) }))));
-  router.get("/chat/messages", async c => c.json(items(s.chatMessageSchema).parse({ items: await c.get("steward").chat.messages(request(z.coerce.number().int().min(1).max(100).optional()).parse(c.req.query("limit"))) })));
-  router.get("/affairs", async c => c.json(items(s.affairSchema).parse({ items: await c.get("steward").affairs.list({ status: request(z.enum(s.AFFAIR_STATUSES).optional()).parse(c.req.query("status")) }) })));
-  router.post("/affairs", async c => c.json(s.affairSchema.parse(await c.get("steward").affairs.create(request(s.createAffairSchema).parse(await c.req.json())))));
+  router.post("/chat", async c => c.json(s.chatReplySchema.parse(await c.get("steward").chat.handleMessage({ channel: "in_app", ...s.chatInputSchema.parse(await c.req.json()) }))));
+  router.get("/chat/messages", async c => c.json({ items: await c.get("steward").chat.messages(z.coerce.number().int().min(1).max(100).optional().parse(c.req.query("limit"))) }));
+  router.get("/affairs", async c => c.json({ items: await c.get("steward").affairs.list(z.enum(s.AFFAIR_STATUSES).optional().parse(c.req.query("status"))) }));
+  router.post("/affairs", async c => c.json(await c.get("steward").affairs.create(s.createAffairSchema.parse(await c.req.json()))));
   router.get("/affairs/:id", async c => c.json(s.affairDetailSchema.parse(await c.get("steward").affairs.detail(c.req.param("id")))));
-  router.patch("/affairs/:id", async c => c.json(s.affairSchema.parse(await c.get("steward").affairs.update(c.req.param("id"), request(s.updateAffairSchema).parse(await c.req.json())))));
-  router.post("/affairs/:id/entries", async c => c.json(s.entrySchema.parse(await c.get("steward").affairs.addEntry(c.req.param("id"), request(s.addEntrySchema).parse(await c.req.json())))));
-  router.get("/affairs/:id/results/:version", async c => c.json(s.resultSchema.parse(await c.get("steward").affairs.getResult(c.req.param("id"), request(z.coerce.number().int().positive()).parse(c.req.param("version"))))));
-  router.post("/asks/:id/resolve", async c => c.json(s.askSchema.parse(await c.get("steward").asks.resolve(c.req.param("id"), request(s.resolveAskSchema).parse(await c.req.json())))));
-  router.get("/settings", async c => c.json(s.settingsSchema.parse(await c.get("steward").settings.get())));
-  router.patch("/settings", async c => c.json(s.settingsSchema.parse(await c.get("steward").settings.update(request(s.updateSettingsSchema).parse(await c.req.json())))));
-  router.get("/grants", async c => c.json(items(s.grantSchema).parse({ items: await c.get("steward").grants.list() })));
-  router.post("/grants", async c => c.json(s.grantSchema.parse(await c.get("steward").grants.create(request(s.createGrantSchema).parse(await c.req.json())))));
-  router.post("/grants/:id/revoke", async c => c.json(s.grantSchema.parse(await c.get("steward").grants.revoke(c.req.param("id")))));
-  router.get("/preferences", async c => c.json(items(s.preferenceSchema).parse({ items: await c.get("steward").preferences.list() })));
-  router.post("/preferences", async c => c.json(s.preferenceSchema.parse(await c.get("steward").preferences.add(request(s.createPreferenceSchema).parse(await c.req.json())))));
+  router.patch("/affairs/:id", async c => c.json(await c.get("steward").affairs.update(c.req.param("id"), s.updateAffairSchema.parse(await c.req.json()))));
+  router.get("/affairs/:id/file", async c => c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).read(s.affairPathSchema.parse(c.req.query("path")))));
+  router.put("/affairs/:id/file", async c => {
+    const input = s.saveFileSchema.parse(await c.req.json());
+    return c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).save(input.path, input.content, input.baseRevision));
+  });
+  router.post("/affairs/:id/checkbox", async c => {
+    const input = s.toggleCheckboxSchema.parse(await c.req.json());
+    return c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).toggleCheckbox(input.path, input.line, input.checked, input.baseRevision));
+  });
+  router.post("/affairs/:id/panel-entry", async c => {
+    const input = s.panelEntrySchema.parse(await c.req.json());
+    const files = await c.get("steward").affairs.files(c.req.param("id"));
+    for (const node of await files.tree()) {
+      if (node.kind !== "file" || !node.path.endsWith(".md")) continue;
+      const panel = parsePanelBlocks((await files.read(node.path)).content).find(p => p.data === input.dataPath);
+      if (panel) {
+        try { return c.json(await files.appendPanelEntry(input.dataPath, panel.fields, input.values)); }
+        catch (error) { if (error instanceof StewardError) throw error; throw new StewardError("invalid", "Invalid panel entry"); }
+      }
+    }
+    throw new StewardError("not_found", "Panel not found");
+  });
+  router.post("/affairs/:id/upload", async c => {
+    const files = await c.get("steward").affairs.files(c.req.param("id"));
+    let form: FormData;
+    try { form = await c.req.formData(); } catch { throw new StewardError("invalid", "Invalid multipart body"); }
+    const file = form.get("file"), directory = form.get("dir") ?? "";
+    if (!(file instanceof File) || typeof directory !== "string" || form.getAll("file").length !== 1 || file.size > 20 * 1024 * 1024) throw new StewardError("invalid", "Invalid upload");
+    return c.json(await files.upload(directory, file.name, new Uint8Array(await file.arrayBuffer())));
+  });
+  router.get("/affairs/:id/raw", async c => {
+    const path = s.affairPathSchema.parse(c.req.query("path"));
+    const bytes = await (await c.get("steward").affairs.files(c.req.param("id"))).raw(path);
+    c.header("Content-Type", "application/octet-stream");
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Content-Security-Policy", "sandbox; default-src 'none'");
+    c.header("Content-Disposition", `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(path.split("/").pop()!).replace(/['()*]/g, ch => `%${ch.charCodeAt(0).toString(16)}`)}`);
+    return c.body(bytes);
+  });
+  router.get("/affairs/:id/revisions", async c => c.json({ items: await (await c.get("steward").affairs.files(c.req.param("id"))).revisions(s.affairPathSchema.optional().parse(c.req.query("path"))) }));
+  router.get("/affairs/:id/revisions/:sha/diff", async c => c.json({ diff: await (await c.get("steward").affairs.files(c.req.param("id"))).diff(c.req.param("sha")) }));
+  router.post("/affairs/:id/revisions/:sha/revert", async c => c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).revert(c.req.param("sha"))));
+  router.get("/affairs/:id/schedules", async c => c.json({ items: await c.get("steward").schedules.list(c.req.param("id")) }));
+  router.post("/affairs/:id/schedules", async c => c.json(await c.get("steward").schedules.create(c.req.param("id"), s.createScheduleSchema.parse(await c.req.json()))));
+  router.patch("/schedules/:id", async c => c.json(await c.get("steward").schedules.update(c.req.param("id"), s.updateScheduleSchema.parse(await c.req.json()))));
+  router.get("/approvals", async c => c.json({ items: await c.get("steward").approvals.list(z.enum(s.APPROVAL_STATUSES).optional().parse(c.req.query("status"))) }));
+  router.post("/approvals/:id/resolve", async c => c.json((await c.get("steward").approvals.resolve(c.req.param("id"), s.resolveApprovalSchema.parse(await c.req.json()))).approval));
+  router.get("/settings", async c => c.json(await c.get("steward").settings.get()));
+  router.patch("/settings", async c => c.json(await c.get("steward").settings.update(s.updateSettingsSchema.parse(await c.req.json()))));
+  router.get("/grants", async c => c.json({ items: await c.get("steward").grants.list() }));
+  router.post("/grants", async c => c.json(await c.get("steward").grants.create(s.createGrantSchema.parse(await c.req.json()))));
+  router.post("/grants/:id/revoke", async c => c.json(await c.get("steward").grants.revoke(c.req.param("id"))));
+  router.get("/preferences", async c => c.json({ items: await c.get("steward").preferences.list() }));
+  router.post("/preferences", async c => c.json(await c.get("steward").preferences.add(s.createPreferenceSchema.parse(await c.req.json()))));
   router.delete("/preferences/:id", async c => { await c.get("steward").preferences.delete(c.req.param("id")); return c.body(null, 204); });
-  router.get("/notifications", async c => c.json(items(s.notificationSchema).parse({ items: await c.get("steward").notifications.list() })));
-  router.post("/notifications/:id/feedback", async c => c.json(s.notificationSchema.parse(await c.get("steward").notifications.recordFeedback(c.req.param("id"), request(s.notificationFeedbackSchema).parse(await c.req.json()).feedback))));
-  router.post("/notifications/:id/retry", async c => c.json(s.notificationSchema.parse(await c.get("steward").notifications.retry(c.req.param("id")))));
-  router.get("/connections", async c => c.json(items(s.connectionSchema).parse({ items: await c.get("steward").connections.list() })));
-  router.post("/connections", async c => c.json(s.connectionSchema.parse(await c.get("steward").connections.create(request(s.createConnectionSchema).parse(await c.req.json())))));
-  router.post("/connections/:id/transition", async c => c.json(s.connectionSchema.parse(await c.get("steward").connections.transition(c.req.param("id"), request(s.connectionTransitionSchema).parse(await c.req.json())))));
-  router.post("/connections/:id/sync", async c => { const connections = c.get("steward").connections; await connections.syncConnection(c.req.param("id")); return c.json(s.connectionSchema.parse((await connections.detail(c.req.param("id"))).connection)); });
+  router.get("/notifications", async c => c.json({ items: await c.get("steward").notifications.list() }));
+  router.post("/notifications/:id/feedback", async c => c.json(await c.get("steward").notifications.recordFeedback(c.req.param("id"), z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict().parse(await c.req.json()).feedback)));
+  router.post("/notifications/:id/retry", async c => c.json(await c.get("steward").notifications.retry(c.req.param("id"))));
   return router;
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createServerApp as createApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
-const createServerApp = () => createApp({ steward: createStewardRuntime(db, { agent: null }) });
+const createServerApp = () => createApp({ steward: createStewardRuntime(db, { provider: null, chatTransport: null }) });
 import { resetEnvCacheForTests } from "./config/env";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
@@ -24,7 +24,7 @@ test("health and database readiness do not require an execution engine", async (
   const app = await createServerApp();
   const health = await app.request("/health");
   expect(health.status).toBe(200);
-  expect((await health.json()).agent).toEqual({ available: false, name: "none", lastError: "Agent 未启用" });
+  expect((await health.json()).provider).toEqual({ available: false, name: "unconfigured", sandboxed: false });
   expect(await (await app.request("/ready")).json()).toEqual({ status: "ready" });
 });
 
@@ -41,13 +41,13 @@ test("origin policy and body limit apply to steward routes", async () => {
   const app = await createServerApp();
   expect((await app.request("/api/steward/works", { method: "OPTIONS", headers: { origin: "https://untrusted.example" } })).status).toBe(403);
   expect((await app.request("/api/steward/works", { method: "OPTIONS", headers: { origin: "https://trusted.example" } })).status).toBe(204);
-  expect((await app.request("/api/steward/works", { method: "POST", headers: owner, body: "x".repeat(1_048_577) })).status).toBe(413);
+  expect((await app.request("/api/steward/works", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
 });
 
 test("only exact capability endpoints bypass owner auth, retaining their own proxy guard", async () => {
   const app = await createServerApp();
   const headers = { authorization: "Bearer invalid-capability", "x-forwarded-for": "203.0.113.1" };
-  for (const [path, method] of [["catalog", "GET"], ["tools/chrona_get_context", "POST"], ["web/preflight", "POST"], ["web/observed", "POST"]]) {
+  for (const [path, method] of [["catalog", "GET"], ["tools/chrona_reply", "POST"]]) {
     expect((await app.request(`/api/steward-agent/${path}`, { method, headers })).status).toBe(403);
   }
   expect((await app.request("/api/steward-agent/catalog/extra", { headers })).status).toBe(401);

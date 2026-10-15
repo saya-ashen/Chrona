@@ -186,6 +186,16 @@ export function createWorkspaceFs(dataDir: string) {
         return result.sort((a, b) => a.path.localeCompare(b.path));
       }),
       read: (path: string) => run(dir => readFile(dir, path)),
+      /** Raw download uses the same confinement and no-follow boundary as text reads. */
+      raw: (path: string) => run(async dir => {
+        const target = await confined(dir, path);
+        const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+        try {
+          const info = await handle.stat();
+          if (!info.isFile() || info.nlink !== 1) throw new StewardError("forbidden", "Unsafe file path");
+          return new Uint8Array(await handle.readFile());
+        } finally { await handle.close(); }
+      }),
       save: (path: string, content: string, baseRevision: string | null, author: FileAuthor = "user") => run(async dir => {
         await confined(dir, path); await checkBase(dir, path, baseRevision);
         await writeFile(dir, path, content); await commit(dir, author, `Edit ${path}`, [path]);
