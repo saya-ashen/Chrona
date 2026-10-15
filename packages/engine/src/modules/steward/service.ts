@@ -1,55 +1,40 @@
 import type { PrismaClient } from "@chrona/db";
-import type { SourceAdapter, Assessor, DeliveryAdapter, Health, EntryActor } from "@chrona/contracts/steward";
+import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
 import { createAffairs } from "./affairs";
-import { createAsks } from "./asks";
+import { createApprovals } from "./approvals";
 import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
 import { createSettings } from "./settings";
-import { createChatLog } from "./chat-log";
-import { createToday } from "./today";
 import { createNotifications } from "./notify";
-import { createConnections } from "./sources";
-import { createTick } from "./tick";
-import { createRuns } from "./runs";
-import { createAgentTools } from "./agent-tools";
-import { createConcierge } from "./concierge";
-import { createManagedTools } from "./managed-tools";
-export type StewardActor = EntryActor;
+import { createToday } from "./today";
+import { createWorkspaceFs } from "./workspace-fs";
 export type StewardPorts = {
-  db: PrismaClient; now(): Date; publicUrl: string | null;
-  sources: SourceAdapter[]; assessor: Assessor; deliveries: DeliveryAdapter[];
+  db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
+  deliveries: DeliveryAdapter[];
   chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
-  agentHealth(): Health["agent"];
-  sandbox?: {
-    health: Health["sandbox"];
-    run(input: { language: "python" | "shell" | "typescript"; source: string; input: unknown }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null }>;
-  };
-  agent: {
-    runAffair(input: { runId: string; token: string; affairId: string; deadline: Date }): Promise<void>;
-    runConcierge(input: { runId: string; token: string; deadline: Date }): Promise<void>;
-  } | null;
+  provider?: ProviderAdapter;
+  connectors?: ConnectorAdapter[];
+  sandbox?: { available: boolean };
+  gitHealth?: () => Promise<boolean>;
 };
-/** Trusted application boundary: routes authenticate the owner before selecting a workspace. */
+/** Authenticated owner boundary. V3 will compose schedules/runs/chat/tools here;
+ * no execution endpoints are advertised until those modules exist. */
 export function createStewardService(ports: StewardPorts) {
-  const concierge = createConcierge(ports), tools = createAgentTools(ports), runs = createRuns(ports);
-  const agentEndpoint = {
-    async catalog(token: string) {
-      if (concierge.owns(token)) return concierge.catalog(token);
-      await runs.authenticate(token); return tools.catalog();
-    },
-    callTool: (token: string, name: string, raw: unknown) => concierge.owns(token) ? concierge.conciergeCallTool(token, name, raw) : tools.callTool(token, name, raw),
-    webPreflight: (token: string, raw: unknown) => concierge.owns(token) ? concierge.webPreflight(token, raw) : tools.webPreflight(token, raw),
-    webObserved: (token: string, raw: unknown) => concierge.owns(token) ? concierge.webObserved(token, raw) : tools.webObserved(token, raw),
-  };
-  return { chat: concierge, agentEndpoint, runs, agentTools: () => tools, tick: createTick(ports), forWorkspace(workspaceId: string) {
-    const ctx = { db: ports.db, workspaceId, now: ports.now }, projection = createToday(ctx, ports.agentHealth, () => ports.sandbox?.health ?? { available: false, languages: [] });
-    async function health() {
-      const value = await projection.health();
-      const state = await ports.db.stewardState.findUnique({ where: { workspaceId } });
-      if (state?.agentLastError === "Assessor unavailable") value.agent = { available: false, name: state.agentName, lastError: state.agentLastError };
-      return value;
-    }
-    return { chat: { handleMessage: (input: Omit<Parameters<typeof concierge.handleMessage>[0], "workspaceId">) => concierge.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => concierge.messages(workspaceId, limit) }, affairs: createAffairs(ctx), tools: createManagedTools(ctx), asks: createAsks(ctx), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), chatLog: createChatLog(ctx), notifications: createNotifications(ports, workspaceId), connections: createConnections(ports, workspaceId), today: async () => ({ ...await projection.get(), health: await health() }), health };
+  const fs = createWorkspaceFs(ports.dataDir);
+  return { forWorkspace(workspaceId: string) {
+    const ctx = { db: ports.db, workspaceId, now: ports.now };
+    const projection = createToday(ctx, fs, {
+      async provider() {
+        if (!ports.provider) return { name: "unconfigured", available: false, sandboxed: false, lastError: null };
+        try { const h = await ports.provider.health(); return { name: ports.provider.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
+        catch { return { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
+      },
+      git: ports.gitHealth ?? (async () => {
+        try { return await Bun.spawn(["git", "--version"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).exited === 0; } catch { return false; }
+      }),
+      jobsSandbox: () => ports.sandbox?.available ?? false,
+    });
+    return { affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

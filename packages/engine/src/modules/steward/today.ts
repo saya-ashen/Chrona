@@ -1,19 +1,60 @@
-import { todayViewSchema, healthSchema, type Health, type Upcoming } from "@chrona/contracts/steward";
+import { affairPathSchema, type Health, type TodayView } from "@chrona/contracts/steward";
+import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { RecordContext } from "./affairs";
-import * as view from "./store";
-export function createToday({ db, workspaceId, now }: RecordContext, agentHealth: () => Health["agent"], sandboxHealth: () => Health["sandbox"] = () => ({ available: false, languages: [] })) {
-  async function health() {
-    const affairs = await db.affair.findMany({ where: { workspaceId }, select: { agentState: true } });
-    return healthSchema.parse({ sandbox: sandboxHealth(), agent: agentHealth(), queuedAffairs: affairs.filter(a => a.agentState === "queued").length, runningAffairs: affairs.filter(a => a.agentState === "running").length, failedAffairs: affairs.filter(a => a.agentState === "failed").length, pendingEvents: await db.inboundEvent.count({ where: { workspaceId, status: "pending" } }), failingConnections: await db.sourceConnection.count({ where: { workspaceId, status: "failing" } }), queuedNotifications: await db.notification.count({ where: { workspaceId, status: "queued" } }), failedNotifications: await db.notification.count({ where: { workspaceId, status: "failed" } }), lastTickAt: (await db.stewardState.findUnique({ where: { workspaceId } }))?.lastTickAt?.toISOString() ?? null });
+import { notificationSettings } from "./settings";
+import { toApproval, toRun, toSchedule } from "./store";
+import type { WorkspaceFs } from "./workspace-fs";
+export type HealthPorts = { provider(): Promise<Health["provider"]>; git(): Promise<boolean>; jobsSandbox(): boolean };
+export function createToday({ db, workspaceId, now }: RecordContext, fs: WorkspaceFs, ports: HealthPorts) {
+  async function health(): Promise<Health> {
+    const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
+    const [provider, git, runs, dueSchedules, failingConnectors, queuedNotifications, failedNotifications, state] = await Promise.all([
+      ports.provider(), ports.git(), db.run.findMany({ where: { workspaceId, OR: [{ status: { in: ["queued", "running"] } }, { createdAt: { gte: new Date(at.getTime() - 48 * 3600000) } }] } }),
+      db.schedule.count({ where: { workspaceId, status: "active", nextAt: { lte: at }, affair: { status: "active" } } }),
+      db.connector.count({ where: { workspaceId, status: { in: ["failing", "needs_authorization"] } } }),
+      db.notification.count({ where: { workspaceId, status: "queued" } }), db.notification.count({ where: { workspaceId, status: { in: ["failed", "uncertain"] } } }),
+      db.stewardState.findUnique({ where: { workspaceId } }),
+    ]);
+    const day = localDayKey(at, settings.timezone);
+    return { provider, git, jobsSandbox: ports.jobsSandbox(), queuedRuns: runs.filter(r => r.status === "queued").length, runningRuns: runs.filter(r => r.status === "running").length,
+      failedRunsToday: runs.filter(r => ["failed", "timed_out", "provider_unavailable"].includes(r.status) && localDayKey(r.endedAt ?? r.createdAt, settings.timezone) === day).length,
+      dueSchedules, failingConnectors, queuedNotifications, failedNotifications, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
   }
-  return { health, get: async () => {
-    const at = now(), affairs = await db.affair.findMany({ where: { workspaceId }, include: { results: { orderBy: { version: "desc" }, take: 1 } } });
-    const asks = (await db.ask.findMany({ where: { workspaceId, status: "open" }, include: { affair: true }, orderBy: { createdAt: "asc" } })).map(view.toAsk);
-    const changes = (await db.affairEntry.findMany({ where: { workspaceId, kind: "change", at: { gte: new Date(at.getTime() - 48 * 3600000), lte: at } }, include: { affair: true }, orderBy: { at: "desc" } })).filter(r => r.data && typeof r.data === "object" && !Array.isArray(r.data) && r.data.important === true).map(r => ({ ...view.toEntry(r), affairTitle: r.affair.title }));
-    const results = affairs.flatMap(a => a.results.filter(r => r.createdAt.getTime() >= at.getTime() - 3 * 86400000 && r.createdAt <= at).map(r => ({ id: r.id, affairId: a.id, affairTitle: a.title, version: r.version, title: r.title, summary: r.summary, createdAt: r.createdAt.toISOString() }))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const upcoming: Upcoming[] = (await db.followUp.findMany({ where: { workspaceId, status: "pending", dueAt: { gte: at, lte: new Date(at.getTime() + 7 * 86400000) }, affair: { status: { in: ["active", "watching"] } } }, include: { affair: true } })).map(f => ({ kind: "follow_up", affairId: f.affairId, affairTitle: f.affair.title, note: f.note, at: f.dueAt.toISOString() }));
-    for (const a of affairs) if (a.status === "watching" && a.nextCheckAt && a.nextCheckAt >= at && a.nextCheckAt.getTime() <= at.getTime() + 86400000) upcoming.push({ kind: "care_check", affairId: a.id, affairTitle: a.title, note: a.nextStep, at: a.nextCheckAt.toISOString() });
-    upcoming.sort((a, b) => a.at.localeCompare(b.at));
-    return todayViewSchema.parse({ generatedAt: at.toISOString(), counts: { active: affairs.filter(a => a.status === "active").length, watching: affairs.filter(a => a.status === "watching").length, waiting: new Set(asks.filter(a => a.kind !== "suggestion" && a.affairId).map(a => a.affairId)).size, newResults: results.length }, decisions: asks.filter(a => a.kind !== "suggestion"), changes, results, upcoming, suggestions: asks.filter(a => a.kind === "suggestion"), health: await health() });
-  } };
+  async function get(): Promise<TodayView> {
+    const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings), day = localDayKey(at, settings.timezone);
+    const [approvals, schedules, edits, affairs, running, status] = await Promise.all([
+      db.approval.findMany({ where: { workspaceId, status: "open" }, include: { affair: true }, orderBy: { createdAt: "asc" } }),
+      db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + 26 * 3600000) }, affair: { status: "active" } }, include: { affair: true }, orderBy: { nextAt: "asc" } }),
+      db.activity.findMany({ where: { workspaceId, kind: "edit" }, include: { affair: true }, orderBy: { at: "desc" }, take: 100 }),
+      db.affair.findMany({ where: { workspaceId, status: "active" }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }] }),
+      db.run.findMany({ where: { workspaceId, status: "running" }, orderBy: { createdAt: "asc" } }), health(),
+    ]);
+    const changes: TodayView["changes"] = [];
+    const seen = new Set<string>();
+    for (const edit of edits) {
+      if (edit.actor !== "user" && edit.actor !== "chrona") continue;
+      const data = edit.data as { paths?: unknown } | null;
+      if (!Array.isArray(data?.paths)) continue;
+      for (const value of data.paths) {
+        const path = affairPathSchema.safeParse(value);
+        if (!path.success || seen.has(`${edit.affairId}:${path.data}`)) continue;
+        seen.add(`${edit.affairId}:${path.data}`);
+        changes.push({ affairId: edit.affairId, affairTitle: edit.affair.title, path: path.data, message: edit.text.slice(0, 500), at: edit.at.toISOString(), author: edit.actor });
+      }
+    }
+    let todayPage: TodayView["todayPage"] = null;
+    for (const affair of affairs) {
+      try {
+        const directory = fs.forAffair(affair.dirName), path = affairPathSchema.safeParse((await directory.read(".chrona/today")).content.trim());
+        if (!path.success) continue;
+        await directory.read(path.data); // Pointer must resolve through the confined filesystem.
+        todayPage = { affairId: affair.id, path: path.data }; break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as { code?: string }).code === "invalid" || (error as { code?: string }).code === "forbidden") continue;
+        throw error;
+      }
+    }
+    return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), agenda: schedules.filter(s => localDayKey(s.nextAt!, settings.timezone) === day && (!s.until || s.nextAt! <= s.until)).map(s => ({ ...toSchedule(s), affairTitle: s.affair.title })), changes: changes.slice(0, 100), todayPage, running: running.map(toRun), health: status };
+  }
+  return { get, health };
 }

@@ -1,14 +1,9 @@
 export { createStewardService } from "./service";
-export type { StewardPorts, StewardActor, StewardService } from "./service";
+export type { StewardPorts, StewardService } from "./service";
 export { StewardError } from "./errors";
 export type { StewardErrorCode } from "./errors";
-export { queueAffair } from "./affairs";
-export { consumeOnce } from "./grants";
+export { createWorkspaceFs } from "./workspace-fs";
+export type { WorkspaceFs, AffairFs } from "./workspace-fs";
+export { consumeOnce, effectivePolicyIn } from "./grants";
 export { createNotifications, enqueueNotification } from "./notify";
 export type { NotificationInput, NotificationContext } from "./notify";
-export { createConnections } from "./sources";
-export { createTick } from "./tick";
-export { createRuns } from "./runs";
-export { createAgentTools } from "./agent-tools";
-export type { AgentToolReply } from "./agent-tools";
-export { isPublicWebUrl, publicWebInput } from "./web-url";
