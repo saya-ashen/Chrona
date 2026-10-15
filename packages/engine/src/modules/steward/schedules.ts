@@ -20,6 +20,8 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     if (input.mode === "job" && !input.command?.trim()) throw new StewardError("invalid", "Job requires a command");
     if (input.mode !== "job" && input.command !== undefined) throw new StewardError("invalid", "Only jobs accept commands");
     let nextAt = nextOccurrence(input.rule, now, await timezone());
+    // "Do it now" one-shots arrive with a time that is already past by the time they are stored: fire on the next tick.
+    if (!nextAt && input.rule.kind === "at") nextAt = now;
     const until = input.until ? new Date(input.until) : null;
     if (until && nextAt && nextAt > until) nextAt = null;
     return db.$transaction(async tx => {

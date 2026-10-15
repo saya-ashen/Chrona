@@ -149,3 +149,14 @@ test("tick launches both lanes without awaiting long background; session persist
   expect(await db.run.count({ where: { status: "running" } })).toBe(0);
   expect((await db.affair.findUniqueOrThrow({ where: { id: a.id } })).sessionId).toBe("saved");
 });
+
+test("a one-shot wake whose time already passed fires on the next tick instead of being dropped", async () => {
+  const a = await affair();
+  const s = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "at", at: new Date(time.getTime() - 5000).toISOString() }, text: "Prepare materials now" }, "chrona");
+  expect(s.status).toBe("active");
+  expect(s.nextAt).toBe(time.toISOString());
+  await api.schedules.fireDue(time);
+  const runs = await db.run.findMany({ where: { workspaceId, lane: "background" } });
+  expect(runs).toHaveLength(1);
+  expect(runs[0]!.prompt).toContain("Prepare materials now");
+});
