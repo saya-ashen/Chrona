@@ -5,6 +5,7 @@
 「执行者无关的工作与成果」降为成果层的设计依据；
 [proactive-personal-assistant-plan](../en/proactive-personal-assistant-plan.md)
 中的阶段顺序、兼容性优先、禁止大改条款不再适用，其安全要求继续有效。
+产品目标以 [steward-goals](steward-goals.md)（2026-10-15 定稿）为最高依据，本文记录实现与现状。
 
 ## 定位
 
@@ -136,12 +137,13 @@ Reddit/QQ。Reddit 收件箱只实现只读适配边界；未获账号授权时�
 - `pi-assessor-v1`：`CHRONA_STEWARD_ASSESSOR=pi` 时，每个待评估事件调用一次主机既有 `pi -p`（禁用工具、会话、扩展、技能、上下文文件），只传有界上下文，并声明其为不可信数据。输出经服务端 schema 严格校验；未知动作即无效，affair 猜测不在候选中则置空。Pi 只有评估权：权限仍由确定性判定决定，`reply_external` 等试点动作恒拒。进程失败/超时 → 事件保持 pending、健康页显示不可用；输出无效 → 计一次失败，五次后进入故障待处理。
 - 唯一调度权威仍是 Chrona 的 steward tick；Pi 不重试、不调度、不执行动作。tick 只把数据库阶段放进服务的串行队列，模型调用期间释放队列，因此慢模型不会阻塞今日页等请求。
 - 默认（未设置环境变量）仍是确定性的 `rule-assessor-v1`，界面标注为「规则评估（非 AI）」。
+- **通用事务 Agent**（2026-10-14 晚）：`/chrona <任何需求>` 或网页「交给管家」成为一件工作（`StewardWork`），`CHRONA_STEWARD_AGENT=pi` 时由真实 Pi 通过 Chrona 受限工具多步处理（检索、进展、澄清、发布成果、提议跟进/持续委托、建议、脚本/面板草稿、请求授权）。Chrona 持有状态、租约、预算与权限。见 [steward-agent-work](steward-agent-work.md)。
 - 已部署到 Chino 生产（`https://chrona.saya.love`），备份、恢复演练、迁移演练与上线验收见部署回执 `/var/lib/chrona-pi/deployment/20261014-steward/receipt.json`。
 
 ### 未实现或被阻塞
 
 - Reddit 真实读取：阻塞于**明确账号授权**，连接显示 `needs_authorization`；没有接入私人账号、没有 live verification。
-- 真实外部通知通道未实现；非测试通道只有 `in_app`（QQ 等外发未授权）。日常聊天接入不是本 steward 已实现能力。
+- 聊天闭环（QQ 私聊交代委托、回复码确认/暂停、`hermes_qqbot` 投递）已实现并部署，见 [steward-chat-loop](steward-chat-loop.md)；仅限服务端白名单中的一个私聊，真实聊天轮次的端到端仍需用户在 QQ 中亲自完成。其他外部通道未实现。
 - 旧托管 workflow（Plan/Run/编排）尚未在代码中退役，仍在「旧版工作台」二级导航下运行；只完成了旧运行包与旧启动入口的停用归档。
 - 共享契约中的 membership 注释并非实际多用户权限：路由是单一本地 owner + workspace 数据范围。
 - 工具是声明式规则/表格，不是任意脚本执行环境。Today 的「已完成成果」只读列出已有成果版本，发布不等于验收。
@@ -165,7 +167,9 @@ bun run dev:web      # 只启动 Vite
 | `CHRONA_STEWARD_TICK_SECONDS` | 默认 60 秒；非正数或非有限数禁用自动 tick |
 | `CHRONA_STEWARD_ASSESSOR` | `pi` 使用主机 Pi 模型；其他值或未设置使用规则评估器 |
 | `CHRONA_STEWARD_PI_COMMAND` / `CHRONA_STEWARD_PI_MODEL` | 可选：Pi 可执行文件与模型；默认 `pi` 与 Pi 已配置的默认模型 |
+| `CHRONA_STEWARD_AGENT` / `CHRONA_STEWARD_PI_WEB_EXTENSION` / `CHRONA_STEWARD_PI_AGENT_EXTENSION` / `CHRONA_STEWARD_AGENT_POLL_SECONDS` | `pi` 启用事务 Agent 运行循环（每服务同时 1 个 Pi 进程）；可选宿主 pi-web-access 扩展路径（未设置则无检索工具）；Chrona 工具扩展路径（默认随包资源）；轮询间隔（默认 15 秒） |
 | `CHRONA_STEWARD_CHINO_DASHBOARD_URL` | 仅 Chino 宿主配置；回环 HTTP，未配置时该来源为 unsupported |
+| `CHRONA_STEWARD_CHAT_RECIPIENTS` / `CHRONA_PUBLIC_URL` / `CHRONA_STEWARD_HERMES_COMMAND` | 聊天闭环：允许的 `qqbot:<openid>`、通知中的详情链接源、`hermes` 路径；见 [steward-chat-loop](steward-chat-loop.md) |
 | `CHRONA_E2E_TEST_ROUTES` | 仅隔离测试设置 `1`/`true`；启用 `/api/test/steward/*` 和 `local_test` 投递，正常开发/生产勿开 |
 | `NODE_ENV=test` / `BUN_ENV=test` | 不自动启动 steward 定时器；测试显式 tick |
 | `CHRONA_WEB_PORT` / `CHRONA_SERVER_WATCH=false` | 开发脚本的 Vite 端口 / 禁用 server watch |

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./db": "./src/db.ts",
+    "./transaction-context": "./src/transaction-context.ts",
     "./generated/prisma/client": "./src/generated/prisma/client.ts",
     "./sqlite-url": "./src/sqlite-url.ts",
     "./sqlite-migrations": "./src/sqlite-migrations.ts",

@@ -4,7 +4,7 @@ import { delegationView, type Context } from "./mappers";
 /** One durable outbox entry per delegation/local day; delivery retains authority. */
 export async function raiseDigests(ctx: Context) {
   const workspaceId = ctx.actor.workspaceId, now = ctx.now();
-  const rows = await ctx.db.delegation.findMany({ where: { workspaceId, status: "active" } });
+  const rows = await ctx.db.delegation.findMany({ where: { workspaceId, status: "active", work: { is: null } } });
   for (const row of rows) {
     const delegation = delegationView(row);
     if (delegation.notification.mode !== "digest" || decidePermission({ action: "notify_user", delegation, now }).outcome !== "allowed") continue;

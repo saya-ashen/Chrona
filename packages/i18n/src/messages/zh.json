@@ -1,7 +1,13 @@
 {
   "steward": {
+    "work": {
+      "title": "工作", "inProgress": "进行中的工作", "ask": "请 Chrona 帮忙", "request": "请求原话", "send": "发送", "answer": "补充回答", "feedback": "反馈", "accept": "验收成果", "result": "查看成果（发布≠验收）", "progress": "最新进展", "toolCalls": "工具调用次数", "nextRun": "下次运行", "authorizations": "单项工作授权", "authorizationHint": "这些授权仅覆盖这一项请求，不代表持续监控委托。", "standing": "持续委托", "missing": "缺少", "howToGrant": "如何授予",
+      "missingKinds": { "information": "信息", "tool": "工具", "permission": "权限" },
+      "statuses": { "received": "已收到", "running": "处理中", "waiting_input": "等你补充", "waiting_authorization": "等你授权", "result_ready": "成果已就绪", "accepted": "已验收", "failed": "失败", "cancelled": "已取消" }
+    },
+    "chat": { "replyRef": "回复码 {ref}", "replyHint": "在 QQ 中回复『确认/暂停/撤销 {ref}』", "feedback": "你的反馈", "receiptRecorded": "回执已记录", "sentNotRead": "已发送不等于已读", "uncertain": "投递结果未知：不会自动重发，请在 QQ 中确认是否收到，必要时手动重试" },
     "controls": {
-      "cancel": "取消", "retryDelivery": "重试", "channel": "投递渠道", "in_app": "站内通知", "local_test": "测试接收端", "sentMeaning": "已发送表示已投递到渠道，不代表已读。",
+      "cancel": "取消", "retryDelivery": "重试", "channel": "投递渠道", "in_app": "Chrona 内", "local_test": "测试接收端", "hermes_qqbot": "QQ 私聊（经 Hermes）", "chrona_qqbot": "QQ 私聊（Chrona 专用机器人）", "sentMeaning": "已发送表示已投递到渠道，不代表已读。",
       "stewardStatus": "管家状态", "lastTick": "最近运行", "never": "尚未运行", "assessorName": "判断器", "available": "可用", "unavailable": "不可用", "queued": "排队通知", "staleWarning": "管家最近未运行",
       "validate": "验证", "authorize": "授权", "enable": "启用", "disable": "停用", "retire": "退役", "run": "立即运行", "editHint": "验证失败。请修改规格并重新生成工具。", "authorizeHint": "你正在授权此工具可以被启用；启用且有委托覆盖之前，它仍不会运行", "version": "版本", "validation": "验证摘要", "lastRun": "最近运行", "progress": "工具进度", "matches": "匹配结果", "rows": "数据行", "matched": "匹配", "notMatched": "不匹配", "runHint": "使用此事务已关联的消息运行；委托必须允许此工具。",
       "needTool": "需要工具吗？", "name": "名称", "generate": "选择处理方式", "noTool": "不需要工具", "created": "工具已生成", "spec": "规格", "event_rule": "事件规则", "table_panel": "表格面板", "optionalAuthor": "作者（可选）", "disposition": "匹配后的处理", "retain": "保留", "digest": "汇总", "await_decision": "等待决定", "note": "备注", "samples": "测试样例", "sampleTitle": "样例标题", "sampleBody": "样例正文", "sampleAuthor": "样例作者", "expectMatch": "预期匹配", "addSample": "添加样例", "removeSample": "移除样例", "sampleHint": "至少包含一个匹配和一个不匹配的样例。", "invalidSpec": "请提供关键词、备注及匹配和不匹配的样例，或至少选择一个面板列。", "columns": "列", "source": "数据来源", "affair_events": "事务消息", "affair_attention": "事务待处理事项", "columnLabels": { "title": "标题", "author": "作者", "occurredAt": "发生时间", "status": "状态", "note": "备注" },

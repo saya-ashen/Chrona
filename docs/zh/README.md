@@ -25,6 +25,7 @@ Chrona 是主动个人管家：今日 / 事务 / 日程 / 委托 / 连接与权�
 | 目标 | 文档 |
 | --- | --- |
 | 安装并运行 Chrona | [快速开始](./quick-start.md) |
+| 查看产品设计目标（最高依据） | [设计目标](./steward-goals.md) |
 | 查看当前产品方向 | [个人管家](./personal-steward.md) |
 | 优化任务工作区交互链路 | [任务工作区交互优化方案](./task-workspace-interaction-improvements.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./goal-workbench-product-design.md) |

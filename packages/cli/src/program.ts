@@ -164,7 +164,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .requiredOption("--name <name>", "Agent/client label")
     .requiredOption("--public-url <origin>", "Trusted HTTPS Chrona origin, or localhost HTTP")
     .requiredOption("--timezone <zone>", "IANA timezone, e.g. Asia/Shanghai")
-    .requiredOption("--access <preset>", "Explicit preset: steward, steward-assessor, read, full, assistant-read, assistant, assistant-edit, results-read, results-submit, results-review, results-files-read, results-files-submit, results-files-review, work-read, work-record, pages-read, pages-author, library-read, library-organize or library-configure; submission/recording never grants review or execution authority")
+    .requiredOption("--access <preset>", "Explicit preset: steward, steward-assessor, steward-chat, read, full, assistant-read, assistant, assistant-edit, results-read, results-submit, results-review, results-files-read, results-files-submit, results-files-review, work-read, work-record, pages-read, pages-author, library-read, library-organize or library-configure; submission/recording never grants review or execution authority")
     .requiredOption("--token-file <path>", "New private file; token is never printed")
     .action(async (input: { name: string; publicUrl: string; timezone: string; access: string; tokenFile: string }) => {
       const { enrollLocalManagementClient } = await import("./management");
@@ -179,6 +179,20 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     await revokeLocalManagementClient(clientId);
     console.log("Management client revoked.");
   });
+
+  const qq = program.command("qq").description("Chrona's own QQ bot (local administration; reads CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR or CHRONA_DATA_DIR)");
+  qq.command("bind-code")
+    .description("Create a one-time owner binding code (shown once; only its hash is stored)")
+    .requiredOption("--workspace <id>", "Workspace the bound QQ owner acts in")
+    .option("--ttl <minutes>", "Validity in minutes (1-60)", "10")
+    .option("--replace", "Allow replacing an existing owner binding")
+    .action(async (input: { workspace: string; ttl: string; replace?: boolean }) => {
+      const { createQqBotState, qqBotConfig } = await import("@chrona/integrations/steward");
+      const config = qqBotConfig();
+      if (!config) throw new ConfigError("CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR (or CHRONA_DATA_DIR) are required");
+      const challenge = await createQqBotState(config.stateDir, config.appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) });
+      console.log(JSON.stringify({ appId: config.appId, ...challenge }));
+    });
 
   const hermes = program
     .command("hermes")

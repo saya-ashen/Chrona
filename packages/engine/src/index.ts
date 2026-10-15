@@ -1,5 +1,5 @@
 export { createChronaEngine } from "./engine";
-export { createStewardService, StewardError } from "./modules/steward";
+export { createStewardChat, createStewardService, createStewardWork, moveChatDestination, serializeSteward, StewardError } from "./modules/steward";
 export type { StewardPorts, StewardActor, StewardService } from "./modules/steward";
 export { createWorkRecordsService } from "./modules/work-records/service";
 export { createLocalWorkRecordsService } from "./modules/work-records/local-owner";

@@ -7,5 +7,5 @@ export function publishedResult(): ResultSummary {
   return { id: "version-1", taskId: "task-1", taskTitle: "Research task", title: "Published report", version: 2, reviewState: "unreviewed", publishedAt: timestamp, href: "/tasks/task-1/results" };
 }
 export function decisionItem(): AttentionItem {
-  return { id: "attention-1", kind: "decision", status: "open", affairId: null, affairTitle: null, eventId: null, delegationId: null, title: "Confirm follow-up", whatHappened: "A deadline moved", whyItMatters: "Your response is due sooner", nextStep: "Approve the follow-up", evidence: [{ label: "Source message", excerpt: "Please reply tomorrow", url: "https://example.com/evidence" }], dueAt: null, snoozedUntil: null, decision: null, decidedAt: null, createdAt: timestamp, updatedAt: timestamp };
+  return { id: "attention-1", kind: "decision", status: "open", affairId: null, affairTitle: null, eventId: null, delegationId: null, title: "Confirm follow-up", whatHappened: "A deadline moved", whyItMatters: "Your response is due sooner", nextStep: "Approve the follow-up", evidence: [{ label: "Source message", excerpt: "Please reply tomorrow", url: "https://example.com/evidence" }], dueAt: null, snoozedUntil: null, decision: null, decidedAt: null, replyRef: null, userNote: null, createdAt: timestamp, updatedAt: timestamp };
 }

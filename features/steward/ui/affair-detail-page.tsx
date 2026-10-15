@@ -9,6 +9,7 @@ import { affairStatusOptions, deriveAffair, isNotFound } from "../model/affairs"
 import { evidenceHref } from "../model/today";
 import { AttentionCard } from "./today-page";
 import { ToolGenerator } from "./tool-generator";
+import { WorkSection } from "./work-section";
 import { ToolRow } from "./tool-row";
 import { canFinishFollowUp } from "../model/controls";
 import { StewardMutationNotice } from "./steward-mutation-notice";
@@ -44,6 +45,7 @@ export function AffairDetailPage({ workspaceId, affairId }: { workspaceId: strin
           </SelectContent>
         </Select>
       </header>
+      <WorkSection works={detail.works} client={client} refresh={resource.refresh} />
       <AffairContext affair={detail.affair} />
       <AffairSection title={c.needsYou} empty={view.attention.length === 0}>{view.attention.map(item => <AttentionCard key={item.id} item={item} mutation={attentionMutation} />)}</AffairSection>
       {view.showSuggestions && <AffairSection title={c.possiblyRelated}>

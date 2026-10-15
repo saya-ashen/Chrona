@@ -5,7 +5,9 @@ import { Alert, AlertTitle, AlertDescription } from "@shared/ui";
 import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { attentionDecisions, deriveToday, evidenceHref } from "../model/today";
 
+import { replyText } from "../model/chat";
 import { LocalizedLink } from "./localized-link";
+import { TodayWork } from "./today-work";
 import { StewardStatus } from "./steward-status";
 
 export function TodayPage({ workspaceId }: { workspaceId: string }) {
@@ -16,6 +18,7 @@ export function TodayPage({ workspaceId }: { workspaceId: string }) {
   const view = resource.data ? deriveToday(resource.data) : null;
   return <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 p-4 [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
     <h1 className="text-2xl font-semibold">{copy.today}</h1>
+    <TodayWork client={client} />
     <StewardStatus health={resource.data?.health} />
     {resource.loading && <p role="status">{copy.loading}</p>}
     {resource.error && <Alert variant="destructive"><AlertTitle>{copy.error}</AlertTitle><AlertDescription><Button onClick={resource.refresh}>{copy.retry}</Button></AlertDescription></Alert>}
@@ -42,8 +45,9 @@ export function TodayPage({ workspaceId }: { workspaceId: string }) {
 export function AttentionCard({ item, mutation }: { item: AttentionItem; mutation: ReturnType<typeof useAttentionDecision> }) {
   const { messages } = useI18n(), copy = messages.steward;
   return <Card className="min-w-0">
-    <CardHeader><CardTitle><h3>{item.title}</h3></CardTitle><div>{copy.status}: <Badge variant="outline">{copy.statuses[item.status]}</Badge></div></CardHeader>
+    <CardHeader><CardTitle><h3>{item.title}</h3></CardTitle><div className="flex min-w-0 flex-wrap items-center gap-2">{copy.status}: <Badge variant="outline">{copy.statuses[item.status]}</Badge>{item.replyRef && <Badge variant="outline" className="max-w-full whitespace-normal font-mono">{replyText(copy.chat.replyRef, item.replyRef)}</Badge>}</div></CardHeader>
     <CardContent className="space-y-4">
+      {item.userNote && <div><h4 className="font-medium">{copy.chat.feedback}</h4><p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{item.userNote}</p></div>}
       <dl className="space-y-3">
         <div><dt className="font-medium">{copy.what}</dt><dd className="whitespace-pre-wrap">{item.whatHappened}</dd></div>
         <div><dt className="font-medium">{copy.why}</dt><dd className="whitespace-pre-wrap">{item.whyItMatters || copy.notProvided}</dd></div>

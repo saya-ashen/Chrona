@@ -28,7 +28,7 @@ export async function tick(ctx: Context, serialize: Serialize = step => step()) 
 async function syncDueConnections(ctx: Context) {
   const workspaceId = ctx.actor.workspaceId;
   const now = ctx.now();
-  const delegations = (await ctx.db.delegation.findMany({ where: { workspaceId, status: "active" } })).map(delegationView)
+  const delegations = (await ctx.db.delegation.findMany({ where: { workspaceId, status: "active", work: { is: null } } })).map(delegationView)
     .filter(delegation => decidePermission({ action: "read_source", delegation, now }).outcome === "allowed");
   const connections = await ctx.db.sourceConnection.findMany({ where: {
     workspaceId, status: { in: ["active", "failing"] }, mode: "poll",
@@ -76,7 +76,7 @@ async function afterAssessment(ctx: Context, done: { synced: number; syncFailed:
   try { suggested = (await raiseSuggestions(ctx)).raised; }
   catch { suggestionFailed++; }
   await raiseDigests(ctx);
-  const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now }).deliverDue();
+  const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, allowedRecipients: new Set(ctx.chatRecipients ?? []), now: ctx.now }).deliverDue();
   const lastTickAt = ctx.now();
   await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name, assessorAvailable: true }, update: { lastTickAt } });
   return { ...done, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };

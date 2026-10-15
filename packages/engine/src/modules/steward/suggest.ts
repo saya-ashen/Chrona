@@ -11,7 +11,7 @@ export async function raiseSuggestions(ctx: Context) {
     ctx.db.attentionItem.findMany({ where: { workspaceId } }),
     ctx.db.followUp.findMany({ where: { workspaceId } }),
     ctx.db.inboundEvent.findMany({ where: { workspaceId, status: "assessed", occurredAt: { gte: new Date(now.getTime() - 30 * 86400_000), lte: now } }, include: { assessments: { where: { workspaceId }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: 1 } } }),
-    ctx.db.delegation.findMany({ where: { workspaceId, status: "active", OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
+    ctx.db.delegation.findMany({ where: { workspaceId, status: "active", work: { is: null }, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } }),
     ctx.db.managedTool.findMany({ where: { workspaceId } }),
   ]);
   const affairViews = affairs.map(a => affairView(a));

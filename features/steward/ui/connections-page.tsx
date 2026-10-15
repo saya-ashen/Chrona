@@ -6,6 +6,7 @@ import { useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
 import { canAcknowledge, canSync, connectionTransitions, connectionWarning } from "../model/management";
 
+import { channelLabel, maskRecipient } from "../model/chat";
 import { canRetryNotification } from "../model/controls";
 import { StewardMutationNotice } from "./steward-mutation-notice";
 
@@ -93,8 +94,10 @@ export function ConnectionsPage({ workspaceId }: { workspaceId: string }) {
       <ul className="space-y-3">{notifications.data?.items.map(item => <li key={item.id}>
         <Card><CardContent className="space-y-2 pt-4">
           <h3>{item.title}</h3><Badge variant="outline">{c.notificationStatuses[item.status]}</Badge>
-          <p>{c.controls.channel}: {item.channel === "in_app" || item.channel === "local_test"
-            ? c.controls[item.channel] : item.channel}</p>
+          <div className="flex min-w-0 flex-wrap gap-2"><p>{c.controls.channel}: {channelLabel(item.channel, c.controls)}</p><span>{maskRecipient(item.recipient)}</span></div>
+          {item.status === "uncertain" && <p>{c.chat.uncertain}</p>}
+          {item.status === "sent" && <p>{c.chat.sentNotRead}</p>}
+          {item.receiptRef && <p>{c.chat.receiptRecorded}</p>}
           <p className="whitespace-pre-wrap">{item.body}</p>
           <p>{c.attempts}: {item.attempts}</p><p>{c.lastError}: {item.lastError ?? c.notProvided}</p>
           {canRetryNotification(item.status) && <Button disabled={disabled}

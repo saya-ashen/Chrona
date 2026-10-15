@@ -373,6 +373,7 @@ model Affair {
   attentionItems AttentionItem[]
   followUps FollowUp[]
   tools ManagedTool[]
+  works StewardWork[]
   @@index([workspaceId, status, updatedAt])
   @@index([taskId])
 }
@@ -462,6 +463,7 @@ model Delegation {
   purpose String
   originalWording String @default("")
   cadenceSeconds Int?
+  replyRef String?
   allowedActions Json @default("[]")
   askFirstActions Json @default("[]")
   notification Json @default("{\"mode\":\"digest\",\"cooldownMinutes\":60,\"quietHours\":null,\"channel\":\"local_test\"}")
@@ -479,6 +481,8 @@ model Delegation {
   connection SourceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   attentionItems AttentionItem[]
   notifications StewardNotification[]
+  work StewardWork?
+  @@unique([workspaceId, replyRef])
   @@index([workspaceId, status, lastCheckAt])
   @@index([affairId])
   @@index([connectionId])
@@ -503,6 +507,9 @@ model AttentionItem {
   cooldownUntil DateTime?
   decision String?
   decidedAt DateTime?
+  replyRef String?
+  delegationRevision Int?
+  userNote String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -512,6 +519,7 @@ model AttentionItem {
   notifications StewardNotification[]
   followUps FollowUp[]
   @@unique([workspaceId, dedupeKey])
+  @@unique([workspaceId, replyRef])
   @@index([workspaceId, status, snoozedUntil])
   @@index([workspaceId, kind, dueAt])
   @@index([affairId])
@@ -526,6 +534,7 @@ model StewardNotification {
   delegationId String?
   idempotencyKey String @unique
   channel String
+  recipient String?
   status String @default("generated")
   title String
   body String
@@ -594,6 +603,57 @@ model ManagedTool {
 }
 
 // SQL guards reject updates and direct deletes; owning-workspace deletion may cascade.
+/// One requested piece of work handled by the agent. Chrona owns status, leases and budgets; see contracts WORK_*.
+model StewardWork {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String
+  delegationId String @unique
+  request String
+  status String @default("received")
+  revision Int @default(1)
+  question Json?
+  authorization Json?
+  inputs Json @default("[]")
+  progress Json @default("[]")
+  handling Json?
+  resultTaskId String?
+  resultVersionId String?
+  failures Int @default(0)
+  wakeReason String @default("new_request")
+  nextRunAt DateTime?
+  leaseUntil DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
+  delegation Delegation @relation(fields: [delegationId], references: [id], onDelete: Cascade)
+  attempts StewardWorkAttempt[]
+  @@index([workspaceId, status, nextRunAt])
+  @@index([affairId])
+}
+/// One agent run. The capability token is stored only as a SHA-256 hash and is valid while the attempt is running.
+model StewardWorkAttempt {
+  id String @id @default(uuid())
+  workspaceId String
+  workId String
+  number Int
+  status String @default("running")
+  wakeReason String
+  workRevision Int
+  tokenHash String @unique
+  toolCalls Json @default("[]")
+  webCalls Int @default(0)
+  observedSources Json @default("[]")
+  error String?
+  startedAt DateTime @default(now())
+  deadlineAt DateTime
+  endedAt DateTime?
+  work StewardWork @relation(fields: [workId], references: [id], onDelete: Cascade)
+  @@unique([workId, number])
+  @@index([workspaceId, status, deadlineAt])
+}
 model StewardAudit {
   id String @id @default(uuid())
   workspaceId String
@@ -737,6 +797,7 @@ model Workspace {
   followUps                 FollowUp[]
   managedTools              ManagedTool[]
   stewardAudits             StewardAudit[]
+  stewardWorks              StewardWork[]
   stewardState              StewardState?
   libraryState              LibraryState?
   libraryGroups             LibraryGroup[]

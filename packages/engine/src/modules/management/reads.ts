@@ -62,7 +62,7 @@ export async function readManagementContext(client: ManagementIdentity) {
     defaults: { mode: client.defaultMode, source: "explicit_client_setup", aiClientId: selected?.clientId ?? null },
     scopes: client.scopes, aiClients: clients, timing: AUTOMATION_TIMING_PRESETS,
     capabilities: {
-      steward: { available: true, contractVersion: 1, canRead: client.scopes.includes("steward:read"), canPropose: client.scopes.includes("steward:propose"), tools: ["chrona_steward_today", "chrona_steward_affair_search", "chrona_steward_affair_read", "chrona_steward_capture", "chrona_steward_delegation_propose"], granting: false, attentionApproval: false, toolAuthorization: false, connectionChanges: false, grantInstructions: "Review and grant proposals on the Delegations page in Chrona." },
+      steward: { available: true, contractVersion: 1, canRead: client.scopes.includes("steward:read"), canPropose: client.scopes.includes("steward:propose"), canChat: client.scopes.includes("steward:read") && client.scopes.includes("steward:chat"), chatTools: ["chrona_steward_chat_propose", "chrona_steward_chat_respond", "chrona_steward_chat_pending"], tools: ["chrona_steward_today", "chrona_steward_affair_search", "chrona_steward_affair_read", "chrona_steward_capture", "chrona_steward_delegation_propose"], granting: false, attentionApproval: false, toolAuthorization: false, connectionChanges: false, grantInstructions: "Review and grant proposals on the Delegations page in Chrona; chat confirm requires the user's own message quoting the ref." },
       workResults: readWorkResultCapabilities(client.scopes),
       workPages: workPageCapabilities(client.scopes),
       workRecords: workCapabilities(client.scopes),

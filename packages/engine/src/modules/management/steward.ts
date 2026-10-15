@@ -1,7 +1,7 @@
 import { notificationPolicySchema } from "@chrona/contracts/steward";
 import { db, withDatabaseTransaction } from "@/lib/db";
 import { managementStewardCaptureSchema, managementStewardDelegationSchema, managementStewardReadSchema, managementStewardSearchSchema, managementStewardTodaySchema } from "@chrona/contracts/api";
-import { captureSteward, StewardError } from "../steward";
+import { captureSteward, createStewardChat, StewardError } from "../steward";
 import { affairView, attentionView, delegationView, followUpView, toolView } from "../steward/mappers";
 import { stableJsonHash } from "../ai";
 import { refreshManagementClient, type ManagementIdentity } from "./clients";
@@ -9,7 +9,7 @@ import { requireScopes } from "./reads";
 import { ManagementError } from "./errors";
 import { commandReceipt, managementJson } from "./receipts";
 
-import { managementStewardPendingSchema, managementStewardAssessmentSchema } from "@chrona/contracts/api";
+import { managementStewardChatRequestSchema, managementStewardChatProposeSchema, managementStewardChatRespondSchema, managementStewardChatPendingSchema, managementStewardPendingSchema, managementStewardAssessmentSchema } from "@chrona/contracts/api";
 import { pendingAssessments, submitAssessment } from "../steward/external-assess";
 
 export async function callManagementAssessment(client: ManagementIdentity, name: string, raw: unknown) {
@@ -39,12 +39,38 @@ export async function callManagementAssessment(client: ManagementIdentity, name:
   }
 }
 
+async function callManagementChat(client: ManagementIdentity, name: string, raw: unknown) {
+  const scopes = ["steward:read", "steward:chat"];
+  requireScopes(client, scopes);
+  const allowedRecipients = new Set((process.env.CHRONA_STEWARD_CHAT_RECIPIENTS ?? "").split(",").map(value => value.trim()).filter(value => /^qqbot:[A-Za-z0-9_-]{1,128}$/.test(value)));
+  if (!allowedRecipients.size) throw new ManagementError("FORBIDDEN", "Chat channel is not configured");
+  const pending = name === "chrona_steward_chat_pending", propose = name === "chrona_steward_chat_propose", request = name === "chrona_steward_chat_request";
+  const input = pending ? managementStewardChatPendingSchema.parse(raw) : request ? managementStewardChatRequestSchema.parse(raw) : propose ? managementStewardChatProposeSchema.parse(raw) : managementStewardChatRespondSchema.parse(raw);
+  const service = createStewardChat({ db, workspaceId: client.workspaceId, actorKey: client.id, allowedRecipients });
+  try {
+    // Rejections must retain their privacy-safe audit, not roll back with the command.
+    await service.authorize(input.chat);
+    return await withDatabaseTransaction(async () => {
+      const authorized = await refreshManagementClient(client); requireScopes(authorized, scopes);
+      if (pending) return service.pending(input);
+      const write = request ? managementStewardChatRequestSchema.parse(raw) : propose ? managementStewardChatProposeSchema.parse(raw) : managementStewardChatRespondSchema.parse(raw), requestId = write.requestId, payloadHash = stableJsonHash(input);
+      const prior = await db.managementCommand.findUnique({ where: { clientId_toolName_requestId: { clientId: authorized.id, toolName: name, requestId } } });
+      if (prior) { if (prior.payloadHash !== payloadHash) throw new ManagementError("IDEMPOTENCY_CONFLICT", "requestId already identifies a different command"); return commandReceipt(prior, true); }
+      const result = "text" in write ? await service.request(write) : "connectionKind" in write ? await service.propose(write) : await service.respond(write);
+      const safeInput = { ...input, ...("text" in write ? { text: undefined, textSha256: stableJsonHash(write.text) } : {}), chat: { ...input.chat, userText: undefined, userTextSha256: stableJsonHash(input.chat.userText) } };
+      const command = await db.managementCommand.create({ data: { clientId: authorized.id, workspaceId: authorized.workspaceId, toolName: name, requestId, payloadHash, input: managementJson(safeInput), state: "completed", phase: "completed", result: managementJson(result) } });
+      return commandReceipt(command);
+    });
+  } catch (error) { if (error instanceof StewardError) throw new ManagementError(error.code === "NOT_FOUND" ? "NOT_FOUND" : error.code === "FORBIDDEN" ? "FORBIDDEN" : "VALIDATION_ERROR", error.message); throw error; }
+}
+
 export const isStewardTool = (name: string) => name.startsWith("chrona_steward_");
 async function assertReferences(workspaceId: string, input: { affairId?: string; connectionId?: string }) {
   if (input.affairId && !await db.affair.findFirst({ where: { id: input.affairId, workspaceId }, select: { id: true } })) throw new ManagementError("NOT_FOUND", "Affair not found");
   if (input.connectionId && !await db.sourceConnection.findFirst({ where: { id: input.connectionId, workspaceId }, select: { id: true } })) throw new ManagementError("NOT_FOUND", "Connection not found");
 }
 export async function callManagementSteward(client: ManagementIdentity, name: string, raw: unknown) {
+  if (name.startsWith("chrona_steward_chat_")) return callManagementChat(client, name, raw);
   const writing = name === "chrona_steward_capture" || name === "chrona_steward_delegation_propose";
   const scopes = writing ? ["steward:propose"] : ["steward:read"];
   requireScopes(client, scopes);

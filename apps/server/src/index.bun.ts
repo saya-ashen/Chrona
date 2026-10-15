@@ -11,7 +11,7 @@ const SSE_REQUEST_TIMEOUT_SECONDS = 120;
 
 let isShuttingDown = false;
 
-async function loadApplicationGraph(databaseUrl: string) {
+async function loadApplicationGraph(databaseUrl: string, port: number) {
   const [{ db }, { bootstrapServerRuntime }, { createServerApp }] = await Promise.all([
     import("@chrona/db/db"),
     import("./bootstrap"),
@@ -21,7 +21,7 @@ async function loadApplicationGraph(databaseUrl: string) {
   await db.$queryRawUnsafe("SELECT 1");
   secureGeneratedSqliteSidecars(databaseUrl);
   const { createStewardRuntime } = await import("./steward-runtime");
-  const steward = createStewardRuntime(db, { onError: () => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED" }) });
+  const steward = createStewardRuntime(db, { port, onError: () => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED" }) });
   return { bootstrapServerRuntime, createServerApp, steward };
 }
 
@@ -48,7 +48,7 @@ export async function startBunServer() {
   // Load the Prisma-backed app graph only after migrations and storage permissions settle.
   let applicationGraph: Awaited<ReturnType<typeof loadApplicationGraph>>;
   try {
-    applicationGraph = await loadApplicationGraph(env.DATABASE_URL);
+    applicationGraph = await loadApplicationGraph(env.DATABASE_URL, port);
   } catch (error) {
     databaseLock.release();
     throw error;

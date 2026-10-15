@@ -34,6 +34,7 @@ function validateWorkScopes(scopes: z.infer<typeof managementClientInputSchema>[
 export async function createManagementClient(raw: z.input<typeof managementClientInputSchema>) {
   const input = managementClientInputSchema.parse(raw);
   if (!input.scopes.includes("tasks:read") && !input.scopes.includes("goals:read") && !input.scopes.includes("steward:read")) throw new ManagementError("VALIDATION_ERROR", "Clients require tasks:read, goals:read or steward:read");
+  if (input.scopes.includes("steward:chat") && !input.scopes.includes("steward:read")) throw new ManagementError("VALIDATION_ERROR", "Steward chat requires steward:read");
   if (input.scopes.includes("steward:propose") && !input.scopes.includes("steward:read")) throw new ManagementError("VALIDATION_ERROR", "Steward proposals require steward:read");
   if ((input.scopes.includes("goals:propose") || input.scopes.includes("goals:write")) && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Goal writes require goals:read");
   validateWorkScopes(input.scopes);

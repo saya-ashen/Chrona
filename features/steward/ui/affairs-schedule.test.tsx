@@ -15,7 +15,7 @@ vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 const now = "2026-10-13T00:00:00.000Z";
 const affair = affairSchema.parse({ id: "a1", title: "Travel plans", summary: "Family trip", goal: "Arrive safely", status: "active", keywords: [], taskId: null, openAttentionCount: 2, createdAt: now, updatedAt: now });
 const event = inboundEventSchema.parse({ id: "e1", connectionId: "c1", externalId: "external1", status: "assessed", title: "Trip update", body: "New dates", author: "Sam", url: "https://example.com/message", occurredAt: now, receivedAt: now, affairId: "a1", linkStatus: "suggested", attempts: 1, lastError: null, nextAttemptAt: null });
-const detail: AffairDetail = { affair, attention: [], events: [], suggestedEvents: [event], delegations: [], followUps: [], tools: [] };
+const detail: AffairDetail = { affair, attention: [], events: [], suggestedEvents: [event], delegations: [], followUps: [], tools: [], works: [] };
 function show(children: ReactNode) { render(<MemoryRouter><I18nProvider locale="en" messages={en}>{children}</I18nProvider></MemoryRouter>); }
 function showDetail() { show(<AffairDetailPage workspaceId="w1" affairId="a1" />); }
 afterEach(cleanup);

@@ -30,7 +30,7 @@ export function assessmentLink(event: InboundEvent, affairId: string | null, gue
 export async function assessmentAuthority(tx: Tx, event: InboundEvent, affairId: string | null, now: Date) {
   // Suggested links never grant affair-scoped authority.
   const candidates = await tx.delegation.findMany({
-    where: { workspaceId: event.workspaceId, status: "active", AND: [
+    where: { workspaceId: event.workspaceId, status: "active", work: { is: null }, AND: [
       { OR: [{ connectionId: null }, { connectionId: event.connectionId }] },
       { OR: [{ affairId: null }, ...(affairId ? [{ affairId }] : [])] },
     ] }, orderBy: [{ createdAt: "desc" }, { id: "asc" }],

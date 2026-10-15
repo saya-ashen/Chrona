@@ -27,6 +27,9 @@ export function createStewardRoutes(ports: StewardRoutePorts) {
   const items = <T extends z.ZodType>(schema: T) => z.object({ items: z.array(schema) });
   router.get("/assessment-mode", async c => c.json(await c.get("steward").getAssessmentMode()));
   router.put("/assessment-mode", async c => { const { mode } = z.object({ mode: z.enum(["builtin", "external"]) }).strict().parse(await c.req.json()); return c.json(await c.get("steward").setAssessmentMode(mode)); });
+  router.post("/works", async c => { const { text } = z.object({ text: z.string().trim().min(1).max(2000) }).strict().parse(await c.req.json()); return c.json(s.workSchema.parse(await c.get("steward").works.create(text))); });
+  router.post("/works/:id/input", async c => { const input = z.object({ kind: z.enum(["answer", "feedback"]), text: z.string().trim().min(1).max(1000) }).strict().parse(await c.req.json()); return c.json(s.workSchema.parse(await c.get("steward").works.respond(c.req.param("id"), input))); });
+  router.post("/works/:id/accept", async c => c.json(s.workSchema.parse(await c.get("steward").works.accept(c.req.param("id")))));
   router.get("/today", async c => c.json(s.todayViewSchema.parse(await c.get("steward").today())));
   router.get("/health", async c => c.json(s.stewardHealthSchema.parse(await c.get("steward").health())));
   router.get("/affairs", async c => c.json(items(s.affairSchema).parse({ items: await c.get("steward").affairs.list() })));

@@ -12,9 +12,12 @@ import { createStewardFollowUps } from "./follow-ups";
 import { schedule } from "./schedule";
 import { tick } from "./tick";
 import { createStewardTools } from "./tools";
+import { createStewardWork } from "./work";
+export { createStewardWork } from "./work";
 type Tools = ReturnType<typeof createStewardTools>;
-export { StewardError } from "./mappers";
+export { StewardError, serial as serializeSteward } from "./mappers";
 export { captureSteward } from "./capture";
+export { createStewardChat, moveChatDestination } from "./chat";
 export type { Ports as StewardPorts, Actor as StewardActor } from "./mappers";
 export function createStewardService(ports: Ports) {
   async function run<T>(write: boolean, fn: (ctx: Context) => Promise<T>) {
@@ -42,7 +45,7 @@ export function createStewardService(ports: Ports) {
     affairs: {
       create: (raw: unknown) => run(true, ctx => createAffair(ctx, raw)),
       update: (id: string, raw: unknown) => run(true, ctx => updateAffair(ctx, id, raw)),
-      detail: (id: string) => run(false, ctx => affairDetail(ctx, id)),
+      detail: (id: string) => run(false, async ctx => ({ ...await affairDetail(ctx, id), works: await listWorks(ctx, id), delegations: await listDelegations(ctx, id) })),
       list: () => run(false, async ctx => { const rows = await ctx.db.affair.findMany({ where: { workspaceId: ctx.actor.workspaceId }, include: { _count: { select: { attentionItems: { where: { status: "open" } } } } } }); return rows.map(r => affairView(r, r._count.attentionItems)); }),
     },
     linkEvent: (id: string, raw: unknown) => run(true, ctx => linkEvent(ctx, id, raw)),
@@ -65,21 +68,31 @@ export function createStewardService(ports: Ports) {
       run: (id: string, input: Omit<Parameters<Tools["run"]>[2], "actorKey">) => run(true, ctx => tools(ctx).run(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
     },
     schedule: (from: string, to: string) => run(false, ctx => schedule(ctx, from, to)),
-    tick: () => runPhased(tick),
+    works: {
+      create: (text: string) => run(true, async ctx => { const result = await works(ctx).create({ workspaceId: ctx.actor.workspaceId, text }); const row = await ctx.db.stewardWork.findFirstOrThrow({ where: { id: result.workId, workspaceId: ctx.actor.workspaceId } }); return works(ctx).view(row); }),
+      respond: (id: string, input: { kind: "answer" | "feedback"; text: string }) => run(true, ctx => works(ctx).respondOwner(ctx.actor.workspaceId, id, input, ctx.actor.actorKey)),
+      accept: (id: string) => run(true, ctx => works(ctx).respondOwner(ctx.actor.workspaceId, id, { kind: "accept" }, ctx.actor.actorKey)),
+      list: (affairId?: string) => run(false, ctx => listWorks(ctx, affairId)),
+      detail: (id: string) => run(false, async ctx => { const row = await ctx.db.stewardWork.findFirst({ where: { id, workspaceId: ctx.actor.workspaceId } }); if (!row) throw new StewardError("NOT_FOUND", "Work not found"); return works(ctx).view(row); }),
+    },
+    tick: () => runPhased(async (ctx, serialize) => { await serialize(async () => { await works(ctx).recover(); await works(ctx).wakeDueFollowUps(); }); return tick(ctx, serialize); }),
     delegations: {
       propose: (raw: unknown) => run(true, ctx => proposeDelegation(ctx, raw)),
-      transition: (id: string, raw: unknown) => run(true, ctx => transitionDelegation(ctx, id, raw)),
-      list: () => run(false, async ctx => (await ctx.db.delegation.findMany({ where: { workspaceId: ctx.actor.workspaceId } })).map(delegationView)),
+      transition: (id: string, raw: unknown) => run(true, async ctx => { const result = await transitionDelegation(ctx, id, raw); if (result.status === "revoked") await ctx.db.stewardWork.updateMany({ where: { workspaceId: ctx.actor.workspaceId, delegationId: id }, data: { status: "cancelled", nextRunAt: null, leaseUntil: null } }); return result; }),
+      list: () => run(false, ctx => listDelegations(ctx)),
     },
     attention: { list: (status?: AttentionStatus) => run(false, ctx => listAttention(ctx, status)), decide: (id: string, raw: unknown) => run(true, ctx => decideAttention(ctx, id, raw)) },
     today: () => run(false, async ctx => { await refreshExternalHealth(ctx); return today(ctx); }), health: () => run(false, async ctx => { await refreshExternalHealth(ctx); return health(ctx); }),
   };
 }
+function works(ctx: Context) { return createStewardWork({ db: ctx.db, now: ctx.now, workspaceId: ctx.actor.workspaceId, allowedRecipients: new Set(ctx.chatRecipients ?? []) }); }
+async function listWorks(ctx: Context, affairId?: string) { return Promise.all((await ctx.db.stewardWork.findMany({ where: { workspaceId: ctx.actor.workspaceId, affairId }, orderBy: { createdAt: "desc" } })).map(row => works(ctx).view(row))); }
+async function listDelegations(ctx: Context, affairId?: string) { return (await ctx.db.delegation.findMany({ where: { workspaceId: ctx.actor.workspaceId, affairId }, include: { work: { select: { id: true } } } })).map(row => delegationView({ ...row, workId: row.work?.id ?? null })); }
 function tools(ctx: Context) {
   return createStewardTools({ db: ctx.db, now: ctx.now });
 }
 function delivery(ctx: Context) {
-  return createStewardDelivery({ db: ctx.db, workspaceId: ctx.actor.workspaceId, actorKey: ctx.actor.actorKey, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now });
+  return createStewardDelivery({ db: ctx.db, workspaceId: ctx.actor.workspaceId, actorKey: ctx.actor.actorKey, adapters: ctx.deliveryAdapters ?? {}, allowedRecipients: new Set(ctx.chatRecipients ?? []), now: ctx.now });
 }
 function followUps(ctx: Context) {
   return createStewardFollowUps({ db: ctx.db, workspaceId: ctx.actor.workspaceId, actorKey: ctx.actor.actorKey, now: ctx.now });

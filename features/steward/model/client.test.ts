@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStewardClient } from "./client";
+import { workFixture, workTime } from "./work-fixtures";
 import { decisionItem, emptyToday } from "./fixtures";
 import { initialSignals } from "./tool-form";
 import { parseKeywords } from "./affairs";
@@ -7,6 +8,18 @@ import { apiJson } from "@shared/http";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 describe("steward HTTP client", () => {
+  it("reads all affairs for open work, excluding only accepted and cancelled", async () => {
+    const affair = { id: "a1", title: "Work", summary: "", goal: "", keywords: [], status: "closed", taskId: null, openAttentionCount: 0, createdAt: workTime, updatedAt: workTime };
+    vi.mocked(apiJson).mockResolvedValueOnce({ items: [affair] }).mockResolvedValueOnce({ affair, attention: [], events: [], suggestedEvents: [], delegations: [], followUps: [], tools: [], works: [workFixture("running"), workFixture("failed"), workFixture("accepted"), workFixture("cancelled")] });
+    expect((await createStewardClient("ws").openWorks()).map(w => w.status)).toEqual(["running", "failed"]);
+    expect(apiJson).toHaveBeenLastCalledWith("/api/steward/affairs/a1?workspaceId=ws", expect.objectContaining({ method: "GET" }));
+  });
+  it("posts scoped work commands and validates work responses", async () => {
+    vi.mocked(apiJson).mockResolvedValue(workFixture()); const client = createStewardClient("ws");
+    await client.createWork("Request"); expect(apiJson).toHaveBeenLastCalledWith("/api/steward/works?workspaceId=ws", expect.objectContaining({ method: "POST", body: '{"text":"Request"}' }));
+    await client.respondWork("w/1", { kind: "answer", text: "Reply" }); expect(apiJson).toHaveBeenLastCalledWith("/api/steward/works/w%2F1/input?workspaceId=ws", expect.objectContaining({ method: "POST", body: '{"kind":"answer","text":"Reply"}' }));
+    await client.acceptWork("w/1"); expect(apiJson).toHaveBeenLastCalledWith("/api/steward/works/w%2F1/accept?workspaceId=ws", expect.objectContaining({ method: "POST" }));
+  });
   it("generates tools and accepts created=false with a rationale", async () => {
     const response = { created: false, choice: { mode: "direct_answer", rationale: "One question" } };
     vi.mocked(apiJson).mockResolvedValue(response);
@@ -27,7 +40,7 @@ describe("steward HTTP client", () => {
     expect(apiJson).toHaveBeenCalledWith(`/api/steward/follow-ups/f%2F1/${action}?workspaceId=ws`, expect.objectContaining({ method: "POST" }));
   });
   it("retries a notification without reassessment payload", async () => {
-    const notification = { id: "n/1", attentionItemId: null, channel: "in_app", status: "queued", title: "Notice", body: "Body", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: "2026-10-13T00:00:00Z", sentAt: null, acknowledgedAt: null };
+    const notification = { id: "n/1", recipient: null, receiptRef: null, attentionItemId: null, channel: "in_app", status: "queued", title: "Notice", body: "Body", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: "2026-10-13T00:00:00Z", sentAt: null, acknowledgedAt: null };
     vi.mocked(apiJson).mockResolvedValue(notification);
     expect(await createStewardClient("ws").retryNotification("n/1")).toEqual(notification);
     expect(apiJson).toHaveBeenCalledWith("/api/steward/notifications/n%2F1/retry?workspaceId=ws", expect.objectContaining({ method: "POST" }));

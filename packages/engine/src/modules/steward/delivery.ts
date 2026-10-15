@@ -1,8 +1,9 @@
-import { delegationSchema, type DeliveryAdapter, type DeliveryOutcome } from "@chrona/contracts/steward";
-import type { PrismaClient, Prisma, StewardNotification } from "@chrona/db/generated/prisma/client";
+import { CHAT_CHANNELS, delegationSchema, type DeliveryAdapter, type DeliveryMessage, type DeliveryOutcome } from "@chrona/contracts/steward";
+import type { AttentionItem, PrismaClient, Prisma, StewardNotification } from "@chrona/db/generated/prisma/client";
 import { decidePermission } from "@chrona/domain/steward/permission";
 import { StewardError } from "./mappers";
 import { deliveryTimePolicy } from "./delivery-policy";
+import { chatChannelOf, ensureRef } from "./chat";
 
 // A claim is deliberately uncertain until the adapter supplies a receipt. No new
 // schema status is needed. nextAttemptAt is the lease deadline while claimed.
@@ -58,8 +59,8 @@ async function failure(tx: Tx, row: StewardNotification) {
 }
 
 /** Internal application service. The caller supplies its authorized workspace. */
-export function createStewardDelivery({ db, adapters, workspaceId, actorKey = "system:steward", now = () => new Date() }: {
-  db: PrismaClient; adapters: Record<string, Adapter>; workspaceId: string; actorKey?: string; now?: () => Date;
+export function createStewardDelivery({ db, adapters, workspaceId, actorKey = "system:steward", allowedRecipients = new Set<string>(), now = () => new Date() }: {
+  db: PrismaClient; adapters: Record<string, Adapter>; workspaceId: string; actorKey?: string; allowedRecipients?: ReadonlySet<string>; now?: () => Date;
 }) {
   if (!workspaceId) throw new StewardError("FORBIDDEN", "Workspace access required");
   async function recover() {
@@ -76,11 +77,11 @@ export function createStewardDelivery({ db, adapters, workspaceId, actorKey = "s
       if (status === "failed") await failure(tx, row);
     });
   }
-  return createDeliveryActions({ db, adapters, workspaceId, actorKey, now }, recover);
+  return createDeliveryActions({ db, adapters, workspaceId, actorKey, allowedRecipients, now }, recover);
 }
 
 type DeliveryContext = {
-  db: PrismaClient; adapters: Record<string, Adapter>; workspaceId: string; actorKey: string; now: () => Date;
+  db: PrismaClient; adapters: Record<string, Adapter>; workspaceId: string; actorKey: string; allowedRecipients: ReadonlySet<string>; now: () => Date;
 };
 function cooldownDeadline(row: DeliveryRow, previous: StewardNotification | null, inFlight: StewardNotification | null, minutes: number) {
   return Math.max(
@@ -90,7 +91,7 @@ function cooldownDeadline(row: DeliveryRow, previous: StewardNotification | null
   );
 }
 
-async function claim({ db, workspaceId, now }: DeliveryContext, id: string) {
+async function claim({ db, workspaceId, allowedRecipients, now }: DeliveryContext, id: string) {
     return db.$transaction(async (tx) => {
       const at = now();
       // First statement acquires SQLite's write lock; policy checks and reservations
@@ -122,11 +123,22 @@ async function claim({ db, workspaceId, now }: DeliveryContext, id: string) {
         const until = cooldownDeadline(row, previous, inFlight, policy.cooldownMinutes);
         if (until > at.getTime()) return defer("Attention-item notification cooldown.", new Date(until));
       }
-      const claimed = await tx.stewardNotification.update({ where: { id }, data: { attempts: { increment: 1 }, lastError: CLAIM, nextAttemptAt: new Date(at.getTime() + LEASE_MS) } });
+      let recipient: string | null = null;
+      if ((CHAT_CHANNELS as readonly string[]).includes(row.channel)) {
+        recipient = policy.recipient;
+        if (!recipient || !allowedRecipients.has(recipient) || chatChannelOf(recipient) !== row.channel) return suppress("Chat recipient is not authorized.");
+        if (row.attentionItem) row.attentionItem.replyRef = await ensureRef(tx, "attentionItem", row.attentionItem.id);
+      }
+      const claimed = await tx.stewardNotification.update({ where: { id }, data: { recipient, attempts: { increment: 1 }, lastError: CLAIM, nextAttemptAt: new Date(at.getTime() + LEASE_MS) } });
       await tx.stewardAudit.create({ data: { workspaceId: row.workspaceId, subjectId: id, kind: "notification.claimed", actorKey: "system:steward", details: { delegationId: row.delegationId, attempt: claimed.attempts, timeoutAt: claimed.nextAttemptAt!.toISOString() }, createdAt: at } });
-      return claimed;
+      return { ...claimed, attentionItem: row.attentionItem };
     });
   }
+function deliveryMessage(row: StewardNotification & { attentionItem: AttentionItem | null }): DeliveryMessage {
+  const item = row.attentionItem;
+  return { idempotencyKey: row.idempotencyKey, title: row.title, body: row.body, link: row.link, recipient: row.recipient,
+    replyRef: item?.replyRef ?? null, whyItMatters: item?.whyItMatters ?? "", nextStep: item?.nextStep ?? "", appPath: item?.affairId ? `/affairs/${item.affairId}` : "/today" };
+}
 function createDeliveryActions(context: DeliveryContext, recover: () => Promise<void>) {
   const { db, adapters, workspaceId, actorKey, now } = context;
   return {
@@ -141,7 +153,7 @@ function createDeliveryActions(context: DeliveryContext, recover: () => Promise<
         attempted++;
         const adapter = findAdapter(adapters, row.channel);
         let outcome: DeliveryOutcome;
-        try { outcome = adapter ? await adapter.send({ idempotencyKey: row.idempotencyKey, title: row.title, body: row.body, link: row.link }) : { outcome: "rejected", retryable: false, error: "Adapter unavailable" }; }
+        try { outcome = adapter ? await adapter.send(deliveryMessage(row)) : { outcome: "rejected", retryable: false, error: "Adapter unavailable" }; }
         catch { outcome = { outcome: "uncertain", error: "Adapter threw; delivery outcome unknown" }; }
         await db.$transaction(async (tx) => {
           const at = now();

@@ -5,6 +5,7 @@ import { Badge, Button, Card, CardContent, Checkbox, Input, Label, Textarea, Sel
 import { useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
 import { delegationTransitions, pilotDenied } from "../model/management";
+import { channelLabel, maskRecipient, replyText, showReplyHint } from "../model/chat";
 import { StewardMutationNotice } from "./steward-mutation-notice";
 
 export function DelegationsPage({ workspaceId }: { workspaceId: string }) {
@@ -19,11 +20,16 @@ export function DelegationsPage({ workspaceId }: { workspaceId: string }) {
     {resource.error && <p role="alert">{c.error} <Button onClick={resource.refresh}>{c.retry}</Button></p>}
     <StewardMutationNotice mutation={mutation} refresh={resource.refresh} />
     {resource.data?.items.length === 0 && <p role="status">{c.empty}</p>}
-    <ul className="space-y-3">{resource.data?.items.map(item => <li key={item.id}><Card><CardContent className="space-y-3 pt-4">
+    {[false, true].map(single => <section key={String(single)} aria-label={single ? c.work.authorizations : c.work.standing} className="space-y-3"><h2 className="text-xl font-semibold">{single ? c.work.authorizations : c.work.standing}</h2>{single && <p>{c.work.authorizationHint}</p>}
+    <ul className="space-y-3">{resource.data?.items.filter(item => Boolean(item.workId) === single).map(item => <li key={item.id}><Card><CardContent className="space-y-3 pt-4">
       <h2 className="font-semibold">{item.purpose}</h2><Badge variant="outline">{c.statuses[item.status]}</Badge>
+      <div className="flex min-w-0 flex-wrap items-center gap-2"><span>{channelLabel(item.notification.channel, c.controls)}</span><span>{maskRecipient(item.notification.recipient)}</span>
+        {item.replyRef && <Badge variant="outline" className="max-w-full whitespace-normal font-mono">{replyText(c.chat.replyRef, item.replyRef)}</Badge>}
+      </div>
+      {item.replyRef && showReplyHint(item.status) && <p>{replyText(c.chat.replyHint, item.replyRef)}</p>}
       <DelegationFacts item={item} />
       <div className="flex flex-wrap gap-2">{delegationTransitions(item.status).map(action => <Button key={action} variant="outline" disabled={mutation.busy || mutation.notice === "mutationError" || resource.loading} onClick={() => void mutation.run(() => client.transitionDelegation(item.id, { action, expectedRevision: item.revision }))}>{c[action]}</Button>)}</div>
-    </CardContent></Card></li>)}</ul>
+    </CardContent></Card></li>)}</ul></section>)}
     <section className="space-y-3"><h2 className="text-xl font-semibold">{c.newDelegation}</h2><p>{c.proposalHint}</p>
       <form className="space-y-4" onSubmit={event => {
         event.preventDefault();

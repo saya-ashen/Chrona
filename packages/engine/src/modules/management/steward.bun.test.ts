@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { db, withDatabaseTransaction } from "@/lib/db";
 import { resetTestDb, seedWorkspace } from "@chrona/db/test-support";
 import { MANAGEMENT_ACCESS_PRESETS, managementTools } from "@chrona/contracts/api";
 import { createChronaEngine } from "../../engine";
 import { createManagementClient, requireManagementClient } from "./clients";
 const engine = createChronaEngine();
+const priorChatRecipients = process.env.CHRONA_STEWARD_CHAT_RECIPIENTS;
+afterEach(() => { if (priorChatRecipients === undefined) delete process.env.CHRONA_STEWARD_CHAT_RECIPIENTS; else process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = priorChatRecipients; });
 const capture = () => ({ requestId: crypto.randomUUID(), newAffair: { title: "Remember trip", summary: "Trip context", goal: "Prepare", keywords: ["trip"] }, note: "Check dates", source: { label: "Chat", excerpt: "Please remember this" }, followUp: { note: "Check booking", dueAt: "2030-01-01T00:00:00Z" } });
 const proposal = () => ({ requestId: crypto.randomUUID(), purpose: "Watch for changes", allowedActions: ["read_source", "summarize"] });
 async function client(preset: keyof typeof MANAGEMENT_ACCESS_PRESETS = "steward") { return requireManagementClient((await createManagementClient({ name: "Everyday agent", publicUrl: "http://localhost:3101", scopes: [...MANAGEMENT_ACCESS_PRESETS[preset]] })).token); }
@@ -21,13 +23,60 @@ beforeEach(async () => {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
 });
 describe("least-privilege steward MCP", () => {
+  it("chat scopes are isolated, allowlist fails closed, pending has no receipt", async () => {
+    process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = "invalid, qqbot:TEST";
+    const legacy = await client(), identity = await client("steward-chat");
+    for (const tool of ["chrona_steward_chat_propose", "chrona_steward_chat_respond", "chrona_steward_chat_pending"]) expect((await call(legacy, tool, {})).error.code).toBe("FORBIDDEN");
+    expect((await call(identity, "chrona_steward_capture", capture())).error.code).toBe("FORBIDDEN"); expect((await call(identity, "chrona_steward_delegation_propose", proposal())).error.code).toBe("FORBIDDEN");
+    const chat = { route: "chrona_command", platform: "qqbot", chatType: "dm", userId: "TEST", chatId: "TEST", messageId: "m", userText: "test" };
+    expect((await call(identity, "chrona_steward_chat_pending", { chat })).ok).toBe(true); expect(await db.managementCommand.count()).toBe(0); expect(await db.stewardAudit.count()).toBe(0);
+    expect((await call(identity, "chrona_steward_chat_pending", { chat: { ...chat, userId: "PRIVATE", chatId: "PRIVATE" } })).error.code).toBe("FORBIDDEN");
+    const audit = await db.stewardAudit.findFirst({ where: { kind: "chat.denied" } }); expect(audit).not.toBeNull(); expect(JSON.stringify(audit)).not.toContain("PRIVATE");
+    process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = "bad"; expect((await call(identity, "chrona_steward_chat_pending", { chat })).error).toMatchObject({ code: "FORBIDDEN", message: "Chat channel is not configured" });
+  });
+  for (const route of [undefined, "model_turn"]) for (const tool of ["propose", "respond", "pending"]) it(`chat ${tool} rejects route ${route ?? "missing"} without writes`, async () => {
+    process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = "qqbot:TEST";
+    const identity = await client("steward-chat"), chat = { platform: "qqbot", chatType: "dm", userId: "TEST", chatId: "TEST", messageId: "m", userText: "/chrona K7QM 暂停", ...(route === undefined ? {} : { route }) };
+    await db.sourceConnection.create({ data: { workspaceId: identity.workspaceId, kind: "local_test", label: "Test source", status: "active" } });
+    const input = tool === "pending" ? { chat } : tool === "propose" ? { requestId: crypto.randomUUID(), chat, purpose: "Watch", connectionKind: "local_test" } : { requestId: crypto.randomUUID(), chat, ref: "K7QM", action: "pause" };
+    expect((await call(identity, `chrona_steward_chat_${tool}`, input)).error.code).toBe("VALIDATION_ERROR");
+    expect(await Promise.all([db.delegation.count(), db.managementCommand.count(), db.attentionItem.count(), db.stewardAudit.count()])).toEqual([0, 0, 0, 0]);
+  });
+  it("chat proposes and confirms with durable replay without retaining response words", async () => {
+    process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = "qqbot:TEST";
+    const identity = await client("steward-chat"), chat = { route: "chrona_command", platform: "qqbot", chatType: "dm", userId: "TEST", chatId: "TEST", messageId: "m", userText: "Watch changes" };
+    await db.sourceConnection.create({ data: { workspaceId: identity.workspaceId, kind: "local_test", label: "Test source", status: "active" } });
+    const input = { requestId: crypto.randomUUID(), chat, purpose: "Watch", connectionKind: "local_test" };
+    const first = await call(identity, "chrona_steward_chat_propose", input); expect(first.ok).toBe(true);
+    const p = first.data.result; expect(p).toMatchObject({ status: "proposed", permissionsGranted: false });
+    expect((await call(identity, "chrona_steward_chat_propose", input)).data).toMatchObject({ commandId: first.data.commandId, replayed: true, result: p });
+    const response = { requestId: crypto.randomUUID(), ref: p.ref, action: "confirm", chat: { ...chat, messageId: "m2", userText: `确认 ${p.ref} 私密回复原文` } };
+    const applied = await call(identity, "chrona_steward_chat_respond", response); expect(applied.ok).toBe(true); expect(applied.data.result).toMatchObject({ status: "applied", state: "active" });
+    expect((await call(identity, "chrona_steward_chat_respond", response)).data).toMatchObject({ commandId: applied.data.commandId, replayed: true, result: applied.data.result });
+    expect((await call(identity, "chrona_steward_chat_respond", { ...response, action: "pause" })).error.code).toBe("IDEMPOTENCY_CONFLICT");
+    expect((await call(identity, "chrona_steward_chat_respond", { ...response, requestId: crypto.randomUUID(), chat: { ...response.chat, messageId: "m3" } })).data.result).toMatchObject({ status: "unchanged" });
+    expect((await db.delegation.findUniqueOrThrow({ where: { id: p.delegationId } })).revision).toBe(2);
+    expect(JSON.stringify(await db.managementCommand.findMany())).not.toContain("私密回复原文"); expect(JSON.stringify(await db.stewardAudit.findMany())).not.toContain("私密回复原文");
+  });
+  it("chat request replays once and receipts retain hashes rather than request text", async () => {
+    process.env.CHRONA_STEWARD_CHAT_RECIPIENTS = "qqbot:TEST";
+    const identity = await client("steward-chat"), text = "Test-only private request words";
+    const input = { requestId: crypto.randomUUID(), text, chat: { route: "chrona_command", platform: "qqbot", chatType: "dm", userId: "TEST", chatId: "TEST", messageId: "work", userText: text } };
+    const first = await call(identity, "chrona_steward_chat_request", input);
+    expect(first.ok).toBe(true); expect(first.data.result.status).toBe("received");
+    expect((await call(identity, "chrona_steward_chat_request", input)).data).toMatchObject({ commandId: first.data.commandId, replayed: true });
+    expect((await call(identity, "chrona_steward_chat_request", { ...input, text: "changed" })).error.code).toBe("IDEMPOTENCY_CONFLICT");
+    expect(await db.stewardWork.count()).toBe(1);
+    expect(JSON.stringify(await db.managementCommand.findMany())).not.toContain(text);
+    expect(JSON.stringify(await db.stewardAudit.findMany())).not.toContain(text);
+  });
   it("preserves every old profile and denies legacy clients", async () => {
     expect(MANAGEMENT_ACCESS_PRESETS.read).toEqual(["tasks:read"]);
     expect(MANAGEMENT_ACCESS_PRESETS.full).toEqual(["tasks:read", "tasks:write", "schedule:write", "plans:write", "executions:control", "results:accept", "tasks:delete"]);
     expect(MANAGEMENT_ACCESS_PRESETS["assistant-read"]).toEqual(["goals:read"]);
     expect(MANAGEMENT_ACCESS_PRESETS.assistant).toEqual(["goals:read", "goals:propose"]);
     expect(MANAGEMENT_ACCESS_PRESETS["assistant-edit"]).toEqual(["goals:read", "goals:propose", "goals:write"]);
-    for (const [name, scopes] of Object.entries(MANAGEMENT_ACCESS_PRESETS)) if (name !== "steward" && name !== "steward-assessor") expect(scopes.some(s => s.startsWith("steward:"))).toBe(false);
+    for (const [name, scopes] of Object.entries(MANAGEMENT_ACCESS_PRESETS)) if (name !== "steward" && name !== "steward-assessor" && name !== "steward-chat") expect(scopes.some(s => s.startsWith("steward:"))).toBe(false);
     for (const preset of ["read", "full", "assistant-edit"] as const) {
       const identity = await client(preset);
       for (const [tool, input] of [["chrona_steward_today", {}], ["chrona_steward_capture", capture()], ["chrona_steward_delegation_propose", proposal()]] as const) expect((await call(identity, tool, input)).error.code).toBe("FORBIDDEN");
@@ -39,7 +88,7 @@ describe("least-privilege steward MCP", () => {
     expect(result.ok).toBe(true);
     expect(result.data.capabilities.steward).toMatchObject({ canRead: true, canPropose: true, granting: false, attentionApproval: false, connectionChanges: false });
     expect(result.data.aiClients).toEqual([]);
-    expect(Object.keys(managementTools).filter(n => n.startsWith("chrona_steward_"))).toHaveLength(7);
+    expect(Object.keys(managementTools).filter(n => n.startsWith("chrona_steward_"))).toHaveLength(11);
     for (const name of ["chrona_steward_delegation_grant", "chrona_steward_attention_approve", "chrona_steward_tool_run", "chrona_steward_connection_update"]) expect((await call(identity, name, {})).error.code).toBe("VALIDATION_ERROR");
   });
   it("atomically captures and replays once, rejects changed intent, preserves provenance", async () => {

@@ -28,6 +28,19 @@ beforeEach(async () => {
 });
 afterEach(async () => { await Promise.all(clients.splice(0).map((client) => client.$disconnect())); rmSync(directory, { recursive: true, force: true }); });
 
+test.each(["paused", "revoked", "recipient_removed", "uncertain"])("chat delivery fences %s and enriches its durable claim", async mode => {
+  await policy({ channel: "hermes_qqbot", recipient: "qqbot:TEST" });
+  await db.stewardNotification.update({ where: { id: "n" }, data: { channel: "hermes_qqbot" } });
+  if (["paused", "revoked"].includes(mode)) await db.delegation.update({ where: { id: "d" }, data: { status: mode } });
+  let calls = 0;
+  const adapter: DeliveryAdapter = { channel: "hermes_qqbot", async send(message) { calls++; expect(message).toMatchObject({ recipient: "qqbot:TEST", whyItMatters: "Test", nextStep: "Review", appPath: "/today" }); expect(message.replyRef).toMatch(/^[2-9A-HJKMNP-Z]{4}$/); return { outcome: "uncertain", error: "Test-only lost receipt" }; } };
+  const delivery = () => createStewardDelivery({ db, workspaceId: "ws", adapters: { hermes_qqbot: adapter }, allowedRecipients: new Set(mode === "recipient_removed" ? [] : ["qqbot:TEST"]), now: () => at });
+  await delivery().deliverDue(); at = new Date(at.getTime() + 86400_000); await delivery().deliverDue();
+  expect(calls).toBe(mode === "uncertain" ? 1 : 0); expect((await row()).status).toBe(mode === "uncertain" ? "uncertain" : "suppressed");
+  if (mode === "recipient_removed") expect((await row()).lastError).toBe("Chat recipient is not authorized.");
+  if (mode === "uncertain") { expect((await row()).recipient).toBe("qqbot:TEST"); expect((await db.attentionItem.findUniqueOrThrow({ where: { id: "a" } })).replyRef).not.toBeNull(); }
+});
+
 test("transient rejection retries after backoff with unchanged key; accepted != acknowledged", async () => {
   sink.script([{ outcome: "rejected", retryable: true, error: "offline" }, { outcome: "accepted", receiptRef: "receipt" }]);
   const keys: string[] = [];
@@ -67,7 +80,7 @@ test("restart after committed claim never blindly resends; timeout is durable an
 });
 
 test("idempotent restart retries same key without duplicating already accepted effect", async () => {
-  await sink.adapter.send({ idempotencyKey: "key:n", title: "Test", body: "Test", link: null });
+  await sink.adapter.send({ idempotencyKey: "key:n", title: "Test", body: "Test", link: null, recipient: null, replyRef: null, whyItMatters: "", nextStep: "", appPath: "/today" });
   await db.stewardNotification.update({ where: { id: "n" }, data: { status: "uncertain", attempts: 1, lastError: "Delivery in progress; outcome unknown until receipt or 5-minute claim timeout.", nextAttemptAt: at } });
   await service({ ...sink.adapter, idempotent: true }, connect()).deliverDue({});
   expect((await row()).status).toBe("sent"); expect(sink.sent).toHaveLength(1); expect((await row()).idempotencyKey).toBe("key:n");

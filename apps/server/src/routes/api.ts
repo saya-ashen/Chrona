@@ -20,6 +20,7 @@ import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../
 import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
 
 import { createStewardRoutes } from "./steward.routes";
+import { createStewardAgentRoutes } from "./steward-agent.routes";
 import type { StewardRuntime } from "../steward-runtime";
 
 export type ApiRouterOptions = {
@@ -55,7 +56,10 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createManagementMcpRoutes(engine))
     .route("/", createAgentControlRoutes());
 
-  if (options.steward) router.route("/steward", createStewardRoutes(options.steward.ports));
+  if (options.steward) {
+    router.route("/steward", createStewardRoutes(options.steward.ports));
+    router.route("/steward-agent", createStewardAgentRoutes(options.steward.ports));
+  }
 
   // Env-gated E2E test seam — only ever mounted when the Playwright webServer
   // sets CHRONA_E2E_TEST_ROUTES=1. Keeps the production surface unchanged.

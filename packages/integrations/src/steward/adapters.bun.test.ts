@@ -13,7 +13,7 @@ const item: SourceItem = {
 const localConnection = { id: "test", config: {} };
 const redditConnection = { id: "reddit", config: { credentialRef: "reddit.read", userAgent: "Chrona-local-test/1" } };
 const tokenProvider = async () => "synthetic-test-token";
-const message: DeliveryMessage = { idempotencyKey: "key", title: "Test", body: "Local only", link: null };
+const message: DeliveryMessage = { idempotencyKey: "key", title: "Test", body: "Local only", link: null, recipient: null, replyRef: null, whyItMatters: "", nextStep: "", appPath: null };
 
 function child(kind: string, name: string, extra: Record<string, unknown> = {}) {
   return { kind, data: { name, subject: "Subject", body: "Body", author: "tester", context: "/r/test/comments/abc/comment", created_utc: 1_760_356_800, ...extra } };

@@ -3,16 +3,28 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import zh from "@chrona/i18n/messages/zh.json";
+import { workFixture } from "../model/work-fixtures";
 import { TodayPage } from "./today-page";
 import { decisionItem, emptyToday, publishedResult, timestamp } from "../model/fixtures";
 import { I18nProvider } from "@chrona/i18n/react";
 import en from "@chrona/i18n/messages/en.json";
-const mocks = vi.hoisted(() => ({ today: vi.fn(), decideAttention: vi.fn() }));
+const mocks = vi.hoisted(() => ({ today: vi.fn(), decideAttention: vi.fn(), openWorks: vi.fn(), createWork: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 function show(locale: "en" | "zh" = "en") { render(<MemoryRouter><I18nProvider locale={locale} messages={locale === "en" ? en : zh}><TodayPage workspaceId="workspace-test" /></I18nProvider></MemoryRouter>); }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-beforeEach(() => { vi.resetAllMocks(); vi.spyOn(Date, "now").mockReturnValue(Date.parse(timestamp)); mocks.today.mockResolvedValue(emptyToday()); mocks.decideAttention.mockResolvedValue(decisionItem()); });
+beforeEach(() => { vi.resetAllMocks(); vi.spyOn(Date, "now").mockReturnValue(Date.parse(timestamp)); mocks.today.mockResolvedValue(emptyToday()); mocks.openWorks.mockResolvedValue([]); mocks.decideAttention.mockResolvedValue(decisionItem()); });
 describe("Today page", () => {
+  it("shows in-progress work linked to its affair and creates a request", async () => {
+    mocks.openWorks.mockResolvedValue([workFixture("running")]); show();
+    expect(await screen.findByRole("link", { name: "Research <b>plain text</b>" })).toHaveAttribute("href", "/en/affairs/a1");
+    expect(screen.getByText(en.steward.work.statuses.running)).toBeVisible();
+    await userEvent.type(screen.getByLabelText(en.steward.work.ask), "Compare trains"); await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(mocks.createWork).toHaveBeenCalledWith("Compare trains"); await waitFor(() => expect(mocks.openWorks).toHaveBeenCalledTimes(2));
+  });
+  it("shows the chat reply code and user feedback as plain text", async () => {
+    const view = emptyToday(); view.decisions = [{ ...decisionItem(), replyRef: "K7QM", userNote: "**保留** <script>example</script>" }]; mocks.today.mockResolvedValue(view); show("zh");
+    expect(await screen.findByText("回复码 K7QM")).toBeVisible(); expect(screen.getByText("你的反馈")).toBeVisible(); expect(screen.getByText("**保留** <script>example</script>")).toBeVisible(); expect(document.querySelector("script")).toBeNull();
+  });
   it("announces loading", () => { mocks.today.mockReturnValue(new Promise(() => {})); show(); expect(screen.getByRole("status")).toHaveTextContent("Loading"); });
   it("shows read errors and reload action", async () => { mocks.today.mockRejectedValue(new Error("offline")); show(); expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.error); expect(screen.getByRole("button", { name: "Reload" })).toBeEnabled(); });
   it("shows a healthy empty state", async () => { show(); expect(await screen.findByText(en.steward.allClear)).toBeVisible(); });

@@ -1,7 +1,7 @@
 import * as c from "@chrona/contracts/steward";
 import type { Prisma, PrismaClient } from "@chrona/db";
 export type Actor = { workspaceId: string; actorKey: string; canWrite: boolean };
-export type Ports = { db: PrismaClient; sources: Record<c.ConnectionKind, c.SourceAdapter>; assessor: c.Assessor; deliveryAdapters?: Record<string, c.DeliveryAdapter & { idempotent?: boolean }>; now?: () => Date; authorize: (write: boolean) => Promise<Actor> };
+export type Ports = { chatRecipients?: string[]; db: PrismaClient; sources: Record<c.ConnectionKind, c.SourceAdapter>; assessor: c.Assessor; deliveryAdapters?: Record<string, c.DeliveryAdapter & { idempotent?: boolean }>; now?: () => Date; authorize: (write: boolean) => Promise<Actor> };
 export type Context = Ports & { now: () => Date; actor: Actor };
 export type Tx = Prisma.TransactionClient;
 export class StewardError extends Error {

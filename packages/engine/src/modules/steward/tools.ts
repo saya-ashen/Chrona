@@ -9,8 +9,9 @@ type Tx = Prisma.TransactionClient;
 export class ToolConflictError extends Error { readonly code = "TOOL_CONFLICT"; constructor() { super("Tool version or state changed."); } }
 export class ToolNotFoundError extends Error { readonly code = "TOOL_NOT_FOUND"; constructor() { super("Tool not found."); } }
 export class ToolRunRefusedError extends Error {
-  constructor(readonly code: "TOOL_NOT_ENABLED" | "TOOL_NOT_PERMITTED" | "TOOL_RUN_FAILED") { super(code); }
+  constructor(readonly code: "TOOL_NOT_ENABLED" | "TOOL_NOT_PERMITTED" | "TOOL_RUN_FAILED" | "SCRIPT_DRAFT_ONLY") { super(code === "SCRIPT_DRAFT_ONLY" ? "Script drafts cannot run: Chrona has no arbitrary-script sandbox; human review is required." : code); }
 }
+function isScriptDraft(spec: ToolRow["spec"]) { return spec !== null && typeof spec === "object" && !Array.isArray(spec) && spec.type === "script_draft"; }
 function view(row: ToolRow): ManagedTool {
   const { workspaceId: _workspace, spec: _spec, disabledAt: _disabled, retiredAt: _retired, ...fields } = row;
   return managedToolSchema.parse({ ...fields, ...Object.fromEntries(["authorizedAt", "enabledAt", "lastRunAt", "lastSuccessAt", "lastFailureAt", "createdAt", "updatedAt"].map((key) => [key, (row[key as keyof ToolRow] as Date | null)?.toISOString() ?? null])) });
@@ -32,7 +33,8 @@ async function get(tx: Tx, workspaceId: string, id: string) {
     return view(await get(tx, row.workspaceId, row.id));
   }
 /** Internal service: transports must authenticate workspace membership and user actorKey. */
-export function createStewardTools({ db, now = () => new Date() }: { db: PrismaClient; now?: () => Date }) {
+export function createStewardTools({ db, now = () => new Date() }: { db: PrismaClient | Tx; now?: () => Date }) {
+  const transaction = <T>(fn: (tx: Tx) => Promise<T>): Promise<T> => "$transaction" in db ? db.$transaction(fn) : fn(db);
   async function audit(tx: Tx, subject: { workspaceId: string; id: string }, kind: string, details: Prisma.InputJsonObject, actorKey = "system:steward") {
     await tx.stewardAudit.create({ data: { workspaceId: subject.workspaceId, subjectId: subject.id, kind: `tool.${kind}`, actorKey, details, createdAt: now() } });
   }
@@ -44,7 +46,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       const spec = toolSpecSchema.parse(input.spec);
       if ((spec.type === "event_rule" ? "script" : "panel") !== choice.mode) throw new Error("Handling choice and spec kind disagree.");
       const fields = managedToolSchema.pick({ name: true, purpose: true, dataScopes: true }).parse({ name: input.name, purpose: input.purpose, dataScopes: input.dataScopes });
-      return db.$transaction(async (tx) => {
+      return transaction(async (tx) => {
         if (input.affairId && !await tx.affair.findFirst({ where: { id: input.affairId, workspaceId } })) throw new ToolNotFoundError();
         const row = await tx.managedTool.create({ data: { workspaceId, affairId: input.affairId, ...fields, spec, kind: choice.mode, handlingMode: choice.mode, selectionRationale: choice.rationale, state: "generated", version: 1 } });
         await audit(tx, { workspaceId, id: row.id }, "generated", { choice, version: 1 }, input.actorKey);
@@ -52,9 +54,10 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       });
     },
     async transition(workspaceId: string, id: string, input: { action: (typeof TOOL_TRANSITIONS)[number]; expectedVersion: number; actorKey?: string }) {
-      return db.$transaction(async (tx) => {
+      return transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         if (row.version !== input.expectedVersion) throw new ToolConflictError();
+        if (isScriptDraft(row.spec) && ["validate", "authorize", "enable"].includes(input.action)) throw new ToolRunRefusedError("SCRIPT_DRAFT_ONLY");
         const validation = input.action === "validate" ? validateToolSpec(row.spec) : undefined;
         const state = nextToolState(view(row).state, input.action, { version: row.version, validatedVersion: row.validatedVersion, validationPassed: validation?.passed });
         assertAuthorizationActor(input);
@@ -70,7 +73,7 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
       });
     },
     async edit(workspaceId: string, id: string, input: { spec: unknown; expectedVersion: number; actorKey: string }) {
-      return db.$transaction(async (tx) => {
+      return transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         if (row.version !== input.expectedVersion) throw new ToolConflictError();
         const spec = toolSpecSchema.parse(input.spec);
@@ -84,12 +87,13 @@ export function createStewardTools({ db, now = () => new Date() }: { db: PrismaC
     async run(workspaceId: string, id: string, { events, actorKey }: { events: RuleEvent[]; actorKey: string }) {
       // Entire bounded, in-process execution shares the permission snapshot transaction.
       // Return refusals from the transaction, then throw so refusal audits survive.
-      const result = await db.$transaction(async (tx) => {
+      const result = await transaction(async (tx) => {
         const row = await get(tx, workspaceId, id);
         const refuse = async (code: ToolRunRefusedError["code"]) => {
           await audit(tx, { workspaceId, id }, "run_refused", { code, version: row.version }, actorKey);
           return { error: code };
         };
+        if (isScriptDraft(row.spec)) return refuse("SCRIPT_DRAFT_ONLY");
         if (row.state !== "enabled") return refuse("TOOL_NOT_ENABLED");
         // An affair-less tool has no implicit workspace-wide delegation authority.
         const delegations = row.affairId ? await tx.delegation.findMany({ where: { workspaceId, affairId: row.affairId, status: "active" } }) : [];

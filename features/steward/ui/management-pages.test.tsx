@@ -10,11 +10,33 @@ import { ConnectionsPage } from "./connections-page";
 const mocks = vi.hoisted(() => ({ delegations: vi.fn(), connections: vi.fn(), events: vi.fn(), notifications: vi.fn(), transitionDelegation: vi.fn(), proposeDelegation: vi.fn(), transitionConnection: vi.fn(), syncConnection: vi.fn(), createConnection: vi.fn(), acknowledgeNotification: vi.fn(), retryNotification: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 const now = "2026-10-13T00:00:00.000Z";
-const delegation = delegationSchema.parse({ id: "d1", revision: 7, status: "proposed", affairId: null, connectionId: "c1", purpose: "Watch updates", originalWording: "Tell me when this changes", cadenceSeconds: 300, allowedActions: ["read_source"], askFirstActions: ["run_tool"], notification: {}, limits: {}, grantedAt: null, expiresAt: null, lastCheckAt: now, lastSuccessAt: now, lastFailureAt: null, lastError: null, createdAt: now, updatedAt: now });
+const delegation = delegationSchema.parse({ id: "d1", replyRef: null, revision: 7, status: "proposed", affairId: null, connectionId: "c1", purpose: "Watch updates", originalWording: "Tell me when this changes", cadenceSeconds: 300, allowedActions: ["read_source"], askFirstActions: ["run_tool"], notification: {}, limits: {}, grantedAt: null, expiresAt: null, lastCheckAt: now, lastSuccessAt: now, lastFailureAt: null, lastError: null, createdAt: now, updatedAt: now });
 const connection = connectionSchema.parse({ id: "c1", kind: "local_test", label: "Test source", mode: "poll", status: "active", readScopes: ["inbox"], writeScopes: [], pollIntervalSeconds: 300, baselineAt: now, lastSuccessAt: now, lastFailureAt: null, lastError: null, nextCheckAt: now, coverageNote: "Polling only; older items are not processed.", pendingEvents: 2, failedEvents: 1 });
 function show(page: "delegations" | "connections", locale: "en" | "zh" = "en") { render(<I18nProvider locale={locale} messages={locale === "en" ? en : zh}>{page === "delegations" ? <DelegationsPage workspaceId="w1" /> : <ConnectionsPage workspaceId="w1" />}</I18nProvider>); }
 afterEach(cleanup);
 beforeEach(() => { vi.resetAllMocks(); mocks.delegations.mockResolvedValue({ items: [delegation] }); mocks.connections.mockResolvedValue({ items: [connection] }); mocks.events.mockResolvedValue({ items: [] }); mocks.notifications.mockResolvedValue({ items: [] }); });
+it.each(["proposed", "active", "paused", "revoked", "expired"] as const)("shows masked QQ destination and reply code for %s", async status => {
+  const recipient = "qqbot:1741306CEFED52771EF2DE2746A70A12";
+  mocks.delegations.mockResolvedValue({ items: [{ ...delegation, status, replyRef: "K7QM", notification: { ...delegation.notification, channel: "hermes_qqbot", recipient } }] }); show("delegations", "zh");
+  expect(await screen.findByText("QQ 私聊（经 Hermes）")).toBeVisible(); expect(screen.getByText("QQ 1741…0A12")).toBeVisible(); expect(screen.getByText("回复码 K7QM")).toBeVisible();
+  expect(screen.queryByText("在 QQ 中回复『确认/暂停/撤销 K7QM』") !== null).toBe(["proposed", "active", "paused"].includes(status));
+  expect(document.body.innerHTML).not.toContain(recipient.slice(6));
+  if (status === "proposed") { expect(screen.getByRole("button", { name: zh.steward.grant })).toBeEnabled(); expect(screen.getByRole("button", { name: zh.steward.revoke })).toBeEnabled(); }
+});
+it("separates single-work authorizations from standing delegations", async () => {
+  mocks.delegations.mockResolvedValue({ items: [delegation, { ...delegation, id: "single", workId: "work1", purpose: "One request only" }] }); show("delegations");
+  await screen.findByText("One request only");
+  expect(within(screen.getByRole("region", { name: en.steward.work.authorizations })).getByText("One request only")).toBeVisible();
+  expect(within(screen.getByRole("region", { name: en.steward.work.standing })).queryByText("One request only")).toBeNull();
+  expect(within(screen.getByRole("region", { name: en.steward.work.standing })).getByText("Watch updates")).toBeVisible();
+});
+it("explains uncertain QQ delivery and hides destination and receipt IDs", async () => {
+  const recipient = "qqbot:1741306CEFED52771EF2DE2746A70A12";
+  mocks.notifications.mockResolvedValue({ items: ["uncertain", "sent"].map(status => notificationSchema.parse({ id: status, attentionItemId: null, channel: "hermes_qqbot", recipient, receiptRef: "private-receipt-id", status, title: `Notice ${status}`, body: "Notice", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: now, sentAt: now, acknowledgedAt: null })) });
+  show("connections", "zh"); await screen.findByText("Test source"); await userEvent.click(screen.getByText(zh.steward.deliveryLog));
+  expect(screen.getByText(zh.steward.chat.uncertain)).toBeVisible(); expect(screen.getByText("已发送不等于已读")).toBeVisible(); expect(screen.getAllByText("回执已记录")).toHaveLength(2); expect(screen.getAllByText("QQ 1741…0A12")).toHaveLength(2);
+  expect(document.body.innerHTML).not.toContain(recipient.slice(6)); expect(document.body.innerHTML).not.toContain("private-receipt-id");
+});
 it.each([ ["proposed", "Grant", "grant"], ["active", "Pause", "pause"], ["paused", "Resume", "resume"] ] as const)("%s sends revision-protected %s", async (status, label, action) => {
   mocks.delegations.mockResolvedValue({ items: [{ ...delegation, status }] }); show("delegations");
   expect(await screen.findByText("Tell me when this changes")).toBeVisible();
@@ -49,7 +71,7 @@ it("keeps an unconfirmed mutation blocked until reload", async () => { mocks.tra
 it("shows test coverage and sync outcomes", async () => { mocks.syncConnection.mockResolvedValue({ received: 3, duplicates: 2, baseline: true }); show("connections"); expect(await screen.findByText("Test data")).toBeVisible(); expect(screen.getByText(connection.coverageNote)).toBeVisible(); await userEvent.click(screen.getByRole("button", { name: "Sync now" })); expect(mocks.syncConnection).toHaveBeenCalledWith("c1"); expect(await screen.findByText("Received: 3; Duplicates: 2; Baseline: Yes")).toBeVisible(); });
 it.each(["needs_authorization", "failing"] as const)("shows %s honestly", async status => { mocks.connections.mockResolvedValue({ items: [{ ...connection, status }] }); show("connections"); expect(await screen.findByText(en.steward.statuses[status])).toBeVisible(); if (status === "needs_authorization") expect(screen.queryByRole("button", { name: "Sync now" })).toBeNull(); });
 it("offers acknowledgment only for sent and uncertain, preserving distinct delivery labels", async () => {
-  mocks.notifications.mockResolvedValue({ items: NOTIFICATION_STATUSES.map(status => notificationSchema.parse({ id: status, attentionItemId: null, channel: "local_test", status, title: `Notice ${status}`, body: "Test notice", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: now, sentAt: null, acknowledgedAt: null })) });
+  mocks.notifications.mockResolvedValue({ items: NOTIFICATION_STATUSES.map(status => notificationSchema.parse({ id: status, recipient: null, receiptRef: null, attentionItemId: null, channel: "local_test", status, title: `Notice ${status}`, body: "Test notice", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: now, sentAt: null, acknowledgedAt: null })) });
   show("connections"); await screen.findByText("Test source"); await userEvent.click(screen.getByText("Delivery log"));
   for (const status of NOTIFICATION_STATUSES) { const row = screen.getByText(`Notice ${status}`).closest("li")!; expect(within(row).getByText(en.steward.notificationStatuses[status])).toBeVisible(); expect(within(row).queryByRole("button", { name: "Acknowledge" }) !== null).toBe(status === "sent" || status === "uncertain"); expect(within(row).queryByRole("button", { name: "Retry" }) !== null).toBe(status === "failed"); expect(within(row).getByText("Channel: Test sink")).toBeVisible(); }
   expect(screen.getByText(en.steward.controls.sentMeaning)).toBeVisible();

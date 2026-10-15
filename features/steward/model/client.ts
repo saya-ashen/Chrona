@@ -16,6 +16,19 @@ export function createStewardClient(workspaceId: string) {
   const list = <S extends z.ZodType>(schema: S) => z.object({ items: z.array(schema) }).strict();
   const id = encodeURIComponent;
   return {
+    createWork: (text: string) => request("/works", c.workSchema, { method: "POST", body: { text } }),
+    respondWork: (workId: string, input: { kind: "answer" | "feedback"; text: string }) => request(`/works/${id(workId)}/input`, c.workSchema, { method: "POST", body: input }),
+    acceptWork: (workId: string) => request(`/works/${id(workId)}/accept`, c.workSchema, { method: "POST" }),
+    openWorks: async (signal?: AbortSignal) => {
+      const affairs = await request("/affairs", list(c.affairSchema), { signal });
+      const works: c.Work[] = [];
+      // Sequential reads bound concurrency; use existing owner-scoped projections.
+      for (const affair of affairs.items) {
+        const detail = await request(`/affairs/${id(affair.id)}`, c.affairDetailSchema, { signal });
+        works.push(...detail.works.filter(work => work.status !== "accepted" && work.status !== "cancelled"));
+      }
+      return works;
+    },
     today: (signal?: AbortSignal) => request("/today", c.todayViewSchema, { signal }),
     health: (signal?: AbortSignal) => request("/health", c.stewardHealthSchema, { signal }),
     affairs: (signal?: AbortSignal) => request("/affairs", list(c.affairSchema), { signal }),

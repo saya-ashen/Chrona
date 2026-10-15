@@ -49,6 +49,23 @@ export const TOOL_KINDS = ["script", "panel"] as const;
 export const TOOL_STATES = ["generated", "validation_failed", "validated", "authorized", "enabled", "disabled", "retired"] as const;
 export const TOOL_TRANSITIONS = ["validate", "authorize", "enable", "disable", "retire"] as const;
 export const SCHEDULE_ITEM_KINDS = ["appointment", "deadline", "steward_check", "follow_up", "unconfirmed_suggestion"] as const;
+/**
+ * External chat channels. Chrona owns scheduling and the outbox; the transport only
+ * carries one message per send. `hermes_qqbot` = legacy Hermes host (`hermes send`,
+ * Hermes owns its credentials); `chrona_qqbot` = Chrona's own QQ bot, whose openids are
+ * app-scoped and therefore a separate identity namespace (`chrona_qq:<openid>`).
+ */
+export const CHAT_CHANNELS = ["hermes_qqbot", "chrona_qqbot"] as const;
+export const CHAT_PLATFORMS = ["qqbot", "chrona_qq"] as const;
+/** The only channel a chat identity of each platform may bind a delegation to. */
+export const CHAT_CHANNEL_BY_PLATFORM = { qqbot: "hermes_qqbot", chrona_qq: "chrona_qqbot" } as const satisfies Record<(typeof CHAT_PLATFORMS)[number], (typeof CHAT_CHANNELS)[number]>;
+/** What a user can do by replying in chat. Every action names a reply ref. */
+export const CHAT_ACTIONS = ["confirm", "decline", "snooze", "done", "dismiss", "less_often", "pause", "resume", "revoke", "ack", "feedback"] as const;
+/** Actions a chat proposal may request; anything else needs the web console. */
+export const CHAT_PROPOSABLE_ACTIONS = ["read_source", "summarize", "notify_user", "create_follow_up", "link_affair"] as const;
+/** Reply refs: 4 characters, no 0/O/1/I/L, unique per workspace across items and delegations. */
+export const REPLY_REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+export const REPLY_REF_PATTERN = /^[2-9A-HJKMNP-Z]{4}$/;
 
 export type AffairStatus = (typeof AFFAIR_STATUSES)[number];
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
@@ -65,6 +82,9 @@ export type AttentionStatus = (typeof ATTENTION_STATUSES)[number];
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 export type HandlingMode = (typeof HANDLING_MODES)[number];
 export type ToolState = (typeof TOOL_STATES)[number];
+export type ChatChannel = (typeof CHAT_CHANNELS)[number];
+export type ChatPlatform = (typeof CHAT_PLATFORMS)[number];
+export type ChatAction = (typeof CHAT_ACTIONS)[number];
 
 // ---------------------------------------------------------------- views ----
 
@@ -106,6 +126,11 @@ export const notificationPolicySchema = z.object({
   quietHours: z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/), timezone: z.string().min(1).max(80) }).strict().nullable().default(null),
   /** "in_app" = visible in Chrona itself; the only channel that needs no external account. */
   channel: short.default("in_app"),
+  /**
+   * External destination such as "qqbot:<openid>". Set only from an authenticated
+   * chat binding on the server allowlist, never from event or model text.
+   */
+  recipient: z.string().trim().min(1).max(200).nullable().default(null),
 }).strict();
 
 export const delegationSchema = z.object({
@@ -113,11 +138,15 @@ export const delegationSchema = z.object({
   affairId: id.nullable(), connectionId: id.nullable(),
   purpose: prose, originalWording: z.string().max(4000),
   cadenceSeconds: z.number().int().min(60).nullable(),
+  /** Short code the user quotes in chat to act on this delegation. */
+  replyRef: z.string().max(16).nullable(),
   allowedActions: z.array(z.enum(STEWARD_ACTIONS)), askFirstActions: z.array(z.enum(STEWARD_ACTIONS)),
   notification: notificationPolicySchema,
   limits: z.object({ maxEventsPerCheck: z.number().int().min(1).max(500).default(50), maxNotificationsPerDay: z.number().int().min(0).max(200).default(10) }).strict(),
   grantedAt: iso.nullable(), expiresAt: iso.nullable(),
   lastCheckAt: iso.nullable(), lastSuccessAt: iso.nullable(), lastFailureAt: iso.nullable(), lastError: z.string().max(500).nullable(),
+  /** Set when this delegation is the bounded authorization of one requested piece of work, not a standing watch. */
+  workId: id.nullable().default(null),
   createdAt: iso, updatedAt: iso,
 }).strict();
 
@@ -138,11 +167,20 @@ export const attentionItemSchema = z.object({
   affairId: id.nullable(), affairTitle: z.string().max(200).nullable(), eventId: id.nullable(), delegationId: id.nullable(),
   title: short, whatHappened: prose, whyItMatters: z.string().max(4000), nextStep: z.string().max(2000),
   evidence: z.array(evidenceSchema).max(20), dueAt: iso.nullable(), snoozedUntil: iso.nullable(),
-  decision: z.enum(ATTENTION_DECISIONS).nullable(), decidedAt: iso.nullable(), createdAt: iso, updatedAt: iso,
+  decision: z.enum(ATTENTION_DECISIONS).nullable(), decidedAt: iso.nullable(),
+  /** Short code the user quotes in chat to act on this item. */
+  replyRef: z.string().max(16).nullable(),
+  /** Latest free-text feedback the user gave on this item (e.g. a chat reply). */
+  userNote: z.string().max(1000).nullable(),
+  createdAt: iso, updatedAt: iso,
 }).strict();
 
 export const notificationSchema = z.object({
   id, attentionItemId: id.nullable(), channel: short, status: z.enum(NOTIFICATION_STATUSES),
+  /** Destination snapshot at claim time; null for in_app. */
+  recipient: z.string().max(200).nullable(),
+  /** Channel receipt, e.g. "qqbot:<message id>". Sent is not read. */
+  receiptRef: z.string().max(200).nullable(),
   title: short, body: z.string().max(2000), link: z.string().max(2048).nullable(),
   attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), nextAttemptAt: iso.nullable(),
   generatedAt: iso, sentAt: iso.nullable(), acknowledgedAt: iso.nullable(),
@@ -195,6 +233,7 @@ export const affairDetailSchema = z.object({
   affair: affairSchema, attention: z.array(attentionItemSchema), events: z.array(inboundEventSchema),
   suggestedEvents: z.array(inboundEventSchema), delegations: z.array(delegationSchema),
   followUps: z.array(followUpSchema), tools: z.array(managedToolSchema),
+  works: z.array(z.lazy(() => workSchema)).default([]),
 }).strict();
 
 // ------------------------------------------------------------- requests ----
@@ -308,12 +347,149 @@ export class AssessorUnavailableError extends Error {
   constructor(message = "Assessor unavailable") { super(message); this.name = "AssessorUnavailableError"; }
 }
 
-export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null };
+export type DeliveryMessage = {
+  idempotencyKey: string; title: string; body: string; link: string | null;
+  /** Destination from the owning delegation's current policy; null for in_app. */
+  recipient: string | null;
+  /** Reply ref of the attention item, so the user can answer in chat. */
+  replyRef: string | null;
+  whyItMatters: string; nextStep: string;
+  /** App-relative page without locale, e.g. "/affairs/<id>" or "/today". */
+  appPath: string | null;
+};
 export type DeliveryOutcome =
   | { outcome: "accepted"; receiptRef: string | null }
   | { outcome: "rejected"; retryable: boolean; error: string }
   | { outcome: "uncertain"; error: string };
 export type DeliveryAdapter = { channel: string; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
+
+// ----------------------------------------------------------------- chat ----
+
+/**
+ * Identity of the chat turn, filled by the host plugin from the gateway's
+ * authenticated session context, never by the model. `userText` is the user's
+ * own message for this turn: Chrona checks reply refs against it and keeps it
+ * only as a proposal's original wording (otherwise only a hash is audited).
+ */
+export const chatIdentitySchema = z.object({
+  platform: z.literal("qqbot"), chatType: z.literal("dm"),
+  userId: id, chatId: id, messageId: z.string().trim().min(1).max(200).nullable(),
+  userText: z.string().max(2000).default(""),
+  /**
+   * How this turn reached Chrona. Only the explicit `/chrona` slash command, which the
+   * host dispatches before any model turn, may call the chat tools; ordinary chat never does.
+   */
+  route: z.literal("chrona_command"),
+}).strict();
+export type ChatIdentity = z.infer<typeof chatIdentitySchema>;
+/**
+ * A private message to Chrona's own QQ bot. Built in-process by the bot adapter from a
+ * gateway event, only after the sender's app-scoped openid matched the owner binding;
+ * never accepted from the management MCP. Every message there is a Chrona turn.
+ */
+export const dedicatedChatIdentitySchema = chatIdentitySchema.extend({ platform: z.literal("chrona_qq"), route: z.literal("dedicated_bot") }).strict();
+export const stewardChatIdentitySchema = z.discriminatedUnion("platform", [chatIdentitySchema, dedicatedChatIdentitySchema]);
+export type StewardChatIdentity = z.infer<typeof stewardChatIdentitySchema>;
+
+// ----------------------------------------------------------------- work ----
+/**
+ * Agent work protocol. One StewardWork = one thing the user asked for (via /chrona or the web).
+ * Chrona owns the status, leases, budgets, retries, permissions and the outbox; the agent
+ * (Pi, through Chrona-scoped tools) only reads bounded context and chooses tools. A status
+ * changes only through a server-side tool effect or the runner, never from model prose.
+ *
+ *   received → running → waiting_input | waiting_authorization | result_ready | received (retry)
+ *   waiting_* → received (user input / decision) ; result_ready → accepted (user) | received (feedback)
+ *   any open → cancelled (delegation revoked) ; running → failed after MAX failures ; paused delegation = no runs
+ */
+export const WORK_STATUSES = ["received", "running", "waiting_input", "waiting_authorization", "result_ready", "accepted", "failed", "cancelled"] as const;
+export const WORK_ATTEMPT_STATUSES = ["running", "result_published", "asked_user", "requested_authorization", "closed_quietly", "no_outcome", "timed_out", "budget_exhausted", "agent_unavailable", "cancelled", "lease_expired"] as const;
+/** Why a run was started. Wakes are bounded; nothing re-asks the model on a bare timer. */
+export const WORK_WAKE_REASONS = ["new_request", "user_input", "follow_up_due", "affair_changed", "retry"] as const;
+export const WORK_TOOLS = [
+  "chrona_get_context", "chrona_read_source", "chrona_save_progress", "chrona_ask_user", "chrona_publish_result",
+  "chrona_request_authorization", "chrona_propose_follow_up", "chrona_propose_delegation",
+  "chrona_suggest", "chrona_draft_tool", "chrona_close_quietly",
+] as const;
+/** Tool calls that end the attempt (the runner stops Pi after one succeeds). */
+export const WORK_TERMINAL_TOOLS = ["chrona_ask_user", "chrona_publish_result", "chrona_request_authorization", "chrona_close_quietly"] as const;
+/** Host-provided web tools (pi-web-access) allowed through Chrona's preflight and budget. */
+export const WORK_WEB_TOOLS = ["web_search", "fetch_content"] as const;
+export const WORK_LIMITS = { attemptTimeoutMs: 6 * 60_000, maxToolCalls: 30, maxWebCalls: 10, maxFailures: 3, maxRunsPerDay: 8, maxProgressNotes: 20, maxInputs: 20 } as const;
+/** Actions a chat request grants for its own work; anything wider is a separate proposal. */
+export const WORK_ALLOWED_ACTIONS = ["summarize", "notify_user", "create_follow_up", "link_affair", "propose_delegation", "propose_tool"] as const;
+
+export type WorkStatus = (typeof WORK_STATUSES)[number];
+export type WorkAttemptStatus = (typeof WORK_ATTEMPT_STATUSES)[number];
+export type WorkWakeReason = (typeof WORK_WAKE_REASONS)[number];
+export type WorkTool = (typeof WORK_TOOLS)[number];
+
+const workText = z.string().trim().min(1);
+export const workResultSourceSchema = z.object({ title: workText.max(300), url: z.string().url().max(2048), note: z.string().max(500).default("") }).strict();
+export const workHandlingSchema = z.object({ mode: z.enum(HANDLING_MODES), rationale: workText.max(2000) }).strict();
+
+export const workToolInputSchemas = {
+  chrona_get_context: z.object({}).strict(),
+  /** Read-only: status and recent events Chrona already holds for one connected source of this workspace (untrusted data). */
+  chrona_read_source: z.object({ connectionKind: z.enum(CONNECTION_KINDS), limit: z.number().int().min(1).max(20).default(10) }).strict(),
+  chrona_save_progress: z.object({
+    summary: workText.max(2000), findings: z.array(workText.max(1000)).max(10).default([]), nextSteps: z.array(workText.max(500)).max(10).default([]),
+    affairTitle: workText.max(200).optional(), affairGoal: workText.max(2000).optional(), handling: workHandlingSchema.optional(),
+  }).strict(),
+  chrona_ask_user: z.object({
+    questions: z.array(z.object({ question: workText.max(500), why: workText.max(500) }).strict()).min(1).max(3),
+    partialSummary: z.string().max(2000).default(""),
+  }).strict(),
+  chrona_publish_result: z.object({
+    title: workText.max(200), summary: workText.max(2000), body: workText.max(20_000),
+    sources: z.array(workResultSourceSchema).max(20).default([]), limitations: z.string().max(2000).default(""),
+    nextSteps: z.array(workText.max(500)).max(10).default([]), handling: workHandlingSchema,
+  }).strict(),
+  chrona_request_authorization: z.object({
+    missing: z.enum(["information", "tool", "permission"]), capability: workText.max(200), why: workText.max(1000), howToGrant: workText.max(1000),
+  }).strict(),
+  chrona_propose_follow_up: z.object({ note: workText.max(1000), dueAt: iso, reason: workText.max(500) }).strict(),
+  chrona_propose_delegation: z.object({
+    purpose: workText.max(2000), connectionKind: z.enum(CONNECTION_KINDS), cadenceMinutes: z.number().int().min(5).max(10080).default(15),
+    notify: z.enum(["immediate", "digest"]).default("immediate"),
+    quietHours: z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/), timezone: z.string().min(1).max(80) }).strict().nullable().default(null),
+    why: workText.max(1000),
+  }).strict(),
+  chrona_suggest: z.object({ topic: workText.max(80), title: workText.max(200), whyItMatters: workText.max(1000), nextStep: workText.max(500), evidence: z.array(workText.max(500)).max(5).default([]) }).strict(),
+  chrona_draft_tool: z.object({
+    kind: z.enum(TOOL_KINDS), name: workText.max(200), purpose: workText.max(2000), rationale: workText.max(2000),
+    signals: handlingSignalsSchema,
+    /** Declarative panel/rule spec (validated by toolSpecSchema); required for panels. */
+    spec: z.unknown().optional(),
+    /** Script DRAFT only: stored and shown, never executed by Chrona (no sandbox yet). */
+    script: z.object({ language: z.enum(["python", "typescript", "shell"]), source: workText.max(20_000), usage: workText.max(2000), validationPlan: workText.max(2000), risks: z.string().max(2000).default("") }).strict().optional(),
+  }).strict(),
+  chrona_close_quietly: z.object({ reason: workText.max(500) }).strict(),
+} satisfies Record<WorkTool, z.ZodTypeAny>;
+/** Web preflight: the agent extension asks before every host web tool call; Chrona enforces budget and URL policy. */
+export const workWebPreflightSchema = z.object({ tool: z.enum(WORK_WEB_TOOLS), input: z.record(z.string(), z.unknown()) }).strict();
+/** After a host web tool returns, the extension reports the URLs it saw so published sources can be checked. */
+export const workWebObservedSchema = z.object({ tool: z.enum(WORK_WEB_TOOLS), urls: z.array(z.string().url().max(2048)).max(50), titles: z.array(z.string().max(300)).max(50).default([]), failed: z.boolean().default(false) }).strict();
+
+export const workAttemptSchema = z.object({
+  id, number: z.number().int().min(1), status: z.enum(WORK_ATTEMPT_STATUSES), wakeReason: z.enum(WORK_WAKE_REASONS),
+  toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean(), note: z.string().max(300) }).strict()).max(60),
+  error: z.string().max(500).nullable(), startedAt: iso, endedAt: iso.nullable(),
+}).strict();
+export const workSchema = z.object({
+  id, affairId: id, delegationId: id, replyRef: z.string().max(16).nullable(), request: z.string().max(4000), status: z.enum(WORK_STATUSES), revision: z.number().int().min(1),
+  question: z.object({ questions: z.array(z.object({ question: z.string(), why: z.string() }).strict()), askedAt: iso }).strict().nullable(),
+  authorization: z.object({ missing: z.enum(["information", "tool", "permission"]), capability: z.string(), why: z.string(), howToGrant: z.string(), askedAt: iso }).strict().nullable(),
+  inputs: z.array(z.object({ at: iso, kind: z.enum(["answer", "feedback", "decision"]), text: z.string().max(1000) }).strict()).max(WORK_LIMITS.maxInputs),
+  progress: z.array(z.object({ at: iso, summary: z.string(), findings: z.array(z.string()), nextSteps: z.array(z.string()) }).strict()).max(WORK_LIMITS.maxProgressNotes),
+  handling: workHandlingSchema.nullable(),
+  /** App-relative link to the published result version (results layer); publication is not acceptance. */
+  resultHref: z.string().max(2048).nullable(), resultVersion: z.number().int().nullable(),
+  attempts: z.array(workAttemptSchema).max(10), failures: z.number().int().min(0), nextRunAt: iso.nullable(), lastError: z.string().max(500).nullable(),
+  createdAt: iso, updatedAt: iso,
+}).strict();
+export type Work = z.infer<typeof workSchema>;
+export type WorkAttempt = z.infer<typeof workAttemptSchema>;
 
 // ---------------------------------------------------------------- types ----
 

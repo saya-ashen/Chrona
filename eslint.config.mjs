@@ -168,6 +168,8 @@ const eslintConfig = defineConfig([
     },
   },
   globalIgnores([
+    // Pi extension: loaded by Pi (jiti + typebox), not part of the Chrona TypeScript build.
+    "external-plugins/pi-steward-agent/**",
     "**/.git/**",
     "**/.worktrees/**",
     "**/.next/**",

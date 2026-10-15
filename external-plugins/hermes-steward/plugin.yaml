@@ -1,0 +1,4 @@
+name: chrona-steward
+version: 0.4.0
+description: Migration notice for the independent Chrona QQ bot; /chrona never calls Chrona or reads credentials.
+provides_hooks: [pre_gateway_dispatch]
