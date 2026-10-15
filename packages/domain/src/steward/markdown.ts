@@ -5,12 +5,20 @@ import { toolSpecSchema, validatePanelEntry, type ToolSpec } from "./tool-spec";
 export function toggleCheckbox(content: string, line: number, checked: boolean): string {
   const lines = content.split("\n");
   const value = lines[line - 1];
-  if (!Number.isInteger(line) || line < 1 || value === undefined || !/^\s*[-*] \[[ x]\](?:\s|$)/.test(value)) throw new Error("不是任务行");
+  if (!Number.isInteger(line) || line < 1 || line > lines.length || !/^\s*[-*] \[[ x]\](?:\s|$)/.test(value)) throw new Error("不是任务行");
   lines[line - 1] = value.replace(/^(\s*[-*] \[)[ x](\])/, `$1${checked ? "x" : " "}$2`);
   return lines.join("\n");
 }
 
 export type PanelBlock = ToolSpec & { data: string };
+function parsePanelBody(body: string[]): PanelBlock {
+  const raw: unknown = JSON.parse(body.join("\n"));
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("无效面板");
+  const { data, ...spec } = raw as Record<string, unknown>;
+  const path = affairPathSchema.parse(data);
+  if (!path.endsWith(".csv") || path.includes("\\")) throw new Error("面板数据必须是相对 CSV 路径");
+  return { ...toolSpecSchema.parse(spec), data: path };
+}
 /** Invalid/unclosed panel declarations fail explicitly rather than silently hiding data. */
 export function parsePanelBlocks(content: string): PanelBlock[] {
   const blocks: PanelBlock[] = [];
@@ -25,14 +33,7 @@ export function parsePanelBlocks(content: string): PanelBlock[] {
       panel = fence[0] === "`" && open[2]!.trim() === "chrona-panel";
       body = [];
     } else if (new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`).test(line)) {
-      if (panel) {
-        const raw: unknown = JSON.parse(body.join("\n"));
-        if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("无效面板");
-        const { data, ...spec } = raw as Record<string, unknown>;
-        const path = affairPathSchema.parse(data);
-        if (!path.endsWith(".csv") || path.includes("\\")) throw new Error("面板数据必须是相对 CSV 路径");
-        blocks.push({ ...toolSpecSchema.parse(spec), data: path });
-      }
+      if (panel) blocks.push(parsePanelBody(body));
       fence = null;
     } else if (panel) body.push(line);
   }
@@ -40,30 +41,36 @@ export function parsePanelBlocks(content: string): PanelBlock[] {
   return blocks;
 }
 
+type CsvCell = { text: string; quoted: boolean; closed: boolean };
+function readCsvCharacter(cell: CsvCell, char: string, next: string | undefined): boolean {
+  if (cell.quoted) {
+    if (char !== '"') cell.text += char;
+    else if (next === '"') { cell.text += '"'; return true; }
+    else { cell.quoted = false; cell.closed = true; }
+  } else if (char === '"' && cell.text === "" && !cell.closed) cell.quoted = true;
+  else {
+    if (cell.closed || char === '"') throw new Error("无效 CSV");
+    cell.text += char;
+  }
+  return false;
+}
 function parseCsv(csv: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  let closed = false;
+  let cell: CsvCell = { text: "", quoted: false, closed: false };
   for (let i = 0; i < csv.length; i++) {
     const char = csv[i]!;
-    if (quoted) {
-      if (char !== '"') cell += char;
-      else if (csv[i + 1] === '"') { cell += '"'; i++; }
-      else { quoted = false; closed = true; }
-    } else if (char === ",") { row.push(cell); cell = ""; closed = false; }
-    else if (char === "\n" || char === "\r") {
-      if (char === "\r" && csv[i + 1] === "\n") i++;
-      row.push(cell); rows.push(row); row = []; cell = ""; closed = false;
-    } else if (char === '"' && cell === "" && !closed) quoted = true;
-    else {
-      if (closed || char === '"') throw new Error("无效 CSV");
-      cell += char;
-    }
+    if (!cell.quoted && [",", "\n", "\r"].includes(char)) {
+      row.push(cell.text);
+      cell = { text: "", quoted: false, closed: false };
+      if (char !== ",") {
+        if (char === "\r" && csv[i + 1] === "\n") i++;
+        rows.push(row); row = [];
+      }
+    } else if (readCsvCharacter(cell, char, csv[i + 1])) i++;
   }
-  if (quoted) throw new Error("CSV 引号未结束");
-  if (cell !== "" || row.length || closed) { row.push(cell); rows.push(row); }
+  if (cell.quoted) throw new Error("CSV 引号未结束");
+  if (cell.text !== "" || row.length || cell.closed) { row.push(cell.text); rows.push(row); }
   return rows;
 }
 

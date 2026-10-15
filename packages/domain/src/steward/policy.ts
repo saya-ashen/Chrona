@@ -16,13 +16,20 @@ function specificity(grant: Grant, target: Target): number {
     case "connector": return scope.connectorId === target.connectorId ? 1 : -1;
   }
 }
-export function decidePolicy(action: Action, target: Target, grants: readonly Grant[], now: Date): PolicyDecision {
-  const fallback: GrantMode = DEFAULT_POLICY[action];
+function isUsableGrant(grant: Grant, action: Action, now: Date): boolean {
+  return grant.action === action && grant.revokedAt === null
+    && !(grant.once && grant.consumedAt !== null)
+    && (grant.expiresAt === null || Date.parse(grant.expiresAt) > now.getTime());
+}
+function policyReason(action: Action, mode: GrantMode, chosen?: Grant): string {
+  const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "affair" ? "你在这件事里允许过：" : "你的授权规则：";
+  return `${prefix}${labels[action]}${modes[mode]}`;
+}
+function chooseGrant(action: Action, target: Target, grants: readonly Grant[], now: Date): Grant | undefined {
   let chosen: Grant | undefined;
   let rank = -1;
-  if (fallback !== "never") for (const grant of grants) {
-    if (grant.action !== action || grant.revokedAt !== null || (grant.once && grant.consumedAt !== null)
-      || (grant.expiresAt !== null && !(Date.parse(grant.expiresAt) > now.getTime()))) continue;
+  for (const grant of grants) {
+    if (!isUsableGrant(grant, action, now)) continue;
     const next = specificity(grant, target);
     if (next < 0) continue;
     if (next > rank || (next === rank && chosen && MODE_STRICTNESS[grant.mode] > MODE_STRICTNESS[chosen.mode])) {
@@ -30,8 +37,12 @@ export function decidePolicy(action: Action, target: Target, grants: readonly Gr
       rank = next;
     }
   }
+  return chosen;
+}
+export function decidePolicy(action: Action, target: Target, grants: readonly Grant[], now: Date): PolicyDecision {
+  const fallback: GrantMode = DEFAULT_POLICY[action];
+  const chosen = fallback === "never" ? undefined : chooseGrant(action, target, grants, now);
   const selected: GrantMode = chosen?.mode ?? fallback;
   const mode = selected === "preapproved" && !chosen ? "ask" : selected;
-  const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "affair" ? "你在这件事里允许过：" : "你的授权规则：";
-  return { action, mode, grantId: chosen?.id ?? null, reason: `${prefix}${labels[action]}${modes[mode]}` };
+  return { action, mode, grantId: chosen?.id ?? null, reason: policyReason(action, mode, chosen) };
 }

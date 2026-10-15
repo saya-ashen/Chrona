@@ -92,7 +92,11 @@ function formatDebt(path: string, baseline: Debt, current: Debt): string {
 }
 
 const baseRef = resolveBaseRef();
-const files = changedLintableFiles(baseRef);
+const eslint = new ESLint({ cwd: ROOT });
+const files: string[] = [];
+for (const path of changedLintableFiles(baseRef)) {
+	if (!await eslint.isPathIgnored(resolve(ROOT, path))) files.push(path);
+}
 if (files.length === 0) {
 	console.log(
 		`Lint ratchet: no changed lintable files relative to ${baseRef}.`,
@@ -100,7 +104,6 @@ if (files.length === 0) {
 	process.exit(0);
 }
 
-const eslint = new ESLint({ cwd: ROOT });
 const currentResults = await eslint.lintFiles(files);
 const currentByPath = new Map(
 	currentResults.map((result) => [

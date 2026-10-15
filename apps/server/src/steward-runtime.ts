@@ -27,20 +27,24 @@ export function stewardDataDir(env = process.env): string {
   if (!file || file === ":memory:") throw new Error("CHRONA_DATA_DIR required for an in-memory database");
   return dirname(resolve(file));
 }
-export function createStewardRuntime(db: PrismaClient, options: {
+type RuntimeOptions = {
   now?: () => Date; onError?: () => void; port?: number; provider?: ProviderAdapter | null;
   dataDir?: string; chatTransport?: StewardChatTransport | null; tickSeconds?: number; chatTimeoutMs?: number;
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
-} = {}) {
-  const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const configured = options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
+};
+function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) {
+  return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
     chronaExtension: fileURLToPath(new URL("../../../external-plugins/pi-steward-agent/chrona-tools.ts", import.meta.url)),
     command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
   }) : null) : options.provider;
+}
+export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
+  const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
+  const configured = configuredProvider(options, bwrap);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
   const provider: ProviderAdapter | undefined = configured ? { name: configured.name, health: () => configured.health(), start(input) {
@@ -77,12 +81,13 @@ export function createStewardRuntime(db: PrismaClient, options: {
   };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
+  const canTick = () => pending && !stopping;
   function tickOnce(): Promise<void> {
     if (stopping) return Promise.resolve();
     pending = true;
     if (running) return running;
     running = (async () => {
-      while (pending && !stopping) {
+      while (canTick()) {
         pending = false;
         try { if ((await service.tick()).failures.length) options.onError?.(); }
         catch { options.onError?.(); }

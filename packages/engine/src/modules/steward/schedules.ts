@@ -12,6 +12,15 @@ import { createRuns } from "./runs";
 import { createWorkspaceFs } from "./workspace-fs";
 import { audit } from "./audit";
 
+function beforeDeadline(nextAt: Date | null, until: Date | null): Date | null {
+  return until && nextAt && nextAt > until ? null : nextAt;
+}
+function nextDueOccurrence(rule: Parameters<typeof nextOccurrence>[0], now: Date, zone: string, until: Date | null): Date | null {
+  const nextAt = nextOccurrence(rule, now, zone);
+  if (until && now > until) return null;
+  return beforeDeadline(nextAt, until);
+}
+
 export function createSchedules(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, runs = createRuns(ports, workspaceId), fs = createWorkspaceFs(ports.dataDir);
   const timezone = async () => notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
@@ -23,7 +32,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     // "Do it now" one-shots arrive with a time that is already past by the time they are stored: fire on the next tick.
     if (!nextAt && input.rule.kind === "at") nextAt = now;
     const until = input.until ? new Date(input.until) : null;
-    if (until && nextAt && nextAt > until) nextAt = null;
+    nextAt = beforeDeadline(nextAt, until);
     return db.$transaction(async tx => {
       const affair = await requireAffair(tx, workspaceId, affairId);
       if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
@@ -56,8 +65,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       // Advance before external execution: concurrent ticks/downtime fire at most once.
       // A crash during a job leaves lastResult at "Firing" for inspection; it does not rerun external work.
       const rule = scheduleRuleSchema.parse(row.rule), delayMs = now.getTime() - row.nextAt!.getTime();
-      let nextAt = nextOccurrence(rule, now, zone);
-      if (row.until && (now > row.until || (nextAt && nextAt > row.until))) nextAt = null;
+      const nextAt = nextDueOccurrence(rule, now, zone, row.until);
       const expired = !!row.until && now > row.until;
       const claimed = await db.$transaction(async tx => {
         const changed = await tx.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt, affair: { status: "active" } }, data: { nextAt, status: nextAt ? "active" : "done", ...(!expired ? { lastAt: now, lastResult: `Firing; delay ${delayMs}ms` } : {}) } });

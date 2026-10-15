@@ -5,6 +5,20 @@ import { notificationSettings } from "./settings";
 import { toApproval, toRun, toSchedule } from "./store";
 import type { WorkspaceFs } from "./workspace-fs";
 export type HealthPorts = { provider(): Promise<Health["provider"]>; git(): Promise<boolean>; jobsSandbox(): boolean };
+async function findTodayPage(fs: WorkspaceFs, affairs: { id: string; dirName: string }[]): Promise<TodayView["todayPage"]> {
+  for (const affair of affairs) {
+    try {
+      const directory = fs.forAffair(affair.dirName), path = affairPathSchema.safeParse((await directory.read(".chrona/today")).content.trim());
+      if (!path.success) continue;
+      await directory.read(path.data); // Pointer must resolve through the confined filesystem.
+      return { affairId: affair.id, path: path.data };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as { code?: string }).code === "invalid" || (error as { code?: string }).code === "forbidden") continue;
+      throw error;
+    }
+  }
+  return null;
+}
 export function createToday({ db, workspaceId, now }: RecordContext, fs: WorkspaceFs, ports: HealthPorts) {
   async function health(): Promise<Health> {
     const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
@@ -42,18 +56,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, fs: Workspa
         changes.push({ affairId: edit.affairId, affairTitle: edit.affair.title, path: path.data, message: edit.text.slice(0, 500), at: edit.at.toISOString(), author: edit.actor });
       }
     }
-    let todayPage: TodayView["todayPage"] = null;
-    for (const affair of affairs) {
-      try {
-        const directory = fs.forAffair(affair.dirName), path = affairPathSchema.safeParse((await directory.read(".chrona/today")).content.trim());
-        if (!path.success) continue;
-        await directory.read(path.data); // Pointer must resolve through the confined filesystem.
-        todayPage = { affairId: affair.id, path: path.data }; break;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as { code?: string }).code === "invalid" || (error as { code?: string }).code === "forbidden") continue;
-        throw error;
-      }
-    }
+    const todayPage = await findTodayPage(fs, affairs);
     return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), agenda: schedules.filter(s => localDayKey(s.nextAt!, settings.timezone) === day && (!s.until || s.nextAt! <= s.until)).map(s => ({ ...toSchedule(s), affairTitle: s.affair.title })), changes: changes.slice(0, 100), todayPage, running: running.map(toRun), health: status };
   }
   return { get, health };

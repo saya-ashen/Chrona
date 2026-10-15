@@ -13,6 +13,15 @@ export type ApprovedAction = { workspaceId: string; approvalId: string; grantId:
 /** V5 seam: the executor must claim idempotently, recheck policy, consume once grants,
  * and record delivery outcomes. A resolved approval alone never means sent. */
 export type OnApproved = (action: ApprovedAction) => Promise<void>;
+async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
+  const { workspaceId, now } = context;
+  if (scope === "affair" && !row.affairId) throw new StewardError("invalid", "Affair scope requires an affair");
+  const action = toApproval(row).action;
+  const grant = await tx.grant.create({ data: { workspaceId, action, mode: "preapproved", scope: row.affairId ? { kind: "affair", affairId: row.affairId } : { kind: "global" }, once: scope === "once", createdAt: now() } });
+  const decision = decidePolicy(action, row.affairId ? { affairId: row.affairId } : {}, (await tx.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now());
+  if (decision.mode === "never" || decision.mode === "ask") throw new StewardError("forbidden", "Policy does not allow this approval");
+  return grant.id;
+}
 export function createApprovals({ db, workspaceId, now }: RecordContext, onApproved?: OnApproved) {
   return {
     list: async (status?: "open" | "approved" | "denied" | "expired") => (await db.approval.findMany({ where: { workspaceId, status }, include: { affair: true }, orderBy: { createdAt: "desc" } })).map(toApproval),
@@ -31,12 +40,7 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
       let grantId: string | null = null;
       if (input.decision === "approve") {
-        if (input.scope === "affair" && !row.affairId) throw new StewardError("invalid", "Affair scope requires an affair");
-        const action = toApproval(row).action;
-        const grant = await tx.grant.create({ data: { workspaceId, action, mode: "preapproved", scope: row.affairId ? { kind: "affair", affairId: row.affairId } : { kind: "global" }, once: input.scope === "once", createdAt: now() } });
-        const decision = decidePolicy(action, row.affairId ? { affairId: row.affairId } : {}, (await tx.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now());
-        if (decision.mode === "never" || decision.mode === "ask") throw new StewardError("forbidden", "Policy does not allow this approval");
-        grantId = grant.id;
+        grantId = await grantApproval(tx, { db, workspaceId, now }, row, input.scope);
       }
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");

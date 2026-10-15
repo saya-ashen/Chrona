@@ -8,7 +8,6 @@ export function createPreferences({ db, workspaceId, now }: RecordContext) {
     list: async () => (await db.preference.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } })).map(toPreference),
     add: (raw: unknown, origin: "said" | "learned" = "said") => db.$transaction(async tx => {
       const input = parseInput(createPreferenceSchema, raw);
-      if (origin !== "said" && origin !== "learned") throw new StewardError("invalid", "Invalid origin");
       const existing = await tx.preference.findFirst({ where: { workspaceId, text: input.text } });
       if (existing) return toPreference(existing);
       const row = await tx.preference.create({ data: { ...input, workspaceId, origin, createdAt: now() } });
