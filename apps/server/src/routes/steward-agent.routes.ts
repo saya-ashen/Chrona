@@ -3,7 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { createStewardService, StewardError, type StewardService } from "@chrona/engine";
 import type { StewardRoutePorts } from "./steward.routes";
 
-const failure = (code: string) => ({ ok: false as const, error: { code, message: code } });
+const failure = (code: string, message = code) => ({ ok: false as const, error: { code, message } });
 export function createStewardAgentRoutes(ports: StewardRoutePorts, service: StewardService = createStewardService(ports)) {
   const endpoint = service.tools;
   const router = new Hono<{ Variables: { token: string; catalog: Awaited<ReturnType<typeof endpoint.catalog>> } }>();
@@ -22,7 +22,7 @@ export function createStewardAgentRoutes(ports: StewardRoutePorts, service: Stew
   router.post("/tools/:name", async c => c.json({ ok: true, data: await endpoint.call(c.get("token"), c.req.param("name"), await c.req.json()) }));
   router.onError((error, c) => {
     if (error instanceof SyntaxError) return c.json(failure("INVALID_JSON"), 400);
-    if (error instanceof StewardError) return c.json(failure(error.code), { forbidden: 403, invalid: 400, not_found: 404, conflict: 409 }[error.code] as 400 | 403 | 404 | 409);
+    if (error instanceof StewardError) return c.json(failure(error.code, error.message), { forbidden: 403, invalid: 400, not_found: 404, conflict: 409 }[error.code] as 400 | 403 | 404 | 409);
     return c.json(failure("INTERNAL_ERROR"), 500);
   });
   return router;

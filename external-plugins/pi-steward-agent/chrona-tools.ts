@@ -19,8 +19,14 @@ export default async function (pi: BridgeApi) {
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`Chrona agent endpoint returned HTTP ${response.status}`);
-    return response.json();
+    const result = await response.json().catch(() => null) as { error?: { code?: unknown; message?: unknown } } | null;
+    if (!response.ok) {
+      const error = result?.error;
+      const message = typeof error?.code === "string" && typeof error.message === "string"
+        ? `${error.code}: ${error.message}` : `Chrona agent endpoint returned HTTP ${response.status}`;
+      throw new Error(message.replaceAll(token, "[redacted]"));
+    }
+    return result;
   }
   const catalog = await call("/catalog", undefined, 5000) as Catalog;
   for (const tool of catalog.tools) {

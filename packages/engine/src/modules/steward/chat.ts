@@ -110,10 +110,11 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   }
   function wait(inbound: MessageRow, runId: string, before: string[]): Promise<ChatReply> {
     return new Promise((resolve, reject) => {
-      let settled = false;
+      let settled = false, checking = false;
+      let grace: ReturnType<typeof setTimeout> | undefined;
       const finish = () => {
         if (settled) return;
-        settled = true; clearTimeout(timer); events.off(runId, finish);
+        settled = true; clearTimeout(timer); clearTimeout(grace); clearInterval(poll); events.off(runId, finish);
         void serial(`result:${inbound.id}`, async () => {
           const rows = await replies(inbound, before);
           const saved = await db.audit.findFirst({ where: { workspaceId: inbound.workspaceId, kind: "chat_result", subjectId: inbound.id } });
@@ -122,11 +123,19 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
         }).then(resolve, reject);
       };
       const timer = setTimeout(finish, ports.chatTimeoutMs ?? 120000);
+      // Replies are durable before delivery; polling also works across service instances.
+      const poll = setInterval(() => {
+        if (settled || checking || grace) return;
+        checking = true;
+        void replies(inbound, before).then(rows => {
+          if (!settled && rows.length) grace = setTimeout(finish, 3000);
+        }, () => {}).finally(() => { checking = false; });
+      }, 100);
       events.on(runId, finish);
       // Subscribe then check the durable completion marker, avoiding missed events
       // and resolving duplicates after restart without racing failure finalization.
       void db.audit.findFirst({ where: { workspaceId: inbound.workspaceId, kind: "chat_run_finished", subjectId: runId } }).then(done => { if (done) finish(); }, error => {
-        clearTimeout(timer); events.off(runId, finish); reject(error);
+        settled = true; clearTimeout(timer); clearTimeout(grace); clearInterval(poll); events.off(runId, finish); reject(error);
       });
     });
   }

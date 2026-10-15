@@ -23,7 +23,12 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     const call = await app.request("http://localhost/tools/chrona_remember", { method: "POST", headers, body: JSON.stringify({ text: "Prefer concise replies" }) });
     expect(call.status).toBe(200); expect((await call.json()).ok).toBe(true);
     expect(await db.preference.count()).toBe(1);
-    expect((await app.request("http://localhost/tools/chrona_remember", { method: "POST", headers, body: "{}" })).status).toBe(400);
+    const invalid = await app.request("http://localhost/tools/chrona_remember", { method: "POST", headers, body: "{}" });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("text:") } });
+    const root = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
+    expect(root.status).toBe(400);
+    expect(await root.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("chrona_affair_create / chrona_focus") } });
     await db.run.update({ where: { id: run.id }, data: { status: "finished" } });
     expect((await app.request("http://localhost/catalog", { headers })).status).toBe(401);
   } finally { await db.$disconnect(); }

@@ -94,6 +94,22 @@ test("timeout returns existing replies; late replies still use delivery", async 
   expect(delivered).toEqual(["working", "late"]);
 });
 
+test("first reply returns after three-second grace while run remains active; later replies deliver", async () => {
+  const delivered: string[] = [];
+  ports.deliveries = [{ channel: "in_app", send: async m => { delivered.push(m.body); return { outcome: "accepted", receiptRef: null }; } }];
+  const p = provider(), pending = send("long work"), run = await p.started;
+  const start = Date.now();
+  await service.tools.call(run.token, "chrona_reply", { text: "working" });
+  expect((await pending).messages.map(m => m.text)).toEqual(["working"]);
+  expect(Date.now() - start).toBeGreaterThanOrEqual(3000);
+  expect(Date.now() - start).toBeLessThan(4500);
+  expect((await db.run.findUniqueOrThrow({ where: { id: run.runId } })).status).toBe("running");
+  await service.tools.call(run.token, "chrona_reply", { text: "done" });
+  expect(delivered).toEqual(["working", "done"]);
+  const finished = deferred<void>(); ports.onRunFinished = async () => { finished.resolve(); };
+  p.finish(success); await finished.promise;
+});
+
 test("concurrent externalId duplicates share one inbound and one run", async () => {
   const p = provider();
   const first = send("once", { externalId: "concurrent" });

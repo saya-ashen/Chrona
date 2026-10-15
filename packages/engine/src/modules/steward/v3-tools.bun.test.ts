@@ -44,19 +44,22 @@ test("reply stores outbound and delivers; preferences and inbound are workspace 
   expect(await call("chrona_inbound")).toEqual([]);
   await expect(call("chrona_inbound", { connectorId: "other" })).rejects.toMatchObject({ code: "not_found" });
 });
-test("affair creation returns relative directory, readme, focus; schedules require explicit root affair", async () => {
+test("root schedules require an affair, then resolve conversation focus", async () => {
+  await expect(call("chrona_schedules")).rejects.toThrow("chrona_affair_create / chrona_focus");
+  await expect(call("chrona_schedule", { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "review" })).rejects.toThrow("then pass affairId");
   const a = await call("chrona_affair_create", { title: "Study", readme: "# Study\n\nProgress" }) as { id: string; path: string };
   expect(a.path).not.toContain("/");
   expect((await service.forWorkspace(workspaceId).affairs.detail(a.id)).affair.summary).toBe("Progress");
   await call("chrona_focus", { affairId: a.id });
   expect((await db.audit.findFirstOrThrow({ where: { kind: "conversation_focus" } })).subjectId).toBe("in_app");
   const input = { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "review" };
-  await expect(call("chrona_schedule", input)).rejects.toMatchObject({ code: "invalid" });
-  const s = await call("chrona_schedule", { ...input, affairId: a.id }) as { id: string };
-  expect(await call("chrona_schedules", { affairId: a.id })).toMatchObject([{ id: s.id }]);
+  const s = await call("chrona_schedule", input) as { id: string };
+  expect(await call("chrona_schedules")).toMatchObject([{ id: s.id }]);
+  const other = await service.forWorkspace(workspaceId).affairs.create({ title: "Other" });
+  expect(await call("chrona_schedules", { affairId: other.id })).toEqual([]);
   await call("chrona_schedule_cancel", { scheduleId: s.id });
   await call("chrona_affair_update", { affairId: a.id, title: "Updated" });
-  expect(await call("chrona_affairs")).toMatchObject([{ title: "Updated" }]);
+  expect(await call("chrona_affairs")).toEqual(expect.arrayContaining([expect.objectContaining({ title: "Updated" })]));
   await call("chrona_notify", { level: "digest", title: "Update", body: "Progress" });
   expect(await db.notification.count()).toBe(1);
 });

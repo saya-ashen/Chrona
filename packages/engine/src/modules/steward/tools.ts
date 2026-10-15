@@ -55,9 +55,19 @@ export function createTools(ports: StewardPorts) {
       const preferences = createPreferences(ctx), approvals = createApprovals(ctx);
       const affairId = (id?: string) => {
         const result = id ?? run.affairId;
-        if (!result) throw new StewardError("invalid", "An affairId is required at workspace root");
+        if (!result) throw new StewardError("invalid", "This run is at the workspace root: create or focus an affair first (chrona_affair_create / chrona_focus), then pass affairId.");
         return result;
       };
+      async function scheduleAffairId(id?: string) {
+        if (id || run.affairId) return affairId(id);
+        const focus = run.conversationKey ? await db.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey }, orderBy: { createdAt: "desc" } }) : null;
+        const focusedId = z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+        if (focusedId) {
+          const focused = await requireAffair(db, workspaceId, focusedId);
+          if (focused.status === "active") return focused.id;
+        }
+        return affairId();
+      }
       async function gate(action: Action, target: { affairId?: string; connectorId?: string }, payload: Prisma.InputJsonValue) {
         return db.$transaction(async tx => {
           const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
@@ -102,12 +112,12 @@ export function createTools(ports: StewardPorts) {
           return createNotifications(ports, workspaceId).enqueue({ level: input.level, title: input.title, body: input.body, affairId: run.affairId ?? undefined, dedupeKey: `tool:${run.id}:${index}` });
         }
         case "chrona_schedule": {
-          const input = parseInput(schemas[tool], raw), id = affairId(input.affairId);
+          const input = parseInput(schemas[tool], raw), id = await scheduleAffairId(input.affairId);
           const pending = await gate("schedule", { affairId: id }, { tool, ...input, affairId: id });
           if (pending) return pending;
           return schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, command: input.command, until: input.until });
         }
-        case "chrona_schedules": return schedules.list(affairId(parseInput(schemas[tool], raw).affairId));
+        case "chrona_schedules": return schedules.list(await scheduleAffairId(parseInput(schemas[tool], raw).affairId));
         case "chrona_schedule_cancel": {
           const input = parseInput(schemas[tool], raw);
           const row = await db.schedule.findFirst({ where: { workspaceId, id: input.scheduleId } });
