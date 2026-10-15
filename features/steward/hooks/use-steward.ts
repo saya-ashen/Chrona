@@ -1,37 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createStewardClient, type StewardClient } from "../model/client";
-import { decisionInput, type AttentionDecision } from "../model/today";
+import { createStewardClient, stewardError, type StewardClientError } from "../model/client";
 
-export function useStewardClient(workspaceId: string) { return useMemo(() => createStewardClient(workspaceId), [workspaceId]); }
-export function useStewardResource<T>(load: (signal?: AbortSignal) => Promise<T>) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true), [error, setError] = useState(false);
+export function useStewardClient(workspaceId: string) {
+  return useMemo(() => createStewardClient(workspaceId), [workspaceId]);
+}
+/** Refresh retains data; changing the loader clears data from the previous scope. */
+export function useStewardResource<T>(load: (signal?: AbortSignal) => Promise<T>, poll = false) {
+  const [state, setState] = useState<{ loader: typeof load; data: T | null; loading: boolean; error: StewardClientError | null }>({ loader: load, data: null, loading: true, error: null });
   const [generation, setGeneration] = useState(0);
-  const previousLoad = useRef(load);
+  const inFlight = useRef(false);
   const refresh = useCallback(() => setGeneration(value => value + 1), []);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(false);
-    // Refresh the same resource without unmounting its local answers/results.
-    // A new loader (workspace, affair or filter) must not retain old scoped data.
-    if (previousLoad.current !== load) setData(null);
-    previousLoad.current = load;
-    void load(controller.signal).then(value => { if (!controller.signal.aborted) setData(value); })
-      .catch(() => { if (!controller.signal.aborted) setError(true); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+    inFlight.current = true;
+    setState(previous => ({ loader: load, data: previous.loader === load ? previous.data : null, loading: true, error: null }));
+    void load(controller.signal).then(data => {
+      if (!controller.signal.aborted) setState({ loader: load, data, loading: false, error: null });
+    }).catch(error => {
+      if (!controller.signal.aborted) setState(previous => ({ ...previous, loading: false, error: stewardError(error) }));
+    }).finally(() => { if (!controller.signal.aborted) inFlight.current = false; });
+    return () => { controller.abort(); inFlight.current = false; };
   }, [load, generation]);
-  return { data, loading, error, refresh };
+  useEffect(() => {
+    if (!poll) return;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const update = () => {
+      clearInterval(timer);
+      if (!document.hidden) timer = setInterval(() => { if (!inFlight.current) refresh(); }, 15_000);
+    };
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", update); };
+  }, [poll, refresh]);
+  return { data: state.loader === load ? state.data : null, loading: state.loader !== load || state.loading, error: state.loader === load ? state.error : null, refresh };
 }
-export function useAttentionDecision(client: StewardClient, refresh: () => void) {
-  const [busy, setBusy] = useState(false), [error, setError] = useState(false);
-  const locked = useRef(false);
-  async function decide(id: string, decision: AttentionDecision) {
-    if (locked.current) return;
-    locked.current = true; setBusy(true); setError(false);
-    try { await client.decideAttention(id, decisionInput(decision, new Date())); refresh(); }
-    catch { setError(true); }
-    finally { locked.current = false; setBusy(false); }
-  }
-  return { busy, error, decide, clearError: () => setError(false) };
+
+/** Today health contains the aggregate queued/running count, including affairs not in its sections. */
+export function useSteward(workspaceId: string, chatPending = false) {
+  const client = useStewardClient(workspaceId);
+  const [poll, setPoll] = useState(chatPending);
+  const resource = useStewardResource(client.today, poll || chatPending);
+  useEffect(() => {
+    if (resource.data) setPoll(resource.data.health.queuedAffairs > 0 || resource.data.health.runningAffairs > 0);
+  }, [resource.data]);
+  return { ...resource, client };
 }

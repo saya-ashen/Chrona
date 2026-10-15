@@ -1,17 +1,21 @@
 import { useRef, useState } from "react";
-import { serverReason } from "../model/controls";
-import { staleResponse } from "../model/management";
-export function useStewardMutation(refresh: () => void) {
-  const lock = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [reason, setReason] = useState<string | null>(null);
-  const [notice, setNotice] = useState<"saved" | "stale" | "mutationError" | null>(null);
-  async function run(operation: () => Promise<unknown>) {
-    if (lock.current) return false;
-    lock.current = true; setBusy(true); setNotice(null); setReason(null);
-    try { await operation(); setNotice("saved"); refresh(); return true; }
-    catch (error) { setReason(serverReason(error)); if (staleResponse(error)) { setNotice("stale"); refresh(); } else setNotice("mutationError"); return false; }
-    finally { lock.current = false; setBusy(false); }
+import { stewardError, type StewardClientError } from "../model/client";
+
+export function useStewardMutation(refresh: () => void | Promise<void>) {
+  const locked = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<StewardClientError | null>(null);
+  async function run<T>(operation: () => Promise<T>): Promise<{ ok: true; data: T } | { ok: false }> {
+    if (locked.current) return { ok: false };
+    locked.current = true; setPending(true); setError(null);
+    try {
+      const data = await operation();
+      await refresh();
+      return { ok: true, data };
+    } catch (cause) {
+      setError(stewardError(cause));
+      return { ok: false };
+    } finally { locked.current = false; setPending(false); }
   }
-  return { busy, notice, reason, run, reset: () => { setNotice(null); setReason(null); } };
+  return { pending, error, run, reset: () => setError(null) };
 }

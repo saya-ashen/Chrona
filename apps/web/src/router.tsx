@@ -1,74 +1,32 @@
-import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
-
-import { defaultLocale, hasLocale } from "@chrona/i18n";
-
+import { createBrowserRouter, Navigate, useLocation, useParams } from "react-router-dom";
+import { defaultLocale, hasLocale, resolveLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
-import {
-  TodayRoutePage,
-  AffairDetailRoutePage,
-  StewardListRoutePage,
-  ActionCenterRoutePage,
-  DashboardRoutePage,
-  LocaleLandingPage,
-  GoalListRoutePage,
-  GoalWorkspaceRoutePage,
-  GoalTaskInspectorRoutePage,
-  ScheduleRoutePage,
-  SettingsRoutePage,
-  TaskDetailRoutePage,
-  TaskListRoutePage,
-  WorkResultsRoutePage,
-  WorkInboxRoutePage,
-  WorkRecordRoutePage,
-  WorkPagesHomeRoutePage,
-  WorkPageRoutePage,
-} from "./pages";
+import { TodayRoutePage } from "./pages";
+import { SettingsPage } from "@features/steward";
+import { AffairsPage } from "@features/steward/ui/affairs-page";
+import { AffairDetailPage } from "@features/steward/ui/affair-detail-page";
+import { PanelPage } from "@features/steward/ui/panel-page";
+import { ResultPage } from "@features/steward/ui/result-page";
 import { NotFoundPage } from "@/components/not-found-page";
-import {
-  loadAppBootData,
-  loadActionCenterRouteData,
-  loadDashboardRouteData,
-  loadGoalListData,
-  loadGoalWorkspaceData,
-  loadGoalTaskInspectorData,
-  loadScheduleRouteData,
-  loadTaskListData,
-  loadTaskPageData,
-} from "./loaders";
-function DefaultLocaleRedirect() {
+import { loadAppBootData } from "./loaders";
+
+function LocaleRedirect({ today = false }: { today?: boolean }) {
   const { search, hash } = useLocation();
-  return <Navigate to={`/${defaultLocale}${search}${hash}`} replace />;
+  const { lang } = useParams();
+  return <Navigate to={`/${today ? resolveLocale(lang) : defaultLocale}${search}${hash}`} replace />;
 }
 
-function redirectToDefaultLocale(
-  pathname: string,
-  search: string,
-  hash: string,
-  invalidLocale: string,
-) {
-  const invalidPrefix = `/${invalidLocale}`;
-  const localizedPath = pathname === invalidPrefix ? "" : pathname.slice(invalidPrefix.length);
-  return `${window.location.origin}/${defaultLocale}${localizedPath}${search}${hash}`;
-}
-
-function loadLocaleBootData({ params, request }: Parameters<typeof loadAppBootData>[0]) {
-  if (!params.lang || !hasLocale(params.lang)) {
-    const url = new URL(request.url);
-    throw Response.redirect(
-      redirectToDefaultLocale(url.pathname, url.search, url.hash, params.lang ?? ""),
-      302,
-    );
+function loadLocaleBootData(args: Parameters<typeof loadAppBootData>[0]) {
+  if (!args.params.lang || !hasLocale(args.params.lang)) {
+    throw new Response(null, { status: 404 });
   }
-  return loadAppBootData({ params, request } as Parameters<typeof loadAppBootData>[0]);
+  return loadAppBootData(args);
 }
 
 export function createAppRouter() {
   return createBrowserRouter([
-    {
-      path: "/",
-      element: <DefaultLocaleRedirect />,
-    },
+    { path: "/", element: <LocaleRedirect /> },
     {
       path: "/:lang",
       loader: loadLocaleBootData,
@@ -76,85 +34,14 @@ export function createAppRouter() {
       errorElement: <AccessKeyRouteError />,
       hydrateFallbackElement: <div aria-hidden="true" />,
       children: [
-        {
-          index: true,
-          element: <LocaleLandingPage />,
-        },
-        { path: "today", element: <TodayRoutePage /> },
-        { path: "affairs", element: <StewardListRoutePage kind="affairs" /> },
-        { path: "affairs/:affairId", element: <AffairDetailRoutePage /> },
-        { path: "delegations", element: <StewardListRoutePage kind="delegations" /> },
-        { path: "connections", element: <StewardListRoutePage kind="connections" /> },
-        {
-          path: "home",
-          element: <WorkPagesHomeRoutePage />,
-        },
-        {
-          path: "dashboard",
-          loader: loadDashboardRouteData,
-          element: <DashboardRoutePage />,
-        },
-        {
-          path: "schedule",
-          loader: loadScheduleRouteData,
-          element: <ScheduleRoutePage />,
-        },
-        {
-          path: "action-center",
-          loader: loadActionCenterRouteData,
-          element: <ActionCenterRoutePage />,
-        },
-        {
-          path: "goals",
-          loader: loadGoalListData,
-          element: <GoalListRoutePage />,
-        },
-        {
-          path: "goals/:goalId",
-          loader: loadGoalWorkspaceData,
-          element: <GoalWorkspaceRoutePage />,
-        },
-        {
-          path: "goals/:goalId/workbench/tasks/:taskId",
-          loader: loadGoalTaskInspectorData,
-          element: <GoalTaskInspectorRoutePage />,
-        },
-        {
-          path: "tasks",
-          loader: loadTaskListData,
-          element: <TaskListRoutePage />,
-        },
-        {
-          path: "settings",
-          element: <SettingsRoutePage />,
-        },
-        {
-          path: "work",
-          element: <WorkInboxRoutePage />,
-        },
-        {
-          path: "tasks/:taskId/work",
-          loader: loadTaskPageData,
-          element: <WorkRecordRoutePage />,
-        },
-        {
-          path: "tasks/:taskId/page",
-          loader: loadTaskPageData,
-          element: <WorkPageRoutePage />,
-        },
-        {
-          path: "tasks/:taskId/results",
-          element: <WorkResultsRoutePage />,
-        },
-        {
-          path: "tasks/:taskId",
-          loader: loadTaskPageData,
-          element: <TaskDetailRoutePage />,
-        },
-        {
-          path: "*",
-          element: <NotFoundPage />,
-        },
+        { index: true, element: <TodayRoutePage /> },
+        { path: "today", element: <LocaleRedirect today /> },
+        { path: "affairs", element: <AffairsPage /> },
+        { path: "affairs/:affairId", element: <AffairDetailPage /> },
+        { path: "affairs/:affairId/results/:version", element: <ResultPage /> },
+        { path: "settings", element: <SettingsPage /> },
+        { path: "tools/:toolId", element: <PanelPage /> },
+        { path: "*", element: <NotFoundPage /> },
       ],
     },
   ]);

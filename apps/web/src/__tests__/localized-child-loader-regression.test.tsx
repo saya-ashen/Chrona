@@ -1,68 +1,25 @@
-import { describe, expect, it } from "vitest";
-import React from "react";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { act, render, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LoaderFunctionArgs } from "react-router-dom";
+import { apiJson } from "../../../../shared/http/api-client";
+import { loadAppBootData } from "../loaders";
 
-import { AppShell } from "../app-shell";
-import { LocaleLandingPage } from "../pages";
-import type { AppBootData } from "../pages";
-import en from "@chrona/i18n/messages/en.json";
-
-const bootData: AppBootData = {
-  locale: "en",
-  dictionary: ({
-    ...en,
-    common: {},
-    navigation: {},
-    pages: {
-      actionCenter: { title: "Action Center", subtitle: "subtitle" },
-      memory: { title: "Memory", subtitle: "subtitle" },
-      settings: {
-        title: "Settings",
-        subtitle: "subtitle",
-        aiClientsDescription: "ai desc",
-        manageAiClients: "manage",
-        scheduleAiTitle: "schedule ai",
-        scheduleAiDescription: "schedule ai desc",
-        advancedTitle: "advanced",
-        advancedDescription: "advanced desc",
-        openAdvancedSettings: "open",
-      },
-    },
-    components: {
-      actionCenterList: {},
-      taskPage: {},
-    },
-  } as unknown) as AppBootData["dictionary"],
-  defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
-};
-
-
-describe("localized child pages under /:lang", () => {
-  it("navigates from /:lang to Today without crashing", async () => {
-    const router = createMemoryRouter(
-      [
-        {
-          path: "/:lang",
-          loader: async () => bootData,
-          element: <AppShell />,
-          children: [
-            { index: true, element: <LocaleLandingPage /> },
-            { path: "today", element: <div>Today</div> },
-          ],
-        },
-      ],
-      { initialEntries: ["/en"] },
-    );
-
-    const view = render(<RouterProvider router={router} />);
-
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/en/today");
-    });
-
-    await act(async () => {
-      view.unmount();
-    });
+vi.mock("../../../../shared/http/api-client", () => ({ apiJson: vi.fn() }));
+const args: LoaderFunctionArgs = { params: { lang: "en" }, request: new Request("http://localhost/en"), url: new URL("http://localhost/en"), pattern: "/:lang", context: {} };
+beforeEach(() => vi.resetAllMocks());
+describe("steward workspace boot", () => {
+  it("selects the first owner workspace from the list endpoint", async () => {
+    vi.mocked(apiJson).mockResolvedValue([{ id: "ws-1", name: "Owner" }, { id: "ws-2", name: "Other" }]);
+    const data = await loadAppBootData(args);
+    expect(data.defaultWorkspace).toEqual({ id: "ws-1", name: "Owner" });
+    expect(apiJson).toHaveBeenCalledWith("http://localhost/api/workspaces");
+  });
+  it("does not render without a workspace", async () => {
+    vi.mocked(apiJson).mockResolvedValue([]);
+    await expect(loadAppBootData(args)).rejects.toMatchObject({ status: 503 });
+  });
+  it("preserves authentication failures for the access-key boundary", async () => {
+    const error = new Response(null, { status: 401 });
+    vi.mocked(apiJson).mockRejectedValue(error);
+    await expect(loadAppBootData(args)).rejects.toBe(error);
   });
 });

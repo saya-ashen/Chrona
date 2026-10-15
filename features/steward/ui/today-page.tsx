@@ -1,63 +1,139 @@
+import { Link } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
-import type { AttentionItem } from "@chrona/contracts";
-import { Badge, Button, Card, CardHeader, CardTitle, CardContent } from "@shared/ui";
-import { Alert, AlertTitle, AlertDescription } from "@shared/ui";
-import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
-import { attentionDecisions, deriveToday, evidenceHref } from "../model/today";
+import { Alert, AlertDescription, Button, Skeleton } from "@shared/ui";
+import { AskItem } from "./ask-item";
+import { useStewardSession } from "../hooks/use-steward-session";
+import { headline, summary, healthProblems, relativeTime, visibleSections } from "../model/today";
 
-import { replyText } from "../model/chat";
-import { LocalizedLink } from "./localized-link";
-import { TodayWork } from "./today-work";
-import { StewardStatus } from "./steward-status";
-
-export function TodayPage({ workspaceId }: { workspaceId: string }) {
-  const { messages } = useI18n(), copy = messages.steward;
-  const client = useStewardClient(workspaceId);
-  const resource = useStewardResource(client.today);
-  const mutation = useAttentionDecision(client, resource.refresh);
-  const view = resource.data ? deriveToday(resource.data) : null;
-  return <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 p-4 [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
-    <h1 className="text-2xl font-semibold">{copy.today}</h1>
-    <TodayWork client={client} />
-    <StewardStatus health={resource.data?.health} />
-    {resource.loading && <p role="status">{copy.loading}</p>}
-    {resource.error && <Alert variant="destructive"><AlertTitle>{copy.error}</AlertTitle><AlertDescription><Button onClick={resource.refresh}>{copy.retry}</Button></AlertDescription></Alert>}
-    {mutation.error && <Alert variant="destructive"><AlertTitle>{copy.decisionError}</AlertTitle><AlertDescription><Button onClick={() => { mutation.clearError(); resource.refresh(); }}>{copy.retry}</Button></AlertDescription></Alert>}
-    {view && <>
-      {view.empty && <p role="status">{view.allClear ? copy.allClear : copy.noAttention}</p>}
-      {view.issues.length > 0 && <Alert><AlertTitle>{copy.health}</AlertTitle><AlertDescription><ul className="space-y-1">{view.issues.map(issue => <li key={issue.kind}>{copy[issue.kind]}{issue.count !== null && `: ${issue.count}`}{issue.since && <p>{copy.oldestPending}: <time dateTime={issue.since}>{issue.since}</time></p>}</li>)}</ul></AlertDescription></Alert>}
-      {view.sections.filter(section => section.items.length > 0 || section.recentResults.length > 0).map(section => <section key={section.key} aria-labelledby={`steward-${section.key}`} className="space-y-3">
-        <h2 id={`steward-${section.key}`} className="text-xl font-semibold">{copy[section.key]}</h2>
-        {section.items.map(item => <AttentionCard key={item.id} item={item} mutation={mutation} />)}
-        {section.recentResults.map(result => <Card key={result.id} className="min-w-0">
-          <CardHeader><CardTitle><h3><LocalizedLink className="underline" href={result.href}>{result.title}</LocalizedLink></h3></CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <p>{copy.resultTask}: {result.taskTitle}</p>
-            <p>{copy.resultVersion}: {result.version}</p>
-            <p>{copy.resultReview}: <Badge variant="outline">{Object.hasOwn(copy.resultReviews, result.reviewState) ? copy.resultReviews[result.reviewState as keyof typeof copy.resultReviews] : result.reviewState}</Badge></p>
-            <p>{copy.resultPublished}: <time dateTime={result.publishedAt}>{result.publishedAt}</time></p>
-          </CardContent>
-        </Card>)}
-      </section>)}
-    </>}
-  </div>;
+function TodayHeader({ view }: { view: NonNullable<ReturnType<typeof useStewardSession>["today"]["data"]> }) {
+  const { messages, locale } = useI18n();
+  const copy = messages.steward.foundation;
+  return (
+    <header className="space-y-1">
+      <time className="text-sm text-muted-foreground" dateTime={view.generatedAt}>
+        {new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", weekday: "long" }).format(new Date(view.generatedAt))}
+      </time>
+      <h1 className="text-2xl font-semibold">{headline(view.counts, copy)}</h1>
+      <p className="text-muted-foreground">{summary(view.counts, copy.summary)}</p>
+    </header>
+  );
 }
-export function AttentionCard({ item, mutation }: { item: AttentionItem; mutation: ReturnType<typeof useAttentionDecision> }) {
-  const { messages } = useI18n(), copy = messages.steward;
-  return <Card className="min-w-0">
-    <CardHeader><CardTitle><h3>{item.title}</h3></CardTitle><div className="flex min-w-0 flex-wrap items-center gap-2">{copy.status}: <Badge variant="outline">{copy.statuses[item.status]}</Badge>{item.replyRef && <Badge variant="outline" className="max-w-full whitespace-normal font-mono">{replyText(copy.chat.replyRef, item.replyRef)}</Badge>}</div></CardHeader>
-    <CardContent className="space-y-4">
-      {item.userNote && <div><h4 className="font-medium">{copy.chat.feedback}</h4><p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{item.userNote}</p></div>}
-      <dl className="space-y-3">
-        <div><dt className="font-medium">{copy.what}</dt><dd className="whitespace-pre-wrap">{item.whatHappened}</dd></div>
-        <div><dt className="font-medium">{copy.why}</dt><dd className="whitespace-pre-wrap">{item.whyItMatters || copy.notProvided}</dd></div>
-        <div><dt className="font-medium">{copy.next}</dt><dd className="whitespace-pre-wrap">{item.nextStep || copy.notProvided}</dd></div>
-      </dl>
-      <div><h3 className="font-medium">{copy.evidence}</h3>{item.evidence.length === 0 ? <p>{copy.noEvidence}</p> : <ul className="space-y-2">{item.evidence.map((evidence, index) => <li key={index}>
-        {evidenceHref(evidence.url) ? <a className="underline" href={evidenceHref(evidence.url)} target="_blank" rel="noopener noreferrer">{evidence.label}</a> : <span>{evidence.label}</span>}
-        {evidence.excerpt && <blockquote className="whitespace-pre-wrap">{evidence.excerpt}</blockquote>}
-      </li>)}</ul>}</div>
-      <div className="flex flex-wrap gap-2">{attentionDecisions(item).map(decision => <Button key={decision} variant={decision === "approve" || decision === "done" ? "default" : "outline"} disabled={mutation.busy || mutation.error} onClick={() => void mutation.decide(item.id, decision)}>{copy[decision]}</Button>)}</div>
-    </CardContent>
-  </Card>;
+
+function TodayHealth({ view }: { view: NonNullable<ReturnType<typeof useStewardSession>["today"]["data"]> }) {
+  const { messages } = useI18n();
+  const copy = messages.steward.foundation;
+  return healthProblems(view).length > 0 && (
+    <p role="alert" className="text-sm text-muted-foreground">
+      {healthProblems(view).map((key) => copy[key]).join(" · ")}
+    </p>
+  );
+}
+
+function TodayLoading() {
+  const { messages } = useI18n();
+  return (
+    <div role="status" aria-label={messages.steward.foundation.loading}>
+      <Skeleton className="h-24 w-full" />
+    </div>
+  );
+}
+
+export function TodayPage() {
+  const { messages, locale } = useI18n();
+  const copy = messages.steward.foundation;
+  const { today: resource } = useStewardSession();
+  const view = resource.data;
+  const affairHref = (id: string) => `/${locale}/affairs/${encodeURIComponent(id)}`;
+
+  return (
+    <div className="mx-auto grid w-full min-w-0 max-w-5xl gap-7 p-4 [overflow-wrap:anywhere]">
+      {resource.loading && !view && <TodayLoading />}
+      {resource.error && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {copy[resource.error.messageKey]}
+            <Button onClick={resource.refresh}>{copy.retry}</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {view && (
+        <>
+          <TodayHeader view={view} />
+          <div className="grid items-start gap-7 min-[860px]:grid-cols-2">
+            {visibleSections(view).map((section) => (
+              <section
+                key={section}
+                aria-labelledby={`today-${section}`}
+                className={
+                  section === "decisions" ? "grid gap-3 min-[860px]:col-span-2" : "grid gap-3"
+                }
+              >
+                <h2 id={`today-${section}`} className="text-sm font-semibold text-muted-foreground">
+                  {copy[section]}
+                </h2>
+                <div
+                  className={
+                    section === "decisions"
+                      ? "divide-y rounded-lg border border-l-4 border-l-warning bg-background"
+                      : "divide-y rounded-lg border bg-background"
+                  }
+                >
+                  {(section === "decisions" || section === "suggestions") &&
+                    view[section].map((ask) => (
+                      <AskItem
+                        key={ask.id}
+                        ask={ask}
+                        client={resource.client}
+                        refresh={resource.refresh}
+                      />
+                    ))}
+                  {section === "changes" &&
+                    view.changes.map((item) => (
+                      <article key={item.id} className="grid gap-2 p-4">
+                        <p>{item.text}</p>
+                        <Link to={affairHref(item.affairId)}>{item.affairTitle}</Link>
+                        <time dateTime={item.at} className="text-xs text-muted-foreground">
+                          {relativeTime(item.at, view.generatedAt, locale)}
+                        </time>
+                      </article>
+                    ))}
+                  {section === "results" &&
+                    view.results.map((item) => (
+                      <article key={item.id} className="grid gap-2 p-4">
+                        <h3>
+                          {item.title} · v{item.version}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{item.summary}</p>
+                        <Link
+                          className="text-xs text-muted-foreground hover:underline"
+                          to={affairHref(item.affairId)}
+                        >
+                          {item.affairTitle}
+                        </Link>
+                        <Button variant="outline" className="w-fit" asChild>
+                          <Link to={`${affairHref(item.affairId)}/results/${item.version}`}>
+                            {copy.read}
+                          </Link>
+                        </Button>
+                      </article>
+                    ))}
+                  {section === "upcoming" &&
+                    view.upcoming.map((item, index) => (
+                      <article key={`${item.affairId}-${index}`} className="grid gap-2 p-4">
+                        <p>{item.note}</p>
+                        <Link to={affairHref(item.affairId)}>{item.affairTitle}</Link>
+                        <time dateTime={item.at} className="text-xs text-muted-foreground">
+                          {relativeTime(item.at, view.generatedAt, locale)}
+                        </time>
+                      </article>
+                    ))}
+                </div>
+              </section>
+            ))}
+          </div>
+          <TodayHealth view={view} />
+        </>
+      )}
+    </div>
+  );
 }
