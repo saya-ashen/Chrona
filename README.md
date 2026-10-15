@@ -3,17 +3,7 @@ English | [中文](./README.zh.md)
 <p align="center">
   <img src="apps/web/public/favicon.png" width="80" alt="Chrona logo" />
 </p>
-
 <h1 align="center">Chrona</h1>
-
-<p align="center">
-  <strong>A proactive personal steward for your affairs.</strong>
-</p>
-
-<p align="center">
-  Keep context, notice authorized changes, surface decisions, and act within explicit boundaries.
-</p>
-
 <p align="center">
   <a href="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://github.com/saya-ashen/Chrona/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saya-ashen/Chrona" /></a>
@@ -21,389 +11,117 @@ English | [中文](./README.zh.md)
   <a href="./package.json"><img alt="Bun >= 1.3.11" src="https://img.shields.io/badge/bun-%3E%3D1.3.11-black" /></a>
 </p>
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#core-workflow">Workflow</a> ·
-  <a href="#providers">Providers</a> ·
-  <a href="#local-first-and-safety">Safety</a> ·
-  <a href="#project-status">Status</a> ·
-  <a href="./docs/en/quick-start.md">Full Guide</a> ·
-  <a href="./docs/en/architecture.md">Architecture</a> ·
-  <a href="./CONTRIBUTING.md">Contributing</a>
-</p>
-<p align="center">
-  <img src="docs/assets/generated/task-workflow.gif" width="100%" alt="Animated Chrona workflow showing task discovery, execution progress, and trace inspection" />
-  <br />
-  <em>Find an AI-executable task, follow its plan graph, and inspect the durable execution trace.</em>
-</p>
+## What Chrona is
 
----
+A personal steward available in chat, an affair center you control on the web, and a background agent service that keeps working. Tell it once; it keeps context, advances what it can, reports important changes, and shows what happened, where the results are, and what remains unresolved.
 
-Chrona is being rebuilt as a **proactive personal steward**: Today / Affairs /
-Schedule / Delegations / Connections over a durable event loop. The canonical
-[personal-steward direction](./docs/zh/personal-steward.md) (2026-10-13) replaces
-earlier product goals. Read the [English direction, implementation and gaps](./docs/en/personal-steward.md)
-before designing changes. Work/results remain the result layer; managed execution
-is secondary.
-
-> **Current checkout, unreleased:** local event loop, deterministic built-in
-> assessor, declarative tools, restrained suggestions and in-app delivery. Reddit
-> credentials/transport and external-Agent assessment are not wired; no real
-> external notification channel exists. This rebuild is not deployed and has not
-> migrated real user data.
-
-> **Earlier result-layer history, not steward deployment:** independent
-> text/file results and version/review UI were verified with an external Pi Agent.
-> Human acceptance is pending; other installs still default writes off. See
-> [Agent integration](./docs/en/work-results-integration.md). Managed-result and
-> Goal Inbox convergence remain next-stage work.
-> The earlier [Product Architecture](./docs/zh/product-architecture.md) remains
-> historical/result-layer design reference, not current product direction.
-
-The current managed-execution path creates reviewable plans, runs them manually
-or on a schedule, pauses for input/approval, and preserves evidence and results.
-That supported path remains available during the transition:
+Everything you hand over is an **affair**: a one-off request or something to keep watching. Simple questions can be answered without creating an affair. The agent chooses a handling method from context, not a fixed keyword menu; its choice is visible and correctable.
 
 ```text
-Task -> Plan -> Schedule -> Inspectable Execution
+QQ private chat / web → concierge → affairs → Pi agent → results / notifications
+                         └ direct reply        ↑              ↓
+                                  sources / scheduled checks  QQ / web
 ```
 
-Use Chrona for:
+Chrona owns state, scheduling, permissions and delivery. Pi works through scoped tools; model prose alone never changes state.
 
-- recurring research briefs and release preparation
-- maintenance, follow-up tasks, and scheduled work that should move forward
-- agent runs that need state, approvals, recovery, and persisted outputs
+## Pages
 
-## Why Chrona
+- **Today**: decisions, important changes, results and upcoming follow-ups.
+- **Affairs**: what is waiting for you, active, watching, paused or done.
+- **Affair**: context, current status, handling, timeline, care schedule and controls.
+- **Result**: readable content, versions, sources, limitations and feedback.
+- **Settings**: chat binding, notifications, permissions, preferences, sources, tools and runtime health.
 
-Calendars tell you what should happen. Task apps tell you what is pending. AI
-chat can do work, but it usually loses schedule, state, and accountability.
-Chrona combines those loops without pretending they are the same thing.
+## Autonomy and notifications
 
-| If you need to...                           | Chrona gives you...                                                                       |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Plan the day around real work               | tasks with priority, status, due dates, estimates, dependencies, and schedule metadata    |
-| Turn a scheduled task into executable steps | AI-generated plan graphs that can be reviewed, patched, accepted, rerun, and traced       |
-| Let due work move forward automatically     | schedule blocks, proposals, waiting states, task workspace approvals, and execution actions |
-| Keep AI execution accountable               | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
+Deterministic policy decides: `auto`, `notify_after`, `preapproved`, `ask`, or `never`. Read-only research and internal records are normally automatic; care schedules and panels are reported afterward. Sensitive external actions require approval; credential changes are left to you. Approval does not create an implementation for an unsupported action. External text cannot grant permission.
 
-## Quick Start
+Proactive notifications go through `now` / `digest` / `web` budgeting. Defaults: five immediate pushes per day, quiet hours 23:00–08:00 (urgent notices excepted), and a daily digest only when there is content. Excess immediate notices are folded into the digest. Settings lets you adjust the budget.
 
-Packaged releases are standalone and do not require Bun. Building or running
-Chrona from source requires Bun; npm-based repository development is not
-currently supported.
+## Quick start
 
-### Download a release
+Requires **Bun ≥ 1.3.11** and a compatible **Pi CLI**, with model access configured for the user running Chrona. Pi must support the flags used by the [runner](packages/integrations/src/steward/pi-agent-runner.ts). Web research additionally needs an explicit web extension path.
 
-Use this path if you want to run Chrona without cloning the repository.
-
-1. Open the
-   [latest GitHub release](https://github.com/saya-ashen/Chrona/releases/latest).
-2. Download the archive for your platform:
-
-| Platform            | Asset                        |
-| ------------------- | ---------------------------- |
-| Linux x64           | `chrona-linux-x64.tar.gz`    |
-| Linux ARM64         | `chrona-linux-arm64.tar.gz`  |
-| macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
-| macOS Intel         | `chrona-darwin-x64.tar.gz`   |
-| Windows x64         | `chrona-windows-x64.tar.gz`  |
-
-3. Extract the archive and start Chrona:
+From the repository root, choose a new, empty data directory:
 
 ```bash
-tar -xzf chrona-linux-x64.tar.gz
-cd chrona-linux-x64
-./chrona start
-```
-
-On Windows, run the packaged executable instead:
-
-```powershell
-tar -xzf chrona-windows-x64.tar.gz
-cd chrona-windows-x64
-.\Chrona.exe start
-```
-
-Open `http://localhost:3101` after the server starts.
-
-### Run from source
-
-Use this path if you want to develop Chrona or inspect the codebase.
-
-```bash
-git clone https://github.com/saya-ashen/Chrona.git
-cd Chrona
 bun install
+export CHRONA_DATA_DIR="$PWD/.data/steward-fresh"
+export DATABASE_URL="file:$CHRONA_DATA_DIR/chrona.db"
+export CHRONA_STEWARD_AGENT=pi
 bun run dev
 ```
 
-Open `http://localhost:3101`. `bun run dev` starts the Bun/Hono API server and
-the Vite web app.
+Open `http://localhost:3100`; the API defaults to `http://127.0.0.1:3101`. Startup creates the schema and the `ws_default` workspace. Source development requires an explicit `DATABASE_URL`: setting the data directory alone does not relocate its database. Do not reuse a pre-rebuild database.
 
-## First Run
-
-Explore Chrona without connecting a real provider:
-
-1. Create tasks with enough context to act on later.
-2. Build a schedule and inspect the Dashboard.
-3. Open task workspaces to review plans, state, and outputs.
-
-Enable AI execution when you are ready:
-
-1. Go to `Settings -> AI Clients`, add Codex—the default recommended provider—and run its availability check.
-2. Bind the client to the product features you want it to own. Codex, OMP, and Claude Code all support planning, Goal review, execution, and dashboard briefs.
-3. Generate a plan from the task workspace, review or edit the generated graph,
-   then accept it.
-4. Start execution manually from the task workspace, or let Chrona move
-   scheduled work forward when auto-execution is configured.
-
-See the [full quick start](./docs/en/quick-start.md) for data directories, AI
-client details, and troubleshooting.
-
-Trying the public alpha? Share your first-run experience through the
-[early-adopter feedback form](https://github.com/saya-ashen/Chrona/issues/new?template=early_adopter_feedback.yml),
-report a [setup/provider problem](https://github.com/saya-ashen/Chrona/issues/new?template=setup_provider_issue.yml),
-or open a [bug report](https://github.com/saya-ashen/Chrona/issues/new?template=bug_report.yml).
-Never include API keys, tokens, private URLs, database contents, or raw provider
-payloads.
-
-## Core Workflow
-
-Current steward: authorized source → durable event/baseline/dedupe → assessment
-and deterministic permission check → attention/follow-up/outbox → user decision
-and audited delivery. Start at Today; manage Affairs, Delegations and Connections.
-See [how it works](./docs/en/personal-steward.md).
-
-The workflow below is the retained managed-execution path, not a prerequisite
-for the steward. The demo above also shows that retained path.
-
-1. **Capture work** — create a task with priority, estimates, due dates,
-   dependencies, and schedule metadata.
-2. **Generate a plan** — turn rough context into a structured plan graph.
-3. **Review before execution** — patch, accept, or rerun plans before they
-   become executable task nodes.
-4. **Run with state** — execute `task`, `checkpoint`, `condition`, and `wait`
-   nodes manually, with AI assistance, or automatically when configured.
-5. **Inspect and recover** — review approvals, tool activity, failures,
-   blockers, persisted outputs, and next actions from the workspace.
-
-<p align="center">
-  <img src="docs/assets/generated/result-review.gif" width="100%" alt="Animated Chrona result review showing evidence inspection and result acceptance" />
-  <br />
-  <em>Review evidence and recommendations, then accept the result and keep it with the task.</em>
-</p>
-
-## Providers
-
-Chrona separates product workflow from execution providers. You configure
-providers as AI clients, then bind those clients to Chrona features.
-
-| Provider type | Status | Best for |
-| --- | --- | --- |
-| `codex` | Stable · Recommended | Default first-run ACP adapter. Supports planning, Goal review, execution, dashboard briefs, structured results, approvals, and session-history recovery. |
-| `omp` | Stable | In-process SDK adapter supporting planning, Goal review, execution, dashboard briefs, structured results, and session-history recovery. |
-| `claude_code` | Stable | Claude Agent SDK adapter supporting planning, Goal review, execution, dashboard briefs, structured results, and session recovery. |
-
-Configure providers in `Settings -> AI Clients`, then bind the client only to
-its displayed Chrona features. All released providers run side-effect-free planning and review through an explicit terminal-only read-only attempt that fails closed instead of replaying an uncertain start. Provider-specific recovery details remain visible in Settings.
-
-For provider fields, defaults, and troubleshooting, use the
-[full quick start](./docs/en/quick-start.md).
-
-## Local-first and Safety
-
-Chrona is designed to start local and explicit.
-
-| Area | Default / behavior |
-| --- | --- |
-| Storage | SQLite. Source development defaults to `file:./prisma/dev.db`; packaged releases use the platform data directory unless overridden. |
-| Network binding | `HOST` defaults to local-only `127.0.0.1`. |
-| API auth | `API_KEY` is optional for local development; set it before exposing `/api/*` beyond localhost. |
-| CORS | `ALLOWED_ORIGINS` can restrict browser origins when web and API are split. |
-| Provider scope | AI workers receive scoped runtime refs and Chrona control tools instead of raw internal database IDs. |
-| Automatic execution | Requires explicit provider/feature configuration and remains visible through task workspace state, approvals, blockers, and run records. |
-
-## Features
-
-- **Personal steward (local rebuild)** — Today, affairs, scoped delegations,
-  connection coverage, proactive suggestions, declarative tools and in-app delivery.
-- **Retained result/execution layer** — the capabilities below remain available
-  through secondary surfaces; they no longer define the product centre.
-
-- **Real schedules** — tasks carry priority, estimates, due dates,
-  dependencies, and schedule metadata.
-- **Editable plan graphs** — generated plans can be reviewed, patched, accepted,
-  rerun, and materialized into typed graph nodes.
-- **Graph-based execution** — `task`, `checkpoint`, `condition`, and `wait`
-  nodes support manual, assisted, and automatic work.
-- **Due-work recovery** — schedule views, AI insights, conflict suggestions,
-  proposals, waiting runs, failed runs, cancelled runs, and approvals keep the
-  next action visible.
-- **Observable AI work** — provider runs receive safe runtime refs instead of
-  internal database IDs. They report progress through Chrona tools such as
-  `chrona_node_complete`, `chrona_condition_select`, `chrona_node_block`,
-  `chrona_node_fail`, and `chrona_wait_complete`. Conversation history, tool
-  traces, and persisted outputs stay attached to the task.
-
-## Project Status
-
-> [!WARNING]
-> Chrona is a public alpha for local, non-critical workflows. Packaged releases
-> are standalone; source development uses Bun.
-
-Version 0.3.1 is ready for early adopters to exercise the complete local flow:
-task, plan, schedule, execution, recovery, and result review. It remains alpha
-because workflow UX and operational contracts may change. Do not rely on Chrona
-for unattended critical work or expose it directly to the public internet.
-
-## Roadmap
-
-This is a short maturity summary. See the full
-[roadmap](./docs/en/roadmap.md) for the source of truth.
-
-| Area | Availability | Maturity | Notes |
-| --- | --- | --- | --- |
-| Task foundation | Available | Usable | Task create/update/delete, completion/reopen, status, priority, labels, dependencies, parent/child relationships, and projections. |
-| Schedule surfaces | Available | Usable, polishing | Timeline/task views, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces. |
-| Plan generation | Available | Experimental | Streaming AI plan generation, persistence, review/edit/accept flows, and materialization into graph nodes. |
-| Execution runtime | Available | Experimental | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted state. |
-| Review loops | Available | Experimental | Dashboard and task workspace surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs. |
-| External calendars | Available | Early | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context. |
-| Polish existing flows | In progress | Active | Make Dashboard, Schedule, Task Workspace, and execution records more reliable and easier to understand. |
-| Reliable auto execution | In progress | Not stable | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails. |
-| Released provider parity | Available | Stable adapters | Codex, OMP, and Claude Code expose the same product feature surface; future adapters remain gated. |
-| Multi-session execution | Planned | Not available | Add isolation, reuse, recovery, and diagnostics across multiple sessions. |
-| Production readiness | Planned | Not ready | Authentication, backup/restore, deployment docs, migration safety, observability, and operational runbooks. |
-
-## Architecture
-
-Chrona is a Vite + Hono monorepo running on Bun with SQLite persistence.
-
-```text
-React SPA
-  -> Hono API server
-  -> Chrona engine
-      -> task / plan / schedule / projection modules
-      -> graph-runtime execution state
-      -> Prisma + SQLite persistence
-      -> AI clients and provider adapters
-```
-
-| Area                                 | Path                      |
-| ------------------------------------ | ------------------------- |
-| Web app                              | `apps/web/`               |
-| API server                           | `apps/server/`            |
-| CLI and binary entrypoints           | `packages/cli/`           |
-| Shared schemas and runtime contracts | `packages/contracts/`     |
-| Database layer                       | `packages/db/`            |
-| Steward UI                           | `features/steward/` |
-| Steward use cases                    | `packages/engine/src/modules/steward/` |
-| Steward pure rules                   | `packages/domain/src/steward/` |
-| Steward adapters                     | `packages/integrations/src/steward/` |
-| Product engine                       | `packages/engine/`        |
-| Plan graph runtime                   | `packages/graph-runtime/` |
-| Provider adapters                    | `packages/providers/`     |
-
-Start with the [product direction](./docs/zh/product-architecture.md), then read
-the [architecture guide](./docs/en/architecture.md),
-[data model](./docs/en/data-model.md), and
-[backend execution flow](./docs/en/backend-execution-flow.md) for deeper design
-notes.
+Use a trusted development network: the dev script binds Vite to all interfaces, even though the API defaults to loopback. This is not a production exposure recipe. See [operations](docs/zh/operations.md) for backups and health checks.
 
 ## Configuration
 
-Copy `.env.example` if you want local overrides.
+Set variables in the server process environment. Optional values are unset unless noted.
 
-| Variable            | Purpose                                    | Default / note                                                                                              |
-| ------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`      | SQLite database URL                        | source default: `file:./prisma/dev.db`; packaged releases use the platform data directory unless overridden |
-| `HOST`              | API server bind host                       | defaults to local-only `127.0.0.1`                                                                          |
-| `PORT`              | API server port                            | `3101`                                                                                                      |
-| `API_KEY`           | Optional bearer token for `/api/*` routes  | omit for local-only development                                                                             |
-| `CHRONA_WEB_DIST`   | Built web app directory for static serving | `apps/web/dist`                                                                                             |
-| `ALLOWED_ORIGINS`   | Comma-separated CORS allowlist             | omit for local development                                                                                  |
-| `VITE_API_BASE_URL` | Frontend API base URL override             | useful when web and API are split                                                                           |
+| Variable | Meaning / default |
+| --- | --- |
+| `DATABASE_URL` | SQLite URL; source server default `file:./prisma/dev.db` |
+| `CHRONA_DATA_DIR` | Packaged CLI data root and QQ state fallback; set explicitly for predictable operation |
+| `HOST`, `PORT` | API bind address and port: `127.0.0.1`, `3101` |
+| `API_KEY` | API authentication; required before non-loopback exposure |
+| `ALLOWED_ORIGINS` | Comma-separated additional browser origins; same-origin works by default |
+| `CHRONA_WEB_PORT` | Development web port: `3100` |
+| `VITE_API_BASE_URL` | Development proxy target: `http://127.0.0.1:3101` |
+| `CHRONA_SERVER_WATCH` | Set `false` to disable server watch in development |
+| `CHRONA_WEB_DIST` | Override built web asset directory |
+| `CHRONA_CONFIG_FILE` | Optional runtime JSON config path; explicit environment values take precedence |
+| `CHRONA_MIGRATIONS_DIR` | Override migration directory; source startup uses `prisma/migrations` |
+| `CHRONA_STEWARD_AGENT` | Set `pi` to enable concierge and affair agent; otherwise disabled |
+| `CHRONA_STEWARD_PI_COMMAND` | Pi executable path/name, default `pi` (not a shell command) |
+| `CHRONA_STEWARD_PI_MODEL` | Optional model passed to Pi |
+| `CHRONA_STEWARD_PI_AGENT_EXTENSION` | Override Chrona tool extension file; repository copy is discovered automatically |
+| `CHRONA_STEWARD_PI_WEB_EXTENSION` | Absolute path to a compatible web extension, such as pi-web-access; absent means no web tools |
+| `CHRONA_STEWARD_ASSESSOR` | `pi` for source assessment through Pi; otherwise deterministic rules |
+| `CHRONA_STEWARD_TICK_SECONDS` | Background tick interval: `60` seconds |
+| `CHRONA_STEWARD_CHINO_DASHBOARD_URL` | Enables the Chino service-health source adapter |
+| `CHRONA_PUBLIC_URL` | HTTP(S) origin for notification links; no path, query or credentials |
+| `CHRONA_QQ_APP_ID` | Dedicated QQ bot application ID |
+| `CHRONA_QQ_SECRET_FILE` | Path to private app-secret file owned by the server user |
+| `CHRONA_QQ_STATE_DIR` | QQ state directory; fallback: `CHRONA_DATA_DIR/qq-bot/<appId>` |
+| `CHRONA_STEWARD_SANDBOX_BWRAP` | Optional sandbox executable path; no script execution by default |
 
-AI clients are configured in the web app under `Settings -> AI Clients`. See
-[Providers](#providers) for supported provider types and Claude Code/Codex setup.
+Unsafe overrides `CHRONA_UNSAFE_PUBLIC_BIND` and `CHRONA_UNSAFE_CORS` exist but should remain unset. Do not enable `CHRONA_E2E_TEST_ROUTES` outside isolated tests.
 
-## FAQ
+## QQ bot setup
 
-### Can I use Chrona without an AI provider?
+Use a dedicated official QQ bot with private-chat access enabled for your account. Set its application ID, secret-file path and data/state directory in the same environment used by the server and CLI. The secret must be a private regular file owned by that user (for example, mode `0600`); never paste it into chat or source control.
 
-Yes. You can create tasks, schedule work, inspect the dashboard, and use task
-workspaces without an AI provider. Real AI plan generation and agent execution
-require a configured AI client. Codex, OMP, and Claude Code are stable supported providers; Codex is the default recommendation.
-
-### Is Chrona production-ready?
-
-Not yet. Version 0.3.1 is intended for early adopters running local,
-non-critical workflows. Core flows are usable, but workflow UX, operational
-contracts, and auto-execution hardening are still evolving.
-
-### Where does Chrona store data?
-
-Source development defaults to `file:./prisma/dev.db`. Packaged releases use the
-platform data directory unless `DATABASE_URL` overrides it.
-
-### Does automatic execution run silently?
-
-No. Automatic execution requires provider/feature configuration and remains
-visible through task workspace state, approvals, blockers, activity, and run
-records.
-
-## Development
-
-Chrona requires Bun `>=1.3.11` for repository development.
+Start Chrona, then generate a one-time code:
 
 ```bash
-bun install
-bun run dev              # full development stack
-bun run typecheck        # TypeScript
-bun run lint             # ESLint
-bun run test             # Vitest
-bun run test:bun         # Bun-native tests
-bun run test:api         # API tests
-bun run test:e2e         # Playwright E2E tests
+chrona qq bind-code --workspace ws_default
 ```
 
-Before larger changes, also run:
+For a source checkout without an installed `chrona` binary:
 
 ```bash
-bun run check:ui-foundation
-bun run check:boundaries
-bun run analyze
+bun run packages/cli/src/index.ts qq bind-code --workspace ws_default
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, code style, boundary rules,
-schema-first contract rules, and testing expectations.
+Send `绑定 <码>` to the bot in private chat. Codes expire after ten minutes by default. Only the bound owner can use the bot; normal conversation needs no command prefix. Check Settings → Chat and the QQ status file described in [operations](docs/zh/operations.md). QQ platform delivery limits still apply.
 
-## Documentation
+## Privacy and safety
 
-| Topic                  | Document                                                               |
-| ---------------------- | ---------------------------------------------------------------------- |
-| Documentation index    | [docs/README.md](./docs/README.md)                                     |
-| Quick start            | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md) |
-| Product direction      | [Personal steward (English)](./docs/en/personal-steward.md) / [中文（权威）](./docs/zh/personal-steward.md) |
-| Architecture           | [docs/en/architecture.md](./docs/en/architecture.md)                         |
-| API reference          | [docs/en/api-reference.md](./docs/en/api-reference.md)                       |
-| Data model             | [docs/en/data-model.md](./docs/en/data-model.md)                             |
-| Backend execution flow | [docs/en/backend-execution-flow.md](./docs/en/backend-execution-flow.md)     |
-| Provider boundary      | [docs/en/provider-boundary.md](./docs/en/provider-boundary.md)               |
-| Package boundaries     | [docs/en/package-boundaries.md](./docs/en/package-boundaries.md)             |
-| Roadmap                | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md)         |
-| Privacy and local data | [docs/en/privacy.md](./docs/en/privacy.md)                             |
-| Security               | [SECURITY.md](./SECURITY.md)                                           |
-| Code of Conduct        | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)                             |
+Local-first SQLite stores affairs and results on your machine; this does **not** mean offline-only. Model calls through Pi send bounded context to the configured model service; web searches/fetches contact external services; QQ chat and notifications pass through QQ. Chino polling contacts the configured service. Protect database backups and QQ state as private data.
 
-## Contributing
+The agent runner disables built-in tools and loads explicit extensions. Chrona API/database/QQ configuration is filtered from its environment; Pi still needs its own model credentials. Keep unrelated secrets out of the server environment. Review sources, results and approvals rather than treating model output as verified fact.
 
-Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md), run
-the relevant checks, and keep behavior covered by tests when changing task,
-schedule, execution, or navigation flows. For usage and setup questions, see
-[SUPPORT.md](./SUPPORT.md).
+## Project status
+
+Rebuilt, single-owner application; no multi-user collaboration or compatibility with pre-rebuild databases. Connected source adapters are **Chino service health** and **local test** (the latter is an isolated test seam, not a production feed).
+
+Scripts begin as drafts and require version-specific approval. Script execution is **unavailable by default**. This checkout contains an optional bubblewrap runner, requiring a configured executable and a successful isolation probe; its current mounts assume `/nix/store`. This is not a generally available or deployment-verified sandbox. A draft or approval is not evidence that a script ran.
+
+Product goals are not a claim that every target capability has shipped. See [documentation](docs/README.md), [design goals](docs/zh/steward-goals.md), [architecture](docs/zh/steward-rebuild.md), and [contributing](CONTRIBUTING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE).

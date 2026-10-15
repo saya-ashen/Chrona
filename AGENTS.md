@@ -1,139 +1,114 @@
 # Chrona — AI agent coding rules
 
-This is a Vite + Hono monorepo. There is NO Next.js — do not generate Next.js
-patterns.
+Vite + Hono monorepo (Bun runtime). There is NO Next.js.
 
-## Product direction — read before designing changes
+## Product — read before designing changes
 
-**Current direction (2026-10-13, user-authorized rebuild):**
-[Personal steward](docs/zh/personal-steward.md). Chrona is a proactive personal
-steward: Today / Affairs / Schedule / Delegations / Connections over a durable
-event loop. Where that document conflicts with anything below or with older
-docs, it wins. Within its scope, internal architecture, pages, domain model,
-APIs and the development schema may be rebuilt without compatibility shims, and
-the "unsafe without human approval" items for schema, engine and large UI
-redesign are pre-approved. Never pre-approved: deleting or migrating real user
-data, deploy/push, live databases, real accounts or external sends, disabling
-auth, approvals or secret redaction. The shared contract
-`packages/contracts/src/steward/index.ts` is supervisor-owned.
+Chrona is a proactive personal steward: the user hands over things in natural language
+(QQ private chat with Chrona's own bot, or the web composer); Chrona understands them,
+picks a suitable way to get them done, keeps looking after them, and reports back.
 
-The executor-independent work/results design below now describes the result
-layer the steward reuses, not the product centre.
+- Goals (highest authority): [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md).
+- Architecture, data model and pages: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
+- Page prototype: [`docs/prototypes/steward-pages.html`](docs/prototypes/steward-pages.html).
 
-Canonical target: [Executor-independent work and results workspace](docs/zh/product-architecture.md).
-Chrona owns durable work records, result versions, review, and reuse. Humans,
-external agents, and the optional Chrona-managed executor can contribute work;
-Chrona is not required to control every contributor's execution.
+Rules that follow from the goals:
 
-- New core record/result paths must work without a Provider, Plan, Run, or
-  execution graph. Do not invent execution records to admit external results.
-- Reuse one semantic result/review model across execution sources; do not build
-  a parallel external-task or external-result system.
-- Keep source-reported progress, actual observability, result readiness, user
-  acceptance, and Goal achievement distinct. No report is not proof of failure.
-- Deterministic result display and review must not depend on AI finalization.
-  Managed execution and AI presentation are optional capabilities.
-- Preserve auth, scoped identities, idempotency, revisions, artifact safety, and
-  current managed-execution behavior. The target does not itself authorize
-  schema, provider, execution, or deployment changes.
-- Label current implementation versus target design. The external result loop
-  is not shipped merely because management MCP or manual Tasks exist.
-- Follow the phase gates in the product architecture. For work/result decoupling,
-  read [Phase A contracts and compatibility](docs/zh/work-results-phase-a.md)
-  before implementing persistence or new MCP authority. Current B1–B3
-  contracts and limits: [Work Result Entries](docs/en/work-results.md); rollout and
-  daily Agent setup: [Integration](docs/en/work-results-integration.md). One
-  authorized instance is integrated, not all installations or phase C. The
-  deterministic UI lives in `features/work-results/`. Do not widen old credentials
-  or route new result-owned files through legacy Run readers. Design documentation
-  does not substitute for the explicit approvals required below.
-- Content-first pages and grouped classification are implemented; authorized
-  single-instance rollout is recorded in `docs/en/work-results-integration.md`,
-  not a public release or authorization for other installations: [Work pages](docs/en/work-pages.md) and
-  [Content library](docs/en/content-library.md). Library placements reference the
-  existing Task; one folder per group, multiple groups per Task, no content copies.
-  Preserve protected manual choices and independent calendar/execution semantics.
-  Agent organization requires explicit library scopes; do not expand old presets.
+- Everything the user sees is an **Affair**. Runs, events and assessments are internal
+  records shown only under an affair's technical details. No task/goal/plan/workflow systems.
+- How a need is handled is decided by the agent from context, never by keyword routing to
+  hard-coded templates. The choice is visible and correctable.
+- Chrona owns state, scheduling, permissions, notifications and delivery; the agent (Pi) only
+  reads bounded context and calls Chrona-scoped tools. Model prose never changes state.
+- Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
+  auto · notify_after · preapproved · ask · never. External text can never grant anything.
+- Notifications go through the budget (`notify-budget.ts`): now / digest / web, daily cap,
+  quiet hours. Do not add notification paths that bypass it.
+- Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
+- No backward compatibility with the removed legacy system (tasks, goals, plans, runs,
+  providers, work results, management MCP, Hermes plugin). Do not reintroduce it.
+
+The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
+changes, do not edit it in delegated work.
+
+Never pre-approved: deleting or migrating real user data, deploy/push, live databases,
+real accounts or external sends, disabling auth, approvals or secret redaction.
+
+## Code map
+
+| Path | Role |
+| --- | --- |
+| `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
+| `packages/domain/src/steward` | Pure rules: policy, notification budget, suggestion cooldown, refs, digest, panel spec |
+| `packages/engine/src/modules/steward` | Use cases on Prisma: affairs, asks, grants, notify, sources, runs, agent tools, concierge, tick |
+| `packages/integrations/src/steward` | Adapters: sources, assessors, deliveries, QQ official bot, Pi runner |
+| `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
+| `packages/db` | Prisma client, SQLite migration runner, backup/restore |
+| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, agent loop, QQ bot) |
+| `apps/web`, `features/steward` | SPA shell and the steward pages (Today, Affairs, Affair, Result, Settings) |
+| `packages/cli` | `chrona start / backup / restore / doctor / qq bind-code` |
+
+Dependency direction: `apps → features → packages/engine → packages/domain → packages/contracts`;
+routes validate and delegate; domain has no I/O.
 
 ## Tech stack
 
-- **Frontend:** Vite + React 19 + React Router 7 (SPA under `apps/web/`)
-- **Backend:** Hono API server (Bun runtime under `apps/server/`)
-- **Database:** SQLite via Prisma 7 with `prisma-adapter-bun-sqlite` (Bun-only
-  runtime)
-- **Language:** TypeScript strict everywhere
-- **AI runtime:** Provider bridge via structured-result contracts
+- Frontend: Vite + React 19 + React Router 7 (SPA in `apps/web`), shadcn/ui primitives in `shared/ui`, Tailwind.
+- Backend: Hono on Bun (`apps/server`).
+- Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
+- Agent: Pi (`pi -p`) with Chrona's tool extension; web tools from pi-web-access.
+- TypeScript strict everywhere.
 
-## Database migration policy
+## Database
 
-Current verified boundary and recovery rules: [Migration Release Lines](docs/en/migrations.md).
-Public v0.3.1 SQL is frozen; the sole next-release mutable directory is
-`20260917000000_add_work_management`. Read its metadata/normalizer requirements
-before adding work-result persistence.
+- Single migration line starting at `prisma/migrations/0001_initial`. Until the first release of
+  the rebuilt product, edit `0001_initial` to match `prisma/schema.prisma`
+  (`bunx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script`).
+- The runner (`packages/db/src/sqlite-migrations.ts`) records checksums and refuses changed
+  applied migrations and pre-rebuild databases. Use a fresh data dir for development.
+- Tests use temporary databases only (OS temp dir).
 
-- Database schema changes do not require a separate human approval gate by
-  default; follow the release-line migration policy below. Still get explicit
-  approval for schema changes that also alter unsafe areas such as auth,
-  provider contracts, secrets, deployment, or execution-engine semantics.
-- Keep exactly one mutable migration folder for the current unreleased release
-  line. Do not create a new migration folder for every schema edit.
-- Before the first public release with persistent user databases, that mutable
-  release-line migration is `prisma/migrations/0001_initial`, and it must match
-  `prisma/schema.prisma`.
-- After a public release ships, never edit, rename, delete, or squash any
-  migration included in that release. Treat those files and checksums as a user
-  data compatibility contract.
-- For the next release after a shipped version, create one new release-line
-  migration folder on the first schema change after the release. Name it with a
-  release-oriented timestamp and purpose, for example
-  `20260715000000_add_workspace_preferences`.
-- Continue writing subsequent unreleased schema changes for that release into
-  the same release-line migration folder, keeping it aligned with
-  `prisma/schema.prisma`. Only create another migration folder after the current
-  release ships, or when a release explicitly needs multiple independently
-  reversible upgrade steps.
-- When an earlier checksum of the mutable migration has already been applied to
-  an unreleased development database, add a checksum-keyed amendment SQL file
-  under that same migration folder and register its source schema fingerprint
-  and file checksum in `release-metadata.json`. Never authorize unknown schema
-  drift or use this mechanism for a released migration.
-- Every release candidate must prove both paths: fresh install from empty SQLite
-  and upgrade from the previous released database snapshot.
+## Checks
 
-Recommended workflow:
+- Heavy commands use a lot of memory: run them one at a time, memory-capped, e.g.
+  `systemd-run --user --scope --quiet -p MemoryMax=8G -p MemorySwapMax=1G env NODE_OPTIONS=--max-old-space-size=6144 bunx tsc --noEmit`.
+- Targeted first: `bun test <paths>` for packages/server, `bunx vitest run features/steward apps/web` for the web.
+- Full: `bun run typecheck`, `bun run lint`, `bun run test`; `bun run test:e2e:steward` when pages or flows change.
+- State derivation changes need table-driven tests. UI tests assert user-visible text, roles and
+  next actions (not CSS) and cover empty, loading, error, waiting and done states.
+- Never call a real model or QQ in automated tests.
 
-1. During unreleased development: edit `prisma/schema.prisma`; update the
-   current mutable release-line migration; reset disposable test databases as
-   needed. Preserve non-disposable local data with a registered amendment when
-   that mutable migration was already applied.
-2. Before first public release: regenerate `0001_initial/migration.sql` from the
-   final schema and delete any intermediate development-only migration folders.
-3. After each public release: preserve all shipped migrations; on the next
-   schema change, create exactly one new mutable release-line migration for the
-   next release and accumulate subsequent unreleased schema changes there.
-4. Verify with `bun run typecheck`, targeted DB/runtime tests, and release
-   smoke (`bun run chrona build <target>` plus `bun run build:smoke`).
+## Frontend UI foundation
 
-## Understand the codebase — read these first
+- In `apps/web/src/components/ui`, shadcn/ui primitives are the foundation for
+  basic controls. Use or generate standard shadcn primitives before creating any
+  custom button, badge, card, field, input, textarea, select, dialog, dropdown,
+  tabs, tooltip, separator, skeleton, or alert component.
+- Do NOT recreate generic primitives with custom helpers such as local
+  `buttonVariants`, generic status badge variants, generic surface cards, or
+  reusable field class constants when shadcn covers the role.
+- Chrona wrappers are allowed only when they add product/domain meaning or
+  repeated product-specific composition. Wrappers must compose shadcn primitives
+  and must not keep legacy compatibility aliases.
+- Before accepting UI foundation changes, run `bun run check:ui-foundation`. If
+  it flags removed imports, consumer `buttonVariants`, reusable field class
+  helpers, generic status badges, or generic surface cards, replace consumers
+  with official shadcn primitives first. Wrapper decision order: use generated
+  shadcn primitive, compose it in the feature component, then create a
+  product-named wrapper only when the wrapper carries Chrona domain meaning.
 
-Before exploring source, orient with the curated docs (kept current; faster and
-cheaper than reading files):
 
-| To understand…                                                                  | Read                                                                     |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Product destination, ownership, non-goals, and acceptance gates                  | [`docs/zh/product-architecture.md`](docs/zh/product-architecture.md)       |
-| Current system and target transition: layers, workflows, architecture rules      | [`docs/en/architecture.md`](docs/en/architecture.md)                     |
-| Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/en/package-boundaries.md`](docs/en/package-boundaries.md)         |
-| Frontend `apps/web`: routing, components, hooks, lib, conventions               | [`docs/en/frontend-structure.md`](docs/en/frontend-structure.md)         |
-| Execution internals                                                             | [`docs/en/backend-execution-flow.md`](docs/en/backend-execution-flow.md) |
-| Persistence                                                                     | [`docs/en/data-model.md`](docs/en/data-model.md)                         |
-| HTTP/MCP surface                                                                | [`docs/en/api-reference.md`](docs/en/api-reference.md)                   |
-| Full doc index                                                                  | [`docs/README.md`](docs/README.md)                                       |
+## Frontend development principles
 
-For **structural** questions (what calls X, where is X defined, blast radius),
-prefer the codegraph / GitNexus MCP tools (see the tool sections below) over
-grepping — they are a pre-built AST index. Read source directly only when
-editing it or for literal-text searches.
+- No business logic in React components: view models in `features/steward/model`, data in hooks.
+- User-facing strings live in `packages/i18n/src/messages/{zh,en}.json` (`steward` namespace).
+- Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
+- What needs the user's decision, and the primary action, must be visually obvious.
+- Copy speaks the user's language (affairs, results, notifications), not internal names (runs, grants, tokens).
+
+> Note for delegated workers (Pi): the context-mode, memory and CodeGraph sections below describe
+> MCP tools available only to some interactive agents. If you do not have them, use your native
+> read/grep/find/bash tools and keep output small.
 
 # context-mode — MANDATORY routing rules
 
@@ -226,153 +201,6 @@ Auto-expand for: security warnings, irreversible actions, user confusion. Write
 artifacts to FILES — never inline. Return: file path + 1-line description.
 Descriptive source labels for `search(source: "label")`.
 
-## Frontend SSE standard
-
-- In `apps/web/`, use `@microsoft/fetch-event-source` for all Server-Sent
-  Events.
-- Do NOT hand-roll SSE parsing with `ReadableStream#getReader()`, `TextDecoder`,
-  or manual `event:` / `data:` splitting in React components or hooks.
-- Route SSE calls through a shared helper
-  (`apps/web/src/lib/fetch-json-event-source.ts`) so headers, error handling,
-  JSON parsing, and non-stream fallbacks stay consistent.
-
-## Frontend UI foundation
-
-- In `apps/web/src/components/ui`, shadcn/ui primitives are the foundation for
-  basic controls. Use or generate standard shadcn primitives before creating any
-  custom button, badge, card, field, input, textarea, select, dialog, dropdown,
-  tabs, tooltip, separator, skeleton, or alert component.
-- Do NOT recreate generic primitives with custom helpers such as local
-  `buttonVariants`, generic status badge variants, generic surface cards, or
-  reusable field class constants when shadcn covers the role.
-- Chrona wrappers are allowed only when they add product/domain meaning or
-  repeated product-specific composition. Wrappers must compose shadcn primitives
-  and must not keep legacy compatibility aliases.
-- Before accepting UI foundation changes, run `bun run check:ui-foundation`. If
-  it flags removed imports, consumer `buttonVariants`, reusable field class
-  helpers, generic status badges, or generic surface cards, replace consumers
-  with official shadcn primitives first. Wrapper decision order: use generated
-  shadcn primitive, compose it in the feature component, then create a
-  product-named wrapper only when the wrapper carries Chrona domain meaning.
-
-## Frontend development principles
-
-- Preserve existing Chrona product behavior unless the spec explicitly changes
-  it.
-- Do not change backend APIs for visual or interaction polish unless justified
-  in the plan.
-- Do not put business logic in React components.
-- Keep user-facing strings in i18n message files.
-- Validate desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
-- Mobile views must not horizontally scroll.
-- Current task, active node, blocked/review state, and primary action must be
-  visually obvious.
-- Required checks: `bun run typecheck`, `bun run lint`, `bun run test`.
-- Run `bun run test:e2e` when task, schedule, or navigation flows are affected.
-
-## Frontend AI surface ownership
-
-- Keep component names domain-first (`TaskResultPanel`, `ExecutionActivity`,
-  `SettingsPage`). Do not rename components by implementation ownership unless
-  the ownership is the domain concept.
-- Mark AI/product/runtime boundaries with surface metadata, props, wrapper
-  names, `data-ui-surface-kind`, and local comments instead of broad directory
-  moves or component-name churn.
-- Use these surface kinds consistently: `product-authored` for fixed Chrona UI,
-  `ai-authored` for validated AI/json-render output, `ai-editable` for
-  product-owned regions AI may patch after review, and `runtime-control` for
-  execution state/actions owned by Chrona runtime.
-- Visual distinction should clarify trust and mutability: AI-authored shows
-  source/validation, AI-editable shows pending/review/revert affordance,
-  runtime-control emphasizes status and next action, product-authored stays
-  default.
-- Surface kind is lifecycle metadata, not permanent identity. A region may move
-  from product-authored to ai-editable or from ai-authored draft to saved
-  artifact without renaming its business component.
-- AI-authored surfaces must not contain product authority controls,
-  secret-bearing data, permission decisions, or execution lifecycle rules.
-
-## Chrona task workspace / AI auto-edit rules
-
-Target task workspace: work context, known progress and its source, results and
-versions, review needs, and next action come first. Plan, execution, and current
-node details are shown when real managed execution exists; their absence is a
-valid work shape, not an error. Preserve current runtime visibility while
-migrating; do not perform an unattended broad UI redesign.
-
-### Prohibited unattended changes
-
-- Do not change database schema, migrations, auth, run token, MCP bearer,
-  provider protocol, execution engine semantics, deployment config, secrets,
-  network binding, or external provider contracts without explicit human
-  approval.
-- Do not hand-roll SSE parsing in `apps/web`; use
-  `apps/web/src/lib/fetch-json-event-source.ts`.
-- Do not expose secrets, API keys, run tokens, provider request bodies, raw tool
-  payloads, or run context in UI, logs, tests, or json-render output.
-
-### UI state logic constraints
-
-- Derive `task.status`, `currentExecution.status`, `savedPlan.status`, and
-  execution node status through pure helpers under
-  `apps/web/src/components/tasks/workspace/model/`.
-- Header badge, command center status, graph node tone, activity tone, and
-  action disabled reason should share the same derived state source where
-  possible.
-- `WaitingForInput` and `WaitingForApproval` must remain distinguishable in UI
-  copy and derived metadata.
-- `Cancelled`, `Completed`, and `Done` must not be treated as identical unless
-  the test name documents the product decision.
-- Blocked and failed states must make the next action more prominent than
-  secondary metadata.
-
-### json-render rules
-
-- All Chrona json-render specs must validate against the `@chrona/ui-protocol`
-  catalog.
-- Add or update `packages/ui-protocol` tests when changing catalog components,
-  builders, validation, or AI output prompt examples.
-- Prefer shared spec builders over local one-off spec objects.
-- Fallback specs must be tested with `validateChronaSpec()`.
-
-### Required command matrix
-
-- Type-only/model/state changes: `bun run typecheck` and targeted
-  `bun run test`.
-- UI primitive/foundation changes: `bun run check:ui-foundation`,
-  `bun run typecheck`, and targeted tests.
-- json-render catalog/builder/validation changes: `bun run test:bun` and
-  `bun run typecheck`.
-- Task workspace navigation or execution flow changes: targeted tests plus
-  `bun run test:e2e:desktop` when flow affected.
-- Package boundary changes: `bun run check:boundaries`.
-
-### Test requirements
-
-- State derivation changes need table-driven tests.
-- UI changes must cover touched empty, loading, error, blocked, waiting, and
-  completed states.
-- Do not test CSS snapshots only; assert user-visible labels, roles, disabled
-  reasons, and next actions.
-
-### AI auto-edit boundaries
-
-Safe unattended AI:
-
-- pure helper extraction
-- status mapping tests
-- small UI polish
-- validation tests
-- dead field cleanup covered by typecheck
-
-Unsafe without human approval:
-
-- execution engine changes
-- DB schema or migrations
-- auth, permission, or token changes
-- provider protocol changes
-- large visual redesign
-- deploy, network, or secrets config
 
 ## Session Continuity
 
@@ -458,3 +286,4 @@ doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build
 the index?"_
 
 <!-- CODEGRAPH_END -->
+

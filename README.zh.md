@@ -3,17 +3,7 @@
 <p align="center">
   <img src="apps/web/public/favicon.png" width="80" alt="Chrona logo" />
 </p>
-
 <h1 align="center">Chrona</h1>
-
-<p align="center">
-  <strong>主动照看你的事务的个人管家。</strong>
-</p>
-
-<p align="center">
-  记住背景，看见授权范围内的变化，提醒决定与承诺，守住行动边界。
-</p>
-
 <p align="center">
   <a href="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://github.com/saya-ashen/Chrona/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saya-ashen/Chrona" /></a>
@@ -21,330 +11,117 @@
   <a href="./package.json"><img alt="Bun >= 1.3.11" src="https://img.shields.io/badge/bun-%3E%3D1.3.11-black" /></a>
 </p>
 
-<p align="center">
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#核心工作流">工作流</a> ·
-  <a href="#providers">Providers</a> ·
-  <a href="#local-first-与安全模型">安全</a> ·
-  <a href="#项目状态">状态</a> ·
-  <a href="./docs/zh/quick-start.md">完整指南</a> ·
-  <a href="./docs/en/architecture.md">架构</a> ·
-  <a href="./CONTRIBUTING.md">贡献</a>
-</p>
-<p align="center">
-  <img src="docs/assets/generated/task-workflow.gif" width="100%" alt="Chrona 英文界面动图：查找任务、查看执行进度与追踪记录" />
-  <br />
-  <em>查找可由 AI 执行的任务，沿计划图查看进度，并检查可追溯的执行记录。</em>
-</p>
+## Chrona 是什么
 
----
+聊天里随时能找的个人管家，网页上可掌控的事务中心，能持续办事的后台 Agent 服务。交代一次，记得住；能做的事情主动推进；有重要变化及时告诉你；回来查看时，清楚发生了什么、成果在哪里、还有什么没解决。
 
-Chrona 正在重构为**主动个人管家**：今日 / 事务 / 日程 / 委托 / 连接与权限，建立在持久事件闭环之上。[个人管家方向](./docs/zh/personal-steward.md)自 2026-10-13 起替代旧产品目标；[英文实现说明](./docs/en/personal-steward.md)对应当前源码。工作与成果是成果层，托管执行是次级能力。
-
-> **当前 checkout，未发布：** 已实现本地事件闭环、确定性内置 assessor、声明式工具、克制建议和 `in_app` 投递。Reddit 凭据/传输与外部 Agent assessor 未接线，没有真实外部通知通道；本重构未部署、未迁移真实用户数据。
-
-> **旧成果层历史，不代表管家部署：** 不依赖 Chrona Run 的文字／附件成果、版本与审阅界面的历史接入见[日常 Agent 接入](./docs/en/work-results-integration.md)。旧[产品架构](./docs/zh/product-architecture.md)仅保留为成果层历史／设计参考；当前结构见[系统架构](./docs/en/architecture.md)。
-
-当前已支持的托管路径仍保留：创建任务、安排日程、审查 AI 生成的计划，再手动或自动执行，并记录 checkpoint、审批、失败、工具动作和输出：
+交代的事情统一称为**事务**：可以是一次性请求，也可以持续照看。简单问题可以直接回答，不必创建事务。Agent 根据上下文选择处理方式，不按固定关键词菜单分派；选择可见、可纠正。
 
 ```text
-Task -> Plan -> Schedule -> Inspectable Execution
+QQ 私聊 / 网页 → 接待 → 事务 → Pi Agent → 成果 / 通知
+                └ 直接回答      ↑             ↓
+                         来源 / 定时检查      QQ / 网页
 ```
 
-适合用 Chrona 处理：
+Chrona 负责状态、调度、权限与投递。Pi 通过受限工具办事；模型文字本身不会改变状态。
 
-- 周期性调研简报、发布准备
-- 维护和跟进任务，以及需要持续推进的日程工作
-- 需要状态、审批、恢复和持久化输出的 agent run
+## 页面
 
-## 为什么需要 Chrona
+- **今日**：待决定、重要变化、成果与临近跟进。
+- **事务**：等你处理、进行中、照看中、已暂停、已结束的事。
+- **事务详情**：背景、现状、处理方式、时间线、照看节奏与操作。
+- **成果**：可阅读正文、版本、来源、局限与反馈。
+- **设置**：聊天绑定、通知、授权、偏好、来源、工具与运行状况。
 
-日历提醒你什么时候该做事。任务软件记录还有什么没做。AI
-能帮你做事，但很容易丢掉日程、状态和责任链。Chrona
-把这些环节接起来，同时保留它们各自的边界。
+## 自主权与通知
 
-| 如果你想...            | Chrona 可以...                                                       |
-| ---------------------- | -------------------------------------------------------------------- |
-| 围绕真实工作安排一天   | 用带优先级、状态、截止时间、估时、依赖和日程信息的任务组织工作       |
-| 把日程任务拆成执行步骤 | 生成可审查、可修改、可接受、可重跑、可追踪的 AI 计划图               |
-| 让到期任务继续推进     | 通过日程块、提案、等待状态、任务工作区审批和执行动作推动下一步       |
-| 让 AI 执行有记录可查   | 保留 runtime refs、checkpoint、审批、工具轨迹、失败和输出            |
+确定性策略决定 `auto`（直接做）、`notify_after`（做完告知）、`preapproved`（按授权执行）、`ask`（先问）、`never`（交还用户）。只读检索和内部记录通常直接做；设置照看和启用面板做完告知。敏感外部动作需要批准；修改凭据留给用户。批准不会让尚未实现的能力变得可用。外部文本不能授予权限。
+
+主动通知经过 `now` / `digest` / `web` 打扰预算。默认每天最多五条立即推送，23:00–08:00 为安静时段（紧急通知除外），有内容才发日报。超额立即通知合并到日报，可在设置中调整预算。
 
 ## 快速开始
 
-发行版是独立可执行程序，不需要安装 Bun。只有从源码构建或运行 Chrona
-时才需要 Bun；仓库开发暂不支持 npm。
+需要 **Bun ≥ 1.3.11** 和兼容的 **Pi CLI**；为运行 Chrona 的用户配置好模型访问。Pi 必须支持[运行器](packages/integrations/src/steward/pi-agent-runner.ts)使用的参数。网页检索还需要显式配置网页扩展路径。
 
-### 下载发行版
-
-如果只想先把 Chrona 跑起来，不需要克隆仓库：
-
-1. 打开[最新 GitHub Release](https://github.com/saya-ashen/Chrona/releases/latest)。
-2. 下载对应平台的压缩包：
-
-| 平台                | 文件                         |
-| ------------------- | ---------------------------- |
-| Linux x64           | `chrona-linux-x64.tar.gz`    |
-| Linux ARM64         | `chrona-linux-arm64.tar.gz`  |
-| macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
-| macOS Intel         | `chrona-darwin-x64.tar.gz`   |
-| Windows x64         | `chrona-windows-x64.tar.gz`  |
-
-3. 解压并启动 Chrona：
+在仓库根目录操作，选择全新的空数据目录：
 
 ```bash
-tar -xzf chrona-linux-x64.tar.gz
-cd chrona-linux-x64
-./chrona start
-```
-
-Windows 使用打包的可执行文件：
-
-```powershell
-tar -xzf chrona-windows-x64.tar.gz
-cd chrona-windows-x64
-.\Chrona.exe start
-```
-
-服务启动后打开 `http://localhost:3101`。
-
-### 从源码运行
-
-如果想开发 Chrona 或查看源码：
-
-```bash
-git clone https://github.com/saya-ashen/Chrona.git
-cd Chrona
 bun install
+export CHRONA_DATA_DIR="$PWD/.data/steward-fresh"
+export DATABASE_URL="file:$CHRONA_DATA_DIR/chrona.db"
+export CHRONA_STEWARD_AGENT=pi
 bun run dev
 ```
 
-打开 `http://localhost:3101`。`bun run dev` 会启动 Bun/Hono API server 和 Vite
-Web 应用。
+打开 `http://localhost:3100`；API 默认在 `http://127.0.0.1:3101`。启动会初始化数据库和 `ws_default` 工作区。源码开发需要显式指定 `DATABASE_URL`：仅设置数据目录不会改变其数据库位置。不要复用重构前的数据库。
 
-## 首次运行
-
-即使不连接真实 provider，也可以先探索 Chrona：
-
-1. 创建包含足够上下文的任务，方便之后继续推进。
-2. 安排日程，查看 Dashboard。
-3. 打开任务工作区，查看计划、状态和输出。
-
-准备接入 AI 执行时：
-
-1. 进入 `Settings -> AI Clients`，添加默认推荐的 `Codex` client，并运行可用性检查。
-2. 按需要绑定 `task.plan`、`goal.review`、`task.execution`、`dashboard.brief` 等产品功能。Codex、OMP 和 Claude Code 均支持这些完整流程。
-3. 在任务工作区生成计划，审查或编辑图结构，然后接受计划。
-4. 从任务工作区手动启动执行；配置自动执行后，也可以让 Chrona 推进到期任务。
-
-数据目录、AI client 细节和排障说明见[完整快速开始](./docs/zh/quick-start.md)。
-
-如果你正在试用公开 Alpha，请通过[早期用户反馈表](https://github.com/saya-ashen/Chrona/issues/new?template=early_adopter_feedback.yml)
-告诉我们首次使用体验；安装或 Provider 问题使用[设置问题模板](https://github.com/saya-ashen/Chrona/issues/new?template=setup_provider_issue.yml)，
-可复现错误使用[Bug 模板](https://github.com/saya-ashen/Chrona/issues/new?template=bug_report.yml)。
-请勿提交 API key、token、私有 URL、数据库内容或原始 Provider payload。
-
-## 核心工作流
-
-当前管家：授权来源 → 持久接收/基线/去重 → 判断与确定性权限校验 → 待处理/跟进/发件箱 → 用户决定与审计投递。今日为首页，事务、日程、委托和连接为主入口；详情见[个人管家](./docs/zh/personal-steward.md)。
-
-下述流程与上方动图是保留的托管执行路径，不是管家使用的前置条件。
-
-1. **记录工作** — 创建带优先级、估时、截止时间、依赖和日程信息的任务。
-2. **生成计划** — 把粗略上下文整理成结构化计划图。
-3. **执行前审查** — 计划变成可执行节点前，先修改、接受或重新生成。
-4. **带状态运行** — 手动、AI 辅助，或在配置后自动执行
-   `task`、`checkpoint`、`condition`、`wait` 节点。
-5. **检查和恢复** — 从工作区查看审批、工具活动、失败、阻塞、持久化输出和下一步动作。
-
-<p align="center">
-  <img src="docs/assets/generated/result-review.gif" width="100%" alt="Chrona 英文界面动图：检查证据并验收任务结果" />
-  <br />
-  <em>检查结果中的证据和建议，确认后将验收记录保留在任务中。</em>
-</p>
-
-## Providers
-
-Chrona 将产品工作流和执行 provider 分开。先把 provider 配置为 AI
-client，再把 client 绑定到 Chrona 功能。
-
-| Provider 类型 | 状态 | 适合 |
-| --- | --- | --- |
-| `codex` | 稳定 · 推荐 | 默认首次使用的 ACP adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果、审批和 session-history 恢复。 |
-| `omp` | 稳定 | 进程内 SDK adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果和 session-history 恢复。 |
-| `claude_code` | 稳定 | Claude Agent SDK adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果和 session 恢复。 |
-
-在 `Settings -> AI Clients` 中配置 provider，然后绑定到
-`task.plan`、`task.execution`、`dashboard.brief` 等 Chrona 功能。
-
-Provider 字段、默认值和排障说明见[完整快速开始](./docs/zh/quick-start.md)。
-
-## Local-first 与安全模型
-
-Chrona 默认从本机运行和显式配置开始。
-
-| 项目           | 默认行为                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| 存储           | SQLite。源码开发默认 `file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖。    |
-| 网络绑定       | `HOST` 默认只绑定本机 `127.0.0.1`。                                                        |
-| API auth       | 本地开发可以不设置 `API_KEY`；如果把 `/api/*` 暴露到 localhost 之外，应先设置。            |
-| CORS           | 前后端分开部署时，可用 `ALLOWED_ORIGINS` 限制浏览器来源。                                  |
-| Provider scope | AI worker 只会收到作用域受限的 runtime refs 和 Chrona control tools，不直接接触数据库 ID。 |
-| 自动执行       | 必须显式配置 provider/feature；状态、审批、阻塞和 run records 都会在任务工作区中可见。     |
-
-## 功能
-
-- **个人管家（本地重构）** — 今日、事务、明确委托、连接覆盖、主动建议、声明式工具与应用内通知。
-- **保留的成果/执行层** — 下列功能仍可通过次级入口使用，不再定义产品中心。
-
-- **真正的日程** — 任务带优先级、估时、截止时间、依赖和日程元数据。
-- **可编辑计划图** — 生成的计划可审查、可修改、可接受、可重新执行，并转换为类型化图节点。
-- **图结构执行** — `task`、`checkpoint`、`condition`、`wait` 节点支持手动、AI 辅助和自动执行。
-- **到期任务恢复** — 日程视图、AI 洞察、冲突建议、日程提案、等待/失败/取消的
-  run 和审批入口，让下一步动作保持可见。
-- **可观测 AI 工作** — Provider run 只接收安全的 runtime refs，不直接接触内部数据库 ID。它们通过
-  `chrona_node_complete`、`chrona_condition_select`、`chrona_node_block`、`chrona_node_fail`、`chrona_wait_complete`
-  等工具汇报进度。对话历史、工具轨迹和持久化输出都会留在任务上下文里。
-
-## 项目状态
-
-> [!WARNING]
-> Chrona 是面向本地、非关键工作流的公开 Alpha。发行版可独立运行；源码开发使用 Bun。
-
-0.3.1 已适合早期用户测试完整本地流程：任务、计划、日程、执行、恢复和结果验收。
-目前仍标记为 Alpha，因为工作流体验和运维契约可能变化。请勿将 Chrona 用于无人值守的关键任务，也不要直接暴露到公网。
-
-## 路线图
-
-这里是成熟度摘要。完整内容以[路线图](./docs/zh/roadmap.md)为准。
-
-| 领域            | 可用性 | 成熟度       | 备注                                                                                  |
-| --------------- | ------ | ------------ | ------------------------------------------------------------------------------------- |
-| 任务基础        | 已可用 | 可用         | 创建、更新、删除、完成/重开、状态、优先级、标签、依赖、父子任务和投影。               |
-| 日程界面        | 已可用 | 可用，打磨中 | Timeline/task views、AI 洞察、冲突、日程提案、任务创建和配置界面。                    |
-| 计划生成        | 已可用 | 实验性       | 流式 AI 计划生成、持久化、审查/编辑/接受流程，以及转换为图节点。                      |
-| 执行运行时      | 已可用 | 实验性       | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化状态。 |
-| 审查闭环        | 已可用 | 实验性       | Dashboard 和任务工作区里的待审批、日程提案、等待输入、失败/取消 run 入口。            |
-| 外部日历        | 已可用 | 早期         | 只读日历订阅、忙碌事件导入、来源管理、刷新状态和日程上下文。                          |
-| 完善现有流程    | 进行中 | 活跃         | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                 |
-| 可靠自动执行    | 进行中 | 尚不稳定     | 仅在配置允许且安全时启动到期任务，并在执行阻塞或失败时提供清晰恢复路径。              |
-| 已发布 Provider 一致性 | 已可用 | 稳定 Adapter | Codex、OMP 和 Claude Code 提供相同产品功能；未来 Adapter 仍需通过发布门禁。          |
-| 多会话执行      | 已计划 | 尚不可用     | 增加多会话的隔离、复用、恢复和诊断能力。                                              |
-| 生产可用性      | 已计划 | 未就绪       | 认证、备份/恢复、部署文档、迁移安全、可观测性和运维手册。                             |
-
-## 架构
-
-Chrona 是运行在 Bun 上的 Vite + Hono 单仓库项目，使用 SQLite 持久化。
-
-```text
-React SPA
-  -> Hono API server
-  -> Chrona engine
-      -> task / plan / schedule / projection modules
-      -> graph-runtime execution state
-      -> Prisma + SQLite persistence
-      -> AI clients and provider adapters
-```
-
-| 领域                  | 路径                      |
-| --------------------- | ------------------------- |
-| Web 应用              | `apps/web/`               |
-| API server            | `apps/server/`            |
-| CLI 和二进制入口      | `packages/cli/`           |
-| 共享 schema 和合约    | `packages/contracts/`     |
-| 数据库层              | `packages/db/`            |
-| 管家界面              | `features/steward/` |
-| 管家用例              | `packages/engine/src/modules/steward/` |
-| 管家纯规则            | `packages/domain/src/steward/` |
-| 管家适配器            | `packages/integrations/src/steward/` |
-| 产品引擎              | `packages/engine/`        |
-| 计划图运行时          | `packages/graph-runtime/` |
-| Provider adapters     | `packages/providers/`     |
-
-更多设计说明见[架构指南（英文）](./docs/en/architecture.md)、[数据模型（英文）](./docs/en/data-model.md)和[后端执行流程（英文）](./docs/en/backend-execution-flow.md)。
+只在可信开发网络使用：开发脚本将 Vite 绑定到所有网卡，即使 API 默认只监听回环地址。这不是生产环境对外开放方案。备份与健康检查见[运维说明](docs/zh/operations.md)。
 
 ## 配置
 
-如需本地覆盖配置，复制 `.env.example`。
+在服务进程环境中设置变量。除注明默认值外，均可不设置。
 
-| 变量                | 用途                         | 默认 / 说明                                                                |
-| ------------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| `DATABASE_URL`      | SQLite 数据库 URL            | 源码默认：`file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖 |
-| `HOST`              | API server 监听地址          | 默认本机 `127.0.0.1`                                                       |
-| `PORT`              | API server 端口              | `3101`                                                                     |
-| `API_KEY`           | `/api/*` 路由的可选 bearer token | 本地开发可省略                                                             |
-| `CHRONA_WEB_DIST`   | 构建后的 Web 静态目录        | `apps/web/dist`                                                            |
-| `ALLOWED_ORIGINS`   | 逗号分隔的 CORS 允许来源     | 本地开发可省略                                                             |
-| `VITE_API_BASE_URL` | 前端 API base URL 覆盖       | Web 和 API 分离时使用                                                      |
+| 变量 | 用途 / 默认值 |
+| --- | --- |
+| `DATABASE_URL` | SQLite URL；源码服务默认 `file:./prisma/dev.db` |
+| `CHRONA_DATA_DIR` | 打包 CLI 数据根目录、QQ 状态目录的后备位置；建议显式设置 |
+| `HOST`, `PORT` | API 监听地址与端口：`127.0.0.1`、`3101` |
+| `API_KEY` | API 认证；对非回环网络开放前必须配置 |
+| `ALLOWED_ORIGINS` | 逗号分隔的额外浏览器来源；默认允许同源 |
+| `CHRONA_WEB_PORT` | 开发网页端口：`3100` |
+| `VITE_API_BASE_URL` | 开发代理目标：`http://127.0.0.1:3101` |
+| `CHRONA_SERVER_WATCH` | 设为 `false` 关闭开发服务自动重启 |
+| `CHRONA_WEB_DIST` | 覆盖构建后的网页资源目录 |
+| `CHRONA_CONFIG_FILE` | 可选运行时 JSON 配置路径；显式环境变量优先 |
+| `CHRONA_MIGRATIONS_DIR` | 覆盖迁移目录；源码启动默认使用 `prisma/migrations` |
+| `CHRONA_STEWARD_AGENT` | 设为 `pi` 启用接待与事务 Agent；否则关闭 |
+| `CHRONA_STEWARD_PI_COMMAND` | Pi 可执行文件路径或名称，默认 `pi`，不是 shell 命令 |
+| `CHRONA_STEWARD_PI_MODEL` | 可选，传给 Pi 的模型 |
+| `CHRONA_STEWARD_PI_AGENT_EXTENSION` | 覆盖 Chrona 工具扩展路径；自动发现仓库内副本 |
+| `CHRONA_STEWARD_PI_WEB_EXTENSION` | 兼容网页扩展（如 pi-web-access）的绝对路径；不设置则无网页工具 |
+| `CHRONA_STEWARD_ASSESSOR` | `pi` 表示用 Pi 评估来源；否则使用确定性规则 |
+| `CHRONA_STEWARD_TICK_SECONDS` | 后台检查间隔：`60` 秒 |
+| `CHRONA_STEWARD_CHINO_DASHBOARD_URL` | 启用 Chino 服务健康来源适配器 |
+| `CHRONA_PUBLIC_URL` | 通知链接使用的 HTTP(S) origin；不可含路径、查询或凭据 |
+| `CHRONA_QQ_APP_ID` | 独立 QQ Bot 的应用 ID |
+| `CHRONA_QQ_SECRET_FILE` | 服务用户拥有的私有应用密钥文件路径 |
+| `CHRONA_QQ_STATE_DIR` | QQ 状态目录；默认回退到 `CHRONA_DATA_DIR/qq-bot/<appId>` |
+| `CHRONA_STEWARD_SANDBOX_BWRAP` | 可选沙箱可执行文件路径；默认不能执行脚本 |
 
-AI client 在 Web 应用的 `Settings -> AI Clients` 中配置。Provider 类型以及 Codex、OMP 和 Claude Code 的配置方式见 [Providers](#providers)。
+存在危险覆盖项 `CHRONA_UNSAFE_PUBLIC_BIND` 和 `CHRONA_UNSAFE_CORS`，应保持未设置。不要在隔离测试之外启用 `CHRONA_E2E_TEST_ROUTES`。
 
-## FAQ
+## QQ Bot 配置
 
-### 不配置 AI provider 可以使用 Chrona 吗？
+使用独立的 QQ 官方 Bot，并在平台为你的账号开放私聊访问。在服务与 CLI 的同一环境中配置应用 ID、密钥文件路径、数据或状态目录。密钥必须是当前用户拥有的私有普通文件（例如权限 `0600`），不要贴进聊天或提交到仓库。
 
-可以。即使没有 AI provider，也可以创建任务、安排日程、查看 Dashboard、使用任务工作区。真实的 AI 计划生成和 agent 执行需要配置 AI client。Codex、OMP 和 Claude Code 均为稳定支持项，默认推荐 Codex。
-
-### Chrona 生产可用了吗？
-
-还没有。0.3.1 面向运行本地、非关键工作流的早期用户。核心闭环已可使用，但工作流体验、运维契约和自动执行可靠性仍在持续完善。
-
-### Chrona 数据存在哪里？
-
-源码开发默认 `file:./prisma/dev.db`。发行版默认使用平台数据目录，除非通过 `DATABASE_URL` 显式覆盖。
-
-### 自动执行会静默运行吗？
-
-不会。自动执行必须显式配置 provider/feature，任务工作区会持续展示状态、审批、阻塞、activity 和 run records。
-
-## 开发
-
-仓库开发需要 Bun `>=1.3.11`。
-
-```bash
-bun install
-bun run dev              # 完整开发栈
-bun run typecheck        # TypeScript
-bun run lint             # ESLint
-bun run test             # Vitest
-bun run test:bun         # Bun-native tests
-bun run test:api         # API tests
-bun run test:e2e         # Playwright E2E tests
-```
-
-做较大变更前，也建议运行：
+启动 Chrona 后生成一次性绑定码：
 
 ```bash
-bun run check:ui-foundation
-bun run check:boundaries
-bun run analyze
+chrona qq bind-code --workspace ws_default
 ```
 
-开发环境、代码风格、边界规则、schema-first contract 规则和测试要求见
-[CONTRIBUTING.md](./CONTRIBUTING.md)。
+源码环境未安装 `chrona` 可执行文件时：
 
-## 文档
+```bash
+bun run packages/cli/src/index.ts qq bind-code --workspace ws_default
+```
 
-当前产品方向：[个人管家](./docs/zh/personal-steward.md) / [英文实现说明](./docs/en/personal-steward.md)。
+在 Bot 私聊中发送 `绑定 <码>`。默认十分钟过期。只有绑定的主人能使用，之后正常交流不需要命令前缀。检查设置 → 聊天，以及[运维说明](docs/zh/operations.md)中的 QQ 状态文件。QQ 平台投递限制仍然适用。
 
-| 主题               | 文档                                                                     |
-| ------------------ | ------------------------------------------------------------------------ |
-| 文档索引           | [docs/README.md](./docs/README.md)                                       |
-| 快速开始           | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md)   |
-| 架构               | [docs/en/architecture.md](./docs/en/architecture.md)                     |
-| API reference      | [docs/en/api-reference.md](./docs/en/api-reference.md)                   |
-| 数据模型           | [docs/en/data-model.md](./docs/en/data-model.md)                         |
-| 后端执行流程       | [docs/en/backend-execution-flow.md](./docs/en/backend-execution-flow.md) |
-| Provider boundary  | [docs/en/provider-boundary.md](./docs/en/provider-boundary.md)           |
-| Package boundaries | [docs/en/package-boundaries.md](./docs/en/package-boundaries.md)         |
-| 路线图             | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md)           |
-| Security           | [SECURITY.md](./SECURITY.md)                                             |
-| Code of Conduct    | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)                               |
+## 隐私与安全
 
-## 贡献
+本地优先：事务与成果保存在本机 SQLite，但**不等于完全离线**。Pi 模型调用会把有限上下文发送给所配置的模型服务；网页搜索和抓取会访问外部服务；QQ 聊天与通知经过 QQ；Chino 检查会访问配置的服务。数据库备份与 QQ 状态都应作为私人数据保护。
 
-欢迎贡献。请从 [CONTRIBUTING.md](./CONTRIBUTING.md) 开始，运行相关检查；修改任务、日程、执行或导航流程时，请用测试覆盖行为。使用和设置问题请查看 [SUPPORT.md](./SUPPORT.md)。
+Agent 运行器关闭内置工具，只加载显式扩展。Chrona 的 API、数据库、QQ 配置会从子进程环境中过滤；Pi 仍需自己的模型凭据。服务环境中不要放无关密钥。检查来源、成果与审批，不要把模型输出直接视为已核实事实。
 
-## License
+## 项目状态
 
-MIT
+重构中的单一 owner 应用，不支持多人协作，也不兼容重构前的数据库。来源适配器为 **Chino 服务健康**和**本地测试**（后者是隔离测试入口，不是生产信息源）。
+
+脚本起初是草稿，需要按版本批准。脚本执行**默认不可用**。当前代码包含可选 bubblewrap 运行器，需要配置可执行文件并通过隔离探测；目前挂载假定存在 `/nix/store`。它不是普遍可用或经部署验证的沙箱。草稿或批准不代表脚本已经运行。
+
+产品目标不代表所有目标能力均已交付。参阅[文档索引](docs/README.md)、[设计目标](docs/zh/steward-goals.md)、[架构](docs/zh/steward-rebuild.md)和[贡献指南](CONTRIBUTING.md)。
+
+## 许可证
+
+[MIT](LICENSE)。

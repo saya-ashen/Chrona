@@ -1,0 +1,401 @@
+<title>Chrona 管家页面</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm reading column (max 1080px) under a slim top bar; the composer is the constant at the top of every page.
+   Tokens mirror apps/web/src/styles/globals.css (shadcn theme) so the build can map 1:1. */
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --ink: #18181b; --ink-2: #52525b; --line: #dededb; --muted: #f1f1ee;
+  --primary: #6257c7; --primary-soft: #eeecff; --primary-line: #c9c3f5; --on-primary: #ffffff;
+  --warn: #875000; --warn-soft: #fdf3e2; --ok: #258451; --ok-soft: #e7f4ec; --bad: #a92f3e; --bad-soft: #fbeaec; --info: #2970a6;
+  --font: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 10px; --r-sm: 6px;
+  --t-xs: 12px; --t-sm: 13px; --t-md: 15px; --t-lg: 18px; --t-xl: 24px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #131316; --surface: #1b1b20; --ink: #ececf1; --ink-2: #a3a3ad; --line: #2e2e36; --muted: #24242b;
+    --primary: #9a90f0; --primary-soft: #2a2747; --primary-line: #4a4486; --on-primary: #15131f;
+    --warn: #e0a54a; --warn-soft: #33270f; --ok: #5cc28a; --ok-soft: #13291d; --bad: #ec7d8b; --bad-soft: #35181d; --info: #74b2e3;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #131316; --surface: #1b1b20; --ink: #ececf1; --ink-2: #a3a3ad; --line: #2e2e36; --muted: #24242b;
+  --primary: #9a90f0; --primary-soft: #2a2747; --primary-line: #4a4486; --on-primary: #15131f;
+  --warn: #e0a54a; --warn-soft: #33270f; --ok: #5cc28a; --ok-soft: #13291d; --bad: #ec7d8b; --bad-soft: #35181d; --info: #74b2e3;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: var(--t-md); line-height: 1.6; padding-inline: 16px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; font-weight: 600; }
+a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: underline; }
+button, input, textarea, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); margin-inline: -16px; padding: 10px 16px; }
+.bar-in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.brand { font-weight: 600; letter-spacing: .01em; }
+.nav { display: flex; gap: 4px; }
+.nav a { color: var(--ink-2); padding: 4px 10px; border-radius: var(--r-sm); font-size: var(--t-sm); }
+.nav a[aria-current="page"] { color: var(--ink); background: var(--muted); font-weight: 500; text-decoration: none; }
+.conn { margin-left: auto; font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 24px 64px; display: grid; gap: 28px; }
+.composer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 10px 10px 14px; display: flex; gap: 8px; align-items: flex-end; }
+.composer textarea { flex: 1; border: 0; background: transparent; resize: none; min-height: 26px; outline: none; padding: 4px 0; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: var(--r-sm); font-size: var(--t-sm); cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--muted); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.reply { display: grid; gap: 8px; padding: 12px 14px; border-left: 2px solid var(--primary-line); background: color-mix(in srgb, var(--primary-soft) 45%, transparent); border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--t-sm); }
+.reply .who { font-size: var(--t-xs); color: var(--ink-2); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: var(--t-xs); border: 1px solid var(--primary-line); color: var(--primary); background: var(--surface); padding: 1px 8px; border-radius: 99px; }
+
+.headline { display: grid; gap: 4px; }
+.headline .date { font-size: var(--t-sm); color: var(--ink-2); }
+.headline h1 { font-size: var(--t-xl); }
+.headline p { margin: 0; color: var(--ink-2); max-width: 65ch; }
+
+.section { display: grid; gap: 10px; }
+.section > header { display: flex; align-items: baseline; gap: 8px; }
+.section h2 { font-size: var(--t-sm); letter-spacing: .04em; color: var(--ink-2); font-weight: 600; }
+.count { font-size: var(--t-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); display: grid; }
+.item { padding: 12px 14px; display: grid; gap: 6px; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.item.stripe-warn { box-shadow: inset 3px 0 0 var(--warn); }
+.item.stripe-bad { box-shadow: inset 3px 0 0 var(--bad); }
+.item-top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.item-title { font-weight: 500; }
+.affair { font-size: var(--t-xs); color: var(--ink-2); }
+.affair a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); }
+.meta { font-size: var(--t-xs); color: var(--ink-2); margin-left: auto; font-variant-numeric: tabular-nums; }
+.why { margin: 0; font-size: var(--t-sm); color: var(--ink-2); max-width: 72ch; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.answer { display: flex; gap: 6px; flex-wrap: wrap; }
+.answer input { flex: 1; min-width: 180px; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 5px 10px; background: var(--bg); font-size: var(--t-sm); }
+.pill { font-size: var(--t-xs); padding: 1px 8px; border-radius: 99px; white-space: nowrap; font-weight: 500; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.run { background: var(--primary-soft); color: var(--primary); }
+.pill.idle { background: var(--muted); color: var(--ink-2); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; align-items: start; }
+
+/* affairs list */
+.group-h { display: flex; gap: 8px; align-items: baseline; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .t { font-weight: 500; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.row .s { grid-column: 1 / -1; font-size: var(--t-sm); color: var(--ink-2); margin: 0; }
+.row .n { grid-column: 1 / -1; font-size: var(--t-xs); color: var(--ink-2); }
+.row .when { font-size: var(--t-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+details.done summary { cursor: pointer; font-size: var(--t-sm); color: var(--ink-2); }
+
+/* detail */
+.detail { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+@media (max-width: 860px) { .detail { grid-template-columns: 1fr; } }
+.d-head { display: grid; gap: 6px; }
+.d-head .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.d-head h1 { font-size: var(--t-xl); }
+.d-head .goal { color: var(--ink-2); margin: 0; max-width: 65ch; }
+.d-head .ctl { margin-left: auto; display: flex; gap: 6px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 8px; }
+.panel h3 { font-size: var(--t-sm); color: var(--ink-2); font-weight: 600; letter-spacing: .04em; }
+.now { font-size: var(--t-md); margin: 0; max-width: 65ch; }
+.next { font-size: var(--t-sm); margin: 0; }
+.next b { font-weight: 500; }
+.result { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); display: grid; }
+.result-h { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.result-h h2 { font-size: var(--t-lg); }
+.result-b { padding: 16px; display: grid; gap: 10px; max-width: 70ch; font-size: var(--t-md); }
+.result-b h4 { margin: 6px 0 0; font-size: var(--t-md); }
+.result-b p, .result-b ul { margin: 0; }
+.result-b table { border-collapse: collapse; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
+.result-b td, .result-b th { border-bottom: 1px solid var(--line); padding: 4px 12px 4px 0; text-align: left; }
+.tbl { overflow-x: auto; }
+.sources { padding: 12px 16px; border-top: 1px solid var(--line); font-size: var(--t-sm); display: grid; gap: 4px; }
+.sources .v { color: var(--ok); font-size: var(--t-xs); }
+.sources .u { color: var(--warn); font-size: var(--t-xs); }
+.fb { padding: 12px 16px; border-top: 1px solid var(--line); }
+.tl { display: grid; gap: 0; }
+.ev { display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--line); font-size: var(--t-sm); }
+.ev:first-child { border-top: 0; }
+.ev time { color: var(--ink-2); font-size: var(--t-xs); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.ev .who { font-size: var(--t-xs); color: var(--ink-2); }
+.ev.user .who { color: var(--primary); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: var(--t-sm); margin: 0; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+details.tech summary { cursor: pointer; font-size: var(--t-sm); color: var(--ink-2); }
+.mono { font-family: var(--mono); font-size: var(--t-xs); }
+
+/* settings */
+.set { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 760px) { .set { grid-template-columns: 1fr; } .set nav { display: none; } }
+.set nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); display: grid; gap: 2px; font-size: var(--t-sm); }
+.set nav a { color: var(--ink-2); padding: 4px 8px; border-radius: var(--r-sm); }
+.set nav a:hover { background: var(--muted); text-decoration: none; }
+.policy { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+.policy th { text-align: left; font-weight: 500; color: var(--ink-2); font-size: var(--t-xs); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.policy td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.policy select { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 2px 6px; font-size: var(--t-sm); }
+.field { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; align-items: center; font-size: var(--t-sm); }
+@media (max-width: 520px) { .field { grid-template-columns: 1fr; } }
+.field input { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 4px 8px; background: var(--surface); width: 120px; font-variant-numeric: tabular-nums; }
+.hint { font-size: var(--t-xs); color: var(--ink-2); margin: 0; }
+.pref { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--t-sm); }
+.pref:first-child { border-top: 0; }
+.pref .o { font-size: var(--t-xs); color: var(--ink-2); margin-left: auto; white-space: nowrap; }
+
+.view[hidden] { display: none !important; }
+.note { font-size: var(--t-xs); color: var(--ink-2); text-align: center; }
+@media (prefers-reduced-motion: no-preference) { .view { animation: fade .18s ease-out; } @keyframes fade { from { opacity: .4; } to { opacity: 1; } } }
+</style>
+
+<div class="bar"><div class="bar-in">
+  <span class="brand">Chrona</span>
+  <nav class="nav" aria-label="主导航">
+    <a href="#today" data-v="today">今日</a>
+    <a href="#affairs" data-v="affairs">事务</a>
+    <a href="#settings" data-v="settings">设置</a>
+  </nav>
+  <span class="conn"><span class="dot"></span>QQ 已连接 · 今天已推送 2/5</span>
+</div></div>
+
+<div class="wrap">
+  <div style="display:grid;gap:10px">
+    <form class="composer" id="composer">
+      <label for="ask" class="sr" style="position:absolute;left:-9999px">交代一件事，或问点什么</label>
+      <textarea id="ask" rows="1" placeholder="交代一件事，或问点什么……"></textarea>
+      <button class="btn primary" type="submit">发送</button>
+    </form>
+    <div class="reply" id="reply">
+      <span class="who">你 · 10:42 ：“相机那件事，预算再放宽到 6000，也看看富士。”</span>
+      <span>好，我把预算改成 6000 并加上富士，重新比较后会更新成果，大概十几分钟。</span>
+      <span class="chips"><a class="chip" href="#detail">已补充到「二手相机选购」</a></span>
+    </div>
+  </div>
+
+  <!-- 今日 -->
+  <section class="view" id="v-today">
+    <div style="display:grid;gap:28px">
+      <div class="headline">
+        <span class="date">10月15日 周三</span>
+        <h1>2 件事等你决定</h1>
+        <p>4 件事在推进，3 件在照看。昨天以来有 1 个新成果；Jellyfin 已经恢复。</p>
+      </div>
+
+      <div class="section">
+        <header><h2>等你决定</h2><span class="count">2</span></header>
+        <div class="list">
+          <div class="item stripe-warn">
+            <div class="item-top"><span class="item-title">需要补充：最多能接受多重的机身？</span><span class="affair">· <a href="#detail">二手相机选购</a></span><span class="meta">35 分钟前</span></div>
+            <p class="why">旅行用，重量会直接排除 A7 IV 和 X-T5 中的一个。</p>
+            <form class="answer"><label for="a1" style="position:absolute;left:-9999px">回答</label><input id="a1" placeholder="直接回答，比如“600 克以内”"><button class="btn primary" type="button">回答</button></form>
+          </div>
+          <div class="item stripe-warn">
+            <div class="item-top"><span class="item-title">想运行脚本：每周汇总 Chino 服务的不可用时长</span><span class="affair">· <a href="#detail">Chino 服务照看</a></span><span class="meta">今天 08:10</span></div>
+            <p class="why">脚本只读仪表盘历史，在沙箱里运行，不联网。第一次运行需要你同意。<a href="#detail">查看脚本</a></p>
+            <div class="actions"><button class="btn primary" type="button">同意这次</button><button class="btn" type="button">这件事里一直允许</button><button class="btn ghost" type="button">不用</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="section">
+          <header><h2>重要变化</h2><span class="count">1</span></header>
+          <div class="list">
+            <div class="item">
+              <div class="item-top"><span class="pill ok">已恢复</span><span class="item-title">Jellyfin 恢复正常</span><span class="meta">2 小时前</span></div>
+              <p class="why">昨晚 23:40 起不可用，持续 6 小时 20 分。按你的设置，夜间没有推送。</p>
+              <span class="affair"><a href="#detail">Chino 服务照看</a></span>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <header><h2>新成果</h2><span class="count">1</span></header>
+          <div class="list">
+            <div class="item">
+              <div class="item-top"><span class="item-title">二手相机选购结论</span><span class="pill idle">v2</span><span class="meta">昨天 21:05</span></div>
+              <p class="why">在 5000 元内，二手 A7 III 性价比最高；X-S10 更轻但续航短。附 6 个来源。</p>
+              <div class="actions"><a class="btn" href="#detail">阅读</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="section">
+          <header><h2>临近</h2></header>
+          <div class="list">
+            <div class="item"><div class="item-top"><span class="item-title">续费 saya.love 域名</span><span class="meta">周五</span></div><span class="affair">跟进 · 域名与证书</span></div>
+            <div class="item"><div class="item-top"><span class="item-title">下次检查 Chino 服务</span><span class="meta">11:30</span></div><span class="affair">每 30 分钟 · Chino 服务照看</span></div>
+          </div>
+        </div>
+        <div class="section">
+          <header><h2>建议</h2></header>
+          <div class="list">
+            <div class="item">
+              <div class="item-top"><span class="item-title">你这个月查了 3 次日元汇率，要不要做个汇率面板？</span></div>
+              <p class="why">面板会显示近 30 天走势和你设的提醒线，打开网页就能看。</p>
+              <div class="actions"><button class="btn" type="button">好，做一个</button><button class="btn ghost" type="button">暂时不用</button><button class="btn ghost" type="button">别再提</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 事务 -->
+  <section class="view" id="v-affairs" hidden>
+    <div style="display:grid;gap:24px">
+      <div class="headline"><h1>事务</h1></div>
+      <div class="section">
+        <header class="group-h"><h2>等你</h2><span class="count">2</span></header>
+        <div class="list">
+          <div class="row"><span class="t"><a href="#detail">二手相机选购</a><span class="pill warn">等你回答</span></span><span class="when">35 分钟前</span><p class="s">按 6000 元预算加入富士重新比较中，需要知道重量上限。</p><span class="n">下一步：收到重量上限后更新成果 v3</span></div>
+          <div class="row"><span class="t"><a href="#detail">Chino 服务照看</a><span class="pill warn">等你同意</span></span><span class="when">08:10</span><p class="s">所有服务正常。想用脚本做每周不可用时长汇总。</p><span class="n">每 30 分钟检查 · 重要时通知</span></div>
+        </div>
+      </div>
+      <div class="section">
+        <header class="group-h"><h2>进行中</h2><span class="count">2</span></header>
+        <div class="list">
+          <div class="row"><span class="t"><a href="#detail">整理今年的报税材料清单</a><span class="pill run">处理中</span></span><span class="when">10:20</span><p class="s">已核对个税 App 的专项扣除项，正在整理需要的凭证。</p><span class="n">下一步：发布清单</span></div>
+          <div class="row"><span class="t"><a href="#detail">调研：家用 NAS 备份方案</a><span class="pill idle">排队中</span></span><span class="when">09:58</span><p class="s">刚交代，还没开始。</p></div>
+        </div>
+      </div>
+      <div class="section">
+        <header class="group-h"><h2>照看中</h2><span class="count">2</span></header>
+        <div class="list">
+          <div class="row"><span class="t"><a href="#detail">域名与证书</a><span class="pill idle">每天</span></span><span class="when">07:00</span><p class="s">saya.love 周五到期，已提醒；证书还有 54 天。</p></div>
+          <div class="row"><span class="t"><a href="#detail">东京往返机票价格</a><span class="pill idle">每 6 小时</span></span><span class="when">06:00</span><p class="s">最低 ¥2,380（春秋，11/21 出发），比上周低 ¥310。</p></div>
+        </div>
+      </div>
+      <details class="done"><summary>已结束 · 14</summary>
+        <div class="list" style="margin-top:8px">
+          <div class="row"><span class="t">换路由器固件<span class="pill ok">已完成</span></span><span class="when">10/12</span></div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 详情 -->
+  <section class="view" id="v-detail" hidden>
+    <div style="display:grid;gap:20px">
+      <div class="d-head">
+        <div class="top"><a href="#affairs" class="affair">← 事务</a><span class="pill warn">等你回答</span><span class="ctl"><button class="btn" type="button">暂停</button><button class="btn" type="button">结束</button></span></div>
+        <h1>二手相机选购</h1>
+        <p class="goal">目标：旅行和日常用，找一台性价比最高的二手全画幅或 APS-C 相机，预算 6000 元内。</p>
+      </div>
+      <div class="detail">
+        <div style="display:grid;gap:20px;min-width:0">
+          <div class="panel">
+            <h3>现在怎么样了</h3>
+            <p class="now">已按 6000 元预算加入富士 X-T5 和 X-S20 重新比较。两者差别主要在重量和续航，需要你给个重量上限再定结论。</p>
+            <p class="next"><b>下一步：</b>收到重量上限后发布 v3。</p>
+          </div>
+          <div class="item stripe-warn panel" style="gap:6px">
+            <div class="item-top"><span class="item-title">最多能接受多重的机身？</span><span class="meta">35 分钟前</span></div>
+            <p class="why">旅行用，重量会直接排除 A7 IV 和 X-T5 中的一个。</p>
+            <form class="answer"><label for="a2" style="position:absolute;left:-9999px">回答</label><input id="a2" placeholder="比如“600 克以内”"><button class="btn primary" type="button">回答</button></form>
+          </div>
+          <article class="result">
+            <div class="result-h"><h2>二手相机选购结论</h2><span class="pill idle">v2</span><span class="meta">昨天 21:05 · <a href="#detail">v1</a></span></div>
+            <div class="result-b">
+              <p><b>结论：</b>5000 元内首选二手 A7 III（约 4,600 元，快门 2 万次内）；更在意重量选 X-S10。</p>
+              <h4>对比</h4>
+              <div class="tbl"><table>
+                <tr><th>机型</th><th>二手价</th><th>重量</th><th>续航（张）</th></tr>
+                <tr><td>Sony A7 III</td><td>¥4,600</td><td>650 g</td><td>610</td></tr>
+                <tr><td>Fujifilm X-S10</td><td>¥4,100</td><td>465 g</td><td>325</td></tr>
+                <tr><td>Nikon Z6</td><td>¥4,900</td><td>675 g</td><td>310</td></tr>
+              </table></div>
+              <h4>局限</h4>
+              <p>价格取自闲鱼近 7 天成交，没有实际验机；镜头成本未计入。</p>
+            </div>
+            <div class="sources">
+              <span>来源（6）</span>
+              <span><a href="#detail">DPReview：Sony A7 III 评测</a> <span class="v">已查阅</span></span>
+              <span><a href="#detail">富士官网 X-S10 规格</a> <span class="v">已查阅</span></span>
+              <span><a href="#detail">闲鱼成交价汇总</a> <span class="u">未核实</span></span>
+            </div>
+            <form class="fb answer"><label for="fb" style="position:absolute;left:-9999px">修改意见</label><input id="fb" placeholder="修改意见，比如“把镜头预算也算进去”"><button class="btn" type="button">发送修改意见</button></form>
+          </article>
+          <div class="panel">
+            <h3>经过</h3>
+            <div class="tl">
+              <div class="ev user"><time>10:42</time><div><span class="who">你</span><br>相机那件事，预算再放宽到 6000，也看看富士。</div></div>
+              <div class="ev"><time>10:44</time><div><span class="who">Chrona · 进展</span><br>已加入 X-T5、X-S20，查到 4 个新的成交价来源。</div></div>
+              <div class="ev"><time>10:51</time><div><span class="who">Chrona · 提问</span><br>最多能接受多重的机身？</div></div>
+              <div class="ev"><time>昨天</time><div><span class="who">Chrona · 成果</span><br>发布 v2：二手相机选购结论</div></div>
+            </div>
+            <form class="answer"><label for="add" style="position:absolute;left:-9999px">补充</label><input id="add" placeholder="补充信息或改方向"><button class="btn" type="button">补充</button></form>
+          </div>
+          <details class="tech"><summary>技术详情：4 次运行 · 37 次工具调用</summary>
+            <p class="mono">run 4 · user_input · asked · 10:42–10:51 · 9 tools · 4 web</p>
+          </details>
+        </div>
+        <aside style="display:grid;gap:16px">
+          <div class="panel"><h3>照看方式</h3><p class="hint">一次性事务，没有定期检查。</p><button class="btn" type="button" style="justify-self:start">改成定期照看</button></div>
+          <div class="panel"><h3>处理方式</h3><p class="next">调研成果页：需要比较多款机型并保留来源。</p></div>
+          <div class="panel"><h3>授权</h3><dl class="kv"><dt>检索网页</dt><dd>直接做</dd><dt>对外发消息</dt><dd>先问你</dd></dl></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section class="view" id="v-settings" hidden>
+    <div class="set">
+      <nav aria-label="设置分区"><a href="#settings">聊天</a><a href="#settings">通知</a><a href="#settings">授权</a><a href="#settings">记住的偏好</a><a href="#settings">来源</a><a href="#settings">工具</a><a href="#settings">运行状况</a></nav>
+      <div style="display:grid;gap:20px;min-width:0">
+        <div class="headline"><h1>设置</h1></div>
+        <div class="panel"><h3>聊天</h3><p class="next"><span class="pill ok">已绑定</span> Chrona QQ Bot · 私聊里直接说话就行。</p></div>
+        <div class="panel"><h3>通知</h3>
+          <div class="field"><label for="cap">每天最多推送</label><span><input id="cap" value="5"> 条，超出的放进日报</span>
+            <label for="q1">安静时段</label><span><input id="q1" value="23:00"> 到 <input id="q2" value="08:00"> <span class="hint">只推紧急的</span></span>
+            <label for="dg">日报时间</label><span><input id="dg" value="09:00"></span></div>
+        </div>
+        <div class="panel"><h3>授权</h3>
+          <div class="tbl"><table class="policy">
+            <tr><th>动作</th><th>方式</th><th>来源</th></tr>
+            <tr><td>检索网页、读取已接入来源</td><td>直接做</td><td class="hint">内置</td></tr>
+            <tr><td>设置定期照看、启用面板</td><td>做完告诉你</td><td class="hint">内置</td></tr>
+            <tr><td>运行脚本</td><td><label for="p1" style="position:absolute;left:-9999px">运行脚本</label><select id="p1"><option>先问你</option><option>按批准的版本直接运行</option></select></td><td class="hint">内置</td></tr>
+            <tr><td>对外发消息、修改外部系统、购买、删除数据</td><td>先问你</td><td class="hint">内置</td></tr>
+            <tr><td>修改密码与凭据</td><td>留给你</td><td class="hint">不可更改</td></tr>
+            <tr><td>Chino 服务照看 · 运行脚本 v1</td><td>按批准的版本直接运行</td><td><button class="btn ghost" type="button">撤销</button></td></tr>
+          </table></div>
+        </div>
+        <div class="panel"><h3>记住的偏好</h3>
+          <div class="pref">晚上不要推送服务恢复的消息，早上一起说。<span class="o">你说的 · 10/13</span><button class="btn ghost" type="button">删除</button></div>
+          <div class="pref">「东京往返机票价格」的例行变化不必立即通知。<span class="o">从反馈学到 · 10/14</span><button class="btn ghost" type="button">删除</button></div>
+        </div>
+        <div class="panel"><h3>来源</h3>
+          <div class="pref"><span class="pill ok">正常</span>Chino 服务状态<span class="o">轮询 · 上次 11:00 · 两次轮询之间的短暂故障可能漏掉</span></div>
+        </div>
+        <div class="panel"><h3>运行状况</h3><dl class="kv"><dt>Agent</dt><dd>Pi · 可用</dd><dt>排队</dt><dd>1 件</dd><dt>待发通知</dt><dd>0</dd><dt>上次检查</dt><dd>11:00:12</dd></dl></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note">原型：示例数据，仅用于评审页面结构。</p>
+</div>
+
+<script>
+const views = ["today", "affairs", "detail", "settings"];
+function show() {
+  const v = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
+  for (const id of views) document.getElementById("v-" + id).hidden = id !== v;
+  const nav = v === "detail" ? "affairs" : v;
+  document.querySelectorAll(".nav a").forEach(a => { if (a.dataset.v === nav) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+}
+addEventListener("hashchange", () => { show(); scrollTo(0, 0); });
+show();
+document.getElementById("composer").addEventListener("submit", e => { e.preventDefault(); });
+</script>
