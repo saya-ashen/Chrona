@@ -7,7 +7,6 @@ export function createLocalTestSource() {
   const adapter: SourceAdapter = {
     kind: "local_test",
     mode: "poll",
-    supportedActions: ["read_source"],
     coverageNote: "LOCAL TEST DATA only; in-memory polling, not a real account. Lost on restart.",
     async readiness() { return { state: "ready" }; },
     async poll(_connection, cursor) {

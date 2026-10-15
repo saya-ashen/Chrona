@@ -1,74 +1,17 @@
-import { AssessorUnavailableError } from "@chrona/contracts/steward";
-import type { Assessor, AssessmentInput, AssessmentProposal } from "@chrona/contracts/steward";
-
-function matchingAffair(text: string, candidateAffairs: AssessmentInput["candidateAffairs"]): string | null {
-  const normalized = text.toLowerCase();
-  const matches = new Set(candidateAffairs.filter((affair) => affair.keywords.some((keyword) =>
-    keyword.trim().length > 0 && normalized.includes(keyword.trim().toLowerCase()),
-  )).map((affair) => affair.id));
-  return matches.size === 1 ? [...matches][0] : null;
-}
-
-function explicitDueAt(text: string): string | null {
-  const dateText = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
-  const parsedDate = dateText ? new Date(`${dateText}T00:00:00.000Z`) : null;
-  return parsedDate && Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === dateText
-    ? parsedDate.toISOString() : null;
-}
-
-function datedRequest(proposal: AssessmentProposal, dueAt: string | null, occurredAt: string): AssessmentProposal {
-  const fallback = new Date(Date.parse(occurredAt) + 86_400_000);
-  if (!dueAt && !Number.isFinite(fallback.getTime())) throw new Error("Invalid event occurredAt for follow-up proposal");
-  return {
-    ...proposal, disposition: "await_decision", proposedAction: "notify_user",
-    whyItMatters: "A request includes a date or deadline; user confirmation is required.",
-    nextStep: "Confirm the request and proposed follow-up; no external action has been authorized.",
-    followUp: { note: "Review the dated request; confirm its deadline before acting.", dueAt: dueAt ?? fallback.toISOString() },
-  };
-}
-
-/**
- * Deterministic, deliberately limited English rules, in priority order:
- * 1. Deadline/date + request -> await_decision, notify_user, proposed follow-up.
- * 2. A question containing you/your -> notify_now, notify_user.
- * 3. newsletter/automated/no-action markers -> retain, no action.
- * 4. Everything else -> digest, summarize.
- * Dates: valid YYYY-MM-DD at UTC midnight; otherwise a deadline/tomorrow means
- * one day after occurredAt (not wall-clock time). Dates are proposals, not schedules.
- * Affair matching: case-insensitive literal keyword substring, exactly one distinct
- * candidate affair only. Text cannot supply permissions, destinations or executable
- * actions: all action values below are fixed local constants, never parsed from text.
- */
+import { AgentUnavailableError, type Assessor } from "@chrona/contracts/steward";
+/** Deterministic health changes only. Source text never grants authority. */
 export function createRuleAssessor({ available }: { available: () => boolean }): Assessor {
   return {
-    name: "rule-assessor-v1",
-    async assess({ event, candidateAffairs }) {
-      if (!available()) throw new AssessorUnavailableError();
-      const text = `${event.title}\n${event.body}`;
-      const affairId = matchingAffair(text, candidateAffairs);
-      const dueAt = explicitDueAt(text);
-      const deadline = dueAt !== null || /\b(deadline|due|tomorrow)\b/i.test(text);
-      const request = /\b(please|request|could you|can you|would you|need you|must|confirm|approve|submit)\b/i.test(text);
-      const proposal: AssessmentProposal = {
-        disposition: "digest",
-        whatHappened: (event.title.trim() || event.body.trim() || "Source event received").slice(0, 4000),
-        whyItMatters: "No explicit urgent request; include in the digest.",
-        nextStep: "Review in the next digest.", proposedAction: "summarize",
-        affairId,
-        followUp: null,
-      };
-      if (deadline && request) {
-        return datedRequest(proposal, dueAt, event.occurredAt);
-      }
-      if (/[?？]/.test(text) && /\b(you|your)\b/i.test(text)) {
-        return { ...proposal, disposition: "notify_now", proposedAction: "notify_user",
-          whyItMatters: "A question is addressed to you.", nextStep: "Review the question; decide whether to respond yourself." };
-      }
-      if (/\b(newsletter|automated|no[- ]action(?: required)?|no reply needed|do not reply)\b/i.test(text)) {
-        return { ...proposal, disposition: "retain", proposedAction: null,
-          whyItMatters: "Informational or automated message with no identified request.", nextStep: "Keep for reference." };
-      }
-      return proposal;
+    name: "rule-assessor-v2",
+    async assess({ event, affairs }) {
+      if (!available()) throw new AgentUnavailableError();
+      const text = `${event.title}\n${event.body}`.toLowerCase();
+      const matches = affairs.filter(a => a.title.toLowerCase().split(/[\s,，、:：]+/).some(word => word.length > 1 && text.includes(word)));
+      // Engine orders linked affairs first, but the port deliberately carries no connection identifiers.
+      const affairId = matches.length === 1 ? matches[0]!.id : null;
+      const recovered = /已恢复|恢复正常|\b(back up|recovered|restored)\b/i.test(event.title);
+      const down = /不可用|状态异常|\b(down|offline|unhealthy)\b/i.test(event.title);
+      return { disposition: recovered ? "record" : down ? "notify" : "ignore", affairId, whatHappened: (event.title.trim() || "Source changed").slice(0, 4000), whyItMatters: recovered ? "服务已恢复，可查看事项确认状态。" : down ? "服务可用性发生变化，请查看事项详情。" : "没有识别到服务可用性变化。", important: down && !recovered };
     },
   };
 }

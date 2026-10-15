@@ -1,276 +1,60 @@
 import { Command } from "commander";
-import { buildControlPayload, sendControlAction, UsageError, ConfigError } from "@chrona-org/agent-cli";
 import { join, resolve } from "node:path";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
 import cliPackage from "../package.json" with { type: "json" };
 import { getChronaDataDir } from "./start-server.js";
 import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
-import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
-import {
-  detectHermesEnvironment,
-  generateHermesApiKey,
-  getHermesEnvApiKey,
-  maskHermesApiKey,
-  planHermesSetup,
-  setupLocalHermesIntegration,
-  type HermesDiagnostics,
-  type HermesSetupPlan,
-} from "./integrations/hermes/index.js";
 
-export type NodeDispatchResult = {
-  code: 0 | 1;
-  stdout: string;
-  stderr: string;
-};
-
-/**
- * Dispatch `chrona node <verb>` (and `chrona task read` / `chrona plan read`)
- * directly to the agent-cli library without going through Commander. The
- * reason: the verb is a free-form positional that doesn't fit Commander's
- * strict subcommand schema, and we want zero surprising option parsing.
- */
-export async function dispatchNodeCommand(argv: readonly string[]): Promise<NodeDispatchResult> {
-  const stdoutChunks: string[] = [];
-  const stderrChunks: string[] = [];
-  try {
-    const { body } = buildControlPayload([...argv]);
-    const result = await sendControlAction(body, {
-      env: {
-        CHRONA_BASE_URL: process.env.CHRONA_BASE_URL,
-        CHRONA_RUN_TOKEN: process.env.CHRONA_RUN_TOKEN,
-      },
-      fetchImpl: fetch,
-    });
-    stdoutChunks.push(`${JSON.stringify(result)}\n`);
-    return { code: 0, stdout: stdoutChunks.join(""), stderr: "" };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (error instanceof UsageError) {
-      stderrChunks.push(`Usage error: ${message}\n`);
-      stderrChunks.push("Usage: chrona node complete --summary <text> [--result-file <path>] | chrona node <condition-select|wait-complete|block|fail> [...]\n");
-    } else if (error instanceof ConfigError) {
-      stderrChunks.push(`Config error: ${message}\n`);
-      stderrChunks.push("Chrona skill-mode commands require CHRONA_BASE_URL and CHRONA_RUN_TOKEN in env.\n");
-    } else {
-      stderrChunks.push(`Chrona agent command failed: ${message}\n`);
-    }
-    return { code: 1, stdout: stdoutChunks.join(""), stderr: stderrChunks.join("") };
-  }
-}
-
-type HermesCommandOptions = {
-  apiKey?: string;
-  baseUrl?: string;
-  hermesHome?: string;
-  mcpUrl?: string;
-  pluginDir?: string;
-  skipEnable?: boolean;
-  showApiKey?: boolean;
-};
-
-export type StartCommandOptions = {
-  host?: string;
-  port?: string;
-  open?: boolean;
-};
-
-type CreateProgramOptions = {
-  startServer?: (options: StartCommandOptions) => Promise<void>;
-};
-
-function printHermesDiagnostics(diagnostics: HermesDiagnostics, plan: HermesSetupPlan): void {
-  console.log(`Hermes mode: ${diagnostics.mode}`);
-  console.log(`Hermes base URL: ${diagnostics.baseUrl}`);
-  console.log(`Chrona MCP URL: ${diagnostics.mcpUrl}`);
-  console.log("");
-
-  console.log("Checks:");
-  for (const check of diagnostics.checks) {
-    console.log(`  [${check.status}] ${check.key}: ${check.message}`);
-  }
-  console.log("");
-
-  console.log(`Plan: ${plan.summary}`);
-  for (const action of plan.actions) {
-    const blocked = action.blocked ? " blocked" : "";
-    console.log(`  [${action.kind}${blocked}] ${action.key}: ${action.reason}`);
-  }
-}
+export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
+type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void> };
 
 export function createProgram(options: CreateProgramOptions = {}): Command {
-  const program = new Command();
-
-  program
-    .name("chrona")
-    .description("Chrona CLI: starts the Chrona app server.")
-    .version(cliPackage.version);
-
-  program
-    .command("start")
-    .description("Start the Chrona app server")
+  const program = new Command().name("chrona").description("Chrona personal steward").version(cliPackage.version);
+  program.command("start").description("Start the Chrona app server")
     .option("--host <host>", "Host to bind", "127.0.0.1")
     .option("--port <port>", "Port to bind", "3101")
     .option("--no-open", "Do not open Chrona in the default browser")
-    .action(async (startOptions: StartCommandOptions) => {
-      if (!options.startServer) {
-        throw new Error("chrona start is only available in packaged Chrona binaries.");
-      }
-      await options.startServer(startOptions);
+    .action(async (input: StartCommandOptions) => {
+      if (!options.startServer) throw new Error("chrona start is only available in packaged Chrona binaries.");
+      await options.startServer(input);
     });
-
-  program
-    .command("backup")
-    .description("Create a consistent backup of the Chrona SQLite database")
+  program.command("backup").description("Create a consistent SQLite backup")
     .argument("<output>", "Backup database path")
     .action((output: string) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
       const result = backupSqliteDatabase(databaseUrl, resolve(output));
       console.log(`Chrona backup created: ${result.backupPath}`);
     });
-
-  program
-    .command("restore")
-    .description("Restore a Chrona SQLite database backup while the server is stopped")
+  program.command("restore").description("Restore a SQLite backup while the server is stopped")
     .argument("<input>", "Backup database path")
     .option("--force", "Replace the current Chrona database", false)
     .action((input: string, restoreOptions: { force?: boolean }) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
-      const result = restoreSqliteDatabase(databaseUrl, resolve(input), {
-        force: restoreOptions.force,
-      });
+      const result = restoreSqliteDatabase(databaseUrl, resolve(input), { force: restoreOptions.force });
       console.log(`Chrona database restored: ${result.backupPath}`);
     });
-
-  program
-    .command("doctor")
-    .description("Inspect local database and network safety before starting Chrona")
+  program.command("doctor").description("Inspect local database and network safety")
     .option("--repair-stale-lock", "Quarantine a confirmed stale runtime lock; never removes the database")
-    .action((doctorOptions: { repairStaleLock?: boolean }) => {
-      if (doctorOptions.repairStaleLock) {
+    .action((input: { repairStaleLock?: boolean }) => {
+      if (input.repairStaleLock) {
         const quarantined = repairStaleRuntimeLock();
         console.log(quarantined ? `Stale runtime lock quarantined: ${quarantined}` : "No runtime lock is present.");
       }
       const checks = inspectLocalChrona();
-      for (const check of checks) {
-        console.log(`[${check.status}] ${check.key}: ${check.message}`);
-      }
-      if (checks.some((check) => check.status === "error")) {
-        process.exitCode = 1;
-      }
+      for (const check of checks) console.log(`[${check.status}] ${check.key}: ${check.message}`);
+      if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
-
-  const management = program.command("mcp").description("External-agent management MCP credentials (local administration)");
-  management.command("enroll")
-    .requiredOption("--name <name>", "Agent/client label")
-    .requiredOption("--public-url <origin>", "Trusted HTTPS Chrona origin, or localhost HTTP")
-    .requiredOption("--timezone <zone>", "IANA timezone, e.g. Asia/Shanghai")
-    .requiredOption("--access <preset>", "Explicit preset: steward, steward-assessor, steward-chat, read, full, assistant-read, assistant, assistant-edit, results-read, results-submit, results-review, results-files-read, results-files-submit, results-files-review, work-read, work-record, pages-read, pages-author, library-read, library-organize or library-configure; submission/recording never grants review or execution authority")
-    .requiredOption("--token-file <path>", "New private file; token is never printed")
-    .action(async (input: { name: string; publicUrl: string; timezone: string; access: string; tokenFile: string }) => {
-      const { enrollLocalManagementClient } = await import("./management");
-      console.log(JSON.stringify(await enrollLocalManagementClient(input)));
-    });
-  management.command("list").action(async () => {
-    const { listLocalManagementClients } = await import("./management");
-    console.log(JSON.stringify(await listLocalManagementClients()));
-  });
-  management.command("revoke").argument("<client-id>").action(async (clientId: string) => {
-    const { revokeLocalManagementClient } = await import("./management");
-    await revokeLocalManagementClient(clientId);
-    console.log("Management client revoked.");
-  });
-
-  const qq = program.command("qq").description("Chrona's own QQ bot (local administration; reads CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR or CHRONA_DATA_DIR)");
-  qq.command("bind-code")
-    .description("Create a one-time owner binding code (shown once; only its hash is stored)")
+  const qq = program.command("qq").description("Chrona QQ bot local administration");
+  qq.command("bind-code").description("Create a one-time owner binding code (only its hash is stored)")
     .requiredOption("--workspace <id>", "Workspace the bound QQ owner acts in")
     .option("--ttl <minutes>", "Validity in minutes (1-60)", "10")
     .option("--replace", "Allow replacing an existing owner binding")
     .action(async (input: { workspace: string; ttl: string; replace?: boolean }) => {
       const { createQqBotState, qqBotConfig } = await import("@chrona/integrations/steward");
       const config = qqBotConfig();
-      if (!config) throw new ConfigError("CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR (or CHRONA_DATA_DIR) are required");
+      if (!config) throw new Error("CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR (or CHRONA_DATA_DIR) are required");
       const challenge = await createQqBotState(config.stateDir, config.appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) });
       console.log(JSON.stringify({ appId: config.appId, ...challenge }));
     });
-
-  const hermes = program
-    .command("hermes")
-    .description("Hermes integration commands");
-
-  const hermesPlugin = hermes
-    .command("plugin")
-    .description("Hermes plugin commands");
-
-  hermes
-    .command("doctor")
-    .description("Diagnose Hermes integration state without changing files")
-    .option("--base-url <url>", "Hermes API base URL", "http://127.0.0.1:8642")
-    .option("--api-key <key>", "Hermes API key")
-    .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
-    .option("--hermes-home <path>", "Hermes home directory")
-    .option("--plugin-dir <path>", "Chrona plugin install directory")
-    .action(async (options: HermesCommandOptions) => {
-      const diagnostics = await detectHermesEnvironment(options);
-      const plan = planHermesSetup(diagnostics);
-      printHermesDiagnostics(diagnostics, plan);
-    });
-
-  hermes
-    .command("setup")
-    .description("Auto-configure local Hermes plugin and API server env")
-    .option("--base-url <url>", "Hermes API base URL", "http://127.0.0.1:8642")
-    .option("--api-key <key>", "Hermes API key; generated when omitted")
-    .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
-    .option("--hermes-home <path>", "Hermes home directory")
-    .option("--plugin-dir <path>", "Chrona plugin install directory")
-    .option("--skip-enable", "Copy the plugin without enabling it", false)
-    .option("--show-api-key", "Print the full Hermes API key", false)
-    .action(async (options: HermesCommandOptions) => {
-      const apiKey = options.apiKey ?? getHermesEnvApiKey(options.hermesHome) ?? generateHermesApiKey();
-      const result = await setupLocalHermesIntegration({ ...options, apiKey });
-
-      console.log(`Hermes API key: ${options.showApiKey ? apiKey : maskHermesApiKey(apiKey)}`);
-      if (!options.showApiKey) {
-        console.log("Use --show-api-key to print the full key, or read API_SERVER_KEY from ~/.hermes/.env.");
-      }
-      if (result.changed.length > 0) {
-        console.log("Changed:");
-        for (const item of result.changed) console.log(`  ${item}`);
-      } else {
-        console.log("Changed: none");
-      }
-      console.log("");
-
-      printHermesDiagnostics(result.diagnostics, result.plan);
-      if (result.diagnostics.restartRequired) {
-        console.log("");
-        console.log("Restart Hermes, then rerun: chrona hermes doctor");
-      }
-    });
-
-  hermesPlugin
-    .command("install")
-    .description("Install the Chrona Hermes plugin")
-    .option("--hermes-home <path>", "Hermes home directory")
-    .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
-    .option("--plugin-dir <path>", "Chrona plugin install directory")
-    .option("--skip-enable", "Copy the plugin without enabling it", false)
-    .action(async (options: InstallHermesPluginOptions) => {
-      const result = await installHermesPlugin(options);
-      console.log(`Chrona Hermes plugin installed to ${result.installDir}`);
-      console.log(`Chrona MCP URL configured as ${result.mcpUrl}`);
-      console.log(`Chrona Hermes plugin version ${result.pluginVersion}`);
-
-      if (options.skipEnable || process.env.CHRONA_HERMES_SKIP_ENABLE === "1") {
-        console.log("Skipped Hermes enable step. Enable later with: hermes plugins enable chrona");
-      } else if (result.enabled) {
-        console.log("Chrona Hermes plugin enabled.");
-      } else {
-        console.log("Chrona Hermes plugin copied, but Hermes CLI was unavailable or enable failed.");
-        console.log("Enable later with: hermes plugins enable chrona");
-      }
-    });
-
   return program;
 }

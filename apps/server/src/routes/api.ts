@@ -1,79 +1,22 @@
 import { Hono } from "hono";
-import type { ChronaEngine } from "@chrona/engine";
-
-import { json } from "../lib/http";
-
-import { createTaskRoutes } from "./tasks";
-import { createPageRoutes } from "./pages";
-import { createWorkspacesRoutes } from "./workspaces.routes";
-import { createGoalRoutes } from "./goals.routes";
-import { createGoalWorkbenchRoutes } from "./goal-workbench.routes";
-import { createTaskTriggerRoutes } from "./task-triggers.routes";
-import { createEmailTriggerAdapterRoutes } from "./email-trigger-adapter.routes";
-import { createClientsRoutes } from "./ai/clients.routes";
-import { createAiSuggestionRoutes } from "./ai/suggestions.routes";
-import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
-import { createMcpRoutes, createManagementMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
-import { createRuntimeRoutes } from "./runtime.routes";
-import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
-import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar/server";
 import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
-
 import { createStewardRoutes } from "./steward.routes";
 import { createStewardAgentRoutes } from "./steward-agent.routes";
 import type { StewardRuntime } from "../steward-runtime";
 
-export type ApiRouterOptions = {
-  steward?: StewardRuntime;
-  calendarSources?: CalendarSourceRouteOptions;
-  /** Passed from the server composition root; MCP owns scoped run-token auth. */
-  mcpApiKey?: string;
-};
-
+export type ApiRouterOptions = { steward: StewardRuntime };
 export type ApiRouter = Hono;
 
-export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions = {}) {
+export function createApiRouter({ steward }: ApiRouterOptions) {
+  const service = steward.service;
   const router = new Hono()
-    .get("/health", (c) => json(c, { status: "ok" }))
-    .get("/ready", async (c) => {
-      const readiness = await engine.runtime.getReadiness();
-      return json(c, readiness, readiness.status === "ready" ? 200 : 503);
-    })
-    .route("/", createTaskRoutes(engine))
-    .route("/", createPageRoutes(engine))
-    .route("/", createWorkspacesRoutes(engine))
-    .route("/", createGoalRoutes(engine))
-    .route("/", createGoalWorkbenchRoutes(engine))
-    .route("/", createTaskTriggerRoutes(engine))
-    .route("/", createEmailTriggerAdapterRoutes(engine))
-    .route("/", createClientsRoutes(engine))
-    .route("/", createAiSuggestionRoutes(engine))
-    .route("/", createHermesIntegrationRoutes())
-    .route("/", createCalendarSourceRoutes(options.calendarSources))
-    .route("/", createRuntimeRoutes(engine))
-    .route("/", createAssistantSurfaceRoutes(engine))
-    .route("/", createMcpRoutes(engine, { apiKey: options.mcpApiKey }))
-    .route("/", createManagementMcpRoutes(engine))
-    .route("/", createAgentControlRoutes());
+    .get("/workspaces", async c => c.json(await steward.ports.db.workspace.findMany({ select: { id: true, name: true } })))
+    .route("/steward", createStewardRoutes(steward.ports, service, () => { void steward.agent.runAgentOnce(); }))
+    .route("/steward-agent", createStewardAgentRoutes(steward.ports, service));
 
-  if (options.steward) {
-    router.route("/steward", createStewardRoutes(options.steward.ports));
-    router.route("/steward-agent", createStewardAgentRoutes(options.steward.ports));
-  }
-
-  // Env-gated E2E test seam — only ever mounted when the Playwright webServer
-  // sets CHRONA_E2E_TEST_ROUTES=1. Keeps the production surface unchanged.
-  if (areE2eTestRoutesEnabled()) {
-    router.route("/", createTestSupportRoutes(engine, options.steward));
-  }
-
+  // Only mounted when the host explicitly enables the steward E2E seam.
+  if (areE2eTestRoutesEnabled()) router.route("/", createTestSupportRoutes(steward));
   return router;
 }
 
-/**
- * Exported type for the hono/client RPC:
- *   import type { ApiType } from "@chrona/server/routes/api";
- *   import { hc } from "hono/client";
- *   const client = hc<ApiType>("/api");
- */
 export type ApiType = ReturnType<typeof createApiRouter>;

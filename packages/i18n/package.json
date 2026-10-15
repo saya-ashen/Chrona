@@ -6,8 +6,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/client.tsx",
-    "./messages": "./src/messages.ts",
-    "./task-workspace": "./src/task-workspace-messages.ts",
-    "./external-calendar": "./src/external-calendar-messages.ts"
+    "./messages": "./src/messages.ts"
   }
 }

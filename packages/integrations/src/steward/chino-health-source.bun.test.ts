@@ -17,10 +17,10 @@ function fixture(initial = dashboard()) {
 
 test("first attention observations are current, ok observations only enter cursor; identical polls and restart are stable", async () => {
   const f = fixture(dashboard([service("a", "offline"), service("b", "unhealthy"), service("c"), service("d", "reachable")]));
-  expect(f.source).toMatchObject({ kind: "chino_service_health", mode: "poll", supportedActions: ["read_source"] });
+  expect(f.source).toMatchObject({ kind: "chino_service_health", mode: "poll" });
   const first = await f.poll();
   expect(first.items).toHaveLength(2);
-  expect(first.items[0]).toMatchObject({ externalId: `service:a:attention:${t1}`, threadId: "chino-service:a", title: "Chino 服务 Test a 不可用（offline）", author: "chino-dashboard", url: null, occurredAt: t1, current: true });
+  expect(first.items[0]).toMatchObject({ externalId: `service:a:attention:${t1}`, title: "Chino 服务 Test a 不可用（offline）", url: null, occurredAt: t1, current: true });
   expect(first.items.every(item => item.current)).toBe(true);
   expect(JSON.parse(first.nextCursor!)).toEqual({ v: 1, services: { a: { cls: "attention", since: t1 }, b: { cls: "attention", since: t1 }, c: { cls: "ok", since: t1 }, d: { cls: "ok", since: t1 } }, network: { cls: "ok", since: t1 } });
   expect(await f.poll(first.nextCursor)).toEqual({ items: [], nextCursor: first.nextCursor });
@@ -60,7 +60,7 @@ test("unobserved unknown subjects do not enter cursor; stale overall does not su
 
 test("network first attention, same class, outage and recovery transitions", async () => {
   const f = fixture(dashboard([], "down")); const first = await f.poll();
-  expect(first.items).toHaveLength(1); expect(first.items[0]).toMatchObject({ current: true, externalId: `network:attention:${t1}`, threadId: "chino-network", title: "Chino 网络状态异常（down）" });
+  expect(first.items).toHaveLength(1); expect(first.items[0]).toMatchObject({ current: true, externalId: `network:attention:${t1}`, title: "Chino 网络状态异常（down）" });
   f.set(dashboard([], "degraded", t2)); expect(await f.poll(first.nextCursor)).toEqual({ items: [], nextCursor: first.nextCursor });
   f.set(dashboard([], "healthy", t2)); const recovery = await f.poll(first.nextCursor);
   expect(recovery.items).toHaveLength(1); expect(recovery.items[0].externalId).toBe(`network:ok:${t2}`);

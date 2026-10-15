@@ -1,160 +1,90 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, qqBotConfig, routeQqText, type QqBinding, type QqChatPort } from "./qq-official-bot";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, qqBotConfig, type QqChatPort } from "./qq-official-bot";
 import { createQqTokenSource } from "./qq-official";
-
 const APP = "1905797537";
 let dir: string, at: Date;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "qq-bot-")); at = new Date("2026-10-15T08:00:00Z"); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
-function harness() {
+function harness(options: { run?: QqChatPort["handleMessage"]; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> } = {}) {
   const state = createQqBotState(join(dir, "state"), APP);
-  const replies: { openid: string; messageId: string; text: string }[] = [], calls: { kind: string; input: any }[] = [], bound: [QqBinding, string | null][] = [];
-  const port: QqChatPort = {
-    async request(input) { calls.push({ kind: "request", input }); return { status: "received", ref: "K7QM" }; },
-    async respond(input) { calls.push({ kind: "respond", input }); return { status: "applied", state: "paused", subject: { title: "服务" } }; },
-    async pending(input) { calls.push({ kind: "pending", input }); return { works: [{ ref: "K7QM", status: "running", request: "答辩" }] }; },
-  };
-  const handler = createQqBotHandler({ state, now: () => at, chat: () => port, reply: async (openid, messageId, text) => { replies.push({ openid, messageId, text }); }, onBound: async (b, r) => { bound.push([b, r]); } });
+  const replies: { text: string; sequence: number }[] = [], calls: Parameters<QqChatPort["handleMessage"]>[0][] = [], outbox: string[] = [];
+  const handler = createQqBotHandler({ state, now: () => at, timers: options.timers,
+    chat: { async handleMessage(input) { calls.push(input); return options.run ? options.run(input) : { reply: "收到" }; } },
+    reply: async (_openid, _id, text, sequence) => { replies.push({ text, sequence }); },
+    enqueueFinal: async (_binding, _id, text) => { outbox.push(text); },
+  });
   let n = 0;
-  const say = (openid: string, content: string, id = `M${++n}`, quoted = "") => handler.onMessage({ id, openid, content, quoted, timestamp: "" });
-  return { state, replies, calls, bound, say };
+  const say = (openid: string, content: string, id = `M${++n}`, timestamp = at.toISOString()) => handler.onMessage({ id, openid, content, quoted: "", timestamp });
+  const bind = async () => { await say("U1", `绑定 ${(await state.createChallenge({ workspaceId: "ws", now: at })).code}`); replies.length = 0; };
+  return { state, replies, calls, outbox, say, bind };
 }
-
-test("config needs a numeric AppID and a state location; the secret is only a path", () => {
-  expect(qqBotConfig({ CHRONA_QQ_APP_ID: APP, CHRONA_DATA_DIR: "/data", CHRONA_QQ_SECRET_FILE: "/s" })).toEqual({ appId: APP, stateDir: `/data/qq-bot/${APP}`, secretFile: "/s" });
-  expect(qqBotConfig({ CHRONA_QQ_APP_ID: "abc", CHRONA_DATA_DIR: "/data" })).toBeNull();
-  expect(qqBotConfig({ CHRONA_QQ_APP_ID: APP })).toBeNull();
+test("configuration requires numeric app and state directory", () => {
+  expect(qqBotConfig({ CHRONA_QQ_APP_ID: APP, CHRONA_DATA_DIR: "/data" })?.stateDir).toBe(`/data/qq-bot/${APP}`);
+  expect(qqBotConfig({ CHRONA_QQ_APP_ID: "bad" })).toBeNull();
 });
-
-test("before binding: only help/binding text, nothing reaches Chrona, strangers are not spammed", async () => {
+test("unbound and non-owner cannot reach concierge; stranger rate limit preserves help", async () => {
   const h = harness();
-  await h.say("U1", "帮我看看最近的事务");
-  await h.say("U1", "进度");
-  await h.say("U1", "帮助");
-  expect(h.calls).toEqual([]);
-  expect(h.replies.map(r => r.text)).toEqual([expect.stringContaining("尚未绑定"), expect.stringContaining("尚未绑定")]);
-  expect(h.replies.every(r => r.openid === "U1" && /^M\d$/.test(r.messageId))).toBe(true);
-  await h.say("U1", "绑定 ABCDEFGH");
-  expect(h.replies.at(-1)!.text).toContain("没有待使用的绑定码");
+  await h.say("U2", "需求"); await h.say("U2", "进度"); await h.say("U2", "帮助");
+  expect(h.replies).toHaveLength(2); expect(h.replies[0]!.text).toContain("尚未绑定");
+  await h.bind(); await h.say("U3", "需求");
+  expect(h.replies[0]!.text).toContain("没有使用权限"); expect(h.calls).toEqual([]);
 });
-
-test("one-time code: hashed at rest, wrong codes burn attempts, success binds once, a second person cannot take over", async () => {
-  const h = harness();
-  const { code } = await h.state.createChallenge({ workspaceId: "ws", now: at });
-  const stored = readFileSync(join(dir, "state", "challenge.json"), "utf8");
-  expect(stored).not.toContain(code);
-  expect(statSync(join(dir, "state")).mode & 0o777).toBe(0o700);
-  expect(statSync(join(dir, "state", "challenge.json")).mode & 0o777).toBe(0o600);
-  await h.say("EVIL", "绑定 ZZZZZZZZ");
-  expect(h.replies.at(-1)!.text).toContain("不正确");
-  await h.say("U1", `/chrona 绑定 ${code.toLowerCase()}`);
-  expect(h.replies.at(-1)!.text).toContain("绑定成功");
-  expect(h.bound).toEqual([[{ version: 1, appId: APP, openid: "U1", workspaceId: "ws", boundAt: at.toISOString(), replacedOpenid: null }, null]]);
-  expect(readdirSync(join(dir, "state"))).not.toContain("challenge.json");
-  await h.say("EVIL", `绑定 ${code}`); // replay of a used code
-  expect(h.replies.at(-1)!.text).toContain("没有待使用的绑定码");
-  await h.say("EVIL", "进度");
-  expect(h.replies.at(-1)!.text).toContain("没有使用权限");
-  expect(h.calls).toEqual([]);
-  // Even a fresh non-replace challenge cannot be minted or redeemed over an existing owner.
-  await expect(h.state.createChallenge({ workspaceId: "ws" })).rejects.toThrow("Already bound");
+test("owner text goes unchanged to concierge; replay and restart dedupe", async () => {
+  const h = harness(); await h.bind();
+  for (const text of ["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]) await h.say("U1", text, text);
+  expect(h.calls.map(c => c.text)).toEqual(["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]);
+  expect(h.calls[0]).toEqual({ workspaceId: "ws", channel: "chrona_qqbot", externalId: "帮我准备答辩", text: "帮我准备答辩" });
+  expect(h.replies).toEqual(Array.from({ length: 4 }, () => ({ text: "收到", sequence: 1 })));
+  await h.say("U1", "duplicate", "帮助"); expect(h.calls).toHaveLength(4);
+  const restart = harness(); await restart.say("U1", "duplicate", "帮助"); expect(restart.calls).toHaveLength(0);
 });
-
-test("challenge expiry and attempt exhaustion", async () => {
-  const h = harness();
-  await h.state.createChallenge({ workspaceId: "ws", ttlMinutes: 1, now: at });
-  at = new Date(at.getTime() + 61_000);
-  await h.say("U1", "绑定 ABCDEFGH");
-  expect(h.replies.at(-1)!.text).toContain("过期");
-  const { code } = await h.state.createChallenge({ workspaceId: "ws", now: at });
-  for (let i = 0; i < 5; i++) await h.say("U1", "绑定 ZZZZZZZZ");
-  await h.say("U1", `绑定 ${code}`);
-  expect(h.replies.at(-1)!.text).toContain("没有待使用的绑定码");
-  expect(h.bound).toEqual([]);
+test("slow concierge acknowledges at 8 seconds then sends final with next sequence", async () => {
+  let fire: (() => void) | undefined, release: (() => void) | undefined;
+  const timers = { setTimeout: ((fn: () => void, ms: number) => { expect(ms).toBe(8000); fire = fn; return 1; }) as typeof setTimeout, clearTimeout: (() => {}) as typeof clearTimeout };
+  const h = harness({ timers, run: async () => { await new Promise<void>(r => { release = r; }); return { reply: "最终答复" }; } });
+  await h.bind(); const pending = h.say("U1", "需求");
+  while (!release) await new Promise(r => setTimeout(r, 1));
+  expect(h.replies).toEqual([]); fire!(); release!(); await pending;
+  expect(h.replies).toEqual([{ text: "收到，处理中…", sequence: 1 }, { text: "最终答复", sequence: 2 }]);
 });
-
-test("replace challenge rebinds and reports the previous owner", async () => {
-  const h = harness();
-  await h.say("U1", `绑定 ${(await h.state.createChallenge({ workspaceId: "ws", now: at })).code}`);
-  await h.say("U2", `绑定 ${(await h.state.createChallenge({ workspaceId: "ws", replace: true, now: at })).code}`);
-  expect(h.bound.map(([b, r]) => [b.openid, r])).toEqual([["U1", null], ["U2", "U1"]]);
-  expect(await h.state.binding()).toMatchObject({ openid: "U2", replacedOpenid: "U1" }); // survives a crash before the move finishes
-  await expect(h.state.createChallenge({ workspaceId: "other", replace: true, now: at })).rejects.toThrow("bound workspace");
+test("passive quota reserves four unique sequences and expires after 60 min", async () => {
+  const seq: number[] = []; const send = createQqPassiveReplies(async (_o, _i, _t, n) => { seq.push(n); }, () => at.getTime());
+  const message = { id: "m", openid: "U1", timestamp: at.toISOString(), content: "", quoted: "" };
+  for (let i = 0; i < 4; i++) expect(await send(message, "x")).toBe(true);
+  expect(await send(message, "final")).toBe(false); expect(seq).toEqual([1, 2, 3, 4]);
+  at = new Date(at.getTime() + 3600_000); expect(await send({ ...message, id: "expired" }, "x")).toBe(false);
 });
-
-test("owner messages go to Chrona with the dedicated identity; duplicates and restarts never repeat a write", async () => {
-  const h = harness();
-  await h.say("U1", `绑定 ${(await h.state.createChallenge({ workspaceId: "ws", now: at })).code}`);
-  await h.say("U1", "帮我准备周五答辩", "IN1");
-  await h.say("U1", "帮我准备周五答辩", "IN1"); // gateway replay
-  expect(h.calls).toEqual([{ kind: "request", input: { chat: { platform: "chrona_qq", chatType: "dm", userId: "U1", chatId: "U1", messageId: "IN1", userText: "帮我准备周五答辩", route: "dedicated_bot" }, text: "帮我准备周五答辩" } }]);
-  expect(h.replies.at(-1)).toMatchObject({ messageId: "IN1", text: expect.stringContaining("已收到，码 K7QM") });
-  const restarted = harness(); // same state directory, fresh process
-  await restarted.say("U1", "帮我准备周五答辩", "IN1");
-  expect(restarted.calls).toEqual([]);
-  await restarted.say("U1", "暂停", "IN2", "【Chrona】服务变化\n回复：K7QM 收到｜暂后｜完成｜暂停");
-  expect(restarted.calls[0]).toMatchObject({ kind: "respond", input: { ref: "K7QM", action: "pause", chat: { userText: "K7QM 暂停" } } });
-  await restarted.say("U1", "进度", "IN3");
-  expect(restarted.replies.at(-1)!.text).toContain("工作 K7QM｜处理中｜答辩");
-  await restarted.say("U1", "帮助", "IN4");
-  expect(restarted.replies.at(-1)!.text).toContain("不经过 Hermes");
+test("expired passive window sends final through outbox callback", async () => {
+  const h = harness(); await h.bind();
+  await h.say("U1", "需求", "expired", new Date(at.getTime() - 3600_000).toISOString());
+  expect(h.replies).toEqual([]); expect(h.outbox).toEqual(["收到"]);
 });
-
-test("routing: optional /chrona prefix, refs never guessed, everything else is a request", () => {
-  expect(routeQqText("/chrona K7QM 暂后 4小时").route).toEqual({ kind: "respond", ref: "K7QM", action: "snooze", snoozeHours: 4 });
-  expect(routeQqText("暂停 K7QM").route).toEqual({ kind: "respond", ref: "K7QM", action: "pause" });
-  expect(routeQqText("K7QM 反馈 只告诉我关键服务").route).toEqual({ kind: "respond", ref: "K7QM", action: "feedback", note: "只告诉我关键服务" });
-  expect(routeQqText("暂停").route).toEqual({ kind: "need_ref", action: "pause" });
-  expect(routeQqText("暂停", "【Chrona】a\n回复：K7QM 收到\n回复：ABCD 收到").route).toEqual({ kind: "need_ref", action: "pause" });
-  expect(routeQqText("暂停", "别人的消息 回复：K7QM").route).toEqual({ kind: "need_ref", action: "pause" });
-  expect(routeQqText("K7QM ABCD 暂停").route).toMatchObject({ kind: "clarify", reason: "multiple_refs" });
-  expect(routeQqText("K7QM 暂后 999小时").route).toMatchObject({ kind: "clarify", reason: "invalid_snooze" });
-  expect(routeQqText("K7QM").route).toMatchObject({ kind: "clarify", reason: "missing_action" });
-  // Quoting a notification never turns a sentence into an action on it.
-  expect(routeQqText("取消 明天的会议", "【Chrona】x\n回复：K7QM 收到").route).toMatchObject({ kind: "clarify", reason: "extra_text", ref: "K7QM" });
-  expect(routeQqText("取消", "【Chrona】x\n回复：K7QM 收到").route).toEqual({ kind: "respond", ref: "K7QM", action: "revoke" });
-  expect(routeQqText("K7QM 暂停 一下").route).toMatchObject({ kind: "clarify", reason: "extra_text" });
-  expect(routeQqText("取消 明天的会议").route).toEqual({ kind: "need_ref", action: "revoke" });
-  expect(routeQqText("今晚吃什么好").route).toEqual({ kind: "request", text: "今晚吃什么好" });
-  expect(routeQqText("  ").route).toEqual({ kind: "help" });
+test("binding code hash, permissions, attempt exhaustion, expiry and replacement", async () => {
+  const h = harness(); const challenge = await h.state.createChallenge({ workspaceId: "ws", now: at });
+  expect(readFileSync(join(dir, "state/challenge.json"), "utf8")).not.toContain(challenge.code);
+  expect(statSync(join(dir, "state/challenge.json")).mode & 0o777).toBe(0o600);
+  for (let i = 0; i < 5; i++) expect((await h.state.redeem("U1", "ZZZZZZZZ", at)).ok).toBe(false);
+  expect(await h.state.redeem("U1", challenge.code, at)).toMatchObject({ reason: "no_challenge" });
+  await h.bind(); const replacement = await h.state.createChallenge({ workspaceId: "ws", replace: true, now: at });
+  expect((await h.state.redeem("U2", replacement.code, at)).ok).toBe(true);
+  expect(await h.state.binding()).toMatchObject({ openid: "U2" });
+  await expect(h.state.createChallenge({ workspaceId: "other", replace: true })).rejects.toThrow("bound workspace");
+  const expired = await h.state.createChallenge({ workspaceId: "ws", replace: true, now: at, ttlMinutes: 1 });
+  expect(await h.state.redeem("U1", expired.code, new Date(at.getTime() + 60000))).toMatchObject({ reason: "expired" });
 });
-
-test("delivery: only the bound recipient, local per-recipient limit, receipt in the bot namespace", async () => {
-  const sent: any[] = [];
+test("active delivery allowlist, local rate limit and no passive message id", async () => {
+  const sent: Record<string, unknown>[] = [];
   const fetch = async (url: string, init?: RequestInit) => {
-    if (url.includes("getAppAccessToken")) return new Response(JSON.stringify({ access_token: "t", expires_in: 7200 }));
-    sent.push({ url, body: JSON.parse(String(init!.body)) });
-    return new Response(JSON.stringify({ id: `R${sent.length}` }));
+    if (url.includes("getAppAccessToken")) return Response.json({ access_token: "fake", expires_in: 7200 });
+    sent.push(JSON.parse(String(init!.body))); return Response.json({ id: "receipt" });
   };
-  const tokens = createQqTokenSource({ appId: APP, readSecret: async () => "s", fetch });
-  const allowed = new Set(["chrona_qq:U1"]);
-  const delivery = createChronaQqDelivery({ tokens, fetch, publicUrl: "https://chrona.example", allowedRecipients: () => allowed, perMinute: 2, now: () => 0 });
-  const message = { idempotencyKey: "k", title: "服务恢复", body: "Chino 服务恢复", link: null, recipient: "chrona_qq:U1", replyRef: "K7QM", whyItMatters: "", nextStep: "", appPath: "/today" };
-  expect(await delivery.send(message)).toEqual({ outcome: "accepted", receiptRef: "chrona_qq:R1" });
-  expect(sent[0].url).toEndWith("/v2/users/U1/messages");
-  expect(sent[0].body.msg_id).toBeUndefined();
-  expect(sent[0].body.content).toContain("回复：K7QM 收到｜暂后｜完成｜暂停");
-  expect(sent[0].body.content).not.toMatch(/\/chrona\s/);
-  expect(sent[0].body.content).toContain("详情：https://chrona.example/zh/today");
-  expect(await delivery.send({ ...message, recipient: "qqbot:U1" })).toMatchObject({ outcome: "rejected", retryable: false });
+  const tokens = createQqTokenSource({ appId: APP, readSecret: async () => "fake", fetch });
+  const delivery = createChronaQqDelivery({ tokens, fetch, allowedRecipients: () => new Set(["chrona_qq:U1"]), perMinute: 1 });
+  const message = { idempotencyKey: "k", title: "title", body: "body", link: null, recipient: "chrona_qq:U1" };
+  expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" }); expect(sent[0]!.msg_id).toBeUndefined();
+  expect(await delivery.send(message)).toMatchObject({ outcome: "rejected", retryable: true });
   expect(await delivery.send({ ...message, recipient: "chrona_qq:U2" })).toMatchObject({ outcome: "rejected", retryable: false });
-  await delivery.send(message);
-  expect(await delivery.send(message)).toMatchObject({ outcome: "rejected", retryable: true, error: "Local QQ rate limit" });
-  expect(sent).toHaveLength(2);
-});
-
-test("CLI minting and server redemption are serialized: a code shown to the user is never clobbered", async () => {
-  const h = harness();
-  const first = await h.state.createChallenge({ workspaceId: "ws", now: at });
-  const [, second] = await Promise.all([h.state.redeem("U1", "ZZZZZZZZ", at), createQqBotState(join(dir, "state"), APP).createChallenge({ workspaceId: "ws", now: at })]);
-  // Whichever order won, the newest code is the stored one and still has all its attempts.
-  const stored = JSON.parse(readFileSync(join(dir, "state", "challenge.json"), "utf8"));
-  expect([4, 5]).toContain(stored.attemptsLeft);
-  expect((await h.state.redeem("U1", second.code, at)).ok).toBe(true);
-  expect(first.code).not.toBe(second.code);
-  expect(readdirSync(join(dir, "state"))).not.toContain(".lock");
 });

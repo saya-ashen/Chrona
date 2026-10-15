@@ -1,8 +1,6 @@
 import { Hono } from "hono";
-import { db } from "@chrona/db";
 import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
-import { createChronaEngine } from "@chrona/engine";
 
 import { defaultLocale, getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
 
@@ -20,10 +18,9 @@ import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config
 const log = createLogger("apps.server");
 const MAX_HTTP_BODY_BYTES = 1_048_576;
 
-function isRunTokenProtectedApiPath(path: string, method: string) {
+function isStewardAgentPath(path: string, method: string) {
   // These exact endpoints validate their own narrower credentials. Prefixes stay API-key protected.
-  return (method === "POST" && path === "/api/agent/control") || path === "/api/mcp" || path === "/api/mcp/management"
-    || (method === "GET" && path === "/api/steward-agent/catalog")
+  return (method === "GET" && path === "/api/steward-agent/catalog")
     || (method === "POST" && (/^\/api\/steward-agent\/tools\/[^/]+$/.test(path) || path === "/api/steward-agent/web/preflight" || path === "/api/steward-agent/web/observed"));
 }
 
@@ -41,6 +38,18 @@ function wantsHtml(acceptHeader: string | undefined) {
   return typeof acceptHeader === "string" && acceptHeader.includes("text/html");
 }
 
+function mountHealthRoutes(app: Hono, steward: StewardRuntime) {
+  app.get("/health", (c) => c.json({ status: "ok", server: "chrona-hono", agent: steward.ports.agentHealth() }));
+  app.get("/ready", async (c) => {
+    try {
+      await steward.ports.db.$queryRawUnsafe("SELECT 1");
+      return c.json({ status: "ready" });
+    } catch {
+      return c.json({ status: "not_ready" }, 503);
+    }
+  });
+}
+
 /**
  * Creates the Hono server app with all middleware and routes mounted.
  *
@@ -52,8 +61,8 @@ function wantsHtml(acceptHeader: string | undefined) {
  */
 export async function createServerApp(options: { steward?: StewardRuntime } = {}) {
   const app = new Hono();
-  const engine = createChronaEngine({ logger: log });
-  const api = createApiRouter(engine, { mcpApiKey: readEnv().API_KEY, steward: options.steward ?? createStewardRuntime(db) });
+  const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
+  const api = createApiRouter({ steward });
   const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 
@@ -74,7 +83,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/*", apiKeyAuth({ isExempt: isRunTokenProtectedApiPath }));
+  app.use("/api/*", apiKeyAuth({ isExempt: isStewardAgentPath }));
   app.use(
     "/api/*",
     bodyLimit({
@@ -89,11 +98,7 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     }),
   );
 
-  app.get("/health", (c) => c.json({ status: "ok", server: "chrona-hono" }));
-  app.get("/ready", async (c) => {
-    const readiness = await engine.runtime.getReadiness();
-    return c.json(readiness, readiness.status === "ready" ? 200 : 503);
-  });
+  mountHealthRoutes(app, steward);
 
   app.route("/api", api);
   if (spaAvailable) {

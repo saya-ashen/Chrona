@@ -3,19 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@chrona/hermes": "workspace:*",
-    "@chrona/contracts": "workspace:*"
-  },
-  "exports": {
-    ".": "./src/index.ts",
-    "./calendar/feed-fetcher": "./src/calendar/feed-fetcher.ts",
-    "./calendar/normalizer": "./src/calendar/normalizer.ts",
-    "./calendar/parse-feed": "./src/calendar/parse-feed.ts",
-    "./calendar/recurrence": "./src/calendar/recurrence.ts",
-    "./calendar/source-url": "./src/calendar/source-url.ts",
-    "./calendar/test-fixtures": "./src/calendar/test-fixtures.ts",
-    "./hermes": "./src/hermes/index.ts",
-    "./steward": "./src/steward/index.ts"
-  }
+  "dependencies": { "@chrona/contracts": "workspace:*" },
+  "exports": { ".": "./src/index.ts", "./steward": "./src/steward/index.ts" }
 }

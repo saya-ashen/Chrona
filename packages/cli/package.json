@@ -4,14 +4,11 @@
   "private": true,
   "type": "module",
   "bin": {
-    "chrona": "./src/index.ts",
-    "agentdash": "./src/index.ts"
+    "chrona": "./src/index.ts"
   },
   "dependencies": {
     "@chrona/db": "workspace:*",
     "@chrona/integrations": "workspace:*",
-    "@chrona/providers-foundation": "workspace:*",
-    "@chrona-org/agent-cli": "workspace:*",
     "commander": "^15.0.0",
     "chalk": "^6.0.0",
     "cli-table3": "^0.6.5"

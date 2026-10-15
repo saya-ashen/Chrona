@@ -82,16 +82,12 @@ function ensureEnv(resourceDir: string) {
 }
 
 function banner() {
-  console.log("⚡ Chrona — AI-native task control plane");
+  console.log("⚡ Chrona — personal steward");
   console.log("");
 }
 
 function browserHost(host: string): string {
   return host === "0.0.0.0" ? "localhost" : host;
-}
-
-function mcpHost(host: string): string {
-  return host === "0.0.0.0" ? "127.0.0.1" : host;
 }
 
 function openBrowser(host: string, port: number) {
@@ -140,9 +136,7 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number.parseInt(process.env.PORT ?? "3101", 10);
   const appUrl = `http://${browserHost(host)}:${port}`;
-  const mcpUrl = `http://${mcpHost(host)}:${port}/api/mcp`;
   console.log(`🚀 Starting Chrona on ${appUrl}`);
-  console.log(`🔌 Chrona MCP: ${mcpUrl}`);
   console.log("");
 
   if (options.open !== false && process.env.CHRONA_NO_OPEN !== "1") {

@@ -1,84 +1,66 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import type { StewardService } from "@chrona/engine";
 import type { PrismaClient } from "@chrona/db";
-import { createStewardChat, moveChatDestination } from "@chrona/engine";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqGateway, createQqTokenSource, qqBotConfig, readProtectedSecret, sendQqC2c, DEDICATED_CHANNEL, DEDICATED_PLATFORM, type QqBinding, type QqLog } from "@chrona/integrations/steward";
-import type { DeliveryAdapter } from "@chrona/contracts/steward";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqGateway, createQqTokenSource, qqBotConfig, readProtectedSecret, sendQqC2c, DEDICATED_PLATFORM, type QqLog, type QqC2cMessage } from "@chrona/integrations/steward";
+import type { StewardChatTransport } from "./steward-runtime";
 
-const hash = (value: string) => createHash("sha256").update(value).digest("hex");
-const legacyRecipient = /^qqbot:[A-Za-z0-9_-]{1,128}$/;
-
-/**
- * Chrona's own QQ bot, wired in-process: gateway → owner check → the steward chat service of
- * the bound workspace; outbox → `chrona_qqbot`. Disabled unless CHRONA_QQ_APP_ID, a secret file
- * and a state directory are configured. `allowedRecipients` is the runtime's shared allowlist;
- * the owner's `chrona_qq:<openid>` joins it only through a binding.
- */
-export function createStewardQqBot({ db, allowedRecipients, deliveryAdapters, publicUrl, now = () => new Date(), env = process.env }: {
-  db: PrismaClient; allowedRecipients: string[]; deliveryAdapters: Record<string, DeliveryAdapter & { idempotent?: boolean }>; publicUrl: string | null; now?: () => Date; env?: Record<string, string | undefined>;
-}) {
+/** Injectable transport boundary; tests never read secrets or open a gateway. */
+export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env = process.env, transport }: {
+  db: PrismaClient; publicUrl: string | null; now?: () => Date; env?: Record<string, string | undefined>;
+  transport?: {
+    send: typeof sendQqC2c;
+    gateway: typeof createQqGateway;
+  };
+}): StewardChatTransport | null {
   const config = qqBotConfig(env);
   if (!config?.secretFile) return null;
   const { appId, stateDir, secretFile } = config;
-  const migrateFrom = legacyRecipient.test(env.CHRONA_QQ_MIGRATE_FROM ?? "") ? env.CHRONA_QQ_MIGRATE_FROM! : null;
   const log: QqLog = (event, fields = {}) => console.info(JSON.stringify({ component: "qq-bot", appId, event, ...fields }));
   const tokens = createQqTokenSource({ appId, readSecret: () => readProtectedSecret(secretFile), log });
   const state = createQqBotState(stateDir, appId);
-  const actorKey = `qq-bot:${appId}`;
-  deliveryAdapters[DEDICATED_CHANNEL] = createChronaQqDelivery({ tokens, publicUrl, allowedRecipients: () => new Set(allowedRecipients) });
-
-  function allow(binding: QqBinding, replaced: string | null) {
-    const recipient = `${DEDICATED_PLATFORM}:${binding.openid}`;
-    if (replaced) allowedRecipients.splice(0, allowedRecipients.length, ...allowedRecipients.filter(r => r !== `${DEDICATED_PLATFORM}:${replaced}`));
-    if (!allowedRecipients.includes(recipient)) allowedRecipients.push(recipient);
-    return recipient;
+  let recipients = new Set<string>();
+  const delivery = createChronaQqDelivery({ tokens, publicUrl, allowedRecipients: () => recipients });
+  let handler: ReturnType<typeof createQqBotHandler> | undefined;
+  const gateway = (transport?.gateway ?? createQqGateway)({ appId, tokens, log, onMessage: (message: QqC2cMessage) => { void handler?.onMessage(message).then(writeStatus); } });
+  async function refreshBinding() {
+    const binding = await state.binding();
+    recipients = new Set(binding ? [`${DEDICATED_PLATFORM}:${binding.openid}`] : []);
+    return binding;
   }
-  /** Explicit operator cut-over (CHRONA_QQ_MIGRATE_FROM): the legacy Hermes identity's delegations follow the owner here. */
-  async function migrate(binding: QqBinding, recipient: string, replaced: string | null) {
-    const moves = [replaced ? `${DEDICATED_PLATFORM}:${replaced}` : null, migrateFrom].filter((from): from is string => Boolean(from));
-    for (const from of moves) {
-      const moved = await moveChatDestination({ db, workspaceId: binding.workspaceId, from, to: recipient, actorKey, now });
-      log("qq.destination_moved", { legacy: from === migrateFrom, delegations: moved.delegations, queuedNotifications: moved.queuedNotifications });
-    }
-  }
-  const handler = createQqBotHandler({
-    state, log, now,
-    chat: binding => {
-      const service = createStewardChat({ db, workspaceId: binding.workspaceId, actorKey, allowedRecipients: new Set(allowedRecipients), now });
-      return {
-        request: input => service.request({ requestId: randomUUID(), ...input }),
-        respond: input => service.respond({ requestId: randomUUID(), ...input }),
-        pending: input => service.pending(input),
-      };
-    },
-    reply: async (openid, messageId, text) => {
-      const result = await sendQqC2c({ tokens, openid, content: text, replyTo: messageId });
-      if (result.outcome !== "accepted") log("qq.reply_not_accepted", { outcome: result.outcome });
-    },
-    onBound: async (binding, replaced) => {
-      const recipient = allow(binding, replaced);
-      await db.stewardAudit.create({ data: { workspaceId: binding.workspaceId, actorKey, kind: "chat.bound", subjectId: binding.workspaceId, details: { platform: DEDICATED_PLATFORM, appId, recipientHash: hash(recipient), replacedHash: replaced ? hash(`${DEDICATED_PLATFORM}:${replaced}`) : null }, createdAt: now() } });
-      await migrate(binding, recipient, replaced);
-      await writeStatus();
-    },
-  });
-  const gateway = createQqGateway({ appId, tokens, log, onMessage: message => { void handler.onMessage(message).then(writeStatus); } });
-
   async function writeStatus() {
     try {
-      const binding = await state.binding();
-      await state.writeStatus({ updatedAt: now().toISOString(), gateway: gateway.status(), token: tokens.status(), bound: Boolean(binding), boundAt: binding?.boundAt ?? null, ownerHash: binding ? hash(`${DEDICATED_PLATFORM}:${binding.openid}`).slice(0, 12) : null, challengePending: await state.challengePending(now()), legacyMigration: Boolean(migrateFrom) });
+      const binding = await refreshBinding();
+      await state.writeStatus({ updatedAt: now().toISOString(), gateway: gateway.status(), token: tokens.status(), bound: Boolean(binding), boundAt: binding?.boundAt ?? null, ownerHash: binding ? createHash("sha256").update(`${DEDICATED_PLATFORM}:${binding.openid}`).digest("hex").slice(0, 12) : null, challengePending: await state.challengePending(now()) });
     } catch { log("qq.status_write_failed"); }
   }
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
-    async start() {
-      const binding = await state.binding();
-      if (binding) { const recipient = allow(binding, binding.replacedOpenid ?? null); await migrate(binding, recipient, binding.replacedOpenid ?? null).catch(() => log("qq.migration_failed")); }
+    delivery: { channel: delivery.channel, async send(input) { await refreshBinding(); return delivery.send(input); } },
+    bound: async () => Boolean(await refreshBinding()),
+    async start(service: StewardService, wake: () => void) {
+      if (handler) return;
+      handler = createQqBotHandler({ state, now, log,
+        chat: { async handleMessage(input) { try { return await service.chat.handleMessage(input); } finally { wake(); } } },
+        reply: async (openid, messageId, text, msgSeq) => {
+          const result = await (transport?.send ?? sendQqC2c)({ tokens, openid, content: text, replyTo: messageId, msgSeq });
+          if (result.outcome !== "accepted") throw new Error("Passive reply not accepted");
+        },
+        async enqueueFinal(binding, messageId, text, affairId) {
+          // The normal budget may fold this into a digest; never bypass quiet hours/caps.
+          await db.$transaction(async tx => {
+            const row = await service.forWorkspace(binding.workspaceId).notifications.enqueueNotification(tx, { workspaceId: binding.workspaceId, level: "now", title: "Chrona", body: text, dedupeKey: `qq-final:${messageId}`, ...(affairId ? { affairId } : {}) });
+            // Pin this reply to its sender. A replacement owner must not receive
+            // an old final reply; the adapter rejects recipients no longer bound.
+            await tx.notification.update({ where: { id: row.id }, data: { recipient: `${DEDICATED_PLATFORM}:${binding.openid}` } });
+          });
+        },
+        onBound: async () => { await writeStatus(); },
+      });
+      await refreshBinding();
       gateway.start();
       timer = setInterval(() => void writeStatus(), 30_000);
       await writeStatus();
     },
-    async stop() { clearInterval(timer); await gateway.stop(); await writeStatus(); },
-    status: gateway.status,
+    async stop() { clearInterval(timer); await gateway.stop(); await handler?.drain(); await writeStatus(); },
   };
 }

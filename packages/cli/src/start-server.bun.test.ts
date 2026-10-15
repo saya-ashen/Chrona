@@ -46,7 +46,7 @@ describe("startChronaServer", () => {
       // Packaged launch delegates the sole lock/migration ownership to startBunServer.
       expect(existsSync(join(getChronaDataDir(), "chrona.db"))).toBe(false);
       expect(output).toContain("🚀 Starting Chrona on http://localhost:4310");
-      expect(output).toContain("🔌 Chrona MCP: http://127.0.0.1:4310/api/mcp");
+      expect(output).toContain("⚡ Chrona — personal steward");
       if (process.platform !== "win32") {
         expect(statSync(getChronaDataDir()).mode & 0o777).toBe(0o700);
         expect(statSync(join(process.env.CHRONA_CONFIG_DIR!, ".env")).mode & 0o777).toBe(0o600);

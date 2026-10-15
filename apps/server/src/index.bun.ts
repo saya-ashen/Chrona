@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import type { PrismaClient } from "@chrona/db";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { recoverInterruptedSqliteRestore } from "@chrona/db/sqlite-backup";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
@@ -7,22 +8,25 @@ import { createLogger } from "@chrona/logging";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
 const log = createLogger("apps.server");
-const SSE_REQUEST_TIMEOUT_SECONDS = 120;
 
 let isShuttingDown = false;
 
+export async function ensureDefaultWorkspace(db: PrismaClient) {
+  await db.workspace.upsert({ where: { id: "ws_default" }, create: { id: "ws_default", name: "Personal" }, update: {} });
+}
+
 async function loadApplicationGraph(databaseUrl: string, port: number) {
-  const [{ db }, { bootstrapServerRuntime }, { createServerApp }] = await Promise.all([
+  const [{ db }, { createServerApp }] = await Promise.all([
     import("@chrona/db/db"),
-    import("./bootstrap"),
     import("./app"),
   ]);
   await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
   await db.$queryRawUnsafe("SELECT 1");
+  await ensureDefaultWorkspace(db);
   secureGeneratedSqliteSidecars(databaseUrl);
   const { createStewardRuntime } = await import("./steward-runtime");
   const steward = createStewardRuntime(db, { port, onError: () => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED" }) });
-  return { bootstrapServerRuntime, createServerApp, steward };
+  return { createServerApp, steward };
 }
 
 export async function startBunServer() {
@@ -53,13 +57,12 @@ export async function startBunServer() {
     databaseLock.release();
     throw error;
   }
-  const { bootstrapServerRuntime, createServerApp, steward } = applicationGraph;
-  const runtimeLifecycle = bootstrapServerRuntime();
+  const { createServerApp, steward } = applicationGraph;
   let app: Awaited<ReturnType<typeof createServerApp>>;
   try {
     app = await createServerApp({ steward });
   } catch (error) {
-    await runtimeLifecycle.stop().catch(() => undefined);
+    await steward.stop().catch(() => undefined);
     databaseLock.release();
     throw error;
   }
@@ -86,15 +89,12 @@ export async function startBunServer() {
     hostname: host,
     port,
     idleTimeout: 120,
-    fetch: (request, server) => {
+    fetch: (request) => {
       if (isShuttingDown) {
         return new Response(JSON.stringify({ error: "Server is shutting down" }), {
           status: 503,
           headers: { "content-type": "application/json" },
         });
-      }
-      if (new URL(request.url).pathname.endsWith("/events")) {
-        server.timeout(request, SSE_REQUEST_TIMEOUT_SECONDS);
       }
       return app.fetch(request);
     },
@@ -111,7 +111,6 @@ export async function startBunServer() {
     server.stop(true);
     try {
       await steward.stop();
-      await runtimeLifecycle.stop();
     } catch (err) {
       log.error("runtime shutdown failed", { error: String(err) });
     }

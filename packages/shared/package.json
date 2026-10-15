@@ -5,7 +5,6 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
-    "@chrona/providers-foundation": "workspace:*",
     "zod": "^4.4.3"
   },
   "exports": {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { WORK_TOOLS, WORK_WEB_TOOLS } from "@chrona/contracts/steward";
+import { AFFAIR_TOOLS, CONCIERGE_TOOLS, WEB_TOOLS } from "@chrona/contracts/steward";
 import { createPiAgentRunner, resolvePiAgentExtension } from "./pi-agent-runner";
 
 const agentUrl = "http://127.0.0.1:3101/api/steward-agent";
@@ -41,7 +41,7 @@ function runner(command: string, extra: Partial<Parameters<typeof createPiAgentR
   return createPiAgentRunner({ command, extensionPath: join(directory, "chrona-tools.ts"), agentUrl, timeoutMs: 10_000, ...extra });
 }
 function input(extra: Partial<Parameters<ReturnType<typeof createPiAgentRunner>["run"]>[0]> = {}) {
-  return { token, deadlineAt: new Date(Date.now() + 10_000), shouldStop: async () => false, ...extra };
+  return { role: "affair" as const, token, deadlineAt: new Date(Date.now() + 10_000), shouldStop: async () => false, ...extra };
 }
 function assertGone(report: Report) {
   expect(existsSync(report.cwd)).toBe(false);
@@ -61,19 +61,46 @@ describe("Pi agent runner (fake executables only)", () => {
     expect(report.args.slice(0, 9)).toEqual(["-p", "--no-session", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-builtin-tools", "--offline"]);
     expect(report.args.filter(value => value === "-e")).toHaveLength(1);
     expect(report.args[report.args.indexOf("-e") + 1]).toBe(join(directory, "chrona-tools.ts"));
-    expect(report.args[report.args.indexOf("--tools") + 1]).toBe(WORK_TOOLS.join(","));
+    expect(report.args[report.args.indexOf("--tools") + 1]).toBe(AFFAIR_TOOLS.join(","));
     expect(report.args).not.toContain("--approve");
     expect(report.args[report.args.indexOf("--model") + 1]).toBe("test/model");
     const systemPrompt = report.args[report.args.indexOf("--system-prompt") + 1]!;
     expect(systemPrompt.length).toBeLessThanOrEqual(3500);
     expect(systemPrompt).toContain("untrusted data");
     expect(systemPrompt).toContain("handling");
-    expect(report.args.at(-1)).toBe("Handle the Chrona work item now. Start with chrona_get_context, then act. End the run by calling exactly one of: chrona_publish_result, chrona_ask_user, chrona_request_authorization, chrona_close_quietly.");
+    expect(systemPrompt).toContain("chrona_add_panel_entry");
+    expect(report.args[report.args.indexOf("--tools") + 1]!.split(",")).toContain("chrona_add_panel_entry");
+    expect(systemPrompt).toContain("set a short title (≤ 20 汉字) via chrona_save_progress.title in your first progress update");
+    expect(systemPrompt).toContain("state the assumptions in the result instead of asking");
+    expect(systemPrompt).toContain("Write user-facing text in the user's language; default Chinese.");
+    expect(report.args.at(-1)).toBe("Handle the Chrona affair now. Call chrona_get_context first, then act. End with exactly one terminal tool: chrona_publish_result, chrona_ask_user, chrona_request_approval, or chrona_close.");
     expect(report.env).toEqual({ CHRONA_AGENT_URL: agentUrl, CHRONA_AGENT_TOKEN: token });
     expect(report.stdin).toBe("");
     expect(report.entries).toEqual([]);
     expect(report.cwd).not.toBe(process.cwd());
     assertGone(report);
+  });
+
+  test("concierge role uses its own allowlist and context-first prompt, with optional web", async () => {
+    const fake = fakePi();
+    await runner(fake.command).run(input({ role: "concierge" }));
+    let args = fake.report().args;
+    expect(args[args.indexOf("--tools") + 1]).toBe(CONCIERGE_TOOLS.join(","));
+    const prompt = args[args.indexOf("--system-prompt") + 1]!;
+    expect(prompt).toContain("concierge_context FIRST");
+    expect(prompt).toContain("Always end with concierge_reply");
+    expect(prompt).toContain("without creating an affair");
+    expect(prompt).toContain("今天体重 71.2");
+    expect(prompt).toContain("chrona_add_panel_entry");
+    expect(prompt).toContain("To end an affair, use concierge_set_affair_status only; do not also answer its open questions.");
+    expect(prompt).toContain("Write user-facing text in the user's language; default Chinese.");
+    expect(args.at(-1)).toContain("concierge_context first");
+    expect(args.at(-1)).not.toContain("chrona_get_context");
+    const webExtensionPath = join(directory, "web.ts");
+    writeFileSync(webExtensionPath, "// fake");
+    await runner(fake.command, { webExtensionPath }).run(input({ role: "concierge" }));
+    args = fake.report().args;
+    expect(args[args.indexOf("--tools") + 1]).toBe([...CONCIERGE_TOOLS, ...WEB_TOOLS].join(","));
   });
 
   test("existing web extension adds exactly the two web tools and second -e", async () => {
@@ -82,7 +109,7 @@ describe("Pi agent runner (fake executables only)", () => {
     writeFileSync(webExtensionPath, "// test-only extension placeholder");
     expect((await runner(fake.command, { webExtensionPath }).run(input())).outcome).toBe("exited");
     const { args } = fake.report();
-    expect(args[args.indexOf("--tools") + 1]).toBe([...WORK_TOOLS, ...WORK_WEB_TOOLS].join(","));
+    expect(args[args.indexOf("--tools") + 1]).toBe([...AFFAIR_TOOLS, ...WEB_TOOLS].join(","));
     expect(args.flatMap((arg, index) => arg === "-e" ? [args[index + 1]] : [])).toEqual([join(directory, "chrona-tools.ts"), webExtensionPath]);
     expect(args).not.toContain("--model");
     expect(args).not.toContain("--approve");
@@ -92,7 +119,7 @@ describe("Pi agent runner (fake executables only)", () => {
     const fake = fakePi();
     await runner(fake.command, { webExtensionPath: join(directory, "absent.ts") }).run(input());
     const { args } = fake.report();
-    expect(args[args.indexOf("--tools") + 1]).toBe(WORK_TOOLS.join(","));
+    expect(args[args.indexOf("--tools") + 1]).toBe(AFFAIR_TOOLS.join(","));
     expect(args.filter(arg => arg === "-e")).toHaveLength(1);
   });
 

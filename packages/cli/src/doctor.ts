@@ -4,8 +4,15 @@ import { Database } from "bun:sqlite";
 
 import { inspectSqliteRuntimeLock, quarantineStaleSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { assertPrivateStoragePath, sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
-import { isExactLoopbackHost } from "@chrona/providers-foundation";
+import { isIP } from "node:net";
 import { getChronaConfigDir, getChronaDataDir } from "./start-server.js";
+
+// Exact local endpoint classification, preserved from the retired provider helper.
+function isExactLoopbackHost(host: string): boolean {
+  const normalized = host.trim().replace(/^\[/, "").replace(/\]$/, "").split("%")[0]?.toLowerCase() ?? "";
+  if (normalized === "localhost" || normalized === "::1") return true;
+  return isIP(normalized) === 4 && normalized.startsWith("127.");
+}
 
 export type ChronaDoctorCheck = {
   key: "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";

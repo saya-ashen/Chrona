@@ -70,7 +70,7 @@ function serviceSubject(service: Dashboard["services"][number], old: Entry | und
   if (service.status === "unknown" || service.checkedAt === null) return null;
   const cls = service.status === "online" || service.status === "reachable" ? "ok" : "attention";
   return { key: `service:${service.id}`, old, cls, checkedAt: service.checkedAt, item: {
-    threadId: `chino-service:${service.id}`, author: "chino-dashboard", url: null,
+    url: null,
     title: `Chino 服务 ${service.name} ${cls === "attention" ? "不可用" : "已恢复"}（${service.status}）`,
     body: `服务 ID: ${service.id}\n名称: ${service.name}\n分类: ${service.category}\n状态: ${old?.cls ?? "未观测"} -> ${service.status}\nHTTP 状态: ${service.httpStatus ?? "无"}\n检查时间: ${service.checkedAt}`,
   } };
@@ -80,7 +80,7 @@ function networkSubject(network: Dashboard["network"], old: Entry | undefined): 
   if (network.stale || network.state === "unknown" || network.checkedAt === null) return null;
   const cls = network.state === "healthy" ? "ok" : "attention";
   return { key: "network", old, cls, checkedAt: network.checkedAt, item: {
-    threadId: "chino-network", author: "chino-dashboard", url: null,
+    url: null,
     title: `Chino 网络${cls === "attention" ? "状态异常" : "已恢复"}（${network.state}）`,
     body: `状态: ${old?.cls ?? "未观测"} -> ${network.state}\n检查时间: ${network.checkedAt}`,
   } };
@@ -119,7 +119,7 @@ export function createChinoServiceHealthSource(options: { url?: string; fetch?: 
   const url = configuredUrl(options.url);
   const reason = !options.url ? "Chino dashboard URL is not configured on this host" : "Chino dashboard URL must be credential-free HTTP on loopback";
   return {
-    kind: "chino_service_health", mode: "poll", supportedActions: ["read_source"],
+    kind: "chino_service_health", mode: "poll",
     coverageNote: "Polls the Chino dashboard summary; only state changes seen between polls are recorded, short outages between polls are missed, and service details are not read. At most 50 changes per poll; excess changes are deferred.",
     async readiness() { return url ? { state: "ready" } : { state: "unsupported", reason }; },
     async poll(_connection, cursor) {

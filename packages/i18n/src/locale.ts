@@ -141,4 +141,3 @@ export type { Messages } from "./messages";
 export { fallbackMessages } from "./messages";
 export { getDictionary } from "./get-dictionary";
 export { localizeHref, stripLocalePrefix } from "./routing";
-export { externalCalendarMessages } from "./external-calendar-messages";

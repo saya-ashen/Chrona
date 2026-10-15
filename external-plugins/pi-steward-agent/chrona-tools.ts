@@ -50,7 +50,7 @@ export default async function (pi: any) {
     const calledTools = (event.message?.content ?? []).some(part => part.type === "toolCall");
     if (finished || calledTools || nudges >= 2) return undefined;
     nudges++;
-    await pi.sendUserMessage("Chrona: this run has not ended. Your text answer is not saved. Call exactly one terminal tool now: chrona_publish_result (put the answer and its limitations there), chrona_ask_user, chrona_request_authorization, or chrona_close_quietly.", { deliverAs: "followUp" });
+    await pi.sendUserMessage(`Chrona: this run has not ended. Your text answer is not saved. Call exactly one terminal tool now: ${catalog.tools.filter(tool => tool.terminal).map(tool => tool.name).join(", ")}.`, { deliverAs: "followUp" });
     return undefined;
   });
   pi.on("tool_call", async (event: { toolName: string; input: Record<string, unknown> }) => {

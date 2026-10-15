@@ -2,7 +2,15 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
-import { isExactLoopbackHost, normalizeNetworkHost } from "@chrona/providers-foundation";
+// Kept local after removal of providers-foundation; exact classifier semantics unchanged.
+function normalizeNetworkHost(host: string): string {
+  return host.trim().replace(/^\[/, "").replace(/\]$/, "").split("%")[0]?.toLowerCase() ?? "";
+}
+function isExactLoopbackHost(host: string): boolean {
+  const normalized = normalizeNetworkHost(host);
+  if (normalized === "localhost" || normalized === "::1") return true;
+  return isIP(normalized) === 4 && normalized.startsWith("127.");
+}
 
 
 const envSchema = z.object({
@@ -19,8 +27,6 @@ const envSchema = z.object({
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
   CHRONA_UNSAFE_CORS: z.string().optional(),
   CHRONA_WEB_DIST: z.string().optional(),
-  CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: z.string().optional(),
-  CHRONA_EMAIL_TRIGGER_SECRET: z.string().min(16).optional(),
 });
 
 type Env = z.output<typeof envSchema>;

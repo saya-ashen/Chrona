@@ -12,7 +12,7 @@ export function createTestDelivery() {
   const receipts = new Map<string, Extract<DeliveryOutcome, { outcome: "accepted" }>>();
   let outcomes: TestDeliveryScriptOutcome[] = [];
   const adapter: DeliveryAdapter = {
-    channel: "local_test",
+    channel: "in_app",
     async send(message) {
       const previous = receipts.get(message.idempotencyKey);
       // An accepted retry consumes neither another outcome nor another send.

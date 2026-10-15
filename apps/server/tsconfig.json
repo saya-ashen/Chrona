@@ -14,7 +14,6 @@
       "@features/execution-monitoring/server": ["../../features/execution-monitoring/server.ts"],
       "@features/task-workspace/server": ["../../features/task-workspace/server.ts"],
       "@shared/http": ["../../shared/http/index.ts"],
-      "@shared/http/server": ["../../shared/http/server.ts"],
       "shared/http/*": ["../../shared/http/*"],
       "@chrona/logging": ["../../packages/logging/src/index.ts"],
       "@chrona/i18n/*": ["../../packages/i18n/src/*"],
