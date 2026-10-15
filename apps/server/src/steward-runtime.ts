@@ -7,6 +7,9 @@ import type { DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createInAppDelivery } from "../../../packages/integrations/src/steward/in-app-delivery";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
+import { createEmailConnector } from "../../../packages/integrations/src/steward/email";
+import { createLocalTestSource } from "../../../packages/integrations/src/steward/local-test-source";
+import { createChinoServiceHealthSource } from "../../../packages/integrations/src/steward/chino-health-source";
 
 export type StewardChatTransport = {
   delivery: DeliveryAdapter; bound(): Promise<boolean>;
@@ -61,6 +64,7 @@ export function createStewardRuntime(db: PrismaClient, options: {
   void scriptSandbox;
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
+    connectors: [createEmailConnector(), createLocalTestSource().adapter, createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
     sandbox: options.sandbox ?? { available: false }, chatTimeoutMs: options.chatTimeoutMs,

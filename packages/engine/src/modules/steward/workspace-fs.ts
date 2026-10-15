@@ -223,6 +223,11 @@ export function createWorkspaceFs(dataDir: string) {
         const info = await lstat(await confined(dir, path));
         return { path, kind: "file" as const, size: info.size, updatedAt: info.mtime.toISOString() };
       }),
+      /** Trusted connector intake; same confinement as user writes, one Chrona commit. */
+      intake: (files: { path: string; bytes: Uint8Array }[], message: string) => run(async dir => {
+        for (const file of files) await writeFile(dir, file.path, file.bytes);
+        await commit(dir, "chrona", message, files.map(file => file.path));
+      }),
       revisions: (path?: string) => run(dir => revisionsAt(dir, path)),
       diff: (sha: string) => run(async dir => {
         if (!/^[a-f0-9]{40}$/.test(sha)) throw new StewardError("invalid", "Invalid revision");

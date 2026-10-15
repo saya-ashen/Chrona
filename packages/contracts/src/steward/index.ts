@@ -267,6 +267,9 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
  *   GET  /health
  */
+/** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
+export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+
 export const STEWARD_API_BASE = "/api/steward";
 
 // ---------------------------------------------------------- Chrona tools ---

@@ -1,15 +1,14 @@
-import type { SourceAdapter, SourceItem } from "@chrona/contracts/steward";
+import type { ConnectorAdapter, SourceItem } from "@chrona/contracts/steward";
 
 /** Append-only, process-local test log. Cursors are exclusive sequence offsets. */
 export function createLocalTestSource() {
   const items: SourceItem[] = [];
   const failures: unknown[] = [];
-  const adapter: SourceAdapter = {
+  const adapter: ConnectorAdapter = {
     kind: "local_test",
-    mode: "poll",
     coverageNote: "LOCAL TEST DATA only; in-memory polling, not a real account. Lost on restart.",
-    async readiness() { return { state: "ready" }; },
-    async poll(_connection, cursor) {
+    async test() { return { ok: true }; },
+    async poll({ cursor }) {
       if (failures.length) throw failures.shift();
       if (cursor !== null && !/^(0|[1-9]\d*)$/.test(cursor)) {
         throw new Error("Invalid local test cursor");
@@ -20,7 +19,7 @@ export function createLocalTestSource() {
       }
       return {
         items: items.slice(offset).map((item) => ({ ...item })),
-        nextCursor: items.length ? String(items.length) : cursor,
+        cursor: items.length ? String(items.length) : cursor,
       };
     },
   };

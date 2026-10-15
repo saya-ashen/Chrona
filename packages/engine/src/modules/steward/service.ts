@@ -13,6 +13,7 @@ import { createSchedules } from "./schedules";
 import { createRuns } from "./runs";
 import { createTick } from "./tick";
 import { createChat } from "./chat";
+import { createConnectors } from "./connectors";
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   deliveries: DeliveryAdapter[];
@@ -49,7 +50,7 @@ export function createStewardService(inputPorts: StewardPorts) {
       }),
       jobsSandbox: () => ports.sandbox?.available ?? false,
     });
-    return { chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx, ports.onApproved), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
+    return { connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx, ports.onApproved), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

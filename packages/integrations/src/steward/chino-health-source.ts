@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SourceAdapter, SourceItem } from "@chrona/contracts/steward";
+import type { ConnectorAdapter, SourceItem } from "@chrona/contracts/steward";
 
 const iso = z.string().datetime({ offset: true }).max(40);
 const serviceSchema = z.object({
@@ -64,14 +64,14 @@ async function readDashboard(response: Response) {
 }
 
 type Dashboard = z.infer<typeof dashboardSchema>;
-type Subject = { key: string; old: Entry | undefined; cls: Entry["cls"]; checkedAt: string; item: Omit<SourceItem, "externalId" | "occurredAt"> };
+type Subject = { key: string; old: Entry | undefined; cls: Entry["cls"]; checkedAt: string; item: Omit<SourceItem, "externalId" | "receivedAt"> };
 
 function serviceSubject(service: Dashboard["services"][number], old: Entry | undefined): Subject | null {
   if (service.status === "unknown" || service.checkedAt === null) return null;
   const cls = service.status === "online" || service.status === "reachable" ? "ok" : "attention";
   return { key: `service:${service.id}`, old, cls, checkedAt: service.checkedAt, item: {
     url: null,
-    title: `Chino 服务 ${service.name} ${cls === "attention" ? "不可用" : "已恢复"}（${service.status}）`,
+    from: "Chino", subject: `Chino 服务 ${service.name} ${cls === "attention" ? "不可用" : "已恢复"}（${service.status}）`,
     body: `服务 ID: ${service.id}\n名称: ${service.name}\n分类: ${service.category}\n状态: ${old?.cls ?? "未观测"} -> ${service.status}\nHTTP 状态: ${service.httpStatus ?? "无"}\n检查时间: ${service.checkedAt}`,
   } };
 }
@@ -81,14 +81,14 @@ function networkSubject(network: Dashboard["network"], old: Entry | undefined): 
   const cls = network.state === "healthy" ? "ok" : "attention";
   return { key: "network", old, cls, checkedAt: network.checkedAt, item: {
     url: null,
-    title: `Chino 网络${cls === "attention" ? "状态异常" : "已恢复"}（${network.state}）`,
+    from: "Chino", subject: `Chino 网络${cls === "attention" ? "状态异常" : "已恢复"}（${network.state}）`,
     body: `状态: ${old?.cls ?? "未观测"} -> ${network.state}\n检查时间: ${network.checkedAt}`,
   } };
 }
 
 /** Turns one dashboard reading into state-change items and the cursor that remembers it. */
-function changes(dashboard: Dashboard, previous: Cursor | null): { items: SourceItem[]; nextCursor: string | null } {
-  if (dashboard.overallState === "collecting") return { items: [], nextCursor: previous ? JSON.stringify(previous) : null };
+function changes(dashboard: Dashboard, previous: Cursor | null): { items: SourceItem[]; cursor: string | null } {
+  if (dashboard.overallState === "collecting") return { items: [], cursor: previous ? JSON.stringify(previous) : null };
   const items: SourceItem[] = [];
   // Returns the entry to remember. A deferred change keeps the old entry so a later poll still reports it.
   function observe(subject: Subject | null, old: Entry | undefined): Entry | undefined {
@@ -96,7 +96,7 @@ function changes(dashboard: Dashboard, previous: Cursor | null): { items: Source
     if (old || subject.cls === "attention") {
       if (items.length === 50) return old;
       // With no previous cursor this is the first sync: what is wrong now is a live condition, not history.
-      items.push({ ...subject.item, externalId: `${subject.key}:${subject.cls}:${subject.checkedAt}`, occurredAt: subject.checkedAt, ...(previous ? {} : { current: true }) });
+      items.push({ ...subject.item, externalId: `${subject.key}:${subject.cls}:${subject.checkedAt}`, receivedAt: subject.checkedAt });
     }
     return { cls: subject.cls, since: subject.checkedAt };
   }
@@ -111,18 +111,18 @@ function changes(dashboard: Dashboard, previous: Cursor | null): { items: Source
   }
   const oldNetwork = previous?.network ?? undefined;
   const network = observe(networkSubject(dashboard.network, oldNetwork), oldNetwork) ?? null;
-  return { items, nextCursor: JSON.stringify({ v: 1, services, network } satisfies Cursor) };
+  return { items, cursor: JSON.stringify({ v: 1, services, network } satisfies Cursor) };
 }
 
 /** Read-only host-local summary polling. Connection config cannot override the host-owned URL. */
-export function createChinoServiceHealthSource(options: { url?: string; fetch?: (url: string, init: RequestInit) => Promise<Response>; timeoutMs?: number } = {}): SourceAdapter {
+export function createChinoServiceHealthSource(options: { url?: string; fetch?: (url: string, init: RequestInit) => Promise<Response>; timeoutMs?: number } = {}): ConnectorAdapter {
   const url = configuredUrl(options.url);
   const reason = !options.url ? "Chino dashboard URL is not configured on this host" : "Chino dashboard URL must be credential-free HTTP on loopback";
   return {
-    kind: "chino_service_health", mode: "poll",
+    kind: "chino_service_health",
     coverageNote: "Polls the Chino dashboard summary; only state changes seen between polls are recorded, short outages between polls are missed, and service details are not read. At most 50 changes per poll; excess changes are deferred.",
-    async readiness() { return url ? { state: "ready" } : { state: "unsupported", reason }; },
-    async poll(_connection, cursor) {
+    async test() { return url ? { ok: true } : { ok: false, error: reason }; },
+    async poll({ cursor }) {
       if (!url) throw new Error(reason);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 10_000);

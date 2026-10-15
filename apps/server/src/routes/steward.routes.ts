@@ -94,5 +94,11 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.get("/notifications", async c => c.json({ items: await c.get("steward").notifications.list() }));
   router.post("/notifications/:id/feedback", async c => c.json(await c.get("steward").notifications.recordFeedback(c.req.param("id"), z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict().parse(await c.req.json()).feedback)));
   router.post("/notifications/:id/retry", async c => c.json(await c.get("steward").notifications.retry(c.req.param("id"))));
+  router.get("/connectors", async c => c.json({ items: await c.get("steward").connectors.list() }));
+  router.post("/connectors", async c => c.json(await c.get("steward").connectors.create(s.createConnectorSchema.parse(await c.req.json()))));
+  router.patch("/connectors/:id", async c => c.json(await c.get("steward").connectors.update(c.req.param("id"), s.updateConnectorSchema.parse(await c.req.json()))));
+  router.post("/connectors/:id/test", async c => c.json(await c.get("steward").connectors.test(c.req.param("id"))));
+  router.post("/connectors/:id/sync", async c => c.json(await c.get("steward").connectors.sync(c.req.param("id"))));
+  router.get("/connectors/:id/items", async c => c.json({ items: await c.get("steward").connectors.items(c.req.param("id")) }));
   return router;
 }

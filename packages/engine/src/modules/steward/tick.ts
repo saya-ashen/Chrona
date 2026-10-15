@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./service";
 import { createSchedules } from "./schedules";
+import { createConnectors } from "./connectors";
 import { createRuns, liveRuns } from "./runs";
 import { createNotifications } from "./notify";
 import { createAffairs } from "./affairs";
@@ -49,6 +50,7 @@ export function createTick(ports: StewardPorts) {
         }
       }
       for (const [stage, action] of [
+        ["connectors", () => createConnectors(ports, workspaceId).tick()],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
         ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
