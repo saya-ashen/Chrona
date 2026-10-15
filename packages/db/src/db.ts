@@ -6,7 +6,7 @@ import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
 import { resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
-import { AUTO_TEST_DATABASE_ENV, resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
+import { resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
 
 applyChronaRuntimeConfigToEnv(process.env);
 
@@ -31,7 +31,6 @@ function createDbClient() {
     ensureSqliteDatabase({
       databaseUrl: DATABASE_URL,
       migrationsDir: MIGRATIONS_DIR,
-      reset: process.env[AUTO_TEST_DATABASE_ENV] === "1",
     });
   }
 
@@ -53,7 +52,7 @@ function hasRequiredDelegates(client: PrismaClient | undefined) {
     return false;
   }
 
-  return typeof (client as PrismaClient & { taskSession?: unknown }).taskSession === "object";
+  return typeof client.affair === "object";
 }
 
 function resolveCachedClient(globalForPrisma: typeof globalThis & {

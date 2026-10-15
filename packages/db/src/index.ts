@@ -1,24 +1,2 @@
 export * from "./generated/prisma/client";
-export { db } from "./db";
-
-// Execution-layer repository exports
-export { getActiveWorkBlock, getWorkBlocksByTask, createWorkBlock } from "./work-block-repository";
-export { getActiveExecutionSession, getSessionByWorkBlock, createExecutionSession } from "./execution-session-repository";
-export {
-  createCalendarSource,
-  getCalendarSource,
-  listCalendarSources,
-  listImportedCalendarEventsInRange,
-  markCalendarSourceRemoved,
-  replaceImportedCalendarEvents,
-  updateCalendarSource,
-  updateCalendarSourceSyncStatus,
-} from "./external-calendar";
-export type {
-  CalendarSourceCreateData,
-  ImportedCalendarAutomationRequest,
-  ImportedCalendarEventWrite,
-  ImportedCalendarReplacementResult,
-} from "./external-calendar";
-export { resetTestDb, seedTask, seedWorkspace } from "./test-support";
-export type { SeedTaskResult, SeedWorkspaceResult } from "./test-support";
+export { db, withDatabaseTransaction, afterDatabaseCommit } from "./db";

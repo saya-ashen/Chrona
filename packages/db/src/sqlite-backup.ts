@@ -4,27 +4,19 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 
 import { acquireSqliteRuntimeLock, type SqliteRuntimeLock } from "./sqlite-runtime-lock";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
 
-const AUTOMATIC_BACKUP_RETENTION = 5;
 const RESTORE_MARKER_VERSION = 1;
 
 export type SqliteBackupResult = {
   sourcePath: string;
   backupPath: string;
-};
-
-export type PreUpgradeBackupResult = SqliteBackupResult & {
-  metadataPath: string;
-  sourceFingerprint: string;
-  targetReleaseLine: string;
 };
 
 type RestoreMarker = {
@@ -103,52 +95,6 @@ export function backupSqliteDatabase(databaseUrl: string, outputPath: string): S
   createPrivateDirectory(dirname(backupPath));
   vacuumInto(sourcePath, backupPath);
   return { sourcePath, backupPath };
-}
-
-function timestamp(): string {
-  return new Date().toISOString().replaceAll(/[:.]/g, "-");
-}
-
-function automaticBackupDirectory(databasePath: string): string {
-  return join(dirname(databasePath), "backups", "pre-upgrade");
-}
-
-function trimAutomaticBackups(directory: string, keepPath: string): void {
-  const entries = Bun.file(directory);
-  void entries;
-  // Bun's glob is unnecessary here; readdir avoids treating user-controlled names as paths.
-  const names = Array.from(new Bun.Glob("*.sqlite").scanSync({ cwd: directory }))
-    .map((name) => join(directory, name))
-    .filter((path) => path !== keepPath)
-    .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs);
-  for (const path of names.slice(Math.max(0, AUTOMATIC_BACKUP_RETENTION - 1))) {
-    rmSync(path, { force: true });
-    rmSync(`${path}.json`, { force: true });
-  }
-}
-
-/** Creates a validated automatic recovery point before a schema/history upgrade. */
-export function createPreUpgradeBackup(input: {
-  databaseUrl: string;
-  sourceFingerprint: string;
-  targetReleaseLine: string;
-}): PreUpgradeBackupResult {
-  const sourcePath = requireFilePath(input.databaseUrl);
-  if (!existsSync(sourcePath)) throw new Error("Chrona database was not found for upgrade backup.");
-  const directory = automaticBackupDirectory(sourcePath);
-  createPrivateDirectory(directory);
-  const backupPath = join(directory, `${basename(sourcePath, ".db")}-${timestamp()}-${input.targetReleaseLine}.sqlite`);
-  const result = backupSqliteDatabase(input.databaseUrl, backupPath);
-  const metadataPath = `${backupPath}.json`;
-  writeFileSync(metadataPath, `${JSON.stringify({
-    createdAt: new Date().toISOString(),
-    sourceFingerprint: input.sourceFingerprint,
-    sourceName: basename(sourcePath),
-    targetReleaseLine: input.targetReleaseLine,
-  })}\n`, { mode: 0o600 });
-  secureGeneratedFile(metadataPath);
-  trimAutomaticBackups(directory, backupPath);
-  return { ...result, metadataPath, sourceFingerprint: input.sourceFingerprint, targetReleaseLine: input.targetReleaseLine };
 }
 
 function restoreMarkerPath(databasePath: string): string {
