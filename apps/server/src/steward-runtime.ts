@@ -4,6 +4,7 @@ import type { PrismaClient } from "@chrona/db";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
 import type { DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
+import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createInAppDelivery } from "../../../packages/integrations/src/steward/in-app-delivery";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
@@ -34,6 +35,7 @@ type RuntimeOptions = {
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
 function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) {
+  if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
     chronaExtension: fileURLToPath(new URL("../../../external-plugins/pi-steward-agent/chrona-tools.ts", import.meta.url)),

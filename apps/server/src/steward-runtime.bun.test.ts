@@ -31,6 +31,26 @@ jobTest("configured runtime job reads affair cwd and wakes only on output change
   } finally { await runtime.stop(); await db.$disconnect(); }
 });
 
+test("E2E provider requires both the explicit test gate and provider selection", async () => {
+  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
+  const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;
+  try {
+    for (const [gate, agent, expected] of [["0", "e2e", undefined], ["1", "none", undefined], ["1", "e2e", "e2e"]] as const) {
+      process.env.CHRONA_E2E_TEST_ROUTES = gate;
+      process.env.CHRONA_STEWARD_AGENT = agent;
+      const runtime = createStewardRuntime(db, { dataDir, port: 48130, chatTransport: null });
+      expect(runtime.ports.provider?.name).toBe(expected);
+      await runtime.stop();
+    }
+  } finally {
+    if (previousGate === undefined) delete process.env.CHRONA_E2E_TEST_ROUTES;
+    else process.env.CHRONA_E2E_TEST_ROUTES = previousGate;
+    if (previousAgent === undefined) delete process.env.CHRONA_STEWARD_AGENT;
+    else process.env.CHRONA_STEWARD_AGENT = previousAgent;
+    await db.$disconnect();
+  }
+});
+
 test("runtime data directory follows explicit setting then database directory", () => {
   expect(stewardDataDir({ CHRONA_DATA_DIR: "/tmp/chrona-data", DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/chrona-data");
   expect(stewardDataDir({ DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/db");
