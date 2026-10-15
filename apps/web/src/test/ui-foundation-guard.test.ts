@@ -12,7 +12,14 @@ describe("steward UI foundation", () => {
     "features/steward/ui/today-page.tsx",
   ])("uses shared shadcn controls in %s", file => {
     const source = readFileSync(resolve(file), "utf8");
-    expect(source).toMatch(/import\s*\{[^}]*Button[^}]*\}\s*from\s*["']@shared\/ui["']/);
+    if (file === "features/steward/ui/today-page.tsx") {
+      // Today delegates loading/error controls to the shared resource component.
+      expect(source).toMatch(/import\s*\{\s*ResourceStatus\s*\}\s*from\s*["'].\/resource-status["']/);
+      const resource = readFileSync(resolve("features/steward/ui/resource-status.tsx"), "utf8");
+      expect(resource).toMatch(/import\s*\{[^}]*Button[^}]*\}\s*from\s*["']@shared\/ui["']/);
+    } else {
+      expect(source).toMatch(/import\s*\{[^}]*Button[^}]*\}\s*from\s*["']@shared\/ui["']/);
+    }
     expect(source).not.toMatch(/<(?:button|input|textarea|select)\b/);
     expect(source).not.toMatch(/\b(?:buttonVariants|inputClassName|StatusBadge|SurfaceCard)\b/);
   });

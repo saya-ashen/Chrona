@@ -41,7 +41,7 @@ export function useSteward(workspaceId: string, chatPending = false) {
   const [poll, setPoll] = useState(chatPending);
   const resource = useStewardResource(client.today, poll || chatPending);
   useEffect(() => {
-    if (resource.data) setPoll(resource.data.health.queuedAffairs > 0 || resource.data.health.runningAffairs > 0);
+    if (resource.data) setPoll(resource.data.health.queuedRuns > 0 || resource.data.health.runningRuns > 0);
   }, [resource.data]);
   return { ...resource, client };
 }

@@ -30,7 +30,7 @@ export function Composer({
         <Textarea
           aria-label={copy.composer}
           placeholder={copy.composer}
-          maxLength={4000}
+          maxLength={8000}
           rows={1}
           className="min-h-9 max-h-40 min-w-0 flex-1 resize-none [field-sizing:content]"
           value={composer.text}
@@ -66,22 +66,19 @@ export function Composer({
           <p className="whitespace-pre-wrap text-muted-foreground">
             {copy.you} · {composer.exchange.text}
           </p>
-          <p className="whitespace-pre-wrap">{composer.exchange.response.reply}</p>
-          <div className="flex flex-wrap gap-2">
-            {composer.exchange.response.effects.map((effect, index) =>
-              effect.affairId ? (
-                <Badge variant="outline" key={index} asChild>
-                  <Link to={`/${lang}/affairs/${encodeURIComponent(effect.affairId)}`}>
-                    {effect.label}
-                  </Link>
-                </Badge>
-              ) : (
-                <Badge variant="outline" key={index}>
-                  {effect.label}
-                </Badge>
-              ),
-            )}
-          </div>
+          {composer.exchange.response.messages.filter(message => message.direction === "out").map(message => (
+            <article key={message.id} className="grid gap-2">
+              <p className="whitespace-pre-wrap">{message.text}</p>
+              {message.affairId && <Badge variant="outline" asChild><Link to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}`}>{messages.steward.affairs.title}</Link></Badge>}
+              <div className="flex flex-wrap gap-2">
+                {message.attachments.map((attachment, index) => message.affairId && attachment.path ? (
+                  /\.md$/i.test(attachment.path)
+                    ? <Link key={index} className="underline" to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}?${new URLSearchParams({ path: attachment.path })}`}>{attachment.name}</Link>
+                    : <a key={index} className="underline" href={client.rawUrl(message.affairId, attachment.path)} download>{attachment.name}</a>
+                ) : <span key={index}>{attachment.name}</span>)}
+              </div>
+            </article>
+          ))}
         </section>
       )}
     </div>
