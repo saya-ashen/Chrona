@@ -15,7 +15,7 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 if (process.argv.includes('--version')) process.exit(0);
 writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),env:process.env}));
 const mode=${JSON.stringify(mode)};
-let streaming=false, queue=0, cycle=0;
+let streaming=false, queue=0, cycle=0, retried=false;
 const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
 const reply=(c,data={})=>emit({id:c.id,type:'response',command:c.type,success:true,data});
 function run() {
@@ -34,7 +34,17 @@ process.stdin.on('data',chunk=>{
  while((n=buffer.indexOf('\\n'))!==-1){
   const c=JSON.parse(buffer.slice(0,n)); buffer=buffer.slice(n+1);
   appendFileSync('commands.jsonl',JSON.stringify(c)+'\\n');
-  if(c.type==='get_state') reply(c,{sessionId:'retained-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
+  if(c.type==='get_state') {
+   if(mode==='retry-state' && cycle===1 && !streaming && !retried) {
+    retried=true;
+    emit({type:'auto_retry_start'});
+    setTimeout(()=>{
+     emit({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:'retry failed'}});
+     emit({type:'auto_retry_end'});
+    },60);
+   }
+   reply(c,{sessionId:'retained-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
+  }
   if(c.type==='prompt') {
    reply(c);
    if(mode==='crash'){process.stderr.write('crash '+process.env.CHRONA_AGENT_TOKEN);process.exit(7);}
@@ -83,6 +93,13 @@ describe("Pi RPC provider", () => {
     await handle.inject("more", [{ mime: "image/jpeg", base64: "ZA==" }]);
     expect((await f.commands()).some(c => c.type === "steer")).toBe(true);
     expect((await handle.done).outcome).toBe("finished");
+    expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThan(2);
+  });
+  test("rechecks completion when retry starts during get_state", async () => {
+    const f = await fixture("retry-state");
+    const result = await f.provider.start(f.input).done;
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toBe("retry failed");
     expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThan(2);
   });
   test("idle injection uses follow_up", async () => {
