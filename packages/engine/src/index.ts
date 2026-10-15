@@ -1,2 +1,2 @@
-export { createStewardService, StewardError } from "./modules/steward";
-export type { StewardPorts, StewardService } from "./modules/steward";
+export { createStewardService, createTools, StewardError } from "./modules/steward";
+export type { StewardPorts, StewardService, ApprovedAction, OnApproved } from "./modules/steward";

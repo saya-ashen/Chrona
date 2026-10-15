@@ -2,6 +2,8 @@ export { createStewardService } from "./service";
 export { createSchedules } from "./schedules";
 export { createRuns, liveRuns, authenticateRun } from "./runs";
 export { createTick } from "./tick";
+export { createTools } from "./tools";
+export type { ApprovedAction, OnApproved } from "./approvals";
 export type { StewardPorts, StewardService } from "./service";
 export { StewardError } from "./errors";
 export type { StewardErrorCode } from "./errors";

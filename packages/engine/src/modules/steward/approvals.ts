@@ -9,7 +9,11 @@ import { toApproval, toGrant } from "./store";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ affairId: z.string().min(1).optional(), payload: z.json() }).strict();
 /** Only trusted owner routes may resolve. The caller executes the returned payload,
  * rechecking policy and atomically consuming a once grant with its action claim. */
-export function createApprovals({ db, workspaceId, now }: RecordContext) {
+export type ApprovedAction = { workspaceId: string; approvalId: string; grantId: string; payload: Prisma.JsonValue };
+/** V5 seam: the executor must claim idempotently, recheck policy, consume once grants,
+ * and record delivery outcomes. A resolved approval alone never means sent. */
+export type OnApproved = (action: ApprovedAction) => Promise<void>;
+export function createApprovals({ db, workspaceId, now }: RecordContext, onApproved?: OnApproved) {
   return {
     list: async (status?: "open" | "approved" | "denied" | "expired") => (await db.approval.findMany({ where: { workspaceId, status }, include: { affair: true }, orderBy: { createdAt: "desc" } })).map(toApproval),
     create: (raw: unknown) => db.$transaction(async tx => {
@@ -38,6 +42,9 @@ export function createApprovals({ db, workspaceId, now }: RecordContext) {
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId } });
       return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id }, include: { affair: true } })), grantId, payload: input.decision === "approve" ? row.payload : null };
+    }).then(async result => {
+      if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
+      return result;
     }),
   };
 }
