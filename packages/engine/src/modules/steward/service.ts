@@ -12,20 +12,31 @@ import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
 import { createRuns } from "./runs";
 import { createTick } from "./tick";
+import { createChat } from "./chat";
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   deliveries: DeliveryAdapter[];
   chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
   provider?: ProviderAdapter;
+  chatTimeoutMs?: number;
+  onQueued?: () => Promise<unknown>;
+  onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
   connectors?: ConnectorAdapter[];
   sandbox?: { available: boolean; run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }> };
   gitHealth?: () => Promise<boolean>;
 };
 /** Authenticated owner boundary. */
-export function createStewardService(ports: StewardPorts) {
+export function createStewardService(inputPorts: StewardPorts) {
+  const ports: StewardPorts = Object.create(inputPorts);
   const fs = createWorkspaceFs(ports.dataDir);
-  return { tools: createTools(ports), tick: createTick(ports), forWorkspace(workspaceId: string) {
+  const tick = createTick(ports);
+  const chat = createChat(ports, () => ports.onQueued ? ports.onQueued() : tick());
+  ports.onRunFinished = async (workspaceId, runId) => {
+    await chat.runFinished(workspaceId, runId);
+    await inputPorts.onRunFinished?.(workspaceId, runId);
+  };
+  return { chat, tools: createTools(ports), tick, forWorkspace(workspaceId: string) {
     const ctx = { db: ports.db, workspaceId, now: ports.now };
     const projection = createToday(ctx, fs, {
       async provider() {
@@ -38,7 +49,7 @@ export function createStewardService(ports: StewardPorts) {
       }),
       jobsSandbox: () => ports.sandbox?.available ?? false,
     });
-    return { schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx, ports.onApproved), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
+    return { chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx, ports.onApproved), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

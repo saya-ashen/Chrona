@@ -90,6 +90,7 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
     });
     liveRuns.delete(runId);
+    await ports.onRunFinished?.(workspaceId, runId);
   }
   async function expireLeases(now = ports.now()) {
     const rows = await db.run.findMany({ where: { workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });
