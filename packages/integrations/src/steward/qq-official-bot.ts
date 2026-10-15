@@ -107,14 +107,19 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
   let seen: Map<string, number> | null = null, queue = Promise.resolve();
   const strangerReplies = new Map<string, number>();
   const passive = createQqPassiveReplies(reply, () => now().getTime());
-  async function handle(message: QqC2cMessage) {
-    if (!OPENID.test(message.openid)) return;
+  async function recordUnseenMessage(message: QqC2cMessage) {
     seen ??= new Map((await state.loadSeen()).map(row => [row.id, row.at]));
-    if (seen.has(message.id)) return;
+    if (seen.has(message.id)) return null;
     const at = now().getTime();
     seen.set(message.id, at);
     for (const [id, time] of seen) if (seen.size > 2000 || at - time > 7 * 86400_000) seen.delete(id);
     await state.saveSeen([...seen].map(([id, at]) => ({ id, at })));
+    return at;
+  }
+  async function handle(message: QqC2cMessage) {
+    if (!OPENID.test(message.openid)) return;
+    const at = await recordUnseenMessage(message);
+    if (at === null) return;
     // An interrupted send may already have reached QQ. Only local quota/window
     // exhaustion falls back to the outbox; unknown outcomes are not resent.
     const send = (text: string, result?: QqChatResult) => passive(message, text, result).catch(() => { log("qq.reply_failed"); return true; });
@@ -128,12 +133,18 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
     }
     const binding = await state.binding();
     if (binding?.openid !== message.openid) {
-      const last = strangerReplies.get(message.openid);
-      if (last !== undefined && at - last < 3600_000 && !HELP_WORDS.has(text.toLowerCase())) return;
-      strangerReplies.set(message.openid, at);
-      await send(binding ? NOT_OWNER : UNBOUND); return;
+      await replyToStranger(message.openid, text, at, binding, send); return;
     }
     if (!text && !message.attachments?.length) return;
+    await handleOwnerMessage(message, binding, send);
+  }
+  async function replyToStranger(openid: string, text: string, at: number, binding: QqBinding | null, send: (text: string) => Promise<boolean>) {
+    const last = strangerReplies.get(openid);
+    if (last !== undefined && at - last < 3600_000 && !HELP_WORDS.has(text.toLowerCase())) return;
+    strangerReplies.set(openid, at);
+    await send(binding ? NOT_OWNER : UNBOUND);
+  }
+  async function handleOwnerMessage(message: QqC2cMessage, binding: QqBinding, send: (text: string, result?: QqChatResult) => Promise<boolean>) {
     let ack: Promise<boolean> | undefined;
     const timer = timers.setTimeout(() => { ack = send("收到，处理中…"); }, 8000);
     let result: QqChatResult;

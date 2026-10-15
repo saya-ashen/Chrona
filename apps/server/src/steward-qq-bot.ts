@@ -13,6 +13,10 @@ export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Me
     : `${file.name}（请在 Chrona 网页查看附件）`)].join("\n\n");
 }
 
+function isReplyImage(file: import("@chrona/contracts/steward").Attachment | undefined) {
+  return file?.path && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024;
+}
+
 /** Injectable transport boundary; tests never read secrets or open a gateway. */
 export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env = process.env, transport }: {
   db: PrismaClient; publicUrl: string | null; now?: () => Date; env?: Record<string, string | undefined>;
@@ -43,6 +47,17 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
       const binding = await refreshBinding();
       await state.writeStatus({ updatedAt: now().toISOString(), gateway: gateway.status(), token: tokens.status(), bound: Boolean(binding), boundAt: binding?.boundAt ?? null, ownerHash: binding ? createHash("sha256").update(`${DEDICATED_PLATFORM}:${binding.openid}`).digest("hex").slice(0, 12) : null, challengePending: await state.challengePending(now()) });
     } catch { log("qq.status_write_failed"); }
+  }
+  async function uploadReplyImage(service: StewardService, openid: string, messageId: string, workspaceId: string) {
+    const row = await db.message.findFirst({ where: { id: messageId, workspaceId, channel: "chrona_qqbot", direction: "out" } });
+    const image = Array.isArray(row?.attachments) ? row.attachments.map(a => attachmentSchema.safeParse(a).data).find(isReplyImage) : null;
+    if (image?.path && row?.affairId) {
+      try {
+        const bytes = await (await service.forWorkspace(workspaceId).affairs.files(row.affairId)).raw(image.path);
+        return await (transport?.upload ?? uploadQqImage)({ tokens, openid, bytes }) ?? undefined;
+      } catch { /* Unsupported media remains available through the authenticated web link. */ }
+    }
+    return undefined;
   }
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
@@ -80,17 +95,8 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
           } finally { wake(); }
         } },
         reply: async (openid, messageId, text, msgSeq, message) => {
-          let mediaFileInfo: string | undefined;
-          if (message?.messageId && message.workspaceId) {
-            const row = await db.message.findFirst({ where: { id: message.messageId, workspaceId: message.workspaceId, channel: "chrona_qqbot", direction: "out" } });
-            const image = Array.isArray(row?.attachments) ? row.attachments.map(a => attachmentSchema.safeParse(a).data).find(a => a?.path && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(a.mime) && a.size <= 5 * 1024 * 1024) : null;
-            if (image?.path && row?.affairId) {
-              try {
-                const bytes = await (await service.forWorkspace(message.workspaceId).affairs.files(row.affairId)).raw(image.path);
-                mediaFileInfo = await (transport?.upload ?? uploadQqImage)({ tokens, openid, bytes }) ?? undefined;
-              } catch { /* Unsupported media remains available through the authenticated web link. */ }
-            }
-          }
+          const mediaFileInfo = message?.messageId && message.workspaceId
+            ? await uploadReplyImage(service, openid, message.messageId, message.workspaceId) : undefined;
           const result = await (transport?.send ?? sendQqC2c)({ tokens, openid, content: text, replyTo: messageId, msgSeq, ...(mediaFileInfo ? { mediaFileInfo } : {}) });
           if (result.outcome !== "accepted") throw new Error("Passive reply not accepted");
           if (message?.messageId && message.workspaceId) await db.message.updateMany({ where: { id: message.messageId, workspaceId: message.workspaceId, direction: "out", channel: "chrona_qqbot" }, data: { externalId: `qq:out:${result.messageId}` } });

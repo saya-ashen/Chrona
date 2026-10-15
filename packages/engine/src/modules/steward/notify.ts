@@ -26,9 +26,22 @@ export async function enqueueNotification(tx: Prisma.TransactionClient, raw: Not
   const sentToday = sent.filter(r => localDayKey(r.sentAt ?? r.createdAt, settings.timezone) === day && !r.idempotencyKey.startsWith("digest:")).length;
   const negative = input.affairId ? await tx.notification.count({ where: { workspaceId, affairId: input.affairId, feedback: "not_useful", createdAt: { gte: new Date(context.now.getTime() - 30 * 86400000) } } }) : 0;
   const route = routeNotification(negative >= 2 && input.level === "now" ? "digest" : input.level, { ...settings, now: context.now, urgent: input.urgent ?? false, sentToday });
-  const row = await tx.notification.create({ data: { workspaceId, affairId: input.affairId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, channel: route === "web" || !context.chatBound ? "in_app" : "chrona_qqbot", status: affair && affair.status !== "active" ? "suppressed" : route === "fold" ? "folded" : "queued", createdAt: context.now, nextAttemptAt: context.now, link: input.affairId ? `${context.publicUrl ?? ""}/affairs/${input.affairId}` : null } });
+  const row = await tx.notification.create({ data: { workspaceId, affairId: input.affairId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, ...notificationRouting(input, context, route, affair), createdAt: context.now, nextAttemptAt: context.now } });
   await audit(tx, { workspaceId, kind: "notification_enqueued", actor: "chrona", subjectId: row.id, details: { status: row.status, route } });
   return row;
+}
+function notificationRouting(input: NotificationInput, context: NotificationContext, route: ReturnType<typeof routeNotification>, affair: { status: string } | null) {
+  return {
+    channel: route === "web" || !context.chatBound ? "in_app" : "chrona_qqbot",
+    status: affair && affair.status !== "active" ? "suppressed" : route === "fold" ? "folded" : "queued",
+    link: input.affairId ? `${context.publicUrl ?? ""}/affairs/${input.affairId}` : null,
+  };
+}
+function deliveryStatus(outcome: DeliveryOutcome, attempts: number) {
+  return outcome.outcome === "accepted" ? "sent" : outcome.outcome === "uncertain" ? "uncertain" : outcome.retryable && attempts < 6 ? "queued" : "failed";
+}
+function validateMutation(action: string, status: string) {
+  if (action === "retry" && status !== "failed") throw new StewardError("conflict", "Only failed notifications may be retried");
 }
 export function createNotifications(ports: StewardPorts, workspaceId: string) {
   const { db } = ports;
@@ -65,7 +78,7 @@ export function createNotifications(ports: StewardPorts, workspaceId: string) {
       try { outcome = adapter ? await adapter.send({ idempotencyKey: row.idempotencyKey, title: row.title, body: row.body, link: row.link, recipient: row.recipient }) : { outcome: "rejected", retryable: false, error: "Delivery channel unavailable" }; }
       catch { outcome = { outcome: "uncertain", error: "Delivery adapter threw; receipt unknown" }; }
       const attempts = row.attempts + 1;
-      const status = outcome.outcome === "accepted" ? "sent" : outcome.outcome === "uncertain" ? "uncertain" : outcome.retryable && attempts < 6 ? "queued" : "failed";
+      const status = deliveryStatus(outcome, attempts);
       await db.$transaction(async tx => {
         const changed = await tx.notification.updateMany({ where: { id: row.id, status: "queued", leaseToken: token }, data: { status, leaseToken: null, leaseUntil: null, sentAt: outcome.outcome === "accepted" ? now : null, receiptRef: outcome.outcome === "accepted" ? outcome.receiptRef : null, lastError: outcome.outcome === "accepted" ? null : outcome.error.slice(0, 500), nextAttemptAt: status === "queued" ? new Date(now.getTime() + Math.min(21600000, 60000 * 2 ** (attempts - 1))) : null } });
         if (changed.count) await audit(tx, { workspaceId, kind: "notification_delivery", actor: "chrona", subjectId: row.id, details: { outcome: outcome.outcome, status, attempts } });
@@ -94,7 +107,7 @@ export function createNotifications(ports: StewardPorts, workspaceId: string) {
       const row = await tx.notification.findFirst({ where: { id, workspaceId } });
       if (!row) throw new StewardError("not_found", "Notification not found");
       const now = ports.now();
-      if (action === "retry" && row.status !== "failed") throw new StewardError("conflict", "Only failed notifications may be retried");
+      validateMutation(action, row.status);
       if (action === "retry" && row.affairId && (await requireAffair(tx, workspaceId, row.affairId)).status !== "active") throw new StewardError("conflict", "Affair is paused");
       const feedback = action === "useful" || action === "not_useful";
       if (feedback && row.feedback === action) return toNotification(row);

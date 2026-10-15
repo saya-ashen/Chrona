@@ -21,11 +21,7 @@ export function createTick(ports: StewardPorts) {
     const failures: { workspaceId: string; stage: string }[] = [];
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId), notifications = createNotifications(ports, workspaceId);
-      async function launch() {
-        for (const lane of ["foreground", "background"] as const) {
-          const run = await runs.claimNext(lane, now);
-          if (!run) continue;
-          try {
+      async function prepareContext(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
             const timezone = notificationSettings(workspace.settings).timezone;
             const messages = run.conversationKey ? (await ports.db.message.findMany({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" }, take: 20 })).reverse() : [];
             const preferences = await ports.db.preference.findMany({ where: { workspaceId }, select: { text: true } });
@@ -39,6 +35,14 @@ export function createTick(ports: StewardPorts) {
             const inbound = messageId ? await ports.db.message.findFirst({ where: { id: messageId, workspaceId, direction: "in" } }) : messages.findLast(m => m.direction === "in");
             const rootInstructions = run.affairId ? "" : "\nThis run is at the workspace root. The root is NOT an affair: never write README.md or other work files here. Existing affairs are listed in Context.affairs below (id, dirName, title). For any multi-step need, first use chrona_affair_create or chrona_focus on an existing affair, then work only inside the returned path (<dirName>/), not the root. Simple conversation needs no affair. Focus does not change this run's cwd. If a newly created directory is read-only in this run, schedule a background wake for that affair to do the file work there and stop.";
             const prompt = `${STEWARD_PROMPT}${rootInstructions}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, affairs, agenda, now: now.toISOString(), timezone })}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
+            return { prompt, inbound };
+      }
+      async function launch() {
+        for (const lane of ["foreground", "background"] as const) {
+          const run = await runs.claimNext(lane, now);
+          if (!run) continue;
+          try {
+            const { prompt, inbound } = await prepareContext(run);
             const sessionDir = join(run.cwd, ".chrona", "sessions");
             await mkdir(sessionDir, { recursive: true });
             if (!ports.provider) { await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }); continue; }

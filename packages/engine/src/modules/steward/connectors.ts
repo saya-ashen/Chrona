@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { connectorSchema, inboundItemSchema, createConnectorSchema, updateConnectorSchema, RUN_LIMITS } from "@chrona/contracts/steward";
+import { connectorSchema, inboundItemSchema, createConnectorSchema, updateConnectorSchema, RUN_LIMITS, type SourceItem } from "@chrona/contracts/steward";
 import type { Connector, Prisma } from "@chrona/db";
 import { applyRules } from "@chrona/domain/steward/rules";
 import type { StewardPorts } from "./service";
 import { createSecrets } from "./secrets";
-import { createWorkspaceFs } from "./workspace-fs";
+import { createWorkspaceFs, type AffairFs } from "./workspace-fs";
 import { requireAffair } from "./affairs";
 import { createRuns } from "./runs";
 import { parseInput, StewardError } from "./errors";
@@ -17,6 +17,50 @@ function safeSettings(settings: Record<string, unknown>) {
   // Settings are public. Credential-like keys must use the write-only secret field.
   if (/password|passwd|secret|token|credential|authorization/i.test(JSON.stringify(settings))) throw new StewardError("invalid", "Credentials belong in secret, not settings");
   return settings as Prisma.InputJsonObject;
+}
+function allowedAttachment(attachment: NonNullable<SourceItem["attachments"]>[number]) {
+  return !(attachment.bytes.byteLength > 10 * 1024 * 1024 || /\.(exe|dll|com|bat|cmd|ps1|sh|js|vbs|msi|scr|jar|app|desktop)$/i.test(attachment.name) || /executable|x-sh|javascript/i.test(attachment.mime) || (attachment.bytes[0] === 0x4d && attachment.bytes[1] === 0x5a) || (attachment.bytes[0] === 0x7f && attachment.bytes[1] === 0x45));
+}
+function prepareInboundItem(row: Connector, item: SourceItem, rules: unknown, batchAt: Date, now: () => Date) {
+  const receivedAt = new Date(item.receivedAt);
+  if (!Number.isFinite(receivedAt.getTime())) throw new Error("Invalid item date");
+  const hash = createHash("sha256").update(`${row.id}:${item.externalId}`).digest("hex").slice(0, 16);
+  const prefix = `inbox/${receivedAt.toISOString().slice(0, 10)}/${receivedAt.toISOString().slice(11, 16).replace(":", "")}-${slug(item.subject)}-${hash}`;
+  const path = `${prefix}.md`;
+  const body = Buffer.from(item.body).subarray(0, 200 * 1024).toString("utf8");
+  const disposition = applyRules(rules, { ...item, body });
+  const writes = [{ path, bytes: Buffer.from(`From: ${header(item.from)}\nTo: ${header(String(settingsOf(row).address ?? ""))}\nSubject: ${header(item.subject)}\nDate: ${receivedAt.toISOString()}\nMessage-ID: ${header(item.externalId)}\n\n${body}`) }];
+  for (const [index, attachment] of (item.attachments ?? []).entries()) {
+    if (!allowedAttachment(attachment)) continue;
+    writes.push({ path: `${prefix}-attachment-${index}-${slug(attachment.name)}`, bytes: Buffer.from(attachment.bytes) });
+  }
+  const data: Prisma.InboundItemCreateManyInput = { workspaceId: row.workspaceId, connectorId: row.id, externalId: item.externalId, from: item.from.slice(0, 500), subject: item.subject.slice(0, 1000), receivedAt, path, action: disposition.action, ruleNote: disposition.note,
+    status: disposition.action === "ignore" ? "ignored" : disposition.action === "digest_only" ? "delivered" : "new",
+    deliveredAt: disposition.action === "digest_only" ? now() : null, deliverAt: disposition.action === "wake_now" ? now() : batchAt };
+  return { writes, data };
+}
+async function storeInboundItems(db: StewardPorts["db"], row: Connector, files: AffairFs, items: SourceItem[], now: () => Date) {
+  const id = row.id;
+  let rules: unknown = null;
+  try { rules = (await files.read(".chrona/rules.json")).content; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  const pending = await db.inboundItem.findFirst({ where: { connectorId: id, status: "new", action: "batch" }, orderBy: { deliverAt: "asc" } });
+  const batchAt = pending?.deliverAt ?? new Date(now().getTime() + RUN_LIMITS.inboundBatchWindowMs);
+  const allWrites: { path: string; bytes: Uint8Array }[] = [];
+  const rows: Prisma.InboundItemCreateManyInput[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.externalId)) continue;
+    seen.add(item.externalId);
+    if (await db.inboundItem.findUnique({ where: { connectorId_externalId: { connectorId: id, externalId: item.externalId } } })) continue;
+    const prepared = prepareInboundItem(row, item, rules, batchAt, now);
+    allWrites.push(...prepared.writes);
+    rows.push(prepared.data);
+  }
+  if (rows.length) {
+    await files.intake(allWrites, `收到 ${rows.length} 封邮件`);
+    await db.inboundItem.createMany({ data: rows });
+  }
+  return rows.length;
 }
 export function createConnectors(ports: StewardPorts, workspaceId: string) {
   const { db, now } = ports, secrets = createSecrets(ports.dataDir), fs = createWorkspaceFs(ports.dataDir);
@@ -55,42 +99,11 @@ export function createConnectors(ports: StewardPorts, workspaceId: string) {
     const files = fs.forAffair(affair.dirName);
     try {
       const result = await adapter(row).poll({ settings: settingsOf(row), secret: await secrets.read(id), cursor: row.cursor });
-      let rules: unknown = null;
-      try { rules = (await files.read(".chrona/rules.json")).content; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-      const pending = await db.inboundItem.findFirst({ where: { connectorId: id, status: "new", action: "batch" }, orderBy: { deliverAt: "asc" } });
-      const batchAt = pending?.deliverAt ?? new Date(now().getTime() + RUN_LIMITS.inboundBatchWindowMs);
-      const allWrites: { path: string; bytes: Uint8Array }[] = [];
-      const rows: Prisma.InboundItemCreateManyInput[] = [];
-      const seen = new Set<string>();
-      for (const item of result.items) {
-        if (seen.has(item.externalId)) continue;
-        seen.add(item.externalId);
-        if (await db.inboundItem.findUnique({ where: { connectorId_externalId: { connectorId: id, externalId: item.externalId } } })) continue;
-        const receivedAt = new Date(item.receivedAt);
-        if (!Number.isFinite(receivedAt.getTime())) throw new Error("Invalid item date");
-        const hash = createHash("sha256").update(`${id}:${item.externalId}`).digest("hex").slice(0, 16);
-        const prefix = `inbox/${receivedAt.toISOString().slice(0, 10)}/${receivedAt.toISOString().slice(11, 16).replace(":", "")}-${slug(item.subject)}-${hash}`;
-        const path = `${prefix}.md`;
-        const body = Buffer.from(item.body).subarray(0, 200 * 1024).toString("utf8");
-        const disposition = applyRules(rules, { ...item, body });
-        const writes = [{ path, bytes: Buffer.from(`From: ${header(item.from)}\nTo: ${header(String(settingsOf(row).address ?? ""))}\nSubject: ${header(item.subject)}\nDate: ${receivedAt.toISOString()}\nMessage-ID: ${header(item.externalId)}\n\n${body}`) }];
-        for (const [index, attachment] of (item.attachments ?? []).entries()) {
-          if (attachment.bytes.byteLength > 10 * 1024 * 1024 || /\.(exe|dll|com|bat|cmd|ps1|sh|js|vbs|msi|scr|jar|app|desktop)$/i.test(attachment.name) || /executable|x-sh|javascript/i.test(attachment.mime) || (attachment.bytes[0] === 0x4d && attachment.bytes[1] === 0x5a) || (attachment.bytes[0] === 0x7f && attachment.bytes[1] === 0x45)) continue;
-          writes.push({ path: `${prefix}-attachment-${index}-${slug(attachment.name)}`, bytes: Buffer.from(attachment.bytes) });
-        }
-        allWrites.push(...writes);
-        rows.push({ workspaceId, connectorId: id, externalId: item.externalId, from: item.from.slice(0, 500), subject: item.subject.slice(0, 1000), receivedAt, path, action: disposition.action, ruleNote: disposition.note,
-          status: disposition.action === "ignore" ? "ignored" : disposition.action === "digest_only" ? "delivered" : "new",
-          deliveredAt: disposition.action === "digest_only" ? now() : null, deliverAt: disposition.action === "wake_now" ? now() : batchAt });
-      }
-      if (rows.length) {
-        await files.intake(allWrites, `收到 ${rows.length} 封邮件`);
-        await db.inboundItem.createMany({ data: rows });
-      }
+      const received = await storeInboundItems(db, row, files, result.items, now);
       const minutes = Number(settingsOf(row).pollMinutes ?? 10);
       await db.connector.update({ where: { id }, data: { cursor: result.cursor, lastSyncAt: now(), nextSyncAt: new Date(now().getTime() + (Number.isFinite(minutes) ? Math.max(1, minutes) : 10) * 60000), failures: 0, lastError: null, status: "active" } });
       await flush(id);
-      return { received: rows.length };
+      return { received };
     } catch (error) {
       const auth = (error as { code?: string }).code === "AUTHENTICATION_FAILED";
       await db.connector.update({ where: { id }, data: { status: auth ? "needs_authorization" : "failing", failures: { increment: 1 }, lastError: auth ? "Connector authorization required" : "Connector sync failed", nextSyncAt: new Date(now().getTime() + Math.min(360, 10 * 2 ** Math.min(row.failures, 6)) * 60000) } });

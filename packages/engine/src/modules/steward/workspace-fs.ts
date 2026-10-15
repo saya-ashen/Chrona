@@ -33,7 +33,7 @@ const identity = (author: FileAuthor) => author === "user" ? { name: "你", emai
 /** One process-wide mutex per canonical affair directory. Provider writes must be quiescent
  * while committing/reverting; the runtime owns that coordination (V3). Symlinks are never
  * traversed, including ones pointing back inside the affair, and special files are rejected. */
-export function createWorkspaceFs(dataDir: string) {
+function createWorkspaceRoots(dataDir: string) {
   const dataRoot = resolve(dataDir);
   const affairsRoot = join(dataRoot, "affairs");
   async function roots() {
@@ -49,7 +49,14 @@ export function createWorkspaceFs(dataDir: string) {
     if (!info.isDirectory() || await realpath(dir) !== dir) throw new StewardError("forbidden", "Invalid affair directory");
     return dir;
   }
-  async function confined(dir: string, path: string, createParents = false) {
+  return { roots, root, affairsRoot };
+}
+
+function assertSafeFile(info: Awaited<ReturnType<typeof lstat>>, canonical: string, dir: string) {
+  if (info.isSymbolicLink() || !canonical.startsWith(dir + sep) || (!info.isDirectory() && !info.isFile()) || (info.isFile() && info.nlink > 1)) throw new StewardError("forbidden", "Unsafe file path");
+}
+
+async function confined(dir: string, path: string, createParents = false) {
     const parts = safePath(path).split("/");
     let current = dir;
     for (let i = 0; i < parts.length; i++) {
@@ -64,7 +71,7 @@ export function createWorkspaceFs(dataDir: string) {
         info = await lstat(current);
       }
       const canonical = await realpath(current);
-      if (info.isSymbolicLink() || !canonical.startsWith(dir + sep) || (!info.isDirectory() && !info.isFile()) || (info.isFile() && info.nlink > 1)) throw new StewardError("forbidden", "Unsafe file path");
+      assertSafeFile(info, canonical, dir);
       if (i < parts.length - 1 && !info.isDirectory()) throw new StewardError("invalid", "Not a directory");
     }
     return current;
@@ -85,6 +92,9 @@ export function createWorkspaceFs(dataDir: string) {
       try { await lstat(join(metadata, path)); } catch (error) { if (missing(error)) continue; throw error; }
       throw new StewardError("forbidden", "External git object stores are not allowed");
     }
+    await checkGitConfig(metadata);
+  }
+  async function checkGitConfig(metadata: string) {
     // The repository is engine-owned. Reject config includes, external filters, worktrees,
     // and command-valued settings rather than letting git read/execute them first.
     let section = "";
@@ -163,7 +173,7 @@ export function createWorkspaceFs(dataDir: string) {
       return { sha, author: email === "user@local" ? "user" : "chrona", at: new Date(at!).toISOString(), message: message.join("\n").slice(0, 500), paths };
     }));
   }
-  function forAffair(dirName: string) {
+function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<string>, dirName: string) {
     safeDir(dirName);
     const run = <T>(action: (dir: string) => Promise<T>) => locked(join(affairsRoot, dirName), async () => action(await root(dirName)));
     return {
@@ -245,6 +255,10 @@ export function createWorkspaceFs(dataDir: string) {
       commitAll: (author: FileAuthor, message: string) => run(dir => commit(dir, author, message)),
     };
   }
+
+export function createWorkspaceFs(dataDir: string) {
+  const { roots, root, affairsRoot } = createWorkspaceRoots(dataDir);
+  const forAffair = (dirName: string) => affairFiles(affairsRoot, root, dirName);
   return {
     forAffair,
     /** Non-affair chat intake: deliberately no git repo, under the Provider workspace cwd. */
