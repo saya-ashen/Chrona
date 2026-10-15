@@ -1,7 +1,0 @@
-BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-UID:malformed@example.test
-DTSTART:not-a-date
-SUMMARY:Malformed event
-END:VCALENDAR
