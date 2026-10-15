@@ -53,10 +53,6 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
       const inbound = caller?.subjectId ? await db.message.findUnique({ where: { id: caller.subjectId } }) : null;
       if (inbound && !(await replies(inbound, callerSchema.parse(caller!.details).before)).length) {
         await db.message.create({ data: { workspaceId, conversationKey: inbound.conversationKey, channel: inbound.channel, direction: "out", text: unavailable, quotedMessageId: inbound.id, affairId: run.affairId, at: new Date(Math.max(ports.now().getTime(), inbound.at.getTime())) } });
-        if (run.status === "failed") {
-          const retry = await createRuns(ports, workspaceId).enqueue({ lane: "foreground", trigger: "retry", conversationKey: inbound.conversationKey, prompt: run.prompt, ...(run.affairId ? { affairId: run.affairId } : {}) });
-          await db.run.update({ where: { id: retry.id }, data: { leaseUntil: new Date(ports.now().getTime() + 60000) } });
-        }
       }
     }
     await audit(db, { workspaceId, actor: "chrona", kind: "chat_run_finished", subjectId: runId, details: {} });

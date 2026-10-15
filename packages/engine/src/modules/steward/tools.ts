@@ -87,7 +87,7 @@ export function createTools(ports: StewardPorts) {
           if (run.lane !== "foreground" || !run.conversationKey) throw new StewardError("invalid", "Reply requires a foreground conversation");
           const conversation = await db.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" } });
           if (!conversation) throw new StewardError("not_found", "Conversation not found");
-          const files = [], deliveryFiles = [];
+          const files: { name: string; path: string; mime: string; size: number }[] = [], deliveryFiles = [];
           for (const path of input.files) {
             const directory = await affairs.files(affairId());
             // Resolve through the workspace filesystem boundary, never trust a supplied path.
@@ -99,7 +99,11 @@ export function createTools(ports: StewardPorts) {
             files.push({ name, path, mime: file.mime, size: node.size });
             deliveryFiles.push({ name, path: join(await directory.directory(), path) });
           }
-          const message = await db.message.create({ data: { workspaceId, direction: "out", channel: conversation.channel, conversationKey: run.conversationKey, affairId: run.affairId, text: input.text, attachments: files, at: now() } });
+          const message = await db.$transaction(async tx => {
+            const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation.channel, conversationKey: run.conversationKey!, affairId: run.affairId, text: input.text, attachments: files, at: now() } });
+            await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
+            return message;
+          });
           const adapter = ports.deliveries.find(d => d.channel === conversation.channel);
           const delivery = adapter ? await adapter.send({ idempotencyKey: `reply:${message.id}`, title: "", body: input.text, link: run.affairId ? `${ports.publicUrl ?? ""}/affairs/${run.affairId}` : null, recipient: null, files: deliveryFiles }) : { outcome: "rejected", retryable: true, error: "Delivery unavailable" };
           return { messageId: message.id, delivery };

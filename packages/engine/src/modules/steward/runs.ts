@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { z } from "zod";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger } from "@chrona/contracts/steward";
@@ -62,7 +63,13 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
     const now = ports.now(), run = await db.run.findFirst({ where: { id: runId, workspaceId }, include: { affair: true } });
     if (!run) throw new StewardError("not_found", "Run not found");
     if (run.status !== "running") return;
-    let error = outcome.error, status = outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
+    // An abort can settle the provider promise before expireLeases calls finish.
+    // Persist the timeout rather than misclassifying that race as provider failure.
+    const expired = (run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now);
+    let error = expired ? "Run lease expired" : outcome.error;
+    let status = expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
+    const foregroundDeadline = run.lane === "foreground" && status === "timed_out" &&
+      (!expired || !!(run.deadlineAt && run.deadlineAt <= now));
     let commit: string | null = null, paths: string[] = [];
     if (run.affair) {
       try {
@@ -73,8 +80,9 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
       } catch { status = "failed"; error = "Could not commit affair changes"; }
     }
     const chatBound = ports.chat ? await ports.chat.bound() : false;
-    await db.$transaction(async tx => {
-      if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return;
+    const finalized = await db.$transaction(async tx => {
+      if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return null;
+      let deadlineMessage = null;
       if (run.affairId) {
         await tx.affair.update({ where: { id: run.affairId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { sessionId: outcome.sessionId } : {}) } });
         await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "run", text: `Chrona: ${run.trigger} (${status})`, data: { runId }, at: now } });
@@ -84,12 +92,38 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
       if (failures === RUN_LIMITS.maxFailures) await enqueueNotification(tx, { workspaceId, affairId: run.affairId ?? undefined, level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", dedupeKey: `run-failed:${runId}` }, { now, chatBound, publicUrl: ports.publicUrl });
-      if (status === "provider_unavailable" && (!run.affair || run.affair.status === "active")) {
-        await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: "retry", provider: run.provider, prompt: run.prompt, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+      if (foregroundDeadline) {
+        const focus = run.conversationKey ? await tx.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey }, orderBy: { createdAt: "desc" } }) : null;
+        const affairId = run.affairId ?? z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+        const affair = affairId ? await tx.affair.findFirst({ where: { workspaceId, id: affairId, status: "active" } }) : null;
+        if (affair) await enqueue({ affairId: affair.id, conversationKey: run.conversationKey ?? undefined, lane: "background", trigger: run.trigger as RunTrigger, prompt: run.prompt }, tx);
+        const replied = await tx.audit.findFirst({ where: { workspaceId, kind: "run_reply", subjectId: run.id } });
+        const conversation = !replied && run.conversationKey ? await tx.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" } }) : null;
+        if (conversation) {
+          deadlineMessage = await tx.message.create({ data: { workspaceId, conversationKey: run.conversationKey!, channel: conversation.channel, direction: "out", affairId: affair?.id, text: affair ? "这次处理超时了，我会在后台继续。" : "这次处理超时了，尚未关联事务，无法在后台继续。请再试一次。", at: now } });
+          await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: deadlineMessage.id, reason: "deadline" } });
+        }
+      } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
+        // Retry identity is immutable; the attempt status already records why it retried.
+        const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+        const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
+        if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
       }
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
+      return { deadlineMessage };
     });
+    if (!finalized) return;
     liveRuns.delete(runId);
+    if (finalized.deadlineMessage) {
+      const message = finalized.deadlineMessage;
+      try {
+        const adapter = ports.deliveries.find(d => d.channel === message.channel);
+        const delivery = adapter ? await adapter.send({ idempotencyKey: `reply:${message.id}`, title: "", body: message.text, link: message.affairId ? `${ports.publicUrl ?? ""}/affairs/${message.affairId}` : null, recipient: null }) : { outcome: "rejected" };
+        await audit(db, { workspaceId, actor: "chrona", kind: "deadline_reply_delivery", subjectId: run.id, details: { messageId: message.id, outcome: delivery.outcome } });
+      } catch {
+        await audit(db, { workspaceId, actor: "chrona", kind: "deadline_reply_delivery", subjectId: run.id, details: { messageId: message.id, outcome: "failed" } });
+      }
+    }
     await ports.onRunFinished?.(workspaceId, runId);
   }
   async function expireLeases(now = ports.now()) {

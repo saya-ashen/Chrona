@@ -78,7 +78,21 @@ for (const outcome of ["unconfigured", "unavailable", "failed"] as const) test(`
   if (p) { await p.started; p.finish({ outcome: outcome === "failed" ? "failed" : "unavailable", sessionId: null, error: "offline" }); }
   const reply = await pending;
   expect(reply.messages.map(m => m.text)).toEqual(["模型暂时不可用，消息已记下，恢复后会继续处理。"]);
-  expect(await db.run.count({ where: { status: "queued", trigger: "retry" } })).toBe(1);
+  expect(await db.run.count({ where: { status: "queued", trigger: "message", conversationKey: "chat:in_app", prompt: "remember me" } })).toBe(1);
+});
+
+test("provider deadline resolves waiting caller with honest message and queues background only", async () => {
+  const affair = await service.forWorkspace(workspaceId).affairs.create({ title: "Study" });
+  const delivered: string[] = [];
+  ports.deliveries = [{ channel: "in_app", send: async input => { delivered.push(input.body); return { outcome: "accepted", receiptRef: null }; } }];
+  const p = provider(), pending = send("prepare materials", { affairId: affair.id });
+  const run = await p.started;
+  ports.now = () => run.deadline;
+  p.finish({ outcome: "timed_out", sessionId: null, error: "Pi deadline exceeded" });
+  expect((await pending).messages.map(m => m.text)).toEqual(["这次处理超时了，我会在后台继续。"]);
+  expect(delivered).toEqual(["这次处理超时了，我会在后台继续。"]);
+  expect(await db.run.count({ where: { status: "queued", lane: "foreground" } })).toBe(0);
+  expect(await db.run.count({ where: { status: "queued", lane: "background", affairId: affair.id, prompt: "prepare materials" } })).toBe(1);
 });
 
 test("timeout returns existing replies; late replies still use delivery", async () => {

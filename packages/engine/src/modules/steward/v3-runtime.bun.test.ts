@@ -105,7 +105,7 @@ test("per-affair daily cap defers without blocking root; unavailable backs off; 
   const run = (await api.runs.claimNext("foreground"))!;
   await api.runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "offline" });
   expect(await api.runs.claimNext("foreground")).toBeNull();
-  advance(60000); const retry = (await api.runs.claimNext("foreground"))!; expect(retry.trigger).toBe("retry");
+  advance(60000); const retry = (await api.runs.claimNext("foreground"))!; expect(retry.trigger).toBe("message");
   advance(300000); expect(await api.runs.expireLeases()).toBe(1);
   expect((await db.run.findUniqueOrThrow({ where: { id: retry.id } })).status).toBe("timed_out");
 });
