@@ -4,6 +4,6 @@
     "incremental": false,
     "types": ["bun", "node", "@playwright/test"]
   },
-  "include": ["./**/*.ts"],
+  "include": ["./steward-loop.spec.ts", "./steward-cleanup.ts", "./results-server.ts"],
   "exclude": ["../node_modules", "../.worktrees", "../test-results", "../playwright-report"]
 }

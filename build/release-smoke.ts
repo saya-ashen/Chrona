@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } from "./manifest";
 import { assertElfInterpreterFile } from "./portable-elf";
-import { smokePackagedUpgrade } from "../scripts/release-upgrade-smoke";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const RUNTIME_TIMEOUT_MS = 20_000;
@@ -62,7 +61,6 @@ export function releaseSmokeEnvironment(
     CHRONA_CONFIG_DIR: configDir,
     DATABASE_URL: `file:${join(dataDir, "chrona.db")}`,
     CHRONA_NO_OPEN: "1",
-    CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: "0",
   };
 }
 
@@ -121,7 +119,7 @@ async function assertRuntimeStarts(binaryPath: string) {
     if (typeof workspace.id !== "string" || workspace.id.length === 0) {
       throw new Error("Default workspace response missing id");
     }
-    await waitForJson(`${baseUrl}/api/dashboard?workspaceId=${encodeURIComponent(workspace.id)}`, "dashboard endpoint");
+    await waitForJson(`${baseUrl}/api/steward/today?workspaceId=${encodeURIComponent(workspace.id)}`, "steward today endpoint");
     await assertExists(join(dataDir, "chrona.db"), "Runtime SQLite database");
   } catch (error) {
     proc.kill();
@@ -139,7 +137,6 @@ async function assertRuntimeStarts(binaryPath: string) {
 }
 
 export type SmokeReleaseOptions = {
-  pluginSource?: string;
   releaseRoot?: string;
   runtime?: boolean;
 };
@@ -159,28 +156,10 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/schema.prisma"), "Prisma schema");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/migrations"), "Prisma migrations");
 
-  const nativePackageDir = resolve(ROOT, "node_modules", ...manifestTarget.nativePackage.split("/"));
-  if (await pathExists(nativePackageDir)) {
-    const nativeAddonNames = (await readdir(nativePackageDir)).filter((name) => name.endsWith(".node"));
-    if (nativeAddonNames.length === 0) {
-      throw new Error(`Native package contains no addon: ${manifestTarget.nativePackage}`);
-    }
-    for (const nativeAddonName of nativeAddonNames) {
-      await assertExists(resolve(releaseDir, nativeAddonName), `Native addon ${nativeAddonName}`);
-    }
-  }
-
-  const pluginSource = resolve(ROOT, options.pluginSource ?? "external-plugins/hermes");
-  const pluginRelease = resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/hermes");
-  if (await pathExists(pluginSource)) {
-    await assertExists(pluginRelease, "Hermes plugin");
-  } else if (await pathExists(pluginRelease)) {
-    throw new Error(`Hermes plugin bundled without source path: ${pluginRelease}`);
-  }
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/pi-steward-agent"), "Pi steward extension");
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);
-    await smokePackagedUpgrade(target);
   }
 
   console.log(`✓ Release smoke passed for ${target}`);

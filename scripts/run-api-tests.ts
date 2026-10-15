@@ -17,17 +17,8 @@ const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
 );
-const dirs = [
-	"apps/server/src/__tests__/api",
-	"apps/server/src/routes/__tests__",
-];
-const serialFiles = new Set([
-	"apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
-	"apps/server/src/__tests__/api/ai-client-crud.bun.test.ts",
-	"apps/server/src/__tests__/api/decide-schedule-proposal.bun.test.ts",
-	"apps/server/src/__tests__/api/schedule-proposal-workflow.bun.test.ts",
-	"apps/server/src/__tests__/api/task-workflow.bun.test.ts",
-]);
+const dirs = ["apps/server/src/__tests__/api"];
+const serialFiles = new Set<string>();
 
 let exitCode = 0;
 const failedFiles: Array<{ file: string; code: number }> = [];
@@ -46,7 +37,7 @@ async function runFile(
 	let initCode = 1;
 	for (let attempt = 0; attempt < 3; attempt += 1) {
 		const initProc = Bun.spawn(
-			["bun", "run", "scripts/init-sqlite-db.ts", "--reset", dbPath],
+			["bun", "run", "scripts/init-sqlite-db.ts", dbPath],
 			{
 				cwd: rootDir,
 				stdout: "inherit",

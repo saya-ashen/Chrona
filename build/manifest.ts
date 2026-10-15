@@ -15,7 +15,6 @@ export const buildArtifacts = {
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },
     { from: "prisma/migrations", to: "resources/prisma/migrations", required: true },
     { from: ".env.example", to: "resources/.env.example", required: false },
-    { from: "external-plugins/hermes", to: "resources/external-plugins/hermes", required: false },
     { from: "external-plugins/pi-steward-agent", to: "resources/external-plugins/pi-steward-agent", required: true },
   ] satisfies ReleaseResource[],
 } as const;
@@ -27,7 +26,6 @@ export const buildTargets = {
     binaryName: "chrona",
     executable: true,
     linuxInterpreter: "/lib64/ld-linux-x86-64.so.2",
-    nativePackage: "@oh-my-pi/pi-natives-linux-x64",
   },
   "linux-arm64": {
     bunTarget: "bun-linux-arm64",
@@ -35,28 +33,24 @@ export const buildTargets = {
     binaryName: "chrona",
     executable: true,
     linuxInterpreter: "/lib/ld-linux-aarch64.so.1",
-    nativePackage: "@oh-my-pi/pi-natives-linux-arm64",
   },
   "darwin-x64": {
     bunTarget: "bun-darwin-x64",
     releaseName: "chrona-darwin-x64",
     binaryName: "chrona",
     executable: true,
-    nativePackage: "@oh-my-pi/pi-natives-darwin-x64",
   },
   "darwin-arm64": {
     bunTarget: "bun-darwin-arm64",
     releaseName: "chrona-darwin-arm64",
     binaryName: "chrona",
     executable: true,
-    nativePackage: "@oh-my-pi/pi-natives-darwin-arm64",
   },
   "windows-x64": {
     bunTarget: "bun-windows-x64",
     releaseName: "chrona-windows-x64",
     binaryName: "Chrona.exe",
     executable: false,
-    nativePackage: "@oh-my-pi/pi-natives-win32-x64",
   },
 } as const;
 

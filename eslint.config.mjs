@@ -160,8 +160,8 @@ const eslintConfig = defineConfig([
             "@/lib/db",
             "@/generated/prisma/*",
             "@prisma/*",
-            "@chrona/*-integration*",
-            "@chrona/runtime-*-provider*",
+            "@chrona/integrations",
+            "@chrona/integrations/*",
           ],
         },
       ],
@@ -172,13 +172,11 @@ const eslintConfig = defineConfig([
     "external-plugins/pi-steward-agent/**",
     "**/.git/**",
     "**/.worktrees/**",
-    "**/.next/**",
     "**/node_modules/**",
     "**/out/**",
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",
-    "agent-dashboard-app/**",
     // Generated Playwright HTML report (minified third-party bundles) and the
     // throwaway audit scratch dir are not shipped source — linting them only
     // produced thousands of false positives.

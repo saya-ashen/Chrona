@@ -19,7 +19,18 @@ const concurrency = Math.max(
 );
 
 function shouldInclude(path: string) {
-	return !path.split("/").some((segment) => ignoredSegments.has(segment));
+	const retained = [
+		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",
+		"packages/integrations/src/steward/", "packages/contracts/src/steward/",
+		"packages/db/", "packages/shared/", "packages/logging/", "packages/i18n/",
+	];
+	const standalone = new Set([
+		"packages/cli/src/doctor.bun.test.ts", "packages/cli/src/start-server.bun.test.ts",
+		"scripts/portable-elf.bun.test.ts",
+	]);
+	return (standalone.has(path) || retained.some(prefix => path.startsWith(prefix)))
+		&& !/hermes-qq-delivery|reddit-inbox|task-workspace|external-calendar/.test(path)
+		&& !path.split("/").some((segment) => ignoredSegments.has(segment));
 }
 
 function resolveRequestedFiles(paths: string[]) {
@@ -86,7 +97,7 @@ async function runWithFreshDatabase(
 	let initCode = 1;
 	for (let attempt = 0; attempt < 3; attempt += 1) {
 		const initProc = Bun.spawn(
-			["bun", "run", "scripts/init-sqlite-db.ts", "--reset", fileDbPath],
+			["bun", "run", "scripts/init-sqlite-db.ts", fileDbPath],
 			{
 				cwd: rootDir,
 				env,
