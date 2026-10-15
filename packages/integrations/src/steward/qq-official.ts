@@ -70,10 +70,20 @@ function classifySend(status: number, code: number | null): QqSendOutcome {
   return { outcome: "rejected", retryable: status === 401, error: `QQ rejected the message (${status}${code ? `/${code}` : ""})` };
 }
 
-/** One C2C text send. Never retried here once a request may have reached QQ. */
-export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1 }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number }): Promise<QqSendOutcome> {
+/** Upload bytes, not a private authenticated web URL, for a subsequent passive rich-media send. */
+export async function uploadQqImage({ tokens, openid, bytes, fetch = globalThis.fetch }: { tokens: QqTokenSource; openid: string; bytes: Uint8Array; fetch?: Fetch }): Promise<string | null> {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(openid) || bytes.byteLength > 5 * 1024 * 1024) return null;
+  try {
+    const response = await fetch(`${QQ_API_BASE}/v2/users/${openid}/files`, { method: "POST", headers: { authorization: `QQBot ${await tokens.get()}`, "content-type": "application/json" }, body: JSON.stringify({ file_type: 1, file_data: Buffer.from(bytes).toString("base64"), srv_send_msg: false }), redirect: "error", signal: AbortSignal.timeout(20_000) });
+    const data = await response.json() as { file_info?: unknown };
+    return response.ok && typeof data.file_info === "string" && data.file_info ? data.file_info : null;
+  } catch { return null; }
+}
+
+/** One C2C send. Never retried here once a request may have reached QQ. */
+export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1, mediaFileInfo }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number; mediaFileInfo?: string }): Promise<QqSendOutcome> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(openid)) return { outcome: "rejected", retryable: false, error: "Invalid recipient" };
-  const body = JSON.stringify({ content: content.slice(0, 2000), msg_type: 0, msg_seq: msgSeq, ...(replyTo ? { msg_id: replyTo } : {}) });
+  const body = JSON.stringify({ content: content.slice(0, 2000), msg_type: mediaFileInfo ? 7 : 0, ...(mediaFileInfo ? { media: { file_info: mediaFileInfo } } : {}), msg_seq: msgSeq, ...(replyTo ? { msg_id: replyTo } : {}) });
   const post = async (): Promise<QqSendOutcome | { status: 401 }> => {
     let token: string;
     try { token = await tokens.get(); } catch { return { outcome: "rejected", retryable: true, error: "QQ token unavailable" }; }
@@ -93,7 +103,34 @@ export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, cont
 }
 
 type WebSocketLike = { readyState: number; send(data: string): void; close(code?: number): void; addEventListener(type: string, listener: (event: { data?: unknown; code?: number }) => void): void };
-export type QqC2cMessage = { id: string; openid: string; content: string; quoted: string; timestamp: string };
+export type QqAttachment = { url: string; name: string; mime: string; size?: number };
+export type QqC2cMessage = { id: string; openid: string; content: string; quoted: string; timestamp: string; quotedId?: string; attachments?: QqAttachment[] };
+
+/** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
+export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
+  const url = new URL(attachment.url);
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !["multimedia.nt.qq.com", "gchat.qpic.cn", "c2cpicdw.qpic.cn", "file.bot.qq.com"].includes(url.hostname)) throw new QqTransportError("Invalid QQ attachment URL");
+  const cap = 20 * 1024 * 1024;
+  if (attachment.size !== undefined && (!Number.isFinite(attachment.size) || attachment.size < 0 || attachment.size > cap)) throw new QqTransportError("Attachment exceeds size limit");
+  const response = await fetch(url.href, { redirect: "error", signal: AbortSignal.timeout(20_000) });
+  const mime = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const expected = attachment.mime.split(";")[0]!.trim().toLowerCase();
+  if (!response.ok || !response.body || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(mime) || (expected && expected !== mime && mime !== "application/octet-stream") || (expected.startsWith("image/") && !mime.startsWith("image/"))) {
+    await response.body?.cancel(); throw new QqTransportError("Invalid attachment content type");
+  }
+  if (Number(response.headers.get("content-length")) > cap) { await response.body.cancel(); throw new QqTransportError("Attachment exceeds size limit"); }
+  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read(); if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > cap) throw new QqTransportError("Attachment exceeds size limit");
+      chunks.push(chunk.value);
+    }
+  } finally { await reader.cancel(); reader.releaseLock(); }
+  return { name: attachment.name, mime, bytes: Buffer.concat(chunks, size) };
+}
 export type QqGatewayStatus = { state: "stopped" | "connecting" | "ready" | "backoff" | "fatal"; appId: string; readyAt: string | null; lastEventAt: string | null; reconnects: number; lastCloseCode: number | null; resumable: boolean };
 type Payload = { op?: number; t?: string; s?: unknown; d?: unknown };
 const record = (value: unknown): Record<string, unknown> => (value && typeof value === "object" ? value as Record<string, unknown> : {});
@@ -104,7 +141,12 @@ export function parseC2cEvent(d: unknown): QqC2cMessage | null {
   const event = record(d), id = text(event.id), openid = text(record(event.author).user_openid);
   if (!id || !openid) return null;
   const elements = Number(event.message_type) === 103 && Array.isArray(event.msg_elements) ? event.msg_elements : [];
-  return { id, openid, content: text(event.content), quoted: elements.map(e => text(record(e).content)).join("\n"), timestamp: text(event.timestamp) };
+  const attachments = Array.isArray(event.attachments) ? event.attachments.map(value => {
+    const a = record(value);
+    return { url: text(a.url), name: text(a.filename) || "attachment", mime: text(a.content_type), ...(typeof a.size === "number" ? { size: a.size } : {}) };
+  }) : [];
+  const quotedId = text(record(event.message_reference).message_id) || text(event.referenced_message_id);
+  return { id, openid, content: text(event.content), quoted: elements.map(e => text(record(e).content)).join("\n"), timestamp: text(event.timestamp), ...(quotedId ? { quotedId } : {}), ...(attachments.length ? { attachments } : {}) };
 }
 
 /**

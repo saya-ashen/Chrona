@@ -76,29 +76,30 @@ export function createQqBotState(dir: string, appId: string) {
   };
 }
 export type QqBotState = ReturnType<typeof createQqBotState>;
-export type QqChatPort = { handleMessage(input: { workspaceId: string; channel: "chrona_qqbot"; text: string; externalId: string }): Promise<{ reply: string; affairId?: string | null }> };
+export type QqChatResult = { reply: string; affairId?: string | null; messageId?: string; workspaceId?: string; replies?: { reply: string; messageId: string; affairId: string | null }[] };
+export type QqChatPort = { handleMessage(input: { workspaceId: string; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<QqChatResult> };
 const HELP_WORDS = new Set(["help", "帮助", "?", "？", "用法", "菜单"]);
 const UNBOUND = "【Chrona】这是 Chrona 的私人管家机器人，尚未绑定主人。主人请在 Chrona 管理端取得一次性绑定码后发送：绑定 <绑定码>。未绑定前不处理任何其他内容。";
 const NOT_OWNER = "【Chrona】这是私人机器人，你没有使用权限。本条未做任何处理。";
 const BIND_FAIL = { no_challenge: "当前没有待使用的绑定码，请重新生成。", expired: "绑定码已过期或尝试次数已用完，请重新生成。", wrong_code: "绑定码不正确（多次错误后会失效）。", already_bound: "这个机器人已经绑定了主人，未做更改。" };
 
 /** Reservations count even failed/uncertain sends; sequence numbers must never be reused. */
-export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number) => Promise<unknown>, now = Date.now) {
+export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>, now = Date.now) {
   const windows = new Map<string, { until: number; count: number }>();
-  return async (message: QqC2cMessage, text: string): Promise<boolean> => {
+  return async (message: QqC2cMessage, text: string, result?: QqChatResult): Promise<boolean> => {
     const at = now(), key = `${message.openid}:${message.id}`;
     const timestamp = Date.parse(message.timestamp);
     const window = windows.get(key) ?? { until: (Number.isFinite(timestamp) ? timestamp : at) + 3600_000, count: 0 };
     windows.set(key, window);
     for (const [id, value] of windows) if (value.until < at && id !== key) windows.delete(id);
     if (at >= window.until || window.count >= 4) return false;
-    await reply(message.openid, message.id, text, ++window.count);
+    await reply(message.openid, message.id, text, ++window.count, result);
     return true;
   };
 }
 export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound = async () => {}, log = () => {}, now = () => new Date(), timers = globalThis }: {
   state: QqBotState; chat: QqChatPort;
-  reply: (openid: string, messageId: string, text: string, sequence: number) => Promise<unknown>;
+  reply: (openid: string, messageId: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>;
   enqueueFinal: (binding: QqBinding, messageId: string, text: string, affairId?: string | null) => Promise<void>;
   onBound?: (binding: QqBinding) => Promise<void>; log?: QqLog; now?: () => Date;
   timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
@@ -116,7 +117,7 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
     await state.saveSeen([...seen].map(([id, at]) => ({ id, at })));
     // An interrupted send may already have reached QQ. Only local quota/window
     // exhaustion falls back to the outbox; unknown outcomes are not resent.
-    const send = (text: string) => passive(message, text).catch(() => { log("qq.reply_failed"); return true; });
+    const send = (text: string, result?: QqChatResult) => passive(message, text, result).catch(() => { log("qq.reply_failed"); return true; });
     const text = message.content.trim();
     const bind = /^(?:绑定|bind)\s+([A-Za-z0-9]{4,16})$/i.exec(text);
     if (bind?.[1]) {
@@ -132,22 +133,24 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
       strangerReplies.set(message.openid, at);
       await send(binding ? NOT_OWNER : UNBOUND); return;
     }
-    if (!text) return;
+    if (!text && !message.attachments?.length) return;
     let ack: Promise<boolean> | undefined;
     const timer = timers.setTimeout(() => { ack = send("收到，处理中…"); }, 8000);
-    let result: { reply: string; affairId?: string | null };
-    try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, text: message.content, externalId: message.id }); }
+    let result: QqChatResult;
+    try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
     catch { log("qq.chat_failed"); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
     finally { timers.clearTimeout(timer); }
     await ack;
-    if (!await send(result.reply)) await enqueueFinal(binding, message.id, result.reply, result.affairId);
+    for (const item of result.replies?.length ? result.replies : [result]) {
+      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, message.id, item.reply, item.affairId);
+    }
   }
   return { onMessage(message: QqC2cMessage) { queue = queue.then(() => handle(message)).catch(() => log("qq.handler_failed")); return queue; }, drain: () => queue };
 }
 
 /** Active sends are only called by the notification outbox. */
-export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, fetch, perMinute = 10, now = Date.now }: {
-  tokens: QqTokenSource; allowedRecipients: () => ReadonlySet<string>; publicUrl?: string | null; fetch?: (input: string, init?: RequestInit) => Promise<Response>; perMinute?: number; now?: () => number;
+export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, fetch, send = sendQqC2c, perMinute = 10, now = Date.now }: {
+  tokens: QqTokenSource; allowedRecipients: () => ReadonlySet<string>; publicUrl?: string | null; fetch?: (input: string, init?: RequestInit) => Promise<Response>; send?: typeof sendQqC2c; perMinute?: number; now?: () => number;
 }): DeliveryAdapter & { idempotent: false } {
   const sent = new Map<string, number[]>();
   return { channel: DEDICATED_CHANNEL, idempotent: false, async send(message): Promise<DeliveryOutcome> {
@@ -159,7 +162,7 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
     if (window.length >= perMinute) return { outcome: "rejected", retryable: true, error: "Local QQ rate limit" };
     sent.set(recipient, [...window, at]);
     const link = message.link?.startsWith("/") && publicUrl ? `${publicUrl.replace(/\/$/, "")}${message.link}` : message.link;
-    const result = await sendQqC2c({ tokens, fetch, openid, content: [message.title, message.body, link].filter(Boolean).join("\n\n") });
+    const result = await send({ tokens, fetch, openid, content: [message.title, message.body, link].filter(Boolean).join("\n\n") });
     return result.outcome === "accepted" ? { outcome: "accepted", receiptRef: `${DEDICATED_PLATFORM}:${result.messageId}` } : result;
   } };
 }

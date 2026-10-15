@@ -245,6 +245,15 @@ export function createWorkspaceFs(dataDir: string) {
   }
   return {
     forAffair,
+    /** Non-affair chat intake: deliberately no git repo, under the Provider workspace cwd. */
+    async uploadChatInbox(path: string, bytes: Uint8Array) {
+      if (!path.startsWith("inbox/chat/") || bytes.byteLength > MAX_UPLOAD) throw new StewardError("invalid", "Invalid chat upload");
+      return locked(affairsRoot, async () => {
+        await roots();
+        await writeFile(affairsRoot, path, bytes, true);
+        return path;
+      });
+    },
     async createAffairDir(dirName: string, readme: string) {
       safeDir(dirName);
       return locked(join(affairsRoot, dirName), async () => {

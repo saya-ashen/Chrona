@@ -1,4 +1,6 @@
 import { EventEmitter } from "node:events";
+import { randomUUID } from "node:crypto";
+import { createWorkspaceFs } from "./workspace-fs";
 import { z } from "zod";
 import { attachmentSchema, messageSchema, type ChatReply, type Message } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
@@ -85,14 +87,16 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
       // Timestamp ties are common with fake clocks and SQLite; explicitly exclude existing replies.
       const before = (await db.message.findMany({ where: { workspaceId: input.workspaceId, conversationKey, direction: "out", at: { gte: inbound.at } }, select: { id: true } })).map(m => m.id);
       const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, conversationKey, lane: "foreground", status: "running" } });
-      const handle = active && liveRuns.get(active.id);
-      const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt: input.text, ...(affair ? { affairId: affair.id } : {}) });
+      // A quote changing affairs must queue in the correct cwd, not steer a different affair.
+      const handle = active && (!quoted || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);
+      const prompt = [input.text, ...(quoted ? [`Quoted Chrona message (data): ${JSON.stringify({ text: quoted.text, affairId: quoted.affairId })}`] : []), ...(input.attachments.some(a => a.path) ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, path, mime, size }) => ({ name, path, mime, size })))}`] : []), ...input.attachments.filter(a => a.mime.startsWith("audio/")).map(a => `Voice note (not transcribed by Chrona): ${JSON.stringify({ name: a.name, path: a.path })}`)].join("\n\n");
+      const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
       await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
       if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });
       // Subscribe before injection/launch: scripted providers can finish immediately.
       const waiting = wait(inbound, run.id, before);
       if (handle) {
-        try { await handle.inject(input.text, images); }
+        try { await handle.inject(prompt, images); }
         catch { await handle.abort(); await createRuns(ports, input.workspaceId).finish(run.id, { outcome: "unavailable", sessionId: null, error: "Message injection failed" }); }
       } else {
         // A stuck launcher must not prevent the caller's timeout from resolving.
@@ -126,5 +130,25 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
       });
     });
   }
-  return { handleMessage, runFinished, messages: async (workspaceId: string, limit = 50) => (await db.message.findMany({ where: { workspaceId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage) };
+  /** Trusted transport bytes only; all paths are generated and filesystem-confined here. */
+  async function intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
+    if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
+    const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, direction: "out" } }) : null;
+    const focus = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "conversation_focus", subjectId: `chat:${input.channel}` }, orderBy: { createdAt: "desc" } });
+    const focusedId = quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+    const affair = focusedId ? await db.affair.findFirst({ where: { id: focusedId, workspaceId: input.workspaceId, status: "active" } }) : null;
+    const fs = createWorkspaceFs(ports.dataDir), day = ports.now().toISOString().slice(0, 10);
+    const attachments: NonNullable<ChatInput["attachments"]> = [];
+    let images = 0;
+    for (const file of files) {
+      const name = file.name.normalize("NFKC").replaceAll("\\", "/").split("/").pop()!.replace(/[^\p{L}\p{N}._-]/gu, "_").replace(/^\.+/, "").slice(0, 180) || "attachment";
+      const unique = `${randomUUID()}-${name}`;
+      const path = affair ? (await fs.forAffair(affair.dirName).upload(`attachments/${day}`, unique, file.bytes)).path : await fs.uploadChatInbox(`inbox/chat/${day}/${unique}`, file.bytes);
+      const inline = file.mime.startsWith("image/") && file.bytes.byteLength <= 5 * 1024 * 1024 && images < 4;
+      if (inline) images++;
+      attachments.push({ name, path, mime: file.mime, size: file.bytes.byteLength, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
+    }
+    return { attachments, ...(affair ? { affairId: affair.id } : {}) };
+  }
+  return { handleMessage, intakeAttachments, runFinished, messages: async (workspaceId: string, limit = 50) => (await db.message.findMany({ where: { workspaceId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage) };
 }
