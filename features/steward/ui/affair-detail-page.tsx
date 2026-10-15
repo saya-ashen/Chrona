@@ -7,6 +7,7 @@ import { fileTree, visiblePath, type FileBranch } from "../model/affair-file";
 import { pageHref } from "../model/workspace";
 import { PageColumn } from "./layout";
 import { ResourceStatus } from "./resource-status";
+import { AffairHistory } from "./affair-history";
 import { AffairFileView } from "./affair-file-view";
 import { WorkspaceAffairSidebar } from "./workspace-affair-sidebar";
 
@@ -34,6 +35,7 @@ export function AffairDetailPage() {
         <section aria-label={path} className="min-w-0">{selected ? <AffairFileView key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} /> : <p>{tree.length ? c.notFound : c.empty}</p>}</section>
         <WorkspaceAffairSidebar detail={detail} client={client} refresh={resource.refresh} />
       </div>
+      <AffairHistory key={affairId} client={client} affairId={affairId} refresh={resource.refresh} />
     </>}
   </PageColumn>;
 }

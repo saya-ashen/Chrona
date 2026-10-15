@@ -1,0 +1,35 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, expect, it, vi } from "vitest";
+import { I18nProvider } from "@chrona/i18n/react";
+import en from "../../../packages/i18n/src/messages/en.json";
+import { createStewardClient } from "../model/client";
+import { AffairHistory } from "./affair-history";
+afterEach(cleanup);
+it("loads scoped history and diff, confirms revert and preserves failures for retry", async () => {
+  const client = createStewardClient("ws"), refresh = vi.fn();
+  const revision = { sha: "abc", author: "user" as const, message: "Edit notes", at: "2026-01-01T00:00:00Z", paths: ["notes.md"] };
+  vi.spyOn(client, "revisions").mockResolvedValue({ items: [revision] });
+  const diff = vi.spyOn(client, "diff").mockResolvedValue({ diff: "--- a/notes.md\n+++ b/notes.md\n-old\n+new" });
+  const revert = vi.spyOn(client, "revert").mockRejectedValueOnce(new Error("offline")).mockResolvedValue(revision);
+  render(<I18nProvider locale="en" messages={en}><AffairHistory client={client} affairId="a" refresh={refresh} /></I18nProvider>);
+  await userEvent.click(await screen.findByRole("button", { name: /Edit notes · You/ }));
+  expect(await screen.findByLabelText("Unified diff")).toHaveTextContent("+new");
+  expect(diff).toHaveBeenCalledWith("a", "abc", expect.any(AbortSignal));
+  await userEvent.click(screen.getByRole("button", { name: "Revert this change" }));
+  expect(revert).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(revert).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Revert this change" }));
+  await userEvent.click(screen.getByRole("button", { name: "Revert this change" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not connect");
+  await userEvent.click(screen.getByRole("button", { name: "Revert this change" }));
+  await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  expect(revert).toHaveBeenLastCalledWith("a", "abc");
+});
+it("shows empty history", async () => {
+  const client = createStewardClient("ws");
+  vi.spyOn(client, "revisions").mockResolvedValue({ items: [] });
+  render(<I18nProvider locale="en" messages={en}><AffairHistory client={client} affairId="a" refresh={vi.fn()} /></I18nProvider>);
+  expect(await screen.findByText("No revisions yet.")).toBeVisible();
+});

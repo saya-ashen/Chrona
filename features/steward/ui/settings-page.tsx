@@ -1,20 +1,19 @@
-import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useI18n } from "@chrona/i18n";
 import { GRANT_MODES, type GrantMode, type Settings } from "@chrona/contracts";
 import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui";
 import { useNotificationForm, useSettings } from "../hooks/use-settings";
 import type { StewardClient } from "../model/client";
-import { toolActions } from "../model/settings";
+import { ConnectorsSection } from "./settings-connectors";
 import { MutationStatus, ResourceStatus } from "./resource-status";
 import { PageColumn, Surface, InlineForm } from "./layout";
 
-const sections = ["chat", "notifications", "permissions", "preferences", "connections", "tools", "health"] as const;
+const sections = ["chat", "notifications", "permissions", "preferences", "connections", "provider", "health"] as const;
 type SettingsState = ReturnType<typeof useSettings>;
 type LoadedSettings = NonNullable<SettingsState["data"]>;
 type SectionProps = { s: SettingsState; d: LoadedSettings };
 
-function SettingsSection({ name, children }: { name: (typeof sections)[number]; children: ReactNode }) {
+export function SettingsSection({ name, children }: { name: (typeof sections)[number]; children: ReactNode }) {
   const c = useI18n().messages.steward.settings;
   return <section id={`settings-${name}`} aria-labelledby={`heading-${name}`} className="min-w-0 scroll-mt-6">
     <Surface>
@@ -72,7 +71,7 @@ function NotificationsSection({ s, d }: SectionProps) {
 function ScopedGrants({ s }: { s: SettingsState }) {
   const { messages } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs;
   return <ul className="grid gap-3">{s.grants.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 break-words">
-    <p>{a.actions[g.action]} · {c.modes[g.mode]} · {c[g.scope.kind]} {g.scope.kind === "affair" ? g.scope.affairId : g.scope.kind === "connection" ? g.scope.connectionId : g.scope.kind === "tool_version" ? `${g.scope.toolId} · ${a.version} ${g.scope.version}` : ""}</p>
+    <p>{a.actions[g.action]} · {c.modes[g.mode]} · {c[g.scope.kind]} {g.scope.kind === "affair" ? g.scope.affairId : g.scope.kind === "connector" ? g.scope.connectorId : ""}</p>
     <Button size="sm" variant="outline" disabled={s.mutation.pending} onClick={() => void s.mutation.run(() => s.client.revokeGrant(g.id))}>{a.revoke}</Button>
   </li>)}</ul>;
 }
@@ -113,55 +112,15 @@ function PreferencesSection({ s, d }: SectionProps) {
   </SettingsSection>;
 }
 
-function ConnectionsSection({ s, d }: SectionProps) {
-  const { messages, locale } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs, m = s.mutation;
-  return <SettingsSection name="connections">
-    {!d.connections.length && <p>{a.none}</p>}
-    <ul className="grid gap-4">{d.connections.map(source => <li key={source.id} className="grid gap-2 border-b pb-4 text-sm">
-      <p>{source.label} <Badge variant="outline">{c.connectionStates[source.status]}</Badge></p>
-      <p className="text-xs text-muted-foreground">{c.lastSuccess}: {source.lastSuccessAt ? new Date(source.lastSuccessAt).toLocaleString(locale) : a.none}</p>
-      <p>{source.coverageNote}</p>
-      {source.lastError && <p>{source.lastError}</p>}
-      {source.status !== "revoked" && <div className="flex flex-wrap justify-end gap-2">
-        <Button size="sm" variant="outline" disabled={m.pending} onClick={() => void m.run(() => s.client.transitionConnection(source.id, { action: source.status === "paused" ? "resume" : "pause" }))}>{source.status === "paused" ? a.resume : a.pause}</Button>
-        <Button size="sm" variant="ghost" disabled={m.pending} onClick={() => void m.run(() => s.client.transitionConnection(source.id, { action: "revoke" }))}>{a.revoke}</Button>
-        <Button size="sm" variant="outline" disabled={m.pending || source.status === "paused"} onClick={() => void m.run(() => s.client.syncConnection(source.id))}>{c.sync}</Button>
-      </div>}
-    </li>)}</ul>
-  </SettingsSection>;
-}
-
-function ToolsSection({ s, d }: SectionProps) {
-  const { messages, locale } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs, m = s.mutation;
-  return <SettingsSection name="tools">
-    {!d.tools.length && <p>{a.none}</p>}
-    <ul className="grid gap-4">{d.tools.map(tool => <li key={tool.id} className="grid min-w-0 gap-2 border-b pb-4 text-sm">
-      <p>{tool.kind === "panel" ? <Link className="underline" to={`/${locale}/tools/${encodeURIComponent(tool.id)}`}>{tool.name}</Link> : tool.name} <Badge variant="outline">{a.toolStates[tool.state]}</Badge> · {a.version} {tool.version}</p>
-      <p>{tool.purpose}</p>
-      <p className="text-xs text-muted-foreground">{tool.approvedVersion === tool.version ? `${a.approved} ${tool.approvedVersion}` : a.notApproved}</p>
-      {tool.script && <details><summary>{c.source}</summary><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all"><code>{tool.script.source}</code></pre></details>}
-      {tool.kind === "script" && <details><summary>{c.scriptRuns}</summary>
-        {!d.toolRuns[tool.id]?.length && <p>{a.none}</p>}
-        <ul>{d.toolRuns[tool.id]?.map(run => <li key={run.id}>
-          <p>{a.version} {run.version} · {c.runStates[run.status]} · {new Date(run.startedAt).toLocaleString(locale)}</p>
-          {run.output && <pre className="whitespace-pre-wrap break-all">{run.output}</pre>}
-          {run.error && <p className="break-all">{run.error}</p>}
-        </li>)}</ul>
-      </details>}
-      <div className="flex flex-wrap justify-end gap-2">{toolActions(tool).map(action => <Button key={action} size="sm" variant="outline" disabled={m.pending} onClick={() => void m.run(() => s.client.transitionTool(tool.id, { action, expectedVersion: tool.version }))}>{c[action]}</Button>)}</div>
-    </li>)}</ul>
-  </SettingsSection>;
-}
-
 function HealthSection({ d }: { d: LoadedSettings }) {
   const { messages, locale } = useI18n(), c = messages.steward.settings;
   return <SettingsSection name="health">
     <div className="flex flex-wrap gap-2">
-      <Badge variant="secondary">{d.health.agent.name === "none" ? c.agentDisabled : `${d.health.agent.name} · ${d.health.agent.available ? c.available : c.unavailable}`}</Badge>
-      <Badge variant="outline">{c.sandbox} · {d.health.sandbox.available ? c.available : c.unavailable} {d.health.sandbox.languages.join(", ")}</Badge>
+      <Badge variant="secondary">{c.git} · {d.health.git ? c.available : c.unavailable}</Badge>
+      <Badge variant="outline">{c.sandbox} · {d.health.jobsSandbox ? c.available : c.unavailable}</Badge>
     </div>
     <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 text-sm [&_dt]:text-muted-foreground [&_dd]:text-right [&_dd]:font-medium [&_dd]:tabular-nums">
-      {(["queuedAffairs", "runningAffairs", "failedAffairs", "pendingEvents", "failingConnections", "queuedNotifications", "failedNotifications"] as const).map(key => <div key={key} className="contents"><dt>{c[key]}</dt><dd>{d.health[key]}</dd></div>)}
+      {(["queuedRuns", "runningRuns", "failedRunsToday", "dueSchedules", "failingConnectors", "queuedNotifications", "failedNotifications"] as const).map(key => <div key={key} className="contents"><dt>{c[key]}</dt><dd>{d.health[key]}</dd></div>)}
       <dt>{c.lastTick}</dt><dd>{d.health.lastTickAt ? new Date(d.health.lastTickAt).toLocaleString(locale) : messages.steward.affairs.none}</dd>
     </dl>
   </SettingsSection>;
@@ -186,8 +145,12 @@ export function SettingsPage() {
           <NotificationsSection s={s} d={d} />
           <PermissionsSection s={s} />
           <PreferencesSection s={s} d={d} />
-          <ConnectionsSection s={s} d={d} />
-          <ToolsSection s={s} d={d} />
+          <SettingsSection name="connections"><ConnectorsSection client={s.client} connectors={d.connectors} affairs={d.affairs} refresh={s.refresh} /></SettingsSection>
+          <SettingsSection name="provider">
+            <p>{d.health.provider.name} · {d.health.provider.available ? c.available : c.unavailable}</p>
+            <p>{d.health.provider.sandboxed ? c.bashEnabled : c.bashDisabled}</p>
+            {d.health.provider.lastError && <p role="status">{d.health.provider.lastError}</p>}
+          </SettingsSection>
           <HealthSection d={d} />
         </>}
       </div>
