@@ -27,82 +27,80 @@ export async function authenticateRun(tx: Prisma.TransactionClient, token: strin
   return { run, affair, workspaceId: row.workspaceId };
 }
 export type EnqueueRun = { affairId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; conversationKey?: string };
+type RunWithAffair = Prisma.RunGetPayload<{ include: { affair: true } }>;
+type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
+
 export function createRuns(ports: StewardPorts, workspaceId: string) {
-  const { db } = ports, fs = createWorkspaceFs(ports.dataDir);
-  async function enqueue(input: EnqueueRun, tx: Prisma.TransactionClient = db) {
+  const runs = new RunService(ports, workspaceId);
+  return { enqueue: runs.enqueue.bind(runs), claimNext: runs.claimNext.bind(runs), finish: runs.finish.bind(runs), expireLeases: runs.expireLeases.bind(runs), authenticate: (token: string) => authenticateRun(ports.db, token, ports.now()) };
+}
+
+class RunService {
+  private readonly fs: ReturnType<typeof createWorkspaceFs>;
+  constructor(private readonly ports: StewardPorts, private readonly workspaceId: string) {
+    this.fs = createWorkspaceFs(ports.dataDir);
+  }
+  async enqueue(input: EnqueueRun, tx: Prisma.TransactionClient = this.ports.db) {
+    const { ports, workspaceId, fs } = this;
     const affair = input.affairId ? await requireAffair(tx, workspaceId, input.affairId) : null;
     if (affair && affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
     if (input.lane === "background" && !affair) throw new StewardError("invalid", "Background run requires an affair");
     return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd: affair ? await fs.forAffair(affair.dirName).directory() : join(ports.dataDir, "affairs"), createdAt: ports.now() } });
   }
-  async function claimNext(lane: RunLane, now = ports.now()) {
-    return db.$transaction(async tx => {
-      if (await tx.run.count({ where: { workspaceId, lane, status: "running" } })) return null;
-      const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
-      // Claim foreground first, but a running foreground never blocks background.
-      if (lane === "background" && !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { ...eligible, lane: "foreground" } })) return null;
-      const timezone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
-      for (const run of await tx.run.findMany({ where: { ...eligible, lane }, include: { affair: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
-        if (run.affair && run.affair.status !== "active") { await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } }); continue; }
-        if (run.affairId) {
-          const recent = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true } });
-          if (recent.filter(r => r.startedAt && localDayKey(r.startedAt, timezone) === localDayKey(now, timezone)).length >= RUN_LIMITS.maxRunsPerAffairPerDay) {
-            await tx.run.update({ where: { id: run.id }, data: { leaseUntil: nextLocalMidnight(now, timezone) } }); continue;
-          }
-        }
-        const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (lane === "foreground" ? RUN_LIMITS.foregroundTimeoutMs : RUN_LIMITS.backgroundTimeoutMs));
-        const claimed = await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt } });
-        if (!claimed.count) continue;
-        await audit(tx, { workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane } });
-        return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, token, runId: run.id };
-      }
-      return null;
-    });
+  async claimNext(lane: RunLane, now = this.ports.now()) {
+    return this.ports.db.$transaction(tx => this.claimInTransaction(tx, lane, now));
   }
-  async function finish(runId: string, outcome: Awaited<ReturnType<ProviderAdapter["start"]>["done"]>) {
+  private async deferIneligibleRun(tx: Prisma.TransactionClient, run: RunWithAffair, now: Date, timezone: string) {
+    const { workspaceId } = this;
+    if (run.affair && run.affair.status !== "active") {
+      await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } });
+      return true;
+    }
+    if (run.affairId) {
+      const recent = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true } });
+      if (recent.filter(r => r.startedAt && localDayKey(r.startedAt, timezone) === localDayKey(now, timezone)).length >= RUN_LIMITS.maxRunsPerAffairPerDay) {
+        await tx.run.update({ where: { id: run.id }, data: { leaseUntil: nextLocalMidnight(now, timezone) } });
+        return true;
+      }
+    }
+    return false;
+  }
+  private async claimInTransaction(tx: Prisma.TransactionClient, lane: RunLane, now: Date) {
+    const { workspaceId } = this;
+    if (await tx.run.count({ where: { workspaceId, lane, status: "running" } })) return null;
+    const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
+    // Claim foreground first, but a running foreground never blocks background.
+    if (lane === "background" && !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { ...eligible, lane: "foreground" } })) return null;
+    const timezone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
+    for (const run of await tx.run.findMany({ where: { ...eligible, lane }, include: { affair: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
+      if (await this.deferIneligibleRun(tx, run, now, timezone)) continue;
+      const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (lane === "foreground" ? RUN_LIMITS.foregroundTimeoutMs : RUN_LIMITS.backgroundTimeoutMs));
+      const claimed = await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt } });
+      if (!claimed.count) continue;
+      await audit(tx, { workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane } });
+      return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, token, runId: run.id };
+    }
+    return null;
+  }
+  async finish(runId: string, outcome: RunOutcome) {
+    const { ports, workspaceId } = this, { db } = ports;
     const now = ports.now(), run = await db.run.findFirst({ where: { id: runId, workspaceId }, include: { affair: true } });
     if (!run) throw new StewardError("not_found", "Run not found");
     if (run.status !== "running") return;
-    // An abort can settle the provider promise before expireLeases calls finish.
-    // Persist the timeout rather than misclassifying that race as provider failure.
-    const expired = (run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now);
-    let error = expired ? "Run lease expired" : outcome.error;
-    let status = expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
-    const foregroundDeadline = run.lane === "foreground" && status === "timed_out" &&
-      (!expired || !!(run.deadlineAt && run.deadlineAt <= now));
-    let commit: string | null = null, paths: string[] = [];
-    if (run.affair) {
-      try {
-        const files = fs.forAffair(run.affair.dirName);
-        const reply = run.conversationKey ? await db.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey, direction: "out", at: { gte: run.startedAt! } }, orderBy: { at: "asc" } }) : null;
-        paths = await files.commitAll("chrona", `Chrona: ${run.trigger}${reply ? ` — ${reply.text.split("\n")[0]}` : ""}`.slice(0, 500));
-        if (paths.length) commit = (await files.revisions())[0]?.sha ?? null;
-      } catch { status = "failed"; error = "Could not commit affair changes"; }
-    }
+    const result = this.finishState(run, outcome, now);
+    const { commit, paths } = await this.commitChanges(run, result);
+    const { status, error, foregroundDeadline } = result;
     const chatBound = ports.chat ? await ports.chat.bound() : false;
     const finalized = await db.$transaction(async tx => {
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return null;
       let deadlineMessage = null;
-      if (run.affairId) {
-        await tx.affair.update({ where: { id: run.affairId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { sessionId: outcome.sessionId } : {}) } });
-        await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "run", text: `Chrona: ${run.trigger} (${status})`, data: { runId }, at: now } });
-        for (const path of paths) await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "edit", text: path, data: { commit, paths: [path] }, at: now } });
-      }
+      await this.recordActivity(tx, run, { now, status, sessionId: outcome.sessionId, commit, paths });
       const history = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
       if (failures === RUN_LIMITS.maxFailures) await enqueueNotification(tx, { workspaceId, affairId: run.affairId ?? undefined, level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", dedupeKey: `run-failed:${runId}` }, { now, chatBound, publicUrl: ports.publicUrl });
       if (foregroundDeadline) {
-        const focus = run.conversationKey ? await tx.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey }, orderBy: { createdAt: "desc" } }) : null;
-        const affairId = run.affairId ?? z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
-        const affair = affairId ? await tx.affair.findFirst({ where: { workspaceId, id: affairId, status: "active" } }) : null;
-        if (affair) await enqueue({ affairId: affair.id, conversationKey: run.conversationKey ?? undefined, lane: "background", trigger: run.trigger as RunTrigger, prompt: run.prompt }, tx);
-        const replied = await tx.audit.findFirst({ where: { workspaceId, kind: "run_reply", subjectId: run.id } });
-        const conversation = !replied && run.conversationKey ? await tx.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" } }) : null;
-        if (conversation) {
-          deadlineMessage = await tx.message.create({ data: { workspaceId, conversationKey: run.conversationKey!, channel: conversation.channel, direction: "out", affairId: affair?.id, text: affair ? "这次处理超时了，我会在后台继续。" : "这次处理超时了，尚未关联事务，无法在后台继续。请再试一次。", at: now } });
-          await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: deadlineMessage.id, reason: "deadline" } });
-        }
+        deadlineMessage = await this.continueAfterDeadline(tx, run, now);
       } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
         // Retry identity is immutable; the attempt status already records why it retried.
         const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
@@ -126,14 +124,62 @@ export function createRuns(ports: StewardPorts, workspaceId: string) {
     }
     await ports.onRunFinished?.(workspaceId, runId);
   }
-  async function expireLeases(now = ports.now()) {
+  async expireLeases(now = this.ports.now()) {
+    const { db } = this.ports, { workspaceId } = this;
     const rows = await db.run.findMany({ where: { workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });
     for (const row of rows) {
       // Never commit while the Provider may still be writing.
       await liveRuns.get(row.id)?.abort();
-      await finish(row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" });
+      await this.finish(row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" });
     }
     return rows.length;
   }
-  return { enqueue, claimNext, finish, expireLeases, authenticate: (token: string) => authenticateRun(db, token, ports.now()) };
+  private finishState(run: RunWithAffair, outcome: RunOutcome, now: Date) {
+    // An abort can settle the provider promise before expireLeases calls finish.
+    // Persist the timeout rather than misclassifying that race as provider failure.
+    const expired = (run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now);
+    const error = expired ? "Run lease expired" : outcome.error;
+    const status = expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
+    const foregroundDeadline = run.lane === "foreground" && status === "timed_out" &&
+      (!expired || !!(run.deadlineAt && run.deadlineAt <= now));
+    return { error, status, foregroundDeadline };
+  }
+  private async commitChanges(run: RunWithAffair, result: ReturnType<RunService["finishState"]>) {
+    const { ports, workspaceId } = this, { db } = ports;
+    let commit: string | null = null, paths: string[] = [];
+    if (run.affair) {
+      try {
+        const files = this.fs.forAffair(run.affair.dirName);
+        const reply = run.conversationKey ? await db.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey, direction: "out", at: { gte: run.startedAt! } }, orderBy: { at: "asc" } }) : null;
+        paths = await files.commitAll("chrona", `Chrona: ${run.trigger}${reply ? ` — ${reply.text.split("\n")[0]}` : ""}`.slice(0, 500));
+        if (paths.length) commit = (await files.revisions())[0]?.sha ?? null;
+      } catch { result.status = "failed"; result.error = "Could not commit affair changes"; }
+    }
+    return { commit, paths };
+  }
+  private async recordActivity(tx: Prisma.TransactionClient, run: RunWithAffair, result: { now: Date; status: string; sessionId: string | null; commit: string | null; paths: string[] }) {
+    const { workspaceId } = this;
+    const { now, status, sessionId, commit, paths } = result;
+    if (!run.affairId) return;
+    await tx.affair.update({ where: { id: run.affairId }, data: { lastActivityAt: now, ...(sessionId ? { sessionId } : {}) } });
+    await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "run", text: `Chrona: ${run.trigger} (${status})`, data: { runId: run.id }, at: now } });
+    for (const path of paths) await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "edit", text: path, data: { commit, paths: [path] }, at: now } });
+  }
+  private async deadlineAffair(tx: Prisma.TransactionClient, run: RunWithAffair) {
+    const { workspaceId } = this;
+    const focus = run.conversationKey ? await tx.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey }, orderBy: { createdAt: "desc" } }) : null;
+    const affairId = run.affairId ?? z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+    return affairId ? await tx.affair.findFirst({ where: { workspaceId, id: affairId, status: "active" } }) : null;
+  }
+  private async continueAfterDeadline(tx: Prisma.TransactionClient, run: RunWithAffair, now: Date) {
+    const { workspaceId } = this;
+    const affair = await this.deadlineAffair(tx, run);
+    if (affair) await this.enqueue({ affairId: affair.id, conversationKey: run.conversationKey ?? undefined, lane: "background", trigger: run.trigger as RunTrigger, prompt: run.prompt }, tx);
+    const replied = await tx.audit.findFirst({ where: { workspaceId, kind: "run_reply", subjectId: run.id } });
+    const conversation = !replied && run.conversationKey ? await tx.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" } }) : null;
+    if (!conversation) return null;
+    const deadlineMessage = await tx.message.create({ data: { workspaceId, conversationKey: run.conversationKey!, channel: conversation.channel, direction: "out", affairId: affair?.id, text: affair ? "这次处理超时了，我会在后台继续。" : "这次处理超时了，尚未关联事务，无法在后台继续。请再试一次。", at: now } });
+    await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: deadlineMessage.id, reason: "deadline" } });
+    return deadlineMessage;
+  }
 }

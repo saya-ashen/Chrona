@@ -32,20 +32,31 @@ function toMessage(row: MessageRow): Message {
 const callerSchema = z.object({ runId: z.string(), before: z.array(z.string()) });
 
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
-  const { db } = ports, events = new EventEmitter();
-  events.setMaxListeners(0);
-  const locks = new Map<string, Promise<unknown>>();
-  async function serial<T>(key: string, action: () => Promise<T>): Promise<T> {
+  const chat = new ChatService(ports, wake);
+  return { handleMessage: chat.handleMessage.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat) };
+}
+
+class ChatService {
+  private readonly events = new EventEmitter();
+  private readonly locks = new Map<string, Promise<unknown>>();
+  constructor(private readonly ports: StewardPorts, private readonly wake: () => Promise<unknown>) {
+    this.events.setMaxListeners(0);
+  }
+  private async serial<T>(key: string, action: () => Promise<T>): Promise<T> {
+    const { locks } = this;
     const previous = locks.get(key) ?? Promise.resolve();
     const next = previous.catch(() => {}).then(action);
     locks.set(key, next);
     try { return await next; } finally { if (locks.get(key) === next) locks.delete(key); }
   }
-  async function replies(inbound: MessageRow, before: string[]) {
+  private async replies(inbound: MessageRow, before: string[]) {
+    const { db } = this.ports;
     return (await db.message.findMany({ where: { workspaceId: inbound.workspaceId, conversationKey: inbound.conversationKey, direction: "out", at: { gte: inbound.at } }, orderBy: [{ at: "asc" }, { id: "asc" }] })).filter(m => !before.includes(m.id));
   }
   // Called after run finalization, including when no HTTP caller remains attached.
-  async function runFinished(workspaceId: string, runId: string) {
+  async runFinished(workspaceId: string, runId: string) {
+    const { ports, events } = this, { db } = ports;
+    const replies = this.replies.bind(this);
     const run = await db.run.findUniqueOrThrow({ where: { id: runId } });
     if (["failed", "provider_unavailable"].includes(run.status)) {
       const callers = await db.audit.findMany({ where: { workspaceId, kind: "chat_caller" }, orderBy: { createdAt: "asc" } });
@@ -58,53 +69,74 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
     await audit(db, { workspaceId, actor: "chrona", kind: "chat_run_finished", subjectId: runId, details: {} });
     events.emit(runId);
   }
-  async function handleMessage(raw: ChatInput): Promise<ChatReply> {
+  async handleMessage(raw: ChatInput): Promise<ChatReply> {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments);
     const conversationKey = `chat:${input.channel}`;
-    const prepared = await serial(`${input.workspaceId}:${conversationKey}`, async () => {
-      const existing = input.externalId ? await db.message.findUnique({ where: { workspaceId_externalId: { workspaceId: input.workspaceId, externalId: input.externalId } } }) : null;
-      if (existing) {
-        const saved = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_result", subjectId: existing.id } });
-        if (saved) {
-          const result = z.object({ runId: z.string(), messageIds: z.array(z.string()) }).parse(saved.details);
-          const rows = await db.message.findMany({ where: { workspaceId: input.workspaceId, id: { in: result.messageIds } } });
-          return { result: { runId: result.runId, messages: result.messageIds.flatMap(id => rows.filter(r => r.id === id).map(toMessage)) } };
-        }
-        const caller = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_caller", subjectId: existing.id } });
-        if (caller) return { inbound: existing, ...callerSchema.parse(caller.details) };
-      }
-      const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, direction: "out" } }) : null;
-      if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found");
-      const focus = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "conversation_focus", subjectId: conversationKey }, orderBy: { createdAt: "desc" } });
-      const focusedId = input.affairId ?? (quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId);
-      const affair = focusedId ? await db.affair.findFirst({ where: { id: focusedId, workspaceId: input.workspaceId, status: "active" } }) : null;
-      if (input.affairId && !affair) throw new StewardError("not_found", "Active affair not found");
-      const inbound = existing ?? await db.message.create({ data: { ...input, attachments: input.attachments, conversationKey, affairId: affair?.id, direction: "in", at: ports.now() } });
-      // Timestamp ties are common with fake clocks and SQLite; explicitly exclude existing replies.
-      const before = (await db.message.findMany({ where: { workspaceId: input.workspaceId, conversationKey, direction: "out", at: { gte: inbound.at } }, select: { id: true } })).map(m => m.id);
-      const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, conversationKey, lane: "foreground", status: "running" } });
-      // A quote changing affairs must queue in the correct cwd, not steer a different affair.
-      const handle = active && (!quoted || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);
-      const prompt = [input.text, ...(quoted ? [`Quoted Chrona message (data): ${JSON.stringify({ text: quoted.text, affairId: quoted.affairId })}`] : []), ...(input.attachments.some(a => a.path) ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, path, mime, size }) => ({ name, path, mime, size })))}`] : []), ...input.attachments.filter(a => a.mime.startsWith("audio/")).map(a => `Voice note (not transcribed by Chrona): ${JSON.stringify({ name: a.name, path: a.path })}`)].join("\n\n");
-      const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
-      await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
-      if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });
-      // Subscribe before injection/launch: scripted providers can finish immediately.
-      const waiting = wait(inbound, run.id, before);
-      if (handle) {
-        try { await handle.inject(prompt, images); }
-        catch { await handle.abort(); await createRuns(ports, input.workspaceId).finish(run.id, { outcome: "unavailable", sessionId: null, error: "Message injection failed" }); }
-      } else {
-        // A stuck launcher must not prevent the caller's timeout from resolving.
-        await Promise.race([wake().catch(() => {}), waiting]);
-      }
-      return { waiting };
-    });
+    const prepared = await this.serial(`${input.workspaceId}:${conversationKey}`, () => this.prepareMessage(input, images, conversationKey));
     if ("result" in prepared) return prepared.result!;
     if ("waiting" in prepared) return prepared.waiting!;
-    return wait(prepared.inbound, prepared.runId, prepared.before);
+    return this.wait(prepared.inbound, prepared.runId, prepared.before);
   }
-  function wait(inbound: MessageRow, runId: string, before: string[]): Promise<ChatReply> {
+  private async previousResult(input: z.output<typeof inputSchema>, existing: MessageRow) {
+    const { db } = this.ports;
+    const saved = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_result", subjectId: existing.id } });
+    if (saved) {
+      const result = z.object({ runId: z.string(), messageIds: z.array(z.string()) }).parse(saved.details);
+      const rows = await db.message.findMany({ where: { workspaceId: input.workspaceId, id: { in: result.messageIds } } });
+      return { result: { runId: result.runId, messages: result.messageIds.flatMap(id => rows.filter(r => r.id === id).map(toMessage)) } };
+    }
+    const caller = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_caller", subjectId: existing.id } });
+    if (caller) return { inbound: existing, ...callerSchema.parse(caller.details) };
+    return null;
+  }
+  private async messageContext(input: z.output<typeof inputSchema>, conversationKey: string) {
+    const { db } = this.ports;
+    const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, direction: "out" } }) : null;
+    if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found");
+    const focus = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "conversation_focus", subjectId: conversationKey }, orderBy: { createdAt: "desc" } });
+    const focusedId = input.affairId ?? (quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId);
+    const affair = focusedId ? await db.affair.findFirst({ where: { id: focusedId, workspaceId: input.workspaceId, status: "active" } }) : null;
+    if (input.affairId && !affair) throw new StewardError("not_found", "Active affair not found");
+    return { quoted, affair };
+  }
+  private async prepareMessage(input: z.output<typeof inputSchema>, images: ReturnType<typeof chatImages>, conversationKey: string) {
+    const { ports, wake } = this, { db } = ports;
+    const existing = input.externalId ? await db.message.findUnique({ where: { workspaceId_externalId: { workspaceId: input.workspaceId, externalId: input.externalId } } }) : null;
+    if (existing) {
+      const previous = await this.previousResult(input, existing);
+      if (previous) return previous;
+    }
+    const { quoted, affair } = await this.messageContext(input, conversationKey);
+    const inbound = existing ?? await db.message.create({ data: { ...input, attachments: input.attachments, conversationKey, affairId: affair?.id, direction: "in", at: ports.now() } });
+    // Timestamp ties are common with fake clocks and SQLite; explicitly exclude existing replies.
+    const before = (await db.message.findMany({ where: { workspaceId: input.workspaceId, conversationKey, direction: "out", at: { gte: inbound.at } }, select: { id: true } })).map(m => m.id);
+    const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, conversationKey, lane: "foreground", status: "running" } });
+    // A quote changing affairs must queue in the correct cwd, not steer a different affair.
+    const handle = this.injectionHandle(active, quoted, affair);
+    const prompt = this.messagePrompt(input, quoted);
+    const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
+    await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
+    if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });
+    // Subscribe before injection/launch: scripted providers can finish immediately.
+    const waiting = this.wait(inbound, run.id, before);
+    if (handle) {
+      try { await handle.inject(prompt, images); }
+      catch { await handle.abort(); await createRuns(ports, input.workspaceId).finish(run.id, { outcome: "unavailable", sessionId: null, error: "Message injection failed" }); }
+    } else {
+      // A stuck launcher must not prevent the caller's timeout from resolving.
+      await Promise.race([wake().catch(() => {}), waiting]);
+    }
+    return { waiting };
+  }
+  private injectionHandle(active: { id: string; affairId: string | null } | null, quoted: MessageRow | null, affair: { id: string } | null) {
+    return active && (!quoted || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);
+  }
+  private messagePrompt(input: z.output<typeof inputSchema>, quoted: MessageRow | null) {
+    return [input.text, ...(quoted ? [`Quoted Chrona message (data): ${JSON.stringify({ text: quoted.text, affairId: quoted.affairId })}`] : []), ...(input.attachments.some(a => a.path) ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, path, mime, size }) => ({ name, path, mime, size })))}`] : []), ...input.attachments.filter(a => a.mime.startsWith("audio/")).map(a => `Voice note (not transcribed by Chrona): ${JSON.stringify({ name: a.name, path: a.path })}`)].join("\n\n");
+  }
+  private wait(inbound: MessageRow, runId: string, before: string[]): Promise<ChatReply> {
+    const { ports, events } = this, { db } = ports;
+    const serial = this.serial.bind(this), replies = this.replies.bind(this);
     return new Promise((resolve, reject) => {
       let settled = false, checking = false;
       let grace: ReturnType<typeof setTimeout> | undefined;
@@ -136,12 +168,18 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
     });
   }
   /** Trusted transport bytes only; all paths are generated and filesystem-confined here. */
-  async function intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
-    if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
+  private async attachmentAffair(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">) {
+    const { db } = this.ports;
     const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, direction: "out" } }) : null;
     const focus = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "conversation_focus", subjectId: `chat:${input.channel}` }, orderBy: { createdAt: "desc" } });
     const focusedId = quoted ? quoted.affairId : z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
     const affair = focusedId ? await db.affair.findFirst({ where: { id: focusedId, workspaceId: input.workspaceId, status: "active" } }) : null;
+    return affair;
+  }
+  async intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
+    if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
+    const { ports } = this;
+    const affair = await this.attachmentAffair(input);
     const fs = createWorkspaceFs(ports.dataDir), day = ports.now().toISOString().slice(0, 10);
     const attachments: NonNullable<ChatInput["attachments"]> = [];
     let images = 0;
@@ -155,5 +193,7 @@ export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
     }
     return { attachments, ...(affair ? { affairId: affair.id } : {}) };
   }
-  return { handleMessage, intakeAttachments, runFinished, messages: async (workspaceId: string, limit = 50) => (await db.message.findMany({ where: { workspaceId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage) };
+  async messages(workspaceId: string, limit = 50) {
+    return (await this.ports.db.message.findMany({ where: { workspaceId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage);
+  }
 }
