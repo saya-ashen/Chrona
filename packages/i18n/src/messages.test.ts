@@ -18,6 +18,7 @@ function flattenMessages(value: unknown, prefix = ""): FlatMessages {
 
 const allowedIdenticalMessages = new Set([
   "nav.brandTitle",
+  "steward.workspace.chrona",
   "locale.en",
   "locale.zh",
   "metadata.title",

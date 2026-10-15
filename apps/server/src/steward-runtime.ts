@@ -59,16 +59,20 @@ export function createStewardRuntime(db: PrismaClient, options: {
       start: async (service, wake) => { await (await loadQq())?.start(service, wake); },
       stop: async () => { if (qq) await (await qq)?.stop(); },
     } : null;
-  // The existing script sandbox has no affair-cwd mount API. Fail closed until that
-  // adapter exposes the v3 job port; never run a job on the host or in the wrong cwd.
   const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap });
-  void scriptSandbox;
+  const sandbox: StewardPorts["sandbox"] = {
+    available: scriptSandbox.health.available,
+    async run({ command, cwd, timeoutMs, maxOutputBytes }) {
+      const result = await scriptSandbox.run({ language: "shell", source: command, input: {}, cwd, timeoutMs, maxOutputBytes });
+      return { output: result.output, exitCode: result.status === "succeeded" ? 0 : result.exitCode || 1 };
+    },
+  };
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     connectors: [createEmailConnector(), createLocalTestSource().adapter, createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
-    sandbox: options.sandbox ?? { available: false }, chatTimeoutMs: options.chatTimeoutMs,
+    sandbox: options.sandbox ?? sandbox, chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;

@@ -100,7 +100,9 @@ export function createWorkspaceFs(dataDir: string) {
   async function git(dir: string, args: string[], author: FileAuthor = "chrona") {
     if (args[0] !== "init") await checkGitMetadata(dir);
     const who = identity(author);
-    const process = Bun.spawn(["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false", "-c", "core.fsmonitor=false", ...args], {
+    // Auto-maintenance may detach and prune objects after git exits, racing the
+    // next metadata validation even though our foreground operations serialize.
+    const process = Bun.spawn(["git", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false", "-c", "core.fsmonitor=false", ...args], {
       cwd: dir, stdin: "ignore", stdout: "pipe", stderr: "pipe",
       env: { PATH: Bun.env.PATH ?? "/usr/bin:/bin", LANG: "C.UTF-8", HOME: dir,
         GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_ATTR_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GIT_LITERAL_PATHSPECS: "1",

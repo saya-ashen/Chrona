@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test";
+import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createScriptSandbox } from "./script-sandbox";
 const bwrapPath = Bun.which("bwrap") ?? undefined;
 const sandbox = createScriptSandbox({ bwrapPath });
@@ -15,6 +18,15 @@ sandboxTest("network namespace denies loopback connection; home is absent", asyn
   // Loopback in the isolated namespace only: never reaches a host/external network.
   const source = "import socket,os\ns=socket.socket(); s.settimeout(.1)\ntry:\n s.connect(('127.0.0.1',9)); raise AssertionError('connected')\nexcept OSError: pass\nassert not os.path.exists('/home')\nassert not os.path.exists('/root')\nprint('isolated')";
   expect(await sandbox.run({ language: "python", source, input: {} })).toMatchObject({ status: "succeeded", output: "isolated\n" });
+});
+sandboxTest("cwd is writable, rest of host is read-only, network namespace shared", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-sandbox-")), cwd = join(root, "affair");
+  const { mkdir, readlink } = await import("node:fs/promises");
+  await mkdir(cwd); await writeFile(join(cwd, "input"), "value");
+  const network = await readlink("/proc/self/ns/net");
+  const result = await sandbox.run({ language: "python", cwd, input: {}, source: `import os\nassert os.readlink('/proc/self/ns/net') == ${JSON.stringify(network)}\nassert open('input').read() == 'value'\nopen('output', 'w').write('changed')\ntry:\n open('/chrona-sandbox-write-test', 'w')\n raise AssertionError('root writable')\nexcept OSError: pass\nprint('ok')` });
+  expect(result).toMatchObject({ status: "succeeded", output: "ok\n", exitCode: 0 });
+  expect(await readFile(join(cwd, "output"), "utf8")).toBe("changed");
 });
 sandboxTest("timeout kills and stdout/stderr are byte bounded", async () => {
   expect(await createScriptSandbox({ bwrapPath, timeoutMs: 100 }).run({ language: "shell", source: "while :; do :; done", input: {} })).toMatchObject({ status: "timed_out" });
