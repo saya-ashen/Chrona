@@ -96,6 +96,43 @@ test("foreground claims first; lanes independent; tokens and deadlines; commits 
   expect(await api.runs.claimNext("foreground")).not.toBeNull();
 });
 
+test("root run commits new and dirty affairs with activity, leaves clean and foreign affairs alone", async () => {
+  const existing = await affair(), clean = await affair();
+  const other = (await db.workspace.create({ data: { name: "other" } })).id;
+  const foreignApi = service.forWorkspace(other);
+  const foreign = await foreignApi.affairs.create({ title: "Foreign", request: "Private" });
+  const foreignFiles = await foreignApi.affairs.files(foreign.id);
+  await writeFile(join(await foreignFiles.directory(), "pending.md"), "not this workspace");
+  advance(1000);
+  await api.runs.enqueue({ lane: "foreground", trigger: "message", prompt: "plan" });
+  const run = (await api.runs.claimNext("foreground"))!;
+  const created = await affair();
+  const createdClean = await affair();
+  for (const a of [existing, created]) {
+    const files = await api.affairs.files(a.id);
+    await writeFile(join(await files.directory(), "work.md"), "Done");
+  }
+  await api.runs.finish(run.id, { outcome: "finished", sessionId: "root-session", error: null });
+  for (const a of [existing, created]) {
+    const files = await api.affairs.files(a.id);
+    const revision = (await files.revisions())[0]!;
+    expect(revision.author).toBe("chrona");
+    expect(revision.paths).toContain("work.md");
+    expect(await files.commitAll("chrona", "should be clean")).toEqual([]);
+    const activity = await api.affairs.activity(a.id);
+    expect(activity.some(row => row.kind === "run" && row.data?.runId === run.id)).toBe(true);
+    expect(activity.some(row => row.kind === "edit" && row.data?.commit === revision.sha && row.text === "work.md")).toBe(true);
+    expect((await db.affair.findUniqueOrThrow({ where: { id: a.id } })).sessionId).toBeNull();
+  }
+  expect((await api.affairs.activity(createdClean.id)).some(row => row.kind === "run")).toBe(true);
+  expect(await api.affairs.activity(clean.id)).toEqual([]);
+  expect(await foreignApi.affairs.activity(foreign.id)).toEqual([]);
+  expect((await foreignFiles.revisions())[0]!.paths).not.toContain("pending.md");
+  const count = await db.activity.count();
+  await api.runs.finish(run.id, { outcome: "finished", sessionId: null, error: null });
+  expect(await db.activity.count()).toBe(count);
+});
+
 test("per-affair daily cap defers without blocking root; unavailable backs off; lease expires", async () => {
   const a = await affair();
   for (let i = 0; i < 24; i++) await db.run.create({ data: { workspaceId, affairId: a.id, lane: "background", trigger: "schedule", provider: "fake", tokenHash: `cap-${i}`, prompt: "", cwd: "", status: "finished", startedAt: time, endedAt: time } });

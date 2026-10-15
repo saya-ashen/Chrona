@@ -5,6 +5,7 @@ import { Button } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { scheduleDescription } from "../model/workspace";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
+import { AddSchedule } from "./affair-actions";
 import { ApprovalItem } from "./approval-item";
 import { MutationStatus } from "./resource-status";
 import { Section, Surface } from "./layout";
@@ -16,6 +17,7 @@ export function WorkspaceAffairSidebar({ detail, client, refresh }: Props) {
   return <aside className="grid min-w-0 gap-6">
     <AffairStatusActions detail={detail} client={client} refresh={refresh} />
     <Section title={c.schedules}>
+      {detail.affair.status === "active" && <AddSchedule client={client} affairId={detail.affair.id} refresh={refresh} />}
       {!detail.schedules.length && <p>{c.noSchedules}</p>}
       {detail.schedules.map(schedule => <ScheduleItem key={schedule.id} schedule={schedule} client={client} refresh={refresh} />)}
     </Section>

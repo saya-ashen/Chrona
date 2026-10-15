@@ -7,6 +7,7 @@ import { fileTree, visiblePath, type FileBranch } from "../model/affair-file";
 import { pageHref } from "../model/workspace";
 import { PageColumn } from "./layout";
 import { ResourceStatus } from "./resource-status";
+import { AffairFileActions } from "./affair-actions";
 import { AffairHistory } from "./affair-history";
 import { AffairFileView } from "./affair-file-view";
 import { WorkspaceAffairSidebar } from "./workspace-affair-sidebar";
@@ -31,6 +32,7 @@ export function AffairDetailPage() {
           <div className="hidden lg:block"><h2 className="mb-3 font-medium">{c.pages}</h2><FileTree nodes={tree} affairId={affairId} selected={path} /></div>
           <details className="lg:hidden"><summary>{c.pages}</summary><FileTree nodes={tree} affairId={affairId} selected={path} /></details>
           {!tree.length && <p>{c.empty}</p>}
+          <AffairFileActions client={client} affairId={affairId} path={path} refresh={resource.refresh} />
         </nav>
         <section aria-label={path} className="min-w-0">{selected ? <AffairFileView key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} /> : <p>{tree.length ? c.notFound : c.empty}</p>}</section>
         <WorkspaceAffairSidebar detail={detail} client={client} refresh={resource.refresh} />

@@ -88,13 +88,13 @@ class RunService {
     if (!run) throw new StewardError("not_found", "Run not found");
     if (run.status !== "running") return;
     const result = this.finishState(run, outcome, now);
-    const { commit, paths } = await this.commitChanges(run, result);
+    const changes = await this.commitChanges(run, result);
     const { status, error, foregroundDeadline } = result;
     const chatBound = ports.chat ? await ports.chat.bound() : false;
     const finalized = await db.$transaction(async tx => {
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return null;
       let deadlineMessage = null;
-      await this.recordActivity(tx, run, { now, status, sessionId: outcome.sessionId, commit, paths });
+      await this.recordChanges(tx, run, changes, { now, status, sessionId: outcome.sessionId });
       const history = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
@@ -144,26 +144,35 @@ class RunService {
       (!expired || !!(run.deadlineAt && run.deadlineAt <= now));
     return { error, status, foregroundDeadline };
   }
+  private async commitMessage(run: RunWithAffair) {
+    const reply = run.conversationKey ? await this.ports.db.message.findFirst({ where: { workspaceId: this.workspaceId, conversationKey: run.conversationKey, direction: "out", at: { gte: run.startedAt! } }, orderBy: { at: "asc" } }) : null;
+    return `Chrona: ${run.trigger}${reply ? ` — ${reply.text.split("\n")[0]}` : ""}`.slice(0, 500);
+  }
+  private async recordChanges(tx: Prisma.TransactionClient, run: RunWithAffair, changes: Awaited<ReturnType<RunService["commitChanges"]>>, result: { now: Date; status: string; sessionId: string | null }) {
+    for (const change of changes) await this.recordActivity(tx, run, { ...result, sessionId: run.affairId ? result.sessionId : null, ...change });
+  }
   private async commitChanges(run: RunWithAffair, result: ReturnType<RunService["finishState"]>) {
     const { ports, workspaceId } = this, { db } = ports;
-    let commit: string | null = null, paths: string[] = [];
-    if (run.affair) {
+    const changes: { affairId: string; commit: string | null; paths: string[] }[] = [];
+    // A root Provider can create or edit any affair, not only conversation focus.
+    const affairs = run.affair ? [run.affair] : await db.affair.findMany({ where: { workspaceId } });
+    const message = await this.commitMessage(run);
+    for (const affair of affairs) {
       try {
-        const files = this.fs.forAffair(run.affair.dirName);
-        const reply = run.conversationKey ? await db.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey, direction: "out", at: { gte: run.startedAt! } }, orderBy: { at: "asc" } }) : null;
-        paths = await files.commitAll("chrona", `Chrona: ${run.trigger}${reply ? ` — ${reply.text.split("\n")[0]}` : ""}`.slice(0, 500));
-        if (paths.length) commit = (await files.revisions())[0]?.sha ?? null;
+        const files = this.fs.forAffair(affair.dirName);
+        const paths = await files.commitAll("chrona", message);
+        const commit = paths.length ? (await files.revisions())[0]?.sha ?? null : null;
+        if (run.affairId || paths.length || (run.startedAt && affair.createdAt >= run.startedAt)) changes.push({ affairId: affair.id, commit, paths });
       } catch { result.status = "failed"; result.error = "Could not commit affair changes"; }
     }
-    return { commit, paths };
+    return changes;
   }
-  private async recordActivity(tx: Prisma.TransactionClient, run: RunWithAffair, result: { now: Date; status: string; sessionId: string | null; commit: string | null; paths: string[] }) {
+  private async recordActivity(tx: Prisma.TransactionClient, run: RunWithAffair, result: { now: Date; status: string; sessionId: string | null; affairId: string; commit: string | null; paths: string[] }) {
     const { workspaceId } = this;
-    const { now, status, sessionId, commit, paths } = result;
-    if (!run.affairId) return;
-    await tx.affair.update({ where: { id: run.affairId }, data: { lastActivityAt: now, ...(sessionId ? { sessionId } : {}) } });
-    await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "run", text: `Chrona: ${run.trigger} (${status})`, data: { runId: run.id }, at: now } });
-    for (const path of paths) await tx.activity.create({ data: { workspaceId, affairId: run.affairId, actor: "chrona", kind: "edit", text: path, data: { commit, paths: [path] }, at: now } });
+    const { now, status, sessionId, affairId, commit, paths } = result;
+    await tx.affair.update({ where: { id: affairId }, data: { lastActivityAt: now, ...(sessionId ? { sessionId } : {}) } });
+    await tx.activity.create({ data: { workspaceId, affairId, actor: "chrona", kind: "run", text: `Chrona: ${run.trigger} (${status})`, data: { runId: run.id }, at: now } });
+    for (const path of paths) await tx.activity.create({ data: { workspaceId, affairId, actor: "chrona", kind: "edit", text: path, data: { commit, paths: [path] }, at: now } });
   }
   private async deadlineAffair(tx: Prisma.TransactionClient, run: RunWithAffair) {
     const { workspaceId } = this;
