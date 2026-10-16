@@ -1,4 +1,5 @@
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@chrona/db";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
@@ -28,6 +29,13 @@ export function stewardDataDir(env = process.env): string {
   if (!file || file === ":memory:") throw new Error("CHRONA_DATA_DIR required for an in-memory database");
   return dirname(resolve(file));
 }
+// Packaged binaries ship the extension under resources/; source runs use the repo copy.
+function chronaExtensionPath(): string {
+  const relative = join("external-plugins", "pi-steward-agent", "chrona-tools.ts");
+  const packaged = [process.env.CHRONA_RESOURCE_DIR, join(dirname(process.execPath), "resources")]
+    .filter((dir): dir is string => Boolean(dir)).map((dir) => join(dir, relative));
+  return packaged.find((path) => existsSync(path)) ?? fileURLToPath(new URL(`../../../${relative}`, import.meta.url));
+}
 type RuntimeOptions = {
   now?: () => Date; onError?: () => void; port?: number; provider?: ProviderAdapter | null;
   dataDir?: string; chatTransport?: StewardChatTransport | null; tickSeconds?: number; chatTimeoutMs?: number;
@@ -38,7 +46,7 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
-    chronaExtension: fileURLToPath(new URL("../../../external-plugins/pi-steward-agent/chrona-tools.ts", import.meta.url)),
+    chronaExtension: chronaExtensionPath(),
     command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
