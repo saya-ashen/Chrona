@@ -204,9 +204,10 @@ function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<str
       /** Engine UI tool only; changes are committed with the Provider run. */
       writeUi: (path: string, content: string, role: "page" | "entry" | "card") => run(async dir => {
         if (path.startsWith(".chrona") || !path.endsWith(".ui.json")) throw new StewardError("invalid", "Invalid UI page path");
+        // The Today card is metadata, not a page of the affair: keep it out of the page list.
+        if (role === "card") { await writeFile(dir, ".chrona/card.ui.json", content); return; }
         await writeFile(dir, path, content);
         if (role === "entry") await writeFile(dir, ".chrona/entry", path + "\n");
-        if (role === "card") await writeFile(dir, ".chrona/card.ui.json", content);
       }),
       /** Raw download uses the same confinement and no-follow boundary as text reads. */
       raw: (path: string) => run(async dir => {

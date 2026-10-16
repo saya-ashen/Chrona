@@ -36,6 +36,7 @@ test("UI tool validates before writing; JSONL, entry/card roles and read project
     expect(JSON.parse((await f.files.read("button.ui.json")).content)).toEqual(button);
     await f.call("chrona_ui_set", { path: "card.ui.json", spec, role: "card" });
     expect(JSON.parse((await f.files.read(".chrona/card.ui.json")).content)).toEqual(spec);
+    await expect(f.files.read("card.ui.json")).rejects.toThrow();
     expect((await f.owner.today()).progress[0]!.card).toEqual(spec);
     await f.files.intake([{ path: ".chrona/card.ui.json", bytes: new TextEncoder().encode("not json") }], "Invalid card fixture");
     expect((await f.owner.today()).progress[0]!.card).toBeNull();
