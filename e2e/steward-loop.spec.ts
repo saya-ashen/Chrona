@@ -37,6 +37,8 @@ test("question → workspace plan → checkbox → edit/history/revert → setti
   await page.getByRole("button", { name: zh.steward.affairFile.save, exact: true }).click();
   await expect(page.getByText("用户补充的学习笔记", { exact: true })).toBeVisible();
   await page.reload();
+  // Revision history lives inside the collapsed technical details.
+  await page.locator("summary").filter({ hasText: zh.steward.affairCenter.technicalCount.split("：")[0] }).click();
   await page.locator("summary").filter({ hasText: zh.steward.affairCenter.history }).click();
   const history = page.getByRole("region", { name: zh.steward.history.title });
   const revision = history.getByRole("button", { name: /· 你 ·/ }).first();
