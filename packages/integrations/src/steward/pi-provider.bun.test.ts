@@ -58,6 +58,7 @@ process.stdin.on('data',chunk=>{
 });
 process.stdin.on('end',()=>process.exit(0));
 `, { mode: 0o755 });
+  await writeFile(join(cwd, "bridge.ts"), "");
   const provider = createPiProvider({ command, chronaExtension: join(cwd, "bridge.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
   const input: ProviderRunInput = { runId: "run", token: "private-run-token", lane: "foreground", cwd, sessionDir: join(cwd, ".chrona/sessions"), sessionId: "previous-id", prompt: "hello", deadline: new Date(Date.now() + 4000) };
   const commands = async () => (await readFile(join(cwd, "commands.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
@@ -128,6 +129,8 @@ describe("Pi RPC provider", () => {
     expect((await provider.health()).available).toBe(false);
     expect((await provider.start(f.input).done).outcome).toBe("unavailable");
     expect((await provider.start({ ...f.input, deadline: new Date(0) }).done).outcome).toBe("timed_out");
+    const noExtension = createPiProvider({ command: f.command, chronaExtension: join(f.cwd, "missing.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    expect((await noExtension.health()).error).toContain("extension missing");
   });
   test.each([false, true])("bwrap mounts (root=%s), share network, and enable bash/web", async rootRun => {
     const f = await fixture();
@@ -138,7 +141,7 @@ describe("Pi RPC provider", () => {
     await symlink(affair, join(f.cwd, "b".repeat(32)));
     const bwrap = join(f.cwd, "bwrap");
     await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
-    const provider = createPiProvider({ command: f.command, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, chronaExtension: "bridge.ts", webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    const provider = createPiProvider({ command: f.command, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, chronaExtension: join(f.cwd, "bridge.ts"), webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
     expect((await provider.start(f.input).done).outcome).toBe("finished");
     const args = JSON.parse(await readFile(join(f.cwd, "bwrap.json"), "utf8"));
     expect(args).toContain("--die-with-parent"); expect(args).toContain("--ro-bind"); expect(args).toContain("--tmpfs"); expect(args).not.toContain("--unshare-net");

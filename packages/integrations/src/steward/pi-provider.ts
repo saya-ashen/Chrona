@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdirSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
@@ -257,6 +257,7 @@ export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
     async health() {
       if (!await probe(command)) return { available: false, sandboxed: false, error: "Pi binary unavailable" };
       if (bwrap && !await probe(bwrap)) return { available: false, sandboxed: false, error: "bubblewrap binary unavailable" };
+      if (!existsSync(extension)) return { available: false, sandboxed: false, error: `Chrona tools extension missing: ${extension}` };
       return { available: true, sandboxed: bwrap !== null, error: null };
     },
     start(input) {
