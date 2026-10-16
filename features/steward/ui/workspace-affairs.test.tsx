@@ -24,7 +24,7 @@ it("renders decisions first, plain summaries, next label and collapsed ended aff
   show();
   expect(await screen.findByRole("heading", { name: "In progress" })).toBeVisible();
   expect(screen.getAllByRole("heading").map(h => h.textContent)).toEqual(["Affairs", "Waiting for you", "In progress", "Paused"]);
-  expect(screen.getByText(en.steward.affairCenter.replying)).toBeVisible();
+  expect(screen.getByText(en.steward.affairCenter.runningPill)).toBeVisible();
   expect(screen.getByText("Read the comparison with results")).toBeVisible();
   expect(screen.queryByText(/day-01.md/)).not.toBeInTheDocument();
   expect(screen.getByText(/Next: Compare lenses/)).toBeVisible();

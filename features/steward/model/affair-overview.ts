@@ -20,6 +20,18 @@ export function todaySummary(view: TodayView, copy: SummaryCopy): string {
   return copy.clear;
 }
 
+/** The sentence under the headline: only what the headline did not already say. */
+export function todayDetail(view: TodayView, copy: SummaryCopy & { upcoming: string; separator: string; end: string }): string {
+  const working = view.progress.filter(item => item.affair.work !== null).length;
+  const lead = view.approvals.length ? 0 : working ? 1 : view.progress.length ? 2 : 3;
+  const parts = [
+    ...(lead < 1 && working ? [copy.working.replace("{count}", String(working))] : []),
+    ...(lead < 2 && view.progress.length ? [copy.progress.replace("{count}", String(view.progress.length))] : []),
+    ...(view.upcoming.length ? [copy.upcoming.replace("{count}", String(view.upcoming.length))] : []),
+  ];
+  return parts.length ? parts.join(copy.separator) + copy.end : "";
+}
+
 type OverviewCopy = { running: string; queued: string; replying: string; followUp: string; next: string };
 export function affairOverview(affair: Affair, locale: string, copy: OverviewCopy) {
   const work = affair.work;

@@ -26,7 +26,7 @@ it("renders approvals first, progress messages instead of files, and safe upcomi
   vi.mocked(apiJson).mockResolvedValue(view);
   show();
   await screen.findByRole("heading", { name: en.steward.foundation.decisions });
-  expect(screen.getAllByRole("heading").map(h => h.textContent)).toEqual(["Today", en.steward.foundation.decisions, approvalFixture().title, en.steward.overview.progress, en.steward.foundation.upcoming]);
+  expect(screen.getAllByRole("heading").map(h => h.textContent)).toEqual([en.steward.foundation.waiting.replace("{count}", "1"), en.steward.foundation.decisions, approvalFixture().title, en.steward.overview.progress, en.steward.foundation.upcoming]);
   expect(screen.getByText("比较已备好")).toBeVisible();
   expect(screen.getByText("加入富士比较")).toBeVisible();
   expect(screen.queryByText(/README.md/)).not.toBeInTheDocument();
@@ -38,7 +38,7 @@ it("renders approvals first, progress messages instead of files, and safe upcomi
 });
 it("shows the empty summary without obsolete sections", async () => {
   vi.mocked(apiJson).mockResolvedValue(emptyToday()); show();
-  expect(await screen.findByText(en.steward.foundation.clear)).toBeVisible();
+  expect(await screen.findByRole("heading", { level: 1, name: en.steward.foundation.clear })).toBeVisible();
   expect(screen.queryByRole("heading", { name: en.steward.foundation.decisions })).not.toBeInTheDocument();
 });
 it.each(["once", "always", "deny"] as const)("resolves %s with explicit scope", async action => {
@@ -73,7 +73,7 @@ it("shows plain summary fallback, current work and generic upcoming work", async
   vi.mocked(apiJson).mockResolvedValue(view);
   show();
   expect(await screen.findByText("Read the result")).toBeVisible();
-  expect(screen.getByRole("status")).toHaveTextContent(en.steward.affairCenter.queued.replace("{label}", "Compare"));
+  expect(screen.getByRole("status")).toHaveTextContent(en.steward.affairCenter.queuedPill);
   expect(screen.getByText(new RegExp(en.steward.affairCenter.followUp))).toBeVisible();
   expect(screen.queryByText(/Updated 0 pages/)).not.toBeInTheDocument();
 });

@@ -1,6 +1,7 @@
 {
   "steward": {
-     "overview": { "working": "Chrona is working on {count} affairs", "progressSummary": "{count} affairs made progress this week", "progress": "Progress", "pages": "Updated {count} pages", "earlier": "Earlier", "work": "Chrona handles this", "todayPage": "Today's page" },
+     "overview": { "working": "Chrona is working on {count} affairs", "upcomingPart": "{count} arrangements coming up", "separator": ", ", "end": ".", "progressSummary": "{count} affairs made progress this week",
+      "activitySummary": "{progress} affairs made progress this week; {upcoming} arrangements are coming up.", "progress": "Progress", "pages": "Updated {count} pages", "earlier": "Earlier", "work": "Chrona handles this", "todayPage": "Today's page" },
     "affairCenter": { "alsoUpdated": "Updated ", "now": "Where things stand",
       "supplement": "Add",
       "supplementHint": "Add information or change direction",

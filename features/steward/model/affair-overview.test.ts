@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import zh from "../../../packages/i18n/src/messages/zh.json";
-import { affairOverview, plainSummary, todaySummary } from "./affair-overview";
+import { affairOverview, plainSummary, todayDetail, todaySummary } from "./affair-overview";
 import { affairFixture, approvalFixture, emptyToday, fixtureTime } from "./fixtures";
 
 it.each([
@@ -32,4 +32,17 @@ it.each([
 });
 it("uses generic next work copy when label is null", () => {
   expect(affairOverview({ ...affairFixture(), nextSchedule: { mode: "wake", label: null, at: fixtureTime } }, "zh", zh.steward.affairCenter).next).toContain("下一次：Chrona 的后续工作 · ");
+});
+it.each([
+  [{ approvals: 1, working: 1, progress: 2, upcoming: 1 }, "Chrona 正在处理 1 件事，这周有 2 件事有进展，1 项安排临近。"],
+  [{ approvals: 0, working: 1, progress: 2, upcoming: 0 }, "这周有 2 件事有进展。"],
+  [{ approvals: 0, working: 0, progress: 1, upcoming: 1 }, "1 项安排临近。"],
+  [{ approvals: 0, working: 0, progress: 1, upcoming: 0 }, ""],
+])("today detail repeats nothing the headline said (%o)", (counts, expected) => {
+  const view = emptyToday();
+  view.approvals = Array.from({ length: counts.approvals }, approvalFixture);
+  view.progress = Array.from({ length: counts.progress }, (_, index) => ({ affair: { ...affairFixture(), id: `a${index}`, work: index < counts.working ? { state: "running" as const, since: fixtureTime, label: null } : null }, updates: [], changedPages: 0 }));
+  view.upcoming = Array.from({ length: counts.upcoming }, (_, index) => ({ scheduleId: `s${index}`, affairId: "a0", affairTitle: "A", mode: "remind" as const, label: "x", at: fixtureTime }));
+  const o = zh.steward.overview;
+  expect(todayDetail(view, { ...zh.steward.foundation, working: o.working, progress: o.progressSummary, upcoming: o.upcomingPart, separator: o.separator, end: o.end })).toBe(expected);
 });

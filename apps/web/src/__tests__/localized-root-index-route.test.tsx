@@ -33,7 +33,7 @@ afterEach(() => { cleanup(); router?.dispose(); vi.resetAllMocks(); });
 describe("steward routes and shared shell", () => {
   it.each(["/en", "/en/today"])("shows Today at the localized root from %s", async path => {
     show(`${path}?filter=active#attention`);
-    expect(await screen.findByRole("heading", { name: en.steward.workspace.today })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1 })).toBeVisible();
     await waitFor(() => expect(router.state.location.pathname).toBe("/en"));
     expect(router.state.location.search).toBe("?filter=active");
     expect(router.state.location.hash).toBe("#attention");
