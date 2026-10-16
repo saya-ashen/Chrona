@@ -134,6 +134,28 @@ details.done summary { cursor: pointer; font-size: var(--t-sm); color: var(--ink
 details.tech summary { cursor: pointer; font-size: var(--t-sm); color: var(--ink-2); }
 .mono { font-family: var(--mono); font-size: var(--t-xs); }
 
+
+/* affair home (minimal entry) */
+.home { display: grid; gap: 20px; max-width: 760px; }
+.home .status { font-size: var(--t-lg); font-weight: 600; margin: 0; }
+.home .ctx { color: var(--ink-2); margin: 0; font-size: var(--t-sm); }
+.focus-h { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.focus-h h2 { font-size: var(--t-md); }
+.focus-h .count { margin-left: auto; }
+.bar-p { height: 4px; background: var(--muted); border-radius: 99px; overflow: hidden; margin: 0 14px 4px; }
+.bar-p i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+.task { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); font-size: var(--t-md); }
+.task:first-of-type { border-top: 0; }
+.task input { width: 16px; height: 16px; accent-color: var(--primary); }
+.task.done span { color: var(--ink-2); text-decoration: line-through; text-decoration-color: var(--line); }
+.task .min { margin-left: auto; font-size: var(--t-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.focus-a { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-top: 1px solid var(--line); }
+.facts { display: grid; gap: 6px; font-size: var(--t-sm); }
+.facts p { margin: 0; } .facts b { font-weight: 500; color: var(--ink-2); margin-right: 6px; }
+.more { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: var(--t-sm); }
+.more a::after { content: " ›"; color: var(--ink-2); }
+.back { font-size: var(--t-sm); }
+.page-v { display: grid; gap: 16px; max-width: 760px; }
 /* settings */
 .set { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start; }
 @media (max-width: 760px) { .set { grid-template-columns: 1fr; } .set nav { display: none; } }
@@ -384,15 +406,85 @@ details.tech summary { cursor: pointer; font-size: var(--t-sm); color: var(--ink
     </div>
   </section>
 
+
+  <!-- 事务首页：最小入口 -->
+  <section class="view" id="v-home" hidden>
+    <div class="home">
+      <div class="d-head">
+        <div class="top"><a href="#affairs">← 事务</a><span class="pill run">进行中</span>
+          <span class="ctl"><button class="btn ghost" type="button">暂停</button><button class="btn ghost" type="button">结束</button></span></div>
+        <h1>雅思10天冲刺</h1>
+      </div>
+      <div style="display:grid;gap:4px">
+        <p class="status">第 1 天 / 共 10 天：先录一次口语基线</p>
+        <p class="ctx">目标总分 7，单项不低于 6 · 口语是重点</p>
+      </div>
+
+      <div class="list">
+        <div class="focus-h"><h2>今天要做</h2><span class="count">2 / 6 · 约 4.5 小时</span></div>
+        <div class="bar-p"><i style="width:33%"></i></div>
+        <label class="task done"><input type="checkbox" checked><span>口语基线录音，不暂停不重来</span><span class="min">20′</span></label>
+        <label class="task done"><input type="checkbox" checked><span>回听并转写最卡的 60–90 秒</span><span class="min">25′</span></label>
+        <label class="task"><input type="checkbox"><span>Part 1 六题，换说法再答一轮</span><span class="min">25′</span></label>
+        <label class="task"><input type="checkbox"><span>听力两节 + 精听错句</span><span class="min">90′</span></label>
+        <label class="task"><input type="checkbox"><span>Task 2 限时写作 + 改写</span><span class="min">90′</span></label>
+        <label class="task"><input type="checkbox"><span>阅读一篇限时</span><span class="min">30′</span></label>
+        <div class="focus-a">
+          <button class="btn primary" type="button">上传录音或作文</button>
+          <button class="btn" type="button">今天做完了</button>
+          <a class="btn ghost" href="#page">题目和材料 ›</a>
+        </div>
+      </div>
+
+      <div class="list">
+        <div class="item stripe-warn">
+          <div class="item-top"><span class="item-title">考试是哪天？A 类还是 G 类？</span><span class="meta">影响第 9–10 天安排</span></div>
+          <div class="answer"><input placeholder="比如“11 月 1 日，A 类”"><button class="btn primary" type="button">回答</button></div>
+        </div>
+      </div>
+
+      <div class="facts">
+        <p><b>最近</b>昨晚 22:10 根据你的录音调整了第 2 天的口语题 · <a href="#page">看反馈</a></p>
+        <p><b>下一次</b>明天 09:00 提醒你开始第 2 天</p>
+      </div>
+
+      <div class="section">
+        <header><h2>更多</h2></header>
+        <nav class="more" aria-label="二级页面">
+          <a href="#page">今天的题目和材料</a><a href="#page">10 天总览</a><a href="#page">我的记录</a><a href="#page">方法说明</a><a href="#page">对话与历史</a>
+        </nav>
+      </div>
+    </div>
+  </section>
+
+  <!-- 二级页面：阅读视图 -->
+  <section class="view" id="v-page" hidden>
+    <div class="page-v">
+      <a class="back" href="#home">← 雅思10天冲刺</a>
+      <div class="result">
+        <div class="result-h"><h2>第 1 天 · 题目和材料</h2><span class="meta">今天 08:40 · <button class="btn ghost" type="button">编辑</button></span></div>
+        <div class="result-b">
+          <h4>口语 Part 1（约 4–5 分钟）</h4>
+          <ul><li>Do you work or are you a student?</li><li>What do you enjoy most about your work or studies?</li><li>When do you usually listen to music?</li></ul>
+          <h4>口语 Part 2（准备 1 分钟，说 1–2 分钟）</h4>
+          <p>Describe a skill you learned that was useful to you.</p>
+          <h4>听力材料</h4>
+          <p><a href="#page">剑桥雅思 18 Test 1 Section 1–2</a>（官方书，含原文）· <a href="#page">British Council 免费练习</a></p>
+          <h4>写作 Task 2</h4>
+          <p>Some people think schools should focus on practical skills rather than academic subjects…</p>
+        </div>
+      </div>
+    </div>
+  </section>
   <p class="note">原型：示例数据，仅用于评审页面结构。</p>
 </div>
 
 <script>
-const views = ["today", "affairs", "detail", "settings"];
+const views = ["today", "affairs", "detail", "home", "page", "settings"];
 function show() {
   const v = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
   for (const id of views) document.getElementById("v-" + id).hidden = id !== v;
-  const nav = v === "detail" ? "affairs" : v;
+  const nav = ["detail", "home", "page"].includes(v) ? "affairs" : v;
   document.querySelectorAll(".nav a").forEach(a => { if (a.dataset.v === nav) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
 }
 addEventListener("hashchange", () => { show(); scrollTo(0, 0); });
