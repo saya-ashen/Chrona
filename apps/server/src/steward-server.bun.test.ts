@@ -60,3 +60,10 @@ test("legacy routes and the disabled test seam are absent", async () => {
     expect((await app.request(`/api/${path}`, { headers: owner })).status).toBe(404);
   }
 });
+
+test.skipIf(!(await Bun.file("apps/web/dist/index.html").exists()))("unlocalized links keep their query and use the reader's language", async () => {
+  const app = await createServerApp();
+  const response = await app.request("/affairs/a1?path=trending.md", { headers: { "accept-language": "zh-CN,zh;q=0.9" } });
+  expect(response.status).toBe(302);
+  expect(response.headers.get("location")).toBe("/zh/affairs/a1?path=trending.md");
+});

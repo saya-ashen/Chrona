@@ -54,11 +54,6 @@ describe("steward routes and shared shell", () => {
     expect(screen.getByRole("link", { name: active })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("textbox", { name: en.steward.foundation.composer })).toBeVisible();
   });
-  it.each([["/affairs/camera?path=trending.md", "/affairs/camera", "?path=trending.md"], ["/settings", "/settings", ""]])("redirects the unlocalized link %s Chrona sends out", async (link, pathname, search) => {
-    show(link);
-    await waitFor(() => expect(router.state.location.pathname).toMatch(new RegExp(`^/[a-z]{2}(-[A-Za-z]+)?${pathname}$`)));
-    expect(router.state.location.search).toBe(search);
-  });
   it.each(["home", "dashboard", "schedule", "action-center", "goals", "tasks", "work", "connections", "delegations", "affairs/camera/results/2"])("does not expose legacy %s", async path => {
     show(`/en/${path}`);
     expect(await screen.findByRole("heading", { name: "404" })).toBeVisible();

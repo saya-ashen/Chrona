@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 
-import { defaultLocale, getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
+import { getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
 import {
@@ -132,12 +132,10 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
       const firstSegment = pathname.split("/").filter(Boolean)[0];
 
       if (!firstSegment || !hasLocale(firstSegment)) {
-        const locale = defaultLocale;
-
-        return c.redirect(
-          `/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}`,
-          302,
-        );
+        // Links Chrona sends out (QQ, notifications) carry no locale: keep the query (e.g. ?path=) and the reader's language.
+        const locale = getPreferredLocale(c.req.header("accept-language"));
+        const query = new URL(c.req.url).search;
+        return c.redirect(`/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}${query}`, 302);
       }
 
       // For example: /en, /en/settings, /zh/projects/123.
