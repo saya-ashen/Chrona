@@ -3,7 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import * as s from "@chrona/contracts/steward";
 import { createStewardService, StewardError, type StewardPorts, type StewardService } from "@chrona/engine";
-import { parsePanelBlocks } from "@chrona/domain/steward/markdown";
+import { declaredPanel } from "./steward-panel";
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 
 export type StewardRoutePorts = StewardPorts;
@@ -50,8 +50,8 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
     const input = s.panelEntrySchema.parse(await c.req.json());
     const files = await c.get("steward").affairs.files(c.req.param("id"));
     for (const node of await files.tree()) {
-      if (node.kind !== "file" || !node.path.endsWith(".md")) continue;
-      const panel = parsePanelBlocks((await files.read(node.path)).content).find(p => p.data === input.dataPath);
+      if (node.kind !== "file" || !/\.(md|ui\.json)$/.test(node.path)) continue;
+      const panel = declaredPanel((await files.read(node.path)).content, node.path, input.dataPath);
       if (panel) {
         try { return c.json(await files.appendPanelEntry(input.dataPath, panel.fields, input.values)); }
         catch (error) { if (error instanceof StewardError) throw error; throw new StewardError("invalid", "Invalid panel entry"); }

@@ -6,14 +6,16 @@ import type { Spec } from "@json-render/core";
 import { useI18n } from "@chrona/i18n";
 import { Button, Checkbox, MarkdownContent } from "@shared/ui";
 import type { StewardClient } from "../model/client";
-import { uiCatalog } from "@chrona/ui-catalog";
+import type { PanelBlock } from "@chrona/domain/steward/markdown";
+import { FilePanel } from "./file-panel";
+import { safeUiPath, uiCatalog } from "@chrona/ui-catalog";
 import { pageTasks, recordUiEvent } from "../model/ui-page";
 import { pageHref } from "../model/workspace";
 import { pageName } from "../model/affair-file";
 import { useStewardResource } from "../hooks/use-steward";
 import { ResourceStatus } from "./resource-status";
 
-type PageContext = { client: StewardClient; affairId: string; readOnly: boolean; refresh: () => void };
+type PageContext = { client: StewardClient; affairId: string; readOnly: boolean; refresh: () => void; path?: string };
 const Page = createContext<PageContext | null>(null);
 // json-render skips registry actions without a setState; Chrona actions never write page state.
 const keepState = () => {};
@@ -42,9 +44,26 @@ function TaskList({ props }: { props: { path: string; section: string | null; ti
     <ResourceStatus resource={file} />
     <ul className="grid">{tasks.map(task => <li key={task.line} className="flex min-w-0 items-start gap-2.5 border-t py-2 first:border-0">
       <Checkbox className="mt-1" aria-label={task.text} checked={task.checked} disabled={readOnly || pending} onCheckedChange={value => void toggle(task.line, value === true)} />
-      <span className={task.checked ? "text-muted-foreground line-through decoration-border" : ""}>{task.text}</span>
+      <TaskText text={task.text} checked={task.checked} />
     </li>)}</ul>
   </section>;
+}
+function TaskText({ text, checked }: { text: string; checked: boolean }) {
+  const { affairId } = usePage();
+  const { locale } = useI18n();
+  const navigate = useNavigate();
+  return <div className={checked ? "text-muted-foreground line-through decoration-border" : ""} onClick={event => {
+    const anchor = (event.target as HTMLElement).closest("a");
+    const href = anchor?.getAttribute("href");
+    if (href && safeUiPath(href) && !/^[a-z][a-z\d+.-]*:/i.test(href)) {
+      event.preventDefault();
+      navigate(pageHref(locale, affairId, decodeURI(href)));
+    }
+  }}><MarkdownContent>{text}</MarkdownContent></div>;
+}
+function Panel({ props }: { props: PanelBlock }) {
+  const { client, affairId, readOnly, path } = usePage();
+  return <FilePanel spec={props} client={client} affairId={affairId} readOnly={readOnly} onSubmit={() => recordUiEvent(client, affairId, { kind: "action", path: path ?? props.data, name: "panel" })} />;
 }
 function PageLink({ props }: { props: { label: string; path: string; hint: string | null } }) {
   const { affairId } = usePage();
@@ -105,7 +124,7 @@ export function GeneratedPage({ spec, client, affairId, readOnly, refresh, path 
     }
   }, [valid.success, path, client, affairId]);
   const { registry, handlers } = useMemo(() => defineRegistry(uiCatalog, {
-    components: { ...generic, TaskList, PageLink, Upload } as Components<typeof uiCatalog>,
+    components: { ...generic, TaskList, PageLink, Upload, Panel } as Components<typeof uiCatalog>,
     actions: {
       say: async params => { if (params && !readOnly) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "say" }); await client.chat({ affairId, text: params.text }); refresh(); } },
       open: async params => { if (params) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "open" }); navigate(pageHref(locale, affairId, params.path)); } },
@@ -115,7 +134,7 @@ export function GeneratedPage({ spec, client, affairId, readOnly, refresh, path 
   if (!valid.success) return <p role="alert">{valid.error?.issues[0]?.message ?? "Invalid page"}</p>;
   // Render the checked original: json-render 0.21's catalog.validate output drops elements' `on` bindings.
   const page = spec as Spec;
-  return <Page.Provider value={{ client, affairId, readOnly, refresh }}>
+  return <Page.Provider value={{ client, affairId, readOnly, refresh, path }}>
     <div className="min-w-0 text-[13px] [overflow-wrap:anywhere] [&_input]:h-8 [&_button[data-slot=button]]:h-8 [&_button[data-slot=button]]:rounded-md [&_button[data-slot=button]]:px-3 [&_button[data-slot=button]]:text-[13px] [&_[data-slot=card]]:gap-3 [&_[data-slot=card]]:py-3.5 [&_[data-slot=card-content]]:px-3.5 [&_[data-slot=card-header]]:px-3.5">
     <JSONUIProvider registry={registry} initialState={page.state ?? {}} handlers={handlers(() => keepState, () => state.current)}>
       <Renderer spec={page} registry={registry} />

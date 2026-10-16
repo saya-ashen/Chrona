@@ -68,6 +68,15 @@ test("UI event route requires owner, validates and isolates affairs", async () =
   const other = await service.forWorkspace("other").affairs.create({ title: "Private" });
   expect((await request(`/affairs/${other.id}/ui-event`, "POST", { path: "home.ui.json", kind: "open" })).status).toBe(404);
 });
+test("UI panel declarations append deterministic rows and reject undeclared paths", async () => {
+  const id = await affair(), base = `/affairs/${id}`;
+  const files = await service.forWorkspace("w").affairs.files(id);
+  const props = { title: "Weight", data: "records.csv", fields: [{ key: "weight", label: "Weight", type: "number" }], views: [{ kind: "table", columns: ["weight"] }] };
+  await files.save("pages/daily.ui.json", JSON.stringify({ root: "panel", elements: { panel: { type: "Panel", props } } }), null);
+  expect((await request(`${base}/panel-entry`, "POST", { dataPath: "records.csv", values: { weight: 70 } })).status).toBe(200);
+  expect((await files.read("records.csv")).content).toBe("weight\n70\n");
+  expect((await request(`${base}/panel-entry`, "POST", { dataPath: "undeclared.csv", values: { weight: 70 } })).status).toBe(404);
+});
 test("schedule and approval lifecycle errors", async () => {
   const id = await affair();
   const response = await request(`/affairs/${id}/schedules`, "POST", { mode: "remind", rule: { kind: "daily", time: "09:00" }, text: "Remember" });

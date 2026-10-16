@@ -2,10 +2,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { I18nProvider } from "@chrona/i18n/react";
 import en from "../../../packages/i18n/src/messages/en.json";
-import type { StewardClient } from "../model/client";
+import { StewardClientError, type StewardClient } from "../model/client";
 import { GeneratedPage } from "./generated-page";
 
 afterEach(cleanup);
@@ -52,6 +52,32 @@ it("toggles TaskList source lines and records the task path", async () => {
   await userEvent.click(await screen.findByRole("checkbox", { name: "Practice" }));
   expect(toggleCheckbox).toHaveBeenCalledWith("a1", { path: "day-1.md", line: 2, checked: true, baseRevision: "r1" });
   await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { path: "day-1.md", kind: "toggle" }));
+});
+it.each([[false, "existing"], [true, "existing"], [false, "missing"]] as const)("renders a deterministic Panel (readOnly=%s, data file %s)", async (readOnly, data) => {
+  const file = data === "existing" ? vi.fn().mockResolvedValue({ content: "weight\n", revision: "r1" }) : vi.fn().mockRejectedValue(new StewardClientError("requestError", 404));
+  const addPanelEntry = vi.fn().mockResolvedValue({});
+  const uiEvent = vi.fn().mockResolvedValue({ ok: true });
+  const client = { file, addPanelEntry, uiEvent } as unknown as StewardClient;
+  const props = { title: "Daily weight", data: "records.csv", fields: [{ key: "weight", label: "Weight", type: "number", required: true }], views: [{ kind: "table", columns: ["weight"] }] };
+  const page = { root: "panel", elements: { panel: { type: "Panel", props, children: [] } } };
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} path="home.ui.json" client={client} affairId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  const input = await screen.findByLabelText("Weight");
+  if (readOnly) { expect(input).toBeDisabled(); expect(addPanelEntry).not.toHaveBeenCalled(); return; }
+  await userEvent.type(input, "70");
+  await userEvent.click(screen.getByRole("button", { name: en.steward.panel.add }));
+  await waitFor(() => expect(addPanelEntry).toHaveBeenCalledWith("a1", { dataPath: "records.csv", values: { weight: 70 } }));
+  expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "action", name: "panel", path: "home.ui.json" });
+});
+function Location() { const location = useLocation(); return <output aria-label="location">{location.pathname}{location.search}</output>; }
+it("renders TaskList Markdown links and bold", async () => {
+  const client = { file: vi.fn().mockResolvedValue({ content: "- [ ] 按[诊断材料](01-口语诊断材料.md)完成 **练习** [source](https://example.com)", revision: "r1" }) } as unknown as StewardClient;
+  const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", section: null, title: null, showProgress: false }, children: [] } } };
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /><Location /></I18nProvider></MemoryRouter>);
+  const link = await screen.findByRole("link", { name: "诊断材料" });
+  await userEvent.click(link);
+  expect(screen.getByLabelText("location")).toHaveTextContent(`/en/affairs/a1?${new URLSearchParams({ path: "01-口语诊断材料.md" })}`);
+  expect(screen.getByRole("link", { name: "source" })).toHaveAttribute("href", "https://example.com");
+  expect(screen.getByText("练习").tagName).toBe("STRONG");
 });
 it("does not act on an ended affair and rejects specs outside the catalog", async () => {
   const chat = setup(spec({ press: { action: "say", params: { text: "done" } } }), true);

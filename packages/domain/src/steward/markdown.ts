@@ -10,14 +10,12 @@ export function toggleCheckbox(content: string, line: number, checked: boolean):
   return lines.join("\n");
 }
 
+export const panelSpecSchema = toolSpecSchema.safeExtend({
+  data: affairPathSchema.endsWith(".csv").regex(/^[^\\]*$/, "面板数据必须是相对 CSV 路径"),
+});
 export type PanelBlock = ToolSpec & { data: string };
 function parsePanelBody(body: string[]): PanelBlock {
-  const raw: unknown = JSON.parse(body.join("\n"));
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("无效面板");
-  const { data, ...spec } = raw as Record<string, unknown>;
-  const path = affairPathSchema.parse(data);
-  if (!path.endsWith(".csv") || path.includes("\\")) throw new Error("面板数据必须是相对 CSV 路径");
-  return { ...toolSpecSchema.parse(spec), data: path };
+  return panelSpecSchema.parse(JSON.parse(body.join("\n")));
 }
 /** Invalid/unclosed panel declarations fail explicitly rather than silently hiding data. */
 export function parsePanelBlocks(content: string): PanelBlock[] {

@@ -22,6 +22,10 @@ test.each([
   { root: "x", elements: { x: { type: "Script", props: {} } } },
   null,
 ])("rejects malformed structure %#", input => { expect(checkUiSpec(input).ok).toBe(false); });
+test.each(["records.csv", "records.md", "../records.csv", "a\\\\records.csv"])("validates Panel data %s", data => {
+  const props = { title: "Weight", data, fields: [{ key: "weight", label: "Weight", type: "number" }], views: [{ kind: "table", columns: ["weight"] }] };
+  expect(checkUiSpec({ root: "panel", elements: { panel: { type: "Panel", props, children: [] } } }).ok).toBe(data === "records.csv");
+});
 test("guide includes preferences, usage, and tool-only save rule", () => {
   const guide = uiGuide(["Keep it short"], ["Page opened: home.ui.json: 3"]);
   expect(guide).toContain("User preference: Keep it short");

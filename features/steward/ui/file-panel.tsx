@@ -8,17 +8,17 @@ import { ResourceStatus, MutationStatus } from "./resource-status";
 import { Section, Surface } from "./layout";
 
 /** The existing panel form/table/trend composition, backed by an affair CSV rather than a tool. */
-export function FilePanel({ spec, client, affairId }: { spec: PanelBlock; client: StewardClient; affairId: string }) {
+export function FilePanel({ spec, client, affairId, readOnly = false, onSubmit }: { spec: PanelBlock; client: StewardClient; affairId: string; readOnly?: boolean; onSubmit?: () => void }) {
   const c = useI18n().messages.steward.panel;
   const f = useFilePanel(client, affairId, spec);
   return <Section title={spec.title}>
     {spec.description && <p>{spec.description}</p>}
     <ResourceStatus resource={f.resource} />
     {f.parsed.invalid ? <p role="alert">{c.invalid}</p> : f.resource.data && <>
-      <Surface><form className="p-4" onSubmit={event => { event.preventDefault(); void f.save(); }}>
-        <fieldset disabled={f.mutation.pending} className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <Surface><form className="p-4" onSubmit={event => { event.preventDefault(); if (!readOnly) { onSubmit?.(); void f.save(); } }}>
+        <fieldset disabled={readOnly || f.mutation.pending} className="grid min-w-0 gap-3 sm:grid-cols-2">
           {spec.fields.map(field => <label key={field.key} className="grid min-w-0 gap-1">{field.label}{field.required ? " *" : ""}
-            {field.type === "select" ? <Select value={f.values[field.key]} onValueChange={value => f.setValues({ ...f.values, [field.key]: value })} disabled={f.mutation.pending}>
+            {field.type === "select" ? <Select value={f.values[field.key]} onValueChange={value => f.setValues({ ...f.values, [field.key]: value })} disabled={readOnly || f.mutation.pending}>
               <SelectTrigger aria-label={field.label}><SelectValue placeholder={c.choose} /></SelectTrigger><SelectContent>{field.options?.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
             </Select> : <Input aria-label={field.label} type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"} step="any" required={field.required} value={f.values[field.key] ?? ""} onChange={event => f.setValues({ ...f.values, [field.key]: event.target.value })} />}
           </label>)}

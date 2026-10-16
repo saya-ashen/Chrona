@@ -2,6 +2,7 @@ import { compileSpecStream, validateSpec, type Spec, defineCatalog } from "@json
 import { schema } from "@json-render/react/schema";
 import { shadcnComponentDefinitions as shadcn } from "@json-render/shadcn/catalog";
 import { z } from "zod";
+import { panelSpecSchema } from "@chrona/domain/steward/markdown";
 
 /**
  * Building blocks the Provider composes affair pages from at runtime (json-render).
@@ -23,6 +24,10 @@ const affairPath = z.string().min(1).max(500).describe("Path of a file inside th
 export const uiCatalog = defineCatalog(schema, {
   components: {
     ...generic,
+    Panel: {
+      props: panelSpecSchema,
+      description: "For values the user records repeatedly (weight, sleep, spending): the form appends a row immediately without asking Chrona, and shows recent rows and a trend.",
+    },
     TaskList: {
       props: z.object({
         path: affairPath.describe("Markdown page holding the `- [ ]` items; ticking writes back to it"),
@@ -69,8 +74,12 @@ export function checkUiSpec(spec: unknown): { ok: boolean; issues: string[] } {
   if (shape.success) {
     issues.push(...validateSpec(shape.data as Spec).issues.map(issue => `${issue.elementKey ?? "spec"}: ${issue.message}`));
     for (const [id, element] of Object.entries(shape.data.elements)) {
-      const key = element.type === "Upload" ? "folder" : "path";
-      if (["TaskList", "PageLink", "Upload"].includes(element.type) && !safeUiPath(element.props[key])) issues.push(`${id}: ${key} must be a safe affair-relative path`);
+      if (element.type === "Panel") {
+        const panel = panelSpecSchema.safeParse(element.props);
+        if (!panel.success) issues.push(...panel.error.issues.map(issue => `${id}.${issue.path.join(".")}: ${issue.message}`));
+      }
+      const key = element.type === "Panel" ? "data" : element.type === "Upload" ? "folder" : "path";
+      if (["TaskList", "PageLink", "Upload", "Panel"].includes(element.type) && !safeUiPath(element.props[key])) issues.push(`${id}: ${key} must be a safe affair-relative path`);
     }
   }
   return { ok: issues.length === 0, issues };
@@ -87,7 +96,8 @@ export const uiRules = [
   "If they asked to see or read something (a list, ranking, comparison, answer, digest), the content itself is the entry: render it fully with fitting components (Table, Cards in a Grid, Text), not a link to it. If they carry something out over time, lead with what to do now.",
   "Use second-level pages (PageLink) only for material that is long and only occasionally needed, such as history, methodology or raw notes. Never hide the main content behind a link.",
   "Chrona already shows the affair title, its state and pause/end controls above the page: do not repeat the title.",
-  "Keep it scannable: no disclaimers, no restating the request, no filler. Put what matters most first.",
+  "Keep it scannable: no disclaimers, no restating the request, no filler. Put what matters most first: the conclusion or the next step, then the detail. On a phone the page is read top to bottom; detail that only some readers need (full comparison tables, measurement caveats, method) goes inside Collapsible or Tabs, or on a second-level page.",
+  "For values the user records repeatedly, use Panel: entries are saved at once and shown with a trend, without asking Chrona.",
   "Use TaskList for anything the user ticks off, pointing at the Markdown page that holds the items; never copy checklist items into Text.",
   "When an answer from the user is needed, give it an Input bound to state and a Button whose say action sends it.",
   "Use only real content from this affair (its files, conversation and schedules). Never invent sample data.",
