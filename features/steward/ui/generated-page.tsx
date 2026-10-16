@@ -4,7 +4,7 @@ import { JSONUIProvider, Renderer, defineRegistry, type Components } from "@json
 import { shadcnComponents as shadcn } from "@json-render/shadcn";
 import type { Spec } from "@json-render/core";
 import { useI18n } from "@chrona/i18n";
-import { Button, Checkbox } from "@shared/ui";
+import { Button, Checkbox, MarkdownContent } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { uiCatalog } from "@chrona/ui-catalog";
 import { pageTasks, recordUiEvent } from "../model/ui-page";
@@ -68,9 +68,27 @@ function Upload({ props }: { props: { label: string; folder: string; note: strin
   return <div><Button disabled={pending} onClick={() => input.current?.click()}>{props.label}</Button><input ref={input} type="file" multiple hidden aria-label={props.label} onChange={event => { void upload(Array.from(event.target.files ?? [])); event.target.value = ""; }} /></div>;
 }
 
+const textClass: Record<string, string> = { caption: "text-xs", muted: "text-sm text-muted-foreground", lead: "text-lg text-muted-foreground", code: "font-mono text-sm" };
+/** Text and table cells render Markdown so the Provider can link sources and keep line breaks. */
+function Text({ props }: { props: { text: string; variant?: string | null } }) {
+  return <MarkdownContent className={`min-w-0 [overflow-wrap:anywhere] ${textClass[props.variant ?? ""] ?? ""}`}>{keepLineBreaks(props.text)}</MarkdownContent>;
+}
+/** Providers write plain line breaks; Markdown would join them into one paragraph. */
+const keepLineBreaks = (text: string) => text.replace(/([^\n])\n(?!\n|\s*[-*+] |\s*\d+\. )/g, "$1  \n");
+function Table({ props }: { props: { columns: string[]; rows: string[][]; caption?: string | null } }) {
+  // Narrow screens: each row becomes a small card with column labels instead of a sideways-scrolling grid.
+  return <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-[10px] border bg-card [contain:inline-size]"><table className="w-full border-collapse text-sm max-sm:block">
+    {props.caption && <caption className="p-2 text-left text-xs text-muted-foreground max-sm:block">{props.caption}</caption>}
+    <thead className="max-sm:hidden"><tr>{props.columns.map((column, index) => <th key={index} scope="col" className="border-b px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground">{column}</th>)}</tr></thead>
+    <tbody className="max-sm:block">{props.rows.map((row, rowIndex) => <tr key={rowIndex} className="border-b last:border-0 max-sm:grid max-sm:gap-1 max-sm:px-3 max-sm:py-2.5">{row.map((cell, index) => <td key={index} className="px-3 py-2 align-top tabular-nums [overflow-wrap:anywhere] max-sm:flex max-sm:gap-2 max-sm:p-0 [&_p]:m-0">
+      <span aria-hidden="true" className="hidden shrink-0 text-xs text-muted-foreground max-sm:inline max-sm:min-w-16">{props.columns[index]}</span><MarkdownContent>{cell}</MarkdownContent>
+    </td>)}</tr>)}</tbody>
+  </table></div>;
+}
+
 const generic: Partial<Components<typeof uiCatalog>> = {
   Card: shadcn.Card, Stack: shadcn.Stack, Grid: shadcn.Grid, Separator: shadcn.Separator, Tabs: shadcn.Tabs, Accordion: shadcn.Accordion,
-  Collapsible: shadcn.Collapsible, Table: shadcn.Table, Heading: shadcn.Heading, Text: shadcn.Text, Badge: shadcn.Badge, Alert: shadcn.Alert,
+  Collapsible: shadcn.Collapsible, Table, Heading: shadcn.Heading, Text, Link: shadcn.Link, Badge: shadcn.Badge, Alert: shadcn.Alert,
   Progress: shadcn.Progress, Input: shadcn.Input, Textarea: shadcn.Textarea, Select: shadcn.Select, Radio: shadcn.Radio, Button: shadcn.Button,
 };
 

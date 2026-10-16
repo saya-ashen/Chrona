@@ -10,8 +10,11 @@ import { z } from "zod";
  */
 const generic = {
   Card: shadcn.Card, Stack: shadcn.Stack, Grid: shadcn.Grid, Separator: shadcn.Separator,
-  Tabs: shadcn.Tabs, Accordion: shadcn.Accordion, Collapsible: shadcn.Collapsible, Table: shadcn.Table,
-  Heading: shadcn.Heading, Text: shadcn.Text, Badge: shadcn.Badge, Alert: shadcn.Alert, Progress: shadcn.Progress,
+  Tabs: shadcn.Tabs, Accordion: shadcn.Accordion, Collapsible: shadcn.Collapsible,
+  Table: { ...shadcn.Table, description: `${shadcn.Table.description} Cells may contain Markdown links, e.g. [owner/repo](https://github.com/owner/repo).` },
+  Heading: shadcn.Heading,
+  Text: { ...shadcn.Text, description: `${shadcn.Text.description} Supports Markdown (links, bold, line breaks, lists).` },
+  Link: shadcn.Link, Badge: shadcn.Badge, Alert: shadcn.Alert, Progress: shadcn.Progress,
   Input: shadcn.Input, Textarea: shadcn.Textarea, Select: shadcn.Select, Radio: shadcn.Radio,
   Button: shadcn.Button,
 };
@@ -80,12 +83,13 @@ export function uiGuide(preferences: string[], usage: string[]): string {
 
 /** Page-design rules handed to the Provider together with the catalog. */
 export const uiRules = [
-  "This page is the affair's entry: show only what the user needs to handle now and can act on here. Everything else (plans, methods, materials, history) belongs on second-level pages reached via PageLink.",
+  "The entry page is what the user opens this affair for. Decide from the request and the current state what they came to see or do, and put that itself on the entry page, laid out so it is quick to scan and use.",
+  "If they asked to see or read something (a list, ranking, comparison, answer, digest), the content itself is the entry: render it fully with fitting components (Table, Cards in a Grid, Text), not a link to it. If they carry something out over time, lead with what to do now.",
+  "Use second-level pages (PageLink) only for material that is long and only occasionally needed, such as history, methodology or raw notes. Never hide the main content behind a link.",
   "Chrona already shows the affair title, its state and pause/end controls above the page: do not repeat the title.",
-  "Lead with one short status line. Then the few things to do, each one sentence; put durations or counts at the end of the line.",
-  "One primary action per area. No disclaimers, methodology or long paragraphs on the entry page.",
+  "Keep it scannable: no disclaimers, no restating the request, no filler. Put what matters most first.",
   "Use TaskList for anything the user ticks off, pointing at the Markdown page that holds the items; never copy checklist items into Text.",
-  "Ask at most 2–3 open questions, each with an Input bound to state and a Button whose say action sends the answer.",
+  "When an answer from the user is needed, give it an Input bound to state and a Button whose say action sends it.",
   "Use only real content from this affair (its files, conversation and schedules). Never invent sample data.",
   "Do not set className; layout comes from Stack, Grid and Card.",
   "Write in the user's language (default Chinese).",

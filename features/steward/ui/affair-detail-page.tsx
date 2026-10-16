@@ -40,7 +40,7 @@ function AffairContent({ detail, path, client, refresh }: ContentProps) {
       <AffairCenterHeader detail={detail} client={client} refresh={resource.refresh} />
       {composed && <>
         {!!model?.approvals.length && <Section title={messages.steward.foundation.decisions}><Surface>{model.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={client} refresh={resource.refresh} />)}</Surface></Section>}
-        <section aria-label={pageName(path)} className="min-w-0 max-w-[760px]"><ComposedPage key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} readOnly={detail.affair.status === "done"} /></section>
+        <section aria-label={pageName(path)} className="min-w-0"><ComposedPage key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} readOnly={detail.affair.status === "done"} /></section>
       </>}
       {/* A composed entry page is the whole first level; files, arrangements and history stay one click away. */}
       <AffairSecondLevel collapsed={composed} label={messages.steward.affairCenter.secondLevel}>

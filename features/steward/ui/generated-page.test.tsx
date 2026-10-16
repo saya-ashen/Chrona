@@ -61,3 +61,17 @@ it("does not act on an ended affair and rejects specs outside the catalog", asyn
   setup({ root: "x", elements: { x: { type: "Script", props: {}, children: [] } } });
   expect(screen.getByRole("alert")).toBeInTheDocument();
 });
+it("renders Markdown links in text and table cells, keeps line breaks, and labels cells for phones", () => {
+  setup({
+    root: "main",
+    elements: {
+      main: { type: "Stack", props: { direction: "vertical" }, children: ["text", "table"] },
+      text: { type: "Text", props: { text: "first line\nsecond [line](https://example.com/a)" }, children: [] },
+      table: { type: "Table", props: { columns: ["Repo", "Link"], rows: [["owner/repo", "[open](https://github.com/owner/repo)"]] }, children: [] },
+    },
+  });
+  expect(screen.getByRole("link", { name: "line" })).toHaveAttribute("href", "https://example.com/a");
+  expect(screen.getByRole("link", { name: "open" })).toHaveAttribute("href", "https://github.com/owner/repo");
+  expect(screen.getByText(/first line/).innerHTML).toContain("<br");
+  expect(screen.getByRole("columnheader", { name: "Repo" })).toBeInTheDocument();
+});
