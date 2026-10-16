@@ -12,11 +12,22 @@ test("question → workspace plan → checkbox → edit/history/revert → setti
   await composer.fill("帮我做十天学习规划");
   await composer.press("Enter");
   await expect(page.getByText("已建好规划", { exact: true })).toBeVisible();
+  await expect(page.getByText("今天的练习已经准备好", { exact: true })).toBeVisible();
   const navigation = page.getByRole("navigation", { name: zh.steward.shell.navigation });
   await navigation.getByRole("link", { name: "事务", exact: true }).click();
   // Today also links the affair (progress and upcoming); wait for the list page itself.
   await expect(page.getByRole("heading", { level: 1, name: "事务", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "十天学习规划", exact: true }).click();
+  await expect(page.getByText("今天从第一天练习开始", { exact: true })).toBeVisible();
+  const task = page.getByRole("checkbox", { name: "完成第一天练习" });
+  await task.check();
+  await expect(task).toBeEnabled();
+  await page.reload();
+  await expect(task).toBeChecked();
+  const said = page.waitForResponse(response => response.url().includes("/api/steward/chat?") && response.request().postDataJSON()?.text === "今天做完了");
+  await page.getByRole("button", { name: "今天做完了", exact: true }).click();
+  expect((await said).ok()).toBe(true);
+  await page.getByRole("link", { name: /学习规划/ }).click();
   await expect(page.getByRole("heading", { name: "学习规划", exact: true })).toBeVisible();
   const pages = page.getByRole("navigation", { name: zh.steward.affairFile.pages });
   // Narrow screens keep the page list collapsed above the content.

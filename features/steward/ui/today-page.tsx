@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { TodayView } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n";
+import { GeneratedPage } from "./generated-page";
 import { Badge } from "@shared/ui";
 import { PageColumn, Section, Surface } from "./layout";
 import { ApprovalItem } from "./approval-item";
@@ -12,6 +13,7 @@ import { formatShortDateTime } from "../model/format";
 
 function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
   const { messages, locale } = useI18n();
+  const { today } = useStewardSession();
   const copy = messages.steward.overview;
   const c = messages.steward.affairCenter;
   const model = affairOverview(item.affair, locale, c);
@@ -24,9 +26,11 @@ function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
       {pill && <Badge role={affair.work ? "status" : undefined} variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${progressPillClass(affair)}`}>{pill}</Badge>}
       <time className="ml-auto text-xs text-muted-foreground tabular-nums" dateTime={affair.lastActivityAt}>{model.updatedAt}</time>
     </div>
+    {item.card ? <GeneratedPage spec={item.card} client={today.client} affairId={affair.id} readOnly={affair.status === "done"} refresh={today.refresh} /> : <>
     {newest ? <><p className="font-medium">{plainSummary(newest.title)}</p><p className="line-clamp-3 max-w-[72ch] text-[13px] text-muted-foreground">{plainSummary(newest.body)}</p></> : <p className="line-clamp-3 text-[13px] text-muted-foreground">{model.summary}</p>}
     {(item.changedPages > 0 || model.next) && <p className="text-xs text-muted-foreground">{progressDetail(item.changedPages, model.next, copy.pages)}</p>}
     {older.length > 0 && <details className="text-[13px] text-muted-foreground"><summary className="cursor-pointer">{copy.earlier}</summary><div className="grid gap-3 pt-2">{older.map((update, index) => <div key={`${update.at}-${index}`}><p className="font-medium">{plainSummary(update.title)}</p><p>{plainSummary(update.body)}</p><time className="text-xs" dateTime={update.at}>{formatShortDateTime(update.at, locale)}</time></div>)}</div></details>}
+    </>}
   </article>;
 }
 export function TodayPage() {

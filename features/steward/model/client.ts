@@ -47,6 +47,7 @@ export function createStewardClient(workspaceId: string) {
     return request(path, outputSchema, { method, body: parsed.data });
   }
   return {
+    uiEvent: (affairId: string, input: z.input<typeof c.uiEventSchema>) => mutate(`/affairs/${id(affairId)}/ui-event`, c.uiEventSchema, z.object({ ok: z.literal(true) }).strict(), input),
     today: (signal?: AbortSignal) => request("/today", c.todayViewSchema, { signal }),
     health: (signal?: AbortSignal) => request("/health", c.healthSchema, { signal }),
     chat: (input: z.input<typeof c.chatInputSchema>) => mutate("/chat", c.chatInputSchema, c.chatReplySchema, input),

@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { I18nProvider } from "@chrona/i18n/react";
 import en from "../../../packages/i18n/src/messages/en.json";
@@ -20,7 +21,7 @@ const spec = (on: unknown, extra: Record<string, unknown> = {}) => ({
 });
 function setup(page: unknown, readOnly = false) {
   const chat = vi.fn(async () => ({ runId: null, messages: [] }));
-  const client = { chat } as unknown as StewardClient;
+  const client = { chat, uiEvent: vi.fn().mockResolvedValue({ ok: true }) } as unknown as StewardClient;
   render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
   return chat;
 }
@@ -29,6 +30,28 @@ it("sends the say action with state interpolated, linked to the affair", async (
   await userEvent.type(screen.getByLabelText("Answer"), "16/20");
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(chat).toHaveBeenCalledWith({ affairId: "a1", text: "Result: 16/20" }));
+});
+it("records open once even in StrictMode and records a say action without surfacing usage failures", async () => {
+  const uiEvent = vi.fn().mockRejectedValue(new Error("offline"));
+  const chat = vi.fn().mockResolvedValue({ runId: null, messages: [] });
+  const client = { uiEvent, chat } as unknown as StewardClient;
+  render(<StrictMode><MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={spec({ press: { action: "say", params: { text: "done" } } })} path="home.ui.json" client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter></StrictMode>);
+  await waitFor(() => expect(uiEvent).toHaveBeenCalledTimes(1));
+  expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "open", path: "home.ui.json" });
+  await userEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "action", path: "home.ui.json", name: "say" }));
+  expect(chat).toHaveBeenCalledWith({ affairId: "a1", text: "done" });
+});
+it("toggles TaskList source lines and records the task path", async () => {
+  const file = vi.fn().mockResolvedValue({ content: "# Day\n- [ ] Practice", revision: "r1" });
+  const toggleCheckbox = vi.fn().mockResolvedValue({});
+  const uiEvent = vi.fn().mockResolvedValue({ ok: true });
+  const client = { file, toggleCheckbox, uiEvent } as unknown as StewardClient;
+  const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day-1.md", section: null, title: "Today", showProgress: true }, children: [] } } };
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  await userEvent.click(await screen.findByRole("checkbox", { name: "Practice" }));
+  expect(toggleCheckbox).toHaveBeenCalledWith("a1", { path: "day-1.md", line: 2, checked: true, baseRevision: "r1" });
+  await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { path: "day-1.md", kind: "toggle" }));
 });
 it("does not act on an ended affair and rejects specs outside the catalog", async () => {
   const chat = setup(spec({ press: { action: "say", params: { text: "done" } } }), true);

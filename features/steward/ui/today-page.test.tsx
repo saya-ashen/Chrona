@@ -36,6 +36,15 @@ it("renders approvals first, progress messages instead of files, and safe upcomi
   expect(screen.getByText("Older update")).toBeVisible();
   expect(screen.getByText(en.steward.workspace.healthy)).toBeVisible();
 });
+it("uses the Provider card instead of the fallback body, without feedback chrome", async () => {
+  const view = todayFixture();
+  view.progress[0]!.card = { root: "status", elements: { status: { type: "Text", props: { text: "Ready for today's practice" }, children: [] } } };
+  vi.mocked(apiJson).mockResolvedValue(view);
+  show();
+  expect(await screen.findByText("Ready for today's practice")).toBeVisible();
+  expect(screen.queryByText("比较已备好")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: en.steward.generatedPage.feedback })).not.toBeInTheDocument();
+});
 it("shows the empty summary without obsolete sections", async () => {
   vi.mocked(apiJson).mockResolvedValue(emptyToday()); show();
   expect(await screen.findByRole("heading", { level: 1, name: en.steward.foundation.clear })).toBeVisible();

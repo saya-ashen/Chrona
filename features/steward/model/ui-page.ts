@@ -1,3 +1,5 @@
+import type { UiEvent } from "@chrona/contracts";
+import type { StewardClient } from "./client";
 import { markdownParts } from "./affair-file";
 
 export type PageTask = { line: number; text: string; checked: boolean };
@@ -12,7 +14,12 @@ export function pageTasks(content: string, section: string | null): PageTask[] {
   const inside = (line: number) => line > start + 1 && (end < 0 || line <= end);
   return pageTasks(content, null).filter(task => inside(task.line));
 }
-/** The page an affair opens on: a root `*.ui.json` the Provider composed, else README. */
-export function entryPath(files: { path: string; kind: string }[]) {
-  return files.find(file => file.kind === "file" && !file.path.includes("/") && file.path.endsWith(".ui.json"))?.path ?? "README.md";
+/** Explicit navigation wins over the Provider-selected entry. */
+export function selectedPage(entry: string | undefined, path: string | null) {
+  return path || entry || "README.md";
+}
+
+/** Usage is best-effort and must never interfere with the user's action. */
+export function recordUiEvent(client: StewardClient, affairId: string, input: UiEvent) {
+  void Promise.resolve().then(() => client.uiEvent(affairId, input)).catch(() => {});
 }

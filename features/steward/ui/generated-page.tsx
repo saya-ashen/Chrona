@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { JSONUIProvider, Renderer, defineRegistry, type Components } from "@json-render/react";
 import { shadcnComponents as shadcn } from "@json-render/shadcn";
@@ -7,7 +7,7 @@ import { useI18n } from "@chrona/i18n";
 import { Button, Checkbox } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { uiCatalog } from "@chrona/ui-catalog";
-import { pageTasks } from "../model/ui-page";
+import { pageTasks, recordUiEvent } from "../model/ui-page";
 import { pageHref } from "../model/workspace";
 import { pageName } from "../model/affair-file";
 import { useStewardResource } from "../hooks/use-steward";
@@ -23,12 +23,18 @@ function TaskList({ props }: { props: { path: string; section: string | null; ti
   const { client, affairId, readOnly } = usePage();
   const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, props.path, signal), [client, affairId, props.path]));
   const [pending, setPending] = useState(false);
-  const tasks = file.data ? pageTasks(file.data.content, props.section) : [];
+  // Show the tick at once; the page file stays the source of truth once it is re-read.
+  const [optimistic, setOptimistic] = useState<Record<number, boolean>>({});
+  useEffect(() => setOptimistic({}), [file.data]);
+  const tasks = file.data ? pageTasks(file.data.content, props.section).map(task => ({ ...task, checked: optimistic[task.line] ?? task.checked })) : [];
   const done = tasks.filter(task => task.checked).length;
   const toggle = async (line: number, checked: boolean) => {
     if (!file.data) return;
+    setOptimistic(previous => ({ ...previous, [line]: checked }));
     setPending(true);
-    try { await client.toggleCheckbox(affairId, { path: props.path, line, checked, baseRevision: file.data.revision }); file.refresh(); } finally { setPending(false); }
+    try { await client.toggleCheckbox(affairId, { path: props.path, line, checked, baseRevision: file.data.revision }); recordUiEvent(client, affairId, { kind: "toggle", path: props.path }); file.refresh(); }
+    catch { setOptimistic(({ [line]: _failed, ...rest }) => rest); }
+    finally { setPending(false); }
   };
   return <section className="grid min-w-0 gap-2" aria-label={props.title ?? pageName(props.path)}>
     {(props.title || props.showProgress) && <header className="flex items-baseline gap-2">{props.title && <h3 className="font-medium">{props.title}</h3>}{props.showProgress && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{done} / {tasks.length}</span>}</header>}
@@ -69,24 +75,33 @@ const generic: Partial<Components<typeof uiCatalog>> = {
 };
 
 /** Renders a page the Provider composed from the catalog (`*.ui.json`); actions go through Chrona. */
-export function GeneratedPage({ spec, client, affairId, readOnly, refresh }: PageContext & { spec: unknown }) {
+export function GeneratedPage({ spec, client, affairId, readOnly, refresh, path }: PageContext & { spec: unknown; path?: string }) {
   const { locale } = useI18n();
   const navigate = useNavigate();
   const valid = uiCatalog.validate(spec);
+  const opened = useRef(false);
+  useEffect(() => {
+    if (valid.success && path && !opened.current) {
+      opened.current = true;
+      recordUiEvent(client, affairId, { kind: "open", path });
+    }
+  }, [valid.success, path, client, affairId]);
   const { registry, handlers } = useMemo(() => defineRegistry(uiCatalog, {
     components: { ...generic, TaskList, PageLink, Upload } as Components<typeof uiCatalog>,
     actions: {
-      say: async params => { if (params && !readOnly) { await client.chat({ affairId, text: params.text }); refresh(); } },
-      open: async params => { if (params) navigate(pageHref(locale, affairId, params.path)); },
+      say: async params => { if (params && !readOnly) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "say" }); await client.chat({ affairId, text: params.text }); refresh(); } },
+      open: async params => { if (params) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "open" }); navigate(pageHref(locale, affairId, params.path)); } },
     },
-  }), [client, affairId, readOnly, refresh, navigate, locale]);
+  }), [client, affairId, readOnly, refresh, navigate, locale, path]);
   const state = useRef<Record<string, unknown>>({});
   if (!valid.success) return <p role="alert">{valid.error?.issues[0]?.message ?? "Invalid page"}</p>;
   // Render the checked original: json-render 0.21's catalog.validate output drops elements' `on` bindings.
   const page = spec as Spec;
   return <Page.Provider value={{ client, affairId, readOnly, refresh }}>
+    <div className="min-w-0 text-[13px] [overflow-wrap:anywhere] [&_input]:h-8 [&_button[data-slot=button]]:h-8 [&_button[data-slot=button]]:rounded-md [&_button[data-slot=button]]:px-3 [&_button[data-slot=button]]:text-[13px] [&_[data-slot=card]]:gap-3 [&_[data-slot=card]]:py-3.5 [&_[data-slot=card-content]]:px-3.5 [&_[data-slot=card-header]]:px-3.5">
     <JSONUIProvider registry={registry} initialState={page.state ?? {}} handlers={handlers(() => keepState, () => state.current)}>
       <Renderer spec={page} registry={registry} />
     </JSONUIProvider>
+    </div>
   </Page.Provider>;
 }

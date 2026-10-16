@@ -1,4 +1,4 @@
-import { readUiCard } from "./ui";
+import { readUiCard } from "./ui-files";
 import { affairPathSchema, type Health, type TodayView } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { RecordContext } from "./affairs";

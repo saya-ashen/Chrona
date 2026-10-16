@@ -1,4 +1,4 @@
-import { uiEntry } from "./ui";
+import { uiEntry } from "./ui-files";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient, Affair as AffairRow } from "@chrona/db";
 import { activitySchema, createAffairSchema, updateAffairSchema, type AffairStatus } from "@chrona/contracts/steward";

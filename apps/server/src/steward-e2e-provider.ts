@@ -27,6 +27,18 @@ export function createStewardE2eProvider(port: number): ProviderAdapter {
             const process = Bun.spawn(["git", "-c", "user.name=Chrona", "-c", "user.email=chrona@local", ...args], { cwd, stdout: "ignore", stderr: "ignore" });
             if (await process.exited !== 0) throw new Error("E2E fixture commit failed");
           }
+          await call("chrona_ui_set", { affairId: affair.id, path: "home.ui.json", role: "entry", spec: {
+            root: "main", elements: {
+              main: { type: "Stack", props: { direction: "vertical", gap: "md" }, children: ["status", "tasks", "done", "plan"] },
+              status: { type: "Text", props: { text: "今天从第一天练习开始" }, children: [] },
+              tasks: { type: "TaskList", props: { path: "day-1.md", section: null, title: "今天要做", showProgress: true }, children: [] },
+              done: { type: "Button", props: { label: "今天做完了", variant: "primary" }, on: { press: { action: "say", params: { text: "今天做完了" } } }, children: [] },
+              plan: { type: "PageLink", props: { label: "学习规划", path: "README.md", hint: null }, children: [] },
+            },
+          } });
+          await call("chrona_ui_set", { affairId: affair.id, path: "card.ui.json", role: "card", spec: {
+            root: "status", elements: { status: { type: "Text", props: { text: "今天的练习已经准备好" }, children: [] } },
+          } });
           await call("chrona_schedule", { affairId: affair.id, mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习", label: "每日学习提醒" });
           await call("chrona_reply", { text: "已建好规划" });
         } else await call("chrona_reply", { text: "收到" });

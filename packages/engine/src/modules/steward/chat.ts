@@ -79,7 +79,7 @@ class ChatService {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments);
     const conversationKey = `chat:${input.channel}`;
     const prepared = await this.serial(`${input.workspaceId}:${conversationKey}`, () => this.prepareMessage(input, images, conversationKey));
-    if ("waiting" in prepared) void prepared.waiting?.catch(() => {});
+    if ("waiting" in prepared) void prepared.waiting.catch(() => {});
     return { ok: true };
   }
   private async previousResult(input: z.output<typeof inputSchema>, existing: MessageRow) {

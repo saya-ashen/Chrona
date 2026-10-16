@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { compileUiSpec, checkUiSpec, uiGuide } from "@chrona/ui-catalog";
-import { uiSummary, uiUsage } from "./ui";
+import { uiSummary } from "./ui-files";
+import { uiUsage } from "./ui";
 import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
