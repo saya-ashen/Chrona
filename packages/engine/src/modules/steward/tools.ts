@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { authenticateRun } from "./runs";
+import { authenticateRun, liveRuns } from "./runs";
 import { createAffairs, requireAffair } from "./affairs";
 import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
@@ -93,7 +93,39 @@ async function schedule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_schedule, raw), id = await scheduleAffairId(ctx, input.affairId);
   const pending = await gate(ctx, "schedule", { affairId: id }, { tool: ctx.tool, ...input, affairId: id });
   if (pending) return pending;
-  return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, command: input.command, until: input.until });
+  if (input.mode === "wake" && input.rule.kind === "at" && new Date(input.rule.at).getTime() <= ctx.now().getTime() + 60000) {
+    if (input.command !== undefined) throw new StewardError("invalid", "Only jobs accept commands");
+    const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
+    if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
+    // A run scheduling follow-up work for itself must get a new run, not an instruction to its own session.
+    const running = await ctx.db.run.findFirst({ where: { workspaceId: ctx.workspaceId, affairId: id, lane: "background", status: "running", id: { not: ctx.run.id } }, orderBy: { createdAt: "asc" } });
+    const handle = running && liveRuns.get(running.id);
+    let mergedId: string | null = null;
+    if (handle) {
+      try {
+        await handle.inject("Additional instruction for the work in progress (from the conversation): " + input.text);
+        mergedId = running.id;
+      } catch { /* Failed delivery falls back to a normal schedule. */ }
+    } else {
+      mergedId = await ctx.db.$transaction(async tx => {
+        const queued = await tx.run.findFirst({ where: { workspaceId: ctx.workspaceId, affairId: id, lane: "background", status: "queued" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+        if (!queued) {
+          // A due wake that has not fired yet becomes the same run: extend its instruction.
+          const due = await tx.schedule.findFirst({ where: { workspaceId: ctx.workspaceId, affairId: id, mode: "wake", status: "active", nextAt: { lte: new Date(ctx.now().getTime() + 60000) } }, orderBy: { nextAt: "asc" } });
+          if (!due || due.rule === null || (due.rule as { kind?: string }).kind !== "at") return null;
+          const extended = await tx.schedule.updateMany({ where: { id: due.id, status: "active", text: due.text }, data: { text: (due.text + "\n\nAdditional instruction added later: " + input.text).slice(0, 4000) } });
+          return extended.count ? due.id : null;
+        }
+        const updated = await tx.run.updateMany({ where: { id: queued.id, status: "queued", prompt: queued.prompt }, data: { prompt: queued.prompt + "\n\nAdditional instruction added later: " + input.text } });
+        return updated.count ? queued.id : null;
+      });
+    }
+    if (mergedId) {
+      await audit(ctx.db, { workspaceId: ctx.workspaceId, actor: "chrona", kind: "wake_merged", subjectId: mergedId, details: { affairId: id } });
+      return { merged: true, runId: mergedId, note: "Work on this affair is already running; the instruction was delivered to it. Do not schedule another wake." };
+    }
+  }
+  return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, label: input.label, command: input.command, until: input.until }, "chrona");
 }
 async function schedules(ctx: ToolContext, raw: unknown) {
   return ctx.schedules.list(await scheduleAffairId(ctx, parseInput(schemas.chrona_schedules, raw).affairId));

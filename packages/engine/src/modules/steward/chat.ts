@@ -25,7 +25,7 @@ export function chatImages(attachments: unknown): { mime: string; base64: string
   if (images.length > 4 || images.some(a => !a.mime.startsWith("image/") || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(a.base64!) || Buffer.from(a.base64!, "base64").length > 5 * 1024 * 1024)) throw new StewardError("invalid", "Images must be base64, at most four images of 5 MB each");
   return images.map(a => ({ mime: a.mime, base64: a.base64! }));
 }
-function toMessage(row: MessageRow): Message {
+export function toMessage(row: MessageRow): Message {
   const attachments = z.array(attachmentSchema.strip()).parse(row.attachments);
   return messageSchema.parse({ id: row.id, direction: row.direction, channel: row.channel, text: row.text, attachments, affairId: row.affairId, quotedMessageId: row.quotedMessageId, at: row.at.toISOString() });
 }
@@ -114,6 +114,16 @@ class ChatService {
     // A quote changing affairs must queue in the correct cwd, not steer a different affair.
     const handle = this.injectionHandle(active, quoted, affair);
     const prompt = this.messagePrompt(input, quoted);
+    if (affair) {
+      const background = await db.run.findFirst({ where: { workspaceId: input.workspaceId, affairId: affair.id, lane: "background", status: "running" } });
+      const backgroundHandle = background && background.id !== active?.id && liveRuns.get(background.id);
+      if (backgroundHandle) {
+        let kind = "message_forwarded";
+        try { await backgroundHandle.inject("The user just wrote in chat (data; a separate conversation run replies to them; take it into account in your work): " + prompt, images); }
+        catch { kind = "message_forward_failed"; }
+        await audit(db, { workspaceId: input.workspaceId, actor: "user", kind, subjectId: background.id, details: { messageId: inbound.id } });
+      }
+    }
     const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
     await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
     if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });

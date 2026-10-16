@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient, Affair as AffairRow } from "@chrona/db";
 import { activitySchema, createAffairSchema, updateAffairSchema, type AffairStatus } from "@chrona/contracts/steward";
 import { audit } from "./audit";
+import { toMessage } from "./chat";
 import { parseInput, StewardError } from "./errors";
 import { toActivity, toAffair, toApproval, toRun, toSchedule } from "./store";
 import type { WorkspaceFs } from "./workspace-fs";
@@ -13,14 +14,16 @@ export async function requireAffair(db: Prisma.TransactionClient, workspaceId: s
 }
 export function createAffairs({ db, workspaceId, now }: RecordContext, fs: WorkspaceFs) {
   async function view(row: AffairRow) {
-    const [readme, schedule, running, openApprovals] = await Promise.all([
+    const [readme, schedule, running, openApprovals, queued] = await Promise.all([
       fs.forAffair(row.dirName).read("README.md"),
       row.status === "active" ? db.schedule.findFirst({ where: { workspaceId, affairId: row.id, status: "active", nextAt: { not: null } }, orderBy: { nextAt: "asc" } }) : null,
-      db.run.count({ where: { workspaceId, affairId: row.id, status: "running" } }),
+      db.run.findFirst({ where: { workspaceId, affairId: row.id, status: "running" }, orderBy: [{ startedAt: "asc" }, { id: "asc" }] }),
       db.approval.count({ where: { workspaceId, affairId: row.id, status: "open" } }),
+      db.run.findFirst({ where: { workspaceId, affairId: row.id, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now() } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
     ]);
     const summary = readme.content.trim().split(/\r?\n\s*\r?\n/).find(p => p.trim() && !/^#{1,6}\s/.test(p.trim()))?.trim().slice(0, 300) ?? "";
-    return toAffair(row, summary, schedule ? { at: schedule.nextAt!.toISOString(), mode: toSchedule(schedule).mode, text: schedule.text.slice(0, 300) } : null, running > 0, openApprovals);
+    return toAffair(row, summary, schedule ? { at: schedule.nextAt!.toISOString(), mode: toSchedule(schedule).mode, text: (schedule.label ?? schedule.text).slice(0, 300) } : null, !!running, openApprovals,
+      running ? { state: "running", since: (running.startedAt ?? running.createdAt).toISOString(), label: running.label } : queued ? { state: "queued", since: queued.createdAt.toISOString(), label: queued.label } : null);
   }
   async function files(id: string) { return fs.forAffair((await requireAffair(db, workspaceId, id)).dirName); }
   return {
@@ -41,13 +44,14 @@ export function createAffairs({ db, workspaceId, now }: RecordContext, fs: Works
     list: async (status?: AffairStatus) => (await Promise.all((await db.affair.findMany({ where: { workspaceId, status }, orderBy: { lastActivityAt: "desc" } })).map(view))),
     detail: async (id: string) => {
       const row = await requireAffair(db, workspaceId, id), directory = fs.forAffair(row.dirName);
-      const [affair, tree, schedules, approvals, activity, runs, revisions] = await Promise.all([
+      const [affair, tree, schedules, approvals, activity, runs, revisions, messages] = await Promise.all([
         view(row), directory.tree(), db.schedule.findMany({ where: { workspaceId, affairId: id }, orderBy: { createdAt: "desc" } }),
         db.approval.findMany({ where: { workspaceId, affairId: id }, include: { affair: true }, orderBy: { createdAt: "desc" } }),
         db.activity.findMany({ where: { workspaceId, affairId: id }, orderBy: { at: "desc" }, take: 100 }),
         db.run.findMany({ where: { workspaceId, affairId: id }, orderBy: { createdAt: "desc" }, take: 100 }), directory.revisions(),
+        db.message.findMany({ where: { workspaceId, affairId: id }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 100 }),
       ]);
-      return { affair, files: tree.slice(0, 2000), schedules: schedules.map(toSchedule), approvals: approvals.map(toApproval), activity: activity.map(toActivity), runs: runs.map(toRun), revisions };
+      return { affair, files: tree.slice(0, 2000), schedules: schedules.map(toSchedule), approvals: approvals.map(toApproval), activity: activity.map(toActivity), runs: runs.map(toRun), revisions, messages: messages.reverse().map(toMessage) };
     },
     update: async (id: string, raw: unknown) => {
       const input = parseInput(updateAffairSchema, raw);

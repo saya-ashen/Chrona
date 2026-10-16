@@ -26,6 +26,28 @@ async function affair() { return api.affairs.create({ title: "Study", request: "
 async function approval(affairId?: string, action = "send_external_message") { return api.approvals.create({ affairId, action, title: "Send draft", detail: "Send this", preview: "Hello", payload: { to: "test@example.invalid", body: "Hello" } }); }
 async function notify(key: string, level: "now" | "digest" | "web" = "now", affairId?: string) { return api.notifications.enqueue({ dedupeKey: key, level, title: "Update", body: "Something changed", affairId }); }
 describe("workspace affairs", () => {
+  test("work prioritizes running then oldest eligible queue; detail bounds linked messages", async () => {
+    const a = await affair();
+    expect(a.work).toBeNull();
+    expect((await api.affairs.detail(a.id)).messages).toEqual([]);
+    await api.schedules.create(a.id, { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "Internal instruction", label: "Visible label" });
+    const deferred = await api.runs.enqueue({ affairId: a.id, lane: "background", trigger: "schedule", prompt: "Deferred" });
+    await db.run.update({ where: { id: deferred.id }, data: { leaseUntil: new Date(time.getTime() + 60000) } });
+    expect((await api.affairs.detail(a.id)).affair.work).toBeNull();
+    const queued = await api.runs.enqueue({ affairId: a.id, lane: "background", trigger: "schedule", prompt: "Work", label: "Work label" });
+    time = new Date(time.getTime() + 1000);
+    await api.runs.enqueue({ affairId: a.id, lane: "background", trigger: "schedule", prompt: "Later", label: "Later label" });
+    expect((await api.affairs.list())[0]!.work).toEqual({ state: "queued", since: queued.createdAt.toISOString(), label: "Work label" });
+    await api.runs.claimNext("background");
+    for (let i = 0; i < 105; i++) await db.message.create({ data: { workspaceId, affairId: a.id, channel: "in_app", direction: "in", conversationKey: i % 2 ? "one" : "two", text: `Message ${i}`, at: new Date(time.getTime() + i * 1000), attachments: [{ name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" }] } });
+    await db.message.create({ data: { workspaceId, channel: "in_app", direction: "in", conversationKey: "one", text: "Unlinked", at: time } });
+    const detail = affairDetailSchema.parse(await api.affairs.detail(a.id));
+    expect(detail.affair.work).toEqual({ state: "running", since: time.toISOString(), label: "Work label" });
+    expect(detail.affair.nextSchedule?.text).toBe("Visible label");
+    expect(detail.runs.find(r => r.id === queued.id)?.label).toBe("Work label");
+    expect(detail.messages.map(m => m.text)).toEqual(Array.from({ length: 100 }, (_, i) => `Message ${i + 5}`));
+    expect(detail.messages[0]!.attachments[0]).not.toHaveProperty("base64");
+  });
   test("README summary, bounded projection, filesystem ownership and detail", async () => {
     const a = await affair(); expect(a.summary).toBe("First paragraph.");
     const files = await api.affairs.files(a.id), readme = await files.read("README.md");

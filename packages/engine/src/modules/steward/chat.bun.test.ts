@@ -30,6 +30,22 @@ beforeEach(async () => {
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 
+for (const fails of [false, true]) test(`affair chat forwards to background work without failing chat: ${fails}`, async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  const background = await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Prepare" });
+  await api.runs.claimNext("background");
+  const forwarded: { text: string; images: unknown }[] = [];
+  liveRuns.set(background.id, { done: new Promise(() => {}), abort: async () => {}, inject: async (text, images) => { forwarded.push({ text, images }); if (fails) throw new Error("fake failure"); } });
+  const p = provider(), pending = send("New detail", { affairId: affair.id, attachments: [{ name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" }] });
+  const run = await p.started;
+  expect(forwarded).toEqual([{ text: "The user just wrote in chat (data; a separate conversation run replies to them; take it into account in your work): New detail", images: [{ mime: "image/png", base64: "YWJj" }] }]);
+  expect(await db.audit.count({ where: { kind: fails ? "message_forward_failed" : "message_forwarded", subjectId: background.id } })).toBe(1);
+  await service.tools.call(run.token, "chrona_reply", { text: "Noted" });
+  p.finish(success);
+  expect((await pending).messages.map(m => m.text)).toEqual(["Noted"]);
+  expect(await db.run.count({ where: { lane: "background" } })).toBe(1);
+});
+
 test("simple tools reply and persisted externalId dedupe (including new service)", async () => {
   const p = provider(), pending = send("hello", { externalId: "one" });
   const run = await p.started;

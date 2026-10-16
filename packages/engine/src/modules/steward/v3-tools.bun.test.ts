@@ -47,15 +47,15 @@ test("reply stores outbound and delivers; preferences and inbound are workspace 
 });
 test("root schedules require an affair, then resolve conversation focus", async () => {
   await expect(call("chrona_schedules")).rejects.toThrow("chrona_affair_create / chrona_focus");
-  await expect(call("chrona_schedule", { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "review" })).rejects.toThrow("then pass affairId");
+  await expect(call("chrona_schedule", { mode: "wake", label: "Review", rule: { kind: "every", minutes: 5 }, text: "review" })).rejects.toThrow("then pass affairId");
   const a = await call("chrona_affair_create", { title: "Study", readme: "# Study\n\nProgress" }) as { id: string; path: string };
   expect(a.path).not.toContain("/");
   expect((await service.forWorkspace(workspaceId).affairs.detail(a.id)).affair.summary).toBe("Progress");
   expect(await call("chrona_focus", { affairId: a.id })).toEqual({ affairId: a.id, path: a.path });
   expect((await db.audit.findFirstOrThrow({ where: { kind: "conversation_focus" } })).subjectId).toBe("in_app");
-  const input = { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "review" };
+  const input = { mode: "wake", label: "Review", rule: { kind: "every", minutes: 5 }, text: "review" };
   const s = await call("chrona_schedule", input) as { id: string };
-  expect(await call("chrona_schedules")).toMatchObject([{ id: s.id }]);
+  expect(await call("chrona_schedules")).toMatchObject([{ id: s.id, label: "Review", createdBy: "chrona" }]);
   const other = await service.forWorkspace(workspaceId).affairs.create({ title: "Other" });
   expect(await call("chrona_schedules", { affairId: other.id })).toEqual([]);
   await call("chrona_schedule_cancel", { scheduleId: s.id });
@@ -64,6 +64,59 @@ test("root schedules require an affair, then resolve conversation focus", async 
   await call("chrona_notify", { level: "digest", title: "Update", body: "Progress" });
   expect(await db.notification.count()).toBe(1);
 });
+for (const state of ["running", "queued", "none", "failed_inject"] as const) test(`immediate wake: ${state}`, async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  const injected: string[] = [];
+  const background = state === "none" ? null : await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Original", label: "Existing" });
+  if (background && state !== "queued") {
+    await api.runs.claimNext("background");
+    liveRuns.set(background.id, { done: new Promise(() => {}), abort: async () => {}, inject: async text => { if (state === "failed_inject") throw new Error("fake failure"); injected.push(text); } });
+  }
+  const result = await call("chrona_schedule", { affairId: affair.id, mode: "wake", label: "New work", rule: { kind: "at", at: ports.now().toISOString() }, text: "New instruction" });
+  if (state === "running" || state === "queued") {
+    expect(result).toMatchObject({ merged: true, runId: background!.id });
+    expect(await db.schedule.count()).toBe(0);
+    expect(await db.audit.count({ where: { kind: "wake_merged", subjectId: background!.id } })).toBe(1);
+    if (state === "running") expect(injected).toEqual(["Additional instruction for the work in progress (from the conversation): New instruction"]);
+    else expect((await db.run.findUniqueOrThrow({ where: { id: background!.id } })).prompt).toBe("Original\n\nAdditional instruction added later: New instruction");
+  } else {
+    expect(result).toMatchObject({ label: "New work", createdBy: "chrona" });
+    expect(await db.schedule.count()).toBe(1);
+  }
+});
+
+test("immediate wake extends a due wake that has not fired yet", async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  const input = { affairId: affair.id, mode: "wake", label: "Plan", rule: { kind: "at", at: ports.now().toISOString() } };
+  const first = await call("chrona_schedule", { ...input, text: "Write the plan" }) as { id: string };
+  expect(await call("chrona_schedule", { ...input, text: "Use the new target" })).toMatchObject({ merged: true, runId: first.id });
+  expect(await db.schedule.count()).toBe(1);
+  expect((await db.schedule.findUniqueOrThrow({ where: { id: first.id } })).text).toBe("Write the plan\n\nAdditional instruction added later: Use the new target");
+});
+test("a background run scheduling follow-up work for its own affair gets a new wake", async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Original" });
+  const own = (await api.runs.claimNext("background"))!;
+  const injected: string[] = [];
+  liveRuns.set(own.id, { done: new Promise(() => {}), abort: async () => {}, inject: async text => { injected.push(text); } });
+  const result = await service.tools.call(own.token, "chrona_schedule", { mode: "wake", label: "Continue", rule: { kind: "at", at: ports.now().toISOString() }, text: "Continue" });
+  expect(result).toMatchObject({ label: "Continue", createdBy: "chrona" });
+  expect(injected).toEqual([]);
+});
+test("merge is limited to immediate wakes and preserves validation and policy", async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  const background = await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Original" });
+  const input = { affairId: affair.id, mode: "wake", label: "Work", rule: { kind: "at", at: ports.now().toISOString() }, text: "Extra" };
+  await call("chrona_schedule", { ...input, rule: { kind: "at", at: new Date(ports.now().getTime() + 60001).toISOString() } });
+  await call("chrona_schedule", { ...input, mode: "remind" });
+  await expect(call("chrona_schedule", { ...input, command: "invalid" })).rejects.toMatchObject({ code: "invalid" });
+  await api.grants.create({ action: "schedule", mode: "never", scope: { kind: "affair", affairId: affair.id } });
+  await expect(call("chrona_schedule", input)).rejects.toMatchObject({ code: "forbidden" });
+  expect(await db.schedule.count()).toBe(2);
+  expect((await db.run.findUniqueOrThrow({ where: { id: background.id } })).prompt).toBe("Original");
+  expect(await db.audit.count({ where: { kind: "wake_merged" } })).toBe(0);
+});
+
 test("email stores exact payload and never sends before approval; owner resolve invokes seam only once", async () => {
   const connector = await db.connector.create({ data: { workspaceId, kind: "email", label: "fake", canSend: true } });
   const input = { connectorId: connector.id, to: ["recipient@example.invalid"], subject: "Subject", body: "Body", inReplyTo: "message-1" };

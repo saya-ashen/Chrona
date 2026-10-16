@@ -68,6 +68,7 @@ model Schedule {
   lastResult String?
   lastOutputHash String?
   failures Int @default(0)
+  label String?
   createdBy String
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -90,6 +91,7 @@ model Run {
   conversationKey String?
   prompt String
   summary String?
+  label String?
   cwd String
   toolCalls Json @default(dbgenerated("'[]'"))
   error String?

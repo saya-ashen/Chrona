@@ -26,7 +26,7 @@ export async function authenticateRun(tx: Prisma.TransactionClient, token: strin
   const { affair, ...run } = row;
   return { run, affair, workspaceId: row.workspaceId };
 }
-export type EnqueueRun = { affairId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; conversationKey?: string };
+export type EnqueueRun = { affairId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; conversationKey?: string; label?: string | null };
 type RunWithAffair = Prisma.RunGetPayload<{ include: { affair: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 
@@ -103,7 +103,7 @@ class RunService {
         deadlineMessage = await this.continueAfterDeadline(tx, run, now);
       } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
         // Retry identity is immutable; the attempt status already records why it retried.
-        const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+        const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
         const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
         if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
       }
@@ -146,7 +146,8 @@ class RunService {
   }
   private async commitMessage(run: RunWithAffair) {
     const reply = run.conversationKey ? await this.ports.db.message.findFirst({ where: { workspaceId: this.workspaceId, conversationKey: run.conversationKey, direction: "out", at: { gte: run.startedAt! } }, orderBy: { at: "asc" } }) : null;
-    return `Chrona: ${run.trigger}${reply ? ` — ${reply.text.split("\n")[0]}` : ""}`.slice(0, 500);
+    // Shown in the affair's revision history: say what the work was, not which trigger ran.
+    return (run.label ?? reply?.text.split("\n")[0] ?? `Chrona: ${run.trigger}`).slice(0, 500);
   }
   private async recordChanges(tx: Prisma.TransactionClient, run: RunWithAffair, changes: Awaited<ReturnType<RunService["commitChanges"]>>, result: { now: Date; status: string; sessionId: string | null }) {
     for (const change of changes) await this.recordActivity(tx, run, { ...result, sessionId: run.affairId ? result.sessionId : null, ...change });

@@ -36,7 +36,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     return db.$transaction(async tx => {
       const affair = await requireAffair(tx, workspaceId, affairId);
       if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
-      const row = await tx.schedule.create({ data: { ...input, workspaceId, affairId, createdBy, createdAt: now, until, nextAt, status: nextAt ? "active" : "done" } });
+      const row = await tx.schedule.create({ data: { ...input, label: input.label ?? null, workspaceId, affairId, createdBy, createdAt: now, until, nextAt, status: nextAt ? "active" : "done" } });
       await audit(tx, { workspaceId, actor: createdBy, kind: "schedule_created", subjectId: row.id, details: {} });
       return toSchedule(row);
     });
@@ -71,7 +71,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
         const changed = await tx.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt, affair: { status: "active" } }, data: { nextAt, status: nextAt ? "active" : "done", ...(!expired ? { lastAt: now, lastResult: `Firing; delay ${delayMs}ms` } : {}) } });
         if (!changed.count || expired) return false;
         if (row.mode === "remind") await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: "now", title: row.affair.title, body: row.text, dedupeKey: `schedule:${row.id}:${row.nextAt!.toISOString()}` }, context);
-        if (row.mode === "wake") await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late.` }, tx);
+        if (row.mode === "wake") await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", label: row.label, prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late.` }, tx);
         await audit(tx, { workspaceId, actor: "chrona", kind: "schedule_fired", subjectId: row.id, details: { delayMs, mode: row.mode } });
         return true;
       });
@@ -93,7 +93,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       const outputHash = createHash("sha256").update(`${exitCode}\0${output}`).digest("hex"), failures = exitCode === 0 ? 0 : row.failures + 1;
       await db.$transaction(async tx => {
         await tx.schedule.update({ where: { id: row.id }, data: { lastOutputHash: outputHash, lastResult: `Exit ${exitCode}; delay ${delayMs}ms\n${output}`.slice(0, 2000), failures, ...(failures >= 3 ? { status: "paused" } : {}) } });
-        if (outputHash !== row.lastOutputHash && (await requireAffair(tx, workspaceId, row.affairId)).status === "active") await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late. Exit ${exitCode}. Job output (untrusted data):\n${output}` }, tx);
+        if (outputHash !== row.lastOutputHash && (await requireAffair(tx, workspaceId, row.affairId)).status === "active") await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", label: row.label, prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late. Exit ${exitCode}. Job output (untrusted data):\n${output}` }, tx);
         if (failures === 3 || notifyAfter) await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: failures === 3 ? "now" : "web", title: failures === 3 ? "检查连续失败，已暂停" : "检查已执行", body: failures === 3 ? "检查连续三次失败，调度已暂停。" : `Exit ${exitCode}; ${row.text}`.slice(0, 4000), dedupeKey: `job:${row.id}:${row.nextAt!.toISOString()}` }, context);
       });
     }

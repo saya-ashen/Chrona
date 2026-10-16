@@ -1,0 +1,2 @@
+ALTER TABLE "Schedule" ADD COLUMN "label" TEXT;
+ALTER TABLE "Run" ADD COLUMN "label" TEXT;

@@ -20,9 +20,31 @@ const affair = () => api.affairs.create({ title: "Study", request: "Learn" });
 const at = () => ({ kind: "at", at: new Date(time.getTime() + 60000).toISOString() });
 const advance = (ms: number) => { time = new Date(time.getTime() + ms); };
 
+test("schedule-fired context uses latest linked conversation and lists background work", async () => {
+  const a = await affair();
+  await db.message.create({ data: { workspaceId, affairId: a.id, channel: "in_app", direction: "in", conversationKey: "old", text: "Old conversation", at: time } });
+  for (let i = 0; i < 25; i++) {
+    advance(1000);
+    await db.message.create({ data: { workspaceId, affairId: a.id, channel: "in_app", direction: "in", conversationKey: "latest", text: `Message ${i}`, at: time } });
+  }
+  const prompts: string[] = [];
+  ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start: input => {
+    prompts.push(input.prompt);
+    return { done: new Promise(() => {}), inject: async () => {}, abort: async () => {} };
+  } };
+  await api.schedules.create(a.id, { mode: "wake", rule: at(), label: "Prepare", text: "Work" });
+  advance(60000);
+  expect((await service.tick()).failures).toEqual([]);
+  expect(prompts).toHaveLength(1);
+  const context = JSON.parse(prompts[0]!.split("Context (data):\n")[1]!.split("\n\nTrigger:")[0]!);
+  expect(context.messages.map((m: { text: string }) => m.text)).toEqual(Array.from({ length: 20 }, (_, i) => `Message ${i + 5}`));
+  expect(context.backgroundWork).toEqual([{ affairId: a.id, state: "running", label: "Prepare", since: time.toISOString() }]);
+});
+
 test("schedule CRUD validates ownership, timezone, until, and one-shot missed reminder", async () => {
   const a = await affair();
   const daily = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "daily", time: "13:00" }, text: "Prepare" });
+  expect(daily.label).toBeNull();
   expect(daily.nextAt).toBe("2026-10-15T05:00:00.000Z");
   const ended = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "daily", time: "13:00" }, text: "Prepare", until: time.toISOString() });
   expect(ended.status).toBe("done");
@@ -40,10 +62,10 @@ test("schedule CRUD validates ownership, timezone, until, and one-shot missed re
 
 test("wake fires once after downtime, pauses with affair, expired until never fires", async () => {
   const a = await affair();
-  const s = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "Check progress" });
+  const s = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "every", minutes: 5 }, text: "Check progress", label: "Progress" });
   await api.schedules.create(a.id, { mode: "wake", rule: at(), until: new Date(time.getTime() + 120000).toISOString(), text: "Expired" });
   advance(3600000); expect(await api.schedules.fireDue()).toBe(1);
-  const run = await db.run.findFirstOrThrow(); expect(run.prompt).toContain("Check progress"); expect(run.prompt).toContain("3300000ms late");
+  const run = await db.run.findFirstOrThrow(); expect(run.label).toBe("Progress"); expect(run.prompt).toContain("Check progress"); expect(run.prompt).toContain("3300000ms late");
   expect((await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).nextAt).toEqual(new Date(time.getTime() + 300000));
   await api.affairs.update(a.id, { status: "paused" }); advance(3600000); expect(await api.schedules.fireDue()).toBe(0);
 });
@@ -51,9 +73,10 @@ test("wake fires once after downtime, pauses with affair, expired until never fi
 test("job output and exit changes wake; output capped; three failures pause and notify once", async () => {
   const a = await affair(); let output = "ok", exitCode = 0, calls = 0;
   ports.sandbox = { available: true, run: async input => { calls++; expect(input.cwd).toContain("affairs"); expect(input.timeoutMs).toBe(60000); return { output, exitCode }; } };
-  const s = await api.schedules.create(a.id, { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check", command: "fake" });
+  const s = await api.schedules.create(a.id, { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check", label: "Job check", command: "fake" });
   for (let i = 0; i < 2; i++) { advance(300000); await api.schedules.fireDue(); }
   expect(calls).toBe(2); expect(await db.run.count()).toBe(1);
+  expect((await db.run.findFirstOrThrow()).label).toBe("Job check");
   output = "x".repeat(100000); advance(300000); await api.schedules.fireDue();
   expect((await db.run.findMany()).some(r => r.prompt.length > 65536 && r.prompt.length < 66000)).toBe(true);
   exitCode = 1;

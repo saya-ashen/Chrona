@@ -95,6 +95,8 @@ export const scheduleSchema = z.object({
   /** Optional end: after this time the schedule stops. */
   until: iso.nullable(),
   status: z.enum(SCHEDULE_STATUSES), nextAt: iso.nullable(), lastAt: iso.nullable(), lastResult: z.string().max(2000).nullable(),
+  /** Short user-facing name shown on pages; `text` of a wake is an internal instruction and is never primary UI. */
+  label: z.string().max(80).nullable(),
   createdBy: z.enum(["user", "chrona"]), createdAt: iso,
 }).strict();
 
@@ -105,7 +107,10 @@ export const affairSchema = z.object({
   /** First paragraph of README.md, as written by the Provider. */
   summary: z.string().max(1000),
   nextSchedule: z.object({ at: iso, mode: z.enum(SCHEDULE_MODES), text: z.string().max(300) }).strict().nullable(),
-  running: z.boolean(), openApprovals: z.number().int().min(0),
+  running: z.boolean(),
+  /** Work Chrona is doing or about to do on this affair right now. */
+  work: z.object({ state: z.enum(["queued", "running"]), since: iso, label: z.string().max(80).nullable() }).strict().nullable(),
+  openApprovals: z.number().int().min(0),
   lastActivityAt: iso, createdAt: iso,
 }).strict();
 
@@ -125,6 +130,8 @@ export const runSchema = z.object({
   id, affairId: id.nullable(), lane: z.enum(RUN_LANES), trigger: z.enum(RUN_TRIGGERS), status: z.enum(RUN_STATUSES),
   provider: short, toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean() }).strict()).max(200),
   error: z.string().max(1000).nullable(), startedAt: iso.nullable(), endedAt: iso.nullable(), createdAt: iso,
+  /** Short user-facing description (from the schedule that started it); null for conversation runs. */
+  label: z.string().max(80).nullable(),
 }).strict();
 
 export const attachmentSchema = z.object({ name: short, path: affairPathSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
@@ -219,6 +226,8 @@ export const todayViewSchema = z.object({
 export const affairDetailSchema = z.object({
   affair: affairSchema, files: z.array(fileNodeSchema).max(2000), schedules: z.array(scheduleSchema),
   approvals: z.array(approvalSchema), activity: z.array(activitySchema), runs: z.array(runSchema), revisions: z.array(revisionSchema),
+  /** Recent chat messages linked to this affair, oldest first. */
+  messages: z.array(messageSchema).max(100),
 }).strict();
 
 // ------------------------------------------------------------- requests ----
@@ -230,7 +239,7 @@ export const updateAffairSchema = z.object({ title: short.optional(), status: z.
 export const saveFileSchema = z.object({ path: affairPathSchema, content: z.string().max(2_000_000), baseRevision: z.string().max(64).nullable() }).strict();
 export const toggleCheckboxSchema = z.object({ path: affairPathSchema, line: z.number().int().min(1), checked: z.boolean(), baseRevision: z.string().max(64).nullable() }).strict();
 export const panelEntrySchema = z.object({ dataPath: affairPathSchema, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
-export const createScheduleSchema = z.object({ mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema, text: z.string().max(4000), command: z.string().max(2000).optional(), until: iso.optional() }).strict();
+export const createScheduleSchema = z.object({ mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), command: z.string().max(2000).optional(), until: iso.optional() }).strict();
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
@@ -282,7 +291,7 @@ export const chronaToolInputSchemas = {
   chrona_reply: z.object({ text: text.max(8000), files: z.array(affairPathSchema).max(10).default([]) }).strict(),
   /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
   chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: affairPathSchema.optional() }).strict(),
-  chrona_schedule: createScheduleSchema.extend({ affairId: id.optional() }),
+  chrona_schedule: createScheduleSchema.extend({ affairId: id.optional(), label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on the affair page, in the user's language, e.g. 准备第2天材料") }),
   chrona_schedules: z.object({ affairId: id.optional() }).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
   chrona_affairs: z.object({ status: z.enum(AFFAIR_STATUSES).optional() }).strict(),
