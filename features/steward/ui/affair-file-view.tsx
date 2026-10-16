@@ -27,7 +27,7 @@ export function EditableFile({ client, affairId, initial, refresh }: Omit<FilePr
   const c = useI18n().messages.steward.affairFile;
   const f = useAffairFile(client, affairId, initial, refresh);
   return <div className="grid min-w-0 gap-4">
-    <header className="flex flex-wrap items-center justify-between gap-2"><h2 className="break-all font-medium">{f.file.path}</h2>
+    <header className="flex flex-wrap items-center justify-between gap-2"><h2 className="break-all font-medium">{f.file.path.replace(/\.md$/i, "")}</h2>
       {!f.editing && <Button variant="outline" disabled={f.pending} onClick={f.edit}>{c.edit}</Button>}
     </header>
     {f.notice && <p role="alert">{c[f.notice]}</p>}

@@ -112,8 +112,11 @@ test("foreground claims first; lanes independent; tokens and deadlines; commits 
   expect(await api.runs.claimNext("background")).toBeNull();
   await writeFile(join(fg.cwd, "work.md"), "Done");
   await api.runs.finish(fg.id, { outcome: "finished", sessionId: "session", error: null });
-  expect((await api.affairs.activity(a.id)).some(r => r.kind === "edit" && r.data?.paths && JSON.stringify(r.data.paths) === '["work.md"]')).toBe(true);
+  // The background run is still writing the same affair: it commits when it ends.
+  expect((await api.affairs.activity(a.id)).some(r => r.kind === "edit")).toBe(false);
   expect((await db.affair.findUniqueOrThrow({ where: { id: a.id } })).sessionId).toBe("session");
+  await api.runs.finish(bg.id, { outcome: "finished", sessionId: null, error: null });
+  expect((await api.affairs.activity(a.id)).some(r => r.kind === "edit" && r.data?.paths && JSON.stringify(r.data.paths) === '["work.md"]')).toBe(true);
   await expect(api.runs.authenticate(fg.token)).rejects.toMatchObject({ code: "forbidden" });
   await api.runs.enqueue({ lane: "foreground", trigger: "message", prompt: "next" });
   expect(await api.runs.claimNext("foreground")).not.toBeNull();

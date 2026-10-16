@@ -21,6 +21,10 @@ export function fileTree(files: FileNode[]): FileBranch[] {
   const sort = (nodes: FileBranch[]): FileBranch[] => nodes.sort((a, b) => Number(b.name.toLowerCase() === "readme.md") - Number(a.name.toLowerCase() === "readme.md") || Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name)).map(node => ({ ...node, children: sort(node.children) }));
   return sort(root);
 }
+/** Display name of a page: the file name without a Markdown extension. */
+export function pageName(path: string) {
+  return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+}
 export function visiblePath(path: string) {
   return affairPathSchema.safeParse(path).success && !path.split("/").some(part => part === ".chrona" || part === ".git");
 }

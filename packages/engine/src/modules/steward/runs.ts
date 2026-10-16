@@ -159,6 +159,9 @@ class RunService {
     const affairs = run.affair ? [run.affair] : await db.affair.findMany({ where: { workspaceId } });
     const message = await this.commitMessage(run);
     for (const affair of affairs) {
+      // Another run still writing here commits its own work when it ends; committing now would
+      // record its half-finished files under this run's message.
+      if (await this.otherRunWriting(run, affair.id, changes)) continue;
       try {
         const files = this.fs.forAffair(affair.dirName);
         const paths = await files.commitAll("chrona", message);
@@ -167,6 +170,12 @@ class RunService {
       } catch { result.status = "failed"; result.error = "Could not commit affair changes"; }
     }
     return changes;
+  }
+  /** Records the session without committing when another run is still writing this affair. */
+  private async otherRunWriting(run: RunWithAffair, affairId: string, changes: { affairId: string; commit: string | null; paths: string[] }[]) {
+    if (!await this.ports.db.run.count({ where: { workspaceId: this.workspaceId, affairId, status: "running", id: { not: run.id } } })) return false;
+    if (run.affairId === affairId) changes.push({ affairId, commit: null, paths: [] });
+    return true;
   }
   private async recordActivity(tx: Prisma.TransactionClient, run: RunWithAffair, result: { now: Date; status: string; sessionId: string | null; affairId: string; commit: string | null; paths: string[] }) {
     const { workspaceId } = this;

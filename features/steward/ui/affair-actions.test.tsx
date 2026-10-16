@@ -18,8 +18,9 @@ function setup(schedule = false) {
 }
 it("creates an empty page in the current folder and refreshes", async () => {
   const { save, refresh } = setup();
-  await userEvent.type(screen.getByLabelText(en.steward.affairActions.pagePath), "notes.md");
   await userEvent.click(screen.getByRole("button", { name: "New page" }));
+  await userEvent.type(screen.getByLabelText(en.steward.affairActions.pagePath), "notes.md");
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenCalledWith("camera", { path: "days/notes.md", content: "", baseRevision: null });
   await waitFor(() => expect(refresh).toHaveBeenCalled());
   expect(screen.getByLabelText(en.steward.affairActions.pagePath)).toHaveValue("");
@@ -36,8 +37,9 @@ it("uploads through picker and drop into current folder", async () => {
 it("keeps page input and shows error on conflict", async () => {
   const { save, refresh } = setup();
   save.mockRejectedValue(new StewardClientError("requestError", 409));
-  await userEvent.type(screen.getByLabelText(en.steward.affairActions.pagePath), "notes.md");
   await userEvent.click(screen.getByRole("button", { name: "New page" }));
+  await userEvent.type(screen.getByLabelText(en.steward.affairActions.pagePath), "notes.md");
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByRole("alert")).toBeVisible();
   expect(screen.getByLabelText(en.steward.affairActions.pagePath)).toHaveValue("notes.md");
   expect(refresh).not.toHaveBeenCalled();
@@ -46,11 +48,12 @@ it("shows pending until creation finishes, then refreshes", async () => {
   const { create, refresh } = setup(true);
   let resolve!: (value: ReturnType<typeof detailFixture>["schedules"][number]) => void;
   create.mockImplementation(() => new Promise(done => { resolve = done; }));
-  await userEvent.click(screen.getByText("Add schedule", { selector: "summary" }));
+  await userEvent.click(screen.getByText("Add arrangement", { selector: "summary" }));
+  await userEvent.type(screen.getByLabelText("Name (optional)"), "Study reminder");
   await userEvent.type(screen.getByLabelText("Message or instructions"), "Study");
-  await userEvent.click(screen.getByRole("button", { name: "Add schedule" }));
-  expect(create).toHaveBeenCalledWith("camera", { mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "Study" });
-  expect(screen.getByRole("button", { name: "Add schedule" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: "Add arrangement" }));
+  expect(create).toHaveBeenCalledWith("camera", { mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "Study", label: "Study reminder" });
+  expect(screen.getByRole("button", { name: "Add arrangement" })).toBeDisabled();
   resolve(detailFixture().schedules[0]!);
   await waitFor(() => expect(refresh).toHaveBeenCalled());
 });

@@ -27,7 +27,7 @@ export function createStewardE2eProvider(port: number): ProviderAdapter {
             const process = Bun.spawn(["git", "-c", "user.name=Chrona", "-c", "user.email=chrona@local", ...args], { cwd, stdout: "ignore", stderr: "ignore" });
             if (await process.exited !== 0) throw new Error("E2E fixture commit failed");
           }
-          await call("chrona_schedule", { affairId: affair.id, mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习" });
+          await call("chrona_schedule", { affairId: affair.id, mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习", label: "每日学习提醒" });
           await call("chrona_reply", { text: "已建好规划" });
         } else await call("chrona_reply", { text: "收到" });
       }

@@ -24,7 +24,7 @@ beforeEach(() => {
     if (path.endsWith("/test")) return { ok: false, error: "Invalid credentials" } as never;
     if (path.endsWith("/sync") || path.endsWith("/mail")) return source as never;
     if (path.endsWith("/connectors")) return (options?.method === "POST" ? source : { items: [source] }) as never;
-    if (path.endsWith("/affairs") && options?.method === "POST") return { id: "a", title: "Mailbox", status: "active", summary: "", nextSchedule: null, running: false, openApprovals: 0, lastActivityAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z" } as never;
+    if (path.endsWith("/affairs") && options?.method === "POST") return { id: "a", title: "Mailbox", status: "active", summary: "", nextSchedule: null, running: false, work: null, openApprovals: 0, lastActivityAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z" } as never;
     if (path.endsWith("/items")) return { items: [{ id: "i", connectorId: "mail", externalId: "e", from: "A sender", subject: "Hello", receivedAt: "2026-01-01T00:00:00Z", path: "inbox/mail.md", status: "delivered", ruleNote: "Batch rule" }] } as never;
     return { items: [] } as never;
   });

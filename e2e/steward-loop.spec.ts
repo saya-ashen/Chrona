@@ -14,12 +14,18 @@ test("question → workspace plan → checkbox → edit/history/revert → setti
   await expect(page.getByText("已建好规划", { exact: true })).toBeVisible();
   const navigation = page.getByRole("navigation", { name: zh.steward.shell.navigation });
   await navigation.getByRole("link", { name: "事务", exact: true }).click();
+  // Today also links the affair (progress and upcoming); wait for the list page itself.
+  await expect(page.getByRole("heading", { level: 1, name: "事务", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "十天学习规划", exact: true }).click();
   await expect(page.getByRole("heading", { name: "学习规划", exact: true })).toBeVisible();
   const pages = page.getByRole("navigation", { name: zh.steward.affairFile.pages });
-  if (test.info().project.name === "mobile") await pages.locator("summary").first().click();
-  await expect(pages.getByRole("link", { name: "day-1.md", exact: true }).filter({ visible: true })).toBeVisible();
-  await expect(page.getByText("提醒你 · 每天 08:00", { exact: true })).toBeVisible();
+  // Narrow screens keep the page list collapsed above the content.
+  const pageList = pages.locator("summary");
+  if (await pageList.isVisible()) await pageList.click();
+  await expect(pages.getByRole("link", { name: "day-1", exact: true }).filter({ visible: true })).toBeVisible();
+  const arrangements = page.getByRole("region", { name: zh.steward.affairCenter.schedules, exact: true });
+  await expect(arrangements.getByText("每日学习提醒", { exact: true })).toBeVisible();
+  await expect(arrangements.getByText(/^每天 08:00 · /)).toBeVisible();
   const checkbox = page.getByRole("checkbox", { name: "阅读学习目标" });
   await checkbox.check();
   await expect(checkbox).toBeEnabled();
@@ -31,6 +37,7 @@ test("question → workspace plan → checkbox → edit/history/revert → setti
   await page.getByRole("button", { name: zh.steward.affairFile.save, exact: true }).click();
   await expect(page.getByText("用户补充的学习笔记", { exact: true })).toBeVisible();
   await page.reload();
+  await page.locator("summary").filter({ hasText: zh.steward.affairCenter.history }).click();
   const history = page.getByRole("region", { name: zh.steward.history.title });
   const revision = history.getByRole("button", { name: /· 你 ·/ }).first();
   await expect(revision).toBeVisible();

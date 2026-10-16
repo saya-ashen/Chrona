@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient, Affair as AffairRow } from "@chrona/db";
 import { activitySchema, createAffairSchema, updateAffairSchema, type AffairStatus } from "@chrona/contracts/steward";
 import { audit } from "./audit";
-import { toMessage } from "./chat";
 import { parseInput, StewardError } from "./errors";
-import { toActivity, toAffair, toApproval, toRun, toSchedule } from "./store";
+import { toActivity, toAffair, toApproval, toMessage, toRun, toSchedule } from "./store";
 import type { WorkspaceFs } from "./workspace-fs";
 export type RecordContext = { db: PrismaClient; workspaceId: string; now(): Date };
 export async function requireAffair(db: Prisma.TransactionClient, workspaceId: string, id: string) {
@@ -22,8 +21,11 @@ export function createAffairs({ db, workspaceId, now }: RecordContext, fs: Works
       db.run.findFirst({ where: { workspaceId, affairId: row.id, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now() } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
     ]);
     const summary = readme.content.trim().split(/\r?\n\s*\r?\n/).find(p => p.trim() && !/^#{1,6}\s/.test(p.trim()))?.trim().slice(0, 300) ?? "";
-    return toAffair(row, summary, schedule ? { at: schedule.nextAt!.toISOString(), mode: toSchedule(schedule).mode, text: (schedule.label ?? schedule.text).slice(0, 300) } : null, !!running, openApprovals,
-      running ? { state: "running", since: (running.startedAt ?? running.createdAt).toISOString(), label: running.label } : queued ? { state: "queued", since: queued.createdAt.toISOString(), label: queued.label } : null);
+    return toAffair(row, {
+      summary, running: !!running, openApprovals,
+      nextSchedule: schedule ? { at: schedule.nextAt!.toISOString(), mode: toSchedule(schedule).mode, label: (schedule.label ?? (schedule.mode === "remind" ? schedule.text : null))?.slice(0, 300) ?? null } : null,
+      work: running ? { state: "running", since: (running.startedAt ?? running.createdAt).toISOString(), label: running.label } : queued ? { state: "queued", since: queued.createdAt.toISOString(), label: queued.label } : null,
+    });
   }
   async function files(id: string) { return fs.forAffair((await requireAffair(db, workspaceId, id)).dirName); }
   return {

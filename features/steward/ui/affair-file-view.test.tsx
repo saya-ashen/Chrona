@@ -102,9 +102,9 @@ it("renders a markdown panel from its CSV file and posts typed entries", async (
 it("renders a collapsible tree with README first and no metadata", async () => {
   const nodes = fileTree(["notes/day.md", ".chrona/state.json", "README.md"].map(path => ({ path, kind: "file", size: 0, updatedAt: fixtureTime })));
   render(<MemoryRouter><I18nProvider locale="en" messages={en}><FileTree nodes={nodes} selected="README.md" affairId="camera" /></I18nProvider></MemoryRouter>);
-  expect(screen.getAllByRole("link")[0]).toHaveTextContent("README.md");
-  expect(screen.queryByText(".chrona")).not.toBeInTheDocument(); expect(screen.getByText("day.md")).not.toBeVisible();
-  await userEvent.click(screen.getByText("notes")); expect(screen.getByText("day.md")).toBeVisible();
+  expect(screen.getAllByRole("link")[0]).toHaveTextContent("README");
+  expect(screen.queryByText(".chrona")).not.toBeInTheDocument(); expect(screen.getByText("day")).not.toBeVisible();
+  await userEvent.click(screen.getByText("notes")); expect(screen.getByText("day")).toBeVisible();
 });
 it("loads the selected page, schedules, approvals and affair status controls", async () => {
   vi.mocked(apiJson).mockImplementation(async url => {
@@ -114,5 +114,5 @@ it("loads the selected page, schedules, approvals and affair status controls", a
   });
   render(<MemoryRouter initialEntries={["/en/affairs/camera?path=notes.txt"]}><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><Routes><Route path="/:lang/affairs/:affairId" element={<AffairDetailPage />} /></Routes></StewardSession></I18nProvider></MemoryRouter>);
   expect(await screen.findByText("Selected notes")).toBeVisible(); expect(screen.getByText(/Daily at 18:00/)).toBeVisible();
-  expect(screen.getByRole("button", { name: "Allow once" })).toBeVisible(); expect(screen.getByRole("button", { name: "Cancel schedule" })).toBeVisible(); expect(screen.getByRole("button", { name: "End" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Allow once" })).toBeVisible(); expect(screen.getByRole("button", { name: "Cancel arrangement" })).toBeVisible(); expect(screen.getByRole("button", { name: "End" })).toBeVisible();
 });

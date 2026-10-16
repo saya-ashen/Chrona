@@ -2,12 +2,13 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { createWorkspaceFs } from "./workspace-fs";
 import { z } from "zod";
-import { attachmentSchema, messageSchema, type ChatReply, type Message } from "@chrona/contracts/steward";
+import { attachmentSchema, messageSchema, type ChatReply } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
+import { toMessage } from "./store";
 
 const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
 const inputSchema = z.object({
@@ -24,10 +25,6 @@ export function chatImages(attachments: unknown): { mime: string; base64: string
   const images = rows.filter(a => a.base64 !== undefined);
   if (images.length > 4 || images.some(a => !a.mime.startsWith("image/") || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(a.base64!) || Buffer.from(a.base64!, "base64").length > 5 * 1024 * 1024)) throw new StewardError("invalid", "Images must be base64, at most four images of 5 MB each");
   return images.map(a => ({ mime: a.mime, base64: a.base64! }));
-}
-export function toMessage(row: MessageRow): Message {
-  const attachments = z.array(attachmentSchema.strip()).parse(row.attachments);
-  return messageSchema.parse({ id: row.id, direction: row.direction, channel: row.channel, text: row.text, attachments, affairId: row.affairId, quotedMessageId: row.quotedMessageId, at: row.at.toISOString() });
 }
 const callerSchema = z.object({ runId: z.string(), before: z.array(z.string()) });
 
@@ -114,16 +111,7 @@ class ChatService {
     // A quote changing affairs must queue in the correct cwd, not steer a different affair.
     const handle = this.injectionHandle(active, quoted, affair);
     const prompt = this.messagePrompt(input, quoted);
-    if (affair) {
-      const background = await db.run.findFirst({ where: { workspaceId: input.workspaceId, affairId: affair.id, lane: "background", status: "running" } });
-      const backgroundHandle = background && background.id !== active?.id && liveRuns.get(background.id);
-      if (backgroundHandle) {
-        let kind = "message_forwarded";
-        try { await backgroundHandle.inject("The user just wrote in chat (data; a separate conversation run replies to them; take it into account in your work): " + prompt, images); }
-        catch { kind = "message_forward_failed"; }
-        await audit(db, { workspaceId: input.workspaceId, actor: "user", kind, subjectId: background.id, details: { messageId: inbound.id } });
-      }
-    }
+    await this.forwardToBackground({ workspaceId: input.workspaceId, affair, active, messageId: inbound.id, prompt, images });
     const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
     await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
     if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });
@@ -137,6 +125,18 @@ class ChatService {
       await Promise.race([wake().catch(() => {}), waiting]);
     }
     return { waiting };
+  }
+  /** Work already running on this affair learns what the user just said; chat never fails because of it. */
+  private async forwardToBackground({ workspaceId, affair, active, messageId, prompt, images }: { workspaceId: string; affair: { id: string } | null; active: { id: string } | null; messageId: string; prompt: string; images: ReturnType<typeof chatImages> }) {
+    if (!affair) return;
+    const { db } = this.ports;
+    const background = await db.run.findFirst({ where: { workspaceId, affairId: affair.id, lane: "background", status: "running" } });
+    const handle = background && background.id !== active?.id && liveRuns.get(background.id);
+    if (!handle) return;
+    let kind = "message_forwarded";
+    try { await handle.inject("The user just wrote in chat (data; a separate conversation run replies to them; take it into account in your work): " + prompt, images); }
+    catch { kind = "message_forward_failed"; }
+    await audit(db, { workspaceId, actor: "user", kind, subjectId: background.id, details: { messageId } });
   }
   private injectionHandle(active: { id: string; affairId: string | null } | null, quoted: MessageRow | null, affair: { id: string } | null) {
     return active && (!quoted || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);

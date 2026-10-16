@@ -1,7 +1,7 @@
 import type { Affair, Health, ScheduleRule } from "@chrona/contracts";
 
 export function groupWorkspaceAffairs(affairs: Affair[]) {
-  return (["active", "paused", "done"] as const).map(key => ({ key, items: affairs.filter(affair => affair.status === key).sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt) || a.id.localeCompare(b.id)) }));
+  return (["waiting", "active", "paused", "done"] as const).map(key => ({ key, items: affairs.filter(affair => key === "waiting" ? affair.openApprovals > 0 : affair.openApprovals === 0 && affair.status === key).sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt) || a.id.localeCompare(b.id)) }));
 }
 export function scheduleDescription(rule: ScheduleRule, locale: string, copy: { daily: string; weekly: string; every: string }) {
   switch (rule.kind) {

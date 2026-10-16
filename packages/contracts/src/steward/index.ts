@@ -106,7 +106,8 @@ export const affairSchema = z.object({
   id, title: short, status: z.enum(AFFAIR_STATUSES),
   /** First paragraph of README.md, as written by the Provider. */
   summary: z.string().max(1000),
-  nextSchedule: z.object({ at: iso, mode: z.enum(SCHEDULE_MODES), text: z.string().max(300) }).strict().nullable(),
+  /** `label` is the schedule's label, or a reminder's own text; null for an unlabelled wake/job (its text is internal). */
+  nextSchedule: z.object({ at: iso, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable() }).strict().nullable(),
   running: z.boolean(),
   /** Work Chrona is doing or about to do on this affair right now. */
   work: z.object({ state: z.enum(["queued", "running"]), since: iso, label: z.string().max(80).nullable() }).strict().nullable(),
@@ -213,13 +214,18 @@ export const healthSchema = z.object({
 export const todayViewSchema = z.object({
   generatedAt: iso,
   approvals: z.array(approvalSchema),
-  /** Everything scheduled for the rest of today (reminders for the user and the Provider's own work). */
-  agenda: z.array(scheduleSchema.extend({ affairTitle: short })),
-  /** Recently changed pages, newest first. */
-  changes: z.array(z.object({ affairId: id, affairTitle: short, path: affairPathSchema, message: z.string().max(500), at: iso, author: z.enum(["user", "chrona"]) }).strict()),
+  /** Coming up in the next 7 days, soonest first. Pages show `label` (or a reminder's text), never a wake instruction. */
+  upcoming: z.array(z.object({ scheduleId: id, affairId: id, affairTitle: short, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable(), at: iso }).strict()).max(50),
+  /** What happened, per affair: affairs with current work or activity in the last 7 days, most recent first. */
+  progress: z.array(z.object({
+    affair: affairSchema,
+    /** Latest messages Chrona sent about this affair (notifications), newest first. */
+    updates: z.array(z.object({ title: short, body: z.string().max(4000), at: iso }).strict()).max(3),
+    /** Distinct pages changed in the last 7 days. */
+    changedPages: z.number().int().min(0),
+  }).strict()).max(50),
   /** Optional page the Provider maintains for today (any affair file it marks via `.chrona/today` pointer). */
   todayPage: z.object({ affairId: id, path: affairPathSchema }).strict().nullable(),
-  running: z.array(runSchema),
   health: healthSchema,
 }).strict();
 

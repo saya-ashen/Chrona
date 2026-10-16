@@ -87,6 +87,7 @@ describe("steward routes and shared shell", () => {
     vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? new Promise((_resolve, fail) => { reject = fail; }) : emptyToday());
     show("/en");
     expect(await screen.findByText("Loading…")).toBeVisible();
+    await waitFor(() => expect(reject).toBeTypeOf("function"));
     reject(new Error("offline"));
     expect(await screen.findByText("Chat and notification status unavailable")).toBeVisible();
     expect(screen.queryByText(/Sent today/)).not.toBeInTheDocument();

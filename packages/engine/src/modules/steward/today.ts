@@ -2,7 +2,8 @@ import { affairPathSchema, type Health, type TodayView } from "@chrona/contracts
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { RecordContext } from "./affairs";
 import { notificationSettings } from "./settings";
-import { toApproval, toRun, toSchedule } from "./store";
+import { toApproval } from "./store";
+import { createAffairs } from "./affairs";
 import type { WorkspaceFs } from "./workspace-fs";
 export type HealthPorts = { provider(): Promise<Health["provider"]>; git(): Promise<boolean>; jobsSandbox(): boolean };
 async function findTodayPage(fs: WorkspaceFs, affairs: { id: string; dirName: string }[]): Promise<TodayView["todayPage"]> {
@@ -35,29 +36,29 @@ export function createToday({ db, workspaceId, now }: RecordContext, fs: Workspa
       dueSchedules, failingConnectors, queuedNotifications, failedNotifications, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
   }
   async function get(): Promise<TodayView> {
-    const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings), day = localDayKey(at, settings.timezone);
-    const [approvals, schedules, edits, affairs, running, status] = await Promise.all([
-      db.approval.findMany({ where: { workspaceId, status: "open" }, include: { affair: true }, orderBy: { createdAt: "asc" } }),
-      db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + 26 * 3600000) }, affair: { status: "active" } }, include: { affair: true }, orderBy: { nextAt: "asc" } }),
-      db.activity.findMany({ where: { workspaceId, kind: "edit" }, include: { affair: true }, orderBy: { at: "desc" }, take: 100 }),
-      db.affair.findMany({ where: { workspaceId, status: "active" }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }] }),
-      db.run.findMany({ where: { workspaceId, status: "running" }, orderBy: { createdAt: "asc" } }), health(),
+    const at = now(), week = 7 * 86400000, since = new Date(at.getTime() - week);
+    const [approvals, schedules, affairs, notifications, edits, status] = await Promise.all([
+      db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" } }),
+      db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + week) }, affair: { status: "active" } }, include: { affair: true }, orderBy: { nextAt: "asc" }, take: 50 }),
+      createAffairs({ db, workspaceId, now }, fs).list(),
+      db.notification.findMany({ where: { workspaceId, affairId: { not: null }, createdAt: { gte: since }, status: { notIn: ["suppressed"] } }, orderBy: { createdAt: "desc" } }),
+      db.activity.findMany({ where: { workspaceId, kind: "edit", at: { gte: since } }, select: { affairId: true, data: true } }),
+      health(),
     ]);
-    const changes: TodayView["changes"] = [];
-    const seen = new Set<string>();
+    const pages = new Map<string, Set<string>>();
     for (const edit of edits) {
-      if (edit.actor !== "user" && edit.actor !== "chrona") continue;
-      const data = edit.data as { paths?: unknown } | null;
-      if (!Array.isArray(data?.paths)) continue;
-      for (const value of data.paths) {
-        const path = affairPathSchema.safeParse(value);
-        if (!path.success || seen.has(`${edit.affairId}:${path.data}`)) continue;
-        seen.add(`${edit.affairId}:${path.data}`);
-        changes.push({ affairId: edit.affairId, affairTitle: edit.affair.title, path: path.data, message: edit.text.slice(0, 500), at: edit.at.toISOString(), author: edit.actor });
-      }
+      const paths = (edit.data as { paths?: unknown } | null)?.paths;
+      if (Array.isArray(paths)) for (const path of paths) if (affairPathSchema.safeParse(path).success) pages.set(edit.affairId, (pages.get(edit.affairId) ?? new Set()).add(path));
     }
-    const todayPage = await findTodayPage(fs, affairs);
-    return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), agenda: schedules.filter(s => localDayKey(s.nextAt!, settings.timezone) === day && (!s.until || s.nextAt! <= s.until)).map(s => ({ ...toSchedule(s), affairTitle: s.affair.title })), changes: changes.slice(0, 100), todayPage, running: running.map(toRun), health: status };
+    // An affair belongs in "what happened" when Chrona is on it now or it changed this week.
+    const progress = affairs.filter(affair => affair.status !== "done" && (affair.work || Date.parse(affair.lastActivityAt) >= since.getTime())).slice(0, 50).map(affair => ({
+      affair,
+      updates: notifications.filter(n => n.affairId === affair.id).slice(0, 3).map(n => ({ title: n.title, body: n.body, at: n.createdAt.toISOString() })),
+      changedPages: pages.get(affair.id)?.size ?? 0,
+    }));
+    const upcoming = schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, affairId: s.affairId, affairTitle: s.affair.title, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.mode === "remind" ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() }));
+    const active = await db.affair.findMany({ where: { workspaceId, status: "active" }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }] });
+    return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), upcoming, progress, todayPage: await findTodayPage(fs, active), health: status };
   }
   return { get, health };
 }

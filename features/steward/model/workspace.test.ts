@@ -5,10 +5,10 @@ import { affairFixture, emptyToday } from "./fixtures";
 import { groupWorkspaceAffairs, scheduleDescription, workspaceHealthy } from "./workspace";
 
 describe("workspace view models", () => {
-  it("groups by status, without moving approvals to a separate group", () => {
+  it("groups decisions first, then status without duplicating affairs", () => {
     const affair = affairFixture();
-    const groups = groupWorkspaceAffairs([affair, { ...affair, id: "paused", status: "paused" }, { ...affair, id: "done", status: "done" }]);
-    expect(groups.map(group => [group.key, group.items[0]?.id])).toEqual([["active", "camera"], ["paused", "paused"], ["done", "done"]]);
+    const groups = groupWorkspaceAffairs([affair, { ...affair, id: "active", openApprovals: 0 }, { ...affair, id: "paused", status: "paused", openApprovals: 0 }, { ...affair, id: "done", status: "done", openApprovals: 0 }]);
+    expect(groups.map(group => [group.key, group.items[0]?.id])).toEqual([["waiting", "camera"], ["active", "active"], ["paused", "paused"], ["done", "done"]]);
   });
   it.each([
     [{ kind: "daily", time: "09:00" }, "每天 09:00"],

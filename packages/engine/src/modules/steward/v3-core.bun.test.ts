@@ -43,7 +43,7 @@ describe("workspace affairs", () => {
     await db.message.create({ data: { workspaceId, channel: "in_app", direction: "in", conversationKey: "one", text: "Unlinked", at: time } });
     const detail = affairDetailSchema.parse(await api.affairs.detail(a.id));
     expect(detail.affair.work).toEqual({ state: "running", since: time.toISOString(), label: "Work label" });
-    expect(detail.affair.nextSchedule?.text).toBe("Visible label");
+    expect(detail.affair.nextSchedule?.label).toBe("Visible label");
     expect(detail.runs.find(r => r.id === queued.id)?.label).toBe("Work label");
     expect(detail.messages.map(m => m.text)).toEqual(Array.from({ length: 100 }, (_, i) => `Message ${i + 5}`));
     expect(detail.messages[0]!.attachments[0]).not.toHaveProperty("base64");
@@ -107,17 +107,26 @@ test("preferences and validated settings", async () => {
   await expect(api.settings.update({ notifications: { digestAt: "99:99" } })).rejects.toMatchObject({ code: "invalid" });
   expect(settingsSchema.safeParse(await api.settings.update({ notifications: { dailyCap: 1 } })).success).toBe(true);
 });
-test("Today projects local-day agenda, edit paths, pointers and health", async () => {
+test("Today shows what happened per affair, what is coming, pointers and health — never wake instructions", async () => {
   time = new Date("2026-10-15T15:00:00Z"); // 23:00 Shanghai
-  const a = await affair(), files = await api.affairs.files(a.id);
+  const a = await affair(), quiet = await affair(), files = await api.affairs.files(a.id);
+  await db.affair.update({ where: { id: quiet.id }, data: { lastActivityAt: new Date("2026-10-01T00:00:00Z") } });
   await files.save("day.md", "Today's work", null); await files.save(".chrona/today", "day.md\n", null);
   await api.affairs.appendActivity(a.id, { actor: "chrona", kind: "edit", text: "Prepared day", data: { paths: ["day.md", "../escape"] } });
   await approval(a.id);
-  for (const nextAt of ["2026-10-15T15:30:00Z", "2026-10-15T16:30:00Z"]) await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "wake", rule: { kind: "at", at: nextAt }, text: "Prepare", createdBy: "chrona", nextAt: new Date(nextAt) } });
-  await db.run.create({ data: { workspaceId, affairId: a.id, lane: "background", trigger: "schedule", provider: "fake", status: "running", tokenHash: "fake", prompt: "test", cwd: "unused" } });
+  await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "wake", rule: { kind: "at", at: "2026-10-15T15:30:00Z" }, text: "Internal instruction", createdBy: "chrona", nextAt: new Date("2026-10-15T15:30:00Z") } });
+  await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "wake", label: "Prepare day 2", rule: { kind: "at", at: "2026-10-16T16:30:00Z" }, text: "Internal instruction", createdBy: "chrona", nextAt: new Date("2026-10-16T16:30:00Z") } });
+  await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "remind", rule: { kind: "daily", time: "09:00" }, text: "Practise speaking", createdBy: "chrona", nextAt: new Date("2026-10-16T01:00:00Z") } });
+  await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "remind", rule: { kind: "at", at: "2026-10-30T01:00:00Z" }, text: "Too far", createdBy: "chrona", nextAt: new Date("2026-10-30T01:00:00Z") } });
+  await db.notification.create({ data: { workspaceId, affairId: a.id, level: "now", channel: "in_app", title: "Plan ready", body: "Open day 1", idempotencyKey: "n1", createdAt: time } });
+  await db.run.create({ data: { workspaceId, affairId: a.id, lane: "background", trigger: "schedule", provider: "fake", status: "running", label: "Prepare materials", tokenHash: "fake", prompt: "test", cwd: "unused", startedAt: time } });
   const today = await api.today(); expect(todayViewSchema.safeParse(today).success).toBe(true);
-  expect(today.agenda).toHaveLength(1); expect(today.approvals).toHaveLength(1); expect(today.changes).toHaveLength(1); expect(today.todayPage).toEqual({ affairId: a.id, path: "day.md" });
-  expect(today.running).toHaveLength(1); expect(today.health.provider.available).toBe(false); expect(today.health.runningRuns).toBe(1); expect(today.health.git).toBe(true);
+  expect(today.upcoming.map(u => [u.label, u.mode])).toEqual([[null, "wake"], ["Practise speaking", "remind"], ["Prepare day 2", "wake"]]);
+  expect(JSON.stringify(today)).not.toContain("Internal instruction");
+  expect(today.progress.map(p => p.affair.id)).toEqual([a.id]);
+  expect(today.progress[0]).toMatchObject({ changedPages: 1, updates: [{ title: "Plan ready", body: "Open day 1" }], affair: { work: { state: "running", label: "Prepare materials" } } });
+  expect(today.approvals).toHaveLength(1); expect(today.todayPage).toEqual({ affairId: a.id, path: "day.md" });
+  expect(today.health.provider.available).toBe(false); expect(today.health.runningRuns).toBe(1); expect(today.health.git).toBe(true);
 });
 describe("notification outbox", () => {
   test("invalid inputs and foreign workspace transactions cannot enqueue", async () => {
