@@ -7,7 +7,7 @@ import { ApprovalItem } from "./approval-item";
 import { ResourceStatus } from "./resource-status";
 import { useStewardSession } from "../hooks/use-steward-session";
 import { pageHref, workspaceHealthy } from "../model/workspace";
-import { affairOverview, plainSummary, todaySummary, todayDetail } from "../model/affair-overview";
+import { affairOverview, plainSummary, todaySummary, todayDetail, progressPill, progressPillClass, progressDetail } from "../model/affair-overview";
 import { formatShortDateTime } from "../model/format";
 
 function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
@@ -17,15 +17,15 @@ function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
   const model = affairOverview(item.affair, locale, c);
   const { affair } = item;
   const [newest, ...older] = item.updates;
-  const pill = affair.work?.state === "running" ? c.runningPill : affair.work?.state === "queued" ? c.queuedPill : affair.openApprovals ? c.waitingPill : null;
+  const pill = progressPill(affair, c);
   return <article className="grid min-w-0 gap-1.5 px-3.5 py-3 [overflow-wrap:anywhere]">
     <div className="flex flex-wrap items-baseline gap-2.5">
       <Link className="font-medium text-primary hover:underline" to={pageHref(locale, affair.id)}>{affair.title}</Link>
-      {pill && <Badge role={affair.work ? "status" : undefined} variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${affair.work?.state === "running" ? "bg-primary-soft text-primary" : affair.work ? "bg-muted text-muted-foreground" : "bg-warning/10 text-warning"}`}>{pill}</Badge>}
+      {pill && <Badge role={affair.work ? "status" : undefined} variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${progressPillClass(affair)}`}>{pill}</Badge>}
       <time className="ml-auto text-xs text-muted-foreground tabular-nums" dateTime={affair.lastActivityAt}>{model.updatedAt}</time>
     </div>
     {newest ? <><p className="font-medium">{plainSummary(newest.title)}</p><p className="line-clamp-3 max-w-[72ch] text-[13px] text-muted-foreground">{plainSummary(newest.body)}</p></> : <p className="line-clamp-3 text-[13px] text-muted-foreground">{model.summary}</p>}
-    {(item.changedPages > 0 || model.next) && <p className="text-xs text-muted-foreground">{[item.changedPages > 0 ? copy.pages.replace("{count}", String(item.changedPages)) : null, model.next].filter(Boolean).join(" · ")}</p>}
+    {(item.changedPages > 0 || model.next) && <p className="text-xs text-muted-foreground">{progressDetail(item.changedPages, model.next, copy.pages)}</p>}
     {older.length > 0 && <details className="text-[13px] text-muted-foreground"><summary className="cursor-pointer">{copy.earlier}</summary><div className="grid gap-3 pt-2">{older.map((update, index) => <div key={`${update.at}-${index}`}><p className="font-medium">{plainSummary(update.title)}</p><p>{plainSummary(update.body)}</p><time className="text-xs" dateTime={update.at}>{formatShortDateTime(update.at, locale)}</time></div>)}</div></details>}
   </article>;
 }

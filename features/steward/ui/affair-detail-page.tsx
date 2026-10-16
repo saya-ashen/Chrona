@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useI18n } from "@chrona/i18n";
 import { useStewardSession } from "../hooks/use-steward-session";
 import { useStewardResource } from "../hooks/use-steward";
-import { fileTree, pageName, visiblePath, type FileBranch } from "../model/affair-file";
+import { pageName, visiblePath, type FileBranch } from "../model/affair-file";
 import { pageHref } from "../model/workspace";
 import { PageColumn, Section, Surface } from "./layout";
 import { ResourceStatus } from "./resource-status";
@@ -11,7 +11,7 @@ import { AffairFileActions } from "./affair-actions";
 import { AffairHistory } from "./affair-history";
 import { AffairFileView } from "./affair-file-view";
 import { AffairArrangements, AffairCenterHeader, AffairNow, AffairTechnicalDetails, AffairTimeline } from "./affair-center";
-import { affairCenter } from "../model/affair-center";
+import { affairCenter, affairPages } from "../model/affair-center";
 import { ApprovalItem } from "./approval-item";
 
 export function AffairDetailPage() {
@@ -23,8 +23,7 @@ export function AffairDetailPage() {
   const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.affair(affairId, signal), [client, affairId]));
   const detail = resource.data;
   const path = params.get("path") || "README.md";
-  const selected = detail?.files.find(file => file.path === path && file.kind === "file" && visiblePath(path));
-  const tree = detail ? fileTree(detail.files) : [];
+  const { selected, tree } = affairPages(detail, path);
   const model = detail ? affairCenter(detail, messages.steward.affairCenter.followUp) : null;
   return <PageColumn className="gap-5">
     <ResourceStatus resource={resource} />

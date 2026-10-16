@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Affair, Connector } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n";
 import { Badge, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui";
+import { connectorStatusClass } from "../model/connector-status";
 import type { StewardClient } from "../model/client";
 import { useConnector, useEmailConnector } from "../hooks/use-connectors";
 import { MutationStatus, ResourceStatus } from "./resource-status";
@@ -11,7 +12,7 @@ function ConnectorItem({ connector: source, client, refresh }: { connector: Conn
   const s = useConnector(client, source.id, refresh), m = s.mutation;
   return <li className="grid min-w-0 gap-2 border-b pb-3 text-[13px]">
     <div className="flex flex-wrap items-center gap-2.5">
-      <Badge variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${source.status === "active" ? "bg-success/10 text-success" : source.status === "failing" || source.status === "needs_authorization" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>{c.connectionStates[source.status]}</Badge>
+      <Badge variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${connectorStatusClass(source.status)}`}>{c.connectionStates[source.status]}</Badge>
       <p className="break-words">{source.label}</p>
       <div className="text-xs text-muted-foreground min-[1000px]:ml-auto min-[1000px]:text-right">
         <p>{c.lastSync}: {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString(locale) : a.none} · {c.pendingItems}: {source.pendingItems}</p>

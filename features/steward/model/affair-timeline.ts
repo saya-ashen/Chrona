@@ -13,11 +13,9 @@ export function timelineTime(at: string, locale: string, now = new Date()) {
     ? date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
     : new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric" }).format(date);
 }
-export function affairTimeline(detail: AffairDetail): TimelineEntry[] {
-  const entries: TimelineEntry[] = [{ id: "created", at: detail.affair.createdAt, kind: "created", text: "", paths: [] }];
-  for (const message of detail.messages) entries.push({ id: `message:${message.id}`, at: message.at, kind: "message", actor: message.direction === "in" ? "user" : "chrona", text: message.text, paths: [] });
+function timelineEdits(activities: Activity[]) {
   const edits = new Map<string, TimelineEntry>();
-  for (const activity of detail.activity) {
+  for (const activity of activities) {
     if (activity.kind !== "edit") continue;
     const key = typeof activity.data?.commit === "string" ? activity.data.commit : activity.id;
     const paths = editPaths(activity);
@@ -27,6 +25,12 @@ export function affairTimeline(detail: AffairDetail): TimelineEntry[] {
       if (Date.parse(activity.at) > Date.parse(existing.at)) existing.at = activity.at;
     } else edits.set(key, { id: `edit:${key}`, at: activity.at, kind: "edit", actor: activity.actor === "user" ? "user" : "chrona", text: "", paths });
   }
+  return edits;
+}
+export function affairTimeline(detail: AffairDetail): TimelineEntry[] {
+  const entries: TimelineEntry[] = [{ id: "created", at: detail.affair.createdAt, kind: "created", text: "", paths: [] }];
+  for (const message of detail.messages) entries.push({ id: `message:${message.id}`, at: message.at, kind: "message", actor: message.direction === "in" ? "user" : "chrona", text: message.text, paths: [] });
+  const edits = timelineEdits(detail.activity);
   // A run's page edits are committed when it ends, right after its reply: show them on that reply.
   const replies = entries.filter(entry => entry.kind === "message" && entry.actor === "chrona");
   for (const change of edits.values()) {

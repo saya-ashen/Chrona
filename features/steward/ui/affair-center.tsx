@@ -13,7 +13,7 @@ import { useStewardMutation } from "../hooks/use-steward-mutation";
 import { AddSchedule } from "./affair-actions";
 import { MutationStatus } from "./resource-status";
 import { Section } from "./layout";
-import { plainSummary } from "../model/affair-overview";
+import { plainSummary, affairPill, affairPillClass } from "../model/affair-overview";
 import { Composer } from "./composer";
 
 type Props = { detail: AffairDetail; client: StewardClient; refresh: () => void };
@@ -24,11 +24,11 @@ export function AffairCenterHeader({ detail, client, refresh }: Props) {
   const mutation = useStewardMutation(refresh);
   const [confirm, setConfirm] = useState(false);
   const { affair } = detail;
-  const pill = affair.work?.state === "running" ? c.runningPill : affair.work?.state === "queued" ? c.queuedPill : affair.openApprovals ? c.waitingPill : affair.status === "active" ? c.activePill : messages.steward.affairs[affair.status];
+  const pill = affairPill(affair, c, messages.steward.affairs);
   return <header className="grid min-w-0 gap-1.5 break-words">
     <div className="flex flex-wrap items-center gap-2.5">
       <Link className="text-xs text-muted-foreground" to={`/${locale}/affairs`}>← {messages.steward.affairs.title}</Link>
-      <Badge variant="secondary" className={`mr-auto rounded-full border-0 px-2 py-px text-xs ${affair.openApprovals && !affair.work ? "bg-warning/10 text-warning" : affair.work?.state === "running" || affair.status === "active" && !affair.work ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground"}`}>{pill}</Badge>
+      <Badge variant="secondary" className={`mr-auto rounded-full border-0 px-2 py-px text-xs ${affairPillClass(affair)}`}>{pill}</Badge>
       {affair.status !== "done" && <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateAffair(affair.id, { status: affair.status === "paused" ? "active" : "paused" }))}>{affair.status === "paused" ? f.resume : f.pause}</Button><Button variant="outline" disabled={mutation.pending} onClick={() => setConfirm(true)}>{f.end}</Button></div>}
     </div>
     <h1 className="text-2xl font-semibold">{affair.title}</h1>
@@ -86,9 +86,15 @@ function TimelineItem({ entry, affairId }: { entry: TimelineEntry; affairId: str
   const [expanded, setExpanded] = useState(false);
   return <li className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-2.5 break-words border-t border-dashed py-2 text-[13px] first:border-0"><time className="pt-0.5 text-xs tabular-nums text-muted-foreground" dateTime={entry.at}>{timelineTime(entry.at, locale)}</time><div>
     {entry.kind === "message" ? <><p className={`text-xs ${entry.actor === "user" ? "text-primary" : "text-muted-foreground"}`}>{entry.actor === "user" ? messages.steward.foundation.you : c.replyKind}</p><p className={expanded ? "whitespace-pre-wrap" : "line-clamp-3 whitespace-pre-wrap"}>{entry.text}</p>{(entry.text.length > 90 || entry.text.split("\n").length > 3) && <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? c.collapse : c.expand}</Button>}{!!entry.paths.length && <PageLinks prefix={c.alsoUpdated} paths={entry.paths} affairId={affairId} />}</>
-      : entry.kind === "edit" ? (entry.paths.length ? <PageLinks prefix={entry.actor === "user" ? c.userEdited : c.chronaEdited} paths={entry.paths} affairId={affairId} /> : <p>{entry.actor === "user" ? c.userEdited : c.chronaEdited}{c.updatedPages}</p>)
+      : entry.kind === "edit" ? <TimelineEdit entry={entry} affairId={affairId} />
         : <p>{c[entry.kind]}{entry.text}</p>}
   </div></li>;
+}
+function TimelineEdit({ entry, affairId }: { entry: TimelineEntry; affairId: string }) {
+  const { messages } = useI18n();
+  const c = messages.steward.affairCenter;
+  const prefix = entry.actor === "user" ? c.userEdited : c.chronaEdited;
+  return entry.paths.length ? <PageLinks prefix={prefix} paths={entry.paths} affairId={affairId} /> : <p>{prefix}{c.updatedPages}</p>;
 }
 export function AffairTechnicalDetails({ detail, children }: { detail: AffairDetail; children?: ReactNode }) {
   const { messages, locale } = useI18n();

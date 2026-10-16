@@ -1,6 +1,27 @@
 import type { Affair, TodayView } from "@chrona/contracts";
 import { formatShortDateTime } from "./format";
 
+type PillCopy = { runningPill: string; queuedPill: string; waitingPill: string; activePill: string };
+type PillAffair = Pick<Affair, "work" | "openApprovals" | "status">;
+export function progressPill(affair: PillAffair, copy: PillCopy) {
+  if (affair.work?.state === "running") return copy.runningPill;
+  if (affair.work?.state === "queued") return copy.queuedPill;
+  return affair.openApprovals ? copy.waitingPill : null;
+}
+export function affairPill(affair: PillAffair, copy: PillCopy, statuses: Record<Affair["status"], string>) {
+  return progressPill(affair, copy) ?? (affair.status === "active" ? copy.activePill : statuses[affair.status]);
+}
+export function affairPillClass(affair: PillAffair) {
+  if (affair.openApprovals && !affair.work) return "bg-warning/10 text-warning";
+  return affair.work?.state === "running" || affair.status === "active" && !affair.work ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground";
+}
+export function progressPillClass(affair: PillAffair) {
+  return affair.work?.state === "running" ? "bg-primary-soft text-primary" : affair.work ? "bg-muted text-muted-foreground" : "bg-warning/10 text-warning";
+}
+export function progressDetail(changedPages: number, next: string | null, pages: string) {
+  return [changedPages > 0 ? pages.replace("{count}", String(changedPages)) : null, next].filter(Boolean).join(" · ");
+}
+
 /** Plain text for overview cards, never Markdown destinations. */
 export function plainSummary(text: string): string {
   return text

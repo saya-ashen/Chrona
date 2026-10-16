@@ -7,7 +7,7 @@ import { useStewardSession } from "../hooks/use-steward-session";
 import { useStewardResource } from "../hooks/use-steward";
 import { groupWorkspaceAffairs, pageHref } from "../model/workspace";
 import { ResourceStatus } from "./resource-status";
-import { affairOverview } from "../model/affair-overview";
+import { affairOverview, affairPill, affairPillClass } from "../model/affair-overview";
 
 export function AffairsPage() {
   const { today: { client } } = useStewardSession();
@@ -24,11 +24,11 @@ export function AffairsPage() {
       const rows = <Surface>{group.items.map(affair => {
         const model = affairOverview(affair, locale, messages.steward.affairCenter);
         const c = messages.steward.affairCenter;
-        const pill = affair.work?.state === "running" ? c.runningPill : affair.work?.state === "queued" ? c.queuedPill : affair.openApprovals ? c.waitingPill : affair.status === "active" ? c.activePill : copy[affair.status];
+        const pill = affairPill(affair, c, copy);
         return <article key={affair.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-3.5 py-3 [overflow-wrap:anywhere]">
           <div className="flex flex-wrap items-baseline gap-2">
             <Link className="font-medium text-primary hover:underline" to={pageHref(locale, affair.id)}>{affair.title}</Link>
-            <Badge variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${affair.openApprovals && !affair.work ? "bg-warning/10 text-warning" : affair.work?.state === "running" || affair.status === "active" && !affair.work ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground"}`}>{pill}</Badge>
+            <Badge variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${affairPillClass(affair)}`}>{pill}</Badge>
           </div>
           <time className="text-xs text-muted-foreground tabular-nums" dateTime={affair.lastActivityAt}>{model.updatedAt}</time>
           <p className="col-span-full line-clamp-2 text-[13px] text-muted-foreground">{model.summary}</p>

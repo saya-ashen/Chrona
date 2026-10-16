@@ -25,6 +25,13 @@ export function fileTree(files: FileNode[]): FileBranch[] {
 export function pageName(path: string) {
   return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
 }
+function blankSummaryLines(lines: string[], start: number) {
+  let i = start;
+  while (i < lines.length && lines[i]!.trim() && !/^\s*(?:#|>|[-*+]\s|\d+\.\s|`{3,}|~{3,}|\|)/.test(lines[i]!)) {
+    lines[i] = "";
+    i++;
+  }
+}
 /** Blank the README summary while retaining source lines for checkbox mutations. */
 export function omitReadmeSummary(content: string, path: string): string {
   if (path !== "README.md") return content;
@@ -37,10 +44,7 @@ export function omitReadmeSummary(content: string, path: string): string {
     if (fence || !line.trim() || /^\s*(?:#|>|[-*+]\s|\d+\.\s|\|)/.test(line)) continue;
     // A setext heading is a heading, not the summary paragraph.
     if (/^\s*(?:=+|-+)\s*$/.test(lines[i + 1] ?? "")) { i++; continue; }
-    while (i < lines.length && lines[i]!.trim() && !/^\s*(?:#|>|[-*+]\s|\d+\.\s|`{3,}|~{3,}|\|)/.test(lines[i]!)) {
-      lines[i] = "";
-      i++;
-    }
+    blankSummaryLines(lines, i);
     break;
   }
   return lines.join("\n");

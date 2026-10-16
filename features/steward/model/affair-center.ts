@@ -1,4 +1,5 @@
 import { formatShortDateTime } from "./format";
+import { fileTree, visiblePath } from "./affair-file";
 import type { AffairDetail, Schedule } from "@chrona/contracts";
 
 export function scheduleLabel(schedule: Schedule, fallback: string) {
@@ -11,6 +12,13 @@ export function affairCenter(detail: AffairDetail, fallback: string) {
     active: detail.schedules.filter(item => item.status === "active" || item.status === "paused"),
     completed: detail.schedules.filter(item => item.status === "done" || item.status === "cancelled"),
     nextLabel: next?.label ?? fallback,
+  };
+}
+
+export function affairPages(detail: AffairDetail | null | undefined, path: string) {
+  return {
+    selected: detail?.files.find(file => file.path === path && file.kind === "file" && visiblePath(path)),
+    tree: detail ? fileTree(detail.files) : [],
   };
 }
 
