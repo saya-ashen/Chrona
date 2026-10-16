@@ -1,7 +1,7 @@
 import type { Prisma } from "@chrona/db";
 import { z } from "zod";
 import { notificationSchema, type NotifyLevel, type DeliveryOutcome } from "@chrona/contracts/steward";
-import { routeNotification, localDayKey, isDigestDue } from "@chrona/domain/steward/notify-budget";
+import { routeNotification, localDayKey, isDigestDue, foldedBeforeDigest } from "@chrona/domain/steward/notify-budget";
 import { composeDigest } from "@chrona/domain/steward/digest";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
@@ -9,9 +9,11 @@ import { requireAffair } from "./affairs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toNotification } from "./store";
-export type NotificationInput = { workspaceId: string; affairId?: string; approvalId?: string; level: NotifyLevel; title: string; body: string; urgent?: boolean; dedupeKey: string };
+export type NotificationInput = { workspaceId: string; affairId?: string; approvalId?: string; level: NotifyLevel; title: string; body: string; urgent?: boolean; responds?: boolean; dedupeKey: string };
+/** Responses to the user's own requests are stored under this key prefix so they never count against the proactive cap. */
+export const RESPONSE_KEY_PREFIX = "response:";
 export type NotificationContext = { now: Date; chatBound: boolean; publicUrl: string | null };
-const notificationInputSchema = notificationSchema.pick({ level: true, title: true, body: true }).extend({ workspaceId: z.string().min(1), affairId: z.string().min(1).optional(), approvalId: z.string().min(1).optional(), urgent: z.boolean().optional(), dedupeKey: z.string().min(1).max(500) }).strict();
+const notificationInputSchema = notificationSchema.pick({ level: true, title: true, body: true }).extend({ workspaceId: z.string().min(1), affairId: z.string().min(1).optional(), approvalId: z.string().min(1).optional(), urgent: z.boolean().optional(), responds: z.boolean().optional(), dedupeKey: z.string().min(1).max(500) }).strict();
 export async function enqueueNotification(tx: Prisma.TransactionClient, raw: NotificationInput, context: NotificationContext) {
   const input = parseInput(notificationInputSchema, raw);
   const { workspaceId, dedupeKey } = input;
@@ -23,9 +25,10 @@ export async function enqueueNotification(tx: Prisma.TransactionClient, raw: Not
   const settings = notificationSettings(workspace.settings), day = localDayKey(context.now, settings.timezone);
   // Reserve budget for queued sends too: a batch must not overrun the cap before delivery.
   const sent = await tx.notification.findMany({ where: { workspaceId, level: "now", OR: [{ sentAt: { gte: new Date(context.now.getTime() - 48 * 3600000) } }, { status: "queued" }] } });
-  const sentToday = sent.filter(r => localDayKey(r.sentAt ?? r.createdAt, settings.timezone) === day && !r.idempotencyKey.startsWith("digest:")).length;
+  const sentToday = sent.filter(r => localDayKey(r.sentAt ?? r.createdAt, settings.timezone) === day && !r.idempotencyKey.startsWith("digest:") && !r.idempotencyKey.startsWith(RESPONSE_KEY_PREFIX)).length;
   const negative = input.affairId ? await tx.notification.count({ where: { workspaceId, affairId: input.affairId, feedback: "not_useful", createdAt: { gte: new Date(context.now.getTime() - 30 * 86400000) } } }) : 0;
-  const route = routeNotification(negative >= 2 && input.level === "now" ? "digest" : input.level, { ...settings, now: context.now, urgent: input.urgent ?? false, sentToday });
+  const responds = input.responds ?? false;
+  const route = routeNotification(!responds && negative >= 2 && input.level === "now" ? "digest" : input.level, { ...settings, now: context.now, urgent: input.urgent ?? false, sentToday, responds });
   const row = await tx.notification.create({ data: { workspaceId, affairId: input.affairId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, ...notificationRouting(input, context, route, affair), createdAt: context.now, nextAttemptAt: context.now } });
   await audit(tx, { workspaceId, kind: "notification_enqueued", actor: "chrona", subjectId: row.id, details: { status: row.status, route } });
   return row;
@@ -94,10 +97,11 @@ export function createNotifications(ports: StewardPorts, workspaceId: string) {
       if (await tx.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId, idempotencyKey: key } } })) return null;
       const memberships = await tx.audit.findMany({ where: { workspaceId, kind: "digest_included" }, select: { subjectId: true } });
       const rows = await tx.notification.findMany({ where: { workspaceId, status: "folded", id: { notIn: memberships.flatMap(r => r.subjectId ? [r.subjectId] : []) }, OR: [{ affairId: null }, { affair: { status: "active" } }] }, include: { affair: true }, orderBy: { createdAt: "asc" } });
-      const digest = composeDigest(rows.map(r => ({ title: r.title, body: r.body, affairTitle: r.affair?.title ?? null })), { dayLabel: day });
+      const due = rows.filter(r => foldedBeforeDigest(r.createdAt, { ...settings, now }));
+      const digest = composeDigest(due.map(r => ({ title: r.title, body: r.body, affairTitle: r.affair?.title ?? null })), { dayLabel: day });
       if (!digest) return null;
       const row = await tx.notification.create({ data: { workspaceId, ...digest, body: digest.body.slice(0, 2000), level: "now", channel: ctx.chatBound ? "chrona_qqbot" : "in_app", status: "queued", idempotencyKey: key, createdAt: now, nextAttemptAt: now, link: `${ports.publicUrl ?? ""}/today` } });
-      for (const folded of rows) await audit(tx, { workspaceId, kind: "digest_included", actor: "chrona", subjectId: folded.id, details: { digestId: row.id } });
+      for (const folded of due) await audit(tx, { workspaceId, kind: "digest_included", actor: "chrona", subjectId: folded.id, details: { digestId: row.id } });
       await audit(tx, { workspaceId, kind: "notification_enqueued", actor: "chrona", subjectId: row.id, details: { digest: true } });
       return toNotification(row);
     });

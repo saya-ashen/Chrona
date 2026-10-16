@@ -12,7 +12,7 @@ import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
-import { createNotifications } from "./notify";
+import { createNotifications, RESPONSE_KEY_PREFIX } from "./notify";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -84,13 +84,22 @@ async function reply(ctx: ToolContext, raw: unknown) {
   const delivery = adapter ? await adapter.send({ idempotencyKey: `reply:${message.id}`, title: "", body: input.text, link: run.affairId ? `${ports.publicUrl ?? ""}/affairs/${run.affairId}` : null, recipient: null, files: deliveryFiles }) : { outcome: "rejected", retryable: true, error: "Delivery unavailable" };
   return { messageId: message.id, delivery };
 }
+/** The user is waiting on this affair: they wrote about it after Chrona last told them anything about it. */
+async function awaitedByUser({ db, workspaceId, run }: ToolContext) {
+  if (!run.affairId) return false;
+  const asked = await db.message.findFirst({ where: { workspaceId, affairId: run.affairId, direction: "in" }, orderBy: { at: "desc" } });
+  if (!asked) return false;
+  const told = await db.notification.findFirst({ where: { workspaceId, affairId: run.affairId, createdAt: { gt: asked.at }, status: { in: ["queued", "sent"] } } });
+  return !told;
+}
 async function notify(ctx: ToolContext, raw: unknown) {
   const { run, tool, affairs, ports, workspaceId, index } = ctx;
   const input = parseInput(schemas.chrona_notify, raw);
   const pending = await gate(ctx, "notify_user", { affairId: run.affairId ?? undefined }, { tool, ...input });
   if (pending) return pending;
   if (input.file) await (await affairs.files(affairId(ctx))).read(input.file);
-  return createNotifications(ports, workspaceId).enqueue({ level: input.level, title: input.title, body: input.body, affairId: run.affairId ?? undefined, dedupeKey: `tool:${run.id}:${index}` });
+  const responds = await awaitedByUser(ctx);
+  return createNotifications(ports, workspaceId).enqueue({ level: input.level, title: input.title, body: input.body, affairId: run.affairId ?? undefined, responds, dedupeKey: `${responds ? RESPONSE_KEY_PREFIX : "tool:"}${run.id}:${index}` });
 }
 async function schedule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_schedule, raw), id = await scheduleAffairId(ctx, input.affairId);

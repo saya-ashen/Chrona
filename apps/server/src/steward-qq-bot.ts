@@ -8,8 +8,14 @@ import { uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSour
 /** Pages open in the web reader; other files download through the authenticated raw route. Never expose a local path. */
 export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null, workspaceId: string) {
   return [message.text, ...message.attachments.map(file => file.path && message.affairId && publicUrl
-    ? `${file.name}: ${fileLink(publicUrl.replace(/\/$/, ""), message.affairId, file.path, workspaceId)}`
+    ? `${linkLabel(file.name)}：${fileLink(publicUrl.replace(/\/$/, ""), message.affairId, file.path, workspaceId)}`
     : `${file.name}（请在 Chrona 网页查看附件）`)].join("\n\n");
+}
+/** People see page names, not file names: composed pages are "the page", Markdown pages drop their extension. */
+function linkLabel(name: string) {
+  if (/\.ui\.json$/i.test(name)) return "打开页面";
+  if (/^readme\.md$/i.test(name)) return "总览";
+  return name.replace(/\.md$/i, "");
 }
 function fileLink(origin: string, affairId: string, path: string, workspaceId: string) {
   const affair = encodeURIComponent(affairId);

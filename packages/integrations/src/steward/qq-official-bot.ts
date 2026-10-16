@@ -97,6 +97,8 @@ export function createQqPassiveReplies(reply: (openid: string, id: string, text:
     return true;
   };
 }
+export const SLOW_ACK_MS = 30_000;
+const SLOW_ACK = "我还在处理，稍等，好了马上回你。";
 export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound = async () => {}, log = () => {}, now = () => new Date(), timers = globalThis }: {
   state: QqBotState; chat: QqChatPort;
   reply: (openid: string, messageId: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>;
@@ -145,8 +147,10 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
     await send(binding ? NOT_OWNER : UNBOUND);
   }
   async function handleOwnerMessage(message: QqC2cMessage, binding: QqBinding, send: (text: string, result?: QqChatResult) => Promise<boolean>) {
+    // Most answers arrive in well under half a minute: only a genuinely slow one gets a holding line,
+    // so a quick question is answered in one message (QQ passive replies stay valid for an hour).
     let ack: Promise<boolean> | undefined;
-    const timer = timers.setTimeout(() => { ack = send("收到，处理中…"); }, 8000);
+    const timer = timers.setTimeout(() => { ack = send(SLOW_ACK); }, SLOW_ACK_MS);
     let result: QqChatResult;
     try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
     catch { log("qq.chat_failed"); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }

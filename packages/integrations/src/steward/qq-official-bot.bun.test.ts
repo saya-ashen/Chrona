@@ -41,14 +41,14 @@ test("owner text goes unchanged to concierge; replay and restart dedupe", async 
   await h.say("U1", "duplicate", "帮助"); expect(h.calls).toHaveLength(4);
   const restart = harness(); await restart.say("U1", "duplicate", "帮助"); expect(restart.calls).toHaveLength(0);
 });
-test("slow concierge acknowledges at 8 seconds then sends final with next sequence", async () => {
+test("only a slow answer gets a holding line (after 30 s), then the final with the next sequence", async () => {
   let fire: (() => void) | undefined, release: (() => void) | undefined;
-  const timers = { setTimeout: ((fn: () => void, ms: number) => { expect(ms).toBe(8000); fire = fn; return 1; }) as typeof setTimeout, clearTimeout: (() => {}) as typeof clearTimeout };
+  const timers = { setTimeout: ((fn: () => void, ms: number) => { expect(ms).toBe(30_000); fire = fn; return 1; }) as typeof setTimeout, clearTimeout: (() => {}) as typeof clearTimeout };
   const h = harness({ timers, run: async () => { await new Promise<void>(r => { release = r; }); return { reply: "最终答复" }; } });
   await h.bind(); const pending = h.say("U1", "需求");
   while (!release) await new Promise(r => setTimeout(r, 1));
   expect(h.replies).toEqual([]); fire!(); release!(); await pending;
-  expect(h.replies).toEqual([{ text: "收到，处理中…", sequence: 1 }, { text: "最终答复", sequence: 2 }]);
+  expect(h.replies).toEqual([{ text: "我还在处理，稍等，好了马上回你。", sequence: 1 }, { text: "最终答复", sequence: 2 }]);
 });
 test("passive quota reserves four unique sequences and expires after 60 min", async () => {
   const seq: number[] = []; const send = createQqPassiveReplies(async (_o, _i, _t, n) => { seq.push(n); }, () => at.getTime());

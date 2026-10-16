@@ -79,5 +79,9 @@ test("outbound file link uses public origin and encoded raw path; no public orig
   const message = { text: "Ready", affairId: "a", attachments: [{ name: "a b.pdf", path: "out/a b.pdf", mime: "application/pdf", size: 3 }] };
   expect(qqReplyText(message, "https://chrona.example/", "ws_default")).toContain("https://chrona.example/api/steward/affairs/a/raw?workspaceId=ws_default&path=out%2Fa+b.pdf");
   expect(qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, name: "trending.md", path: "trending.md", mime: "text/markdown" }] }, "https://chrona.example", "ws_default")).toContain("https://chrona.example/affairs/a?path=trending.md");
+  const page = (name: string) => qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, name, path: name, mime: "text/plain" }] }, "https://chrona.example", "ws_default");
+  expect(page("entry.ui.json")).toContain("打开页面：https://chrona.example/affairs/a?path=entry.ui.json");
+  expect(page("README.md")).toContain("总览：");
+  expect(page("trending.md")).toContain("trending：");
   expect(qqReplyText(message, null, "ws_default")).toContain("请在 Chrona 网页查看附件");
 });

@@ -85,6 +85,19 @@ for (const state of ["running", "queued", "none", "failed_inject"] as const) tes
   }
 });
 
+test("notify answering the user's own request bypasses the cap; unsolicited ones keep it", async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Plan" });
+  await api.settings.update({ notifications: { dailyCap: 0 } });
+  await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "work" });
+  const run = (await api.runs.claimNext("background"))!;
+  const call2 = (input: unknown) => service.tools.call(run.token, "chrona_notify", input);
+  expect(await call2({ level: "now", title: "Checked", body: "Nothing asked for" })).toMatchObject({ status: "folded" });
+  await db.message.create({ data: { workspaceId, channel: "in_app", direction: "in", conversationKey: "in_app", text: "make the plan", affairId: affair.id, at: new Date(ports.now().getTime() + 1) } });
+  ports.now = () => new Date("2026-10-15T04:00:05Z");
+  expect(await call2({ level: "now", title: "Plan ready", body: "Open it" })).toMatchObject({ status: "queued" });
+  expect((await db.notification.findFirstOrThrow({ where: { title: "Plan ready" } })).idempotencyKey).toMatch(/^response:/);
+  expect(await call2({ level: "now", title: "Also", body: "Second" })).toMatchObject({ status: "folded" });
+});
 test("immediate wake extends a due wake that has not fired yet", async () => {
   const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
   const input = { affairId: affair.id, mode: "wake", label: "Plan", rule: { kind: "at", at: ports.now().toISOString() } };

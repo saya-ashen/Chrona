@@ -140,8 +140,20 @@ describe("notification outbox", () => {
     const first = await notify("one"); expect(first.status).toBe("queued"); expect((await notify("one")).id).toBe(first.id);
     expect((await notify("two")).status).toBe("folded"); expect((await notify("web", "web")).channel).toBe("in_app"); expect((await notify("digest", "digest")).status).toBe("folded");
     await api.notifications.deliverDue(); expect(sent.sort()).toEqual(["one", "web"]);
+    // Folded at noon, after today's 09:00 digest time: it waits for tomorrow's digest instead of interrupting now.
+    expect(await api.notifications.sendDigestIfDue()).toBeNull();
+    time = new Date("2026-10-16T01:00:00Z"); // 09:00 Shanghai
     expect(await api.notifications.sendDigestIfDue()).not.toBeNull(); expect(await api.notifications.sendDigestIfDue()).toBeNull();
-    await api.notifications.deliverDue(); expect(sent).toContain("digest:2026-10-15");
+    await api.notifications.deliverDue(); expect(sent).toContain("digest:2026-10-16");
+  });
+  test("a response to the user's own request ignores the cap and quiet hours and does not use the budget", async () => {
+    await api.settings.update({ notifications: { dailyCap: 1 } });
+    time = new Date("2026-10-15T16:00:00Z"); // 00:00 Shanghai, quiet hours
+    expect((await api.notifications.enqueue({ dedupeKey: "response:r1:0", level: "now", title: "Done", body: "Your plan is ready", responds: true })).status).toBe("queued");
+    expect((await api.notifications.enqueue({ dedupeKey: "response:r2:0", level: "digest", title: "Done", body: "Updated", responds: true })).status).toBe("queued");
+    time = new Date("2026-10-15T04:00:00Z");
+    expect((await notify("proactive")).status).toBe("queued");
+    expect((await notify("second proactive")).status).toBe("folded");
   });
   test("quiet hours fold; urgent still obeys daily cap", async () => {
     time = new Date("2026-10-15T16:00:00Z"); expect((await notify("quiet")).status).toBe("folded");
