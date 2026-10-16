@@ -4,6 +4,7 @@
 @import "@xyflow/react/dist/style.css";
 @source "../../../../features";
 @source "../../../../shared/ui";
+@source "../../../../node_modules/@json-render/shadcn/dist";
 
 @plugin "@tailwindcss/typography";
 

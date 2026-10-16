@@ -1,0 +1,92 @@
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { JSONUIProvider, Renderer, defineRegistry, type Components } from "@json-render/react";
+import { shadcnComponents as shadcn } from "@json-render/shadcn";
+import type { Spec } from "@json-render/core";
+import { useI18n } from "@chrona/i18n";
+import { Button, Checkbox } from "@shared/ui";
+import type { StewardClient } from "../model/client";
+import { uiCatalog } from "../model/ui-catalog";
+import { pageTasks } from "../model/ui-page";
+import { pageHref } from "../model/workspace";
+import { pageName } from "../model/affair-file";
+import { useStewardResource } from "../hooks/use-steward";
+import { ResourceStatus } from "./resource-status";
+
+type PageContext = { client: StewardClient; affairId: string; readOnly: boolean; refresh: () => void };
+const Page = createContext<PageContext | null>(null);
+// json-render skips registry actions without a setState; Chrona actions never write page state.
+const keepState = () => {};
+const usePage = () => { const page = useContext(Page); if (!page) throw new Error("Generated page outside its affair"); return page; };
+
+function TaskList({ props }: { props: { path: string; section: string | null; title: string | null; showProgress: boolean | null } }) {
+  const { client, affairId, readOnly } = usePage();
+  const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, props.path, signal), [client, affairId, props.path]));
+  const [pending, setPending] = useState(false);
+  const tasks = file.data ? pageTasks(file.data.content, props.section) : [];
+  const done = tasks.filter(task => task.checked).length;
+  const toggle = async (line: number, checked: boolean) => {
+    if (!file.data) return;
+    setPending(true);
+    try { await client.toggleCheckbox(affairId, { path: props.path, line, checked, baseRevision: file.data.revision }); file.refresh(); } finally { setPending(false); }
+  };
+  return <section className="grid min-w-0 gap-2" aria-label={props.title ?? pageName(props.path)}>
+    {(props.title || props.showProgress) && <header className="flex items-baseline gap-2">{props.title && <h3 className="font-medium">{props.title}</h3>}{props.showProgress && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{done} / {tasks.length}</span>}</header>}
+    {props.showProgress && tasks.length > 0 && <div className="h-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${(done / tasks.length) * 100}%` }} /></div>}
+    <ResourceStatus resource={file} />
+    <ul className="grid">{tasks.map(task => <li key={task.line} className="flex min-w-0 items-start gap-2.5 border-t py-2 first:border-0">
+      <Checkbox className="mt-1" aria-label={task.text} checked={task.checked} disabled={readOnly || pending} onCheckedChange={value => void toggle(task.line, value === true)} />
+      <span className={task.checked ? "text-muted-foreground line-through decoration-border" : ""}>{task.text}</span>
+    </li>)}</ul>
+  </section>;
+}
+function PageLink({ props }: { props: { label: string; path: string; hint: string | null } }) {
+  const { affairId } = usePage();
+  const { locale } = useI18n();
+  return <Link className="group grid gap-0.5 text-primary" to={pageHref(locale, affairId, props.path)}><span className="group-hover:underline">{props.label} ›</span>{props.hint && <span className="text-xs text-muted-foreground">{props.hint}</span>}</Link>;
+}
+function Upload({ props }: { props: { label: string; folder: string; note: string | null } }) {
+  const { client, affairId, readOnly, refresh } = usePage();
+  const input = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState(false);
+  const upload = async (files: File[]) => {
+    if (!files.length) return;
+    setPending(true);
+    try {
+      for (const file of files) await client.upload(affairId, file, props.folder);
+      await client.chat({ affairId, text: `${props.note ?? props.label}：${files.map(file => file.name).join("、")}` });
+      refresh();
+    } finally { setPending(false); }
+  };
+  if (readOnly) return null;
+  return <div><Button disabled={pending} onClick={() => input.current?.click()}>{props.label}</Button><input ref={input} type="file" multiple hidden aria-label={props.label} onChange={event => { void upload(Array.from(event.target.files ?? [])); event.target.value = ""; }} /></div>;
+}
+
+const generic: Partial<Components<typeof uiCatalog>> = {
+  Card: shadcn.Card, Stack: shadcn.Stack, Grid: shadcn.Grid, Separator: shadcn.Separator, Tabs: shadcn.Tabs, Accordion: shadcn.Accordion,
+  Collapsible: shadcn.Collapsible, Table: shadcn.Table, Heading: shadcn.Heading, Text: shadcn.Text, Badge: shadcn.Badge, Alert: shadcn.Alert,
+  Progress: shadcn.Progress, Input: shadcn.Input, Textarea: shadcn.Textarea, Select: shadcn.Select, Radio: shadcn.Radio, Button: shadcn.Button,
+};
+
+/** Renders a page the Provider composed from the catalog (`*.ui.json`); actions go through Chrona. */
+export function GeneratedPage({ spec, client, affairId, readOnly, refresh }: PageContext & { spec: unknown }) {
+  const { locale } = useI18n();
+  const navigate = useNavigate();
+  const valid = uiCatalog.validate(spec);
+  const { registry, handlers } = useMemo(() => defineRegistry(uiCatalog, {
+    components: { ...generic, TaskList, PageLink, Upload } as Components<typeof uiCatalog>,
+    actions: {
+      say: async params => { if (params && !readOnly) { await client.chat({ affairId, text: params.text }); refresh(); } },
+      open: async params => { if (params) navigate(pageHref(locale, affairId, params.path)); },
+    },
+  }), [client, affairId, readOnly, refresh, navigate, locale]);
+  const state = useRef<Record<string, unknown>>({});
+  if (!valid.success) return <p role="alert">{valid.error?.issues[0]?.message ?? "Invalid page"}</p>;
+  // Render the checked original: json-render 0.21's catalog.validate output drops elements' `on` bindings.
+  const page = spec as Spec;
+  return <Page.Provider value={{ client, affairId, readOnly, refresh }}>
+    <JSONUIProvider registry={registry} initialState={page.state ?? {}} handlers={handlers(() => keepState, () => state.current)}>
+      <Renderer spec={page} registry={registry} />
+    </JSONUIProvider>
+  </Page.Provider>;
+}

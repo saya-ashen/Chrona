@@ -2,7 +2,7 @@
   "steward": {
      "overview": { "working": "Chrona 正在处理 {count} 件事", "upcomingPart": "{count} 项安排临近", "separator": "，", "end": "。", "progressSummary": "这周有 {count} 件事有进展",
       "activitySummary": "这周有 {progress} 件事有进展，{upcoming} 项安排临近。", "progress": "进展", "pages": "更新了 {count} 个页面", "earlier": "更早", "work": "Chrona 处理", "todayPage": "今天的页面" },
-    "affairCenter": { "alsoUpdated": "更新了 ", "now": "现在怎么样了",
+    "affairCenter": { "secondLevel": "页面、安排与经过", "alsoUpdated": "更新了 ", "now": "现在怎么样了",
       "supplement": "补充",
       "supplementHint": "补充信息或改方向",
       "runningPill": "处理中",
