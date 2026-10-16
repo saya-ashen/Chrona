@@ -13,6 +13,12 @@ function LocaleRedirect({ today = false }: { today?: boolean }) {
   return <Navigate to={`/${today ? resolveLocale(lang) : defaultLocale}${search}${hash}`} replace />;
 }
 
+/** Links Chrona sends out (QQ, notifications) carry no locale: keep the path and query under the default one. */
+function UnlocalizedRedirect() {
+  const { pathname, search, hash } = useLocation();
+  return <Navigate to={`/${defaultLocale}${pathname}${search}${hash}`} replace />;
+}
+
 function loadLocaleBootData(args: Parameters<typeof loadAppBootData>[0]) {
   if (!args.params.lang || !hasLocale(args.params.lang)) {
     throw new Response(null, { status: 404 });
@@ -23,6 +29,8 @@ function loadLocaleBootData(args: Parameters<typeof loadAppBootData>[0]) {
 export function createAppRouter() {
   return createBrowserRouter([
     { path: "/", element: <LocaleRedirect /> },
+    { path: "/affairs/*", element: <UnlocalizedRedirect /> },
+    { path: "/settings", element: <UnlocalizedRedirect /> },
     {
       path: "/:lang",
       loader: loadLocaleBootData,

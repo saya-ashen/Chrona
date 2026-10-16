@@ -60,7 +60,7 @@ test("QQ attachment-only message: inbox, images, receipt quote focus, affair sto
     const second = await db.message.findFirstOrThrow({ where: { externalId: "second" } });
     expect(second.quotedMessageId).toBe(outbound.id);
     expect((second.attachments as { path: string }[])[0]!.path).toStartWith("attachments/2026-10-15/");
-    expect(sends[1]!.content).toContain(`/api/steward/affairs/${affairId}/raw?path=output%2Fchart.png`);
+    expect(sends[1]!.content).toContain(`/api/steward/affairs/${affairId}/raw?workspaceId=w&path=output%2Fchart.png`);
     expect(sends[1]!.mediaFileInfo).toBe("uploaded-image");
     expect((await service.chat.messages("w")).find(m => m.direction === "out" && m.attachments.length)?.attachments[0]!.name).toBe("chart.png");
     const prepared = await service.chat.intakeAttachments({ workspaceId: "w", channel: "chrona_qqbot" }, [
@@ -77,6 +77,7 @@ test("QQ attachment-only message: inbox, images, receipt quote focus, affair sto
 
 test("outbound file link uses public origin and encoded raw path; no public origin stays honest", () => {
   const message = { text: "Ready", affairId: "a", attachments: [{ name: "a b.pdf", path: "out/a b.pdf", mime: "application/pdf", size: 3 }] };
-  expect(qqReplyText(message, "https://chrona.example/")).toContain("https://chrona.example/api/steward/affairs/a/raw?path=out%2Fa%20b.pdf");
-  expect(qqReplyText(message, null)).toContain("请在 Chrona 网页查看附件");
+  expect(qqReplyText(message, "https://chrona.example/", "ws_default")).toContain("https://chrona.example/api/steward/affairs/a/raw?workspaceId=ws_default&path=out%2Fa+b.pdf");
+  expect(qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, name: "trending.md", path: "trending.md", mime: "text/markdown" }] }, "https://chrona.example", "ws_default")).toContain("https://chrona.example/affairs/a?path=trending.md");
+  expect(qqReplyText(message, null, "ws_default")).toContain("请在 Chrona 网页查看附件");
 });

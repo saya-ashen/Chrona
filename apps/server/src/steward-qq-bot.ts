@@ -5,11 +5,17 @@ import { attachmentSchema } from "@chrona/contracts/steward";
 import { createChronaQqDelivery, createQqBotHandler, createQqBotState, qqBotConfig, DEDICATED_PLATFORM } from "../../../packages/integrations/src/steward/qq-official-bot";
 import { uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
 
-/** Authenticated web downloads: never expose a local path or invent a public file URL. */
-export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null) {
+/** Pages open in the web reader; other files download through the authenticated raw route. Never expose a local path. */
+export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null, workspaceId: string) {
   return [message.text, ...message.attachments.map(file => file.path && message.affairId && publicUrl
-    ? `${file.name}: ${publicUrl.replace(/\/$/, "")}/api/steward/affairs/${encodeURIComponent(message.affairId)}/raw?path=${encodeURIComponent(file.path)}`
+    ? `${file.name}: ${fileLink(publicUrl.replace(/\/$/, ""), message.affairId, file.path, workspaceId)}`
     : `${file.name}（请在 Chrona 网页查看附件）`)].join("\n\n");
+}
+function fileLink(origin: string, affairId: string, path: string, workspaceId: string) {
+  const affair = encodeURIComponent(affairId);
+  return /\.(md|ui\.json)$/i.test(path)
+    ? `${origin}/affairs/${affair}?${new URLSearchParams({ path })}`
+    : `${origin}/api/steward/affairs/${affair}/raw?${new URLSearchParams({ workspaceId, path })}`;
 }
 
 function isReplyImage(file: import("@chrona/contracts/steward").Attachment | undefined) {
@@ -89,7 +95,7 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
             for (const attachment of remote) files.push(await (transport?.download ?? downloadQqAttachment)(attachment));
             const intake = files.length ? await service.chat.intakeAttachments({ ...chatInput, ...quote }, files) : {};
             const result = await service.chat.handleMessage({ ...chatInput, ...quote, ...intake });
-            const replies = result.messages.map(message => ({ messageId: message.id, affairId: message.affairId, reply: qqReplyText(message, publicUrl) }));
+            const replies = result.messages.map(message => ({ messageId: message.id, affairId: message.affairId, reply: qqReplyText(message, publicUrl, input.workspaceId) }));
             return { reply: replies.map(m => m.reply).join("\n\n") || "处理尚未完成，请稍后在网页查看。", affairId: result.messages.at(-1)?.affairId, workspaceId: input.workspaceId, replies };
           } finally { wake(); }
         } },
