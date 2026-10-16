@@ -6,7 +6,7 @@ import type { Spec } from "@json-render/core";
 import { useI18n } from "@chrona/i18n";
 import { Button, Checkbox, MarkdownContent } from "@shared/ui";
 import type { StewardClient } from "../model/client";
-import type { PanelBlock } from "@chrona/domain/steward/markdown";
+import type { PanelBlock } from "@chrona/domain";
 import { FilePanel } from "./file-panel";
 import { safeUiPath, uiCatalog } from "@chrona/ui-catalog";
 import { pageTasks, recordUiEvent } from "../model/ui-page";
