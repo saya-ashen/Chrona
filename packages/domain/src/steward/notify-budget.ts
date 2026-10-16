@@ -7,6 +7,8 @@ function localParts(now: Date, timezone: string) {
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)!.value;
   return { day: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
+/** Notifications answering the user's own request are keyed with this prefix and never use the proactive budget. */
+export const RESPONSE_KEY_PREFIX = "response:";
 export function localDayKey(now: Date, timezone: string): string { return localParts(now, timezone).day; }
 export function routeNotification(level: NotifyLevel, ctx: Pick<NotificationSettings, "dailyCap" | "quietHours" | "timezone"> & {
   sentToday: number; now: Date; urgent: boolean;

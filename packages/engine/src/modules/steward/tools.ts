@@ -80,6 +80,7 @@ async function reply(ctx: ToolContext, raw: unknown) {
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
     return message;
   });
+  await linkFocusedMessages(ctx);
   const adapter = ports.deliveries.find(d => d.channel === conversation.channel);
   const delivery = adapter ? await adapter.send({ idempotencyKey: `reply:${message.id}`, title: "", body: input.text, link: run.affairId ? `${ports.publicUrl ?? ""}/affairs/${run.affairId}` : null, recipient: null, files: deliveryFiles }) : { outcome: "rejected", retryable: true, error: "Delivery unavailable" };
   return { messageId: message.id, delivery };
@@ -150,6 +151,21 @@ async function cancelSchedule(ctx: ToolContext, raw: unknown) {
   return pending ?? await ctx.schedules.cancel(row.id);
 }
 function affairs(ctx: ToolContext, raw: unknown) { return ctx.affairs.list(parseInput(schemas.chrona_affairs, raw).status); }
+async function linkFocusedMessages(ctx: ToolContext) {
+  const { db, workspaceId, run } = ctx;
+  const focus = await db.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey! }, orderBy: { createdAt: "desc" } });
+  const focusedId = z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+  if (focusedId) await linkRunMessages(ctx, focusedId);
+}
+async function linkRunMessages(ctx: ToolContext, id: string) {
+  const { db, workspaceId, run } = ctx;
+  const records = await db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: { in: ["chat_run_input", "run_reply"] } } });
+  const ids = records.flatMap(record => {
+    const parsed = z.object({ messageId: z.string() }).safeParse(record.details);
+    return parsed.success ? [parsed.data.messageId] : [];
+  });
+  await db.message.updateMany({ where: { workspaceId, conversationKey: run.conversationKey!, affairId: null, id: { in: ids } }, data: { affairId: id } });
+}
 async function createAffair(ctx: ToolContext, raw: unknown) {
   const { affairs, run, db, workspaceId } = ctx;
   const input = parseInput(schemas.chrona_affair_create, raw);
@@ -159,7 +175,10 @@ async function createAffair(ctx: ToolContext, raw: unknown) {
     await files.save("README.md", input.readme, current.revision, "chrona");
   }
   // The conversation now talks about this affair, so later messages and schedules land in it.
-  if (run.conversationKey) await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { affairId: affair.id } });
+  if (run.conversationKey) {
+    await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { affairId: affair.id } });
+    await linkRunMessages(ctx, affair.id);
+  }
   const path = relative(run.cwd, await (await affairs.files(affair.id)).directory()) || ".";
   // A sandboxed run cannot write into a directory created after it started.
   const next = run.affairId ? null : "The new affair directory may not be writable in this run. Its README already holds `readme`; to continue working inside it, chrona_schedule a wake at now with a precise instruction (the next run starts inside the affair), reply briefly, and stop.";
@@ -175,6 +194,7 @@ async function focus(ctx: ToolContext, raw: unknown) {
   if (!run.conversationKey) throw new StewardError("invalid", "Focus requires a conversation");
   const directory = await (await affairs.files(input.affairId)).directory();
   await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: input });
+  await linkRunMessages(ctx, input.affairId);
   return { ...input, path: relative(run.cwd, directory) || "." };
 }
 async function requestApproval(ctx: ToolContext, raw: unknown) {
@@ -216,7 +236,7 @@ async function guideUi(ctx: ToolContext, raw: unknown) {
 async function setUi(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_ui_set, raw), id = affairId(ctx, input.affairId);
   const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
-  if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
+  if (affair.status !== "active" && affair.id !== ctx.run.affairId) throw new StewardError("conflict", "Affair is not active");
   let spec: object;
   try { spec = compileUiSpec(input.spec); }
   catch { return { ok: false, issues: ["Invalid JSONL patch stream"] }; }
@@ -238,7 +258,7 @@ export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
   async function call(token: string, name: string, raw: unknown) {
     const claim = await db.$transaction(async tx => {
-      const auth = await authenticateRun(tx, token, now());
+      const auth = await authenticateRun(tx, token, now(), name);
       const calls = Array.isArray(auth.run.toolCalls) ? auth.run.toolCalls as Prisma.InputJsonObject[] : [];
       if (calls.length >= RUN_LIMITS.maxChronaToolCalls) {
         await audit(tx, { workspaceId: auth.workspaceId, actor: "chrona", kind: "tool_limit_rejected", subjectId: auth.run.id, details: { tool: name.slice(0, 200) } });

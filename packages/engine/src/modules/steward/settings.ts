@@ -2,6 +2,7 @@ import { DEFAULT_NOTIFICATION_SETTINGS, notificationSettingsSchema, updateSettin
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { RecordContext } from "./affairs";
 import { audit } from "./audit";
+import { RESPONSE_KEY_PREFIX } from "@chrona/domain/steward/notify-budget";
 import { parseInput, StewardError } from "./errors";
 export function notificationSettings(settings: unknown): NotificationSettings {
   const value = settings as { notifications?: unknown } | null;
@@ -12,7 +13,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext, chat: { 
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
     const notifications = notificationSettings(row.settings), day = localDayKey(now(), notifications.timezone);
-    const sent = await db.notification.findMany({ where: { workspaceId, channel: "chrona_qqbot", sentAt: { not: null, gte: new Date(now().getTime() - 48 * 3600000) } }, select: { sentAt: true } });
+    const sent = await db.notification.findMany({ where: { workspaceId, channel: "chrona_qqbot", NOT: { idempotencyKey: { startsWith: RESPONSE_KEY_PREFIX } }, sentAt: { not: null, gte: new Date(now().getTime() - 48 * 3600000) } }, select: { sentAt: true } });
     return { notifications, chat: { channel: chat?.channel ?? "in_app" as const, bound: chat ? await chat.bound() : false, sentToday: sent.filter(r => r.sentAt && localDayKey(r.sentAt, notifications.timezone) === day).length } };
   }
   return { get, update: async (raw: unknown) => {

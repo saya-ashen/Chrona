@@ -1,7 +1,7 @@
 import type { Prisma } from "@chrona/db";
 import { z } from "zod";
 import { notificationSchema, type NotifyLevel, type DeliveryOutcome } from "@chrona/contracts/steward";
-import { routeNotification, localDayKey, isDigestDue, foldedBeforeDigest } from "@chrona/domain/steward/notify-budget";
+import { routeNotification, localDayKey, isDigestDue, foldedBeforeDigest, RESPONSE_KEY_PREFIX } from "@chrona/domain/steward/notify-budget";
 import { composeDigest } from "@chrona/domain/steward/digest";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
@@ -10,8 +10,7 @@ import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toNotification } from "./store";
 export type NotificationInput = { workspaceId: string; affairId?: string; approvalId?: string; level: NotifyLevel; title: string; body: string; urgent?: boolean; responds?: boolean; dedupeKey: string };
-/** Responses to the user's own requests are stored under this key prefix so they never count against the proactive cap. */
-export const RESPONSE_KEY_PREFIX = "response:";
+export { RESPONSE_KEY_PREFIX };
 export type NotificationContext = { now: Date; chatBound: boolean; publicUrl: string | null };
 const notificationInputSchema = notificationSchema.pick({ level: true, title: true, body: true }).extend({ workspaceId: z.string().min(1), affairId: z.string().min(1).optional(), approvalId: z.string().min(1).optional(), urgent: z.boolean().optional(), responds: z.boolean().optional(), dedupeKey: z.string().min(1).max(500) }).strict();
 export async function enqueueNotification(tx: Prisma.TransactionClient, raw: NotificationInput, context: NotificationContext) {

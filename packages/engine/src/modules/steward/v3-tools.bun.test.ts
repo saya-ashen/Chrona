@@ -25,6 +25,47 @@ beforeEach(async () => {
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 const call = (name: string, input: unknown = {}) => service.tools.call(token, name, input);
+for (const tool of ["chrona_affair_create", "chrona_focus"]) test(`${tool} links only this run's unassigned messages, including later replies`, async () => {
+  const inbound = await db.message.findFirstOrThrow();
+  await db.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "chat_run_input", subjectId: runId, details: { messageId: inbound.id } } });
+  await call("chrona_reply", { text: "Before focus" });
+  const other = await db.message.create({ data: { workspaceId, channel: "in_app", direction: "out", conversationKey: "in_app", text: "Unrelated", at: ports.now() } });
+  const affair = tool === "chrona_focus" ? await service.forWorkspace(workspaceId).affairs.create({ title: "Existing" }) : null;
+  const result = await call(tool, affair ? { affairId: affair.id } : { title: "New" }) as { id: string };
+  const id = affair?.id ?? result.id;
+  await call("chrona_reply", { text: "After focus" });
+  expect(await db.message.count({ where: { affairId: id } })).toBe(3);
+  expect((await db.message.findUniqueOrThrow({ where: { id: other.id } })).affairId).toBeNull();
+});
+for (const status of ["paused", "done"] as const) test(`running affair can finish describing ${status}, but cannot act`, async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  await db.run.update({ where: { id: runId }, data: { affairId: affair.id } });
+  await call("chrona_affair_update", { affairId: affair.id, status });
+  const spec = { root: "button", elements: { button: { type: "Button", props: { label: "Stopped" }, children: [] } } };
+  expect(await call("chrona_ui_set", { path: "state.ui.json", spec, role: "entry" })).toMatchObject({ ok: true });
+  await call("chrona_reply", { text: "Stopped" });
+  await call("chrona_notify", { level: "digest", title: "Stopped", body: "Stopped" });
+  for (const tool of ["chrona_schedule", "chrona_send_email", "chrona_request_approval", "chrona_inbound"]) await expect(call(tool)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "New" })).rejects.toMatchObject({ code: "conflict" });
+});
+test("sent today excludes response notifications", async () => {
+  for (const idempotencyKey of ["response:answer", "tool:proactive"]) await db.notification.create({ data: { workspaceId, channel: "chrona_qqbot", level: "now", title: "Sent", body: "Sent", status: "sent", idempotencyKey, sentAt: ports.now() } });
+  expect((await service.forWorkspace(workspaceId).settings.get()).chat.sentToday).toBe(1);
+});
+for (const linked of [false, true]) test(`schedule context retains root conversation (linked=${linked})`, async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Page" });
+  if (linked) await db.message.updateMany({ data: { affairId: affair.id } });
+  await db.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "conversation_focus", subjectId: "in_app", details: { affairId: affair.id } } });
+  const prompts: string[] = [];
+  ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start: input => {
+    prompts.push(input.prompt);
+    return { done: new Promise(() => {}), inject: async () => {}, abort: async () => {} };
+  } };
+  await api.schedules.create(affair.id, { mode: "wake", rule: { kind: "at", at: ports.now().toISOString() }, text: "Make page", label: "Page" }, "chrona");
+  await service.tick();
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain('"text":"hello"');
+});
 test("catalog authenticates; every contract tool has a schema; invalid calls are counted and audited", async () => {
   expect((await service.tools.catalog(token)).map(t => t.name)).toEqual(CHRONA_TOOLS);
   await expect(service.tools.catalog("invalid")).rejects.toMatchObject({ code: "forbidden" });
