@@ -56,7 +56,7 @@ export function createAffairs({ db, workspaceId, now }: RecordContext, fs: Works
       ]);
       return { affair, entry: await uiEntry(directory, tree), files: tree.slice(0, 2000), schedules: schedules.map(toSchedule), approvals: approvals.map(toApproval), activity: activity.map(toActivity), runs: runs.map(toRun), revisions, messages: messages.reverse().map(toMessage) };
     },
-    update: async (id: string, raw: unknown) => {
+    update: async (id: string, raw: unknown, runId?: string) => {
       const input = parseInput(updateAffairSchema, raw);
       const row = await db.$transaction(async tx => {
         await requireAffair(tx, workspaceId, id);
@@ -64,7 +64,7 @@ export function createAffairs({ db, workspaceId, now }: RecordContext, fs: Works
         if (input.status && input.status !== "active") await tx.schedule.updateMany({ where: { workspaceId, affairId: id, status: "active" }, data: { status: "paused" } });
         const row = await tx.affair.update({ where: { id }, data: { ...input, lastActivityAt: now(), revision: { increment: 1 } } });
         await tx.activity.create({ data: { workspaceId, affairId: id, actor: "user", kind: "status", text: input.status ?? input.title ?? row.title, at: now() } });
-        await audit(tx, { workspaceId, kind: "affair_updated", actor: "user", subjectId: id, details: input });
+        await audit(tx, { workspaceId, kind: "affair_updated", actor: runId ? "chrona" : "user", subjectId: id, details: { ...input, ...(runId ? { runId } : {}) } });
         return row;
       });
       return view(row);

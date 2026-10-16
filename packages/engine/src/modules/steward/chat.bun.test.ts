@@ -46,6 +46,35 @@ for (const fails of [false, true]) test(`affair chat forwards to background work
   expect(await db.run.count({ where: { lane: "background" } })).toBe(1);
 });
 
+for (const routing of ["focus", "web", "quote"] as const) test(`Provider routes new topics; arrival forwarding requires explicit choice: ${routing}`, async () => {
+  const api = service.forWorkspace(workspaceId), a = await api.affairs.create({ title: "A" });
+  await db.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "conversation_focus", subjectId: "chat:in_app", details: { affairId: a.id } } });
+  const quoted = await db.message.create({ data: { workspaceId, channel: "in_app", conversationKey: "chat:in_app", direction: "out", text: "Old topic", affairId: a.id, at: ports.now() } });
+  const background = await api.runs.enqueue({ affairId: a.id, lane: "background", trigger: "schedule", prompt: "Old work" });
+  await api.runs.claimNext("background");
+  const forwarded: string[] = [];
+  liveRuns.set(background.id, { done: new Promise(() => {}), abort: async () => {}, inject: async text => { forwarded.push(text); } });
+  const extra = routing === "web" ? { affairId: a.id } : routing === "quote" ? { quotedMessageId: quoted.id } : {};
+  const p = provider(), pending = send("New topic", extra), run = await p.started;
+  expect(forwarded).toHaveLength(routing === "focus" ? 0 : 1);
+  await service.tools.call(run.token, "chrona_reply", { text: "Before routing" });
+  const b = await service.tools.call(run.token, "chrona_affair_create", { title: "B" }) as { id: string };
+  await service.tools.call(run.token, "chrona_reply", { text: "After routing" });
+  const target = routing === "focus" ? b.id : a.id;
+  for (const text of ["New topic", "Before routing", "After routing"]) expect((await db.message.findFirstOrThrow({ where: { text } })).affairId).toBe(target);
+  if (routing === "focus") {
+    await api.settings.update({ notifications: { dailyCap: 0 } });
+    await api.runs.enqueue({ affairId: b.id, lane: "background", trigger: "schedule", prompt: "Finish page" });
+    // Release A's background slot without invoking a Provider.
+    await api.runs.finish(background.id, success);
+    const work = (await api.runs.claimNext("background"))!;
+    expect(await service.tools.call(work.token, "chrona_notify", { level: "now", title: "Page ready", body: "Done" })).toMatchObject({ status: "queued" });
+    expect((await db.notification.findFirstOrThrow({ where: { title: "Page ready" } })).idempotencyKey).toMatch(/^response:/);
+  }
+  p.finish(success);
+  await pending;
+});
+
 test("simple tools reply and persisted externalId dedupe (including new service)", async () => {
   const p = provider(), pending = send("hello", { externalId: "one" });
   const run = await p.started;
@@ -67,7 +96,9 @@ test("live run receives second text and inline image; both callers receive later
   await service.tools.call(run.token, "chrona_reply", { text: "early", files: [] });
   const second = send("second", { attachments: [{ name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" }] });
   expect(await p.injected).toEqual({ text: "second", images: [{ mime: "image/png", base64: "YWJj" }] });
+  const affair = await service.tools.call(run.token, "chrona_affair_create", { title: "Both messages" }) as { id: string };
   await service.tools.call(run.token, "chrona_reply", { text: "later", files: [] });
+  expect(await db.message.count({ where: { affairId: affair.id } })).toBe(4);
   p.finish(success);
   expect((await first).messages.map(m => m.text)).toEqual(expect.arrayContaining(["early", "later"]));
   expect((await second).messages.map(m => m.text)).toEqual(["later"]);

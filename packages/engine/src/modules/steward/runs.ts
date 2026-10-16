@@ -20,10 +20,18 @@ export function nextLocalMidnight(now: Date, timezone: string) {
   while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (localDayKey(new Date(mid), timezone) === day) lo = mid; else hi = mid; }
   return new Date(hi);
 }
+export async function canDescribeInactiveAffair(tx: Prisma.TransactionClient, run: { id: string; workspaceId: string }, affairId: string, tool?: string) {
+  if (!["chrona_reply", "chrona_ui_set", "chrona_notify"].includes(tool ?? "")) return false;
+  const records = await tx.audit.findMany({ where: { workspaceId: run.workspaceId, kind: "affair_updated", subjectId: affairId } });
+  return records.some(record => {
+    const change = z.object({ runId: z.string(), status: z.enum(["paused", "done"]) }).safeParse(record.details);
+    return change.success && change.data.runId === run.id;
+  });
+}
 export async function authenticateRun(tx: Prisma.TransactionClient, token: string, now: Date, tool?: string) {
   const row = await tx.run.findUnique({ where: { tokenHash: hash(token) }, include: { affair: true } });
   if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now) throw new StewardError("forbidden", "Run capability is no longer valid");
-  if (row.affair && row.affair.status !== "active" && !["chrona_reply", "chrona_ui_set", "chrona_notify"].includes(tool ?? "")) throw new StewardError("forbidden", "Affair is not active");
+  if (row.affair && row.affair.status !== "active" && !await canDescribeInactiveAffair(tx, row, row.affair.id, tool)) throw new StewardError("forbidden", "Affair is not active");
   const { affair, ...run } = row;
   return { run, affair, workspaceId: row.workspaceId };
 }

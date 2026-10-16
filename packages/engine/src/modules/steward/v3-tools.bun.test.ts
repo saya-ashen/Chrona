@@ -25,7 +25,10 @@ beforeEach(async () => {
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 const call = (name: string, input: unknown = {}) => service.tools.call(token, name, input);
-for (const tool of ["chrona_affair_create", "chrona_focus"]) test(`${tool} links only this run's unassigned messages, including later replies`, async () => {
+for (const tool of ["chrona_affair_create", "chrona_focus"]) test(`${tool} replaces this run's provisional links, including later replies`, async () => {
+  const previous = await service.forWorkspace(workspaceId).affairs.create({ title: "Previous focus" });
+  await db.run.update({ where: { id: runId }, data: { affairId: previous.id } });
+  await db.message.updateMany({ data: { affairId: previous.id } });
   const inbound = await db.message.findFirstOrThrow();
   await db.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "chat_run_input", subjectId: runId, details: { messageId: inbound.id } } });
   await call("chrona_reply", { text: "Before focus" });
@@ -48,6 +51,24 @@ for (const status of ["paused", "done"] as const) test(`running affair can finis
   for (const tool of ["chrona_schedule", "chrona_send_email", "chrona_request_approval", "chrona_inbound"]) await expect(call(tool)).rejects.toMatchObject({ code: "forbidden" });
   await expect(api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "New" })).rejects.toMatchObject({ code: "conflict" });
 });
+for (const status of ["paused", "done"] as const) test(`run in A may describe B it ${status}, but not schedule B`, async () => {
+  const api = service.forWorkspace(workspaceId), a = await api.affairs.create({ title: "A" }), b = await api.affairs.create({ title: "B" });
+  await db.run.update({ where: { id: runId }, data: { affairId: a.id } });
+  await call("chrona_affair_update", { affairId: b.id, status });
+  const spec = { root: "button", elements: { button: { type: "Button", props: { label: "Stopped" }, children: [] } } };
+  expect(await call("chrona_ui_set", { affairId: b.id, path: "state.ui.json", spec, role: "entry" })).toMatchObject({ ok: true });
+  await call("chrona_focus", { affairId: b.id });
+  await call("chrona_reply", { text: "B stopped" });
+  expect((await db.message.findFirstOrThrow({ where: { text: "B stopped" } })).affairId).toBe(b.id);
+  await call("chrona_notify", { level: "digest", title: "B stopped", body: "Stopped" });
+  await expect(call("chrona_schedule", { affairId: b.id, mode: "wake", rule: { kind: "at", at: ports.now().toISOString() }, label: "Work", text: "Work" })).rejects.toMatchObject({ code: "conflict" });
+  const other = await api.affairs.create({ title: "Stopped by user" });
+  await api.affairs.update(other.id, { status });
+  await expect(call("chrona_ui_set", { affairId: other.id, path: "state.ui.json", spec, role: "entry" })).rejects.toMatchObject({ code: "conflict" });
+  await db.run.update({ where: { id: runId }, data: { affairId: other.id } });
+  await expect(call("chrona_reply", { text: "Not my pause" })).rejects.toMatchObject({ code: "forbidden" });
+});
+
 test("sent today excludes response notifications", async () => {
   for (const idempotencyKey of ["response:answer", "tool:proactive"]) await db.notification.create({ data: { workspaceId, channel: "chrona_qqbot", level: "now", title: "Sent", body: "Sent", status: "sent", idempotencyKey, sentAt: ports.now() } });
   expect((await service.forWorkspace(workspaceId).settings.get()).chat.sentToday).toBe(1);
@@ -107,6 +128,8 @@ test("root schedules require an affair, then resolve conversation focus", async 
 });
 for (const state of ["running", "queued", "none", "failed_inject"] as const) test(`immediate wake: ${state}`, async () => {
   const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
+  const own = await api.affairs.create({ title: "Different foreground affair" });
+  await db.run.update({ where: { id: runId }, data: { affairId: own.id } });
   const injected: string[] = [];
   const background = state === "none" ? null : await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Original", label: "Existing" });
   if (background && state !== "queued") {

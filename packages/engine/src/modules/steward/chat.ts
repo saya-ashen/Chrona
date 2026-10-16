@@ -117,12 +117,13 @@ class ChatService {
     const before = (await db.message.findMany({ where: { workspaceId: input.workspaceId, conversationKey, direction: "out", at: { gte: inbound.at } }, select: { id: true } })).map(m => m.id);
     const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, conversationKey, lane: "foreground", status: "running" } });
     // A quote changing affairs must queue in the correct cwd, not steer a different affair.
-    const handle = this.injectionHandle(active, quoted, affair);
+    const explicitAffair = Boolean(input.affairId || quoted);
+    const handle = this.injectionHandle(active, explicitAffair, affair);
     const prompt = this.messagePrompt(input, quoted);
-    await this.forwardToBackground({ workspaceId: input.workspaceId, affair, active, messageId: inbound.id, prompt, images });
+    if (explicitAffair) await this.forwardToBackground({ workspaceId: input.workspaceId, affair, active, messageId: inbound.id, prompt, images });
     const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ lane: "foreground", trigger: "message", conversationKey, prompt, ...(affair ? { affairId: affair.id } : {}) });
     await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
-    if (!handle) await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });
+    await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id, explicitAffair } });
     // Subscribe before injection/launch: scripted providers can finish immediately.
     const waiting = this.wait(inbound, run.id, before);
     if (handle) {
@@ -146,8 +147,8 @@ class ChatService {
     catch { kind = "message_forward_failed"; }
     await audit(db, { workspaceId, actor: "user", kind, subjectId: background.id, details: { messageId } });
   }
-  private injectionHandle(active: { id: string; affairId: string | null } | null, quoted: MessageRow | null, affair: { id: string } | null) {
-    return active && (!quoted || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);
+  private injectionHandle(active: { id: string; affairId: string | null } | null, explicitAffair: boolean, affair: { id: string } | null) {
+    return active && (!explicitAffair || active.affairId === (affair?.id ?? null)) && liveRuns.get(active.id);
   }
   private messagePrompt(input: z.output<typeof inputSchema>, quoted: MessageRow | null) {
     return [input.text, ...(quoted ? [`Quoted Chrona message (data): ${JSON.stringify({ text: quoted.text, affairId: quoted.affairId })}`] : []), ...(input.attachments.some(a => a.path) ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, path, mime, size }) => ({ name, path, mime, size })))}`] : []), ...input.attachments.filter(a => a.mime.startsWith("audio/")).map(a => `Voice note (not transcribed by Chrona): ${JSON.stringify({ name: a.name, path: a.path })}`)].join("\n\n");
@@ -209,7 +210,8 @@ class ChatService {
       if (inline) images++;
       attachments.push({ name, path, mime: file.mime, size: file.bytes.byteLength, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
     }
-    return { attachments, ...(affair ? { affairId: affair.id } : {}) };
+    // Storage under the current focus is not an explicit routing choice.
+    return { attachments, ...(affair && input.quotedMessageId ? { affairId: affair.id } : {}) };
   }
   async messages(workspaceId: string, limit = 50) {
     return (await this.ports.db.message.findMany({ where: { workspaceId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage);

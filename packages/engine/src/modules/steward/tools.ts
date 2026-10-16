@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { authenticateRun, liveRuns } from "./runs";
+import { authenticateRun, canDescribeInactiveAffair, liveRuns } from "./runs";
 import { createAffairs, requireAffair } from "./affairs";
 import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
@@ -57,7 +57,24 @@ async function gate(ctx: ToolContext, action: Action, target: { affairId?: strin
     return null;
   });
 }
+async function explicitMessageAffair({ db, workspaceId, run }: ToolContext) {
+  const source = await db.audit.findFirst({ where: { workspaceId, subjectId: run.id, kind: "chat_run_input" }, orderBy: { createdAt: "desc" } });
+  const input = z.object({ messageId: z.string(), explicitAffair: z.boolean().optional() }).safeParse(source?.details);
+  if (!input.success) return null;
+  const message = await db.message.findFirst({ where: { workspaceId, id: input.data.messageId } });
+  return input.data.explicitAffair || message?.quotedMessageId ? message?.affairId ?? null : null;
+}
+async function responseContext(ctx: ToolContext) {
+  const explicitId = ctx.tool === "chrona_reply" ? await explicitMessageAffair(ctx) : null;
+  const id = explicitId ?? await runFocus(ctx) ?? ctx.run.affairId;
+  if (id) {
+    const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
+    if (affair.status !== "active" && !await canDescribeInactiveAffair(ctx.db, ctx.run, id, ctx.tool)) throw new StewardError("conflict", "Affair is not active");
+  }
+  return { ...ctx, run: { ...ctx.run, affairId: id } };
+}
 async function reply(ctx: ToolContext, raw: unknown) {
+  ctx = await responseContext(ctx);
   const { run, db, workspaceId, affairs, ports, now } = ctx;
   const input = parseInput(schemas.chrona_reply, raw);
   if (run.lane !== "foreground" || !run.conversationKey) throw new StewardError("invalid", "Reply requires a foreground conversation");
@@ -75,9 +92,10 @@ async function reply(ctx: ToolContext, raw: unknown) {
     files.push({ name, path, mime: file.mime, size: node.size });
     deliveryFiles.push({ name, path: join(await directory.directory(), path) });
   }
+  const explicitAffair = Boolean(await explicitMessageAffair(ctx));
   const message = await db.$transaction(async tx => {
     const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation.channel, conversationKey: run.conversationKey!, affairId: run.affairId, text: input.text, attachments: files, at: now() } });
-    await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
+    await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id, explicitAffair } });
     return message;
   });
   await linkFocusedMessages(ctx);
@@ -94,6 +112,7 @@ async function awaitedByUser({ db, workspaceId, run }: ToolContext) {
   return !told;
 }
 async function notify(ctx: ToolContext, raw: unknown) {
+  ctx = await responseContext(ctx);
   const { run, tool, affairs, ports, workspaceId, index } = ctx;
   const input = parseInput(schemas.chrona_notify, raw);
   const pending = await gate(ctx, "notify_user", { affairId: run.affairId ?? undefined }, { tool, ...input });
@@ -151,20 +170,27 @@ async function cancelSchedule(ctx: ToolContext, raw: unknown) {
   return pending ?? await ctx.schedules.cancel(row.id);
 }
 function affairs(ctx: ToolContext, raw: unknown) { return ctx.affairs.list(parseInput(schemas.chrona_affairs, raw).status); }
+async function runFocus({ db, workspaceId, run }: ToolContext) {
+  if (!run.conversationKey) return null;
+  const records = await db.audit.findMany({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey }, orderBy: { createdAt: "desc" } });
+  for (const record of records) {
+    const focus = z.object({ affairId: z.string(), runId: z.string() }).safeParse(record.details);
+    if (focus.success && focus.data.runId === run.id) return focus.data.affairId;
+  }
+  return null;
+}
 async function linkFocusedMessages(ctx: ToolContext) {
-  const { db, workspaceId, run } = ctx;
-  const focus = await db.audit.findFirst({ where: { workspaceId, kind: "conversation_focus", subjectId: run.conversationKey! }, orderBy: { createdAt: "desc" } });
-  const focusedId = z.object({ affairId: z.string() }).safeParse(focus?.details).data?.affairId;
+  const focusedId = await runFocus(ctx);
   if (focusedId) await linkRunMessages(ctx, focusedId);
 }
 async function linkRunMessages(ctx: ToolContext, id: string) {
   const { db, workspaceId, run } = ctx;
   const records = await db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: { in: ["chat_run_input", "run_reply"] } } });
   const ids = records.flatMap(record => {
-    const parsed = z.object({ messageId: z.string() }).safeParse(record.details);
-    return parsed.success ? [parsed.data.messageId] : [];
+    const parsed = z.object({ messageId: z.string(), explicitAffair: z.boolean().optional() }).safeParse(record.details);
+    return parsed.success && !parsed.data.explicitAffair ? [parsed.data.messageId] : [];
   });
-  await db.message.updateMany({ where: { workspaceId, conversationKey: run.conversationKey!, affairId: null, id: { in: ids } }, data: { affairId: id } });
+  await db.message.updateMany({ where: { workspaceId, conversationKey: run.conversationKey!, quotedMessageId: null, id: { in: ids } }, data: { affairId: id } });
 }
 async function createAffair(ctx: ToolContext, raw: unknown) {
   const { affairs, run, db, workspaceId } = ctx;
@@ -176,7 +202,7 @@ async function createAffair(ctx: ToolContext, raw: unknown) {
   }
   // The conversation now talks about this affair, so later messages and schedules land in it.
   if (run.conversationKey) {
-    await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { affairId: affair.id } });
+    await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { affairId: affair.id, runId: run.id } });
     await linkRunMessages(ctx, affair.id);
   }
   const path = relative(run.cwd, await (await affairs.files(affair.id)).directory()) || ".";
@@ -186,14 +212,14 @@ async function createAffair(ctx: ToolContext, raw: unknown) {
 }
 function updateAffair(ctx: ToolContext, raw: unknown) {
   const { affairId: id, ...input } = parseInput(schemas.chrona_affair_update, raw);
-  return ctx.affairs.update(id, input);
+  return ctx.affairs.update(id, input, ctx.run.id);
 }
 async function focus(ctx: ToolContext, raw: unknown) {
   const { run, affairs, db, workspaceId } = ctx;
   const input = parseInput(schemas.chrona_focus, raw);
   if (!run.conversationKey) throw new StewardError("invalid", "Focus requires a conversation");
   const directory = await (await affairs.files(input.affairId)).directory();
-  await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: input });
+  await audit(db, { workspaceId, actor: "chrona", kind: "conversation_focus", subjectId: run.conversationKey, details: { ...input, runId: run.id } });
   await linkRunMessages(ctx, input.affairId);
   return { ...input, path: relative(run.cwd, directory) || "." };
 }
@@ -236,7 +262,7 @@ async function guideUi(ctx: ToolContext, raw: unknown) {
 async function setUi(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_ui_set, raw), id = affairId(ctx, input.affairId);
   const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
-  if (affair.status !== "active" && affair.id !== ctx.run.affairId) throw new StewardError("conflict", "Affair is not active");
+  if (affair.status !== "active" && !await canDescribeInactiveAffair(ctx.db, ctx.run, id, ctx.tool)) throw new StewardError("conflict", "Affair is not active");
   let spec: object;
   try { spec = compileUiSpec(input.spec); }
   catch { return { ok: false, issues: ["Invalid JSONL patch stream"] }; }
