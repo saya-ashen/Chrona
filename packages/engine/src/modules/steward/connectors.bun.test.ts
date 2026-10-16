@@ -30,7 +30,7 @@ test("connector files, dedupe, all rules, batch first-arrival window, isolation 
     const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
     const api = createStewardService(ports).forWorkspace(workspaceId);
     const affair = await api.affairs.create({ title: "Mail" }), files = await api.affairs.files(affair.id);
-    await files.save(".chrona/rules.json", JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action, note: `note:${action}` })), default: "batch" }), null, "chrona");
+    await files.intake([{ path: ".chrona/rules.json", bytes: new TextEncoder().encode(JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action, note: `note:${action}` })), default: "batch" })) }], "Configure inbound rules");
     const connector = await api.connectors.create({ kind: "local_test", label: "mail", affairId: affair.id, secret: { password: "never-expose" } });
     expect(connector.hasCredentials).toBe(true); expect(JSON.stringify(await api.connectors.list())).not.toContain("never-expose");
     expect(connector).not.toHaveProperty("secretRef");

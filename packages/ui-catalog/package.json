@@ -1,0 +1,8 @@
+{
+  "name": "@chrona/ui-catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@json-render/core": "0.21.0", "@json-render/react": "0.21.0", "@json-render/shadcn": "0.21.0", "zod": "^4.4.3" },
+  "exports": { ".": "./src/index.ts" }
+}

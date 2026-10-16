@@ -41,6 +41,7 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
     const input = s.saveFileSchema.parse(await c.req.json());
     return c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).save(input.path, input.content, input.baseRevision));
   });
+  router.post("/affairs/:id/ui-event", async c => c.json(await c.get("steward").uiEvent(c.req.param("id"), s.uiEventSchema.parse(await c.req.json()))));
   router.post("/affairs/:id/checkbox", async c => {
     const input = s.toggleCheckboxSchema.parse(await c.req.json());
     return c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).toggleCheckbox(input.path, input.line, input.checked, input.baseRevision));

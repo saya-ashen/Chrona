@@ -1,3 +1,4 @@
+import { uiEntry } from "./ui";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient, Affair as AffairRow } from "@chrona/db";
 import { activitySchema, createAffairSchema, updateAffairSchema, type AffairStatus } from "@chrona/contracts/steward";
@@ -53,7 +54,7 @@ export function createAffairs({ db, workspaceId, now }: RecordContext, fs: Works
         db.run.findMany({ where: { workspaceId, affairId: id }, orderBy: { createdAt: "desc" }, take: 100 }), directory.revisions(),
         db.message.findMany({ where: { workspaceId, affairId: id }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 100 }),
       ]);
-      return { affair, files: tree.slice(0, 2000), schedules: schedules.map(toSchedule), approvals: approvals.map(toApproval), activity: activity.map(toActivity), runs: runs.map(toRun), revisions, messages: messages.reverse().map(toMessage) };
+      return { affair, entry: await uiEntry(directory, tree), files: tree.slice(0, 2000), schedules: schedules.map(toSchedule), approvals: approvals.map(toApproval), activity: activity.map(toActivity), runs: runs.map(toRun), revisions, messages: messages.reverse().map(toMessage) };
     },
     update: async (id: string, raw: unknown) => {
       const input = parseInput(updateAffairSchema, raw);

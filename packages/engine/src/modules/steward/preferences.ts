@@ -1,4 +1,4 @@
-import { createPreferenceSchema } from "@chrona/contracts/steward";
+import { chronaToolInputSchemas } from "@chrona/contracts/steward";
 import type { RecordContext } from "./affairs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -7,8 +7,8 @@ export function createPreferences({ db, workspaceId, now }: RecordContext) {
   return {
     list: async () => (await db.preference.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } })).map(toPreference),
     add: (raw: unknown, origin: "said" | "learned" = "said") => db.$transaction(async tx => {
-      const input = parseInput(createPreferenceSchema, raw);
-      const existing = await tx.preference.findFirst({ where: { workspaceId, text: input.text } });
+      const input = parseInput(chronaToolInputSchemas.chrona_remember, raw);
+      const existing = await tx.preference.findFirst({ where: { workspaceId, text: input.text, topic: input.topic } });
       if (existing) return toPreference(existing);
       const row = await tx.preference.create({ data: { ...input, workspaceId, origin, createdAt: now() } });
       await audit(tx, { workspaceId, kind: "preference_added", actor: origin === "said" ? "user" : "chrona", subjectId: row.id, details: {} });

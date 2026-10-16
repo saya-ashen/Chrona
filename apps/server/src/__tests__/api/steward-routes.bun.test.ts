@@ -57,6 +57,17 @@ test("files save optimistic conflicts, revisions, upload and safe raw download",
   await symlink("README.md", join(directory, "link"));
   expect((await request(`${base}/raw?path=link`)).status).toBe(403);
 });
+test("UI event route requires owner, validates and isolates affairs", async () => {
+  const id = await affair(), path = `/affairs/${id}/ui-event`;
+  expect((await app.request(`http://localhost${path}?workspaceId=w`, { method: "POST" })).status).toBe(401);
+  expect((await request(path, "POST", { path: "home.ui.json", kind: "open" })).status).toBe(200);
+  expect(await db.audit.findFirst({ where: { workspaceId: "w", kind: "ui_event", subjectId: id } })).toMatchObject({ details: { path: "home.ui.json", kind: "open" } });
+  expect((await request(path, "POST", { path: "../escape", kind: "open" })).status).toBe(400);
+  expect((await request(path, "POST", { path: "home.ui.json", kind: "feedback" })).status).toBe(400);
+  await db.workspace.create({ data: { id: "other", name: "Other" } });
+  const other = await service.forWorkspace("other").affairs.create({ title: "Private" });
+  expect((await request(`/affairs/${other.id}/ui-event`, "POST", { path: "home.ui.json", kind: "open" })).status).toBe(404);
+});
 test("schedule and approval lifecycle errors", async () => {
   const id = await affair();
   const response = await request(`/affairs/${id}/schedules`, "POST", { mode: "remind", rule: { kind: "daily", time: "09:00" }, text: "Remember" });

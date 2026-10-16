@@ -166,7 +166,8 @@ export const grantSchema = z.object({
 }).strict();
 export const policyDecisionSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), grantId: id.nullable(), reason: z.string().max(500) }).strict();
 
-export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
+export const PREFERENCE_TOPICS = ["general", "ui"] as const;
+export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), topic: z.enum(PREFERENCE_TOPICS), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
 
 export const notificationSchema = z.object({
   id, affairId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: z.enum(DELIVERY_CHANNELS), status: z.enum(NOTIFICATION_STATUSES),
@@ -223,6 +224,8 @@ export const todayViewSchema = z.object({
     updates: z.array(z.object({ title: short, body: z.string().max(4000), at: iso }).strict()).max(3),
     /** Distinct pages changed in the last 7 days. */
     changedPages: z.number().int().min(0),
+    /** The Provider's Today card for this affair (json-render spec), if it composed one. */
+    card: z.record(z.string(), z.unknown()).nullable(),
   }).strict()).max(50),
   /** Optional page the Provider maintains for today (any affair file it marks via `.chrona/today` pointer). */
   todayPage: z.object({ affairId: id, path: affairPathSchema }).strict().nullable(),
@@ -234,6 +237,8 @@ export const affairDetailSchema = z.object({
   approvals: z.array(approvalSchema), activity: z.array(activitySchema), runs: z.array(runSchema), revisions: z.array(revisionSchema),
   /** Recent chat messages linked to this affair, oldest first. */
   messages: z.array(messageSchema).max(100),
+  /** Page this affair opens on: the Provider's chosen `*.ui.json` entry, else README.md. */
+  entry: affairPathSchema,
 }).strict();
 
 // ------------------------------------------------------------- requests ----
@@ -243,6 +248,11 @@ export const chatReplySchema = z.object({ runId: id.nullable(), messages: z.arra
 export const createAffairSchema = z.object({ title: short, request: z.string().max(8000).default("") }).strict();
 export const updateAffairSchema = z.object({ title: short.optional(), status: z.enum(AFFAIR_STATUSES).optional() }).strict();
 export const saveFileSchema = z.object({ path: affairPathSchema, content: z.string().max(2_000_000), baseRevision: z.string().max(64).nullable() }).strict();
+/** Usage signal from a composed page; `feedback` also reaches the Provider as a chat message about this affair. */
+export const uiEventSchema = z.object({
+  path: affairPathSchema, kind: z.enum(["open", "action", "toggle", "feedback"]),
+  name: z.string().max(100).optional(), text: z.string().max(2000).optional(),
+}).strict();
 export const toggleCheckboxSchema = z.object({ path: affairPathSchema, line: z.number().int().min(1), checked: z.boolean(), baseRevision: z.string().max(64).nullable() }).strict();
 export const panelEntrySchema = z.object({ dataPath: affairPathSchema, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
 export const createScheduleSchema = z.object({ mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), command: z.string().max(2000).optional(), until: iso.optional() }).strict();
@@ -269,6 +279,7 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /affairs/:id/file?path=                  -> FileContent
  *   PUT  /affairs/:id/file (SaveFile)             -> FileContent (409 on stale baseRevision; commits as user; wakes the Provider)
  *   POST /affairs/:id/checkbox (ToggleCheckbox)   -> FileContent
+ *   POST /affairs/:id/ui-event (UiEvent)         -> {ok: true} (feedback is also sent to the Provider)
  *   POST /affairs/:id/panel-entry (PanelEntry)    -> FileContent of the data file
  *   POST /affairs/:id/upload (multipart file, dir)-> FileNode
  *   GET  /affairs/:id/raw?path=                   -> file bytes (download)
@@ -309,7 +320,14 @@ export const chronaToolInputSchemas = {
   chrona_request_approval: z.object({ action: z.enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20_000) }).strict(),
   chrona_send_email: z.object({ connectorId: id, to: z.array(z.string().email()).min(1).max(20), subject: text.max(500), body: text.max(50_000), inReplyTo: z.string().max(500).optional() }).strict(),
   chrona_inbound: z.object({ connectorId: id.optional(), status: z.enum(INBOUND_STATUSES).optional(), limit: z.number().int().min(1).max(100).default(50) }).strict(),
-  chrona_remember: z.object({ text: text.max(500) }).strict(),
+  chrona_remember: z.object({ text: text.max(500), topic: z.enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
+  chrona_ui_guide: z.object({ affairId: id.optional() }).strict(),
+  chrona_ui_set: z.object({
+    affairId: id.optional(),
+    path: affairPathSchema.refine(path => path.endsWith(".ui.json"), "Page files end with .ui.json"),
+    spec: z.union([z.record(z.string(), z.unknown()), z.string().max(200_000)]).describe("json-render spec {root, elements, state}, or its JSONL patch stream"),
+    role: z.enum(["page", "entry", "card"]).default("page").describe("entry: the page this affair opens on; card: this affair's card on Today"),
+  }).strict(),
   chrona_forget: z.object({ preferenceId: id }).strict(),
   chrona_preferences: z.object({}).strict(),
 } as const;
@@ -368,4 +386,5 @@ export type Settings = z.infer<typeof settingsSchema>;
 export type Health = z.infer<typeof healthSchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
 export type AffairDetail = z.infer<typeof affairDetailSchema>;
+export type UiEvent = z.infer<typeof uiEventSchema>;
 export type ChatReply = z.infer<typeof chatReplySchema>;

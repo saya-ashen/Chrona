@@ -26,6 +26,7 @@
       "@chrona/db": ["../../packages/db/src/index.ts"],
       "@chrona/domain/*": ["../../packages/domain/src/*"],
       "@chrona/domain": ["../../packages/domain/src/index.ts"],
+      "@chrona/ui-catalog": ["../../packages/ui-catalog/src/index.ts"],
       "@chrona/providers-foundation/*": ["../../packages/providers/foundation/src/*"],
       "@chrona/providers-foundation": ["../../packages/providers/foundation/src/index.ts"]
     }

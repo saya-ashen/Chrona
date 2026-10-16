@@ -19,6 +19,7 @@
       "@chrona/i18n/react": ["./packages/i18n/src/client.tsx"],
       "@chrona/i18n/messages": ["./packages/i18n/src/messages.ts"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],
+      "@chrona/ui-catalog": ["./packages/ui-catalog/src/index.ts"],
       "@chrona/domain/steward/*": ["./packages/domain/src/steward/*"],
       "@chrona/contracts": ["./packages/contracts/src/index.ts"],
       "@chrona/contracts/steward": ["./packages/contracts/src/steward/index.ts"],

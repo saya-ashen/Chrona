@@ -1,3 +1,4 @@
+import { readUiCard } from "./ui";
 import { affairPathSchema, type Health, type TodayView } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { RecordContext } from "./affairs";
@@ -51,11 +52,12 @@ export function createToday({ db, workspaceId, now }: RecordContext, fs: Workspa
       if (Array.isArray(paths)) for (const path of paths) if (affairPathSchema.safeParse(path).success) pages.set(edit.affairId, (pages.get(edit.affairId) ?? new Set()).add(path));
     }
     // An affair belongs in "what happened" when Chrona is on it now or it changed this week.
-    const progress = affairs.filter(affair => affair.status !== "done" && (affair.work || Date.parse(affair.lastActivityAt) >= since.getTime())).slice(0, 50).map(affair => ({
+    const progress = await Promise.all(affairs.filter(affair => affair.status !== "done" && (affair.work || Date.parse(affair.lastActivityAt) >= since.getTime())).slice(0, 50).map(async affair => ({
       affair,
       updates: notifications.filter(n => n.affairId === affair.id).slice(0, 3).map(n => ({ title: n.title, body: n.body, at: n.createdAt.toISOString() })),
       changedPages: pages.get(affair.id)?.size ?? 0,
-    }));
+      card: await readUiCard(await createAffairs({ db, workspaceId, now }, fs).files(affair.id)),
+    })));
     const upcoming = schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, affairId: s.affairId, affairTitle: s.affair.title, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.mode === "remind" ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() }));
     const active = await db.affair.findMany({ where: { workspaceId, status: "active" }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }] });
     return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), upcoming, progress, todayPage: await findTodayPage(fs, active), health: status };

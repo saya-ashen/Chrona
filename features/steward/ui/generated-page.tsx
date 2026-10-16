@@ -6,7 +6,7 @@ import type { Spec } from "@json-render/core";
 import { useI18n } from "@chrona/i18n";
 import { Button, Checkbox } from "@shared/ui";
 import type { StewardClient } from "../model/client";
-import { uiCatalog } from "../model/ui-catalog";
+import { uiCatalog } from "@chrona/ui-catalog";
 import { pageTasks } from "../model/ui-page";
 import { pageHref } from "../model/workspace";
 import { pageName } from "../model/affair-file";

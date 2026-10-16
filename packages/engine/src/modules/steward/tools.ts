@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { compileUiSpec, checkUiSpec, uiGuide } from "@chrona/ui-catalog";
+import { uiSummary, uiUsage } from "./ui";
 import { join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
@@ -195,7 +197,27 @@ async function inbound(ctx: ToolContext, raw: unknown) {
 function remember(ctx: ToolContext, raw: unknown) { return ctx.preferences.add(parseInput(schemas.chrona_remember, raw), "learned"); }
 function forget(ctx: ToolContext, raw: unknown) { return ctx.preferences.delete(parseInput(schemas.chrona_forget, raw).preferenceId); }
 function preferences(ctx: ToolContext, raw: unknown) { parseInput(schemas.chrona_preferences, raw); return ctx.preferences.list(); }
+async function guideUi(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_ui_guide, raw);
+  const id = affairId(ctx, input.affairId), files = await ctx.affairs.files(id);
+  const preferences = (await ctx.preferences.list()).filter(p => p.topic === "ui").map(p => p.text);
+  return { guide: uiGuide(preferences, await uiUsage(ctx, id, files)) };
+}
+async function setUi(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_ui_set, raw), id = affairId(ctx, input.affairId);
+  const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
+  if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
+  let spec: object;
+  try { spec = compileUiSpec(input.spec); }
+  catch { return { ok: false, issues: ["Invalid JSONL patch stream"] }; }
+  const checked = checkUiSpec(spec);
+  if (!checked.ok) return checked;
+  const files = await ctx.affairs.files(id);
+  await files.writeUi(input.path, JSON.stringify(spec, null, 2) + "\n", input.role);
+  return { ok: true, path: input.path, role: input.role, summary: uiSummary(spec) };
+}
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {
+  chrona_ui_guide: guideUi, chrona_ui_set: setUi,
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
   chrona_schedule_cancel: cancelSchedule, chrona_affairs: affairs, chrona_affair_create: createAffair,
   chrona_affair_update: updateAffair, chrona_focus: focus, chrona_request_approval: requestApproval,

@@ -18,7 +18,7 @@ it.each([
   [0, 0, 3, "这周有 3 件事有进展"],
   [0, 0, 0, "目前没有需要你处理的事"],
 ])("summarizes approvals %i, work %i, progress %i", (approvals, work, progress, expected) => {
-  const view = { ...emptyToday(), approvals: Array.from({ length: approvals }, approvalFixture), progress: Array.from({ length: progress }, (_, i) => ({ affair: { ...affairFixture(), work: i < work ? { state: "queued" as const, since: fixtureTime, label: null } : null }, updates: [], changedPages: 0 })) };
+  const view = { ...emptyToday(), approvals: Array.from({ length: approvals }, approvalFixture), progress: Array.from({ length: progress }, (_, i) => ({ card: null, affair: { ...affairFixture(), work: i < work ? { state: "queued" as const, since: fixtureTime, label: null } : null }, updates: [], changedPages: 0 })) };
   expect(todaySummary(view, { ...zh.steward.foundation, working: zh.steward.overview.working, progress: zh.steward.overview.progressSummary })).toBe(expected);
 });
 it.each([
@@ -41,7 +41,7 @@ it.each([
 ])("today detail repeats nothing the headline said (%o)", (counts, expected) => {
   const view = emptyToday();
   view.approvals = Array.from({ length: counts.approvals }, approvalFixture);
-  view.progress = Array.from({ length: counts.progress }, (_, index) => ({ affair: { ...affairFixture(), id: `a${index}`, work: index < counts.working ? { state: "running" as const, since: fixtureTime, label: null } : null }, updates: [], changedPages: 0 }));
+  view.progress = Array.from({ length: counts.progress }, (_, index) => ({ card: null, affair: { ...affairFixture(), id: `a${index}`, work: index < counts.working ? { state: "running" as const, since: fixtureTime, label: null } : null }, updates: [], changedPages: 0 }));
   view.upcoming = Array.from({ length: counts.upcoming }, (_, index) => ({ scheduleId: `s${index}`, affairId: "a0", affairTitle: "A", mode: "remind" as const, label: "x", at: fixtureTime }));
   const o = zh.steward.overview;
   expect(todayDetail(view, { ...zh.steward.foundation, working: o.working, progress: o.progressSummary, upcoming: o.upcomingPart, separator: o.separator, end: o.end })).toBe(expected);

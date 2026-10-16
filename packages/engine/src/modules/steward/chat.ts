@@ -30,7 +30,7 @@ const callerSchema = z.object({ runId: z.string(), before: z.array(z.string()) }
 
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   const chat = new ChatService(ports, wake);
-  return { handleMessage: chat.handleMessage.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat) };
+  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat) };
 }
 
 class ChatService {
@@ -73,6 +73,14 @@ class ChatService {
     if ("result" in prepared) return prepared.result!;
     if ("waiting" in prepared) return prepared.waiting!;
     return this.wait(prepared.inbound, prepared.runId, prepared.before);
+  }
+  /** Store and queue (or inject) a message without waiting for the reply; replies arrive in chat as usual. */
+  async submit(raw: ChatInput): Promise<{ ok: true }> {
+    const input = parseInput(inputSchema, raw), images = chatImages(input.attachments);
+    const conversationKey = `chat:${input.channel}`;
+    const prepared = await this.serial(`${input.workspaceId}:${conversationKey}`, () => this.prepareMessage(input, images, conversationKey));
+    if ("waiting" in prepared) void prepared.waiting?.catch(() => {});
+    return { ok: true };
   }
   private async previousResult(input: z.output<typeof inputSchema>, existing: MessageRow) {
     const { db } = this.ports;

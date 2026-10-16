@@ -24,6 +24,9 @@ function safePath(value: string): string {
   if (path !== value || path.includes("\\") || path.includes("\0") || path.split("/").includes(".") || path === ".chrona/sessions" || path.startsWith(".chrona/sessions/")) throw new StewardError("invalid", "Reserved or invalid path");
   return path;
 }
+function guardProviderWrite(path: string, author: FileAuthor) {
+  if (author === "chrona" && path.startsWith(".chrona/")) throw new StewardError("forbidden", "Chrona metadata is engine-owned");
+}
 function safeDir(value: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(value)) throw new StewardError("invalid", "Invalid affair directory");
   return value;
@@ -198,6 +201,13 @@ function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<str
         return result.sort((a, b) => a.path.localeCompare(b.path));
       }),
       read: (path: string) => run(dir => readFile(dir, path)),
+      /** Engine UI tool only; changes are committed with the Provider run. */
+      writeUi: (path: string, content: string, role: "page" | "entry" | "card") => run(async dir => {
+        if (path.startsWith(".chrona") || !path.endsWith(".ui.json")) throw new StewardError("invalid", "Invalid UI page path");
+        await writeFile(dir, path, content);
+        if (role === "entry") await writeFile(dir, ".chrona/entry", path + "\n");
+        if (role === "card") await writeFile(dir, ".chrona/card.ui.json", content);
+      }),
       /** Raw download uses the same confinement and no-follow boundary as text reads. */
       raw: (path: string) => run(async dir => {
         const target = await confined(dir, path);
@@ -209,11 +219,13 @@ function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<str
         } finally { await handle.close(); }
       }),
       save: (path: string, content: string, baseRevision: string | null, author: FileAuthor = "user") => run(async dir => {
+        guardProviderWrite(path, author);
         await confined(dir, path); await checkBase(dir, path, baseRevision);
         await writeFile(dir, path, content); await commit(dir, author, `Edit ${path}`, [path]);
         return readFile(dir, path);
       }),
       toggleCheckbox: (path: string, line: number, checked: boolean, baseRevision: string | null, author: FileAuthor = "user") => run(async dir => {
+        guardProviderWrite(path, author);
         await confined(dir, path); await checkBase(dir, path, baseRevision);
         const file = await readFile(dir, path);
         await writeFile(dir, path, toggleMarkdown(file.content, line, checked));
@@ -221,6 +233,7 @@ function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<str
       }),
       /** Caller obtains fields from parsePanelBlocks(page); domain validates every value. */
       appendPanelEntry: (path: string, fields: ToolSpec["fields"], values: unknown, author: FileAuthor = "user") => run(async dir => {
+        guardProviderWrite(path, author);
         let csv = "";
         try { csv = (await readFile(dir, path)).content; } catch (error) { if (!missing(error)) throw error; }
         await writeFile(dir, path, appendCsvRow(csv, fields, values));

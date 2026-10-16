@@ -186,6 +186,7 @@ model Preference {
   workspaceId String
   text String
   origin String
+  topic String @default("general")
   createdAt DateTime @default(now())
   lastUsedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

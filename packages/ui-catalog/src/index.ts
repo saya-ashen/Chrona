@@ -1,4 +1,4 @@
-import { defineCatalog } from "@json-render/core";
+import { compileSpecStream, validateSpec, type Spec, defineCatalog } from "@json-render/core";
 import { schema } from "@json-render/react/schema";
 import { shadcnComponentDefinitions as shadcn } from "@json-render/shadcn/catalog";
 import { z } from "zod";
@@ -49,6 +49,34 @@ export const uiCatalog = defineCatalog(schema, {
     },
   },
 });
+
+export function compileUiSpec(input: object | string): object {
+  return typeof input === "string" ? compileSpecStream(input) : input;
+}
+
+export function safeUiPath(path: unknown): path is string {
+  return typeof path === "string" && path.length > 0 && !path.startsWith("/") && !path.startsWith(".chrona") && !path.includes("..") && !/[\\\\\0]/.test(path) && !path.split("/").includes(".");
+}
+
+export function checkUiSpec(spec: unknown): { ok: boolean; issues: string[] } {
+  const checked = uiCatalog.validate(spec);
+  const issues = checked.success ? [] : checked.error!.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`);
+  // Structural validation assumes an element map; schema validation handles malformed input.
+  const shape = z.object({ root: z.string().optional(), elements: z.record(z.string(), z.object({ type: z.string(), props: z.record(z.string(), z.unknown()), children: z.array(z.string()).optional() }).passthrough()) }).passthrough().safeParse(spec);
+  if (shape.success) {
+    issues.push(...validateSpec(shape.data as Spec).issues.map(issue => `${issue.elementKey ?? "spec"}: ${issue.message}`));
+    for (const [id, element] of Object.entries(shape.data.elements)) {
+      const key = element.type === "Upload" ? "folder" : "path";
+      if (["TaskList", "PageLink", "Upload"].includes(element.type) && !safeUiPath(element.props[key])) issues.push(`${id}: ${key} must be a safe affair-relative path`);
+    }
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+export function uiGuide(preferences: string[], usage: string[]): string {
+  return uiCatalog.prompt({ customRules: [...uiRules, ...preferences.map(p => "User preference: " + p)] }) +
+    "\nSave pages with chrona_ui_set (spec object or JSONL patches); never write *.ui.json directly.\nRecent usage (14 days):\n" + usage.slice(0, 10).join("\n");
+}
 
 /** Page-design rules handed to the Provider together with the catalog. */
 export const uiRules = [
