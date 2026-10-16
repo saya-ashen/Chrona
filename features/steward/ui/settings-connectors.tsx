@@ -9,10 +9,15 @@ import { MutationStatus, ResourceStatus } from "./resource-status";
 function ConnectorItem({ connector: source, client, refresh }: { connector: Connector; client: StewardClient; refresh: () => void }) {
   const { messages, locale } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs;
   const s = useConnector(client, source.id, refresh), m = s.mutation;
-  return <li className="grid min-w-0 gap-3 border-b pb-4 text-sm">
-    <p className="break-words">{source.label} <Badge variant="outline">{c.connectionStates[source.status]}</Badge></p>
-    <p>{c.lastSync}: {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString(locale) : a.none} · {c.pendingItems}: {source.pendingItems}</p>
-    <p>{source.coverageNote}</p>
+  return <li className="grid min-w-0 gap-2 border-b pb-3 text-[13px]">
+    <div className="flex flex-wrap items-center gap-2.5">
+      <Badge variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${source.status === "active" ? "bg-success/10 text-success" : source.status === "failing" || source.status === "needs_authorization" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>{c.connectionStates[source.status]}</Badge>
+      <p className="break-words">{source.label}</p>
+      <div className="text-xs text-muted-foreground min-[1000px]:ml-auto min-[1000px]:text-right">
+        <p>{c.lastSync}: {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString(locale) : a.none} · {c.pendingItems}: {source.pendingItems}</p>
+        <p>{source.coverageNote}</p>
+      </div>
+    </div>
     {source.lastError && <p>{source.lastError}</p>}
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="outline" disabled={m.pending} onClick={() => void s.testConnection()}>{c.testConnection}</Button>

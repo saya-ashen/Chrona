@@ -39,6 +39,18 @@ it("saves notifications and supports retry after failure", async () => {
   fail = false; await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("Saved")).toBeVisible();
 });
+it("keeps quiet-hour inputs labelled and optional in the compact notification form", async () => {
+  show();
+  const quiet = await screen.findByRole("checkbox", { name: "Quiet hours enabled" });
+  expect(screen.queryByLabelText("Quiet hours start")).toBeNull();
+  expect(screen.getByText("notifications; extras go in the digest")).toBeVisible();
+  await userEvent.click(quiet);
+  expect(screen.getByLabelText("Quiet hours start")).toBeVisible();
+  expect(screen.getByLabelText("Quiet hours end")).toBeVisible();
+  await userEvent.click(quiet);
+  expect(screen.queryByLabelText("Quiet hours end")).toBeNull();
+  expect(screen.getByRole("region", { name: "Permissions" })).toBeVisible();
+});
 it("shows provider, v3 permissions and connector details; test failures remain failures", async () => {
   show();
   expect(await screen.findByText("Pi · Available")).toBeVisible();
