@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AffairDetail, Schedule } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n";
 import { Badge, Button } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 import { affairCenter, scheduleLabel, workStatus } from "../model/affair-center";
-import { affairTimeline, type TimelineEntry } from "../model/affair-timeline";
+import { affairTimeline, timelineTime, type TimelineEntry } from "../model/affair-timeline";
 import { pageHref, scheduleDescription } from "../model/workspace";
 import { pageName } from "../model/affair-file";
 import { formatShortDateTime } from "../model/format";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
 import { AddSchedule } from "./affair-actions";
 import { MutationStatus } from "./resource-status";
-import { Section, Surface } from "./layout";
+import { Section } from "./layout";
+import { plainSummary } from "../model/affair-overview";
+import { Composer } from "./composer";
 
 type Props = { detail: AffairDetail; client: StewardClient; refresh: () => void };
 export function AffairCenterHeader({ detail, client, refresh }: Props) {
@@ -22,25 +24,34 @@ export function AffairCenterHeader({ detail, client, refresh }: Props) {
   const mutation = useStewardMutation(refresh);
   const [confirm, setConfirm] = useState(false);
   const { affair } = detail;
-  const status = workStatus(affair.work, locale, c);
-  const model = affairCenter(detail, c.followUp);
-  return <header className="grid min-w-0 gap-3 break-words">
-    <Link to={`/${locale}/affairs`}>← {messages.steward.affairs.title}</Link>
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0"><h1 className="text-2xl font-semibold">{affair.title}</h1><Badge variant="secondary">{messages.steward.affairs[affair.status]}</Badge></div>
+  const pill = affair.work?.state === "running" ? c.runningPill : affair.work?.state === "queued" ? c.queuedPill : affair.openApprovals ? c.waitingPill : affair.status === "active" ? c.activePill : messages.steward.affairs[affair.status];
+  return <header className="grid min-w-0 gap-1.5 break-words">
+    <div className="flex flex-wrap items-center gap-2.5">
+      <Link className="text-xs text-muted-foreground" to={`/${locale}/affairs`}>← {messages.steward.affairs.title}</Link>
+      <Badge variant="secondary" className={`mr-auto rounded-full border-0 px-2 py-px text-xs ${affair.openApprovals && !affair.work ? "bg-warning/10 text-warning" : affair.work?.state === "running" || affair.status === "active" && !affair.work ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground"}`}>{pill}</Badge>
       {affair.status !== "done" && <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateAffair(affair.id, { status: affair.status === "paused" ? "active" : "paused" }))}>{affair.status === "paused" ? f.resume : f.pause}</Button><Button variant="outline" disabled={mutation.pending} onClick={() => setConfirm(true)}>{f.end}</Button></div>}
     </div>
-    {status && <p role="status">{status}</p>}
-    {affair.nextSchedule && <p>{c.next.replace("{label}", model.nextLabel).replace("{time}", formatShortDateTime(affair.nextSchedule.at, locale))}</p>}
+    <h1 className="text-2xl font-semibold">{affair.title}</h1>
     {confirm && affair.status !== "done" && <div role="group" aria-label={f.confirmEnd} className="flex flex-wrap items-center gap-2"><p>{f.confirmEnd}</p><Button disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateAffair(affair.id, { status: "done" }))}>{f.confirm}</Button><Button variant="outline" onClick={() => setConfirm(false)}>{f.cancel}</Button></div>}
     <MutationStatus mutation={mutation} />
   </header>;
+}
+export function AffairNow({ detail }: { detail: AffairDetail }) {
+  const { messages, locale } = useI18n();
+  const c = messages.steward.affairCenter;
+  const status = workStatus(detail.affair.work, locale, c);
+  const model = affairCenter(detail, c.followUp);
+  return <Section title={c.now} className="rounded-[10px] border bg-card p-3.5 gap-2">
+    <p className="max-w-[65ch] text-[15px]">{plainSummary(detail.affair.summary)}</p>
+    {status && <p className="text-[13px]" role="status">{status}</p>}
+    {detail.affair.nextSchedule && <p className="text-[13px]">{c.next.replace("{label}", model.nextLabel).replace("{time}", formatShortDateTime(detail.affair.nextSchedule.at, locale))}</p>}
+  </Section>;
 }
 export function AffairArrangements({ detail, client, refresh }: Props) {
   const { messages, locale } = useI18n();
   const c = messages.steward.affairCenter;
   const model = affairCenter(detail, c.followUp);
-  return <Section title={c.schedules} aria-label={c.schedules}>
+  return <Section title={c.schedules} aria-label={c.schedules} className="rounded-[10px] border bg-card p-3.5 text-[13px]">
     {!model.active.length && <p>{c.noSchedules}</p>}
     {model.active.map(schedule => <Arrangement key={schedule.id} schedule={schedule} client={client} refresh={refresh} />)}
     {!!model.completed.length && <details><summary>{c.completed.replace("{count}", String(model.completed.length))}</summary><ul className="grid gap-2">{model.completed.map(schedule => <li key={schedule.id}>{scheduleLabel(schedule, c.followUp)} · <time>{new Date(schedule.lastAt || schedule.nextAt || schedule.createdAt).toLocaleString(locale)}</time></li>)}</ul></details>}
@@ -51,35 +62,40 @@ function Arrangement({ schedule, client, refresh }: { schedule: Schedule; client
   const { messages, locale } = useI18n();
   const c = messages.steward.affairFile;
   const mutation = useStewardMutation(refresh);
-  return <Surface><div className="grid gap-2 break-words p-3">
+  return <div className="grid gap-1.5 break-words border-b pb-3 last:border-0">
     <p className="font-medium">{scheduleLabel(schedule, messages.steward.affairCenter.followUp)}</p>
     <p>{schedule.rule.kind === "at" ? <time dateTime={schedule.rule.at}>{formatShortDateTime(schedule.rule.at, locale)}</time> : <>{scheduleDescription(schedule.rule, locale, messages.steward.workspace)}{schedule.nextAt && <> · {messages.steward.affairCenter.nextAt} <time dateTime={schedule.nextAt}>{formatShortDateTime(schedule.nextAt, locale)}</time></>}</>}</p>
     {schedule.status === "paused" && <p>{c.paused}</p>}
-    <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: schedule.status === "active" ? "paused" : "active" }))}>{schedule.status === "active" ? c.pause : c.resume}</Button><Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: "cancelled" }))}>{messages.steward.affairCenter.cancelSchedule}</Button></div>
+    <div className="-ml-2 flex flex-wrap gap-1"><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: schedule.status === "active" ? "paused" : "active" }))}>{schedule.status === "active" ? c.pause : c.resume}</Button><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: "cancelled" }))}>{messages.steward.affairCenter.cancelSchedule}</Button></div>
     <MutationStatus mutation={mutation} />
-  </div></Surface>;
+  </div>;
 }
-export function AffairTimeline({ detail }: { detail: AffairDetail }) {
-  const { messages } = useI18n();
-  const [count, setCount] = useState(20);
+export function AffairTimeline({ detail, client, refresh }: Props) {
+  const { messages, locale } = useI18n();
+  const [count, setCount] = useState(8);
   const entries = affairTimeline(detail);
-  return <Section title={messages.steward.affairCenter.timeline}><ol className="grid gap-4 border-l pl-3">{entries.slice(0, count).map(entry => <TimelineItem key={entry.id} entry={entry} affairId={detail.affair.id} />)}</ol>{entries.length > count && <Button variant="outline" onClick={() => setCount(count + 20)}>{messages.steward.affairCenter.more}</Button>}</Section>;
+  return <Section title={messages.steward.affairCenter.timeline} className="rounded-[10px] border bg-card p-3.5"><ol className="grid">{entries.slice(0, count).map(entry => <TimelineItem key={entry.id} entry={entry} affairId={detail.affair.id} />)}</ol>{entries.length > count && <Button variant="outline" onClick={() => setCount(count + 20)}>{messages.steward.affairCenter.more}</Button>}{detail.affair.status !== "done" && <Composer client={client} lang={locale} refresh={refresh} affairId={detail.affair.id} />}</Section>;
+}
+function PageLinks({ prefix, paths, affairId }: { prefix: string; paths: string[]; affairId: string }) {
+  const { messages, locale } = useI18n();
+  return <p className="text-muted-foreground">{prefix}{paths.slice(0, 3).map((path, index) => <span key={path}>{index > 0 && "、"}<Link className="underline" to={pageHref(locale, affairId, path)}>{pageName(path)}</Link></span>)}{paths.length > 3 && messages.steward.affairCenter.morePages.replace("{count}", String(paths.length - 3))}</p>;
 }
 function TimelineItem({ entry, affairId }: { entry: TimelineEntry; affairId: string }) {
   const { messages, locale } = useI18n();
   const c = messages.steward.affairCenter;
   const [expanded, setExpanded] = useState(false);
-  return <li className="min-w-0 break-words"><time className="text-xs text-muted-foreground" dateTime={entry.at}>{formatShortDateTime(entry.at, locale)}</time>
-    {entry.kind === "message" ? <><p className={expanded ? "whitespace-pre-wrap" : "line-clamp-3 whitespace-pre-wrap"}>{messages.steward.workspace[entry.actor!]}: {entry.text}</p>{(entry.text.length > 90 || entry.text.split("\n").length > 3) && <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? c.collapse : c.expand}</Button>}</>
-      : entry.kind === "edit" ? <p>{entry.actor === "user" ? c.userEdited : c.chronaEdited}{!entry.paths.length && c.updatedPages}{entry.paths.slice(0, 3).map((path, index) => <span key={path}>{index > 0 && "、"}<Link className="underline" to={pageHref(locale, affairId, path)}>{pageName(path)}</Link></span>)}{entry.paths.length > 3 && c.morePages.replace("{count}", String(entry.paths.length - 3))}</p>
+  return <li className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-2.5 break-words border-t border-dashed py-2 text-[13px] first:border-0"><time className="pt-0.5 text-xs tabular-nums text-muted-foreground" dateTime={entry.at}>{timelineTime(entry.at, locale)}</time><div>
+    {entry.kind === "message" ? <><p className={`text-xs ${entry.actor === "user" ? "text-primary" : "text-muted-foreground"}`}>{entry.actor === "user" ? messages.steward.foundation.you : c.replyKind}</p><p className={expanded ? "whitespace-pre-wrap" : "line-clamp-3 whitespace-pre-wrap"}>{entry.text}</p>{(entry.text.length > 90 || entry.text.split("\n").length > 3) && <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? c.collapse : c.expand}</Button>}{!!entry.paths.length && <PageLinks prefix={c.alsoUpdated} paths={entry.paths} affairId={affairId} />}</>
+      : entry.kind === "edit" ? (entry.paths.length ? <PageLinks prefix={entry.actor === "user" ? c.userEdited : c.chronaEdited} paths={entry.paths} affairId={affairId} /> : <p>{entry.actor === "user" ? c.userEdited : c.chronaEdited}{c.updatedPages}</p>)
         : <p>{c[entry.kind]}{entry.text}</p>}
-  </li>;
+  </div></li>;
 }
-export function AffairTechnicalDetails({ detail }: { detail: AffairDetail }) {
+export function AffairTechnicalDetails({ detail, children }: { detail: AffairDetail; children?: ReactNode }) {
   const { messages, locale } = useI18n();
   const c = messages.steward.affairCenter;
-  return <details className="min-w-0 break-words"><summary>{c.technical}</summary><div className="grid gap-4 pt-3">
+  return <details className="min-w-0 break-words"><summary className="cursor-pointer text-[13px] text-muted-foreground">{c.technicalCount.replace("{runs}", String(detail.runs.length)).replace("{tools}", String(detail.runs.reduce((sum, run) => sum + run.toolCalls.length, 0)))}</summary><div className="grid gap-4 pt-3">
     {detail.runs.map(run => <dl key={run.id} className="grid gap-1"><dt>{c.label}</dt><dd>{run.label || "—"}</dd><dt>{c.trigger}</dt><dd>{run.trigger}</dd><dt>{c.status}</dt><dd>{run.status}</dd><dt>{c.start}</dt><dd>{run.startedAt ? new Date(run.startedAt).toLocaleString(locale) : "—"}</dd><dt>{c.end}</dt><dd>{run.endedAt ? new Date(run.endedAt).toLocaleString(locale) : "—"}</dd><dt>{c.toolCalls}</dt><dd>{run.toolCalls.length}</dd>{run.error && <><dt>{c.error}</dt><dd>{run.error}</dd></>}</dl>)}
     {detail.schedules.map(schedule => <div key={schedule.id}><h3>{scheduleLabel(schedule, c.followUp)}</h3><p>{c.instructions}</p><pre className="whitespace-pre-wrap break-all">{schedule.text}</pre>{schedule.command && <><p>{c.command}</p><pre className="whitespace-pre-wrap break-all">{schedule.command}</pre></>}</div>)}
+    {children}
   </div></details>;
 }

@@ -27,17 +27,18 @@ function ShellContent({ data }: { data: AppBootData }) {
     { href: "/affairs", label: copy.affairs },
     { href: "/settings", label: copy.settings },
   ];
-  return <div className="min-h-screen min-w-0 [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
-    <header className="border-b bg-card">
-      <PageColumn className="flex flex-wrap items-center gap-4 py-3">
+  return <div className="steward-shell min-h-screen min-w-0 text-[15px] leading-[1.6] [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
+    <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-sm">
+      <PageColumn className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2.5">
       <LocalizedLink href="/" className="font-semibold">Chrona</LocalizedLink>
-      <nav aria-label={copy.navigation} className="flex flex-wrap gap-4">
+      <nav aria-label={copy.navigation} className="flex flex-wrap gap-1 text-[13px]">
         {navigation.map(item => <NavLink key={item.href} to={localizeHref(locale, item.href)} end={item.href === "/"}
-          className={({ isActive }) => isActive ? "font-semibold underline underline-offset-4" : "text-muted-foreground hover:underline"}>
+          className={({ isActive }) => isActive ? "rounded-md bg-muted px-2.5 py-1 font-medium" : "rounded-md px-2.5 py-1 text-muted-foreground hover:underline"}>
           {item.label}
         </NavLink>)}
       </nav>
-      <div className="min-w-0 text-sm text-muted-foreground sm:ml-auto" aria-live="polite">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+        <span aria-hidden="true" className={`size-[7px] shrink-0 rounded-full ${settings.data?.chat.bound ? "bg-success" : "bg-muted-foreground"}`} />
         {settings.error ? <span>{copy.statusUnavailable} <Button variant="ghost" onClick={settings.refresh}>{messages.steward.foundation.retry}</Button></span>
           : settings.data ? <span>{settings.data.chat.bound ? `${copy.chatConnected} · ${copy.sentToday.replace("{count}", String(settings.data.chat.sentToday)).replace("{cap}", String(settings.data.notifications.dailyCap))}` : copy.chatDisconnected}</span>
           : <span>{messages.steward.foundation.loading}</span>}

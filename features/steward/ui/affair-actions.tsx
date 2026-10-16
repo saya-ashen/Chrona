@@ -13,10 +13,10 @@ export function AffairFileActions({ client, affairId, path, refresh, children }:
   const { mutation, page, setPage, folder, upload, create } = useAffairFiles(client, affairId, path, refresh);
   const input = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
-  return <section aria-label={c.files} className="mt-4 grid min-w-0 gap-3" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); if (!mutation.pending) void upload(Array.from(event.dataTransfer.files)); }}>
+  return <section aria-label={c.files} className="grid min-w-0 gap-2" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); if (!mutation.pending) void upload(Array.from(event.dataTransfer.files)); }}>
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" aria-expanded={creating} onClick={() => setCreating(!creating)}>{c.newPage}</Button>
-      <Button variant="outline" disabled={mutation.pending} onClick={() => input.current?.click()}>{c.upload}</Button>
+      <Button variant="ghost" aria-expanded={creating} onClick={() => setCreating(!creating)}>{c.newPage}</Button>
+      <Button variant="ghost" disabled={mutation.pending} onClick={() => input.current?.click()}>{c.upload}</Button>
       <input ref={input} aria-label={c.upload} type="file" multiple hidden disabled={mutation.pending} onChange={event => { void upload(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
     </div>
     {creating && <form className="grid gap-2" onSubmit={event => { event.preventDefault(); void create(); }}>

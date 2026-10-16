@@ -9,30 +9,32 @@ export function Composer({
   lang,
   refresh,
   onPendingChange,
+  affairId,
 }: {
   client: StewardClient;
   lang: string;
   refresh: () => void | Promise<void>;
   onPendingChange?: (pending: boolean) => void;
+  affairId?: string;
 }) {
   const { messages } = useI18n();
   const copy = messages.steward.foundation;
-  const composer = useComposer(client, refresh, onPendingChange);
+  const composer = useComposer(client, refresh, onPendingChange, affairId);
   return (
-    <div className="grid min-w-0 gap-3 [overflow-wrap:anywhere]">
+    <div className="grid min-w-0 gap-2.5 [overflow-wrap:anywhere]">
       <form
-        className="flex min-w-0 items-end gap-2 rounded-lg border bg-background p-3"
+        className="flex min-w-0 items-end gap-2 rounded-[10px] border bg-card py-2.5 pl-3.5 pr-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           void composer.send();
         }}
       >
         <Textarea
-          aria-label={copy.composer}
-          placeholder={copy.composer}
+          aria-label={affairId ? messages.steward.affairCenter.supplement : copy.composer}
+          placeholder={affairId ? messages.steward.affairCenter.supplementHint : copy.composer}
           maxLength={8000}
           rows={1}
-          className="min-h-9 max-h-40 min-w-0 flex-1 resize-none [field-sizing:content]"
+          className="min-h-[26px] max-h-40 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0 py-1 text-[15px] shadow-none focus-visible:ring-0 [field-sizing:content]"
           value={composer.text}
           disabled={composer.pending}
           onChange={(event) => composer.setText(event.target.value)}
@@ -44,7 +46,7 @@ export function Composer({
           }}
         />
         <Button type="submit" disabled={composer.pending || !composer.text.trim()}>
-          {copy.send}
+          {affairId ? messages.steward.affairCenter.supplement : copy.send}
         </Button>
       </form>
       {composer.pending && <p role="status">{copy.pending}</p>}
@@ -61,15 +63,15 @@ export function Composer({
       {composer.exchange && (
         <section
           aria-label={copy.reply}
-          className="grid min-w-0 gap-2 border-l-2 border-primary bg-muted/40 p-3 text-sm"
+          className="grid min-w-0 gap-2 border-l-2 rounded-r-md border-primary-border bg-primary-soft/45 px-3.5 py-3 text-[13px]"
         >
-          <p className="whitespace-pre-wrap text-muted-foreground">
+          <p className="whitespace-pre-wrap text-xs text-muted-foreground">
             {copy.you} · {composer.exchange.text}
           </p>
           {composer.exchange.response.messages.filter(message => message.direction === "out").map(message => (
             <article key={message.id} className="grid gap-2">
               <p className="whitespace-pre-wrap">{message.text}</p>
-              {message.affairId && <Badge variant="outline" asChild><Link to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}`}>{messages.steward.affairs.title}</Link></Badge>}
+              {message.affairId && <Badge variant="outline" className="w-fit rounded-full border-primary-border bg-card text-primary" asChild><Link to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}`}>{messages.steward.affairs.title}</Link></Badge>}
               <div className="flex flex-wrap gap-2">
                 {message.attachments.map((attachment, index) => message.affairId && attachment.path ? (
                   /\.md$/i.test(attachment.path)

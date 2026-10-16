@@ -9,8 +9,8 @@ export function ApprovalItem({ approval, client, refresh }: { approval: Approval
   const copy = messages.steward.workspace;
   const mutation = useStewardMutation(refresh);
   const resolve = (decision: "approve" | "deny", scope: "once" | "affair") => mutation.run(() => client.resolveApproval(approval.id, { decision, scope }));
-  return <article className="grid gap-3 p-4">
-    <h3 className="font-medium">{approval.title}</h3><p>{approval.detail}</p>
+  return <article className="grid gap-1.5 border-l-[3px] border-warning px-3.5 py-3">
+    <h3 className="font-medium">{approval.title}</h3><p className="max-w-[72ch] text-[13px] text-muted-foreground">{approval.detail}</p>
     <details><summary>{copy.preview}</summary><pre className="whitespace-pre-wrap break-words">{approval.preview}</pre></details>
     <div className="flex flex-wrap gap-2">
       <Button disabled={mutation.pending} onClick={() => void resolve("approve", "once")}>{copy.once}</Button>

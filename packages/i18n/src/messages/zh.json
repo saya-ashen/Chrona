@@ -1,7 +1,16 @@
 {
   "steward": {
      "overview": { "working": "Chrona 正在处理 {count} 件事", "progressSummary": "这周有 {count} 件事有进展", "progress": "进展", "pages": "更新了 {count} 个页面", "earlier": "更早", "work": "Chrona 处理", "todayPage": "今天的页面" },
-    "affairCenter": { "pagesCount": "页面（{count}）· 当前：{page}", "nextAt": "下次", "morePages": " 等 {count} 个页面", "running": "正在处理：{label}", "replying": "正在回复你的消息", "queued": "即将处理：{label}", "started": "开始于 {time}", "next": "下一次：{label} · {time}", "followUp": "Chrona 的后续工作", "schedules": "安排", "noSchedules": "暂无安排。", "cancelSchedule": "取消安排", "updatedPages": "页面", "completed": "已完成的安排（{count}）", "addSchedule": "添加安排", "label": "名称（可选）", "timeline": "经过", "history": "修订历史", "technical": "技术详情", "created": "事务已创建", "approvalCreated": "等你决定：", "approvalResolved": "决定已记录：", "chronaEdited": "Chrona 更新了 ", "userEdited": "你编辑了 ", "more": "显示更多", "expand": "展开", "collapse": "收起", "trigger": "触发原因", "status": "状态", "start": "开始", "end": "结束", "toolCalls": "工具调用次数", "error": "错误", "instructions": "完整指令", "command": "命令" },
+    "affairCenter": { "alsoUpdated": "更新了 ", "now": "现在怎么样了",
+      "supplement": "补充",
+      "supplementHint": "补充信息或改方向",
+      "runningPill": "处理中",
+      "queuedPill": "排队中",
+      "activePill": "进行中",
+      "waitingPill": "等你决定",
+      "replyKind": "Chrona · 回复",
+      "technicalCount": "技术详情：{runs} 次运行 · {tools} 次工具调用",
+      "pagesCount": "页面（{count}）· 当前：{page}", "nextAt": "下次", "morePages": " 等 {count} 个页面", "running": "正在处理：{label}", "replying": "正在回复你的消息", "queued": "即将处理：{label}", "started": "开始于 {time}", "next": "下一次：{label} · {time}", "followUp": "Chrona 的后续工作", "schedules": "安排", "noSchedules": "暂无安排。", "cancelSchedule": "取消安排", "updatedPages": "页面", "completed": "已完成的安排（{count}）", "addSchedule": "添加安排", "label": "名称（可选）", "timeline": "经过", "history": "修订历史", "technical": "技术详情", "created": "事务已创建", "approvalCreated": "等你决定：", "approvalResolved": "决定已记录：", "chronaEdited": "Chrona 更新了 ", "userEdited": "你编辑了 ", "more": "显示更多", "expand": "展开", "collapse": "收起", "trigger": "触发原因", "status": "状态", "start": "开始", "end": "结束", "toolCalls": "工具调用次数", "error": "错误", "instructions": "完整指令", "command": "命令" },
     "history": { "title": "历史", "diff": "统一差异", "empty": "暂无修改历史。", "revert": "撤回此修改", "confirm": "撤回此修改？将生成一个新版本。", "cancel": "取消" },
     "affairActions": { "files": "添加文件", "folder": "当前文件夹", "upload": "上传文件", "drop": "也可将文件拖到这里（每个不超过 20 MB）。", "pagePath": "当前文件夹中的 Markdown 路径", "newPage": "新建页面", "addSchedule": "添加调度", "mode": "模式", "rule": "重复规则", "at": "一次", "daily": "每天", "weekly": "每周", "every": "每隔", "atLocal": "日期与时间（设备时区）", "time": "时间（工作区时区）", "minutes": "间隔分钟数", "days": "星期", "weekdays": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"], "text": "提醒内容或工作指令", "command": "检查命令" },
     "affairFile": { "pages": "页面", "empty": "还没有页面。", "notFound": "此页面不可用。", "edit": "编辑", "editor": "页面内容", "save": "保存", "cancel": "取消", "retry": "使用我的版本重试", "conflict": "文件已在别处更新，本次修改未保存。请查看当前版本后重试。", "error": "未能保存修改，请重试。", "mine": "你的版本", "theirs": "当前已保存版本", "download": "下载文件", "schedules": "调度", "noSchedules": "暂无调度。", "activity": "动态", "noActivity": "暂无动态。", "pause": "暂停", "resume": "继续", "end": "结束", "confirmEnd": "结束这件事务？", "confirm": "确认", "cancelSchedule": "取消调度", "invalidPanel": "面板声明无效。", "active": "进行中", "paused": "已暂停", "done": "已结束", "cancelled": "已取消" },

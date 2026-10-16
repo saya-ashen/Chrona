@@ -25,6 +25,26 @@ export function fileTree(files: FileNode[]): FileBranch[] {
 export function pageName(path: string) {
   return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
 }
+/** Blank the README summary while retaining source lines for checkbox mutations. */
+export function omitReadmeSummary(content: string, path: string): string {
+  if (path !== "README.md") return content;
+  const lines = content.split("\n");
+  let fence: string | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (marker) { fence = fence ? null : marker; continue; }
+    if (fence || !line.trim() || /^\s*(?:#|>|[-*+]\s|\d+\.\s|\|)/.test(line)) continue;
+    // A setext heading is a heading, not the summary paragraph.
+    if (/^\s*(?:=+|-+)\s*$/.test(lines[i + 1] ?? "")) { i++; continue; }
+    while (i < lines.length && lines[i]!.trim() && !/^\s*(?:#|>|[-*+]\s|\d+\.\s|`{3,}|~{3,}|\|)/.test(lines[i]!)) {
+      lines[i] = "";
+      i++;
+    }
+    break;
+  }
+  return lines.join("\n");
+}
 export function visiblePath(path: string) {
   return affairPathSchema.safeParse(path).success && !path.split("/").some(part => part === ".chrona" || part === ".git");
 }

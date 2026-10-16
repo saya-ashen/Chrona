@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { Card, cn } from "@shared/ui";
 
 export function PageColumn({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("mx-auto grid w-full min-w-0 max-w-5xl gap-8 px-4 py-6 sm:px-6 [overflow-wrap:anywhere]", className)} {...props} />;
+  return <div className={cn("mx-auto grid w-full min-w-0 max-w-[1112px] gap-7 px-4 pt-6 pb-16 [overflow-wrap:anywhere]", className)} {...props} />;
 }
 
 export function Section({ title, count, action, children, className, ...props }: Omit<ComponentProps<"section">, "title"> & { title: ReactNode; count?: number; action?: ReactNode }) {
@@ -17,7 +17,7 @@ export function Section({ title, count, action, children, className, ...props }:
 
 /** Shared framing for steward lists, result articles and contextual panels. */
 export function Surface({ className, ...props }: ComponentProps<typeof Card>) {
-  return <Card className={cn("min-w-0 gap-0 divide-y rounded-xl border bg-card py-0 shadow-none", className)} {...props} />;
+  return <Card className={cn("min-w-0 gap-0 divide-y rounded-[10px] border bg-card py-0 shadow-none", className)} {...props} />;
 }
 
 export function InlineForm({ className, ...props }: ComponentProps<"form">) {

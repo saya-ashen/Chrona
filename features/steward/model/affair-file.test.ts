@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localImagePath } from "./affair-file";
+import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localImagePath, omitReadmeSummary } from "./affair-file";
 import { fixtureTime } from "./fixtures";
 import { scheduleDescription } from "./workspace";
 import zh from "../../../packages/i18n/src/messages/zh.json";
 export const panelSpec = { title: "Weight", data: "weight.csv", fields: [{ key: "day", label: "Day", type: "date" as const }, { key: "kg", label: "Weight (kg)", type: "number" as const }], views: [{ kind: "trend" as const, x: "day", y: "kg" }, { kind: "table" as const, columns: ["day", "kg"] }] };
 export const panelMarkdown = '```chrona-panel\n' + JSON.stringify(panelSpec) + '\n```';
 describe("affair files", () => {
+  it.each([
+    ["# Title\n\nSummary with [link](page.md).\nMore summary.\n\n## Result\n- [ ] Go", "# Title\n\n\n\n\n## Result\n- [ ] Go"],
+    ["Summary only", ""],
+    ["# Title\n\n- [ ] Go", "# Title\n\n- [ ] Go"],
+    ["Title\n=====\n\nSummary\n\nResult", "Title\n=====\n\n\n\nResult"],
+  ])("omits the README paragraph without shifting checkbox lines", (source, expected) => {
+    expect(omitReadmeSummary(source, "README.md")).toBe(expected);
+    expect(omitReadmeSummary(source, "day-01.md")).toBe(source);
+    expect(markdownParts(omitReadmeSummary(source, "README.md")).filter(part => part.kind === "task")).toEqual(markdownParts(source).filter(part => part.kind === "task"));
+  });
   it("builds implicit folders, sorts README first and hides metadata", () => {
     const tree = fileTree(["z.md", "days/a.md", ".chrona/state.json", "README.md", "days/.chrona/test"].map(path => ({ path, kind: "file", size: 1, updatedAt: fixtureTime })));
     expect(tree.map(node => node.name)).toEqual(["README.md", "days", "z.md"]);

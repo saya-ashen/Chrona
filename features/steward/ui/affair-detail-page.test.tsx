@@ -40,6 +40,6 @@ it("shows empty pages, approvals before content, and collapsed secondary section
   const approval = screen.getByRole("heading", { name: en.steward.foundation.decisions });
   const content = screen.getByRole("region", { name: "README.md" });
   expect(approval.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.getByText("Technical details", { selector: "summary" }).parentElement).not.toHaveAttribute("open");
+  expect(screen.getByText(/^Technical details:/, { selector: "summary" }).parentElement).not.toHaveAttribute("open");
   expect(screen.getByText("Revision history", { selector: "summary" }).parentElement).not.toHaveAttribute("open");
 });
