@@ -1,6 +1,6 @@
 # Chrona 升级为可自生长平台：改造方案
 
-状态：P0、P1、P2 已实现；P3 起未开始。
+状态：P0–P3 已实现；P4 起未开始。
 范式来源：`~/workspace/agent-growth-lab/docs/self-modification-paradigm.md`（下称"范式"）。
 用户已确认：本方案以当前需求为准，旧 AGENTS.md / steward 文档中与之冲突的约束（删除 ManagedTool、沙箱只用于旧脚本调度、不给 Provider 提供工具等）可以修改。
 
@@ -231,7 +231,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 **验收**：v1 写入的状态在 v2 下仍被正确使用；无反向迁移时回滚给出选择而不是静默丢数据。
 
-### P3 回放验证与自动启用
+### P3 回放验证与自动启用（已完成；改为并行模拟，见 [P3 规格](platform-p3-spec.md)）
 
 - 以 `ModuleRun` 为数据源做轨迹回放；意图对照。
 - 开放 `activate_module` 的 `preapproved`（仅限不新增 effects 且回放通过）。
