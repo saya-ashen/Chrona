@@ -120,7 +120,7 @@ model ModuleRun {
 }
 ```
 
-关系与级联：Module 属于 Workspace、Affair（Cascade）；其余属于 Module（Cascade）。按查询需要加索引。
+关系与级联：Module 属于 Workspace、Affair（Cascade）；ModuleVersion、ModuleRun 属于 Module（Cascade）；Generation 属于 Workspace（Cascade），记录整个工作区的模块快照。按查询需要加索引。
 
 `Schedule`：新增可空 `moduleId`、`triggerId`；`SCHEDULE_MODES` 改为 `["wake", "remind", "module", "job"]`，其中 `job` 仅为遗留值：不得新建；migration 把现有 `job` 行置为 `paused`，`lastResult` 写 `job 已停用：请改为模块`。`module` 行只能由 Chrona 在启用/回滚时创建或取消，`chrona_schedule` 不接受 `module`。
 

@@ -126,7 +126,6 @@ async function schedule(ctx: ToolContext, raw: unknown) {
   const pending = await gate(ctx, "schedule", { affairId: id }, { tool: ctx.tool, ...input, affairId: id });
   if (pending) return pending;
   if (input.mode === "wake" && input.rule.kind === "at" && new Date(input.rule.at).getTime() <= ctx.now().getTime() + 60000) {
-    if (input.command !== undefined) throw new StewardError("invalid", "Only jobs accept commands");
     const affair = await requireAffair(ctx.db, ctx.workspaceId, id);
     if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
     // A run scheduling follow-up work for itself must get a new run, not an instruction to its own session.
@@ -157,7 +156,7 @@ async function schedule(ctx: ToolContext, raw: unknown) {
       return { merged: true, runId: mergedId, note: "Work on this affair is already running; the instruction was delivered to it. Do not schedule another wake." };
     }
   }
-  return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, label: input.label, command: input.command, until: input.until }, "chrona");
+  return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, label: input.label, until: input.until }, "chrona");
 }
 async function schedules(ctx: ToolContext, raw: unknown) {
   return ctx.schedules.list(await scheduleAffairId(ctx, parseInput(schemas.chrona_schedules, raw).affairId));

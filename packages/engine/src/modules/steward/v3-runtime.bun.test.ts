@@ -70,34 +70,43 @@ test("wake fires once after downtime, pauses with affair, expired until never fi
   await api.affairs.update(a.id, { status: "paused" }); advance(3600000); expect(await api.schedules.fireDue()).toBe(0);
 });
 
-test("job output and exit changes wake; output capped; three failures pause and notify once", async () => {
-  const a = await affair(); let output = "ok", exitCode = 0, calls = 0;
-  ports.sandbox = { available: true, run: async input => { calls++; expect(input.cwd).toContain("affairs"); expect(input.timeoutMs).toBe(60000); return { output, exitCode }; } };
-  const s = await api.schedules.create(a.id, { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check", label: "Job check", command: "fake" });
-  for (let i = 0; i < 2; i++) { advance(300000); await api.schedules.fireDue(); }
-  expect(calls).toBe(2); expect(await db.run.count()).toBe(1);
-  expect((await db.run.findFirstOrThrow()).label).toBe("Job check");
-  output = "x".repeat(100000); advance(300000); await api.schedules.fireDue();
-  expect((await db.run.findMany()).some(r => r.prompt.length > 65536 && r.prompt.length < 66000)).toBe(true);
-  exitCode = 1;
-  for (let i = 0; i < 3; i++) { advance(300000); await api.schedules.fireDue(); }
-  expect(await db.run.count()).toBe(3);
-  expect((await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).status).toBe("paused");
-  expect(await db.notification.count({ where: { title: "检查连续失败，已暂停" } })).toBe(1);
-  advance(300000); expect(await api.schedules.fireDue()).toBe(0);
+test("job and module creation is rejected, including jobs with commands", async () => {
+  const a = await affair();
+  for (const mode of ["job", "module"]) {
+    await expect(api.schedules.create(a.id, { mode, rule: at(), text: "Check" })).rejects.toMatchObject({ code: "invalid" });
+  }
+  await expect(api.schedules.create(a.id, { mode: "job", rule: at(), text: "Check", command: "fake" })).rejects.toMatchObject({ code: "invalid" });
+  expect(await db.schedule.count()).toBe(0);
 });
 
-test("job policy denies execution and once grants are consumed", async () => {
+test("legacy jobs pause without execution, notifications, or consuming grants", async () => {
   const a = await affair(); let calls = 0;
   ports.sandbox = { available: true, run: async () => { calls++; return { output: "ok", exitCode: 0 }; } };
-  await api.grants.create({ action: "run_job", mode: "never", scope: { kind: "affair", affairId: a.id } });
-  await api.schedules.create(a.id, { mode: "job", rule: at(), text: "Check", command: "fake" });
-  advance(60000); await api.schedules.fireDue(); expect(calls).toBe(0);
-  const b = await affair();
-  const grant = await db.grant.create({ data: { workspaceId, action: "run_job", mode: "preapproved", once: true, scope: { kind: "affair", affairId: b.id } } });
-  await api.schedules.create(b.id, { mode: "job", rule: at(), text: "Check", command: "fake" });
-  advance(60000); await api.schedules.fireDue(); expect(calls).toBe(1);
-  expect((await db.grant.findUniqueOrThrow({ where: { id: grant.id } })).consumedAt).toEqual(time);
+  const grant = await db.grant.create({ data: { workspaceId, action: "run_job", mode: "preapproved", once: true, scope: { kind: "affair", affairId: a.id } } });
+  const s = await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check", command: "fake", createdBy: "chrona", nextAt: new Date(time.getTime() + 300000) } });
+  advance(300000);
+  expect(await api.schedules.fireDue()).toBe(0);
+  expect(await api.schedules.fireDue()).toBe(0);
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ status: "paused", lastResult: "job 已停用：请改为模块", lastAt: null, lastOutputHash: null });
+  expect(calls).toBe(0);
+  expect(await db.run.count()).toBe(0);
+  expect(await db.notification.count()).toBe(0);
+  expect((await db.grant.findUniqueOrThrow({ where: { id: grant.id } })).consumedAt).toBeNull();
+});
+
+test("module occurrence is claimed once without execution until T3", async () => {
+  const a = await affair(); let calls = 0;
+  ports.sandbox = { available: true, run: async () => { calls++; return { output: "ok", exitCode: 0 }; } };
+  const module = await db.module.create({ data: { workspaceId, affairId: a.id, name: "check" } });
+  const s = await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "module", moduleId: module.id, triggerId: "daily", rule: at(), text: "Check", createdBy: "chrona", nextAt: new Date(time.getTime() + 60000) } });
+  advance(60000);
+  expect(await api.schedules.fireDue()).toBe(1);
+  expect(await api.schedules.fireDue()).toBe(0);
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ status: "done", lastAt: time, lastResult: "module executor not installed", moduleId: module.id, triggerId: "daily" });
+  expect(calls).toBe(0);
+  expect(await db.moduleRun.count()).toBe(0);
+  expect(await db.run.count()).toBe(0);
+  expect(await db.notification.count()).toBe(0);
 });
 
 test("foreground claims first; lanes independent; tokens and deadlines; commits produce activity", async () => {

@@ -16,8 +16,8 @@ describe("affair action inputs", () => {
   ])("builds $kind rule", rule => {
     expect(scheduleInput({ ...initialSchedule, kind: rule.kind, at: "2027-01-01T08:00:00Z" }).rule).toEqual(rule);
   });
-  it("rejects empty weekdays, invalid dates, short intervals, and jobs without a command", () => {
+  it("rejects empty weekdays, invalid dates, short intervals, and legacy jobs", () => {
     for (const patch of [{ kind: "weekly" as const, days: [] }, { kind: "at" as const, at: "" }, { kind: "every" as const, minutes: "1" }, { mode: "job" as const }]) expect(() => scheduleInput({ ...initialSchedule, ...patch })).toThrow();
-    expect(scheduleInput({ ...initialSchedule, mode: "job", command: "sh check.sh" }).command).toBe("sh check.sh");
+    expect(() => scheduleInput({ ...initialSchedule, mode: "job", command: "sh check.sh" })).toThrow();
   });
 });

@@ -28,21 +28,22 @@ export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval"
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
 export const ACTIVITY_ACTORS = ["user", "chrona", "source"] as const;
 export const ACTIVITY_KINDS = ["message", "edit", "run", "schedule", "approval", "notification", "source", "status", "note"] as const;
-/** `wake` runs the Provider with the stored instruction; `remind` sends the stored text to the user without a model call;
- * `job` runs a command inside the affair directory (sandboxed, no model) and wakes the Provider only when its output changes. */
-export const SCHEDULE_MODES = ["wake", "remind", "job"] as const;
+/** `wake` runs the Provider; `remind` sends stored text without a model call.
+ * `job` is legacy-only: never created; existing rows are paused.
+ * `module` rows are created only by Chrona on module activation/rollback. */
+export const SCHEDULE_MODES = ["wake", "remind", "module", "job"] as const;
 export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
 export const APPROVAL_SCOPES = ["once", "affair"] as const;
 
 /** Actions Chrona itself performs for the Provider and therefore gates. Provider-native actions are governed by the Provider runtime/sandbox. */
 export const ACTIONS = [
-  "notify_user", "schedule", "run_job", "read_source", "connect_source",
+  "notify_user", "schedule", "run_job", "activate_module", "read_source", "connect_source",
   "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials",
 ] as const;
 export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
 export const DEFAULT_POLICY = {
-  notify_user: "auto", schedule: "auto", run_job: "notify_after", read_source: "auto",
+  notify_user: "auto", schedule: "auto", run_job: "notify_after", activate_module: "ask", read_source: "auto",
   connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
   share_third_party: "ask", purchase: "ask", change_credentials: "never",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
@@ -88,11 +89,43 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
   z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
 ]);
+export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network"] as const;
+export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
+const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
+export const moduleManifestSchema = z.object({
+  name: slug,
+  entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
+  triggers: z.array(z.object({ id: slug, schedule: scheduleRuleSchema }).strict()).min(1).max(10),
+  effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
+  params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
+  data: z.object({ schema: z.number().int().min(1) }).strict().default({ schema: 1 }),
+  tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
+}).strict().superRefine((manifest, ctx) => {
+  for (const [key, param] of Object.entries(manifest.params)) {
+    if (typeof param.value !== param.type) ctx.addIssue({ code: "custom", path: ["params", key, "value"], message: "Value must match parameter type" });
+  }
+  const ids = new Set<string>();
+  manifest.triggers.forEach((trigger, index) => {
+    if (ids.has(trigger.id)) ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
+    ids.add(trigger.id);
+  });
+  if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
+});
+export const moduleOutputSchema = z.object({
+  effects: z.array(z.discriminatedUnion("type", [
+    z.object({ type: z.literal("notify_user"), key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
+    z.object({ type: z.literal("wake_provider"), key: z.string().min(1).max(200), prompt: text.max(4000) }).strict(),
+  ])).max(20).default([]),
+}).strict();
+export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
+export type ModuleOutput = z.infer<typeof moduleOutputSchema>;
+export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
+
 export const scheduleSchema = z.object({
   id, affairId: id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
-  /** wake: instruction to the future Provider run; remind: the exact text sent to the user; job: what the check is for. */
+  /** wake: instruction to the future Provider run; remind: the exact text sent to the user; job: legacy check description. */
   text: z.string().max(4000),
-  /** job only: command run with `sh -c` inside the affair directory. */
+  /** Legacy job command, retained for existing rows but never executed. */
   command: z.string().max(2000).nullable(),
   /** Optional end: after this time the schedule stops. */
   until: iso.nullable(),
@@ -257,7 +290,7 @@ export const uiEventSchema = z.object({
 }).strict();
 export const toggleCheckboxSchema = z.object({ path: affairPathSchema, line: z.number().int().min(1), checked: z.boolean(), baseRevision: z.string().max(64).nullable() }).strict();
 export const panelEntrySchema = z.object({ dataPath: affairPathSchema, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
-export const createScheduleSchema = z.object({ mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), command: z.string().max(2000).optional(), until: iso.optional() }).strict();
+export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();

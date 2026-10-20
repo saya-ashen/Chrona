@@ -16,6 +16,8 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   affairs Affair[]
+  modules Module[]
+  generations Generation[]
   schedules Schedule[]
   runs Run[]
   messages Message[]
@@ -37,6 +39,7 @@ model Affair {
   status String @default("active")
   dirName String
   sessionId String?
+  modules Module[]
   lastActivityAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -53,6 +56,65 @@ model Affair {
   @@index([workspaceId, status, lastActivityAt])
 }
 
+model Module {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String
+  name String
+  activeHash String?
+  status String @default("active")
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
+  versions ModuleVersion[]
+  runs ModuleRun[]
+  schedules Schedule[]
+  @@unique([affairId, name])
+  @@index([workspaceId, status])
+}
+
+model ModuleVersion {
+  id String @id @default(uuid())
+  moduleId String
+  hash String
+  manifest Json
+  intent Json
+  source String
+  report Json
+  status String
+  createdAt DateTime @default(now())
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@unique([moduleId, hash])
+  @@index([moduleId, status, createdAt])
+}
+
+model Generation {
+  id String @id @default(uuid())
+  workspaceId String
+  seq Int
+  modules Json
+  reason String
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, seq])
+}
+
+model ModuleRun {
+  id String @id @default(uuid())
+  moduleId String
+  hash String
+  triggerId String
+  firedAt DateTime
+  exitCode Int
+  output Json?
+  error String?
+  executed Json
+  createdAt DateTime @default(now())
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@index([moduleId, createdAt])
+  @@index([moduleId, hash, firedAt])
+}
+
 model Schedule {
   id String @id @default(uuid())
   workspaceId String
@@ -61,6 +123,9 @@ model Schedule {
   rule Json
   text String
   command String?
+  moduleId String?
+  triggerId String?
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   until DateTime?
   status String @default("active")
   nextAt DateTime?
@@ -75,6 +140,7 @@ model Schedule {
   affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
   @@index([workspaceId, status, nextAt])
   @@index([affairId, status, nextAt])
+  @@index([moduleId, status])
 }
 
 model Run {

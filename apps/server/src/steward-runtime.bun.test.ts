@@ -1,33 +1,24 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime, stewardDataDir } from "./steward-runtime";
-const bwrapPath = Bun.which("bwrap") ?? undefined;
-const jobTest = createScriptSandbox({ bwrapPath }).health.available ? test : test.skip;
-jobTest("configured runtime job reads affair cwd and wakes only on output change", async () => {
+test("runtime rejects job creation and pauses legacy jobs without waking the provider", async () => {
   const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-job-"));
   let time = new Date("2026-10-15T04:00:00Z");
-  const previous = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrapPath;
   const runtime = createStewardRuntime(db, { dataDir, now: () => time, provider: null, chatTransport: null });
-  if (previous === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = previous;
   try {
     const workspace = await db.workspace.create({ data: { name: "jobs" } });
     const api = runtime.service.forWorkspace(workspace.id), affair = await api.affairs.create({ title: "Check" });
-    const directory = await (await api.affairs.files(affair.id)).directory();
-    writeFileSync(join(directory, "value.txt"), "first\n");
-    await api.schedules.create(affair.id, { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check file", command: "read -r value < value.txt; printf '%s' \"$value\"" });
-    expect((await runtime.health()).jobsSandbox).toBe(true);
-    for (let i = 0; i < 2; i++) { time = new Date(time.getTime() + 300000); await api.schedules.fireDue(); }
-    expect(await db.run.count()).toBe(1);
-    writeFileSync(join(directory, "value.txt"), "changed\n");
-    time = new Date(time.getTime() + 300000); await api.schedules.fireDue();
-    expect(await db.run.count()).toBe(2);
-    expect((await db.run.findMany()).some(run => run.prompt.includes("changed"))).toBe(true);
+    const input = { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check file", command: "printf legacy" };
+    await expect(api.schedules.create(affair.id, input)).rejects.toMatchObject({ code: "invalid" });
+    const schedule = await db.schedule.create({ data: { ...input, workspaceId: workspace.id, affairId: affair.id, createdBy: "chrona", nextAt: new Date(time.getTime() + 300000) } });
+    time = new Date(time.getTime() + 300000);
+    expect(await api.schedules.fireDue()).toBe(0);
+    expect(await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toMatchObject({ status: "paused", lastResult: "job 已停用：请改为模块" });
+    expect(await db.run.count()).toBe(0);
+    expect(await db.notification.count()).toBe(0);
   } finally { await runtime.stop(); await db.$disconnect(); }
 });
 
