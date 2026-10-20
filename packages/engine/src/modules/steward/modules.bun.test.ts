@@ -826,7 +826,10 @@ test("all tests run independently even after a failure; declared network never e
 test("invalid manifests reject without inventing a module identity or leaking parser diagnostics", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "module.json"), "invalid JSON");
-  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { tests: [] } });
+  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { tests: [], errors: ["module.json: missing or not valid JSON"] } });
+  // Real Pi run: a human title as name must come back as a fixable field error.
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "喝水提醒", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], tests: ["test.ts"] }));
+  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [expect.stringMatching(/^name: /)] } });
   expect(await f.db.module.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);

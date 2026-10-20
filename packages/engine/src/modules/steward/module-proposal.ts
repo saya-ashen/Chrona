@@ -35,6 +35,18 @@ async function permittedProposal(context: ModuleContext, affairId: string) {
 function hasMigration(manifest: Manifest, files: { path: string }[]) {
   return !manifest.data.migrate || files.some(file => file.path === manifest.data.migrate);
 }
+async function readManifest(staging: string): Promise<{ manifest: Manifest } | { errors: string[] }> {
+  let raw: unknown;
+  // Invalid manifests have no validated identity; never expose JSON parser/host diagnostics.
+  try { raw = JSON.parse(await readFile(join(staging, "module.json"), "utf8")); }
+  catch { return { errors: ["module.json: missing or not valid JSON"] }; }
+  const parsed = moduleManifestSchema.safeParse(raw);
+  // Schema issue paths and messages come from the contract, so the Provider can fix its manifest.
+  return parsed.success ? { manifest: parsed.data } : { errors: parsed.error.issues.slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
+}
+function submissionErrors(manifest: Manifest, permitted: boolean, hasEntry: boolean, hasMigrate: boolean) {
+  return [...(permitted ? [] : ["policy: module activation or notifications are set to never"]), ...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
+}
 async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, affairId: string, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
   const { db, workspaceId, ports } = context, { hash, report, versionId } = submission;
   for (const file of files) {
@@ -42,17 +54,16 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, file.bytes, { mode: 0o444 });
   }
-  let manifest;
-  try { manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(staging, "module.json"), "utf8"))); }
-  // Invalid manifests have no validated identity; never expose parser/host diagnostics.
-  catch { return { moduleId: null, hash, status: "rejected", report }; }
+  const parsed = await readManifest(staging);
+  if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
+  const { manifest } = parsed;
   const module = await db.module.upsert({ where: { affairId_name: { affairId, name: manifest.name } }, create: { workspaceId, affairId, name: manifest.name, createdAt: ports.now() }, update: {} });
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);
   const permitted = await permittedProposal(context, affairId);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: permitted ? "approved" : "rejected", report: existing.report as BuildReport };
-  if (!permitted || !hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report };
+  if (!permitted || !hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, permitted, hasEntry, hasMigrate) } };
   if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash, status: existing.status as Proposal["status"], report: existing.report as BuildReport };
   const queued = await queueVersion(context, { ...submission, moduleId: module.id, manifest });
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };
