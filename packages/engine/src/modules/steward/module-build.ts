@@ -8,6 +8,7 @@ import { createNotifications } from "./notify";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
 import { checkReplay } from "./module-replay";
+import { tryAutoActivate } from "./module-auto";
 import { readModuleFiles, codeDifference, continuityPreview, replayPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -41,7 +42,10 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
-  const approval = await createApprovals(context).create({ affairId, action: "activate_module", title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module", moduleId: module.id, hash }, preview });
+  const card = { affairId, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  const automatic = await tryAutoActivate(context, version, report, card);
+  if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
+  const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {

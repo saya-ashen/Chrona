@@ -9,12 +9,14 @@ import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
 
+type ActivationAction = Omit<ApprovedAction, "grantId"> & { grantId: string | null };
+
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
   if (value === undefined) return;
   if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.schema !== "number" || !Number.isInteger(value.schema) || value.schema < 1 || typeof value.snapshotAt !== "string") throw new StewardError("invalid", "Invalid module restore approval");
   return { schema: value.schema, snapshotAt: value.snapshotAt };
 }
-async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, affairId: string) {
+async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, affairId: string) {
   const { workspaceId, ports } = context;
   const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", grantId: action.grantId } });
   if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
@@ -22,14 +24,14 @@ async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClien
     const decision = await effectivePolicyIn(tx, workspaceId, action, { affairId }, ports.now());
     if (decision.mode === "never" || (action === "activate_module" && decision.mode === "ask")) throw new StewardError("forbidden", "Policy no longer allows module activation");
   }
-  await consumeOnce(tx, workspaceId, action.grantId, ports.now());
+  if (action.grantId) await consumeOnce(tx, workspaceId, action.grantId, ports.now());
 }
 async function approvedVersion(tx: Prisma.TransactionClient, moduleId: string, hash: string, restore?: Restore) {
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== (restore ? "approved" : "pending_review")) throw new StewardError("conflict", restore ? "Module version is not approved" : "Module version is not pending review");
   return version;
 }
-async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, target: { moduleId: string; hash: string; restore?: Restore }) {
+async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, target: { moduleId: string; hash: string; restore?: Restore }) {
   const { moduleId, hash, restore } = target;
   const module = await requireModule(context, tx, moduleId);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
@@ -46,13 +48,17 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   await activateIn(context, tx, moduleId, hash, "activate");
   return null;
 }
-export async function onApproved(context: ModuleContext, action: ApprovedAction) {
+export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction) {
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
-  const prepared = await context.db.$transaction(tx => prepareApproved(context, tx, action, { moduleId, hash, restore }));
+  return prepareApproved(context, tx, action, { moduleId, hash, restore });
+}
+export async function onApproved(context: ModuleContext, action: ApprovedAction) {
+  const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
+  const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);
   await migrateData(context, prepared, restore ? "rollback" : "activate", restore);
 }
 async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
