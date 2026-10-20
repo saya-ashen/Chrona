@@ -119,7 +119,7 @@ function HealthSection({ d }: { d: LoadedSettings }) {
   return <SettingsSection name="health">
     <div className="flex flex-wrap gap-2">
       <Badge variant="secondary">{c.git} · {d.health.git ? c.available : c.unavailable}</Badge>
-      <Badge variant="outline">{c.sandbox} · {d.health.jobsSandbox ? c.available : c.unavailable}</Badge>
+      <Badge variant="outline">{c.sandbox} · {d.health.moduleSandbox ? c.available : c.unavailable}</Badge>
     </div>
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px] [&_dt]:text-muted-foreground [&_dd]:tabular-nums">
       {(["queuedRuns", "runningRuns", "failedRunsToday", "dueSchedules", "failingConnectors", "queuedNotifications", "failedNotifications"] as const).map(key => <div key={key} className="contents"><dt>{c[key]}</dt><dd>{d.health[key]}</dd></div>)}

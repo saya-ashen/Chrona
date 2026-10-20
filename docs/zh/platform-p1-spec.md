@@ -5,7 +5,7 @@
 
 ## 1. 范围
 
-做：模块存储与清单、`chrona_propose` 完整提案、build（清单校验 + 沙箱测试）、经 Approval 审查并绑定 hash 启用、Generation 记录、仅代码回滚、schedule 触发执行、effects 经现有通道执行、停用 `job`。
+做：模块存储与清单、`chrona_propose` 完整提案、build（清单校验 + 沙箱测试）、经 Approval 审查并绑定 hash 启用、Generation 记录、仅代码回滚、schedule 触发执行、effects 经现有通道执行、删除旧脚本调度模式。
 
 不做（后续阶段）：数据迁移与 schema 升级（P2）、轨迹回放与自动启用（P3）、inbound 触发、模块导出工具、意图提案与构建通道（P4）、网页模块管理页（审查复用现有审批卡片）。
 
@@ -122,9 +122,11 @@ model ModuleRun {
 
 关系与级联：Module 属于 Workspace、Affair（Cascade）；ModuleVersion、ModuleRun 属于 Module（Cascade）；Generation 属于 Workspace（Cascade），记录整个工作区的模块快照。按查询需要加索引。
 
-`Schedule`：新增可空 `moduleId`、`triggerId`；`SCHEDULE_MODES` 改为 `["wake", "remind", "module", "job"]`，其中 `job` 仅为遗留值：不得新建；migration 把现有 `job` 行置为 `paused`，`lastResult` 写 `job 已停用：请改为模块`。`module` 行只能由 Chrona 在启用/回滚时创建或取消，`chrona_schedule` 不接受 `module`。
+`Schedule`：新增可空 `moduleId`、`triggerId`；`SCHEDULE_MODES` 为 `["wake", "remind", "module"]`。0005_drop_jobs 删除旧脚本调度行及其命令、输出哈希列。`module` 行只能由 Chrona 在启用/回滚时创建或取消，`chrona_schedule` 不接受 `module`。
 
-Action：`ACTIONS` 增加 `activate_module`，默认 `ask`。`run_job` 保留枚举值但不再使用。
+Action：`ACTIONS` 增加 `activate_module`，默认 `ask`。
+
+2026-10-20 更新：job 已彻底删除（0005_drop_jobs），run_job 已移除。
 
 ## 7. 网关流程
 
@@ -163,7 +165,7 @@ chrona_propose: z.object({
 
 ## 8. 执行（tick）
 
-`schedules.fireDue` 中 `mode === "module"`：沿用现有"先占位再执行"；读取 Module 与 `activeHash`（模块 paused 或无 activeHash 则跳过）；按 §4 运行；写 ModuleRun；按 §5 执行 effects。连续 3 次失败暂停模块并 `now` 级通知（沿用 job 的规则）。
+`schedules.fireDue` 中 `mode === "module"`：沿用现有"先占位再执行"；读取 Module 与 `activeHash`（模块 paused 或无 activeHash 则跳过）；按 §4 运行；写 ModuleRun；按 §5 执行 effects。连续 3 次失败暂停模块并 `now` 级通知（沿用连续失败暂停规则）。
 
 ## 9. 验收场景（P1 完成标准）
 

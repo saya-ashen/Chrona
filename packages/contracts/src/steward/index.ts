@@ -29,21 +29,20 @@ export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_o
 export const ACTIVITY_ACTORS = ["user", "chrona", "source"] as const;
 export const ACTIVITY_KINDS = ["message", "edit", "run", "schedule", "approval", "notification", "source", "status", "note"] as const;
 /** `wake` runs the Provider; `remind` sends stored text without a model call.
- * `job` is legacy-only: never created; existing rows are paused.
  * `module` rows are created only by Chrona on module activation/rollback. */
-export const SCHEDULE_MODES = ["wake", "remind", "module", "job"] as const;
+export const SCHEDULE_MODES = ["wake", "remind", "module"] as const;
 export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
 export const APPROVAL_SCOPES = ["once", "affair"] as const;
 
 /** Actions Chrona itself performs for the Provider and therefore gates. Provider-native actions are governed by the Provider runtime/sandbox. */
 export const ACTIONS = [
-  "notify_user", "schedule", "run_job", "activate_module", "read_source", "connect_source",
+  "notify_user", "schedule", "activate_module", "read_source", "connect_source",
   "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials",
 ] as const;
 export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
 export const DEFAULT_POLICY = {
-  notify_user: "auto", schedule: "auto", run_job: "notify_after", activate_module: "ask", read_source: "auto",
+  notify_user: "auto", schedule: "auto", activate_module: "ask", read_source: "auto",
   connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
   share_third_party: "ask", purchase: "ask", change_credentials: "never",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
@@ -123,10 +122,8 @@ export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 export const scheduleSchema = z.object({
   id, affairId: id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
-  /** wake: instruction to the future Provider run; remind: the exact text sent to the user; job: legacy check description. */
+  /** wake: instruction to the future Provider run; remind: the exact text sent to the user. */
   text: z.string().max(4000),
-  /** Legacy job command, retained for existing rows but never executed. */
-  command: z.string().max(2000).nullable(),
   /** Optional end: after this time the schedule stops. */
   until: iso.nullable(),
   status: z.enum(SCHEDULE_STATUSES), nextAt: iso.nullable(), lastAt: iso.nullable(), lastResult: z.string().max(2000).nullable(),
@@ -141,7 +138,7 @@ export const affairSchema = z.object({
   id, title: short, status: z.enum(AFFAIR_STATUSES),
   /** First paragraph of README.md, as written by the Provider. */
   summary: z.string().max(1000),
-  /** `label` is the schedule's label, or a reminder's own text; null for an unlabelled wake/job (its text is internal). */
+  /** `label` is the schedule's label, or a reminder's own text; null for an unlabelled wake/module (its text is internal). */
   nextSchedule: z.object({ at: iso, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable() }).strict().nullable(),
   running: z.boolean(),
   /** Work Chrona is doing or about to do on this affair right now. */
@@ -241,7 +238,7 @@ export const settingsSchema = z.object({
 }).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
-  git: z.boolean(), jobsSandbox: z.boolean(),
+  git: z.boolean(), moduleSandbox: z.boolean(),
   queuedRuns: z.number().int().min(0), runningRuns: z.number().int().min(0), failedRunsToday: z.number().int().min(0),
   dueSchedules: z.number().int().min(0), failingConnectors: z.number().int().min(0),
   queuedNotifications: z.number().int().min(0), failedNotifications: z.number().int().min(0), lastTickAt: iso.nullable(),

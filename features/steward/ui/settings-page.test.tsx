@@ -58,7 +58,8 @@ it("shows provider, v3 permissions and connector details; test failures remain f
   expect(screen.getByText("Sandbox missing")).toBeVisible();
   expect(screen.getByText("INBOX only")).toBeVisible();
   expect(screen.getByText(/Pending items: 3/)).toBeVisible();
-  expect(screen.getByText("Run a check")).toBeVisible();
+  expect(screen.getByText("Activate a module")).toBeVisible();
+  expect(screen.queryByText("Run a check")).toBeNull();
   expect(within(screen.getByText("Change credentials").closest("tr")!).queryByRole("combobox")).toBeNull();
   await userEvent.click(screen.getByText("Recent inbound items"));
   expect(await screen.findByText("Batch rule")).toBeVisible();

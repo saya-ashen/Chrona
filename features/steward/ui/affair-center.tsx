@@ -114,7 +114,7 @@ export function AffairTechnicalDetails({ detail, children }: { detail: AffairDet
   const c = messages.steward.affairCenter;
   return <details className="min-w-0 break-words"><summary className="cursor-pointer text-[13px] text-muted-foreground">{c.technicalCount.replace("{runs}", String(detail.runs.length)).replace("{tools}", String(detail.runs.reduce((sum, run) => sum + run.toolCalls.length, 0)))}</summary><div className="grid gap-4 pt-3">
     {detail.runs.map(run => <dl key={run.id} className="grid gap-1"><dt>{c.label}</dt><dd>{run.label || "—"}</dd><dt>{c.trigger}</dt><dd>{run.trigger}</dd><dt>{c.status}</dt><dd>{run.status}</dd><dt>{c.start}</dt><dd>{run.startedAt ? new Date(run.startedAt).toLocaleString(locale) : "—"}</dd><dt>{c.end}</dt><dd>{run.endedAt ? new Date(run.endedAt).toLocaleString(locale) : "—"}</dd><dt>{c.toolCalls}</dt><dd>{run.toolCalls.length}</dd>{run.error && <><dt>{c.error}</dt><dd>{run.error}</dd></>}</dl>)}
-    {detail.schedules.map(schedule => <div key={schedule.id}><h3>{scheduleLabel(schedule, c.followUp)}</h3><p>{c.instructions}</p><pre className="whitespace-pre-wrap break-all">{schedule.text}</pre>{schedule.command && <><p>{c.command}</p><pre className="whitespace-pre-wrap break-all">{schedule.command}</pre></>}</div>)}
+    {detail.schedules.map(schedule => <div key={schedule.id}><h3>{scheduleLabel(schedule, c.followUp)}</h3><p>{c.instructions}</p><pre className="whitespace-pre-wrap break-all">{schedule.text}</pre></div>)}
     {children}
   </div></details>;
 }

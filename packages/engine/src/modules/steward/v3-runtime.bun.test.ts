@@ -48,7 +48,6 @@ test("schedule CRUD validates ownership, timezone, until, and one-shot missed re
   expect(daily.nextAt).toBe("2026-10-15T05:00:00.000Z");
   const ended = await api.schedules.create(a.id, { mode: "wake", rule: { kind: "daily", time: "13:00" }, text: "Prepare", until: time.toISOString() });
   expect(ended.status).toBe("done");
-  await expect(api.schedules.create(a.id, { mode: "job", rule: at(), text: "Check" })).rejects.toMatchObject({ code: "invalid" });
   const s = await api.schedules.create(a.id, { mode: "remind", rule: at(), text: "  exact reminder\n" });
   advance(180000);
   expect(await api.schedules.fireDue()).toBe(1); expect(await api.schedules.fireDue()).toBe(0);
@@ -70,28 +69,10 @@ test("wake fires once after downtime, pauses with affair, expired until never fi
   await api.affairs.update(a.id, { status: "paused" }); advance(3600000); expect(await api.schedules.fireDue()).toBe(0);
 });
 
-test("job and module creation is rejected, including jobs with commands", async () => {
+test("public module schedule creation is rejected", async () => {
   const a = await affair();
-  for (const mode of ["job", "module"]) {
-    await expect(api.schedules.create(a.id, { mode, rule: at(), text: "Check" })).rejects.toMatchObject({ code: "invalid" });
-  }
-  await expect(api.schedules.create(a.id, { mode: "job", rule: at(), text: "Check", command: "fake" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(api.schedules.create(a.id, { mode: "module", rule: at(), text: "Check" })).rejects.toMatchObject({ code: "invalid" });
   expect(await db.schedule.count()).toBe(0);
-});
-
-test("legacy jobs pause without execution, notifications, or consuming grants", async () => {
-  const a = await affair(); let calls = 0;
-  ports.sandbox = { available: true, run: async () => { calls++; return { output: "ok", exitCode: 0 }; } };
-  const grant = await db.grant.create({ data: { workspaceId, action: "run_job", mode: "preapproved", once: true, scope: { kind: "affair", affairId: a.id } } });
-  const s = await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check", command: "fake", createdBy: "chrona", nextAt: new Date(time.getTime() + 300000) } });
-  advance(300000);
-  expect(await api.schedules.fireDue()).toBe(0);
-  expect(await api.schedules.fireDue()).toBe(0);
-  expect(await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ status: "paused", lastResult: "job 已停用：请改为模块", lastAt: null, lastOutputHash: null });
-  expect(calls).toBe(0);
-  expect(await db.run.count()).toBe(0);
-  expect(await db.notification.count()).toBe(0);
-  expect((await db.grant.findUniqueOrThrow({ where: { id: grant.id } })).consumedAt).toBeNull();
 });
 
 test("module without an active hash is claimed once and skipped without execution", async () => {

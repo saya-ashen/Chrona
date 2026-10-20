@@ -61,16 +61,16 @@ describe("module output contract", () => {
   });
 });
 
-test("public schedule creation accepts only wake/remind and no command; stored jobs remain readable", () => {
+test("public schedule creation accepts only wake/remind and no command; stored module schedules remain readable", () => {
   const input = { rule: { kind: "every", minutes: 5 }, text: "Check", label: "Check" };
-  for (const mode of ["wake", "remind", "module", "job"]) {
+  for (const mode of ["wake", "remind", "module"]) {
     const allowed = mode === "wake" || mode === "remind";
     expect(createScheduleSchema.safeParse({ ...input, mode }).success).toBe(allowed);
     expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode }).success).toBe(allowed);
     expect(createScheduleSchema.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
     expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
   }
-  expect(scheduleSchema.safeParse({ ...input, id: "legacy", affairId: "affair", mode: "job", command: "echo old", until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
+  expect(scheduleSchema.safeParse({ ...input, id: "module-schedule", affairId: "affair", mode: "module", until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
 });
 
 test("module activation defaults to ask with its policy label", () => {

@@ -118,7 +118,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       try { if (provider) { const h = await provider.health(); providerHealth = { name: provider.name, available: h.available, sandboxed: h.sandboxed }; } } catch { /* Public health never exposes diagnostic secrets. */ }
       let git = false;
       try { git = await Bun.spawn(["git", "--version"], { stdout: "ignore", stderr: "ignore" }).exited === 0; } catch { /* Missing git. */ }
-      return { provider: providerHealth, git, jobsSandbox: ports.sandbox?.available ?? false };
+      return { provider: providerHealth, git, moduleSandbox: ports.sandbox?.available ?? false };
     },
     start() {
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;

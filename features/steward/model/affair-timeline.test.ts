@@ -23,7 +23,7 @@ it.each(["chrona", "user"] as const)("merges messages and groups %s edits by com
   expect(entries.some(item => item.kind === "created")).toBe(true);
   expect(entries.some(item => item.kind === "approvalCreated")).toBe(true);
 });
-it.each(["remind", "wake", "job"] as const)("uses safe fallback for %s", mode => {
+it.each(["remind", "wake", "module"] as const)("uses safe fallback for %s", mode => {
   const schedule = { ...detailFixture().schedules[0]!, mode, label: null, text: "text" };
   expect(scheduleLabel(schedule, "fallback")).toBe(mode === "remind" ? "text" : "fallback");
   expect(scheduleLabel({ ...schedule, label: "label" }, "fallback")).toBe("label");

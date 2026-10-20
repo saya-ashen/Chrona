@@ -122,7 +122,6 @@ model Schedule {
   mode String
   rule Json
   text String
-  command String?
   moduleId String?
   triggerId String?
   module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
@@ -131,7 +130,6 @@ model Schedule {
   nextAt DateTime?
   lastAt DateTime?
   lastResult String?
-  lastOutputHash String?
   failures Int @default(0)
   label String?
   createdBy String

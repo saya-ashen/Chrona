@@ -2,7 +2,7 @@
 
 状态：2026-10-20 草案，待用户审阅。未开始实现。
 范式来源：`~/workspace/agent-growth-lab/docs/self-modification-paradigm.md`（下称"范式"）。
-用户已确认：本方案以当前需求为准，旧 AGENTS.md / steward 文档中与之冲突的约束（删除 ManagedTool、沙箱只用于 job、不给 Provider 提供工具等）可以修改。
+用户已确认：本方案以当前需求为准，旧 AGENTS.md / steward 文档中与之冲突的约束（删除 ManagedTool、沙箱只用于旧脚本调度、不给 Provider 提供工具等）可以修改。
 
 ## 0. 目标
 
@@ -33,8 +33,8 @@
 ### 1.2 已发现的问题（P0 处理）
 
 1. **Pi 能读到凭据与数据库。** `pi-launch.ts` 用 `--ro-bind / /` 启动 Pi，只把事务目录设为可写；`<dataDir>/secrets`（0600，同一 uid）与 SQLite 数据库对 Pi 可读。被提示注入的 Pi 可以 `cat` 出 QQ/邮箱凭据。与 steward-goals §7.6"凭据不进 Agent"不符。
-2. **job 脚本能读凭据并联网。** `script-sandbox.ts` 带 cwd 运行时同样 `--ro-bind / /` 且 `--share-net`。
-3. **job 批准不绑定代码。** `run_job` 默认 `notify_after`，按事务判定，不绑定 command 或脚本内容 hash；脚本位于 Pi 可写的事务目录，批准后仍可被修改。与 steward-goals §7.3"首次运行或修改后的脚本先问再做"不符。
+2. **旧调度脚本能读凭据并联网。** `script-sandbox.ts` 带 cwd 运行时同样 `--ro-bind / /` 且 `--share-net`。
+3. **旧脚本调度批准不绑定代码。** 原执行动作默认 `notify_after`，按事务判定，不绑定 command 或脚本内容 hash；脚本位于 Pi 可写的事务目录，批准后仍可被修改。与 steward-goals §7.3"首次运行或修改后的脚本先问再做"不符。
 
 以上为代码阅读结论，尚未实际复现。
 
@@ -42,9 +42,9 @@
 
 | 现有 | 处理 |
 |---|---|
-| Schedule `mode: "job"` 与 `command`、`lastOutputHash` | 由模块替代（P1 迁移后删除） |
+| Schedule 的旧脚本模式及命令、输出哈希列 | 已由模块替代，0005_drop_jobs 删除旧行与列 |
 | "输出 hash 变化就唤醒 Provider" | 改为模块显式声明 `wake_provider` 副作用 |
-| AGENTS.md 中"沙箱只用于定时 job""不给 Provider 提供工具"、禁止 ManagedTool 类表 | 改写为本方案的规则 |
+| AGENTS.md 中"沙箱只用于定时脚本""不给 Provider 提供工具"、禁止 ManagedTool 类表 | 改写为本方案的规则 |
 
 ## 2. 目标架构
 
@@ -141,7 +141,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 1. **自我放大循环**：wake 设 wake、模块唤起 Provider 又提交修改模块的提案。模块触发的唤起与提案都计入事务运行预算与每日运行上限。
 2. **后台无人在场**：后台运行遇到需要批准的动作，挂入待答复入口，不阻塞等待。
-3. **触发数据不可信**：模块的 `wake_provider` 内容、来源事件一律按 untrusted data 注入，与现有 job 输出处理一致。
+3. **触发数据不可信**：模块的 `wake_provider` 内容、来源事件一律按 untrusted data 注入，与原脚本调度输出处理一致。
 
 ## 4. 网关
 
@@ -190,7 +190,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 | `Generation` | 新增：序号、各模块版本 hash、参数、启用时间、对应的 L1 版本 |
 | `ModuleRun` | 新增：触发、输入摘要、输出 effects、执行结果；也是回放数据源 |
 | `ModuleEffect` | 新增：幂等键、状态（pending / done / rejected / void） |
-| `Schedule` | 删除 `command`、`lastOutputHash`；`mode` 只剩 `wake` / `remind`；模块的定时触发由 Module 清单生成内部调度 |
+| `Schedule` | 已删除旧命令、输出哈希列；公开创建仅 `wake` / `remind`；模块的定时触发由 Module 清单生成内部 `module` 调度 |
 | Action 枚举 | 新增 `activate_module`、`network` |
 
 模块数据不进数据库，放在 `platform/data/<module>/`，带 `schema.json`。
@@ -209,10 +209,10 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 ### P0 安全修补（不依赖范式，可立即做）
 
 - Pi 的 bwrap：不再 `--ro-bind / /`，改为只读挂载运行所需路径（/nix/store、Pi 安装与配置目录），显式排除 `<dataDir>`，只绑定事务与会话目录。
-- job 沙箱同样屏蔽 `<dataDir>` 与用户主目录。暂时保留联网：现有价格/服务检查 job 依赖网络，按策略控制网络放到 P1。
-- ~~`run_job` 批准绑定内容 hash~~：并入 P1。脚本位于 Pi 可写的事务目录，只绑定 command 字符串无法阻止批准后改脚本；P1 把代码移出该目录后才能真正解决。
+- 旧脚本调度沙箱同样屏蔽 `<dataDir>` 与用户主目录。暂时保留联网：原价格/服务检查脚本依赖网络，按策略控制网络放到 P1。
+- ~~旧脚本调度批准绑定内容 hash~~：并入 P1。脚本位于 Pi 可写的事务目录，只绑定 command 字符串无法阻止批准后改脚本；P1 把代码移出该目录后才能真正解决。
 
-**验收**：在 Pi 运行和 job 中尝试读取 `<dataDir>/secrets` 与数据库失败；事务目录仍可写；现有测试通过。
+**验收**：在 Pi 运行和脚本沙箱中尝试读取 `<dataDir>/secrets` 与数据库失败；事务目录仍可写；现有测试通过。
 
 ### P1 模块与网关最小闭环
 
@@ -220,7 +220,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 - `chrona_propose`（仅完整提案）、build、verify（清单 + 测试）、审查卡片、启用、回滚（仅代码）。
 - 执行器：schedule 触发 → 沙箱 → effects 经策略与现有通道执行。
 - 模块批准绑定内容 hash（原 P0-c）；模块沙箱联网须 `network` 授权。
-- 迁移现有 job：每个 job 包装为一个模块（`effects: ["wake_provider"]`，有网络则加 `network`），首次运行要求批准；之后删除 `command`。
+- 旧脚本调度已彻底删除（0005_drop_jobs），不迁移旧行；需要继续运行的检查重新提案为模块（`effects: ["wake_provider"]`，有网络则加 `network`），首次运行要求批准。
 
 **验收**：在 QQ 里说"每天 10 点看一下 X 价格，低于 2100 告诉我" → Pi 提交模块 → 网页审查并批准 → 到点由模块直接通知，**该次触发没有 Provider 运行** → 修改阈值产生新版本 → 回滚到上一版本后行为恢复。
 

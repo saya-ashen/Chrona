@@ -39,7 +39,7 @@ Rules that follow from the goals:
 - Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
 - No backward compatibility with removed task/goal/plan systems, immutable AffairResult,
   Ask/suggestions, care/cadence, FollowUp, concierge/assessor roles, management MCP or Hermes.
-  The legacy `job` schedule mode is retired (existing rows paused). Current Provider adapters and Run records are not those legacy systems.
+  The `job` schedule mode was removed. Current Provider adapters and Run records are not those legacy systems.
 
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.

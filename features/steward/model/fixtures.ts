@@ -11,7 +11,7 @@ export function fileFixture() {
   return fileContentSchema.parse({ path: "README.md", content: "# 相机\n\n- [ ] 比较镜头", mime: "text/markdown", revision: "abc123", updatedAt: fixtureTime });
 }
 export function scheduleFixture() {
-  return scheduleSchema.parse({ id: "reminder", affairId: "camera", mode: "remind", label: null, rule: { kind: "daily", time: "18:00" }, text: "比较镜头", command: null, until: null, status: "active", nextAt: fixtureTime, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: fixtureTime });
+  return scheduleSchema.parse({ id: "reminder", affairId: "camera", mode: "remind", label: null, rule: { kind: "daily", time: "18:00" }, text: "比较镜头", until: null, status: "active", nextAt: fixtureTime, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: fixtureTime });
 }
 export function runFixture() {
   return runSchema.parse({ id: "run-1", affairId: "camera", lane: "background", trigger: "schedule", status: "failed", provider: "fake", toolCalls: [], error: "Internal provider detail", startedAt: fixtureTime, endedAt: fixtureTime, createdAt: fixtureTime, label: "Prepare day two" });
@@ -20,7 +20,7 @@ export function detailFixture() {
   return affairDetailSchema.parse({ entry: "README.md", affair: affairFixture(), files: [{ path: "README.md", kind: "file", size: 50, updatedAt: fixtureTime }], schedules: [scheduleFixture()], approvals: [approvalFixture()], activity: [], runs: [], revisions: [], messages: [] });
 }
 export function emptyToday() {
-  return todayViewSchema.parse({ generatedAt: fixtureTime, approvals: [], upcoming: [], progress: [], todayPage: null, health: { provider: { available: true, name: "Pi", sandboxed: true, lastError: null }, git: true, jobsSandbox: true, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, failingConnectors: 0, queuedNotifications: 0, failedNotifications: 0, lastTickAt: fixtureTime } });
+  return todayViewSchema.parse({ generatedAt: fixtureTime, approvals: [], upcoming: [], progress: [], todayPage: null, health: { provider: { available: true, name: "Pi", sandboxed: true, lastError: null }, git: true, moduleSandbox: true, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, failingConnectors: 0, queuedNotifications: 0, failedNotifications: 0, lastTickAt: fixtureTime } });
 }
 export function todayFixture() {
   return todayViewSchema.parse({ ...emptyToday(), approvals: [approvalFixture()], upcoming: [{ scheduleId: "reminder", affairId: "camera", affairTitle: "二手相机选购", mode: "remind", label: "比较镜头", at: fixtureTime }], progress: [{ affair: affairFixture(), updates: [{ title: "比较已备好", body: "加入富士比较", at: fixtureTime }], changedPages: 2, card: null }] });

@@ -43,7 +43,7 @@ export function createStewardService(inputPorts: StewardPorts) {
       git: ports.gitHealth ?? (async () => {
         try { return await Bun.spawn(["git", "--version"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).exited === 0; } catch { return false; }
       }),
-      jobsSandbox: () => ports.sandbox?.available ?? false,
+      moduleSandbox: () => ports.sandbox?.available ?? false,
     });
     return { provider: createProviderControl(ports, workspaceId), uiEvent: createUiEvents(ctx, chat.submit), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };

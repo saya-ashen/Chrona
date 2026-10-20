@@ -54,7 +54,7 @@ data/affairs/<affair-id>/          ← Provider 的工作目录（git 仓库）
 | --- | --- |
 | `reply` | 在当前对话里回复用户（前台运行）；可附带改过的页面路径 |
 | `notify` | 主动推送（后台运行），经打扰预算 |
-| `schedule` / `schedule_list` / `schedule_cancel` | 一次 / 周期唤醒；模式仅 `wake`（叫醒 Provider 并带上给未来自己的指令）或 `remind`（到点直接把固定文本发给用户，不调模型）；`job` 已停用 |
+| `schedule` / `schedule_list` / `schedule_cancel` | 一次 / 周期唤醒；模式仅 `wake`（叫醒 Provider 并带上给未来自己的指令）或 `remind`（到点直接把固定文本发给用户，不调模型）；`job` 调度模式已彻底删除 |
 | `chrona_propose` | 提交模块目录，沙箱测试并发起按 hash 绑定的启用审批 |
 | `chrona_modules` | 查询模块、版本与最近运行 |
 | `chrona_module_checkout` | 检出指定模块版本到事务目录以供修改 |

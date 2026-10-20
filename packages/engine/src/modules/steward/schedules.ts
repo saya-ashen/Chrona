@@ -117,10 +117,6 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     const rows = await db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { lte: now }, affair: { status: "active" } }, include: { affair: true }, orderBy: { nextAt: "asc" } });
     let fired = 0;
     for (const row of rows) {
-      if (row.mode === "job") {
-        await db.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt }, data: { status: "paused", lastResult: "job 已停用：请改为模块" } });
-        continue;
-      }
       // Advance before external execution: concurrent ticks/downtime fire at most once.
       // A crash leaves lastResult at "Firing" for inspection; it does not rerun external work.
       const rule = scheduleRuleSchema.parse(row.rule), delayMs = now.getTime() - row.nextAt!.getTime();

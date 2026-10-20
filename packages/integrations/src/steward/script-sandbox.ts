@@ -17,7 +17,7 @@ function workspaceDirectory(cwd?: string) {
   if (!statSync(directory).isDirectory() || directory === "/") throw new Error("Invalid sandbox cwd");
   return directory;
 }
-// Keep sensitive trees hidden even when a job needs the host runtime and network.
+// Keep sensitive trees hidden even when a script needs the host runtime and network.
 export function scriptWorkspaceArguments(directory: string, paths: string[], dataDir?: string) {
   const hidden = [...new Set([homedir(), dataDir].filter((p): p is string => !!p)
     .flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
@@ -27,7 +27,7 @@ export function scriptWorkspaceArguments(directory: string, paths: string[], dat
     ...paths.flatMap(p => ["--ro-bind", p, p]), "--bind", directory, directory, "--chdir", directory,
     "--clearenv", "--setenv", "PATH", paths.map(dirname).join(":"), "--setenv", "LANG", "C.UTF-8"];
 }
-/** Jobs may write only cwd (plus private /tmp); no inherited environment or host fallback. */
+/** Scripts may write only cwd (plus private /tmp); no inherited environment or host fallback. */
 export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512 }: {
   bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
 }) {

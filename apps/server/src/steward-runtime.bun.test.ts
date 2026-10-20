@@ -4,24 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime, stewardDataDir } from "./steward-runtime";
-test("runtime rejects job creation and pauses legacy jobs without waking the provider", async () => {
-  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-job-"));
-  let time = new Date("2026-10-15T04:00:00Z");
-  const runtime = createStewardRuntime(db, { dataDir, now: () => time, provider: null, chatTransport: null });
-  try {
-    const workspace = await db.workspace.create({ data: { name: "jobs" } });
-    const api = runtime.service.forWorkspace(workspace.id), affair = await api.affairs.create({ title: "Check" });
-    const input = { mode: "job", rule: { kind: "every", minutes: 5 }, text: "Check file", command: "printf legacy" };
-    await expect(api.schedules.create(affair.id, input)).rejects.toMatchObject({ code: "invalid" });
-    const schedule = await db.schedule.create({ data: { ...input, workspaceId: workspace.id, affairId: affair.id, createdBy: "chrona", nextAt: new Date(time.getTime() + 300000) } });
-    time = new Date(time.getTime() + 300000);
-    expect(await api.schedules.fireDue()).toBe(0);
-    expect(await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toMatchObject({ status: "paused", lastResult: "job 已停用：请改为模块" });
-    expect(await db.run.count()).toBe(0);
-    expect(await db.notification.count()).toBe(0);
-  } finally { await runtime.stop(); await db.$disconnect(); }
-});
-
 test("E2E provider requires both the explicit test gate and provider selection", async () => {
   const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
   const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;
@@ -87,7 +69,7 @@ test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", asyn
     expect(interval).toBe(30000);
     expect((await db.stewardState.findUniqueOrThrow({ where: { workspaceId: "w" } })).lastTickAt).not.toBeNull();
     expect((await runtime.health()).provider.available).toBe(false);
-    expect((await runtime.health()).jobsSandbox).toBe(false);
+    expect((await runtime.health()).moduleSandbox).toBe(false);
     await runtime.stop(); expect(cleared).toBe(true);
   } finally { await runtime.stop(); await db.$disconnect(); }
 });

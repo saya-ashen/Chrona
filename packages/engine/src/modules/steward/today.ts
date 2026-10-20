@@ -6,7 +6,7 @@ import { notificationSettings } from "./settings";
 import { toApproval } from "./store";
 import { createAffairs } from "./affairs";
 import type { WorkspaceFs } from "./workspace-fs";
-export type HealthPorts = { provider(): Promise<Health["provider"]>; git(): Promise<boolean>; jobsSandbox(): boolean };
+export type HealthPorts = { provider(): Promise<Health["provider"]>; git(): Promise<boolean>; moduleSandbox(): boolean };
 async function findTodayPage(fs: WorkspaceFs, affairs: { id: string; dirName: string }[]): Promise<TodayView["todayPage"]> {
   for (const affair of affairs) {
     try {
@@ -32,7 +32,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, fs: Workspa
       db.stewardState.findUnique({ where: { workspaceId } }),
     ]);
     const day = localDayKey(at, settings.timezone);
-    return { provider, git, jobsSandbox: ports.jobsSandbox(), queuedRuns: runs.filter(r => r.status === "queued").length, runningRuns: runs.filter(r => r.status === "running").length,
+    return { provider, git, moduleSandbox: ports.moduleSandbox(), queuedRuns: runs.filter(r => r.status === "queued").length, runningRuns: runs.filter(r => r.status === "running").length,
       failedRunsToday: runs.filter(r => ["failed", "timed_out", "provider_unavailable"].includes(r.status) && localDayKey(r.endedAt ?? r.createdAt, settings.timezone) === day).length,
       dueSchedules, failingConnectors, queuedNotifications, failedNotifications, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
   }
