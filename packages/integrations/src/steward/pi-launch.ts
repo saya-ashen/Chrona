@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
@@ -8,7 +9,7 @@ import { readPiResources, resourceCommand, resourceVersionError, type PiResource
 export type PiProviderOptions = {
   command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string;
   chronaExtension: string; webExtension?: string | null; agentUrl: string; bwrap?: string | null;
-  workspaceRoot?: string;
+  workspaceRoot?: string; dataDir?: string;
 };
 export type PiLaunchConfig = {
   options: PiProviderOptions; command: string; agentDir: string; version: string;
@@ -96,7 +97,16 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   if (config.options.model) args.push("--model", config.options.model);
   if (!config.bwrap) return args;
   const cwd = resolve(input.cwd);
-  return ["--die-with-parent", "--ro-bind", "/", "/", "--tmpfs", "/tmp", "--dev", "/dev", "--proc", "/proc", ...workspaceMounts(config, input, cwd),
+  // Parent masks precede child masks; all masks precede the explicit resource/workspace mounts.
+  const hidden = [...new Set([homedir(), config.options.dataDir].filter((p): p is string => !!p)
+    .flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
+    .sort((a, b) => a.split(sep).length - b.split(sep).length);
+  const resources = [config.command, config.extension, config.web, ...config.resources.extensions, ...config.resources.skills]
+    .filter((p): p is string => !!p && isAbsolute(p));
+  const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
+    .filter(p => hidden.some(root => inside(root, p)));
+  return ["--die-with-parent", "--ro-bind", "/", "/", "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]),
+    "--dev", "/dev", "--proc", "/proc", ...visible.flatMap(p => ["--ro-bind", p, p]), ...workspaceMounts(config, input, cwd),
     "--bind", config.agentDir, config.agentDir, "--chdir", cwd, "--", config.command, ...args];
 }
 /** Detect command resources appended by a wrapper. Not a proof that arbitrary executable code is safe. */

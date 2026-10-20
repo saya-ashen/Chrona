@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { chmod, mkdtemp, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { readPiResources, resourceCommand, resourceVersionError } from "./pi-resources";
 import { expectedPiCommands, piArguments, piLaunchConfig } from "./pi-launch";
@@ -22,6 +22,26 @@ test("loads only reviewed explicit resources, keeping no-discovery and scoped co
   expect(expectedPiCommands(config, [{ source: "skill", sourceInfo: { path: f.skill } }])).toBe(true);
   expect(expectedPiCommands(config, [{ source: "skill", sourceInfo: { path: join(f.root, "ambient.md") } }])).toBe(false);
   expect(expectedPiCommands(config, [{ source: "prompt", path: f.skill }])).toBe(false);
+});
+test("bwrap masks data and home before re-exposing only Pi resources and workspaces", async () => {
+  const f = await fixture(), dataDir = f.root, workspace = join(dataDir, "affairs"), sessions = join(workspace, ".chrona", "sessions");
+  const affair = join(workspace, "a".repeat(32)), agentDir = join(dataDir, "providers", "pi");
+  for (const path of [sessions, affair, agentDir]) await mkdir(path, { recursive: true });
+  const command = join(dataDir, "fake-pi"); await writeFile(command, "synthetic executable");
+  const config = piLaunchConfig({ command, agentDir, dataDir, workspaceRoot: workspace,
+    chronaExtension: f.extension, resourcesFile: f.file, bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
+  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
+  const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
+  for (const path of [dataDir, homedir()]) {
+    const mask = mount("--tmpfs", path);
+    expect(mask).toBeGreaterThan(mount("--ro-bind", "/") + 2);
+    for (const path of [command, f.extension, f.skill, workspace]) expect(mask).toBeLessThan(mount("--ro-bind", path));
+    for (const path of [sessions, affair, agentDir]) expect(mask).toBeLessThan(mount("--bind", path));
+  }
+  expect(mount("--bind", dataDir)).toBe(-1);
+  expect(mount("--bind", homedir())).toBe(-1);
+  const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
+  expect(unsandboxed).not.toContain("--tmpfs");
 });
 test("missing/invalid manifest never falls back to ambient resources", async () => {
   const f = await fixture();

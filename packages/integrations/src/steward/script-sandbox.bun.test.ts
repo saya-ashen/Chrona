@@ -1,12 +1,34 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, writeFile, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { createScriptSandbox } from "./script-sandbox";
+import { createScriptSandbox, scriptWorkspaceArguments } from "./script-sandbox";
 const bwrapPath = Bun.which("bwrap") ?? undefined;
 const sandbox = createScriptSandbox({ bwrapPath });
 if (!sandbox.health.available) console.warn("SKIP script sandbox integration tests: bubblewrap missing or namespaces unavailable");
 const sandboxTest = sandbox.health.available ? test : test.skip;
+test("workspace masks precede runtime and writable mounts", () => {
+  const dataDir = join(homedir(), "chrona-test-data"), cwd = join(dataDir, "affairs", "fixture");
+  const args = scriptWorkspaceArguments(cwd, ["/usr/bin/sh"], dataDir);
+  const root = args.findIndex((arg, i) => arg === "--ro-bind" && args[i + 1] === "/");
+  for (const path of [homedir(), dataDir]) {
+    const mask = args.findIndex((arg, i) => arg === "--tmpfs" && args[i + 1] === path);
+    expect(mask).toBeGreaterThan(root + 2);
+    expect(mask).toBeLessThan(args.indexOf("--bind"));
+    expect(mask).toBeLessThan(args.findIndex((arg, i) => arg === "--ro-bind" && args[i + 1] === "/usr/bin/sh"));
+  }
+  expect(args).toContain("--share-net");
+});
+sandboxTest("workspace can write but cannot read fake data or home secrets", async () => {
+  // Use only synthetic files; never read the user's real home contents.
+  const dataDir = await mkdtemp(join(tmpdir(), "chrona-hidden-data-"));
+  const cwd = join(dataDir, "affairs", "fixture"), secret = join(dataDir, "secrets", "x.json");
+  await mkdir(cwd, { recursive: true }); await mkdir(join(dataDir, "secrets"));
+  await writeFile(secret, "fake-secret", { mode: 0o600 });
+  const result = await createScriptSandbox({ bwrapPath, dataDir }).run({ language: "python", cwd, input: {}, source: `import os\ntry:\n open(${JSON.stringify(secret)}).read()\n raise AssertionError('secret visible')\nexcept OSError: pass\nassert os.listdir(${JSON.stringify(homedir())}) == []\nopen('output', 'w').write('safe')\nprint('hidden')` });
+  expect(result).toMatchObject({ status: "succeeded", output: "hidden\n" });
+  expect(await readFile(join(cwd, "output"), "utf8")).toBe("safe");
+});
 test("missing sandbox fails closed", async () => {
   expect(await createScriptSandbox({}).run({ language: "shell", source: "exit 0", input: {} })).toMatchObject({ status: "unavailable", error: "沙箱不可用" });
 });

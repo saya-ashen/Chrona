@@ -53,6 +53,7 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
+    dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
@@ -76,7 +77,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       start: async (service, wake) => { await (await loadQq())?.start(service, wake); },
       stop: async () => { if (qq) await (await qq)?.stop(); },
     } : null;
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap });
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()) });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
     async run({ command, cwd, timeoutMs, maxOutputBytes }) {

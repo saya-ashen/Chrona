@@ -1,5 +1,6 @@
-import { accessSync, constants, realpathSync, statSync } from "node:fs";
-import { dirname } from "node:path";
+import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 type Language = "python" | "shell" | "typescript";
@@ -16,9 +17,19 @@ function workspaceDirectory(cwd?: string) {
   if (!statSync(directory).isDirectory() || directory === "/") throw new Error("Invalid sandbox cwd");
   return directory;
 }
+// Keep sensitive trees hidden even when a job needs the host runtime and network.
+export function scriptWorkspaceArguments(directory: string, paths: string[], dataDir?: string) {
+  const hidden = [...new Set([homedir(), dataDir].filter((p): p is string => !!p)
+    .flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
+    .sort((a, b) => a.split(sep).length - b.split(sep).length);
+  return ["--unshare-all", "--share-net", "--die-with-parent", "--new-session", "--ro-bind", "/", "/",
+    "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]), "--proc", "/proc", "--dev", "/dev",
+    ...paths.flatMap(p => ["--ro-bind", p, p]), "--bind", directory, directory, "--chdir", directory,
+    "--clearenv", "--setenv", "PATH", paths.map(dirname).join(":"), "--setenv", "LANG", "C.UTF-8"];
+}
 /** Jobs may write only cwd (plus private /tmp); no inherited environment or host fallback. */
-export function createScriptSandbox({ bwrapPath, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512 }: {
-  bwrapPath?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
+export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512 }: {
+  bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
 }) {
   limits(timeoutMs, maxOutputBytes, memoryMb);
   const bwrap = executable(bwrapPath);
@@ -37,9 +48,7 @@ export function createScriptSandbox({ bwrapPath, timeoutMs = 60_000, maxOutputBy
       limits(runTimeout, outputLimit);
       const directory = workspaceDirectory(cwd);
       // Mount the workspace after /tmp so OS-temp affair directories remain visible.
-      const profile = directory ? ["--unshare-all", "--share-net", "--die-with-parent", "--new-session", "--ro-bind", "/", "/",
-        "--tmpfs", "/tmp", "--proc", "/proc", "--dev", "/dev", "--bind", directory, directory, "--chdir", directory,
-        "--clearenv", "--setenv", "PATH", paths.map(dirname).join(":"), "--setenv", "LANG", "C.UTF-8"] : base;
+      const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
       const interpreter = interpreters[language];
       if (!available || !bwrap || !shell || !interpreter) return { status: "unavailable", output: "", error: "沙箱不可用" };
       return new Promise(resolve => {
