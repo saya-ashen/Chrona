@@ -94,7 +94,8 @@ test("catalog authenticates; every contract tool has a schema; invalid calls are
     expect(CHRONA_TOOLS).toContain(name);
     expect(catalog.find(t => t.name === name)?.inputSchema.description).toBeString();
   }
-  expect(catalog.find(t => t.name === "chrona_propose")!.inputSchema.description!.length).toBeLessThanOrEqual(900);
+  // The module format (schedule/inbound triggers, tools, I/O) lives only here; keep it bounded.
+  expect(catalog.find(t => t.name === "chrona_propose")!.inputSchema.description!.length).toBeLessThanOrEqual(1100);
   await expect(service.tools.catalog("invalid")).rejects.toMatchObject({ code: "forbidden" });
   await expect(call("unknown")).rejects.toMatchObject({ code: "invalid" });
   await expect(call("chrona_reply", { text: "hello", workspaceId: "other" })).rejects.toMatchObject({ code: "invalid" });

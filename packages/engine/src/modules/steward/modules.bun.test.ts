@@ -55,6 +55,17 @@ async function fixture() {
   return { db, dataDir, workspace, ports, service, affair, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
 
+test.each([true, false])("activation schedules only schedule triggers (inbound only: %s)", async only => {
+  const f = await fixture(), path = join(f.dir, "module.json"), manifest = JSON.parse(await readFile(path, "utf8"));
+  const inbound = { id: "mail", inbound: { connector: "mailbox", match: {} } };
+  await writeFile(path, JSON.stringify({ ...manifest, triggers: only ? [inbound] : [inbound, ...manifest.triggers] }));
+  const result = await f.propose();
+  await f.approve(result.approvalId!);
+  const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
+  expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual(only ? [] : [{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "active", activeHash: result.hash });
+});
+
 async function dataFixture() {
   const f = await fixture(), first = await f.propose();
   await f.approve(first.approvalId!);

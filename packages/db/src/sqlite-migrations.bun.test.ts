@@ -46,11 +46,13 @@ describe("clean steward SQLite baseline", () => {
     });
   });
 
-  test("fresh database with all migrations has nullable Module.dataSchema", () => {
+  test("fresh database with all migrations has nullable module schema and inbound item columns", () => {
     const options = { ...fixture(), migrationsDir: resolve("prisma/migrations") };
     ensureSqliteDatabase(options);
     inspect(options.databasePath, db => {
       expect(db.query('PRAGMA table_info("Module")').all()).toContainEqual(expect.objectContaining({ name: "dataSchema", type: "INTEGER", notnull: 0, dflt_value: null }));
+      expect(db.query('PRAGMA table_info("ModuleRun")').all()).toContainEqual(expect.objectContaining({ name: "inboundItemId", type: "TEXT", notnull: 0, dflt_value: null }));
+      expect(db.query('PRAGMA foreign_key_list("ModuleRun")').all()).not.toContainEqual(expect.objectContaining({ from: "inboundItemId" }));
     });
   });
 

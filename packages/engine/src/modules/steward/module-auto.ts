@@ -9,6 +9,10 @@ import { intentSchema, requireModule, type BuildReport, type ModuleContext, type
 import { createNotifications } from "./notify";
 
 type ReviewCard = { affairId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
+function replayEligible(report: BuildReport) {
+  const continuity = report.continuity;
+  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data")) && report.replay?.status === "identical" && report.replay.steps === 10;
+}
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
   if (!module.activeHash || module.status === "migrating") return false;
@@ -16,8 +20,7 @@ async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, ve
   const effects = moduleManifestSchema.parse(active.manifest).effects;
   if (!manifest.effects.every(effect => effects.includes(effect))) return false;
   if (manifest.data.schema !== module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) return false;
-  const continuity = report.continuity;
-  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data")) && report.replay?.status === "identical" && report.replay.steps === 10;
+  return replayEligible(report);
 }
 async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport, card: ReviewCard) {
   if (!await eligible(context, tx, version, report)) return null;

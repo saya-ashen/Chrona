@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, DEFAULT_POLICY, moduleManifestSchema, moduleOutputSchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
+import { createScheduleSchema, DEFAULT_POLICY, moduleManifestSchema, moduleOutputSchema, scheduleSchema, chronaToolInputSchemas, type ModuleTrigger } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -14,6 +14,16 @@ describe("module manifest contract", () => {
     const params = { threshold: { type: "number", value: 2100 }, label: { type: "string", value: "watch" }, enabled: { type: "boolean", value: true } } as const;
     expect(moduleManifestSchema.parse({ ...manifest, params }).params).toEqual(params);
     for (const ext of ["ts", "py", "sh"]) expect(moduleManifestSchema.safeParse({ ...manifest, entry: `index.${ext}`, tests: [`test.${ext}`], effects: [] }).success).toBe(true);
+  });
+  test.each([true, false])("accepts inbound triggers (inbound only: %s)", only => {
+    const inbound: ModuleTrigger = { id: "mail", inbound: { connector: "mailbox", match: { from: "*@shop.example", subject: "Order" } } };
+    const triggers: ModuleTrigger[] = only ? [inbound] : [...manifest.triggers as ModuleTrigger[], inbound];
+    expect(moduleManifestSchema.parse({ ...manifest, triggers }).triggers).toEqual(triggers);
+    expect(moduleManifestSchema.parse({ ...manifest, triggers: [{ id: "mail", inbound: { connector: "mailbox" } }] }).triggers).toEqual([{ id: "mail", inbound: { connector: "mailbox", match: {} } }]);
+  });
+  test.each(["unknown required", "duplicate names"])("rejects tools with %s", kind => {
+    const tool = { name: "lookup", description: "Lookup", parameters: { type: "object", properties: { query: { type: "string" } }, required: kind === "unknown required" ? ["missing"] : ["query"] } };
+    expect(moduleManifestSchema.safeParse({ ...manifest, tools: kind === "duplicate names" ? [tool, tool] : [tool] }).success).toBe(false);
   });
   test.each(["migrate.ts", "migrate_v2.py", "migrate-v2.sh"])("accepts data migration %s", migrate => {
     expect(moduleManifestSchema.parse({ ...manifest, data: { schema: 2, migrate } }).data).toEqual({ schema: 2, migrate });
@@ -52,6 +62,12 @@ describe("module output contract", () => {
     expect(moduleOutputSchema.parse({})).toEqual({ effects: [] });
     expect(moduleOutputSchema.parse({ effects: [notify, { ...notify, level: "digest" }, wake] }).effects).toHaveLength(3);
     expect(moduleOutputSchema.safeParse({ effects: Array(20).fill(wake) }).success).toBe(true);
+  });
+  test("accepts handled and JSON result up to 16 KiB serialized", () => {
+    const result = "x".repeat(16 * 1024 - 2);
+    expect(moduleOutputSchema.parse({ handled: true, result })).toEqual({ effects: [], handled: true, result });
+    expect(moduleOutputSchema.safeParse({ result: `${result}x` }).success).toBe(false);
+    expect(moduleOutputSchema.safeParse({ result: "界".repeat(6000) }).success).toBe(false);
   });
   test.each([
     { effects: [{ ...notify, level: "web" }] }, { effects: [{ ...notify, key: "" }] },

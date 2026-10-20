@@ -18,6 +18,7 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "cancelled", nextAt: null } });
   for (const trigger of manifest.triggers) {
+    if (!("schedule" in trigger)) continue;
     let nextAt = nextOccurrence(trigger.schedule, now, zone);
     if (!nextAt && trigger.schedule.kind === "at") nextAt = now;
     await tx.schedule.create({ data: { workspaceId, affairId: module.affairId, moduleId, triggerId: trigger.id, mode: "module", rule: json(trigger.schedule), text: `${manifest.name}:${trigger.id}`, label: manifest.name, createdBy: "chrona", createdAt: now, nextAt, status: nextAt ? "active" : "done" } });

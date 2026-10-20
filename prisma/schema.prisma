@@ -105,6 +105,7 @@ model ModuleRun {
   moduleId String
   hash String
   triggerId String
+  inboundItemId String?
   firedAt DateTime
   exitCode Int
   output Json?

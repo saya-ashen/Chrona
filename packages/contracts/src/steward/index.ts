@@ -91,10 +91,23 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
 export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network"] as const;
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
+const moduleTriggerSchema = z.union([
+  z.object({ id: slug, schedule: scheduleRuleSchema }).strict(),
+  z.object({ id: slug, inbound: z.object({ connector: id, match: z.object({ from: z.string().max(200).optional(), subject: z.string().max(200).optional() }).strict().default({}) }).strict() }).strict(),
+]);
+const toolParameterSchema = z.union([
+  z.object({ type: z.enum(["string", "number", "boolean"]), description: z.string().max(300).optional() }).strict(),
+  z.object({ type: z.literal("string"), enum: z.array(z.string().max(100)).min(1).max(20), description: z.string().max(300).optional() }).strict(),
+]);
+const moduleToolSchema = z.object({
+  name: slug, description: z.string().min(1).max(500),
+  parameters: z.object({ type: z.literal("object"), properties: z.record(slug, toolParameterSchema).default({}), required: z.array(slug).default([]) }).strict(),
+}).strict();
 export const moduleManifestSchema = z.object({
   name: slug,
   entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
-  triggers: z.array(z.object({ id: slug, schedule: scheduleRuleSchema }).strict()).min(1).max(10),
+  triggers: z.array(moduleTriggerSchema).min(1).max(10),
+  tools: z.array(moduleToolSchema).max(5).default([]),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -109,12 +122,22 @@ export const moduleManifestSchema = z.object({
     ids.add(trigger.id);
   });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
+  const names = new Set<string>();
+  manifest.tools.forEach((tool, index) => {
+    if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
+    names.add(tool.name);
+    for (const key of tool.parameters.required) if (!(key in tool.parameters.properties)) ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
+  });
 });
+export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
+export type ModuleTool = z.infer<typeof moduleToolSchema>;
 export const moduleOutputSchema = z.object({
   effects: z.array(z.discriminatedUnion("type", [
     z.object({ type: z.literal("notify_user"), key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
     z.object({ type: z.literal("wake_provider"), key: z.string().min(1).max(200), prompt: text.max(4000) }).strict(),
   ])).max(20).default([]),
+  handled: z.boolean().optional(),
+  result: z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB"),
 }).strict();
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 export type ModuleOutput = z.infer<typeof moduleOutputSchema>;
@@ -347,7 +370,7 @@ export const chronaToolInputSchemas = {
   chrona_propose: z.object({
     affairId: id.optional(), dir: affairPathSchema,
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().describe('Submit module.json+entry+tests → building → hash-bound approval or repair wake (repeats: digest). Manifest {name,entry,triggers:[{id,schedule}],effects,params?:{key:{type,value}},data?:{schema,migrate?},tests:[file]}. name/ids/keys: ASCII [a-z][a-z0-9-]{1,40}; titles in notify text. Files: name.ts|py|sh. schedule: chrona_schedule, every>=5min. effects: notify_user|wake_provider|network. params: number|string|boolean. Invalid: rejected+report.errors. stdin {trigger:{id,kind:"schedule",firedAt},now,params} (tests omit trigger); stdout {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}]} <=20/64KiB. /module ro,/data rw; tests offline, exit 0. Review: run once on data copy. Schema upgrade with data needs migrate: stdin {migrate:{from,to},now} on /data copy. Affair-authorized updates auto-activate with no new effects, no migration, identical simulation.'),
+  }).strict().describe('Submit module dir → building → hash-bound approval or repair wake. module.json {name,entry,triggers,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. stdin {trigger:{id,kind:schedule|inbound|tool,firedAt,item?,args?},now,params}; stdout {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}],handled?,result?} <=20/64KiB. /module ro, /data rw; tests offline, exit 0. Review runs once on a data copy; schema upgrade with data needs migrate (stdin {migrate:{from,to},now}). In authorized affairs, updates with no new effects, no migration and identical simulation auto-activate.'),
   chrona_modules: z.object({ affairId: id.optional() }).strict().describe("List modules, versions, approval status and recent runs; defaults to this affair, or all workspace modules at the root."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: affairPathSchema }).strict().describe("Copy module files into an empty affair directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),

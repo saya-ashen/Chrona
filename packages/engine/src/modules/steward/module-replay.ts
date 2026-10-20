@@ -19,11 +19,13 @@ export function canonicalJson(value: unknown): string {
 function skip(report: ReplayReport, reason: string) { report.status = "skipped"; report.reason = reason; }
 function skipReason(old: ModuleManifest, proposed: ModuleManifest) {
   if (old.effects.includes("network") || proposed.effects.includes("network")) return "network";
-  const triggers = (manifest: ModuleManifest) => Object.fromEntries(manifest.triggers.map(trigger => [trigger.id, trigger.schedule]));
+  if ([old, proposed].some(manifest => manifest.triggers.some(trigger => "inbound" in trigger))) return "inbound triggers";
+  if ([old, proposed].some(manifest => manifest.tools.length)) return "tools";
+  const triggers = (manifest: ModuleManifest) => Object.fromEntries(manifest.triggers.filter(trigger => "schedule" in trigger).map(trigger => [trigger.id, trigger.schedule]));
   return canonicalJson(triggers(old)) === canonicalJson(triggers(proposed)) ? null : "triggers changed";
 }
 function sequence(manifest: ModuleManifest, now: Date, zone: string): Instant[] {
-  const pending = manifest.triggers.map(trigger => ({ trigger, at: nextOccurrence(trigger.schedule, now, zone) })), instants: Instant[] = [];
+  const pending = manifest.triggers.filter(trigger => "schedule" in trigger).map(trigger => ({ trigger, at: nextOccurrence(trigger.schedule, now, zone) })), instants: Instant[] = [];
   for (let step = 0; step < 10; step++) {
     const next = pending.filter(item => item.at).sort((a, b) => a.at!.getTime() - b.at!.getTime()).at(0);
     if (!next) break;

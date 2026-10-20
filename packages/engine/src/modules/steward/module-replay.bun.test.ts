@@ -26,7 +26,7 @@ async function fixture(scope: "once" | "affair" = "once") {
   const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "price-watch");
   await mkdir(dir);
-  const manifest: ModuleManifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], effects: ["notify_user"], tests: ["test.ts"], params: { threshold: { type: "number", value: 1 } }, data: { schema: 1 } };
+  const manifest: ModuleManifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], effects: ["notify_user"], tests: ["test.ts"], params: { threshold: { type: "number", value: 1 } }, data: { schema: 1 } };
   const write = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
     await writeFile(join(dir, "index.ts"), "entry"); await writeFile(join(dir, "test.ts"), "test");
@@ -117,7 +117,7 @@ test.each(["old network", "new network", "id", "schedule", "data too large"])('r
   }
   if (kind === "new network") f.manifest.effects.push("network");
   if (kind === "id") f.manifest.triggers[0]!.id = "changed";
-  if (kind === "schedule") f.manifest.triggers[0]!.schedule = { kind: "every", minutes: 30 };
+  if (kind === "schedule") f.manifest.triggers[0] = { id: "daily", schedule: { kind: "every", minutes: 30 } };
   if (kind === "data too large") {
     await mkdir(f.live, { recursive: true }); await writeFile(join(f.live, "large"), "");
     await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1);
@@ -127,6 +127,32 @@ test.each(["old network", "new network", "id", "schedule", "data too large"])('r
   expect(result.report.replay).toEqual({ status: "skipped", reason, steps: 0, diffs: [] });
   expect(result.status).toBe("pending_review");
   expect(f.calls.map(call => call.entry)).toEqual(["test.ts"]);
+});
+
+test.each(["old inbound", "new inbound", "old tools", "new tools"])('replay skips P4 paths without auto-activation: %s', async kind => {
+  const f = await fixture("affair"), inbound = kind.endsWith("inbound");
+  const patch = inbound ? { triggers: [{ id: "mail", inbound: { connector: "mailbox", match: {} } }] } : { tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object" as const, properties: {}, required: [] } }] };
+  if (kind.startsWith("old")) {
+    const version = await f.db.moduleVersion.findFirstOrThrow();
+    await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...f.manifest, ...patch } } });
+  } else Object.assign(f.manifest, patch);
+  const result = await f.propose();
+  expect(result.report.replay).toEqual({ status: "skipped", reason: inbound ? "inbound triggers" : "tools", steps: 0, diffs: [] });
+  expect(result.status).toBe("pending_review");
+  expect(result.approval!.status).toBe("open");
+  expect(f.calls.map(call => call.entry)).toEqual(["test.ts"]);
+});
+
+test.each([true, false])("continuity selects schedule before inbound or supplies a synthetic item (inbound only: %s)", async only => {
+  const f = await fixture();
+  await mkdir(f.live, { recursive: true }); await writeFile(join(f.live, "state"), "original");
+  const scheduled = f.manifest.triggers[0]!;
+  f.manifest.triggers = [{ id: "mail", inbound: { connector: "mailbox", match: {} } }, ...(only ? [] : [scheduled])];
+  const result = await f.propose(), now = "2026-10-20T04:00:00.000Z";
+  expect(result.report.continuity!.status).toBe("passed");
+  const trigger = only ? { id: "mail", kind: "inbound", firedAt: now, item: { externalId: "continuity", from: "continuity@chrona.invalid", subject: "", receivedAt: now, body: "" } } : { id: "daily", kind: "schedule", firedAt: now };
+  expect(f.calls.filter(call => call.entry === "index.ts").map(call => call.input)).toEqual([{ trigger, now, params: { threshold: 2 } }]);
+  expect(await readFile(join(f.live, "state"), "utf8")).toBe("original");
 });
 
 test("trigger order may change; future instants merge using OLD order including ties and exhausted at rules", async () => {

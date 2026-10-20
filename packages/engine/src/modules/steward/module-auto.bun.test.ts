@@ -18,7 +18,7 @@ async function fixture(scope: "once" | "affair" = "affair") {
   const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "prices");
   await mkdir(dir);
-  const manifest: ModuleManifest = { name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], effects: ["notify_user"], params: {}, data: { schema: 1 } };
+  const manifest: ModuleManifest = { name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], effects: ["notify_user"], params: {}, data: { schema: 1 } };
   let revision = 0;
   const propose = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));

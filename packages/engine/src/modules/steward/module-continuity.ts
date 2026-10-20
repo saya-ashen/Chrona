@@ -30,7 +30,9 @@ function fail(continuity: ContinuityReport, reason: string) {
 type ContinuityCopy = { staging: string; data: string; manifest: Manifest; continuity: ContinuityReport };
 async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: string) {
   const { staging, data, manifest, continuity } = copy;
-  const entry = await runOffline(context.ports, staging, data, manifest.entry, { trigger: { id: manifest.triggers[0]!.id, kind: "schedule", firedAt: now }, now, params: moduleParams(manifest) });
+  const first = manifest.triggers.find(trigger => "schedule" in trigger) ?? manifest.triggers[0]!;
+  const trigger = "schedule" in first ? { id: first.id, kind: "schedule", firedAt: now } : { id: first.id, kind: "inbound", firedAt: now, item: { externalId: "continuity", from: "continuity@chrona.invalid", subject: "", receivedAt: now, body: "" } };
+  const entry = await runOffline(context.ports, staging, data, manifest.entry, { trigger, now, params: moduleParams(manifest) });
   continuity.output = entry.output;
   if (!entry.succeeded) { fail(continuity, "entry failed"); return; }
   let output;
