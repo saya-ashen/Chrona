@@ -8,6 +8,7 @@ import { createWorkspaceFs, type AffairFs } from "./workspace-fs";
 import { requireAffair } from "./affairs";
 import { createRuns } from "./runs";
 import { parseInput, StewardError } from "./errors";
+import { matchingInboundModules } from "./module-inbound";
 
 const locks = new Map<string, Promise<unknown>>();
 const settingsOf = (row: Connector) => row.settings as Record<string, unknown>;
@@ -53,6 +54,7 @@ async function storeInboundItems(db: StewardPorts["db"], row: Connector, files: 
     seen.add(item.externalId);
     if (await db.inboundItem.findUnique({ where: { connectorId_externalId: { connectorId: id, externalId: item.externalId } } })) continue;
     const prepared = prepareInboundItem(row, item, rules, batchAt, now);
+    if (prepared.data.status === "new" && row.affairId && (await matchingInboundModules(db, { workspaceId: row.workspaceId, affairId: row.affairId, connectorId: row.id }, item)).length) prepared.data.status = "module";
     allWrites.push(...prepared.writes);
     rows.push(prepared.data);
   }

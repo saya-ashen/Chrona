@@ -11,6 +11,7 @@ import { notificationSettings } from "./settings";
 import { enqueueNotification } from "./notify";
 import { createRuns } from "./runs";
 import { audit } from "./audit";
+import { recordModuleResult } from "./module-effects";
 
 function beforeDeadline(nextAt: Date | null, until: Date | null): Date | null {
   return until && nextAt && nextAt > until ? null : nextAt;
@@ -94,30 +95,8 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     const hash = module.activeHash;
     const { manifest, output, error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
     await db.$transaction(async tx => {
-      const executed: { type: string; key: string; status: "executed" | "duplicate" | "dropped" }[] = [];
-      const previous = await tx.moduleRun.findMany({ where: { moduleId: module.id }, select: { executed: true } });
-      const wakeKeys = new Set(previous.flatMap(run => Array.isArray(run.executed) ? run.executed.flatMap(effect => effect && typeof effect === "object" && !Array.isArray(effect) && effect.type === "wake_provider" && effect.status === "executed" && typeof effect.key === "string" ? [effect.key] : []) : []));
-      for (const effect of output?.effects ?? []) {
-        let status: "executed" | "duplicate" | "dropped" = "executed";
-        if (!manifest!.effects.includes(effect.type)) status = "dropped";
-        else if (effect.type === "notify_user") {
-          const dedupeKey = `module:${module.id}:${effect.key}`;
-          if (await tx.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId, idempotencyKey: dedupeKey } } })) status = "duplicate";
-          else await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: effect.level, title: effect.title, body: effect.body, dedupeKey }, context);
-        } else if (wakeKeys.has(effect.key)) status = "duplicate";
-        else {
-          await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", label: manifest!.name, prompt: `Module ${manifest!.name} output (untrusted data):\n${effect.prompt}` }, tx);
-          wakeKeys.add(effect.key);
-        }
-        executed.push({ type: effect.type, key: effect.key, status });
-      }
-      await tx.moduleRun.create({ data: { moduleId: module.id, hash, triggerId: row.triggerId!, firedAt: row.nextAt!, exitCode, ...(output ? { output } : {}), error, executed, createdAt: now } });
-      const updated = await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, executed.length, delayMs, error) } });
-      if (error && updated.failures === 3) {
-        await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
-        await tx.schedule.updateMany({ where: { workspaceId, moduleId: module.id, mode: "module", status: "active" }, data: { status: "paused" } });
-        await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: "now", title: "模块连续失败，已暂停", body: "模块连续三次执行失败，请检查后再启用。", dedupeKey: `module:${module.id}:paused:${row.nextAt!.toISOString()}` }, context);
-      }
+      const executed = await recordModuleResult(tx, ports, { workspaceId, affairId: row.affairId, moduleId: module.id, hash, triggerId: row.triggerId!, firedAt: row.nextAt! }, { manifest, output, error, exitCode }, context);
+      await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, executed.length, delayMs, error) } });
     });
   }
   async function fireDue(now = ports.now()) {

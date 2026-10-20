@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
 import { createSchedules } from "./schedules";
 import { createModules } from "./modules";
+import { processModuleInbound } from "./module-inbound";
 import { createConnectors } from "./connectors";
 import { createRuns, liveRuns } from "./runs";
 import { createNotifications } from "./notify";
@@ -89,6 +90,7 @@ export function createTick(ports: StewardPorts) {
       for (const [stage, action] of [
         ["connectors", () => createConnectors(ports, workspaceId).tick()],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
+        ["module-inbound", () => processModuleInbound(ports, workspaceId, now)],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
         ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
