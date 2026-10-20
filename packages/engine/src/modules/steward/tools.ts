@@ -11,6 +11,7 @@ import { createAffairs, requireAffair } from "./affairs";
 import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
 import { createModules } from "./modules";
+import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { createNotifications, RESPONSE_KEY_PREFIX } from "./notify";
@@ -327,6 +328,11 @@ export function createTools(ports: StewardPorts) {
     const { workspaceId, run, index } = claim;
     let ok = false;
     try {
+      if (name.startsWith("m_")) {
+        const result = await callModuleTool(ports, run, name, raw);
+        ok = true;
+        return result;
+      }
       if (!CHRONA_TOOLS.includes(name as ToolName)) throw new StewardError("invalid", "Unknown Chrona tool");
       const tool = name as ToolName;
       const result = await handlers[tool](toolContext(ports, claim, tool), raw);
@@ -344,8 +350,8 @@ export function createTools(ports: StewardPorts) {
   }
   return {
     catalog: async (token: string) => {
-      await authenticateRun(db, token, now());
-      return CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) }));
+      const { run } = await authenticateRun(db, token, now());
+      return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...await moduleToolCatalog(ports, run)];
     },
     call,
   };
