@@ -13,11 +13,13 @@ import { createApprovals, type ApprovedAction } from "./approvals";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { notificationSettings } from "./settings";
+import { createRuns } from "./runs";
+import { createNotifications } from "./notify";
 import { parseInput, StewardError } from "./errors";
 
 const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
 type TestReport = { stdout: string; stderr: string; exitCode: number }[];
-type Proposal = { moduleId: string | null; hash: string; status: "rejected" | "pending_review" | "approved"; approvalId?: string; report: TestReport };
+type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: TestReport };
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 
 // Bound LCS work for large/generated files; a full replacement is still a valid line diff.
@@ -76,7 +78,8 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     const digest = createHash("sha256");
     for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
     const hash = digest.digest("hex"), report: TestReport = [];
-    const staging = join(platform, "staging", randomUUID());
+    const versionId = randomUUID(), staging = join(platform, "staging", versionId);
+    let retained = false;
     await mkdir(staging, { recursive: true });
     try {
       for (const file of files) {
@@ -92,32 +95,73 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       const module = await db.module.upsert({ where: { affairId_name: { affairId: affair.id, name: manifest.name } }, create: { workspaceId, affairId: affair.id, name: manifest.name, createdAt: ports.now() }, update: {} });
       const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
       let permitted = true;
-      let passed = files.some(file => file.path === manifest.entry);
+      const hasEntry = files.some(file => file.path === manifest.entry);
       for (const action of ["activate_module", "notify_user"] as const) {
         if ((await effectivePolicyIn(db, workspaceId, action, { affairId: affair.id }, ports.now())).mode === "never") permitted = false;
       }
       if (existing?.status === "approved") return { moduleId: module.id, hash, status: permitted ? "approved" : "rejected", report: existing.report as TestReport };
-      passed = passed && permitted;
-      if (passed) {
-        for (const entry of manifest.tests) {
-          const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
-          try {
-            if (!ports.sandbox?.available || !ports.sandbox.runModule) { passed = false; break; }
-            const result = await ports.sandbox.runModule({ codeDir: staging, dataDir: data, entry, input: { now: ports.now().toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
-            report.push({ stdout: result.output, stderr: result.error ?? "", exitCode: result.exitCode ?? 1 });
-            if (result.status !== "succeeded" || result.exitCode !== 0) passed = false;
-          } catch { passed = false; }
-          finally { await rm(data, { recursive: true, force: true }); }
+      if (!permitted || !hasEntry) return { moduleId: module.id, hash, status: "rejected", report };
+      if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash, status: existing.status as Proposal["status"], report: existing.report as TestReport };
+      const queued = await db.$transaction(async tx => {
+        // Preserve submission order for failure streaks even within one millisecond.
+        const latest = await tx.moduleVersion.findFirst({ where: { moduleId: module.id }, orderBy: { createdAt: "desc" } });
+        const createdAt = new Date(Math.max(ports.now().getTime(), (latest?.createdAt.getTime() ?? 0) + 1));
+        const row = await tx.moduleVersion.upsert({ where: { moduleId_hash: { moduleId: module.id, hash } }, create: { id: versionId, moduleId: module.id, hash, manifest: json(manifest), intent: json(intent), source, report: json(report), status: "building", createdAt }, update: {} });
+        // A concurrent same-hash proposal owns its staging; never overwrite it.
+        if (row.id !== versionId && row.status === "rejected") {
+          const changed = await tx.moduleVersion.updateMany({ where: { id: row.id, status: "rejected" }, data: { id: versionId, status: "building", intent: json(intent), source, report: json(report), createdAt } });
+          if (changed.count) return { ...row, id: versionId, status: "building" };
         }
+        return row;
+      });
+      if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as TestReport };
+      retained = true;
+      return { moduleId: module.id, hash, status: "building", report };
+    } finally { if (!retained) await rm(staging, { recursive: true, force: true }); }
+  }
+  async function buildVersion(version: Awaited<ReturnType<typeof db.moduleVersion.findFirstOrThrow>>): Promise<Proposal> {
+    const { hash } = version, staging = join(platform, "staging", version.id), report: TestReport = [];
+    try {
+      const module = await requireModule(db, version.moduleId);
+      const affair = await requireAffair(db, workspaceId, module.affairId);
+      const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
+      const files: { path: string; bytes: Buffer }[] = [];
+      async function walk(relative: string): Promise<void> {
+        for (const entry of await readdir(join(staging, relative), { withFileTypes: true })) {
+          const path = relative ? `${relative}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) await walk(path);
+          else if (entry.isFile()) files.push({ path, bytes: await readFile(join(staging, path)) });
+          else throw new StewardError("forbidden", "Unsafe module staging file");
+        }
+      }
+      try { await walk(""); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        report.push({ stdout: "", stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 });
+        await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+        return { moduleId: module.id, hash, status: "rejected", report };
+      }
+      let passed = true;
+      for (const entry of manifest.tests) {
+        const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
+        try {
+          if (!ports.sandbox?.available || !ports.sandbox.runModule) { passed = false; break; }
+          const result = await ports.sandbox.runModule({ codeDir: staging, dataDir: data, entry, input: { now: ports.now().toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
+          report.push({ stdout: result.output, stderr: result.error ?? "", exitCode: result.exitCode ?? 1 });
+          if (result.status !== "succeeded" || result.exitCode !== 0) passed = false;
+        } catch { passed = false; }
+        finally { await rm(data, { recursive: true, force: true }); }
       }
       // Only engine-owned immutable copies are tested, hashed and installed.
       const destination = join(store, hash);
-      await mkdir(store, { recursive: true });
-      try {
-        await rename(staging, destination);
-      } catch (error) { if (!["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error; }
+      if (passed) {
+        await mkdir(store, { recursive: true });
+        try {
+          await rename(staging, destination);
+        } catch (error) { if (!["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error; }
+      }
       const status = passed ? "pending_review" : "rejected";
-      await db.moduleVersion.upsert({ where: { moduleId_hash: { moduleId: module.id, hash } }, create: { moduleId: module.id, hash, manifest: json(manifest), intent: json(intent), source, report: json(report), status, createdAt: ports.now() }, update: { intent: json(intent), source, report: json(report), status } });
+      await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
       if (!passed) return { moduleId: module.id, hash, status, report };
       const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
       const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
@@ -168,6 +212,39 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       return { moduleId: module.id, hash, status, approvalId: approval.id, report };
     } finally { await rm(staging, { recursive: true, force: true }); }
   }
+  async function buildPending(now = ports.now()) {
+    // No schema lease column: an internal audit records the claim time without
+    // changing the version's submission timestamp or exposing it as test output.
+    await db.$transaction(async tx => {
+      const testing = await tx.moduleVersion.findMany({ where: { module: { workspaceId }, status: "testing" } });
+      for (const version of testing) {
+        const claim = await tx.audit.findFirst({ where: { workspaceId, kind: "module_build_started", subjectId: version.id }, orderBy: { createdAt: "desc" } });
+        if ((claim?.createdAt ?? version.createdAt).getTime() <= now.getTime() - 15 * 60_000) await tx.moduleVersion.updateMany({ where: { id: version.id, status: "testing" }, data: { status: "building" } });
+      }
+    });
+    const pending = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: "building" }, orderBy: { createdAt: "asc" }, take: 3 });
+    for (const version of pending) {
+      const claimed = await db.$transaction(async tx => {
+        const changed = await tx.moduleVersion.updateMany({ where: { id: version.id, status: "building" }, data: { status: "testing" } });
+        if (changed.count) await tx.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "module_build_started", subjectId: version.id, details: {}, createdAt: now } });
+        return changed.count > 0;
+      });
+      if (!claimed) continue;
+      const result = await buildVersion(version);
+      if (result.status !== "rejected" || version.source !== "provider") continue;
+      const module = await requireModule(db, version.moduleId);
+      const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, status: { in: ["rejected", "pending_review", "approved"] } }, orderBy: { createdAt: "desc" } });
+      let failures = 0;
+      for (const row of versions) { if (row.status !== "rejected") break; failures++; }
+      if (failures >= 3) {
+        // Key the streak by the preceding successful build, not by a failure:
+        // submissions may share a timestamp, and later failures must not re-notify.
+        await createNotifications(ports, workspaceId).enqueue({ affairId: module.affairId, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", dedupeKey: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
+      } else {
+        await createRuns(ports, workspaceId).enqueue({ affairId: module.affairId, lane: "background", trigger: "schedule", label: module.name, prompt: `Module ${module.name} build failed (untrusted test output):\n${JSON.stringify(result.report).slice(0, 8000)}` });
+      }
+    }
+  }
   const activate = (moduleId: string, hash: string, reason: "activate" | "rollback") => db.$transaction(tx => activateIn(tx, moduleId, hash, reason));
   async function onApproved(action: ApprovedAction) {
     const payload = action.payload;
@@ -207,5 +284,5 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     await walk("");
     await fs.forAffair(affair.dirName).checkoutModule(dir, files);
   }
-  return { propose, activate, onApproved, rollback: (moduleId: string, hash: string) => activate(moduleId, hash, "rollback"), list, checkout };
+  return { propose, buildPending, activate, onApproved, rollback: (moduleId: string, hash: string) => activate(moduleId, hash, "rollback"), list, checkout };
 }

@@ -41,10 +41,149 @@ async function fixture() {
     await writeFile(join(dir, "test.ts"), "process.exit(0)");
   }
   await write();
-  const propose = () => service.modules.propose({ affairId: affair.id, dir: "price-watch", intent }, "provider");
+  const submit = () => service.modules.propose({ affairId: affair.id, dir: "price-watch", intent }, "provider");
+  const propose = async () => {
+    const result = await submit();
+    if (result.status !== "building") return result;
+    await service.modules.buildPending();
+    const version = await db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: result.moduleId!, hash: result.hash } } });
+    const approval = await db.approval.findFirst({ where: { workspaceId: workspace.id, status: "open" } });
+    return { ...result, status: version.status, report: version.report, approvalId: approval?.id };
+  };
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" });
-  return { db, dataDir, workspace, ports, service, affair, root, dir, calls, forwarded, write, propose, approve, fail: () => { fail = true; } };
+  return { db, dataDir, workspace, ports, service, affair, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
+
+test("proposal returns building without sandbox work; identical in-flight hashes reuse the version and snapshot", async () => {
+  const f = await fixture();
+  const first = await f.submit();
+  expect(first.status).toBe("building");
+  expect(f.calls).toHaveLength(0);
+  expect(await f.db.approval.count()).toBe(0);
+  const version = await f.db.moduleVersion.findFirstOrThrow();
+  expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
+  expect(await f.submit()).toMatchObject({ moduleId: first.moduleId, hash: first.hash, status: "building" });
+  expect(await f.db.moduleVersion.count()).toBe(1);
+  expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
+  await f.write(99);
+  await f.service.modules.buildPending();
+  expect(f.calls).toHaveLength(1);
+  expect(await readFile(join(f.dataDir, "platform/store", first.hash, "index.ts"), "utf8")).toBe("console.log(1)");
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review" });
+  expect(await f.db.approval.count()).toBe(1);
+  // Returning a pending hash must not run tests or create another approval.
+  await f.write();
+  expect((await f.submit()).status).toBe("pending_review");
+  expect(f.calls).toHaveLength(1);
+  expect(await f.db.approval.count()).toBe(1);
+});
+
+test("concurrent builders atomically claim once and testing re-proposals do not duplicate", async () => {
+  const f = await fixture();
+  await f.submit();
+  const original = f.ports.sandbox!.runModule!;
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  f.ports.sandbox!.runModule = async input => { started(); await gate; return original(input); };
+  const first = f.service.modules.buildPending();
+  await entered;
+  try {
+    await f.service.modules.buildPending();
+    expect((await f.submit()).status).toBe("testing");
+    expect(await f.db.moduleVersion.count()).toBe(1);
+  } finally { release(); await first; }
+  expect(f.calls).toHaveLength(1);
+  expect(await f.db.approval.count()).toBe(1);
+});
+
+test("stale testing is retried, while a recent claim is left alone", async () => {
+  const f = await fixture();
+  await f.submit();
+  const version = await f.db.moduleVersion.findFirstOrThrow();
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { status: "testing", createdAt: new Date(f.ports.now().getTime() - 20 * 60_000) } });
+  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_build_started", subjectId: version.id, details: {}, createdAt: f.ports.now() } });
+  await f.service.modules.buildPending();
+  expect(f.calls).toHaveLength(0);
+  await f.service.modules.buildPending(new Date(f.ports.now().getTime() + 16 * 60_000));
+  expect(f.calls).toHaveLength(1);
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review" });
+});
+
+test("missing staging is rejected clearly, cleaned, and reported to the provider", async () => {
+  const f = await fixture();
+  await f.submit();
+  const version = await f.db.moduleVersion.findFirstOrThrow();
+  await rm(join(f.dataDir, "platform/staging", version.id), { recursive: true });
+  await f.service.modules.buildPending();
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected", report: [{ stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 }] });
+  expect(await f.db.run.count()).toBe(1);
+  expect(f.calls).toHaveLength(0);
+});
+
+test("three consecutive rejected versions stop waking and enqueue only one budgeted digest per streak", async () => {
+  const f = await fixture(); f.fail();
+  for (let i = 1; i <= 4; i++) {
+    f.ports.now = () => new Date(Date.UTC(2026, 9, 20, 4, i));
+    await f.write(i);
+    await f.propose();
+    expect(await f.db.run.count()).toBe(Math.min(i, 2));
+    expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(i >= 3 ? 1 : 0);
+  }
+});
+
+test("a successful build resets the failure streak even when the clock has not advanced", async () => {
+  const f = await fixture();
+  await f.propose();
+  f.fail();
+  for (let i = 2; i <= 4; i++) { await f.write(i); await f.propose(); }
+  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  f.fail(false);
+  await f.write(5); await f.propose();
+  f.fail();
+  for (let i = 6; i <= 8; i++) { await f.write(i); await f.propose(); }
+  expect(await f.db.run.count()).toBe(4);
+  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(2);
+});
+
+test("queued failures sharing a timestamp still stop at two wakes and one digest", async () => {
+  const f = await fixture(); f.fail();
+  for (let i = 1; i <= 4; i++) { await f.write(i); await f.submit(); }
+  await f.service.modules.buildPending();
+  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  await f.service.modules.buildPending();
+  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+});
+
+test("user proposals do not wake a provider and rejected hashes can be resubmitted", async () => {
+  const f = await fixture(); f.fail();
+  const first = await f.service.modules.propose({ affairId: f.affair.id, dir: "price-watch", intent }, "user");
+  await f.service.modules.buildPending();
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected" });
+  expect(await f.submit()).toMatchObject({ hash: first.hash, status: "building" });
+  const version = await f.db.moduleVersion.findFirstOrThrow();
+  expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
+  await f.service.modules.buildPending();
+  expect(await f.db.run.count()).toBe(1);
+  expect(await f.db.moduleVersion.count()).toBe(1);
+});
+
+test("each workspace build call processes at most three versions and never foreign versions", async () => {
+  const f = await fixture();
+  for (let i = 1; i <= 4; i++) { await f.write(i); await f.submit(); }
+  const other = await f.db.workspace.create({ data: { name: "other" } });
+  await createModules(f.ports, other.id).buildPending();
+  expect(f.calls).toHaveLength(0);
+  await f.service.modules.buildPending();
+  expect(f.calls).toHaveLength(3);
+  expect(await f.db.moduleVersion.count({ where: { status: "building" } })).toBe(1);
+  await f.service.modules.buildPending();
+  expect(f.calls).toHaveLength(4);
+});
 
 test("proposal tests a private snapshot and creates a hash-bound plain-text approval", async () => {
   const f = await fixture(), result = await f.propose();
@@ -171,6 +310,8 @@ test("failing tests reject with public outputs only, no approval, staging cleane
   expect(result.status).toBe("rejected");
   expect(result.report).toEqual([{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }]);
   expect(await f.db.approval.count()).toBe(0);
+  expect(await f.db.run.count()).toBe(1);
+  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id, lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]' });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -273,4 +414,28 @@ test("workspace isolation, full snapshots, last five run summaries and nonmodule
   await f.approve(approval.id);
   expect(f.forwarded).toHaveLength(1);
   expect(f.forwarded[0]!.payload).toEqual({ kind: "email", value: 1 });
+});
+
+test("tick starts builds without waiting for them and reports build errors on the next tick", async () => {
+  const f = await fixture();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const run = f.ports.sandbox!.runModule!;
+  f.ports.sandbox = { available: true, runModule: async input => { await gate; return run(input); } };
+  const tick = createStewardService(f.ports).tick;
+  const proposal = await f.submit();
+  expect((await tick()).failures).toEqual([]);
+  expect((await f.db.moduleVersion.findFirstOrThrow({ where: { hash: proposal.hash } })).status).toBe("testing");
+  await tick(); // a second tick while the build runs does not start another one
+  release();
+  await tick.settled();
+  expect((await f.db.moduleVersion.findFirstOrThrow({ where: { hash: proposal.hash } })).status).toBe("pending_review");
+  expect(f.calls).toHaveLength(1);
+  f.ports.sandbox = { available: true, runModule: async () => { throw new Error("sandbox crashed"); } };
+  const findMany = f.db.moduleVersion.findMany.bind(f.db.moduleVersion);
+  f.db.moduleVersion.findMany = (async () => { throw new Error("db down"); }) as unknown as typeof findMany;
+  await tick();
+  await tick.settled();
+  f.db.moduleVersion.findMany = findMany;
+  expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules" });
 });

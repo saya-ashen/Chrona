@@ -93,7 +93,7 @@ model ModuleVersion {
   intent Json                          // { changes: string[], preserves: string[] }
   source String                        // "provider" | "user"
   report Json                          // build/test 结果
-  status String                        // rejected | pending_review | approved | denied
+  status String                        // building | testing | rejected | pending_review | approved | denied
   createdAt DateTime @default(now())
   @@unique([moduleId, hash])
 }
@@ -140,13 +140,22 @@ chrona_propose: z.object({
 }).strict()
 ```
 
-1. 把 `dir` 复制到 `staging/<id>/`（拒绝符号链接与超限），此后与 Provider 的修改无关。
-2. 解析清单；校验 §3。`activate_module` 或 `notify_user` 的策略为 `never` 时拒绝。`network` 在 P1 不单独查策略，由本次审批覆盖，审批预览第一行必须标出"联网"。
-3. 在沙箱运行全部测试。
-4. 计算 hash；写入 `store/<hash>/`（已存在则复用）；记 ModuleVersion。
-5. 失败 → `status: rejected`，返回报告给 Provider（只含 build/测试的公开输出）。
-6. 成功 → `pending_review`，创建 Approval：`action: "activate_module"`，`payload: { kind: "activate_module", moduleId, hash }`，`preview` 为纯文本：清单（与当前启用版本的 JSON diff）、意图声明、测试结果、是否联网、hash。
-7. 返回 `{ moduleId, hash, status, approvalId? , report }`。
+**2026-10-20 更新：构建改为异步**（原同步测试可能超过 Provider 桥接 60 秒超时）。
+
+同步部分（在工具调用内完成，只做快速步骤）：
+
+1. 快照 `dir`（拒绝符号链接与超限）并计算 hash；写入 `staging/<versionId>/`，此后与 Provider 的修改无关。
+2. 解析清单；校验 §3。`activate_module` 或 `notify_user` 的策略为 `never` 时拒绝。清单无效 → 立即返回 `rejected`（不建记录）。
+3. 同一 hash 已 `approved` → 直接返回 `approved`；已在 `building` / `testing` / `pending_review` → 返回该状态，不重复构建。
+4. 否则记 ModuleVersion `status: building`，返回 `{ moduleId, hash, status: "building" }`，并说明结果会以审批卡片出现或以后台运行告知失败。
+
+异步部分（tick 中的构建步骤，每轮每工作区处理有限个）：
+
+5. 原子认领 `building → testing`；`testing` 超过 15 分钟未完成视为中断，重置为 `building`（测试无外部副作用，可重跑）。
+6. 在沙箱运行全部测试（无网络、临时数据目录）。
+7. 成功：移入 `store/<hash>/`（已存在则复用）→ `pending_review` → 使该模块旧的 open 审批过期 → 创建 Approval（`action: "activate_module"`，`payload: { kind: "activate_module", moduleId, hash }`，预览含联网标记、清单 diff、代码 diff、意图、测试结果、hash）。
+8. 失败：`rejected`，报告只含测试的公开输出；若提案来自 Provider，对该事务排一次后台 wake，prompt 以 `Module <name> build failed (untrusted test output):` 开头附报告摘要，供 Provider 修复。同一模块连续 3 个版本构建失败后不再自动 wake，改为一条 `digest` 通知。
+9. 无论成败删除 staging。
 
 同一模块已有 `pending_review` 的旧版本时，新提案使旧 Approval 过期（`expired`）。
 

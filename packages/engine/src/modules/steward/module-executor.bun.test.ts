@@ -36,8 +36,10 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   await writeFile(join(dir, "index.ts"), source);
   await writeFile(join(dir, "test.ts"), "process.exit(0)");
   const proposal = await service.modules.propose({ affairId: affair.id, dir: "price-watch", intent: { changes: ["Watch prices"], preserves: [] } }, "provider");
-  expect(proposal.status).toBe("pending_review");
-  await service.approvals.resolve(proposal.approvalId!, { decision: "approve", scope: "once" });
+  expect(proposal.status).toBe("building");
+  await service.modules.buildPending();
+  const approval = await db.approval.findFirstOrThrow({ where: { status: "open" } });
+  await service.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
   const schedule = await db.schedule.findFirstOrThrow({ where: { moduleId: proposal.moduleId, status: "active" } });
   const moduleId = proposal.moduleId!;
   async function fire(delay = 0) {

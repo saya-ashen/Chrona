@@ -115,7 +115,10 @@ test("module tools propose, list, checkout and roll back only approved versions"
   ports.sandbox = { available: true, runModule: async () => ({ status: "succeeded", output: "ok", error: null, exitCode: 0 }) };
   const intent = { changes: ["Watch prices"] };
   const proposal = await call("chrona_propose", { dir: "module", intent }) as { moduleId: string; hash: string; approvalId: string };
-  expect(proposal).toMatchObject({ status: "pending_review", report: [{ stdout: "ok", exitCode: 0 }] });
+  expect(proposal).toMatchObject({ status: "building" });
+  await api.modules.buildPending();
+  proposal.approvalId = (await db.approval.findFirstOrThrow({ where: { status: "open", action: "activate_module" } })).id;
+  expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review", report: [{ stdout: "ok", exitCode: 0 }] });
   expect(await db.approval.findUniqueOrThrow({ where: { id: proposal.approvalId } })).toMatchObject({ status: "open", payload: { kind: "activate_module", moduleId: proposal.moduleId, hash: proposal.hash } });
   expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ source: "provider", intent: { ...intent, preserves: [] } });
   for (const input of [{}, { affairId: affair.id }]) expect(await call("chrona_modules", input)).toMatchObject([{ id: proposal.moduleId, name: "price-watch", activeHash: null, status: "active", versions: [{ hash: proposal.hash, status: "pending_review", intent: { ...intent, preserves: [] }, createdAt: ports.now() }], runs: [] }]);

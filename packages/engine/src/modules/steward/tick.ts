@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
 import { createSchedules } from "./schedules";
+import { createModules } from "./modules";
 import { createConnectors } from "./connectors";
 import { createRuns, liveRuns } from "./runs";
 import { createNotifications } from "./notify";
@@ -25,8 +26,16 @@ async function affairConversation(ports: StewardPorts, workspaceId: string, affa
   return focuses.find(focus => z.object({ affairId: z.string() }).safeParse(focus.details).data?.affairId === affairId)?.subjectId;
 }
 export function createTick(ports: StewardPorts) {
-  return async function tick(now = ports.now()) {
-    const failures: { workspaceId: string; stage: string }[] = [];
+  // Module tests can take minutes; run builds beside the tick so schedules and delivery are not delayed.
+  const builds = new Map<string, Promise<void>>(), buildFailures = new Set<string>();
+  function startBuild(workspaceId: string, now: Date) {
+    if (builds.has(workspaceId)) return;
+    builds.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, () => { buildFailures.add(workspaceId); })
+      .finally(() => { builds.delete(workspaceId); }));
+  }
+  async function tick(now = ports.now()) {
+    const failures: { workspaceId: string; stage: string }[] = [...buildFailures].map(workspaceId => ({ workspaceId, stage: "modules" }));
+    buildFailures.clear();
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId), notifications = createNotifications(ports, workspaceId);
       async function prepareContext(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
@@ -79,6 +88,7 @@ export function createTick(ports: StewardPorts) {
       }
       for (const [stage, action] of [
         ["connectors", () => createConnectors(ports, workspaceId).tick()],
+        ["modules", async () => startBuild(workspaceId, now)],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
         ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
@@ -89,5 +99,7 @@ export function createTick(ports: StewardPorts) {
       catch { failures.push({ workspaceId, stage: "lastTickAt" }); }
     }
     return { failures };
-  };
+  }
+  /** Await builds started by earlier ticks (tests and shutdown). */
+  return Object.assign(tick, { settled: () => Promise.all(builds.values()).then(() => undefined) });
 }
