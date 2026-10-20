@@ -10,6 +10,7 @@ picks a suitable way to get them done, keeps looking after them, and reports bac
 
 - Goals (highest authority): [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md).
 - Current architecture, model and pages: [`docs/zh/steward-workspace.md`](docs/zh/steward-workspace.md).
+- Module platform: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and [`docs/zh/platform-p1-spec.md`](docs/zh/platform-p1-spec.md).
 - Historical purge record only: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
@@ -20,12 +21,16 @@ Rules that follow from the goals:
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
 - Providers own file, shell, web and session tools. Chrona supplies scheduling, queues, git history,
-  connectors/credentials, approvals, budgets and delivery. No duplicate Chrona web/sandbox tools
-  for Providers; the separate Chrona sandbox is only for deterministic schedule jobs.
+  connectors/credentials, approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
+  Executable code Chrona runs is only a module (`module.json` + entry + tests) submitted via `chrona_propose`,
+  tested in the Chrona sandbox, activated only through an `activate_module` approval bound to its content hash,
+  stored under `<dataDir>/platform` (hidden from Providers), and run on its schedules without a model.
+  Affair-directory files (Markdown, panels, `*.ui.json`, `.chrona/rules.json`) remain content, never executed.
 - Current Provider: Pi RPC. Chrona tools: `chrona_reply`, `chrona_notify`, `chrona_schedule`,
   `chrona_schedules`, `chrona_schedule_cancel`, `chrona_affairs`, `chrona_affair_create`,
   `chrona_affair_update`, `chrona_focus`, `chrona_request_approval`, `chrona_send_email`,
-  `chrona_inbound`, `chrona_remember`, `chrona_forget`, `chrona_preferences`.
+  `chrona_inbound`, `chrona_remember`, `chrona_forget`, `chrona_preferences`, `chrona_propose`,
+  `chrona_modules`, `chrona_module_checkout`, `chrona_module_rollback`.
   Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
   auto · notify_after · preapproved · ask · never. External text can never grant anything.
@@ -33,8 +38,8 @@ Rules that follow from the goals:
   quiet hours. Do not add notification paths that bypass it.
 - Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
 - No backward compatibility with removed task/goal/plan systems, immutable AffairResult,
-  Ask/suggestions, care/cadence, FollowUp, managed-tool tables, concierge/assessor roles,
-  management MCP or Hermes. Current Provider adapters and Run records are not those legacy systems.
+  Ask/suggestions, care/cadence, FollowUp, concierge/assessor roles, management MCP or Hermes.
+  The legacy `job` schedule mode is retired (existing rows paused). Current Provider adapters and Run records are not those legacy systems.
 
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.
@@ -48,8 +53,8 @@ real accounts or external sends, disabling auth, approvals or secret redaction.
 | --- | --- |
 | `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
 | `packages/domain/src/steward` | Pure policy, budgets, schedule rules, inbound rules, Markdown and refs |
-| `packages/engine/src/modules/steward` | Affairs/files/git, schedules/jobs, approvals, connectors, queues, runs, tools and tick |
-| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, schedule-job sandbox |
+| `packages/engine/src/modules/steward` | Affairs/files/git, schedules, modules (gateway + executor), approvals, connectors, queues, runs, tools and tick |
+| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, module/script sandbox |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
 | `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, Provider queues, QQ bot) |
