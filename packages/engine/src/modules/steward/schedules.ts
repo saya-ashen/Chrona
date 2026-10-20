@@ -21,6 +21,34 @@ function nextDueOccurrence(rule: Parameters<typeof nextOccurrence>[0], now: Date
   return beforeDeadline(nextAt, until);
 }
 
+async function runScheduledModule(ports: StewardPorts, row: Prisma.ScheduleGetPayload<object>, moduleId: string, hash: string, now: Date) {
+  let manifest: ReturnType<typeof moduleManifestSchema.parse> | undefined;
+  let output: ReturnType<typeof moduleOutputSchema.parse> | null = null, error: string | null = null, exitCode = -1;
+  try {
+    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
+    if (!version) throw new Error("Module version missing");
+    manifest = moduleManifestSchema.parse(version.manifest);
+    if (!manifest.triggers.some(trigger => trigger.id === row.triggerId)) throw new Error("Module trigger missing");
+    const dataDir = join(ports.dataDir, "platform/data", moduleId);
+    await mkdir(dataDir, { recursive: true });
+    if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Module sandbox unavailable");
+    const result = await ports.sandbox.runModule({
+      codeDir: join(ports.dataDir, "platform/store", hash), dataDir, entry: manifest.entry,
+      input: { trigger: { id: row.triggerId, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) },
+      network: manifest.effects.includes("network"), timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
+    });
+    exitCode = result.exitCode ?? -1;
+    if (result.status !== "succeeded" || exitCode !== 0) throw new Error(`Module ${result.status}; exit ${exitCode}: ${result.error ?? ""}`);
+    output = moduleOutputSchema.parse(JSON.parse(result.output));
+  } catch (cause) {
+    error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
+  }
+  return { manifest, output, error, exitCode };
+}
+function moduleResultSummary(exitCode: number, effectCount: number, delayMs: number, error: string | null) {
+  return `Module exit ${exitCode}; effects ${effectCount}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000);
+}
+
 export function createSchedules(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, runs = createRuns(ports, workspaceId);
   const timezone = async () => notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
@@ -64,27 +92,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       return;
     }
     const hash = module.activeHash;
-    let manifest: ReturnType<typeof moduleManifestSchema.parse> | undefined;
-    let output: ReturnType<typeof moduleOutputSchema.parse> | null = null, error: string | null = null, exitCode = -1;
-    try {
-      const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
-      if (!version) throw new Error("Module version missing");
-      manifest = moduleManifestSchema.parse(version.manifest);
-      if (!manifest.triggers.some(trigger => trigger.id === row.triggerId)) throw new Error("Module trigger missing");
-      const dataDir = join(ports.dataDir, "platform/data", module.id);
-      await mkdir(dataDir, { recursive: true });
-      if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Module sandbox unavailable");
-      const result = await ports.sandbox.runModule({
-        codeDir: join(ports.dataDir, "platform/store", hash), dataDir, entry: manifest.entry,
-        input: { trigger: { id: row.triggerId, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) },
-        network: manifest.effects.includes("network"), timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
-      });
-      exitCode = result.exitCode ?? -1;
-      if (result.status !== "succeeded" || exitCode !== 0) throw new Error(`Module ${result.status}; exit ${exitCode}: ${result.error ?? ""}`);
-      output = moduleOutputSchema.parse(JSON.parse(result.output));
-    } catch (cause) {
-      error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
-    }
+    const { manifest, output, error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
     await db.$transaction(async tx => {
       const executed: { type: string; key: string; status: "executed" | "duplicate" | "dropped" }[] = [];
       const previous = await tx.moduleRun.findMany({ where: { moduleId: module.id }, select: { executed: true } });
@@ -104,7 +112,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
         executed.push({ type: effect.type, key: effect.key, status });
       }
       await tx.moduleRun.create({ data: { moduleId: module.id, hash, triggerId: row.triggerId!, firedAt: row.nextAt!, exitCode, ...(output ? { output } : {}), error, executed, createdAt: now } });
-      const updated = await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: `Module exit ${exitCode}; effects ${executed.length}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000) } });
+      const updated = await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, executed.length, delayMs, error) } });
       if (error && updated.failures === 3) {
         await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
         await tx.schedule.updateMany({ where: { workspaceId, moduleId: module.id, mode: "module", status: "active" }, data: { status: "paused" } });

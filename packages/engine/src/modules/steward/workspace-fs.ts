@@ -176,42 +176,44 @@ async function confined(dir: string, path: string, createParents = false) {
       return { sha, author: email === "user@local" ? "user" : "chrona", at: new Date(at!).toISOString(), message: message.join("\n").slice(0, 500), paths };
     }));
   }
+async function snapshotModule(dir: string, path: string) {
+  const result: { path: string; bytes: Uint8Array }[] = [];
+  let total = 0;
+  const walk = async (relative: string, prefix: string): Promise<void> => {
+    const target = await confined(dir, relative), info = await lstat(target);
+    if (info.isDirectory()) {
+      for (const entry of await readdir(target)) await walk(`${relative}/${entry}`, prefix ? `${prefix}/${entry}` : entry);
+    } else {
+      if (result.length >= 200 || total + info.size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+      const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const stat = await handle.stat();
+        if (!stat.isFile() || stat.nlink !== 1) throw new StewardError("forbidden", "Unsafe module file");
+        const buffer = Buffer.alloc(1024 * 1024 - total + 1);
+        let length = 0;
+        while (length < buffer.length) {
+          const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+          if (!bytesRead) break;
+          length += bytesRead;
+        }
+        total += length;
+        if (total > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+        result.push({ path: prefix, bytes: buffer.subarray(0, length) });
+      } finally { await handle.close(); }
+    }
+  };
+  const target = await confined(dir, path);
+  if (!(await lstat(target)).isDirectory()) throw new StewardError("invalid", "Module must be a directory");
+  await walk(path, "");
+  return result.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
 function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<string>, dirName: string) {
     safeDir(dirName);
     const run = <T>(action: (dir: string) => Promise<T>) => locked(join(affairsRoot, dirName), async () => action(await root(dirName)));
     return {
       /** Bounded, no-follow snapshot for the module gateway; never traverse git metadata. */
-      snapshotModule: (path: string) => run(async dir => {
-        const result: { path: string; bytes: Uint8Array }[] = [];
-        let total = 0;
-        const walk = async (relative: string, prefix: string): Promise<void> => {
-          const target = await confined(dir, relative), info = await lstat(target);
-          if (info.isDirectory()) {
-            for (const entry of await readdir(target)) await walk(`${relative}/${entry}`, prefix ? `${prefix}/${entry}` : entry);
-          } else {
-            if (result.length >= 200 || total + info.size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
-            const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
-            try {
-              const stat = await handle.stat();
-              if (!stat.isFile() || stat.nlink !== 1) throw new StewardError("forbidden", "Unsafe module file");
-              const buffer = Buffer.alloc(1024 * 1024 - total + 1);
-              let length = 0;
-              while (length < buffer.length) {
-                const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
-                if (!bytesRead) break;
-                length += bytesRead;
-              }
-              total += length;
-              if (total > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
-              result.push({ path: prefix, bytes: buffer.subarray(0, length) });
-            } finally { await handle.close(); }
-          }
-        };
-        const target = await confined(dir, path);
-        if (!(await lstat(target)).isDirectory()) throw new StewardError("invalid", "Module must be a directory");
-        await walk(path, "");
-        return result.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-      }),
+      snapshotModule: (path: string) => run(dir => snapshotModule(dir, path)),
       checkoutModule: (path: string, files: { path: string; bytes: Uint8Array }[]) => run(async dir => {
         const target = await confined(dir, path, true);
         try {

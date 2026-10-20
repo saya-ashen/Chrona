@@ -56,6 +56,19 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
 }
+function configuredTransport(db: PrismaClient, options: RuntimeOptions): StewardChatTransport | null {
+  let qq: Promise<StewardChatTransport | null> | undefined;
+  const loadQq = () => qq ??= import("./steward-qq-bot").then(({ createStewardQqBot }) => createStewardQqBot({ db, publicUrl: publicOrigin(), now: options.now }));
+  // Do not load optional QQ dependencies or inspect its state when unconfigured.
+  if (options.chatTransport !== undefined) return options.chatTransport;
+  if (!process.env.CHRONA_QQ_APP_ID || !process.env.CHRONA_QQ_SECRET_FILE) return null;
+  return {
+    delivery: { channel: "chrona_qqbot", async send(input) { const bot = await loadQq(); return bot ? bot.delivery.send(input) : { outcome: "rejected", retryable: false, error: "QQ unconfigured" }; } },
+    bound: async () => Boolean(await (await loadQq())?.bound()),
+    start: async (service, wake) => { await (await loadQq())?.start(service, wake); },
+    stop: async () => { if (qq) await (await qq)?.stop(); },
+  };
+}
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   const configured = configuredProvider(options, bwrap);
@@ -67,16 +80,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});
     return handle;
   } } : undefined;
-  let qq: Promise<StewardChatTransport | null> | undefined;
-  const loadQq = () => qq ??= import("./steward-qq-bot").then(({ createStewardQqBot }) => createStewardQqBot({ db, publicUrl: publicOrigin(), now: options.now }));
-  // Do not load optional QQ dependencies or inspect its state when unconfigured.
-  const transport: StewardChatTransport | null = options.chatTransport !== undefined ? options.chatTransport :
-    process.env.CHRONA_QQ_APP_ID && process.env.CHRONA_QQ_SECRET_FILE ? {
-      delivery: { channel: "chrona_qqbot", async send(input) { const bot = await loadQq(); return bot ? bot.delivery.send(input) : { outcome: "rejected", retryable: false, error: "QQ unconfigured" }; } },
-      bound: async () => Boolean(await (await loadQq())?.bound()),
-      start: async (service, wake) => { await (await loadQq())?.start(service, wake); },
-      stop: async () => { if (qq) await (await qq)?.stop(); },
-    } : null;
+  const transport = configuredTransport(db, options);
   const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()) });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
