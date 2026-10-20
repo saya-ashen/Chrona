@@ -53,6 +53,21 @@ it("toggles TaskList source lines and records the task path", async () => {
   expect(toggleCheckbox).toHaveBeenCalledWith("a1", { path: "day-1.md", line: 2, checked: true, baseRevision: "r1" });
   await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { path: "day-1.md", kind: "toggle" }));
 });
+it("shows a failed task save, refreshes a conflict, and retries only when the user checks again", async () => {
+  const file = vi.fn().mockResolvedValueOnce({ content: "# Day\n- [ ] Practice", revision: "old" }).mockResolvedValue({ content: "- [ ] Practice", revision: "latest" });
+  const toggleCheckbox = vi.fn().mockRejectedValueOnce(new StewardClientError("requestError", 409)).mockResolvedValue({});
+  const uiEvent = vi.fn().mockResolvedValue({ ok: true });
+  const client = { file, toggleCheckbox, uiEvent } as unknown as StewardClient;
+  const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", title: "Today", showProgress: true }, children: [] } } };
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  await userEvent.click(await screen.findByRole("checkbox", { name: "Practice" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.affairFile.conflict);
+  await waitFor(() => expect(file).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  expect(uiEvent).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("checkbox"));
+  await waitFor(() => expect(toggleCheckbox).toHaveBeenLastCalledWith("a1", { path: "day.md", line: 1, checked: true, baseRevision: "latest" }));
+});
 it.each([[false, "existing"], [true, "existing"], [false, "missing"]] as const)("renders a deterministic Panel (readOnly=%s, data file %s)", async (readOnly, data) => {
   const file = data === "existing" ? vi.fn().mockResolvedValue({ content: "weight\n", revision: "r1" }) : vi.fn().mockRejectedValue(new StewardClientError("requestError", 404));
   const addPanelEntry = vi.fn().mockResolvedValue({});
@@ -78,6 +93,49 @@ it("renders TaskList Markdown links and bold", async () => {
   expect(screen.getByLabelText("location")).toHaveTextContent(`/en/affairs/a1?${new URLSearchParams({ path: "01-口语诊断材料.md" })}`);
   expect(screen.getByRole("link", { name: "source" })).toHaveAttribute("href", "https://example.com");
   expect(screen.getByText("练习").tagName).toBe("STRONG");
+});
+it("refreshes source tasks after background work without recording a user toggle", async () => {
+  const file = vi.fn().mockResolvedValueOnce({ content: "- [ ] Practice", revision: "r1" }).mockResolvedValue({ content: "- [x] Practice", revision: "r2" });
+  const uiEvent = vi.fn().mockResolvedValue({ ok: true });
+  const client = { file, uiEvent } as unknown as StewardClient;
+  const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", title: "Today", showProgress: true }, children: [] } } };
+  const content = (version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const view = render(content("first"));
+  expect(await screen.findByRole("checkbox")).not.toBeChecked();
+  view.rerender(content("second"));
+  await waitFor(() => expect(screen.getByRole("checkbox")).toBeChecked());
+  expect(file).toHaveBeenCalledTimes(2);
+  expect(uiEvent).not.toHaveBeenCalled();
+});
+it("keeps an unsent form answer when a refreshed spec changes its initial state", async () => {
+  const client = { chat: vi.fn() } as unknown as StewardClient;
+  const page = spec({ press: { action: "say", params: { text: "answer" } } });
+  const content = (value: unknown, version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={value} client={client} affairId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const view = render(content(page, "first"));
+  await userEvent.type(screen.getByLabelText("Answer"), "My unsent answer");
+  view.rerender(content({ ...page, state: { answer: "new default" } }, "second"));
+  expect(screen.getByLabelText("Answer")).toHaveValue("My unsent answer");
+});
+it("refreshes untouched defaults and read-only state alongside a dirty answer", async () => {
+  const client = { chat: vi.fn().mockResolvedValue({ messages: [] }) } as unknown as StewardClient;
+  const page = spec({ press: { action: "say", params: { text: { $template: "Result: ${/answer}" } } } });
+  const elements = {
+    ...page.elements,
+    main: { ...page.elements.main, children: ["answer", "other", "count", "send"] },
+    other: { type: "Input", props: { label: "Other", name: "other", value: { $bindState: "/other" } }, children: [] },
+    count: { type: "Text", props: { text: { $template: "Count: ${/count}" } }, children: [] },
+  };
+  const content = (state: Record<string, unknown>) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={{ ...page, elements, state }} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const view = render(content({ answer: "", other: "old", count: 1 }));
+  await userEvent.type(screen.getByLabelText("Answer"), "draft");
+  view.rerender(content({ answer: "server", other: "new", count: 2 }));
+  expect(screen.getByLabelText("Answer")).toHaveValue("draft");
+  expect(screen.getByLabelText("Other")).toHaveValue("new");
+  expect(screen.getByText("Count: 2")).toBeInTheDocument();
+  view.rerender(content({ answer: "another default", other: "newest", count: 3 }));
+  expect(screen.getByLabelText("Answer")).toHaveValue("draft");
+  await userEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(client.chat).toHaveBeenCalledWith({ affairId: "a1", text: "Result: draft" }));
 });
 it("does not act on an ended affair and rejects specs outside the catalog", async () => {
   const chat = setup(spec({ press: { action: "say", params: { text: "done" } } }), true);

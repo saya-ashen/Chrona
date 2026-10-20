@@ -31,7 +31,7 @@ export default defineConfig({
   webServer: projects.flatMap(({ port, dbPath }) => {
     const baseURL = `http://127.0.0.1:${port}`, database = `file:${dbPath}`;
     return [{
-      command: `HOST=127.0.0.1 PORT=${port} API_KEY=steward-e2e-owner ALLOWED_ORIGINS="http://127.0.0.1:${port + 1}" DATABASE_URL="${database}" CHRONA_DATA_DIR="${dbPath}.data" CHRONA_E2E_TEST_ROUTES=1 CHRONA_STEWARD_AGENT=e2e CHRONA_STEWARD_TICK_SECONDS=0 bun apps/server/src/index.bun.ts`,
+      command: `HOST=127.0.0.1 PORT=${port} API_KEY=steward-e2e-owner ALLOWED_ORIGINS="http://127.0.0.1:${port + 1}" DATABASE_URL="${database}" CHRONA_DATA_DIR="${dbPath}.data" CHRONA_E2E_TEST_ROUTES=1 CHRONA_STEWARD_AGENT=e2e CHRONA_QQ_APP_ID= CHRONA_QQ_SECRET_FILE= CHRONA_STEWARD_TICK_SECONDS=0 bun apps/server/src/index.bun.ts`,
       url: `${baseURL}/health`, reuseExistingServer: false, timeout: 120_000,
     }, {
       command: `VITE_API_BASE_URL=${baseURL} CHRONA_WEB_PORT=${port + 1} bunx --no-install vite --host 127.0.0.1 --config apps/web/vite.config.ts apps/web`,

@@ -2,9 +2,9 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AffairDetail, Schedule } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n";
-import { Badge, Button } from "@shared/ui";
+import { Alert, AlertDescription, Badge, Button } from "@shared/ui";
 import type { StewardClient } from "../model/client";
-import { affairCenter, scheduleLabel, workStatus } from "../model/affair-center";
+import { affairCenter, affairWorkFeedback, scheduleLabel, workStatus } from "../model/affair-center";
 import { affairTimeline, timelineTime, type TimelineEntry } from "../model/affair-timeline";
 import { pageHref, scheduleDescription } from "../model/workspace";
 import { pageName } from "../model/affair-file";
@@ -32,19 +32,32 @@ export function AffairCenterHeader({ detail, client, refresh }: Props) {
       {affair.status !== "done" && <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateAffair(affair.id, { status: affair.status === "paused" ? "active" : "paused" }))}>{affair.status === "paused" ? f.resume : f.pause}</Button><Button variant="outline" disabled={mutation.pending} onClick={() => setConfirm(true)}>{f.end}</Button></div>}
     </div>
     <h1 className="text-2xl font-semibold">{affair.title}</h1>
+    <AffairRuntimeStatus detail={detail} client={client} refresh={refresh} disabled={mutation.pending} />
     {confirm && affair.status !== "done" && <div role="group" aria-label={f.confirmEnd} className="flex flex-wrap items-center gap-2"><p>{f.confirmEnd}</p><Button disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateAffair(affair.id, { status: "done" }))}>{f.confirm}</Button><Button variant="outline" onClick={() => setConfirm(false)}>{f.cancel}</Button></div>}
     <MutationStatus mutation={mutation} />
   </header>;
 }
-export function AffairNow({ detail }: { detail: AffairDetail }) {
+function AffairRuntimeStatus({ detail, client, refresh, disabled }: Props & { disabled: boolean }) {
   const { messages, locale } = useI18n();
   const c = messages.steward.affairCenter;
+  const mutation = useStewardMutation(refresh);
   const status = workStatus(detail.affair.work, locale, c);
-  const model = affairCenter(detail, c.followUp);
+  const { issue, recovering, canResume } = affairWorkFeedback(detail);
+  const next = detail.affair.nextSchedule;
+  const issueCopy = { failed: c.workFailed, timed_out: c.workTimedOut, provider_unavailable: c.workUnavailable, cancelled: c.workCancelled };
+  if (!status && !issue && !next) return null;
+  return <div className="grid min-w-0 gap-2 text-[13px]">
+    {status && <p role="status" aria-live="polite">{status}</p>}
+    {next && <p>{c.next.replace("{label}", next.label ?? c.followUp).replace("{time}", formatShortDateTime(next.at, locale))}</p>}
+    {recovering && <p className="text-muted-foreground">{c.workRecovering}</p>}
+    {issue && canResume && <Alert variant={issue === "cancelled" ? "default" : "destructive"}><AlertDescription className="grid gap-2"><p>{issueCopy[issue]}</p><Button className="w-fit" variant="outline" size="sm" disabled={disabled || mutation.pending} onClick={() => void mutation.run(() => client.chat({ affairId: detail.affair.id, text: c.resumeWorkMessage }))}>{c.resumeWork}</Button></AlertDescription></Alert>}
+    <MutationStatus mutation={mutation} />
+  </div>;
+}
+export function AffairNow({ detail }: { detail: AffairDetail }) {
+  const c = useI18n().messages.steward.affairCenter;
   return <Section title={c.now} className="rounded-[10px] border bg-card p-3.5 gap-2">
     <p className="max-w-[65ch] text-[15px]">{plainSummary(detail.affair.summary)}</p>
-    {status && <p className="text-[13px]" role="status">{status}</p>}
-    {detail.affair.nextSchedule && <p className="text-[13px]">{c.next.replace("{label}", model.nextLabel).replace("{time}", formatShortDateTime(detail.affair.nextSchedule.at, locale))}</p>}
   </Section>;
 }
 export function AffairArrangements({ detail, client, refresh }: Props) {

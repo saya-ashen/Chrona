@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -6,7 +6,7 @@ import { I18nProvider } from "@chrona/i18n/react";
 import en from "../../../packages/i18n/src/messages/en.json";
 import type { Affair } from "@chrona/contracts";
 import { createStewardClient } from "../model/client";
-import { detailFixture, fixtureTime, chatFixture } from "../model/fixtures";
+import { detailFixture, fixtureTime, chatFixture, runFixture } from "../model/fixtures";
 import { AffairArrangements, AffairCenterHeader, AffairNow, AffairTechnicalDetails, AffairTimeline } from "./affair-center";
 
 afterEach(cleanup);
@@ -29,6 +29,42 @@ it.each<{ work: Affair["work"]; text: string | null }>([
   if (text) expect(screen.getByRole("status")).toHaveTextContent(text);
   else expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(screen.getAllByText(detail.affair.summary)).toHaveLength(1);
+});
+it("shows an unfinished outcome without exposing raw errors and lets the user resume this affair", async () => {
+  const detail = detailFixture(); detail.affair.openApprovals = 0; detail.approvals = []; detail.runs = [runFixture()];
+  const { chat } = setup(detail);
+  expect(screen.getByRole("alert")).toHaveTextContent("The last attempt did not finish");
+  expect(screen.getByRole("alert")).not.toHaveTextContent("Internal provider detail");
+  await userEvent.click(screen.getByRole("button", { name: "Continue work" }));
+  expect(chat).toHaveBeenCalledWith({ affairId: "camera", text: expect.stringContaining("latest") });
+});
+it("shows an intentional stop without automatically restarting it", () => {
+  const detail = detailFixture(); detail.runs = [{ ...runFixture(), status: "cancelled" }];
+  const { chat } = setup(detail);
+  expect(screen.getByText(en.steward.affairCenter.workCancelled)).toBeVisible();
+  expect(screen.getByRole("button", { name: en.steward.affairCenter.resumeWork })).toBeEnabled();
+  expect(chat).not.toHaveBeenCalled();
+});
+it("does not submit recovery twice while the first request is pending", async () => {
+  const detail = detailFixture(); detail.runs = [runFixture()];
+  const { chat } = setup(detail);
+  let finish!: (value: typeof chatFixture) => void;
+  chat.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const button = screen.getByRole("button", { name: "Continue work" });
+  await userEvent.click(button);
+  expect(button).toBeDisabled();
+  await userEvent.click(button);
+  expect(chat).toHaveBeenCalledTimes(1);
+  finish(chatFixture);
+  await waitFor(() => expect(button).toBeEnabled());
+});
+it("does not offer a duplicate retry when work is already queued", () => {
+  const detail = detailFixture(); detail.runs = [runFixture()];
+  detail.affair.work = { state: "queued", label: "Prepare day two", since: fixtureTime };
+  setup(detail);
+  expect(screen.queryByRole("button", { name: "Continue work" })).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Up next: Prepare day two");
+  expect(screen.getByText(en.steward.affairCenter.workRecovering)).toBeVisible();
 });
 it("keeps wake instructions only in collapsed technical details", async () => {
   const detail = detailFixture();

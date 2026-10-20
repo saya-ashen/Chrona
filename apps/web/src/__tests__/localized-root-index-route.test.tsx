@@ -60,13 +60,14 @@ describe("steward routes and shared shell", () => {
     expect(screen.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/en");
     expect(screen.getByRole("textbox", { name: en.steward.foundation.composer })).toBeVisible();
   });
-  it("retains the composer exchange when navigating", async () => {
+  it("keeps the composer but does not carry a previous page's exchange into the reader", async () => {
     show("/en/settings");
     await userEvent.type(await screen.findByRole("textbox", { name: en.steward.foundation.composer }), "Budget 6000{Enter}");
     expect(await screen.findByText(/You · Budget 6000/)).toBeVisible();
     await userEvent.click(within(screen.getByRole("navigation", { name: en.steward.shell.navigation })).getByRole("link", { name: "Affairs" }));
     expect(await screen.findByRole("heading", { name: "Affairs" })).toBeVisible();
-    expect(screen.getByText(/You · Budget 6000/)).toBeVisible();
+    expect(screen.queryByText(/You · Budget 6000/)).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: en.steward.foundation.composer })).toBeVisible();
   });
   it("renders Chinese navigation and budget", async () => {
     show("/zh/settings");
@@ -76,7 +77,7 @@ describe("steward routes and shared shell", () => {
     expect(screen.queryByText("建设中")).not.toBeInTheDocument();
   });
   it("shows disconnected status without inventing a connection", async () => {
-    vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? { ...settings, chat: { ...settings.chat, bound: false, sentToday: 0 } } : emptyToday());
+    vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? { ...settings, chat: { ...settings.chat, bound: false, sentToday: 0 } } : String(url).includes("/provider/runs?") ? { items: [] } : emptyToday());
     show("/en/settings");
     expect(await screen.findByText("Chat not connected")).toBeVisible();
     expect(screen.queryByText(/Sent today/)).not.toBeInTheDocument();
@@ -84,14 +85,14 @@ describe("steward routes and shared shell", () => {
   });
   it("shows status loading, failure and retry without a fake budget", async () => {
     let reject!: (error: Error) => void;
-    vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? new Promise((_resolve, fail) => { reject = fail; }) : emptyToday());
+    vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? new Promise((_resolve, fail) => { reject = fail; }) : String(url).includes("/provider/runs?") ? { items: [] } : emptyToday());
     show("/en");
     expect(await screen.findByText("Loading…")).toBeVisible();
     await waitFor(() => expect(reject).toBeTypeOf("function"));
     reject(new Error("offline"));
     expect(await screen.findByText("Chat and notification status unavailable")).toBeVisible();
     expect(screen.queryByText(/Sent today/)).not.toBeInTheDocument();
-    vi.mocked(apiJson).mockResolvedValue(settings);
+    vi.mocked(apiJson).mockImplementation(async url => String(url).includes("/settings?") ? settings : String(url).includes("/provider/runs?") ? { items: [] } : emptyToday());
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("Chat connected · Sent today 2/5")).toBeVisible();
   });

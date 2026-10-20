@@ -3,27 +3,27 @@ import { useI18n } from "@chrona/i18n";
 import type { FileContent } from "@chrona/contracts";
 import { Button, Checkbox, MarkdownContent, Textarea } from "@shared/ui";
 import type { StewardClient } from "../model/client";
-import { fileKind, markdownImages, markdownParts, omitReadmeSummary, pageName } from "../model/affair-file";
+import { fileKind, markdownParts, omitReadmeSummary, pageName } from "../model/affair-file";
 import { useStewardResource } from "../hooks/use-steward";
 import { useAffairFile } from "../hooks/use-affair-file";
 import { ResourceStatus } from "./resource-status";
 import { FilePanel } from "./file-panel";
+import { AffairAsset, AffairDownload } from "./affair-asset";
+import { useAffairMarkdown } from "./affair-markdown";
 
-type FileProps = { client: StewardClient; affairId: string; path: string; refresh: () => void; readOnly?: boolean };
+type FileProps = { client: StewardClient; affairId: string; path: string; refresh: () => void; readOnly?: boolean; refreshVersion?: string; summaryShown?: boolean };
 export function AffairFileView(props: FileProps) {
   const { client, affairId, path } = props;
   const kind = fileKind(path);
-  const c = useI18n().messages.steward.affairFile;
-  if (kind === "binary") return <a href={client.rawUrl(affairId, path)} download>{c.download}: {path}</a>;
-  if (kind === "image") return <div className="grid gap-3"><img className="max-w-full" src={client.rawUrl(affairId, path)} alt={path} /><a href={client.rawUrl(affairId, path)} download>{c.download}</a></div>;
+  if (kind === "binary" || kind === "image" || kind === "audio" || kind === "video") return <AffairAsset client={client} affairId={affairId} path={path} revision={props.refreshVersion} />;
   return <LoadedFile {...props} />;
 }
 function LoadedFile(props: FileProps) {
   const { client, affairId, path } = props;
-  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, path, signal), [client, affairId, path]));
+  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, path, signal), [client, affairId, path]), false, props.refreshVersion);
   return <><ResourceStatus resource={resource} />{resource.data && <EditableFile key={path} {...props} initial={resource.data} />}</>;
 }
-export function EditableFile({ client, affairId, initial, refresh, readOnly = false }: Omit<FileProps, "path"> & { initial: FileContent }) {
+export function EditableFile({ client, affairId, initial, refresh, readOnly = false, summaryShown, refreshVersion }: Omit<FileProps, "path"> & { initial: FileContent }) {
   const { messages, locale } = useI18n();
   const c = messages.steward.affairFile;
   const f = useAffairFile(client, affairId, initial, refresh);
@@ -38,16 +38,23 @@ export function EditableFile({ client, affairId, initial, refresh, readOnly = fa
       <label className="grid min-w-0 gap-2">{f.conflict ? c.mine : c.editor}<Textarea aria-label={c.editor} className="min-h-80 font-mono" value={f.draft} onChange={event => f.setDraft(event.target.value)} disabled={f.pending} /></label>
       {f.conflict && <section className="min-w-0"><h3>{c.theirs}</h3><pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words">{f.conflict.content}</pre></section>}
       <div className="flex flex-wrap gap-2"><Button disabled={f.pending} type="submit">{f.conflict ? c.retry : c.save}</Button><Button variant="outline" disabled={f.pending} type="button" onClick={f.cancel}>{c.cancel}</Button></div>
-    </form> : fileKind(f.file.path, f.file.mime) === "markdown" ? <AffairMarkdown content={omitReadmeSummary(f.file.content, f.file.path)} path={f.file.path} client={client} affairId={affairId} pending={f.pending || readOnly} toggle={f.changeCheckbox} /> : <pre className="overflow-auto whitespace-pre-wrap break-words">{f.file.content}</pre>}
+    </form> : <FileReadView file={f.file} summaryShown={summaryShown} client={client} affairId={affairId} revision={refreshVersion} pending={f.pending || readOnly} toggle={f.changeCheckbox} />}
     </div>
+    {!f.editing && <footer className="border-t px-4 py-2 text-xs"><AffairDownload client={client} affairId={affairId} path={f.file.path} label={c.download} /></footer>}
   </div>;
 }
-function AffairMarkdown({ content, path, client, affairId, pending, toggle }: { content: string; path: string; client: StewardClient; affairId: string; pending: boolean; toggle: (line: number, checked: boolean) => Promise<void> }) {
+type MarkdownProps = { content: string; path: string; client: StewardClient; affairId: string; revision?: string; pending: boolean; toggle: (line: number, checked: boolean) => Promise<void> };
+function FileReadView({ file, summaryShown, ...props }: Omit<MarkdownProps, "content" | "path"> & { file: FileContent; summaryShown?: boolean }) {
+  if (fileKind(file.path, file.mime) !== "markdown") return <pre className="overflow-auto whitespace-pre-wrap break-words">{file.content}</pre>;
+  return <AffairMarkdown {...props} path={file.path} content={summaryShown ? omitReadmeSummary(file.content, file.path) : file.content} />;
+}
+function AffairMarkdown({ content, path, client, affairId, revision, pending, toggle }: MarkdownProps) {
   const c = useI18n().messages.steward.affairFile;
+  const components = useAffairMarkdown(client, affairId, path, revision);
   return <div className="grid min-w-0 gap-3">{markdownParts(content).map((part, index) => {
     if (part.kind === "panel") return <FilePanel key={`${path}:${index}:${JSON.stringify(part.spec)}`} spec={part.spec} client={client} affairId={affairId} />;
     if (part.kind === "invalidPanel") return <div key={index}><p role="alert">{c.invalidPanel}</p><MarkdownContent>{part.text}</MarkdownContent></div>;
-    if (part.kind === "task") return <div key={index} className="flex min-w-0 items-start gap-2"><Checkbox aria-label={part.text || `${c.pages} ${part.line}`} className="mt-1" checked={part.checked} disabled={pending} onCheckedChange={value => void toggle(part.line, value === true)} /><MarkdownContent>{markdownImages(part.text, path, source => client.rawUrl(affairId, source))}</MarkdownContent></div>;
-    return <MarkdownContent key={index}>{markdownImages(part.text, path, source => client.rawUrl(affairId, source))}</MarkdownContent>;
+    if (part.kind === "task") return <div key={index} className="flex min-w-0 items-start gap-2"><Checkbox aria-label={part.text || `${c.pages} ${part.line}`} className="mt-1" checked={part.checked} disabled={pending} onCheckedChange={value => void toggle(part.line, value === true)} /><MarkdownContent components={components}>{part.text}</MarkdownContent></div>;
+    return <MarkdownContent key={index} components={components}>{part.text}</MarkdownContent>;
   })}</div>;
 }

@@ -131,6 +131,7 @@ export {
   useSidebar,
 } from "./sidebar";
 export { Skeleton } from "./skeleton";
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption } from "./table";
 export { Switch } from "./switch";
 export { Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants } from "./tabs";
 export { Textarea } from "./textarea";

@@ -22,6 +22,17 @@ export function affairPages(detail: AffairDetail | null | undefined, path: strin
   };
 }
 
+export type WorkIssue = "failed" | "timed_out" | "provider_unavailable" | "cancelled";
+/** Retain an unfinished outcome, but never invite duplicate work while another attempt exists. */
+export function affairWorkFeedback(detail: Pick<AffairDetail, "affair" | "runs">) {
+  const settled = detail.runs.filter(run => run.status !== "running" && run.status !== "queued");
+  const time = (run: AffairDetail["runs"][number]) => Date.parse(run.endedAt ?? run.createdAt);
+  const status = settled.sort((a, b) => time(b) - time(a))[0]?.status;
+  const issue: WorkIssue | null = detail.affair.status === "active"
+    && (status === "failed" || status === "timed_out" || status === "provider_unavailable" || status === "cancelled") ? status : null;
+  return { issue, recovering: !!issue && !!detail.affair.work, canResume: !!issue && !detail.affair.work };
+}
+
 type WorkCopy = { running: string; queued: string; replying: string; started: string; followUp: string };
 export function workStatus(work: AffairDetail["affair"]["work"], locale: string, copy: WorkCopy) {
   if (!work) return null;

@@ -5,12 +5,12 @@ import type { StewardClientError } from "../model/client";
 export function ResourceStatus({
   resource,
 }: {
-  resource: { loading: boolean; error: StewardClientError | null; refresh: () => void };
+  resource: { data?: unknown; loading: boolean; error: StewardClientError | null; refresh: () => void };
 }) {
   const copy = useI18n().messages.steward.foundation;
   return (
     <>
-      {resource.loading && (
+      {resource.loading && (resource.data === null || resource.data === undefined) && (
         <div role="status" aria-label={copy.loading}>
           <Skeleton className="h-12 w-full" />
         </div>

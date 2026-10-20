@@ -1,4 +1,5 @@
 import type { AffairDetail } from "@chrona/contracts";
+import { Button } from "@shared/ui";
 import { GeneratedPageFeedback } from "./generated-page-feedback";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -18,12 +19,13 @@ import type { StewardClient } from "../model/client";
 import { AffairArrangements, AffairCenterHeader, AffairNow, AffairTechnicalDetails, AffairTimeline } from "./affair-center";
 import { affairCenter, affairPages } from "../model/affair-center";
 import { ApprovalItem } from "./approval-item";
+import { ProviderWork } from "./provider-work";
 
 export function AffairDetailPage() {
   const { affairId = "" } = useParams();
   const [params] = useSearchParams();
-  const client = useStewardSession().today.client;
-  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.affair(affairId, signal), [client, affairId]));
+  const session = useStewardSession(), client = session.today.client;
+  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.affair(affairId, signal), [client, affairId]), true, String(session.revision));
   const detail = resource.data;
   const path = selectedPage(detail?.entry, params.get("path"));
   return <PageColumn className="gap-5"><ResourceStatus resource={resource} />{detail && <AffairContent detail={detail} path={path} client={client} refresh={resource.refresh} />}</PageColumn>;
@@ -31,38 +33,46 @@ export function AffairDetailPage() {
 
 type ContentProps = { detail: AffairDetail; path: string; client: StewardClient; refresh: () => void };
 function AffairContent({ detail, path, client, refresh }: ContentProps) {
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const affairId = detail.affair.id;
-  const resource = { refresh };
-  const composed = path.endsWith(".ui.json");
+  const reading = path !== (detail.entry ?? "README.md");
+  const standalone = reading || path.endsWith(".ui.json");
   const model = affairCenter(detail, messages.steward.affairCenter.followUp);
   return <>
-      <AffairCenterHeader detail={detail} client={client} refresh={resource.refresh} />
-      {composed && <>
-        {!!model?.approvals.length && <Section title={messages.steward.foundation.decisions}><Surface>{model.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={client} refresh={resource.refresh} />)}</Surface></Section>}
-        <section aria-label={pageName(path)} className="min-w-0"><ComposedPage key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} readOnly={detail.affair.status === "done"} /></section>
+      <AffairCenterHeader detail={detail} client={client} refresh={refresh} />
+      <ProviderWork key={affairId} client={client} affairId={affairId} mode="summary" onChange={refresh} />
+      {reading && <Button asChild variant="ghost" className="-ml-2 min-h-10 w-fit px-2"><Link to={pageHref(locale, affairId)}><span aria-hidden="true">←</span>{messages.steward.affairCenter.backHome}</Link></Button>}
+      {standalone && <>
+        {!!model.approvals.length && <Section title={messages.steward.foundation.decisions}><Surface>{model.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={client} refresh={refresh} />)}</Surface></Section>}
+        <section aria-label={path} className="min-w-0"><AffairPageBody detail={detail} path={path} client={client} refresh={refresh} /></section>
       </>}
-      {/* A composed entry page is the whole first level; files, arrangements and history stay one click away. */}
-      <AffairSecondLevel collapsed={composed} label={messages.steward.affairCenter.secondLevel}>
-      <AffairContents detail={detail} path={path} client={client} refresh={refresh} />
+      {/* Entry content and secondary readers do not compete with the workspace's administration. */}
+      <AffairSecondLevel collapsed={standalone} label={messages.steward.affairCenter.secondLevel}>
+        <AffairContents detail={detail} path={path} client={client} refresh={refresh} showPage={!standalone} />
       </AffairSecondLevel>
     </>;
 }
-function AffairContents({ detail, path, client, refresh }: ContentProps) {
+function AffairPageBody({ detail, path, client, refresh }: ContentProps) {
+  const c = useI18n().messages.steward.affairFile;
+  const affairId = detail.affair.id;
+  const { selected, tree } = affairPages(detail, path);
+  if (path.endsWith(".ui.json")) return <ComposedPage key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={refresh} refreshVersion={detail.affair.lastActivityAt} readOnly={detail.affair.status === "done"} />;
+  return selected ? <AffairFileView key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={refresh} refreshVersion={detail.affair.lastActivityAt} summaryShown={path === (detail.entry ?? "README.md")} readOnly={detail.affair.status === "done"} /> : <p>{tree.length ? c.notFound : c.empty}</p>;
+}
+function AffairContents({ detail, path, client, refresh, showPage }: ContentProps & { showPage: boolean }) {
   const { messages } = useI18n();
   const c = messages.steward.affairFile;
   const affairId = detail.affair.id;
   const resource = { refresh };
-  const { selected, tree } = affairPages(detail, path);
-  const composed = path.endsWith(".ui.json");
+  const { tree } = affairPages(detail, path);
   const model = affairCenter(detail, messages.steward.affairCenter.followUp);
   return <div className="grid min-w-0 items-start gap-x-7 gap-y-5 min-[861px]:grid-cols-[minmax(0,1fr)_300px]">
         <div className="contents min-[861px]:grid min-[861px]:gap-5 min-w-0">
         <div className="order-1 grid min-w-0 gap-5">
-          {!composed && <AffairNow detail={detail} />}
-          {!composed && !!model?.approvals.length && <Section title={messages.steward.foundation.decisions}><Surface>{model.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={client} refresh={resource.refresh} />)}</Surface></Section>}
+          {showPage && <AffairNow detail={detail} />}
+          {showPage && !!model.approvals.length && <Section title={messages.steward.foundation.decisions}><Surface>{model.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={client} refresh={resource.refresh} />)}</Surface></Section>}
         </div>
-        <section aria-label={path} className="order-3 min-w-0">{composed ? null : selected ? <AffairFileView key={`${affairId}:${path}`} client={client} affairId={affairId} path={path} refresh={resource.refresh} readOnly={detail.affair.status === "done"} /> : <p>{tree.length ? c.notFound : c.empty}</p>}</section>
+        {showPage && <section aria-label={path} className="order-3 min-w-0"><AffairPageBody detail={detail} path={path} client={client} refresh={refresh} /></section>}
         <div className="order-4 min-w-0"><AffairTimeline key={affairId} detail={detail} client={client} refresh={resource.refresh} /></div>
         <div className="order-6 min-w-0"><AffairTechnicalDetails detail={detail}>
           <details className="min-w-0"><summary>{messages.steward.affairCenter.history}</summary><AffairHistory key={affairId} client={client} affairId={affairId} refresh={resource.refresh} /></details>
@@ -87,10 +97,10 @@ export function FileTree({ nodes, affairId, selected }: { nodes: FileBranch[]; a
   </li>)}</ul>;
 }
 
-function ComposedPage({ client, affairId, path, refresh, readOnly }: { client: StewardClient; affairId: string; path: string; refresh: () => void; readOnly: boolean }) {
-  const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, path, signal), [client, affairId, path]));
+function ComposedPage({ client, affairId, path, refresh, readOnly, refreshVersion }: { client: StewardClient; affairId: string; path: string; refresh: () => void; readOnly: boolean; refreshVersion: string }) {
+  const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, path, signal), [client, affairId, path]), false, refreshVersion);
   const spec = useMemo(() => { try { return file.data ? JSON.parse(file.data.content) as unknown : null; } catch { return null; } }, [file.data]);
-  return <><ResourceStatus resource={file} />{file.data && <><GeneratedPage spec={spec} path={path} client={client} affairId={affairId} readOnly={readOnly} refresh={() => { file.refresh(); refresh(); }} /><GeneratedPageFeedback client={client} affairId={affairId} path={path} readOnly={readOnly} /></>}</>;
+  return <><ResourceStatus resource={file} />{file.data && <><GeneratedPage spec={spec} path={path} client={client} affairId={affairId} readOnly={readOnly} refreshVersion={refreshVersion} refresh={() => { file.refresh(); refresh(); }} /><GeneratedPageFeedback client={client} affairId={affairId} path={path} readOnly={readOnly} /></>}</>;
 }
 
 function AffairSecondLevel({ collapsed, label, children }: { collapsed: boolean; label: string; children: ReactNode }) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localImagePath, omitReadmeSummary } from "./affair-file";
+import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localAffairPath, omitReadmeSummary } from "./affair-file";
 import { fixtureTime } from "./fixtures";
 import { scheduleDescription } from "./workspace";
 import zh from "../../../packages/i18n/src/messages/zh.json";
@@ -37,13 +37,13 @@ describe("affair files", () => {
     const spec = { ...panelSpec, fields: [{ key: "note", label: "Note", type: "text" as const }], views: [{ kind: "table" as const, columns: ["note"] }] };
     expect(panelRows('note\n"a,b\n""quoted"""\n', spec)[0]?.values).toEqual({ note: 'a,b\n"quoted"' });
   });
-  it.each([["README.md", "markdown"], ["a.png", "image"], ["a.txt", "text"], ["a.py", "text"], ["Dockerfile", "text"], ["a.pdf", "binary"]])("classifies %s", (path, kind) => expect(fileKind(path)).toBe(kind));
-  it("resolves images within the affair only", () => {
-    expect(localImagePath("../images/a.png", "days/one.md")).toBe("images/a.png");
-    expect(localImagePath("../../a.png", "days/one.md")).toBeNull();
-    expect(localImagePath("https://example.com/a.png", "README.md")).toBeNull();
-    expect(localImagePath(".chrona/a.png", "README.md")).toBeNull();
-  });
+  it.each([["README.md", "markdown"], ["a.png", "image"], ["a.txt", "text"], ["a.py", "text"], ["Dockerfile", "text"], ["a.pdf", "binary"], ["voice.wav", "audio"], ["clip.mp4", "video"], ["unsafe.svg", "binary"]])("classifies %s", (path, kind) => expect(fileKind(path)).toBe(kind));
+  it.each([
+    ["../images/a.png", "days/one.md", "images/a.png"], ["../../a.png", "days/one.md", null],
+    ["https://example.com/a.png", "README.md", null], [".chrona/a.png", "README.md", null],
+    ["记录%20资料.md#section", "days/one.md", "days/记录 资料.md"], ["%2e%2e/%2e%2e/private.md", "days/one.md", null],
+    ["%2fprivate", "README.md", null], ["bad%ZZ", "README.md", null],
+  ])("resolves local asset/page %s within the affair", (source, page, expected) => expect(localAffairPath(source!, page!)).toBe(expected));
   it.each([
     [{ kind: "daily", time: "09:00" } as const, "每天 09:00"],
     [{ kind: "every", minutes: 30 } as const, "每 30 分钟"],

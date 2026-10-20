@@ -3,10 +3,10 @@ import type { ChatReply } from "@chrona/contracts";
 import type { StewardClient } from "../model/client";
 import { useStewardMutation } from "./use-steward-mutation";
 
-export function useComposer(client: StewardClient, refresh: () => void | Promise<void>, onPendingChange?: (pending: boolean) => void, affairId?: string) {
+export function useComposer(client: StewardClient, refresh: () => void | Promise<void>, onPendingChange?: (pending: boolean) => void, affairId?: string, viewKey?: string) {
   const [text, setText] = useState("");
   const [attempt, setAttempt] = useState("");
-  const [exchange, setExchange] = useState<{ text: string; response: ChatReply } | null>(null);
+  const [exchange, setExchange] = useState<{ text: string; response: ChatReply; viewKey?: string } | null>(null);
   const mutation = useStewardMutation(refresh);
   async function send(value = text) {
     const input = value.trim();
@@ -15,7 +15,7 @@ export function useComposer(client: StewardClient, refresh: () => void | Promise
     onPendingChange?.(true);
     try {
       const result = await mutation.run(() => client.chat({ text: input, ...(affairId ? { affairId } : {}) }));
-      if (result.ok) { setExchange({ text: input, response: result.data }); setText(""); }
+      if (result.ok) { setExchange({ text: input, response: result.data, viewKey }); setText(""); }
     } finally { onPendingChange?.(false); }
   }
   return { text, setText, exchange, ...mutation, send, retry: () => send(attempt) };

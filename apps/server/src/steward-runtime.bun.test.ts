@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -47,6 +47,34 @@ test("E2E provider requires both the explicit test gate and provider selection",
     else process.env.CHRONA_E2E_TEST_ROUTES = previousGate;
     if (previousAgent === undefined) delete process.env.CHRONA_STEWARD_AGENT;
     else process.env.CHRONA_STEWARD_AGENT = previousAgent;
+    await db.$disconnect();
+  }
+});
+
+test("runtime forwards a dedicated Pi profile, executable and version pin", async () => {
+  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-pi-runtime-"));
+  const command = join(dataDir, "fake-pi");
+  writeFileSync(command, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nimport {join} from 'node:path';\nif(process.argv.includes('--version')){writeFileSync(join(process.env.PI_CODING_AGENT_DIR,'probe.json'),JSON.stringify({agentDir:process.env.PI_CODING_AGENT_DIR}));console.log('0.85.0');process.exit(0)}\nprocess.exit(1);\n`, { mode: 0o755 });
+  const keys = ["CHRONA_STEWARD_AGENT", "CHRONA_STEWARD_PI_COMMAND", "CHRONA_STEWARD_PI_AGENT_DIR", "CHRONA_STEWARD_PI_VERSION"] as const;
+  const previous = keys.map(key => process.env[key]);
+  try {
+    process.env.CHRONA_STEWARD_AGENT = "pi"; process.env.CHRONA_STEWARD_PI_COMMAND = command;
+    for (const custom of [false, true]) {
+      const profile = join(dataDir, custom ? "explicit-profile" : "providers/pi"); mkdirSync(profile, { recursive: true, mode: 0o700 });
+      if (custom) process.env.CHRONA_STEWARD_PI_AGENT_DIR = profile; else delete process.env.CHRONA_STEWARD_PI_AGENT_DIR;
+      process.env.CHRONA_STEWARD_PI_VERSION = "0.85.0";
+      const runtime = createStewardRuntime(db, { dataDir, port: 48130, chatTransport: null });
+      try {
+        expect((await runtime.ports.provider!.health()).available).toBe(true);
+        expect(JSON.parse(readFileSync(join(profile, "probe.json"), "utf8"))).toEqual({ agentDir: profile });
+      } finally { await runtime.stop(); }
+    }
+    process.env.CHRONA_STEWARD_PI_VERSION = "1.3.0";
+    const mismatch = createStewardRuntime(db, { dataDir, port: 48130, chatTransport: null });
+    try { expect((await mismatch.ports.provider!.health()).available).toBe(false); }
+    finally { await mismatch.stop(); }
+  } finally {
+    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     await db.$disconnect();
   }
 });

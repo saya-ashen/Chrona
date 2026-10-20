@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiJson } from "@shared/http";
 import { createStewardClient, StewardClientError } from "./client";
 import { chatFixture, approvalFixture, fileFixture, todayFixture } from "./fixtures";
-vi.mock("@shared/http", () => ({ apiJson: vi.fn(), buildAccessKeyHeaders: () => new Headers(), handleUnauthorizedResponse: vi.fn() }));
+vi.mock("@shared/http", () => ({ apiJson: vi.fn(), buildAccessKeyHeaders: () => new Headers({ authorization: "Bearer fixture-owner" }), handleUnauthorizedResponse: vi.fn() }));
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllGlobals(); });
 describe("steward contract client", () => {
   it("parses realistic Today data and encodes workspace scope", async () => {
@@ -56,6 +56,21 @@ describe("steward contract client", () => {
     const options = send.mock.calls[0]![1] as RequestInit;
     expect(options.body).toBeInstanceOf(FormData);
     expect(new Headers(options.headers).has("content-type")).toBe(false);
+  });
+  it("fetches protected bytes with owner headers, never a key-bearing URL or redirects", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("fixture bytes")); vi.stubGlobal("fetch", fetcher);
+    const bytes = await createStewardClient("ws").raw("a/1", "audio/voice.wav");
+    expect(await bytes.text()).toBe("fixture bytes");
+    const [url, options] = fetcher.mock.calls[0]!;
+    expect(url).toBe("/api/steward/affairs/a%2F1/raw?workspaceId=ws&path=audio%2Fvoice.wav");
+    expect(url).not.toContain("fixture-owner"); expect(options.redirect).toBe("error");
+    expect(new Headers(options.headers).get("authorization")).toBe("Bearer fixture-owner");
+    await expect(createStewardClient("ws").raw("a", "../private")).rejects.toMatchObject({ messageKey: "invalidInput" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it("protected byte reads honor 401 rather than falling back to unauthenticated links", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 401 })));
+    await expect(createStewardClient("ws").raw("a", "file.pdf")).rejects.toMatchObject({ messageKey: "unauthorized" });
   });
   it("never exposes server prose as an error message", async () => {
     vi.mocked(apiJson).mockRejectedValue(Object.assign(new Error("private server details"), { status: 401 }));

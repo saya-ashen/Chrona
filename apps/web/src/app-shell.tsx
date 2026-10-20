@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLoaderData } from "react-router-dom";
 import { localizeHref, useI18n } from "@chrona/i18n";
 import { I18nProvider } from "@chrona/i18n/react";
 import { Button } from "@shared/ui";
-import { Composer, StewardSession, useStewardSession } from "@features/steward";
+import { Composer, ProviderWork, StewardSession, useStewardSession } from "@features/steward";
 import { AccessKeyGate } from "@/components/access-key-gate";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import type { AppBootData } from "./pages";
@@ -48,6 +48,7 @@ function ShellContent({ data }: { data: AppBootData }) {
     <main className="min-w-0">
       <PageColumn className="pb-0">
         <Composer client={session.today.client} lang={locale} refresh={session.refresh} onPendingChange={session.setChatPending} />
+        <ProviderWork client={session.today.client} mode="questions" onChange={session.refresh} />
       </PageColumn>
       <Outlet context={data} />
     </main>

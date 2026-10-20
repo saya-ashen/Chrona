@@ -1,8 +1,10 @@
 import { useI18n } from "@chrona/i18n";
 import { Alert, AlertDescription, Badge, Button, Textarea } from "@shared/ui";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { StewardClient } from "../model/client";
 import { useComposer } from "../hooks/use-composer";
+import { fileKind } from "../model/affair-file";
+import { AffairDownload } from "./affair-asset";
 
 export function Composer({
   client,
@@ -19,7 +21,8 @@ export function Composer({
 }) {
   const { messages } = useI18n();
   const copy = messages.steward.foundation;
-  const composer = useComposer(client, refresh, onPendingChange, affairId);
+  const location = useLocation();
+  const composer = useComposer(client, refresh, onPendingChange, affairId, location.key);
   return (
     <div className="grid min-w-0 gap-2.5 [overflow-wrap:anywhere]">
       <form
@@ -60,7 +63,7 @@ export function Composer({
           </AlertDescription>
         </Alert>
       )}
-      {composer.exchange && (
+      {composer.exchange && composer.exchange.viewKey === location.key && (
         <section
           aria-label={copy.reply}
           className="grid min-w-0 gap-2 border-l-2 rounded-r-md border-primary-border bg-primary-soft/45 px-3.5 py-3 text-[13px]"
@@ -74,9 +77,9 @@ export function Composer({
               {message.affairId && <Badge variant="outline" className="w-fit rounded-full border-primary-border bg-card text-primary" asChild><Link to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}`}>{messages.steward.affairs.title}</Link></Badge>}
               <div className="flex flex-wrap gap-2">
                 {message.attachments.map((attachment, index) => message.affairId && attachment.path ? (
-                  /\.md$/i.test(attachment.path)
+                  fileKind(attachment.path) !== "binary"
                     ? <Link key={index} className="underline" to={`/${lang}/affairs/${encodeURIComponent(message.affairId)}?${new URLSearchParams({ path: attachment.path })}`}>{attachment.name}</Link>
-                    : <a key={index} className="underline" href={client.rawUrl(message.affairId, attachment.path)} download>{attachment.name}</a>
+                    : <AffairDownload key={index} client={client} affairId={message.affairId} path={attachment.path} label={attachment.name} />
                 ) : <span key={index}>{attachment.name}</span>)}
               </div>
             </article>

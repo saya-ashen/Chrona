@@ -12,8 +12,8 @@ async function fixture(mode = "normal") {
   const command = join(cwd, "pi");
   await writeFile(command, `#!${process.execPath}
 import { appendFileSync, writeFileSync } from 'node:fs';
-if (process.argv.includes('--version')) process.exit(0);
-writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),env:process.env}));
+if (process.argv.includes('--version')) {console.log('0.85.0');process.exit(0);}
+writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
 const mode=${JSON.stringify(mode)};
 let streaming=false, queue=0, cycle=0, retried=false;
 const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
@@ -22,8 +22,9 @@ function run() {
  streaming=true; cycle++; emit({type:'agent_start'});
  setTimeout(()=>{
   if(mode==='error') emit({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:'failed '+process.env.CHRONA_AGENT_TOKEN}});
-  streaming=false; emit({type:'agent_end'});
+  streaming=false; writeFileSync('completed-cycles.txt',String(cycle));emit({type:'agent_end'});
   if(queue) setTimeout(()=>{queue--; run();},45);
+  else emit({type:'agent_settled'});
  },100);
 }
 let buffer='';
@@ -41,12 +42,16 @@ process.stdin.on('data',chunk=>{
     setTimeout(()=>{
      emit({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:'retry failed'}});
      emit({type:'auto_retry_end'});
+     emit({type:'agent_end'});emit({type:'agent_settled'});
     },60);
    }
    reply(c,{sessionId:'retained-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
   }
+  if(c.type==='get_commands') reply(c,{commands:[]});
+  if(c.type==='clear_queue') {queue=0;reply(c,{steering:[],followUp:[]});}
   if(c.type==='prompt') {
    reply(c);
+   if(streaming&&c.streamingBehavior){queue++;continue;}
    if(mode==='crash'){process.stderr.write('crash '+process.env.CHRONA_AGENT_TOKEN);process.exit(7);}
    else if(mode==='malformed') process.stdout.write('not-json\\n');
    else if(mode==='partial') { const data=Buffer.from(JSON.stringify({type:'message_update',text:'你好\\u2028世界'})+'\\n'); process.stdout.write(data.subarray(0,43)); setTimeout(()=>{process.stdout.write(data.subarray(43));run();},10); }
@@ -59,10 +64,13 @@ process.stdin.on('data',chunk=>{
 process.stdin.on('end',()=>process.exit(0));
 `, { mode: 0o755 });
   await writeFile(join(cwd, "bridge.ts"), "");
-  const provider = createPiProvider({ command, chronaExtension: join(cwd, "bridge.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+  await writeFile(join(cwd, "web.ts"), "");
+  const agentDir = await mkdtemp(join(tmpdir(), "chrona-pi-profile-"));
+  const options = { command, agentDir, expectedVersion: "0.85.0", chronaExtension: join(cwd, "bridge.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" };
+  const provider = createPiProvider(options);
   const input: ProviderRunInput = { runId: "run", token: "private-run-token", lane: "foreground", cwd, sessionDir: join(cwd, ".chrona/sessions"), sessionId: "previous-id", prompt: "hello", deadline: new Date(Date.now() + 4000) };
   const commands = async () => (await readFile(join(cwd, "commands.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
-  return { cwd, command, provider, input, commands };
+  return { cwd, command, agentDir, options, provider, input, commands };
 }
 async function until(check: () => Promise<boolean>) {
   for (let i = 0; i < 100; i++) { if (await check().catch(() => false)) return; await Bun.sleep(10); }
@@ -78,8 +86,8 @@ describe("Pi RPC provider", () => {
       expect(await handle.done).toEqual({ outcome: "finished", sessionId: "retained-session", error: null });
       const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
       expect(launch.cwd).toBe(f.cwd);
-      expect(launch.env.CHRONA_DATABASE_SECRET).toBeUndefined();
-      expect(launch.env.CHRONA_AGENT_TOKEN).toBe(f.input.token);
+      expect(launch.hasChronaDatabaseSecret).toBe(false);
+      expect(launch.tokenMatches).toBe(true);
       expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
       const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
       expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).not.toContain("bash"); expect(tools).not.toContain("web_search");
@@ -87,14 +95,15 @@ describe("Pi RPC provider", () => {
       expect(await f.provider.health()).toEqual({ available: true, sandboxed: false, error: null });
     } finally { if (before === undefined) delete process.env.CHRONA_DATABASE_SECRET; else process.env.CHRONA_DATABASE_SECRET = before; }
   });
-  test("steers during streaming and waits across agent_end with queued messages", async () => {
+  test("injection queues steering during streaming and waits across agent_end", async () => {
     const f = await fixture(), handle = f.provider.start(f.input);
     await until(async () => (await f.commands()).some(c => c.type === "prompt"));
     await Bun.sleep(20);
     await handle.inject("more", [{ mime: "image/jpeg", base64: "ZA==" }]);
-    expect((await f.commands()).some(c => c.type === "steer")).toBe(true);
+    expect((await f.commands()).find(c => c.type === "prompt" && c.message === "more")).toMatchObject({ streamingBehavior: "steer", images: [{ type: "image", mimeType: "image/jpeg", data: "ZA==" }] });
     expect((await handle.done).outcome).toBe("finished");
-    expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThan(2);
+    expect(await readFile(join(f.cwd, "completed-cycles.txt"), "utf8")).toBe("2");
+    expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThanOrEqual(2);
   });
   test("rechecks completion when retry starts during get_state", async () => {
     const f = await fixture("retry-state");
@@ -103,11 +112,12 @@ describe("Pi RPC provider", () => {
     expect(result.error).toBe("retry failed");
     expect((await f.commands()).filter(c => c.type === "get_state").length).toBeGreaterThan(2);
   });
-  test("idle injection uses follow_up", async () => {
+  test("early injection waits for startup and lets Pi choose starting or steering", async () => {
     const f = await fixture(), handle = f.provider.start(f.input);
     await handle.inject("queued before streaming");
     expect((await handle.done).outcome).toBe("finished");
-    expect((await f.commands()).some(c => c.type === "follow_up")).toBe(true);
+    expect((await f.commands()).find(c => c.message === "queued before streaming")).toMatchObject({ type: "prompt", streamingBehavior: "steer" });
+    expect(await readFile(join(f.cwd, "completed-cycles.txt"), "utf8")).toBe("2");
   });
   test.each(["partial", "malformed", "error", "crash"])("handles %s output", async mode => {
     const f = await fixture(mode), result = await f.provider.start(f.input).done;
@@ -125,11 +135,11 @@ describe("Pi RPC provider", () => {
   });
   test("unavailable executable and expired deadline", async () => {
     const f = await fixture();
-    const provider = createPiProvider({ command: join(f.cwd, "missing"), chronaExtension: "bridge.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    const provider = createPiProvider({ ...f.options, command: join(f.cwd, "missing") });
     expect((await provider.health()).available).toBe(false);
     expect((await provider.start(f.input).done).outcome).toBe("unavailable");
     expect((await provider.start({ ...f.input, deadline: new Date(0) }).done).outcome).toBe("timed_out");
-    const noExtension = createPiProvider({ command: f.command, chronaExtension: join(f.cwd, "missing.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    const noExtension = createPiProvider({ ...f.options, chronaExtension: join(f.cwd, "missing.ts") });
     expect((await noExtension.health()).error).toContain("extension missing");
   });
   test.each([false, true])("bwrap mounts (root=%s), share network, and enable bash/web", async rootRun => {
@@ -141,7 +151,7 @@ describe("Pi RPC provider", () => {
     await symlink(affair, join(f.cwd, "b".repeat(32)));
     const bwrap = join(f.cwd, "bwrap");
     await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
-    const provider = createPiProvider({ command: f.command, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, chronaExtension: join(f.cwd, "bridge.ts"), webExtension: "web.ts", agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
+    const provider = createPiProvider({ ...f.options, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, webExtension: join(f.cwd, "web.ts") });
     expect((await provider.start(f.input).done).outcome).toBe("finished");
     const args = JSON.parse(await readFile(join(f.cwd, "bwrap.json"), "utf8"));
     expect(args).toContain("--die-with-parent"); expect(args).toContain("--ro-bind"); expect(args).toContain("--tmpfs"); expect(args).not.toContain("--unshare-net");
@@ -150,6 +160,8 @@ describe("Pi RPC provider", () => {
     expect((await provider.health()).sandboxed).toBe(true);
     const mounts = args.flatMap((arg: string, i: number) => arg === "--bind" || arg === "--ro-bind" ? [{ mode: arg, source: args[i + 1], target: args[i + 2] }] : []);
     expect(mounts).toContainEqual({ mode: rootRun ? "--ro-bind" : "--bind", source: f.cwd, target: f.cwd });
+    expect(mounts).toContainEqual({ mode: "--bind", source: f.agentDir, target: f.agentDir });
+    expect(mounts.some((m: { source: string }) => m.source === join(process.env.HOME!, ".pi"))).toBe(false);
     if (rootRun) {
       expect(mounts).not.toContainEqual({ mode: "--bind", source: f.cwd, target: f.cwd });
       expect(mounts).toContainEqual({ mode: "--bind", source: affair, target: affair });

@@ -64,7 +64,8 @@ data/affairs/<affair-id>/          ← Provider 的工作目录（git 仓库）
 - **后台运行**（调度到点、来源事件、用户编辑）：在该事务目录中工作，必要时 `notify`。
 - 运行中收到新消息：通过 Provider 的机制注入（Pi follow-up 消息；Claude Code 流式输入），不另起运行。
 - 会话：每件事务记录 Provider 会话 id，下次运行优先恢复会话；会话丢失时靠目录内容与动态记录重建上下文。
-- Provider 适配器接口：`start(run)`、`inject(message)`、`stop()`、`health()`；先做 Pi，再做 Claude Code。
+- Provider 适配器接口：`start(run)` 返回 `inject(message)`、`abort()` 与 `done`，另有 `health()`；安全进度、用量、资源与阻塞交互经运行回调交给 Chrona。先做 Pi，再做其他 Provider。
+- 当前 Pi 宿主接线：全局待答复入口、运行绑定/过期/中断失效、安全进度与用量、显式资源清单及可靠停止，见 [Provider 运行说明](provider-runtime.md)。这是转译 Provider 原生协议，不是新的执行/权限引擎；原生交互不授予 Chrona Grant。
 
 ## 6. 数据模型（数据库只存 Provider 做不到的部分）
 
@@ -127,7 +128,7 @@ data/affairs/<affair-id>/          ← Provider 的工作目录（git 仓库）
 | 邮箱 / Telegram 消息处理并汇总推送 | 判断、归类、摘要、起草回复 | 连接器（凭据、增量同步、去重）、入站落成文件、批处理与防抖、AI 写 Chrona 执行的廉价规则、定时汇总、代发需批准、隐私开关 |
 | 10 天备考规划 | 规划、日页面、材料 | 调度、聊天附件进出、“今天做完了”映射到勾选 |
 | 盯服务 / 价格 / 版本 | 写检查脚本、解读变化 | 定时确定性任务（沙箱跑脚本，有变化才叫醒） |
-| 服务器故障诊断 | 自己 SSH、查、提方案 | 审批中继（Provider 运行中的权限确认转给用户，可暂停恢复）— 接 Claude Code 时做 |
+| 服务器故障诊断 | 自己 SSH、查、提方案 | Pi 的受支持 UI 请求可转给用户，受本次运行时限约束；跨日原生权限会话/其他 Provider 中继未完成 |
 | 账单 / 记账 | 识别、记录、汇总 | 附件入站、面板数据文件、到期提醒、隐私与保留期 |
 | 稍后读 | 读、摘要 | 聊天入站链接归档、调度、汇总 |
 | 求职季 | 搜索、文书 | 截止日提醒、日历出口（ICS）— 之后 |
@@ -142,7 +143,7 @@ data/affairs/<affair-id>/          ← Provider 的工作目录（git 仓库）
 做：调度器、触发排队与运行中注入（Pi RPC）、事务目录 + git 历史 + 网页渲染编辑、送达与打扰预算 / 汇总、
 连接器框架 + **邮箱（IMAP 只读同步，SMTP 代发需批准）**、批处理与廉价规则、定时确定性任务、
 Chrona 通道对外动作的审批、聊天附件与引用映射、成本与运行上限。
-暂不做：Claude Code / 第二个 Provider、Provider 权限中继、Telegram、多渠道送达、日历出口、分享。
+暂不做：Claude Code / 第二个 Provider、通用/跨日 Provider 权限会话恢复、Telegram、多渠道送达、日历出口、分享。Pi 的受支持阻塞 UI 请求已有有界桥接，不意味着任意 Provider 的私有权限协议均已接通。
 
 运行环境：Pi 进程整体运行在 bubblewrap 中（事务目录可写、可联网、其余只读）；没有 bwrap 时关闭 bash，只保留文件与网页工具。
 Chino 部署需在包装中加入 bubblewrap 与 git。

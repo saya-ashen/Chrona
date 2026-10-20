@@ -53,13 +53,6 @@ it("keeps an editor draft on a network failure", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.affairFile.error);
   expect(screen.getByRole("textbox")).toHaveValue("Unsaved notes");
 });
-it.each(["photo.png", "document.pdf"])("uses the scoped raw route for %s", path => {
-  const c = client();
-  render(<I18nProvider locale="en" messages={en}><AffairFileView client={c} affairId="camera" path={path} refresh={vi.fn()} /></I18nProvider>);
-  expect(screen.getByRole("link")).toHaveAttribute("href", c.rawUrl("camera", path));
-  if (path.endsWith("png")) expect(screen.getByRole("img")).toHaveAttribute("src", c.rawUrl("camera", path));
-  else expect(screen.queryByRole("img")).not.toBeInTheDocument();
-});
 it("keeps the editor draft, shows both versions after conflict and explicitly retries with the new revision", async () => {
   const c = client();
   const save = vi.spyOn(c, "saveFile").mockRejectedValueOnce(new StewardClientError("requestError", 409)).mockResolvedValue({ ...fileFixture(), content: "My version", revision: "saved" });
@@ -99,6 +92,39 @@ it("renders a markdown panel from its CSV file and posts typed entries", async (
   await userEvent.click(screen.getByRole("button", { name: "Add entry" }));
   await waitFor(() => expect(add).toHaveBeenCalledWith("camera", { dataPath: "weight.csv", values: { day: expect.any(String), kg: 71 } }));
 });
+it("applies refreshed saved content without overwriting an editor draft", async () => {
+  const c = client();
+  const initial = { ...fileFixture(), content: "# Original", revision: "r1" };
+  const renderEditor = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} affairId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
+  const view = render(renderEditor(initial));
+  await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+  await userEvent.clear(screen.getByRole("textbox"));
+  await userEvent.type(screen.getByRole("textbox"), "My unsent draft");
+  view.rerender(renderEditor({ ...initial, content: "# Provider update", revision: "r2" }));
+  expect(screen.getByRole("textbox")).toHaveValue("My unsent draft");
+  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(await screen.findByRole("heading", { name: "Provider update" })).toBeVisible();
+});
+it.each(["save", "checkbox"])("does not revert a successful %s to a refresh received while it was pending", async action => {
+  const c = client();
+  const initial = { ...fileFixture(), content: "- [ ] Practice", revision: "r1" };
+  let finish!: (value: typeof initial) => void;
+  vi.spyOn(c, action === "save" ? "saveFile" : "toggleCheckbox").mockImplementation(() => new Promise<typeof initial>(resolve => { finish = resolve; }));
+  const content = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} affairId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
+  const view = render(content(initial));
+  if (action === "save") {
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.clear(screen.getByRole("textbox"));
+    await userEvent.type(screen.getByRole("textbox"), "My saved version");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  } else await userEvent.click(screen.getByRole("checkbox"));
+  view.rerender(content({ ...initial, content: "- [ ] Practice\nBackground version", revision: "r2" }));
+  finish({ ...initial, content: action === "save" ? "My saved version" : "- [x] Practice", revision: "r3" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Edit" })).toBeEnabled());
+  if (action === "save") expect(screen.getByText("My saved version")).toBeVisible();
+  else expect(screen.getByRole("checkbox")).toBeChecked();
+  expect(screen.queryByText("Background version")).not.toBeInTheDocument();
+});
 it("renders a collapsible tree with README first and no metadata", async () => {
   const nodes = fileTree(["notes/day.md", ".chrona/state.json", "README.md"].map(path => ({ path, kind: "file", size: 0, updatedAt: fixtureTime })));
   render(<MemoryRouter><I18nProvider locale="en" messages={en}><FileTree nodes={nodes} selected="README.md" affairId="camera" /></I18nProvider></MemoryRouter>);
@@ -113,6 +139,11 @@ it("loads the selected page, schedules, approvals and affair status controls", a
     return emptyToday();
   });
   render(<MemoryRouter initialEntries={["/en/affairs/camera?path=notes.txt"]}><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><Routes><Route path="/:lang/affairs/:affairId" element={<AffairDetailPage />} /></Routes></StewardSession></I18nProvider></MemoryRouter>);
-  expect(await screen.findByText("Selected notes")).toBeVisible(); expect(screen.getByText(/Daily at 18:00/)).toBeVisible();
-  expect(screen.getByRole("button", { name: "Allow once" })).toBeVisible(); expect(screen.getByRole("button", { name: "Cancel arrangement" })).toBeVisible(); expect(screen.getByRole("button", { name: "End" })).toBeVisible();
+  expect(await screen.findByText("Selected notes")).toBeVisible();
+  expect(screen.getByRole("link", { name: "Back to home" })).toBeVisible();
+  expect(screen.getByText(/Daily at 18:00/)).not.toBeVisible();
+  expect(screen.getByRole("button", { name: "Allow once" })).toBeVisible();
+  await userEvent.click(screen.getByText(en.steward.affairCenter.secondLevel, { selector: "summary" }));
+  expect(screen.getByText(/Daily at 18:00/)).toBeVisible();
+  expect(screen.getByRole("button", { name: "Cancel arrangement" })).toBeVisible(); expect(screen.getByRole("button", { name: "End" })).toBeVisible();
 });

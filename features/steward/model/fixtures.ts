@@ -1,4 +1,4 @@
-import { affairDetailSchema, affairSchema, approvalSchema, todayViewSchema, chatReplySchema, fileContentSchema, scheduleSchema } from "@chrona/contracts";
+import { affairDetailSchema, affairSchema, approvalSchema, todayViewSchema, chatReplySchema, fileContentSchema, scheduleSchema, runSchema } from "@chrona/contracts";
 
 export const fixtureTime = "2026-10-15T10:42:00+08:00";
 export function affairFixture() {
@@ -12,6 +12,9 @@ export function fileFixture() {
 }
 export function scheduleFixture() {
   return scheduleSchema.parse({ id: "reminder", affairId: "camera", mode: "remind", label: null, rule: { kind: "daily", time: "18:00" }, text: "比较镜头", command: null, until: null, status: "active", nextAt: fixtureTime, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: fixtureTime });
+}
+export function runFixture() {
+  return runSchema.parse({ id: "run-1", affairId: "camera", lane: "background", trigger: "schedule", status: "failed", provider: "fake", toolCalls: [], error: "Internal provider detail", startedAt: fixtureTime, endedAt: fixtureTime, createdAt: fixtureTime, label: "Prepare day two" });
 }
 export function detailFixture() {
   return affairDetailSchema.parse({ entry: "README.md", affair: affairFixture(), files: [{ path: "README.md", kind: "file", size: 50, updatedAt: fixtureTime }], schedules: [scheduleFixture()], approvals: [approvalFixture()], activity: [], runs: [], revisions: [], messages: [] });

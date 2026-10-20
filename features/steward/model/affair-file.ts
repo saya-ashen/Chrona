@@ -55,6 +55,8 @@ export function visiblePath(path: string) {
 export function fileKind(path: string, mime = "") {
   if (/\.md(?:own)?$|\.markdown$/i.test(path)) return "markdown";
   if (/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(path)) return "image";
+  if (/\.(mp3|wav|m4a|ogg|oga|flac|opus)$/i.test(path)) return "audio";
+  if (/\.(mp4|webm|ogv|m4v)$/i.test(path)) return "video";
   if (mime.startsWith("text/") || /\.(txt|csv|tsv|json|jsonl|yaml|yml|toml|ini|xml|log|ts|tsx|js|jsx|css|html|sh|py|rb|rs|go|java|c|h|cpp|sql)$/i.test(path) || /(?:^|\/)(?:Dockerfile|Makefile|LICENSE)$/i.test(path)) return "text";
   return "binary";
 }
@@ -128,16 +130,11 @@ export function panelRows(csv: string, spec: PanelBlock) {
   });
 }
 
-export function localImagePath(source: string, pagePath: string): string | null {
-  if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(source)) return null;
+export function localAffairPath(source: string, pagePath: string): string | null {
+  try { source = decodeURIComponent(source.split(/[?#]/, 1)[0]!); } catch { return null; }
+  if (!source || /^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(source)) return null;
   const parts = pagePath.split("/").slice(0, -1);
   for (const part of source.split("/")) { if (part === "..") { if (!parts.length) return null; parts.pop(); } else if (part !== ".") parts.push(part); }
   const path = parts.join("/");
   return visiblePath(path) ? path : null;
-}
-export function markdownImages(text: string, pagePath: string, rawUrl: (path: string) => string) {
-  return text.replace(/!\[([^\]]*)\]\(([^\s)]+)\)/g, (_match, alt: string, source: string) => {
-    const path = localImagePath(source, pagePath);
-    return path ? `![${alt}](${rawUrl(path)})` : alt;
-  });
 }

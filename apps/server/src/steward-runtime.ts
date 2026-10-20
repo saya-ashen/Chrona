@@ -48,6 +48,9 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
     chronaExtension: chronaExtensionPath(),
     command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
+    agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
+    expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
+    resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
   }) : null) : options.provider;

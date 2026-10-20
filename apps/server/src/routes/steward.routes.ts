@@ -7,8 +7,20 @@ import { declaredPanel } from "./steward-panel";
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 
 export type StewardRoutePorts = StewardPorts;
+type StewardVariables = { Variables: { steward: ReturnType<StewardService["forWorkspace"]> } };
+function providerRoutes(router: Hono<StewardVariables>) {
+  router.get("/provider/runs", async c => c.json({ items: (await c.get("steward").provider.list(z.string().min(1).max(128).optional().parse(c.req.query("affairId")))).map(item => s.providerRunViewSchema.parse(item)) }));
+  router.post("/provider/interactions/:id/answer", async c => c.json(await c.get("steward").provider.answer(c.req.param("id"), s.providerAnswerSchema.parse(await c.req.json()))));
+  router.post("/provider/runs/:id/cancel", async c => c.json(await c.get("steward").provider.cancel(c.req.param("id"))));
+  router.patch("/affairs/:id", async c => {
+    const id = c.req.param("id"), input = s.updateAffairSchema.parse(await c.req.json()), api = c.get("steward");
+    const affair = await api.affairs.update(id, input);
+    if (input.status && input.status !== "active") await api.provider.stopAffair(id);
+    return c.json(affair);
+  });
+}
 export function createStewardRoutes(ports: StewardPorts, service: StewardService = createStewardService(ports), wake: () => void = () => {}) {
-  const router = new Hono<{ Variables: { steward: ReturnType<StewardService["forWorkspace"]> } }>();
+  const router = new Hono<StewardVariables>();
   router.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!isLocalOwnerAuthorized(c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
@@ -30,12 +42,12 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   });
   router.get("/today", async c => c.json(s.todayViewSchema.parse(await c.get("steward").today())));
   router.get("/health", async c => c.json(s.healthSchema.parse(await c.get("steward").health())));
+  providerRoutes(router);
   router.post("/chat", async c => c.json(s.chatReplySchema.parse(await c.get("steward").chat.handleMessage({ channel: "in_app", ...s.chatInputSchema.parse(await c.req.json()) }))));
   router.get("/chat/messages", async c => c.json({ items: await c.get("steward").chat.messages(z.coerce.number().int().min(1).max(100).optional().parse(c.req.query("limit"))) }));
   router.get("/affairs", async c => c.json({ items: await c.get("steward").affairs.list(z.enum(s.AFFAIR_STATUSES).optional().parse(c.req.query("status"))) }));
   router.post("/affairs", async c => c.json(await c.get("steward").affairs.create(s.createAffairSchema.parse(await c.req.json()))));
   router.get("/affairs/:id", async c => c.json(s.affairDetailSchema.parse(await c.get("steward").affairs.detail(c.req.param("id")))));
-  router.patch("/affairs/:id", async c => c.json(await c.get("steward").affairs.update(c.req.param("id"), s.updateAffairSchema.parse(await c.req.json()))));
   router.get("/affairs/:id/file", async c => c.json(await (await c.get("steward").affairs.files(c.req.param("id"))).read(s.affairPathSchema.parse(c.req.query("path")))));
   router.put("/affairs/:id/file", async c => {
     const input = s.saveFileSchema.parse(await c.req.json());

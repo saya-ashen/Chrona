@@ -20,6 +20,19 @@ export function stewardError(error: unknown): StewardClientError {
   return new StewardClientError(status === 401 ? "unauthorized" : status ? "requestError" : "networkError", status, detail);
 }
 
+async function rawAffairFile(workspaceId: string, affairId: string, path: string, signal?: AbortSignal): Promise<Blob> {
+  if (!c.affairPathSchema.safeParse(path).success) throw new StewardClientError("invalidInput");
+  const url = `${c.STEWARD_API_BASE}/affairs/${encodeURIComponent(affairId)}/raw?${new URLSearchParams({ workspaceId, path })}`;
+  let response: Response;
+  try { response = await fetch(url, { headers: buildAccessKeyHeaders(), signal, redirect: "error" }); }
+  catch (error) { if (signal?.aborted) throw error; throw stewardError(error); }
+  if (!response.ok) {
+    handleUnauthorizedResponse(response);
+    throw new StewardClientError(response.status === 401 ? "unauthorized" : "requestError", response.status);
+  }
+  return response.blob();
+}
+
 /** Auth remains in apiJson; every route has an explicit, encoded workspace scope. */
 export function createStewardClient(workspaceId: string) {
   async function request<S extends z.ZodType>(path: string, schema: S, options: { method?: string; body?: unknown; query?: Record<string, string | undefined>; signal?: AbortSignal } = {}): Promise<z.output<S>> {
@@ -50,6 +63,9 @@ export function createStewardClient(workspaceId: string) {
     uiEvent: (affairId: string, input: z.input<typeof c.uiEventSchema>) => mutate(`/affairs/${id(affairId)}/ui-event`, c.uiEventSchema, z.object({ ok: z.literal(true) }).strict(), input),
     today: (signal?: AbortSignal) => request("/today", c.todayViewSchema, { signal }),
     health: (signal?: AbortSignal) => request("/health", c.healthSchema, { signal }),
+    providerRuns: (affairId?: string, signal?: AbortSignal) => request("/provider/runs", list(c.providerRunViewSchema), { query: { affairId }, signal }),
+    answerProvider: (requestId: string, input: c.ProviderAnswer) => mutate(`/provider/interactions/${id(requestId)}/answer`, c.providerAnswerSchema, z.object({ ok: z.literal(true) }).strict(), input),
+    cancelProviderRun: (runId: string) => request(`/provider/runs/${id(runId)}/cancel`, z.object({ ok: z.literal(true) }).strict(), { method: "POST" }),
     chat: (input: z.input<typeof c.chatInputSchema>) => mutate("/chat", c.chatInputSchema, c.chatReplySchema, input),
     chatMessages: (limit?: number, signal?: AbortSignal) => request("/chat/messages", list(c.messageSchema), { query: { limit: limit?.toString() }, signal }),
     affairs: (status?: c.AffairStatus, signal?: AbortSignal) => request("/affairs", list(c.affairSchema), { query: { status }, signal }),
@@ -76,7 +92,7 @@ export function createStewardClient(workspaceId: string) {
       if (!parsed.success) throw new StewardClientError("invalidResponse");
       return parsed.data;
     },
-    rawUrl: (affairId: string, path: string) => `${c.STEWARD_API_BASE}/affairs/${id(affairId)}/raw?${new URLSearchParams({ workspaceId, path })}`,
+    raw: (affairId: string, path: string, signal?: AbortSignal) => rawAffairFile(workspaceId, affairId, path, signal),
     saveFile: (affairId: string, input: z.input<typeof c.saveFileSchema>) => mutate(`/affairs/${id(affairId)}/file`, c.saveFileSchema, c.fileContentSchema, input, "PUT"),
     toggleCheckbox: (affairId: string, input: z.input<typeof c.toggleCheckboxSchema>) => mutate(`/affairs/${id(affairId)}/checkbox`, c.toggleCheckboxSchema, c.fileContentSchema, input),
     addPanelEntry: (affairId: string, input: z.input<typeof c.panelEntrySchema>) => mutate(`/affairs/${id(affairId)}/panel-entry`, c.panelEntrySchema, c.fileContentSchema, input),

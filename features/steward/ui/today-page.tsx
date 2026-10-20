@@ -10,6 +10,7 @@ import { useStewardSession } from "../hooks/use-steward-session";
 import { pageHref, workspaceHealthy } from "../model/workspace";
 import { affairOverview, plainSummary, todaySummary, todayDetail, progressPill, progressPillClass, progressDetail } from "../model/affair-overview";
 import { formatShortDateTime } from "../model/format";
+import { ProviderWork } from "./provider-work";
 
 function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
   const { messages, locale } = useI18n();
@@ -26,7 +27,7 @@ function ProgressItem({ item }: { item: TodayView["progress"][number] }) {
       {pill && <Badge role={affair.work ? "status" : undefined} variant="secondary" className={`rounded-full border-0 px-2 py-px text-xs ${progressPillClass(affair)}`}>{pill}</Badge>}
       <time className="ml-auto text-xs text-muted-foreground tabular-nums" dateTime={affair.lastActivityAt}>{model.updatedAt}</time>
     </div>
-    {item.card ? <GeneratedPage spec={item.card} client={today.client} affairId={affair.id} readOnly={affair.status === "done"} refresh={today.refresh} /> : <>
+    {item.card ? <GeneratedPage spec={item.card} client={today.client} affairId={affair.id} readOnly={affair.status === "done"} refreshVersion={affair.lastActivityAt} refresh={today.refresh} /> : <>
     {newest ? <><p className="font-medium">{plainSummary(newest.title)}</p><p className="line-clamp-3 max-w-[72ch] text-[13px] text-muted-foreground">{plainSummary(newest.body)}</p></> : <p className="line-clamp-3 text-[13px] text-muted-foreground">{model.summary}</p>}
     {(item.changedPages > 0 || model.next) && <p className="text-xs text-muted-foreground">{progressDetail(item.changedPages, model.next, copy.pages)}</p>}
     {older.length > 0 && <details className="text-[13px] text-muted-foreground"><summary className="cursor-pointer">{copy.earlier}</summary><div className="grid gap-3 pt-2">{older.map((update, index) => <div key={`${update.at}-${index}`}><p className="font-medium">{plainSummary(update.title)}</p><p>{plainSummary(update.body)}</p><time className="text-xs" dateTime={update.at}>{formatShortDateTime(update.at, locale)}</time></div>)}</div></details>}
@@ -47,6 +48,7 @@ export function TodayPage() {
     </header>
     <ResourceStatus resource={resource} />
     {view && <>
+      <ProviderWork client={resource.client} mode="summary" onChange={resource.refresh} />
       {view.approvals.length > 0 && <Section title={foundation.decisions} count={view.approvals.length}><Surface className="overflow-hidden">{view.approvals.map(approval => <ApprovalItem key={approval.id} approval={approval} client={resource.client} refresh={resource.refresh} />)}</Surface></Section>}
       {(view.progress.length > 0 || view.upcoming.length > 0) && <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] items-start gap-7">
         {view.progress.length > 0 && <Section title={overview.progress} count={view.progress.length}><Surface>{view.progress.map(item => <ProgressItem key={item.affair.id} item={item} />)}</Surface></Section>}

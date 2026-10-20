@@ -8,6 +8,8 @@
  * An affair is a git-versioned directory of Markdown files that the Provider organizes freely.
  */
 import { z } from "zod";
+import type { ProviderEvents } from "./provider";
+export * from "./provider";
 
 const id = z.string().trim().min(1).max(128);
 const iso = z.string().datetime({ offset: true }).max(40);
@@ -291,6 +293,9 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /settings | PATCH ; GET /grants | POST ; POST /grants/:id/revoke ; GET /preferences | POST | DELETE /preferences/:id
  *   GET  /notifications ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
+ *   GET  /provider/runs?affairId=                 -> {items: ProviderRunView[]} (recent runs, owner-scoped)
+ *   POST /provider/interactions/:id/answer        -> {ok: true} (ProviderAnswer, no grants/replay)
+ *   POST /provider/runs/:id/cancel                -> {ok: true} (no automatic retry)
  *   GET  /health
  */
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
@@ -351,6 +356,8 @@ export type DeliveryAdapter = { channel: DeliveryChannel; send(message: Delivery
 export type ProviderRunInput = {
   runId: string; token: string; lane: RunLane; cwd: string; sessionDir: string; sessionId: string | null;
   prompt: string; images?: { mime: string; base64: string }[]; deadline: Date;
+  /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
+  events?: ProviderEvents;
 };
 export type ProviderAdapter = {
   name: string;

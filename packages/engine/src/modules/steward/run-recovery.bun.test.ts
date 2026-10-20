@@ -6,6 +6,7 @@ import { testDb } from "./test-db";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { liveRuns } from "./runs";
+import type { ProviderRunInput } from "@chrona/contracts/steward";
 
 let db: ReturnType<typeof testDb>, ports: StewardPorts, service: ReturnType<typeof createStewardService>;
 let workspaceId: string, time: Date, sent: string[];
@@ -52,6 +53,30 @@ for (const outcome of ["failed", "unavailable", "timed_out", "lease"] as const) 
     });
   }
 }
+
+test("deadline continuation rebuilds recent persisted input after the Provider queue is cleared", async () => {
+  const affair = await api().affairs.create({ title: "Study" }), run = await start(affair.id);
+  const latest = "Use four hours, not five";
+  time = new Date(time.getTime() + 1000);
+  const message = await db.message.create({ data: { workspaceId, affairId: affair.id, conversationKey, channel: "in_app", direction: "in", text: latest, at: time } });
+  const volatileQueue = [latest];
+  liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { volatileQueue.length = 0; } });
+  time = run.deadlineAt;
+  await api().runs.expireLeases();
+  expect(volatileQueue).toEqual([]);
+  expect((await db.message.findUniqueOrThrow({ where: { id: message.id } })).text).toBe(latest);
+  const inputs: ProviderRunInput[] = [];
+  ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start: input => {
+    inputs.push(input);
+    return { done: new Promise(() => {}), inject: async () => {}, abort: async () => {} };
+  } };
+  expect((await service.tick()).failures).toEqual([]);
+  expect(inputs).toHaveLength(1);
+  expect(inputs[0]!.lane).toBe("background");
+  const context = JSON.parse(inputs[0]!.prompt.split("Context (data):\n")[1]!.split("\n\nTrigger:")[0]!);
+  expect(context.messages.map((entry: { text: string }) => entry.text)).toEqual(expect.arrayContaining(["Original request", latest]));
+  expect(inputs[0]!.prompt).toEndWith("Original request");
+});
 
 test("root provider failure also preserves conversation and prompt", async () => {
   const run = await start();

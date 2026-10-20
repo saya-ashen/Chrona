@@ -11,6 +11,7 @@ import { notificationSettings } from "./settings";
 import { enqueueNotification } from "./notify";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
+import { providerCancelKey } from "./provider-journal";
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
@@ -30,7 +31,7 @@ export async function canDescribeInactiveAffair(tx: Prisma.TransactionClient, ru
 }
 export async function authenticateRun(tx: Prisma.TransactionClient, token: string, now: Date, tool?: string) {
   const row = await tx.run.findUnique({ where: { tokenHash: hash(token) }, include: { affair: true } });
-  if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now) throw new StewardError("forbidden", "Run capability is no longer valid");
+  if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now || await tx.audit.findUnique({ where: { id: providerCancelKey(row.id) } })) throw new StewardError("forbidden", "Run capability is no longer valid");
   if (row.affair && row.affair.status !== "active" && !await canDescribeInactiveAffair(tx, row, row.affair.id, tool)) throw new StewardError("forbidden", "Affair is not active");
   const { affair, ...run } = row;
   return { run, affair, workspaceId: row.workspaceId };
@@ -38,6 +39,7 @@ export async function authenticateRun(tx: Prisma.TransactionClient, token: strin
 export type EnqueueRun = { affairId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; conversationKey?: string; label?: string | null };
 type RunWithAffair = Prisma.RunGetPayload<{ include: { affair: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
+function runExpired(run: RunWithAffair, now: Date) { return !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now)); }
 
 export function createRuns(ports: StewardPorts, workspaceId: string) {
   const runs = new RunService(ports, workspaceId);
@@ -61,7 +63,7 @@ class RunService {
   }
   private async deferIneligibleRun(tx: Prisma.TransactionClient, run: RunWithAffair, now: Date, timezone: string) {
     const { workspaceId } = this;
-    if (run.affair && run.affair.status !== "active") {
+    if (run.affair && run.affair.status !== "active" || await tx.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) {
       await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } });
       return true;
     }
@@ -91,16 +93,24 @@ class RunService {
     }
     return null;
   }
+  private async applyCancellation(tx: Prisma.TransactionClient, runId: string, result: ReturnType<RunService["finishState"]>) {
+    // Owner intent can arrive while git or delivery-state lookup is awaited.
+    if (!await tx.audit.findUnique({ where: { id: providerCancelKey(runId) } })) return;
+    result.status = "cancelled"; result.foregroundDeadline = false;
+    if (result.error !== "Could not commit affair changes") result.error = "Cancelled by owner";
+  }
   async finish(runId: string, outcome: RunOutcome) {
     const { ports, workspaceId } = this, { db } = ports;
     const now = ports.now(), run = await db.run.findFirst({ where: { id: runId, workspaceId }, include: { affair: true } });
     if (!run) throw new StewardError("not_found", "Run not found");
     if (run.status !== "running") return;
-    const result = this.finishState(run, outcome, now);
+    const cancelled = !!await db.audit.findUnique({ where: { id: providerCancelKey(run.id) } });
+    const result = this.finishState(run, outcome, now, cancelled);
     const changes = await this.commitChanges(run, result);
-    const { status, error, foregroundDeadline } = result;
     const chatBound = ports.chat ? await ports.chat.bound() : false;
     const finalized = await db.$transaction(async tx => {
+      await this.applyCancellation(tx, run.id, result);
+      const { status, error, foregroundDeadline } = result;
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return null;
       let deadlineMessage = null;
       await this.recordChanges(tx, run, changes, { now, status, sessionId: outcome.sessionId });
@@ -113,6 +123,7 @@ class RunService {
       } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
         // Retry identity is immutable; the attempt status already records why it retried.
         const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+        await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
         const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
         if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
       }
@@ -143,10 +154,11 @@ class RunService {
     }
     return rows.length;
   }
-  private finishState(run: RunWithAffair, outcome: RunOutcome, now: Date) {
+  private finishState(run: RunWithAffair, outcome: RunOutcome, now: Date, cancelled = false) {
     // An abort can settle the provider promise before expireLeases calls finish.
     // Persist the timeout rather than misclassifying that race as provider failure.
-    const expired = (run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now);
+    if (cancelled) return { error: "Cancelled by owner", status: "cancelled", foregroundDeadline: false };
+    const expired = runExpired(run, now);
     const error = expired ? "Run lease expired" : outcome.error;
     const status = expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
     const foregroundDeadline = run.lane === "foreground" && status === "timed_out" &&
@@ -202,7 +214,10 @@ class RunService {
   private async continueAfterDeadline(tx: Prisma.TransactionClient, run: RunWithAffair, now: Date) {
     const { workspaceId } = this;
     const affair = await this.deadlineAffair(tx, run);
-    if (affair) await this.enqueue({ affairId: affair.id, conversationKey: run.conversationKey ?? undefined, lane: "background", trigger: run.trigger as RunTrigger, prompt: run.prompt }, tx);
+    if (affair) {
+      const continuation = await this.enqueue({ affairId: affair.id, conversationKey: run.conversationKey ?? undefined, lane: "background", trigger: run.trigger as RunTrigger, prompt: run.prompt }, tx);
+      await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: continuation.id } });
+    }
     const replied = await tx.audit.findFirst({ where: { workspaceId, kind: "run_reply", subjectId: run.id } });
     const conversation = !replied && run.conversationKey ? await tx.message.findFirst({ where: { workspaceId, conversationKey: run.conversationKey }, orderBy: { at: "desc" } }) : null;
     if (!conversation) return null;
