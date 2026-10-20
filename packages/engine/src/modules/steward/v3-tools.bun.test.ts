@@ -159,6 +159,16 @@ test("reply stores outbound and delivers; preferences and inbound are workspace 
   expect(await call("chrona_inbound")).toEqual([]);
   await expect(call("chrona_inbound", { connectorId: "other" })).rejects.toMatchObject({ code: "not_found" });
 });
+test("chrona_schedule_cancel cannot cancel a module schedule", async () => {
+  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Module affair" });
+  await db.run.update({ where: { id: runId }, data: { affairId: affair.id } });
+  const module = await db.module.create({ data: { workspaceId, affairId: affair.id, name: "watch", activeHash: "a".repeat(64) } });
+  const schedule = await db.schedule.create({ data: { workspaceId, affairId: affair.id, moduleId: module.id, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "watch", createdBy: "chrona", nextAt: new Date("2030-01-01Z") } });
+  await expect(call("chrona_schedule_cancel", { scheduleId: schedule.id })).rejects.toMatchObject({ code: "conflict" });
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toEqual(schedule);
+  expect((await db.module.findUniqueOrThrow({ where: { id: module.id } })).status).toBe("active");
+});
+
 test("root schedules require an affair, then resolve conversation focus", async () => {
   await expect(call("chrona_schedules")).rejects.toThrow("chrona_affair_create / chrona_focus");
   await expect(call("chrona_schedule", { mode: "wake", label: "Review", rule: { kind: "every", minutes: 5 }, text: "review" })).rejects.toThrow("then pass affairId");

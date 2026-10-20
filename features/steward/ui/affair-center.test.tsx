@@ -75,6 +75,14 @@ it("keeps wake instructions only in collapsed technical details", async () => {
   await userEvent.click(screen.getByText(/^Technical details:/, { selector: "summary" }));
   expect(screen.getByText("chrona_notify level now internal instruction")).toBeVisible();
 });
+it.each(["active", "paused"] as const)("hides module schedule controls when %s", status => {
+  const detail = detailFixture(); detail.affair.status = "done";
+  detail.schedules[0] = { ...detail.schedules[0]!, mode: "module", status, label: "Price watcher" };
+  setup(detail);
+  expect(screen.getByText("Price watcher", { selector: "p" })).toBeVisible();
+  for (const name of ["Pause", "Resume", "Cancel schedule"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+});
+
 it.each(["done", "cancelled"] as const)("collapses %s arrangements", async status => {
   const detail = detailFixture(); detail.schedules[0]!.status = status; detail.schedules[0]!.label = "Old arrangement";
   setup(detail);

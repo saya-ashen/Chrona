@@ -39,6 +39,14 @@ it.each(["active", "paused"] as const)("changes schedule status from %s", async 
   await userEvent.click(screen.getByRole("button", { name: "Cancel schedule" }));
   expect(updateSchedule).toHaveBeenLastCalledWith("reminder", { status: "cancelled" });
 });
+it.each(["active", "paused"] as const)("hides module schedule controls when %s", status => {
+  const detail = detailFixture(); detail.affair.status = "done";
+  detail.schedules[0] = { ...detail.schedules[0]!, mode: "module", status, label: "Price watcher" };
+  sidebar(detail);
+  expect(screen.getByText(detail.schedules[0]!.text)).toBeVisible();
+  for (const name of ["Pause", "Resume", "Cancel schedule"]) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+});
+
 it("renders done, empty schedules and activity without obsolete controls", () => {
   const detail = detailFixture(); detail.affair.status = "done"; detail.schedules = []; detail.approvals = [];
   sidebar(detail);

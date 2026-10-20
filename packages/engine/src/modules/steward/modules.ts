@@ -20,6 +20,24 @@ type TestReport = { stdout: string; stderr: string; exitCode: number }[];
 type Proposal = { moduleId: string | null; hash: string; status: "rejected" | "pending_review" | "approved"; approvalId?: string; report: TestReport };
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 
+// Bound LCS work for large/generated files; a full replacement is still a valid line diff.
+function lineDiff(before: string, after: string): string[] {
+  const a = before ? before.split("\n") : [], b = after ? after.split("\n") : [];
+  if ((a.length + 1) * (b.length + 1) > 1_000_000) return [...a.map(line => `- ${line}`), ...b.map(line => `+ ${line}`)];
+  const width = b.length + 1, lcs = new Uint32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) {
+    lcs[i * width + j] = a[i] === b[j] ? 1 + lcs[(i + 1) * width + j + 1]! : Math.max(lcs[(i + 1) * width + j]!, lcs[i * width + j + 1]!);
+  }
+  const lines: string[] = [];
+  let i = 0, j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) { lines.push(`  ${a[i]}`); i++; j++; }
+    else if (i < a.length && (j === b.length || lcs[(i + 1) * width + j]! >= lcs[i * width + j + 1]!)) lines.push(`- ${a[i++]}`);
+    else lines.push(`+ ${b[j++]}`);
+  }
+  return lines;
+}
+
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, fs = createWorkspaceFs(ports.dataDir);
   const platform = join(ports.dataDir, "platform"), store = join(platform, "store");
@@ -104,12 +122,44 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
       const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
       const results = report.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
-      const preview = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n${diff}\n意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+      const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n${diff}\n`;
+      const suffix = `意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+      let preview = prefix + suffix;
       // The existing approval contract caps previews at 20,000 characters. Fail closed
       // rather than silently hiding part of the manifest or intent being approved.
       if (preview.length > 20_000) {
         await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected" } });
         return { moduleId: module.id, hash, status: "rejected", report };
+      }
+      const previous = new Map<string, Buffer>();
+      async function readActive(relative: string): Promise<void> {
+        for (const entry of await readdir(join(store, module.activeHash!, relative), { withFileTypes: true })) {
+          const path = relative ? `${relative}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) await readActive(path);
+          else if (entry.isFile()) previous.set(path, await readFile(join(store, module.activeHash!, path)));
+          else throw new StewardError("forbidden", "Unsafe module store file");
+        }
+      }
+      if (module.activeHash) await readActive("");
+      const proposed = new Map(files.map(file => [file.path, Buffer.from(file.bytes)]));
+      const code: string[] = ["代码差异："], unchanged: string[] = [];
+      for (const path of [...new Set([...previous.keys(), ...proposed.keys()])].sort()) {
+        const before = previous.get(path), after = proposed.get(path);
+        if (before && after && before.equals(after)) { unchanged.push(path); continue; }
+        code.push(`=== ${path} (${!before ? "added" : !after ? "removed" : "changed"}) ===`);
+        for (const line of lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? "")) code.push(line);
+      }
+      if (unchanged.length) code.push("未变化:", ...unchanged);
+      const codeDiff = code.join("\n") + "\n", available = 20_000 - preview.length;
+      if (codeDiff.length <= available) preview = prefix + codeDiff + suffix;
+      else {
+        const marker = `…代码差异过长，已截断；完整代码可用 chrona_module_checkout 检出 hash ${hash}`;
+        // Leave the mandatory review text intact, even when it leaves no room for the marker.
+        if (available < marker.length + 2) {
+          await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected" } });
+          return { moduleId: module.id, hash, status: "rejected", report };
+        }
+        preview = prefix + codeDiff.slice(0, available - marker.length - 2) + "\n" + suffix + "\n" + marker;
       }
       const open = await db.approval.findMany({ where: { workspaceId, action: "activate_module", status: "open" } });
       const ids = open.filter(row => { const payload = row.payload; return payload && typeof payload === "object" && !Array.isArray(payload) && payload.moduleId === module.id; }).map(row => row.id);

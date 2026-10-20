@@ -79,7 +79,7 @@ function Arrangement({ schedule, client, refresh }: { schedule: Schedule; client
     <p className="font-medium">{scheduleLabel(schedule, messages.steward.affairCenter.followUp)}</p>
     <p>{schedule.rule.kind === "at" ? <time dateTime={schedule.rule.at}>{formatShortDateTime(schedule.rule.at, locale)}</time> : <>{scheduleDescription(schedule.rule, locale, messages.steward.workspace)}{schedule.nextAt && <> · {messages.steward.affairCenter.nextAt} <time dateTime={schedule.nextAt}>{formatShortDateTime(schedule.nextAt, locale)}</time></>}</>}</p>
     {schedule.status === "paused" && <p>{c.paused}</p>}
-    <div className="-ml-2 flex flex-wrap gap-1"><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: schedule.status === "active" ? "paused" : "active" }))}>{schedule.status === "active" ? c.pause : c.resume}</Button><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: "cancelled" }))}>{messages.steward.affairCenter.cancelSchedule}</Button></div>
+    {schedule.mode !== "module" && <div className="-ml-2 flex flex-wrap gap-1"><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: schedule.status === "active" ? "paused" : "active" }))}>{schedule.status === "active" ? c.pause : c.resume}</Button><Button variant="ghost" size="sm" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: "cancelled" }))}>{messages.steward.affairCenter.cancelSchedule}</Button></div>}
     <MutationStatus mutation={mutation} />
   </div>;
 }

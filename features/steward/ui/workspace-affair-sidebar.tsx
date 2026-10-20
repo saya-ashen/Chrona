@@ -50,7 +50,7 @@ function ScheduleItem({ schedule, client, refresh }: { schedule: Schedule; clien
   return <Surface><div className="grid gap-2 p-3">
     <p>{w[schedule.mode]} · {scheduleDescription(schedule.rule, locale, w)}</p><p>{schedule.text}</p><p>{c[schedule.status]}</p>
     {schedule.nextAt && <p>{w.next}: <time dateTime={schedule.nextAt}>{new Date(schedule.nextAt).toLocaleString(locale)}</time></p>}
-    {(schedule.status === "active" || schedule.status === "paused") && <div className="flex flex-wrap gap-2">
+    {schedule.mode !== "module" && (schedule.status === "active" || schedule.status === "paused") && <div className="flex flex-wrap gap-2">
       <Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: schedule.status === "active" ? "paused" : "active" }))}>{schedule.status === "active" ? c.pause : c.resume}</Button>
       <Button variant="outline" disabled={mutation.pending} onClick={() => void mutation.run(() => client.updateSchedule(schedule.id, { status: "cancelled" }))}>{c.cancelSchedule}</Button>
     </div>}

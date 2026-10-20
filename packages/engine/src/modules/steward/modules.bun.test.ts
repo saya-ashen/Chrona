@@ -93,6 +93,49 @@ test("approval switches schedules atomically, proposals keep old schedules, roll
   expect(await f.db.audit.count({ where: { kind: "module_rollback" } })).toBe(1);
 });
 
+test.each(["paused", "cancelled", "active"] as const)("module schedule rejects direct status update to %s", async status => {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  const old = await f.db.schedule.findFirstOrThrow({ where: { status: "active" } });
+  await expect(f.service.schedules.update(old.id, { status })).rejects.toMatchObject({ code: "conflict", message: "Module schedules change only through module activation or rollback; the active version keeps running until a new version is approved" });
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: old.id } })).toEqual(old);
+  expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
+});
+
+test("code-only proposals preview sorted added, removed and changed files and name unchanged files", async () => {
+  const f = await fixture();
+  await writeFile(join(f.dir, "removed.ts"), "old helper");
+  const first = await f.propose(); await f.approve(first.approvalId!);
+  await rm(join(f.dir, "removed.ts"));
+  await writeFile(join(f.dir, "added.ts"), "new helper");
+  await writeFile(join(f.dir, "index.ts"), "console.log(2)");
+  const second = await f.propose();
+  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: second.approvalId! } });
+  expect(preview).toContain("=== added.ts (added) ===\n+ new helper");
+  expect(preview).toContain("=== index.ts (changed) ===\n- console.log(1)\n+ console.log(2)");
+  expect(preview).toContain("=== removed.ts (removed) ===\n- old helper");
+  expect(preview.indexOf("=== added.ts")).toBeLessThan(preview.indexOf("=== index.ts"));
+  expect(preview.indexOf("=== index.ts")).toBeLessThan(preview.indexOf("=== removed.ts"));
+  expect(preview).toContain("未变化:\nmodule.json\ntest.ts");
+  expect(preview).not.toContain("=== module.json");
+});
+
+test("huge code diff truncates with checkout hash while manifest and intent stay complete", async () => {
+  const f = await fixture(), first = await f.propose(); await f.approve(first.approvalId!);
+  await writeFile(join(f.dir, "index.ts"), "new line\n".repeat(20_000));
+  const second = await f.propose();
+  expect(second.status).toBe("pending_review");
+  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: second.approvalId! } });
+  expect(preview.length).toBeLessThanOrEqual(20_000);
+  expect(preview).toContain("=== index.ts (changed) ===");
+  expect(preview).toContain(`意图：${JSON.stringify(intent)}`);
+  const manifest = (await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.moduleId!, hash: first.hash } } })).manifest;
+  for (const line of JSON.stringify(manifest, null, 2).split("\n")) {
+    expect(preview).toContain(`- ${line}`); expect(preview).toContain(`+ ${line}`);
+  }
+  expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 chrona_module_checkout 检出 hash ${second.hash}`)).toBe(true);
+});
+
 test("hash follows sorted path-NUL-content-NUL; identical content reuses approved version without approval", async () => {
   const f = await fixture(), first = await f.propose();
   const digest = createHash("sha256");

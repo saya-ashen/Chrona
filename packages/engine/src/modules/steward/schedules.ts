@@ -44,6 +44,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     return db.$transaction(async tx => {
       const row = await tx.schedule.findFirst({ where: { id, workspaceId } });
       if (!row) throw new StewardError("not_found", "Schedule not found");
+      if (row.mode === "module") throw new StewardError("conflict", "Module schedules change only through module activation or rollback; the active version keeps running until a new version is approved");
       const affair = await requireAffair(tx, workspaceId, row.affairId);
       if (input.status === "active" && affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
       let nextAt = row.nextAt;
