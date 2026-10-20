@@ -1,6 +1,6 @@
 # P2 规格：模块数据与连续性
 
-状态：已实现（2026-10-20，未提交）。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §4.3、§4.5、P2；P1 契约见 [platform-p1-spec](platform-p1-spec.md)。
+状态：已实现（2026-10-20）。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §4.3、§4.5、P2；P1 契约见 [platform-p1-spec](platform-p1-spec.md)。
 本文件是 P2 的契约；实现与本文冲突时以本文为准，需要改契约先改本文。
 
 ## 1. 范围
