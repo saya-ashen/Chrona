@@ -1,6 +1,6 @@
 # P4 规格：入站触发与模块工具
 
-状态：2026-10-21 主管定稿，供实现任务使用。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §3.1、P4；前置契约见 [P1](platform-p1-spec.md)、[P2](platform-p2-spec.md)、[P3](platform-p3-spec.md)。
+状态：已实现（2026-10-21）。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §3.1、P4；前置契约见 [P1](platform-p1-spec.md)、[P2](platform-p2-spec.md)、[P3](platform-p3-spec.md)。
 本文件是 P4 的契约；实现与本文冲突时以本文为准，需要改契约先改本文。
 
 ## 1. 范围
