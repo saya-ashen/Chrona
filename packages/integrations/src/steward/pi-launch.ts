@@ -93,7 +93,7 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   if (config.web) args.push("-e", config.web);
   for (const extension of config.resources.extensions) args.push("-e", extension);
   for (const skill of config.resources.skills) args.push("--skill", skill);
-  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", ...(config.bwrap ? ["bash"] : []), ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
+  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", ...(config.bwrap ? ["bash"] : []), ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name))])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
   if (config.options.model) args.push("--model", config.options.model);
   if (!config.bwrap) return args;
   const cwd = resolve(input.cwd);

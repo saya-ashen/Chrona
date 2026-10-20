@@ -416,6 +416,8 @@ export type DeliveryAdapter = { channel: DeliveryChannel; send(message: Delivery
 export type ProviderRunInput = {
   runId: string; token: string; lane: RunLane; cwd: string; sessionDir: string; sessionId: string | null;
   prompt: string; images?: { mime: string; base64: string }[]; deadline: Date;
+  /** Module tool names (m_*) exposed by this run's catalog; Providers with tool allowlists must admit them. */
+  extraTools?: string[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;
 };

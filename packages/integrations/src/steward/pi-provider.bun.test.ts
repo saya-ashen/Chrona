@@ -82,7 +82,8 @@ describe("Pi RPC provider", () => {
     const before = process.env.CHRONA_DATABASE_SECRET;
     process.env.CHRONA_DATABASE_SECRET = "must-not-leak";
     try {
-      const handle = f.provider.start({ ...f.input, images: [{ mime: "image/png", base64: "YWJj" }] });
+      // Module tools must survive Pi's --tools allowlist; malformed names never reach the argument list.
+      const handle = f.provider.start({ ...f.input, images: [{ mime: "image/png", base64: "YWJj" }], extraTools: ["m_ledger_add_expense", "read,bash", "m_Bad"] });
       expect(await handle.done).toEqual({ outcome: "finished", sessionId: "retained-session", error: null });
       const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
       expect(launch.cwd).toBe(f.cwd);
@@ -91,6 +92,7 @@ describe("Pi RPC provider", () => {
       expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
       const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
       expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).not.toContain("bash"); expect(tools).not.toContain("web_search");
+      expect(tools).toContain("m_ledger_add_expense"); expect(tools).not.toContain("m_Bad");
       expect((await f.commands()).find(c => c.type === "prompt").images).toEqual([{ type: "image", mimeType: "image/png", data: "YWJj" }]);
       expect(await f.provider.health()).toEqual({ available: true, sandboxed: false, error: null });
     } finally { if (before === undefined) delete process.env.CHRONA_DATABASE_SECRET; else process.env.CHRONA_DATABASE_SECRET = before; }
