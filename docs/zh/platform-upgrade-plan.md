@@ -1,6 +1,6 @@
 # Chrona 升级为可自生长平台：改造方案
 
-状态：2026-10-20 草案，待用户审阅。未开始实现。
+状态：P0、P1、P2 已实现；P3 起未开始。
 范式来源：`~/workspace/agent-growth-lab/docs/self-modification-paradigm.md`（下称"范式"）。
 用户已确认：本方案以当前需求为准，旧 AGENTS.md / steward 文档中与之冲突的约束（删除 ManagedTool、沙箱只用于旧脚本调度、不给 Provider 提供工具等）可以修改。
 
@@ -206,7 +206,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 每一阶段结束时，Chrona 都应完整可用。
 
-### P0 安全修补（不依赖范式，可立即做）
+### P0 安全修补（已完成；见 [端到端记录](platform-e2e-2026-10-20.md)）
 
 - Pi 的 bwrap：不再 `--ro-bind / /`，改为只读挂载运行所需路径（/nix/store、Pi 安装与配置目录），显式排除 `<dataDir>`，只绑定事务与会话目录。
 - 旧脚本调度沙箱同样屏蔽 `<dataDir>` 与用户主目录。暂时保留联网：原价格/服务检查脚本依赖网络，按策略控制网络放到 P1。
@@ -214,7 +214,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 **验收**：在 Pi 运行和脚本沙箱中尝试读取 `<dataDir>/secrets` 与数据库失败；事务目录仍可写；现有测试通过。
 
-### P1 模块与网关最小闭环
+### P1 模块与网关最小闭环（已完成；见 [P1 规格](platform-p1-spec.md) 与 [端到端记录](platform-e2e-2026-10-20.md)）
 
 - `Module` / `ModuleVersion` / `Generation` / `ModuleRun` / `ModuleEffect`。
 - `chrona_propose`（仅完整提案）、build、verify（清单 + 测试）、审查卡片、启用、回滚（仅代码）。
@@ -224,7 +224,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 **验收**：在 QQ 里说"每天 10 点看一下 X 价格，低于 2100 告诉我" → Pi 提交模块 → 网页审查并批准 → 到点由模块直接通知，**该次触发没有 Provider 运行** → 修改阈值产生新版本 → 回滚到上一版本后行为恢复。
 
-### P2 数据与连续性
+### P2 数据与连续性（已完成；见 [P2 规格](platform-p2-spec.md)）
 
 - 模块数据目录、schema 版本、迁移在副本上执行、反向迁移与回滚规则（§4.5）。
 - 连续性检查。

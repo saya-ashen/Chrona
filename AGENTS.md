@@ -10,7 +10,7 @@ picks a suitable way to get them done, keeps looking after them, and reports bac
 
 - Goals (highest authority): [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md).
 - Current architecture, model and pages: [`docs/zh/steward-workspace.md`](docs/zh/steward-workspace.md).
-- Module platform: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and [`docs/zh/platform-p1-spec.md`](docs/zh/platform-p1-spec.md).
+- Module platform: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md), [`docs/zh/platform-p1-spec.md`](docs/zh/platform-p1-spec.md) and [`docs/zh/platform-p2-spec.md`](docs/zh/platform-p2-spec.md).
 - Historical purge record only: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
@@ -24,7 +24,7 @@ Rules that follow from the goals:
   connectors/credentials, approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module (`module.json` + entry + tests) submitted via `chrona_propose`,
   tested in the Chrona sandbox, activated only through an `activate_module` approval bound to its content hash,
-  stored under `<dataDir>/platform` (hidden from Providers), and run on its schedules without a model.
+  stored under `<dataDir>/platform` (hidden from Providers), and run on its schedules without a model. Module data declares a schema; upgrades require `data.migrate`, and cross-schema rollback restores a snapshot only after user approval.
   Affair-directory files (Markdown, panels, `*.ui.json`, `.chrona/rules.json`) remain content, never executed.
 - Current Provider: Pi RPC. Chrona tools: `chrona_reply`, `chrona_notify`, `chrona_schedule`,
   `chrona_schedules`, `chrona_schedule_cancel`, `chrona_affairs`, `chrona_affair_create`,
