@@ -183,8 +183,7 @@ async function checkoutModule(ctx: ToolContext, raw: unknown) {
 async function rollbackModule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_module_rollback, raw);
   await requireRunModule(ctx, input.moduleId);
-  await ctx.modules.rollback(input.moduleId, input.hash);
-  return { moduleId: input.moduleId, activeHash: input.hash, status: "active" };
+  return ctx.modules.rollback(input.moduleId, input.hash);
 }
 async function schedules(ctx: ToolContext, raw: unknown) {
   return ctx.schedules.list(await scheduleAffairId(ctx, parseInput(schemas.chrona_schedules, raw).affairId));

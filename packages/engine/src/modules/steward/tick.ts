@@ -88,7 +88,7 @@ export function createTick(ports: StewardPorts) {
       }
       for (const [stage, action] of [
         ["connectors", () => createConnectors(ports, workspaceId).tick()],
-        ["modules", async () => startBuild(workspaceId, now)],
+        ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
         ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],

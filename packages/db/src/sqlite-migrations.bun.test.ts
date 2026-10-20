@@ -46,6 +46,14 @@ describe("clean steward SQLite baseline", () => {
     });
   });
 
+  test("fresh database with all migrations has nullable Module.dataSchema", () => {
+    const options = { ...fixture(), migrationsDir: resolve("prisma/migrations") };
+    ensureSqliteDatabase(options);
+    inspect(options.databasePath, db => {
+      expect(db.query('PRAGMA table_info("Module")').all()).toContainEqual(expect.objectContaining({ name: "dataSchema", type: "INTEGER", notnull: 0, dflt_value: null }));
+    });
+  });
+
   test("workspace scheduling and delivery indexes exist", () => {
     const options = fixture();
     ensureSqliteDatabase(options);

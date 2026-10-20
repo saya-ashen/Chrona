@@ -97,7 +97,7 @@ export const moduleManifestSchema = z.object({
   triggers: z.array(z.object({ id: slug, schedule: scheduleRuleSchema }).strict()).min(1).max(10),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
-  data: z.object({ schema: z.number().int().min(1) }).strict().default({ schema: 1 }),
+  data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
   tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
 }).strict().superRefine((manifest, ctx) => {
   for (const [key, param] of Object.entries(manifest.params)) {
@@ -347,10 +347,10 @@ export const chronaToolInputSchemas = {
   chrona_propose: z.object({
     affairId: id.optional(), dir: affairPathSchema,
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().describe('Submit module.json + entry + tests for asynchronous building. Returns building; chrona_modules shows status. Success creates a user approval card; failure sends a background wake with the test report (repeated failures become a digest). Affair code is never executed directly. Manifest: {name,entry,triggers:[{id,schedule}],effects,params?:{key:{type,value}},data?:{schema:1},tests:[file]}. Names/ids/keys: lowercase slugs, 2-41 chars; entry/tests: basename.ts|py|sh; schedules: chrona_schedule rules; effects: notify_user,wake_provider,network; params: number|string|boolean. stdin: {trigger:{id,kind:"schedule",firedAt:ISO},now:ISO,params} (tests omit trigger). stdout: {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}]}, max 20/64 KiB. /module read-only; /data writable. Tests: no network, exit 0. Only the exact user-approved version runs without a model.'),
+  }).strict().describe('Submit module.json + entry + tests; returns building. chrona_modules shows status; success requests hash-bound approval, failure wakes repair (repeated failures: digest). Manifest: {name,entry,triggers:[{id,schedule}],effects,params?:{key:{type,value}},data?:{schema,migrate?},tests:[file]}. Files: basename.ts|py|sh; schedules: chrona_schedule rules. stdin: {trigger:{id,kind:"schedule",firedAt},now,params}; tests omit trigger. stdout: {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}]}, max 20/64 KiB. /module read-only, /data writable. Tests: offline, exit 0. Before review, new versions run once on a copy of current data; effects only recorded. Schema upgrades with data require migrate: stdin {migrate:{from,to},now}, /data writable copy, offline, exit 0. Affair code never runs directly.'),
   chrona_modules: z.object({ affairId: id.optional() }).strict().describe("List modules, versions, approval status and recent runs; defaults to this affair, or all workspace modules at the root."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: affairPathSchema }).strict().describe("Copy module files into an empty affair directory for editing; hash defaults to the active version."),
-  chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe("Roll back code to a previously approved module hash without changing module data."),
+  chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),
   chrona_schedules: z.object({ affairId: id.optional() }).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
   chrona_affairs: z.object({ status: z.enum(AFFAIR_STATUSES).optional() }).strict(),

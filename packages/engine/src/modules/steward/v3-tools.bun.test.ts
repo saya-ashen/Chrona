@@ -118,7 +118,7 @@ test("module tools propose, list, checkout and roll back only approved versions"
   expect(proposal).toMatchObject({ status: "building" });
   await api.modules.buildPending();
   proposal.approvalId = (await db.approval.findFirstOrThrow({ where: { status: "open", action: "activate_module" } })).id;
-  expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review", report: [{ stdout: "ok", exitCode: 0 }] });
+  expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review", report: { tests: [{ stdout: "ok", exitCode: 0 }], continuity: { status: "skipped", reason: "no data" } } });
   expect(await db.approval.findUniqueOrThrow({ where: { id: proposal.approvalId } })).toMatchObject({ status: "open", payload: { kind: "activate_module", moduleId: proposal.moduleId, hash: proposal.hash } });
   expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ source: "provider", intent: { ...intent, preserves: [] } });
   for (const input of [{}, { affairId: affair.id }]) expect(await call("chrona_modules", input)).toMatchObject([{ id: proposal.moduleId, name: "price-watch", activeHash: null, status: "active", versions: [{ hash: proposal.hash, status: "pending_review", intent: { ...intent, preserves: [] }, createdAt: ports.now() }], runs: [] }]);
@@ -131,6 +131,18 @@ test("module tools propose, list, checkout and roll back only approved versions"
   expect(await call("chrona_module_checkout", { moduleId: proposal.moduleId, dir: "active-copy" })).toMatchObject({ hash: proposal.hash });
   expect(await call("chrona_module_rollback", { moduleId: proposal.moduleId, hash: proposal.hash })).toEqual({ moduleId: proposal.moduleId, activeHash: proposal.hash, status: "active" });
   expect(await db.generation.findFirstOrThrow({ where: { reason: "rollback" } })).toMatchObject({ modules: { [proposal.moduleId]: proposal.hash } });
+  await db.module.update({ where: { id: proposal.moduleId }, data: { dataSchema: 2 } });
+  const live = join(ports.dataDir, "platform/data", proposal.moduleId), snapshot = join(ports.dataDir, "platform/snapshots", proposal.moduleId, "schema-1");
+  await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "current");
+  await mkdir(snapshot, { recursive: true }); await writeFile(join(snapshot, "state"), "old");
+  const generations = await db.generation.count();
+  const pending = await call("chrona_module_rollback", { moduleId: proposal.moduleId, hash: proposal.hash }) as { status: string; approvalId: string };
+  expect(pending).toEqual({ status: "pending_approval", approvalId: expect.any(String) });
+  expect(await db.approval.findUniqueOrThrow({ where: { id: pending.approvalId } })).toMatchObject({ status: "open", action: "activate_module" });
+  expect(await db.module.findUniqueOrThrow({ where: { id: proposal.moduleId } })).toMatchObject({ dataSchema: 2 });
+  expect(await db.generation.count()).toBe(generations);
+  expect(await readFile(join(live, "state"), "utf8")).toBe("current");
+  await expect(call("chrona_module_rollback", { moduleId: proposal.moduleId, hash: proposal.hash, restore: true })).rejects.toMatchObject({ code: "invalid" });
 });
 for (const foreignWorkspace of [false, true]) test(`module checkout and rollback enforce run ownership (foreign workspace=${foreignWorkspace})`, async () => {
   const own = await service.forWorkspace(workspaceId).affairs.create({ title: "Own" });

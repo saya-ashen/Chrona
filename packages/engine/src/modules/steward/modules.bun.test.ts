@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService } from "./service";
 import { createModules } from "./modules";
+import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./approvals";
 import { testDb } from "./test-db";
@@ -53,6 +54,463 @@ async function fixture() {
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" });
   return { db, dataDir, workspace, ports, service, affair, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
+
+async function dataFixture() {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  const live = join(f.dataDir, "platform/data", first.moduleId!), original = f.ports.sandbox!.runModule!;
+  f.ports.sandbox!.runModule = async input => {
+    await mkdir(join(input.dataDir, "nested"));
+    await writeFile(join(input.dataDir, "nested/state"), Buffer.from([0, 255, 1, 2]));
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  await f.service.schedules.fireDue(new Date("2026-10-21T01:00:00Z"));
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).dataSchema).toBe(1);
+  f.ports.sandbox!.runModule = original;
+  await f.write(2);
+  const schema = async (value: number, migrate?: string) => {
+    const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
+    await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...manifest, data: { schema: value, ...(migrate ? { migrate } : {}) } }));
+    if (migrate) await writeFile(join(f.dir, migrate), "migration");
+  };
+  return { ...f, first, live, original, schema };
+}
+
+async function rollbackFixture() {
+  const f = await dataFixture();
+  await f.schema(2, "migrate.ts");
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    if (input.entry === "migrate.ts") await writeFile(join(input.dataDir, "nested/state"), "schema 2");
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  const second = await f.propose(); await f.approve(second.approvalId!);
+  const moduleId = f.first.moduleId!, snapshots = join(f.dataDir, "platform/snapshots", moduleId);
+  return { ...f, second, moduleId, snapshots };
+}
+
+test("cross-schema rollback requests approval without changes, restores data, and can roll forward again", async () => {
+  const f = await rollbackFixture();
+  await writeFile(join(f.live, "nested/state"), "new writes");
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  const request = () => f.service.modules.rollback(f.moduleId, f.first.hash);
+  const older = await request(), pending = await request();
+  expect(pending.status).toBe("pending_approval");
+  if (pending.status !== "pending_approval" || older.status !== "pending_approval") throw new Error("Expected approval");
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: older.approvalId } })).toMatchObject({ status: "expired" });
+  expect(await f.db.module.findFirstOrThrow()).toEqual(before);
+  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.generation.count()).toBe(generations);
+  expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("new writes");
+  expect(await readdir(f.snapshots)).toEqual(["schema-1"]);
+  const approval = await f.db.approval.findUniqueOrThrow({ where: { id: pending.approvalId } });
+  const at = (await stat(join(f.snapshots, "schema-1"))).mtime.toISOString();
+  expect(approval.payload).toEqual({ kind: "activate_module", moduleId: f.moduleId, hash: f.first.hash, restore: { schema: 1, snapshotAt: at } });
+  expect(approval.preview).toContain(`将恢复 ${at} 的数据，此后写入的数据会丢失；当前数据会另存为 before-rollback-<iso>`);
+  await f.approve(pending.approvalId);
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash, dataSchema: 1, status: "active" });
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+  const backup = (await readdir(f.snapshots)).find(name => name.startsWith("before-rollback-"))!;
+  expect(await readFile(join(f.snapshots, backup, "nested/state"), "utf8")).toBe("new writes");
+  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback", modules: { [f.moduleId]: f.first.hash } });
+  let migrated = false;
+  f.ports.sandbox!.runModule = async input => {
+    migrated = true;
+    expect(input.entry).toBe("migrate.ts");
+    expect(input.codeDir).toBe(join(f.dataDir, "platform/store", f.second.hash));
+    expect(input.input).toMatchObject({ migrate: { from: 1, to: 2 } });
+    expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
+    await writeFile(join(input.dataDir, "nested/state"), "forward again");
+    return { status: "succeeded", exitCode: 0, output: "migrated", error: null };
+  };
+  expect(await f.service.modules.rollback(f.moduleId, f.second.hash)).toMatchObject({ status: "active" });
+  expect(migrated).toBe(true);
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.second.hash, dataSchema: 2, status: "active" });
+  expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("forward again");
+  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback" });
+});
+
+test("snapshot restore retains only the newest three before-rollback backups", async () => {
+  const f = await rollbackFixture();
+  for (let i = 0; i < 5; i++) {
+    await writeFile(join(f.live, "nested/state"), `writes ${i}`);
+    const result = await f.service.modules.rollback(f.moduleId, f.first.hash);
+    if (result.status !== "pending_approval") throw new Error("Expected approval");
+    await f.approve(result.approvalId);
+    const backups = (await readdir(f.snapshots)).filter(name => name.startsWith("before-rollback-")).sort();
+    expect(backups).toHaveLength(Math.min(i + 1, 3));
+    for (let j = 0; j < backups.length; j++) expect(await readFile(join(f.snapshots, backups[j]!, "nested/state"), "utf8")).toBe(`writes ${i - backups.length + 1 + j}`);
+    await f.service.modules.rollback(f.moduleId, f.second.hash);
+  }
+});
+
+test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "schema", "shape", "pending version", "copy failure", "forward failure"])('rollback fails safely: %s', async kind => {
+  const f = await rollbackFixture();
+  if (kind === "no snapshot") await rm(join(f.snapshots, "schema-1"), { recursive: true });
+  if (kind === "migrating") await f.db.module.update({ where: { id: f.moduleId }, data: { status: "migrating" } });
+  const before = await f.db.module.findFirstOrThrow(), schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  if (kind === "no snapshot" || kind === "migrating") {
+    await expect(f.service.modules.rollback(f.moduleId, f.first.hash)).rejects.toThrow(kind === "no snapshot" ? "没有 schema 1 的数据快照，无法回滚到该版本" : "Module is migrating");
+  } else {
+    const result = await f.service.modules.rollback(f.moduleId, f.first.hash);
+    if (result.status !== "pending_approval") throw new Error("Expected approval");
+    if (kind === "missing snapshot") await rm(join(f.snapshots, "schema-1"), { recursive: true });
+    if (["schema", "shape", "changed snapshot"].includes(kind)) {
+      const row = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId } });
+      const payload = row.payload as { kind: string; moduleId: string; hash: string; restore: { schema: number; snapshotAt: string } };
+      if (kind === "schema") payload.restore.schema = 3;
+      if (kind === "shape") (payload.restore as unknown as { schema: string }).schema = "1";
+      if (kind === "changed snapshot") payload.restore.snapshotAt = "2000-01-01T00:00:00Z";
+      await f.db.approval.update({ where: { id: row.id }, data: { payload } });
+    }
+    if (kind === "pending version") await f.db.moduleVersion.updateMany({ where: { moduleId: f.moduleId, hash: f.first.hash }, data: { status: "pending_review" } });
+    if (kind === "copy failure") await symlink(join(f.snapshots, "schema-1/nested/state"), join(f.snapshots, "schema-1/nested/link"));
+    if (["copy failure", "forward failure"].includes(kind)) {
+      await f.approve(result.approvalId);
+      if (kind === "forward failure") {
+        const restored = await f.db.module.findFirstOrThrow(), restoredSchedules = await f.db.schedule.findMany(), restoredGenerations = await f.db.generation.count();
+        f.ports.sandbox!.runModule = async input => { await writeFile(join(input.dataDir, "nested/state"), "partial"); return { status: "failed", exitCode: 1, output: "public failure", error: null }; };
+        await expect(f.service.modules.rollback(f.moduleId, f.second.hash)).rejects.toThrow("数据迁移失败");
+        expect(await f.db.module.findFirstOrThrow()).toEqual(restored);
+        expect(await f.db.schedule.findMany()).toEqual(restoredSchedules);
+        expect(await f.db.generation.count()).toBe(restoredGenerations);
+        expect(await f.db.moduleVersion.findFirstOrThrow({ where: { hash: f.second.hash } })).toMatchObject({ status: "approved" });
+        expect(await f.db.notification.count()).toBe(0);
+        expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+        return;
+      }
+      expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "now", title: "模块 price-watch 回滚未完成：数据恢复失败" });
+    } else await expect(f.approve(result.approvalId)).rejects.toThrow();
+  }
+  expect(await f.db.module.findFirstOrThrow()).toEqual(before);
+  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.generation.count()).toBe(generations);
+  expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
+});
+
+test.each(["empty", "missing", "same schema"])('rollback switches directly with %s data', async kind => {
+  const f = await rollbackFixture();
+  if (kind !== "same schema") { await rm(f.live, { recursive: true }); if (kind === "empty") await mkdir(f.live); }
+  const hash = kind === "same schema" ? f.second.hash : f.first.hash;
+  const count = await f.db.approval.count();
+  expect(await f.service.modules.rollback(f.moduleId, hash)).toMatchObject({ status: "active", activeHash: hash });
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ dataSchema: kind === "same schema" ? 2 : 1, activeHash: hash });
+  expect(await f.db.approval.count()).toBe(count);
+  expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback" });
+});
+
+test("activation snapshots and migrates current data, then the next firing reads schema 2", async () => {
+  const f = await dataFixture();
+  await f.schema(2, "migrate.ts");
+  let migrations = 0, liveReads = 0;
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    if (input.entry === "migrate.ts") {
+      migrations++;
+      expect(input).toMatchObject({ network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() } });
+      expect(input.dataDir).not.toBe(f.live);
+      if (migrations === 2) expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
+      await writeFile(join(input.dataDir, "nested/state"), "schema 2");
+      return { status: "succeeded", exitCode: 0, output: "public migration", error: null };
+    }
+    expect(await readFile(join(input.dataDir, "nested/state"), "utf8")).toBe("schema 2");
+    if (input.dataDir === f.live) liveReads++;
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  const result = await f.propose();
+  expect(migrations).toBe(1);
+  // Approval must snapshot current data, not the build-time copy, and replace the previous snapshot.
+  await writeFile(join(f.live, "nested/state"), "changed after build");
+  const snapshot = join(f.dataDir, "platform/snapshots", f.first.moduleId!, "schema-1");
+  await mkdir(snapshot, { recursive: true }); await writeFile(join(snapshot, "stale"), "old snapshot");
+  await f.approve(result.approvalId!);
+  expect(migrations).toBe(2);
+  expect(await readFile(join(snapshot, "nested/state"), "utf8")).toBe("changed after build");
+  expect(await readdir(snapshot)).toEqual(["nested"]);
+  expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ dataSchema: 2, activeHash: result.hash, status: "active" });
+  expect(await f.db.audit.findFirst({ where: { kind: "module_migration_started" } })).toMatchObject({ details: { hash: result.hash, from: 1, to: 2 } });
+  await f.service.schedules.fireDue(new Date("2026-10-22T01:00:00Z"));
+  expect(liveReads).toBe(1);
+  expect((await f.db.moduleRun.findFirstOrThrow({ orderBy: { createdAt: "desc" } })).error).toBeNull();
+  await expect(stat(join(f.dataDir, "platform/data-old", f.first.moduleId!))).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test.each(["empty", "missing"])("activation with %s data records schema without migrate", async kind => {
+  const f = await dataFixture();
+  await f.schema(2);
+  await rm(f.live, { recursive: true });
+  if (kind === "empty") await mkdir(f.live);
+  const result = await f.propose();
+  await f.approve(result.approvalId!);
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: result.hash, dataSchema: 2, status: "active" });
+  expect(f.calls.map(call => call.entry)).toEqual(["test.ts", "test.ts"]);
+  expect(await f.db.audit.count({ where: { kind: "module_migration_started" } })).toBe(0);
+});
+
+test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "symlink"])("activation migration failure preserves old data and schedules: %s", async kind => {
+  const f = await dataFixture();
+  await f.schema(2, "migrate.ts");
+  let activation = false;
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    if (input.entry === "migrate.ts") {
+      await writeFile(join(input.dataDir, "nested/state"), "migrated copy");
+      if (activation && kind === "throw") throw new Error("private host diagnostic");
+      return { status: activation && kind === "failed" ? "failed" : activation && kind === "timeout" ? "timed_out" : "succeeded", exitCode: activation && kind === "failed" ? 1 : 0, output: activation && kind === "output" ? "x".repeat(64 * 1024 + 1) : "public migration output", error: activation ? "public migration stderr" : null };
+    }
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  const result = await f.propose();
+  const schedules = await f.db.schedule.findMany(), generations = await f.db.generation.count();
+  await writeFile(join(f.live, "nested/state"), "changed after build");
+  if (kind === "bytes") { await writeFile(join(f.live, "large"), ""); await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1); }
+  if (kind === "symlink") await symlink(join(f.live, "nested/state"), join(f.live, "link"));
+  if (kind === "unavailable") f.ports.sandbox!.available = false;
+  activation = true;
+  await f.approve(result.approvalId!);
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash, dataSchema: 1, status: "active" });
+  expect(await f.db.schedule.findMany()).toEqual(schedules);
+  expect(await f.db.generation.count()).toBe(generations);
+  expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("changed after build");
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: result.hash } } });
+  expect(version.status).toBe("rejected");
+  expect(JSON.stringify(version.report)).not.toContain("private host diagnostic");
+  if (["failed", "timeout", "output"].includes(kind)) expect(version.report).toMatchObject({ migration: { stdout: expect.stringContaining(""), stderr: "public migration stderr" } });
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).toMatchObject({ status: "approved" });
+  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "now", title: "模块 price-watch 新版本未启用：数据迁移失败", idempotencyKey: `module-migration-failed:${version.id}` });
+  await expect(stat(join(f.dataDir, "platform/data-next", f.first.moduleId!))).rejects.toMatchObject({ code: "ENOENT" });
+  f.ports.sandbox!.available = true;
+  let oldRan = false;
+  f.ports.sandbox!.runModule = async input => {
+    oldRan = true;
+    expect(input.codeDir).toBe(join(f.dataDir, "platform/store", f.first.hash));
+    expect(await readFile(join(input.dataDir, "nested/state"), "utf8")).toBe("changed after build");
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  await f.service.schedules.fireDue(new Date("2026-10-22T01:00:00Z"));
+  expect(oldRan).toBe(true);
+});
+
+test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating modules and recovers stale migrations: %s", async kind => {
+  const f = await dataFixture(), moduleId = f.first.moduleId!;
+  const now = new Date("2026-10-22T01:00:00Z"), next = join(f.dataDir, "platform/data-next", moduleId), old = join(f.dataDir, "platform/data-old", moduleId);
+  await f.db.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
+  const record = (minutes: number) => f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash: "new", from: 1, to: 2 }, createdAt: new Date(now.getTime() - minutes * 60_000) } });
+  await record(30); if (kind === "recent") await record(14);
+  await mkdir(next, { recursive: true }); await writeFile(join(next, "partial"), "incomplete");
+  if (kind === "rename-back" || kind === "swapped") { await mkdir(join(f.dataDir, "platform/data-old"), { recursive: true }); await rename(f.live, old); }
+  // Crash after the swap but before the activation commit: live holds uncommitted migrated data.
+  if (kind === "swapped") { await mkdir(f.live); await writeFile(join(f.live, "migrated"), "v2"); }
+  let ran = false;
+  f.ports.sandbox!.runModule = async input => {
+    ran = true;
+    expect(await readFile(join(input.dataDir, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  await f.service.schedules.fireDue(now);
+  expect(ran).toBe(false);
+  expect(await f.db.moduleRun.count()).toBe(1);
+  const tick = createTick(f.ports);
+  expect(await tick(now)).toEqual({ failures: [] }); await tick.settled();
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ status: kind === "recent" ? "migrating" : "active", activeHash: f.first.hash, dataSchema: 1 });
+  if (kind === "recent") expect(await readdir(next)).toEqual(["partial"]);
+  else {
+    await expect(stat(next)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+    await expect(stat(join(f.live, "migrated"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(old)).rejects.toMatchObject({ code: "ENOENT" });
+    await f.service.schedules.fireDue(new Date("2026-10-23T01:00:00Z"));
+    expect(ran).toBe(true);
+  }
+});
+
+test("same-schema continuity runs on a disposable copy, previews effects and never executes them", async () => {
+  const f = await dataFixture(), effects = [
+    { type: "notify_user", key: "copy", level: "now", title: "Would notify", body: "Only a preview" },
+    { type: "wake_provider", key: "copy", prompt: "Must not run" },
+  ];
+  let copy = "";
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    copy = input.dataDir;
+    expect(copy).not.toBe(f.live);
+    expect(input).toMatchObject({ entry: "index.ts", network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { trigger: { id: "daily", kind: "schedule", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: { threshold: 2 } } });
+    expect(await readFile(join(copy, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+    await writeFile(join(copy, "nested/state"), "new state");
+    return { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
+  };
+  const result = await f.propose();
+  expect(result.status).toBe("pending_review");
+  expect(result.report).toMatchObject({ continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false, effects } });
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
+  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
+  expect(preview).toContain("数据 schema：1 → 1；无需迁移");
+  expect(preview).toContain("连续性：passed");
+  expect(preview).toContain("按当前数据新版本会产生的 effects");
+  expect(preview).toContain("Would notify");
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.notification.count()).toBe(0);
+  expect(await f.db.moduleRun.count()).toBe(1);
+});
+
+test.each(["crash", "json", "shape", "throw"])("continuity %s rejects and wakes provider with public output only", async kind => {
+  const f = await dataFixture();
+  let copy = "";
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    copy = input.dataDir;
+    await writeFile(join(copy, "nested/state"), "changed");
+    if (kind === "throw") throw new Error("private host diagnostic");
+    return { status: kind === "crash" ? "failed" : "succeeded", exitCode: kind === "crash" ? 1 : 0, output: kind === "shape" ? '{"effects":[{"type":"invalid"}]}' : "public continuity output", error: kind === "crash" ? "public continuity stderr" : null };
+  };
+  const result = await f.propose();
+  expect(result.status).toBe("rejected");
+  expect(result.report).toMatchObject({ continuity: { status: "failed", migrated: false } });
+  expect(JSON.stringify(result.report)).not.toContain("private host diagnostic");
+  expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
+  const run = await f.db.run.findFirstOrThrow();
+  expect(run.prompt).toContain("build failed (untrusted test output)");
+  expect(run.prompt).toContain('"status":"failed"');
+  if (kind !== "throw") expect(run.prompt).toContain(kind === "shape" ? "invalid" : "public continuity output");
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test.each([false, true])("schema upgrade migrates only the copy; migration failure=%s", async failed => {
+  const f = await dataFixture();
+  await f.schema(2, "migrate.py");
+  let copy = "", entryRan = false;
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return f.original(input);
+    expect(input.network).toBe(false);
+    expect(input.timeoutMs).toBe(60_000);
+    expect(input.maxOutputBytes).toBe(64 * 1024);
+    if (input.entry === "migrate.py") {
+      copy = input.dataDir;
+      expect(input.input).toEqual({ migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() });
+      expect(copy).not.toBe(f.live);
+      await writeFile(join(copy, "nested/state"), "schema 2");
+      return { status: failed ? "failed" : "succeeded", exitCode: failed ? 1 : 0, output: "public migration output", error: failed ? "public migration stderr" : null };
+    }
+    entryRan = true;
+    expect(input.dataDir).toBe(copy);
+    expect(await readFile(join(copy, "nested/state"), "utf8")).toBe("schema 2");
+    return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  };
+  const result = await f.propose();
+  expect(result.status).toBe(failed ? "rejected" : "pending_review");
+  expect(entryRan).toBe(!failed);
+  expect(result.report).toMatchObject({ continuity: { status: failed ? "failed" : "passed", fromSchema: 1, toSchema: 2, migrated: !failed, migration: { stdout: "public migration output", exitCode: failed ? 1 : 0 } } });
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+  expect((await f.db.module.findFirstOrThrow()).dataSchema).toBe(1);
+  await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
+  if (failed) expect((await f.db.run.findFirstOrThrow()).prompt).toContain("public migration stderr");
+  else expect((await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).preview).toContain("1 → 2；需要迁移");
+});
+
+test.each(["nonempty", "empty", "missing", "unknown schema"])("schema upgrade without migrate: %s", async kind => {
+  const f = await dataFixture();
+  await f.schema(2);
+  if (kind === "empty" || kind === "missing") await rm(f.live, { recursive: true });
+  if (kind === "empty") await mkdir(f.live);
+  if (kind === "unknown schema") {
+    await f.db.module.update({ where: { id: f.first.moduleId! }, data: { dataSchema: null } });
+    f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
+  }
+  const result = await f.propose();
+  expect(result.status).toBe(kind === "nonempty" ? "rejected" : "pending_review");
+  expect(result.report).toMatchObject({ continuity: { status: kind === "nonempty" ? "failed" : kind === "unknown schema" ? "passed" : "skipped", migrated: false, toSchema: 2, ...(kind === "nonempty" ? { reason: "schema 升级需要 migrate" } : {}) } });
+  if (kind === "nonempty") expect((await f.db.run.findFirstOrThrow()).prompt).toContain("schema 升级需要 migrate");
+});
+
+test.each([false, true])("schema downgrade rejects even with empty data=%s", async empty => {
+  const f = await dataFixture();
+  await f.db.module.update({ where: { id: f.first.moduleId! }, data: { dataSchema: 2 } });
+  if (empty) await rm(f.live, { recursive: true });
+  const result = await f.propose();
+  expect(result.status).toBe("rejected");
+  expect(result.report).toMatchObject({ continuity: { status: "failed", reason: "schema 不能降低；降级只能经回滚", fromSchema: 2, toSchema: 1 } });
+  expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
+});
+
+test.each(["bytes", "files"])("oversized live data skips continuity visibly: %s", async kind => {
+  const f = await dataFixture();
+  if (kind === "bytes") {
+    await writeFile(join(f.live, "large"), "");
+    await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1);
+  } else for (let i = 0; i < 5000; i++) await writeFile(join(f.live, `file-${i}`), "");
+  const result = await f.propose();
+  expect(result.status).toBe("pending_review");
+  expect(result.report).toMatchObject({ continuity: { status: "skipped", reason: "data too large", migrated: false } });
+  expect(f.calls).toHaveLength(2);
+  expect((await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).preview).toContain("skipped (data too large)");
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+});
+
+test.each(["file", "directory", "root"])("continuity refuses live data symlink: %s", async kind => {
+  const f = await dataFixture();
+  if (kind === "root") { await rename(f.live, `${f.live}-actual`); await symlink(`${f.live}-actual`, f.live); }
+  else await symlink(join(f.live, kind === "file" ? "nested/state" : "nested"), join(f.live, "linked"));
+  const result = await f.propose();
+  expect(result.status).toBe("rejected");
+  expect(result.report).toMatchObject({ continuity: { status: "failed" } });
+  expect(f.calls).toHaveLength(2);
+  expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
+});
+
+test("test, continuity and schema failures share the same streak and budgeted digest", async () => {
+  const f = await dataFixture();
+  f.fail();
+  expect((await f.propose()).status).toBe("rejected");
+  f.fail(false);
+  await f.write(3);
+  f.ports.sandbox!.runModule = async input => {
+    if (input.entry === "test.ts") return { status: "succeeded", exitCode: 0, output: "x".repeat(64 * 1024), error: null };
+    return { status: "failed", exitCode: 1, output: "public failure after verbose tests", error: null };
+  };
+  expect((await f.propose()).status).toBe("rejected");
+  const runs = await f.db.run.findMany({ orderBy: { createdAt: "desc" } });
+  expect(runs).toHaveLength(2);
+  expect(runs.some(run => run.prompt?.includes("public failure after verbose tests"))).toBe(true);
+  for (let i = 4; i <= 5; i++) {
+    await f.write(i); await f.schema(2);
+    expect((await f.propose()).status).toBe("rejected");
+  }
+  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+});
+
+test("large effects preview is explicitly truncated without hiding schema, intent or hash", async () => {
+  const f = await dataFixture();
+  const effects = Array.from({ length: 3 }, (_, i) => ({ type: "wake_provider", key: `key-${i}`, prompt: "x".repeat(4000) }));
+  f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
+  const result = await f.propose();
+  expect(result.status).toBe("pending_review");
+  expect(result.report).toMatchObject({ continuity: { effects } });
+  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
+  expect(preview.length).toBeLessThanOrEqual(20_000);
+  expect(preview).toContain("…effects 过长，已截断");
+  expect(preview).toContain("数据 schema：1 → 1");
+  expect(preview).toContain(JSON.stringify(intent));
+  expect(preview).toContain(result.hash);
+  expect(await f.db.run.count()).toBe(0);
+});
+
+test.each(["migrate.ts", "migrate.py", "migrate.sh"])("declared %s must exist before a proposal is queued", async migrate => {
+  const f = await fixture();
+  const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...manifest, data: { schema: 2, migrate } }));
+  expect((await f.submit()).status).toBe("rejected");
+  expect(await f.db.moduleVersion.count()).toBe(0);
+  expect(await f.db.approval.count()).toBe(0);
+  expect(f.calls).toHaveLength(0);
+  await writeFile(join(f.dir, migrate), "");
+  expect((await f.propose()).status).toBe("pending_review");
+  expect(f.calls).toHaveLength(1);
+  expect(f.calls[0]!.entry).toBe("test.ts");
+});
 
 test("proposal returns building without sandbox work; identical in-flight hashes reuse the version and snapshot", async () => {
   const f = await fixture();
@@ -116,7 +574,7 @@ test("missing staging is rejected clearly, cleaned, and reported to the provider
   const version = await f.db.moduleVersion.findFirstOrThrow();
   await rm(join(f.dataDir, "platform/staging", version.id), { recursive: true });
   await f.service.modules.buildPending();
-  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected", report: [{ stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 }] });
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected", report: { tests: [{ stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 }] } });
   expect(await f.db.run.count()).toBe(1);
   expect(f.calls).toHaveLength(0);
 });
@@ -189,7 +647,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   const f = await fixture(), result = await f.propose();
   expect(result.status).toBe("pending_review");
   expect(result.moduleId).toBeString();
-  expect(result.report).toEqual([{ stdout: "public stdout", stderr: "", exitCode: 0 }]);
+  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false } });
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]!.timeoutMs).toBe(60_000);
   expect(f.calls[0]!.maxOutputBytes).toBe(64 * 1024);
@@ -308,10 +766,10 @@ test("failing tests reject with public outputs only, no approval, staging cleane
   const f = await fixture(); f.fail();
   const result = await f.propose();
   expect(result.status).toBe("rejected");
-  expect(result.report).toEqual([{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }]);
+  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.run.count()).toBe(1);
-  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id, lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]' });
+  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id, lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n{"tests":[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]}' });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -362,13 +820,13 @@ test("all tests run independently even after a failure; declared network never e
   expect(result.status).toBe("rejected");
   expect(f.calls).toHaveLength(2);
   expect(f.calls[0]!.dataDir).not.toBe(f.calls[1]!.dataDir);
-  expect(result.report).toHaveLength(2);
+  expect(result.report).toMatchObject({ tests: [{ exitCode: 1 }, { exitCode: 1 }] });
 });
 
 test("invalid manifests reject without inventing a module identity or leaking parser diagnostics", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "module.json"), "invalid JSON");
-  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: [] });
+  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { tests: [] } });
   expect(await f.db.module.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);

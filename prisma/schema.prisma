@@ -62,6 +62,7 @@ model Module {
   affairId String
   name String
   activeHash String?
+  dataSchema Int?
   status String @default("active")
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
