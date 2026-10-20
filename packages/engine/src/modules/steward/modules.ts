@@ -43,7 +43,7 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       if (!nextAt && trigger.schedule.kind === "at") nextAt = now;
       await tx.schedule.create({ data: { workspaceId, affairId: module.affairId, moduleId, triggerId: trigger.id, mode: "module", rule: json(trigger.schedule), text: `${manifest.name}:${trigger.id}`, label: manifest.name, createdBy: "chrona", createdAt: now, nextAt, status: nextAt ? "active" : "done" } });
     }
-    await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash } });
+    await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active" } });
     const modules = await tx.module.findMany({ where: { workspaceId }, orderBy: { id: "asc" } });
     const previous = await tx.generation.findFirst({ where: { workspaceId }, orderBy: { seq: "desc" } });
     const generation = await tx.generation.create({ data: { workspaceId, seq: (previous?.seq ?? 0) + 1, modules: Object.fromEntries(modules.map(row => [row.id, row.activeHash])), reason, createdAt: now } });

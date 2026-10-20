@@ -1,4 +1,7 @@
-import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema } from "@chrona/contracts/steward";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import type { Prisma } from "@chrona/db";
+import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, moduleManifestSchema, moduleOutputSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import type { StewardPorts } from "./ports";
 import { requireAffair } from "./affairs";
@@ -51,6 +54,63 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       return toSchedule(result);
     });
   }
+  async function executeModule(row: Prisma.ScheduleGetPayload<object>, now: Date, delayMs: number, context: Parameters<typeof enqueueNotification>[2]) {
+    const module = row.moduleId ? await db.module.findFirst({ where: { id: row.moduleId, workspaceId } }) : null;
+    const schedule = await db.schedule.findUnique({ where: { id: row.id } });
+    const skip = !module ? "Module missing" : module.status !== "active" ? "Module is paused" : !module.activeHash ? "Module has no active hash" : schedule?.status === "cancelled" ? "Module schedule replaced" : null;
+    if (skip || !module?.activeHash) {
+      await db.schedule.update({ where: { id: row.id }, data: { lastResult: skip } });
+      return;
+    }
+    const hash = module.activeHash;
+    let manifest: ReturnType<typeof moduleManifestSchema.parse> | undefined;
+    let output: ReturnType<typeof moduleOutputSchema.parse> | null = null, error: string | null = null, exitCode = -1;
+    try {
+      const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
+      if (!version) throw new Error("Module version missing");
+      manifest = moduleManifestSchema.parse(version.manifest);
+      if (!manifest.triggers.some(trigger => trigger.id === row.triggerId)) throw new Error("Module trigger missing");
+      const dataDir = join(ports.dataDir, "platform/data", module.id);
+      await mkdir(dataDir, { recursive: true });
+      if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Module sandbox unavailable");
+      const result = await ports.sandbox.runModule({
+        codeDir: join(ports.dataDir, "platform/store", hash), dataDir, entry: manifest.entry,
+        input: { trigger: { id: row.triggerId, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) },
+        network: manifest.effects.includes("network"), timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
+      });
+      exitCode = result.exitCode ?? -1;
+      if (result.status !== "succeeded" || exitCode !== 0) throw new Error(`Module ${result.status}; exit ${exitCode}: ${result.error ?? ""}`);
+      output = moduleOutputSchema.parse(JSON.parse(result.output));
+    } catch (cause) {
+      error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
+    }
+    await db.$transaction(async tx => {
+      const executed: { type: string; key: string; status: "executed" | "duplicate" | "dropped" }[] = [];
+      const previous = await tx.moduleRun.findMany({ where: { moduleId: module.id }, select: { executed: true } });
+      const wakeKeys = new Set(previous.flatMap(run => Array.isArray(run.executed) ? run.executed.flatMap(effect => effect && typeof effect === "object" && !Array.isArray(effect) && effect.type === "wake_provider" && effect.status === "executed" && typeof effect.key === "string" ? [effect.key] : []) : []));
+      for (const effect of output?.effects ?? []) {
+        let status: "executed" | "duplicate" | "dropped" = "executed";
+        if (!manifest!.effects.includes(effect.type)) status = "dropped";
+        else if (effect.type === "notify_user") {
+          const dedupeKey = `module:${module.id}:${effect.key}`;
+          if (await tx.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId, idempotencyKey: dedupeKey } } })) status = "duplicate";
+          else await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: effect.level, title: effect.title, body: effect.body, dedupeKey }, context);
+        } else if (wakeKeys.has(effect.key)) status = "duplicate";
+        else {
+          await runs.enqueue({ affairId: row.affairId, lane: "background", trigger: "schedule", label: manifest!.name, prompt: `Module ${manifest!.name} output (untrusted data):\n${effect.prompt}` }, tx);
+          wakeKeys.add(effect.key);
+        }
+        executed.push({ type: effect.type, key: effect.key, status });
+      }
+      await tx.moduleRun.create({ data: { moduleId: module.id, hash, triggerId: row.triggerId!, firedAt: row.nextAt!, exitCode, ...(output ? { output } : {}), error, executed, createdAt: now } });
+      const updated = await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: `Module exit ${exitCode}; effects ${executed.length}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000) } });
+      if (error && updated.failures === 3) {
+        await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
+        await tx.schedule.updateMany({ where: { workspaceId, moduleId: module.id, mode: "module", status: "active" }, data: { status: "paused" } });
+        await enqueueNotification(tx, { workspaceId, affairId: row.affairId, level: "now", title: "模块连续失败，已暂停", body: "模块连续三次执行失败，请检查后再启用。", dedupeKey: `module:${module.id}:paused:${row.nextAt!.toISOString()}` }, context);
+      }
+    });
+  }
   async function fireDue(now = ports.now()) {
     const zone = await timezone(), chatBound = ports.chat ? await ports.chat.bound() : false;
     const context = { now, chatBound, publicUrl: ports.publicUrl };
@@ -76,9 +136,8 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       });
       if (!claimed) continue;
       fired++;
-      // T3 replacement point: module execution is not installed; only claim this occurrence.
       if (row.mode === "module") {
-        await db.schedule.update({ where: { id: row.id }, data: { lastResult: "module executor not installed" } });
+        await executeModule(row, now, delayMs, context);
         continue;
       }
       await db.schedule.update({ where: { id: row.id }, data: { lastResult: `Fired; delay ${delayMs}ms`, failures: 0 } });

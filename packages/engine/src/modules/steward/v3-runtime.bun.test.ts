@@ -94,15 +94,15 @@ test("legacy jobs pause without execution, notifications, or consuming grants", 
   expect((await db.grant.findUniqueOrThrow({ where: { id: grant.id } })).consumedAt).toBeNull();
 });
 
-test("module occurrence is claimed once without execution until T3", async () => {
+test("module without an active hash is claimed once and skipped without execution", async () => {
   const a = await affair(); let calls = 0;
-  ports.sandbox = { available: true, run: async () => { calls++; return { output: "ok", exitCode: 0 }; } };
+  ports.sandbox = { available: true, runModule: async () => { calls++; return { status: "succeeded", output: "{}", exitCode: 0, error: null }; } };
   const module = await db.module.create({ data: { workspaceId, affairId: a.id, name: "check" } });
   const s = await db.schedule.create({ data: { workspaceId, affairId: a.id, mode: "module", moduleId: module.id, triggerId: "daily", rule: at(), text: "Check", createdBy: "chrona", nextAt: new Date(time.getTime() + 60000) } });
   advance(60000);
   expect(await api.schedules.fireDue()).toBe(1);
   expect(await api.schedules.fireDue()).toBe(0);
-  expect(await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ status: "done", lastAt: time, lastResult: "module executor not installed", moduleId: module.id, triggerId: "daily" });
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ status: "done", lastAt: time, lastResult: "Module has no active hash", moduleId: module.id, triggerId: "daily" });
   expect(calls).toBe(0);
   expect(await db.moduleRun.count()).toBe(0);
   expect(await db.run.count()).toBe(0);
