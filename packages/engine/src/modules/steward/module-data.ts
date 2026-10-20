@@ -34,8 +34,12 @@ export async function copyData(live: string, data: string): Promise<boolean> {
   return copy("");
 }
 export async function runOffline(ports: StewardPorts, codeDir: string, dataDir: string, entry: string, input: unknown) {
+  return runOfflineLimited(ports, codeDir, dataDir, { entry, input });
+}
+export async function runOfflineLimited(ports: StewardPorts, codeDir: string, dataDir: string, options: { entry: string; input: unknown; timeoutMs?: number }) {
+  const { entry, input, timeoutMs = RUN_LIMITS.jobTimeoutMs } = options;
   if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Sandbox unavailable");
-  const result = await ports.sandbox.runModule({ codeDir, dataDir, entry, input, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
+  const result = await ports.sandbox.runModule({ codeDir, dataDir, entry, input, network: false, timeoutMs: Math.min(timeoutMs, RUN_LIMITS.jobTimeoutMs), maxOutputBytes: RUN_LIMITS.jobOutputBytes });
   const output = { stdout: result.output.slice(0, RUN_LIMITS.jobOutputBytes), stderr: (result.error ?? "").slice(0, RUN_LIMITS.jobOutputBytes), exitCode: result.exitCode ?? 1 };
   return { result, output, succeeded: result.status === "succeeded" && result.exitCode === 0 && Buffer.byteLength(result.output) <= RUN_LIMITS.jobOutputBytes };
 }

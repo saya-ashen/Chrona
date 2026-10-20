@@ -209,22 +209,22 @@ test("activation snapshots and migrates current data, then the next firing reads
       migrations++;
       expect(input).toMatchObject({ network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() } });
       expect(input.dataDir).not.toBe(f.live);
-      if (migrations === 2) expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
+      if (migrations === 3) expect((await f.db.module.findFirstOrThrow()).status).toBe("migrating");
       await writeFile(join(input.dataDir, "nested/state"), "schema 2");
       return { status: "succeeded", exitCode: 0, output: "public migration", error: null };
     }
-    expect(await readFile(join(input.dataDir, "nested/state"), "utf8")).toBe("schema 2");
+    if (input.codeDir !== join(f.dataDir, "platform/store", f.first.hash)) expect(await readFile(join(input.dataDir, "nested/state"), "utf8")).toBe("schema 2");
     if (input.dataDir === f.live) liveReads++;
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
   const result = await f.propose();
-  expect(migrations).toBe(1);
+  expect(migrations).toBe(2);
   // Approval must snapshot current data, not the build-time copy, and replace the previous snapshot.
   await writeFile(join(f.live, "nested/state"), "changed after build");
   const snapshot = join(f.dataDir, "platform/snapshots", f.first.moduleId!, "schema-1");
   await mkdir(snapshot, { recursive: true }); await writeFile(join(snapshot, "stale"), "old snapshot");
   await f.approve(result.approvalId!);
-  expect(migrations).toBe(2);
+  expect(migrations).toBe(3);
   expect(await readFile(join(snapshot, "nested/state"), "utf8")).toBe("changed after build");
   expect(await readdir(snapshot)).toEqual(["nested"]);
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
@@ -244,7 +244,7 @@ test.each(["empty", "missing"])("activation with %s data records schema without 
   const result = await f.propose();
   await f.approve(result.approvalId!);
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: result.hash, dataSchema: 2, status: "active" });
-  expect(f.calls.map(call => call.entry)).toEqual(["test.ts", "test.ts"]);
+  expect(f.calls.map(call => call.entry)).toEqual(["test.ts", "test.ts", ...Array<string>(20).fill("index.ts")]);
   expect(await f.db.audit.count({ where: { kind: "module_migration_started" } })).toBe(0);
 });
 
@@ -647,7 +647,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   const f = await fixture(), result = await f.propose();
   expect(result.status).toBe("pending_review");
   expect(result.moduleId).toBeString();
-  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false } });
+  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], replay: { status: "skipped", reason: "first version", steps: 0, diffs: [] }, continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false } });
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]!.timeoutMs).toBe(60_000);
   expect(f.calls[0]!.maxOutputBytes).toBe(64 * 1024);

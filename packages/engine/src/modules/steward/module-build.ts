@@ -7,7 +7,8 @@ import { createRuns } from "./runs";
 import { createNotifications } from "./notify";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
-import { readModuleFiles, codeDifference, continuityPreview, insertCodeDiff } from "./module-preview";
+import { checkReplay } from "./module-replay";
+import { readModuleFiles, codeDifference, continuityPreview, replayPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
   try { return await readModuleFiles(join(context.platform, "staging", version.id), "Unsafe module staging file"); }
@@ -31,7 +32,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n${diff}\n`;
-  const suffix = `${continuityPreview(report.continuity!, needsMigration)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+  const suffix = `${continuityPreview(report.continuity!, needsMigration)}${replayPreview(report.replay!)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null;
   if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, await codeDifference(store, module.activeHash, files), hash);
@@ -60,7 +61,10 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
       ({ passed, needsMigration } = await checkContinuity(context, staging, module, manifest, continuity));
     }
     // Only engine-owned immutable copies are tested, hashed and installed.
-    if (passed) await installBuild(context, staging, hash);
+    if (passed) {
+      report.replay = await checkReplay(context, staging, module, manifest);
+      await installBuild(context, staging, hash);
+    }
     const status = passed ? "pending_review" : "rejected";
     await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
     if (!passed) return { moduleId: module.id, hash, status, report };

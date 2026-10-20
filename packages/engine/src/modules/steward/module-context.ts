@@ -9,7 +9,9 @@ import { StewardError } from "./errors";
 export const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
 export type TestReport = { stdout: string; stderr: string; exitCode: number }[];
 export type ContinuityReport = { status: "passed" | "failed" | "skipped"; reason?: string; fromSchema: number | null; toSchema: number; migrated: boolean; effects?: ModuleOutput["effects"]; migration?: TestReport[number]; output?: TestReport[number] };
-export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; migration?: TestReport[number]; errors?: string[] };
+export type ReplayResult = { ok: boolean; effects?: ModuleOutput["effects"] };
+export type ReplayReport = { status: "identical" | "different" | "skipped"; reason?: string; steps: number; diffs: { step: number; triggerId: string; firedAt: string; old: ReplayResult; new: ReplayResult }[] };
+export type BuildReport = { tests: TestReport; replay?: ReplayReport; continuity?: ContinuityReport; migration?: TestReport[number]; errors?: string[] };
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };
 export const json = (value: unknown) => value as Prisma.InputJsonValue;
 export function moduleContext(ports: StewardPorts, workspaceId: string) {
