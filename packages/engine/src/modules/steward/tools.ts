@@ -10,6 +10,7 @@ import { authenticateRun, canDescribeInactiveAffair, liveRuns } from "./runs";
 import { createAffairs, requireAffair } from "./affairs";
 import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
+import { createModules } from "./modules";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { createNotifications, RESPONSE_KEY_PREFIX } from "./notify";
@@ -24,6 +25,7 @@ function toolContext(ports: StewardPorts, claim: Claim, tool: ToolName) {
   const ctx = { db, workspaceId, now };
   return { ...claim, ...ctx, ports, tool,
     affairs: createAffairs(ctx, createWorkspaceFs(ports.dataDir)),
+    modules: createModules(ports, workspaceId),
     schedules: createSchedules(ports, workspaceId), preferences: createPreferences(ctx), approvals: createApprovals(ctx) };
 }
 type ToolContext = ReturnType<typeof toolContext>;
@@ -158,6 +160,32 @@ async function schedule(ctx: ToolContext, raw: unknown) {
   }
   return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, label: input.label, until: input.until }, "chrona");
 }
+async function proposeModule(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_propose, raw);
+  return ctx.modules.propose({ ...input, affairId: await scheduleAffairId(ctx, input.affairId) }, "provider");
+}
+async function listModules(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_modules, raw);
+  const rows = await ctx.modules.list(input.affairId ?? ctx.run.affairId ?? undefined);
+  return rows.map(({ name, id, activeHash, status, versions, runs }) => ({ name, id, activeHash, status, versions, runs }));
+}
+async function requireRunModule(ctx: ToolContext, moduleId: string) {
+  const row = await ctx.db.module.findFirst({ where: { id: moduleId, workspaceId: ctx.workspaceId, ...(ctx.run.affairId ? { affairId: ctx.run.affairId } : {}) } });
+  if (!row) throw new StewardError("not_found", "Module not found");
+  return row;
+}
+async function checkoutModule(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_module_checkout, raw);
+  const module = await requireRunModule(ctx, input.moduleId);
+  await ctx.modules.checkout(module.id, input.hash, input.dir);
+  return { moduleId: module.id, hash: input.hash ?? module.activeHash, dir: input.dir };
+}
+async function rollbackModule(ctx: ToolContext, raw: unknown) {
+  const input = parseInput(schemas.chrona_module_rollback, raw);
+  await requireRunModule(ctx, input.moduleId);
+  await ctx.modules.rollback(input.moduleId, input.hash);
+  return { moduleId: input.moduleId, activeHash: input.hash, status: "active" };
+}
 async function schedules(ctx: ToolContext, raw: unknown) {
   return ctx.schedules.list(await scheduleAffairId(ctx, parseInput(schemas.chrona_schedules, raw).affairId));
 }
@@ -273,6 +301,7 @@ async function setUi(ctx: ToolContext, raw: unknown) {
 }
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {
   chrona_ui_guide: guideUi, chrona_ui_set: setUi,
+  chrona_propose: proposeModule, chrona_modules: listModules, chrona_module_checkout: checkoutModule, chrona_module_rollback: rollbackModule,
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
   chrona_schedule_cancel: cancelSchedule, chrona_affairs: affairs, chrona_affair_create: createAffair,
   chrona_affair_update: updateAffair, chrona_focus: focus, chrona_request_approval: requestApproval,

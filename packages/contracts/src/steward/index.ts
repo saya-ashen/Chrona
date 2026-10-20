@@ -347,6 +347,13 @@ export const chronaToolInputSchemas = {
   /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
   chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: affairPathSchema.optional() }).strict(),
   chrona_schedule: createScheduleSchema.extend({ affairId: id.optional(), label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on the affair page, in the user's language, e.g. 准备第2天材料") }),
+  chrona_propose: z.object({
+    affairId: id.optional(), dir: affairPathSchema,
+    intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
+  }).strict().describe('Submit a module directory (module.json + entry + tests) for testing and user approval; affair code is never executed directly. Manifest: {name,entry,triggers:[{id,schedule}],effects,params?:{key:{type,value}},data?:{schema:1},tests:[file]}; name/ids/param keys: lowercase slugs, 2-41 chars; entry/tests: basename.ts|py|sh; schedules use chrona_schedule rules; effects: notify_user,wake_provider,network; param type: number|string|boolean matching value. stdin JSON: {trigger:{id,kind:"schedule",firedAt:ISO},now:ISO,params:{key:value}} (tests omit trigger). stdout JSON: {effects:[{type:"notify_user",key,level:"now"|"digest",title,body}|{type:"wake_provider",key,prompt}]}, max 20 effects/64 KiB. /module is read-only, /data writable; no network unless declared (tests never network); tests must exit 0. Only the exact user-approved version runs without a model.'),
+  chrona_modules: z.object({ affairId: id.optional() }).strict().describe("List modules, versions, approval status and recent runs; defaults to this affair, or all workspace modules at the root."),
+  chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: affairPathSchema }).strict().describe("Copy module files into an empty affair directory for editing; hash defaults to the active version."),
+  chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe("Roll back code to a previously approved module hash without changing module data."),
   chrona_schedules: z.object({ affairId: id.optional() }).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
   chrona_affairs: z.object({ status: z.enum(AFFAIR_STATUSES).optional() }).strict(),

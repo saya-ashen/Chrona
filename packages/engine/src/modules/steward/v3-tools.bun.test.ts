@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CHRONA_TOOLS, RUN_LIMITS } from "@chrona/contracts/steward";
@@ -88,13 +88,65 @@ for (const linked of [false, true]) test(`schedule context retains root conversa
   expect(prompts[0]).toContain('"text":"hello"');
 });
 test("catalog authenticates; every contract tool has a schema; invalid calls are counted and audited", async () => {
-  expect((await service.tools.catalog(token)).map(t => t.name)).toEqual(CHRONA_TOOLS);
+  const catalog = await service.tools.catalog(token);
+  expect(catalog.map(t => t.name)).toEqual(CHRONA_TOOLS);
+  for (const name of ["chrona_propose", "chrona_modules", "chrona_module_checkout", "chrona_module_rollback"] as const) {
+    expect(CHRONA_TOOLS).toContain(name);
+    expect(catalog.find(t => t.name === name)?.inputSchema.description).toBeString();
+  }
+  expect(catalog.find(t => t.name === "chrona_propose")!.inputSchema.description!.length).toBeLessThanOrEqual(900);
   await expect(service.tools.catalog("invalid")).rejects.toMatchObject({ code: "forbidden" });
   await expect(call("unknown")).rejects.toMatchObject({ code: "invalid" });
   await expect(call("chrona_reply", { text: "hello", workspaceId: "other" })).rejects.toMatchObject({ code: "invalid" });
   const row = await db.run.findUniqueOrThrow({ where: { id: runId } });
   expect(row.toolCalls).toMatchObject([{ ok: false }, { ok: false }]);
   expect(await db.audit.count({ where: { kind: "tool_finished" } })).toBe(2);
+});
+test("module tools propose, list, checkout and roll back only approved versions", async () => {
+  const api = service.forWorkspace(workspaceId);
+  await expect(call("chrona_propose", { dir: "module", intent: { changes: ["Watch"] } })).rejects.toMatchObject({ code: "invalid" });
+  const affair = await api.affairs.create({ title: "Module work" });
+  await call("chrona_focus", { affairId: affair.id });
+  const root = await (await api.affairs.files(affair.id)).directory();
+  await mkdir(join(root, "module"));
+  const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
+  const files = { "module.json": JSON.stringify(manifest), "index.ts": 'console.log(JSON.stringify({effects:[]}))', "test.ts": "process.exit(0)" };
+  for (const [path, content] of Object.entries(files)) await writeFile(join(root, "module", path), content);
+  ports.sandbox = { available: true, runModule: async () => ({ status: "succeeded", output: "ok", error: null, exitCode: 0 }) };
+  const intent = { changes: ["Watch prices"] };
+  const proposal = await call("chrona_propose", { dir: "module", intent }) as { moduleId: string; hash: string; approvalId: string };
+  expect(proposal).toMatchObject({ status: "pending_review", report: [{ stdout: "ok", exitCode: 0 }] });
+  expect(await db.approval.findUniqueOrThrow({ where: { id: proposal.approvalId } })).toMatchObject({ status: "open", payload: { kind: "activate_module", moduleId: proposal.moduleId, hash: proposal.hash } });
+  expect(await db.moduleVersion.findFirstOrThrow()).toMatchObject({ source: "provider", intent: { ...intent, preserves: [] } });
+  for (const input of [{}, { affairId: affair.id }]) expect(await call("chrona_modules", input)).toMatchObject([{ id: proposal.moduleId, name: "price-watch", activeHash: null, status: "active", versions: [{ hash: proposal.hash, status: "pending_review", intent: { ...intent, preserves: [] }, createdAt: ports.now() }], runs: [] }]);
+  await db.run.update({ where: { id: runId }, data: { affairId: affair.id } });
+  await expect(call("chrona_module_rollback", { moduleId: proposal.moduleId, hash: proposal.hash })).rejects.toMatchObject({ code: "conflict" });
+  await expect(call("chrona_module_checkout", { moduleId: proposal.moduleId, dir: "copy" })).rejects.toMatchObject({ code: "not_found" });
+  expect(await call("chrona_module_checkout", { moduleId: proposal.moduleId, hash: proposal.hash, dir: "copy" })).toMatchObject({ hash: proposal.hash, dir: "copy" });
+  for (const [path, content] of Object.entries(files)) expect(await readFile(join(root, "copy", path), "utf8")).toBe(content);
+  await api.approvals.resolve(proposal.approvalId, { decision: "approve", scope: "once" });
+  expect(await call("chrona_module_checkout", { moduleId: proposal.moduleId, dir: "active-copy" })).toMatchObject({ hash: proposal.hash });
+  expect(await call("chrona_module_rollback", { moduleId: proposal.moduleId, hash: proposal.hash })).toEqual({ moduleId: proposal.moduleId, activeHash: proposal.hash, status: "active" });
+  expect(await db.generation.findFirstOrThrow({ where: { reason: "rollback" } })).toMatchObject({ modules: { [proposal.moduleId]: proposal.hash } });
+});
+for (const foreignWorkspace of [false, true]) test(`module checkout and rollback enforce run ownership (foreign workspace=${foreignWorkspace})`, async () => {
+  const own = await service.forWorkspace(workspaceId).affairs.create({ title: "Own" });
+  const otherWorkspaceId = foreignWorkspace ? (await db.workspace.create({ data: { name: "Other" } })).id : workspaceId;
+  const other = await service.forWorkspace(otherWorkspaceId).affairs.create({ title: "Other" });
+  const module = await db.module.create({ data: { workspaceId: otherWorkspaceId, affairId: other.id, name: "other-module" } });
+  await db.run.update({ where: { id: runId }, data: { affairId: own.id } });
+  for (const tool of ["chrona_module_checkout", "chrona_module_rollback"]) {
+    const input = { moduleId: module.id, hash: "a".repeat(64), ...(tool === "chrona_module_checkout" ? { dir: "copy" } : {}) };
+    await expect(call(tool, input)).rejects.toMatchObject({ code: "not_found" });
+    await expect(call(tool, { ...input, hash: "invalid" })).rejects.toMatchObject({ code: "invalid" });
+  }
+  expect(await call("chrona_modules")).toEqual([]);
+  if (foreignWorkspace) {
+    await db.run.update({ where: { id: runId }, data: { affairId: null } });
+    await expect(call("chrona_module_rollback", { moduleId: module.id, hash: "a".repeat(64) })).rejects.toMatchObject({ code: "not_found" });
+    await expect(call("chrona_module_checkout", { moduleId: module.id, dir: "copy" })).rejects.toMatchObject({ code: "not_found" });
+    await expect(call("chrona_modules", { affairId: other.id })).rejects.toMatchObject({ code: "not_found" });
+  }
 });
 test("reply stores outbound and delivers; preferences and inbound are workspace bounded", async () => {
   await call("chrona_reply", { text: "answer" });
@@ -222,6 +274,8 @@ test("fake provider calls authenticated tools in-process through tick", async ()
   await service.forWorkspace(workspaceId).runs.finish(runId, { outcome: "finished", sessionId: null, error: null });
   ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start: input => ({ inject: async () => {}, abort: async () => {}, done: (async () => {
     expect(input.prompt).toContain("Context (data)");
+    expect(input.prompt).toContain("Repeated, rule-stable work should become a module via chrona_propose");
+    expect(input.prompt).toContain("modules run without a model only after the user approves the exact version");
     expect(input.prompt).toContain("root is NOT an affair");
     expect(input.prompt).toContain("first use chrona_affair_create or chrona_focus");
     expect(input.prompt).toContain("<dirName>/");
