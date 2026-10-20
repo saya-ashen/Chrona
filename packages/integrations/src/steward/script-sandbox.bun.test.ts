@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, readFile, readlink, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createScriptSandbox, scriptWorkspaceArguments } from "./script-sandbox";
@@ -31,6 +31,40 @@ sandboxTest("workspace can write but cannot read fake data or home secrets", asy
 });
 test("missing sandbox fails closed", async () => {
   expect(await createScriptSandbox({}).run({ language: "shell", source: "exit 0", input: {} })).toMatchObject({ status: "unavailable", error: "沙箱不可用" });
+});
+sandboxTest("module code is read-only, data writable, JSON stdin, clear environment and network off by default", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-sandbox-"));
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data"), secret = join(root, "secret");
+    await mkdir(codeDir); await mkdir(dataDir); await writeFile(secret, "synthetic secret");
+    const network = await readlink("/proc/self/ns/net");
+    await writeFile(join(codeDir, "test.py"), `import os,json,sys\nassert os.getcwd() == '/module'\nassert 'HOME' not in os.environ\nassert json.load(sys.stdin)['value'] == 42\nassert os.readlink('/proc/self/ns/net') != ${JSON.stringify(network)}\nassert os.listdir(${JSON.stringify(homedir())}) == []\nassert not os.path.exists(${JSON.stringify(secret)})\ntry:\n open('/module/test.py', 'w')\n raise AssertionError('module writable')\nexcept OSError: pass\nopen('/data/result', 'w').write('ok')\nprint('isolated')`);
+    const moduleSandbox = createScriptSandbox({ bwrapPath, dataDir: root });
+    expect(await moduleSandbox.runModule({ codeDir, dataDir, entry: "test.py", input: { value: 42 } })).toMatchObject({ status: "succeeded", exitCode: 0, output: "isolated\n" });
+    expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
+    await writeFile(join(codeDir, "test.py"), `import os\nassert os.readlink('/proc/self/ns/net') == ${JSON.stringify(network)}\nprint('shared')`);
+    expect(await moduleSandbox.runModule({ codeDir, dataDir, entry: "test.py", input: {}, network: true })).toMatchObject({ status: "succeeded", output: "shared\n" });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+sandboxTest("module interpreters, timeout, output caps and entry validation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-limits-"));
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data");
+    await mkdir(codeDir); await mkdir(dataDir);
+    await writeFile(join(codeDir, "test.sh"), 'printf "%s:%s" "$PWD" "${HOME-unset}"');
+    await writeFile(join(codeDir, "test.ts"), 'console.log(JSON.parse(await Bun.stdin.text()).value)');
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "/module:unset" });
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.ts", input: { value: 42 } })).toMatchObject({ status: "succeeded", output: "42\n" });
+    await writeFile(join(codeDir, "test.sh"), 'while :; do :; done');
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {}, timeoutMs: 100 })).toMatchObject({ status: "timed_out" });
+    await writeFile(join(codeDir, "test.py"), "import sys; print('x'*10000); print('y'*10000,file=sys.stderr)");
+    const result = await sandbox.runModule({ codeDir, dataDir, entry: "test.py", input: {}, maxOutputBytes: 100 });
+    expect(result.status).toBe("succeeded");
+    expect(Buffer.byteLength(result.output)).toBe(100);
+    expect(Buffer.byteLength(result.error!)).toBe(100);
+    await expect(sandbox.runModule({ codeDir, dataDir, entry: "../test.py", input: {} })).rejects.toThrow("Invalid module entry");
+    expect(await createScriptSandbox({}).runModule({ codeDir, dataDir, entry: "test.py", input: {} })).toMatchObject({ status: "unavailable" });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 sandboxTest("python reads JSON stdin; shell runs with minimal environment", async () => {
   expect(await sandbox.run({ language: "python", source: "import json,sys; print(json.load(sys.stdin)['value'])", input: { value: 42 } })).toMatchObject({ status: "succeeded", output: "42\n" });

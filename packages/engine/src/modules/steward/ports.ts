@@ -12,6 +12,10 @@ export type StewardPorts = {
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
   connectors?: ConnectorAdapter[];
-  sandbox?: { available: boolean; run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }> };
+  sandbox?: {
+    available: boolean;
+    run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }>;
+    runModule?(input: { codeDir: string; dataDir: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;
+  };
   gitHealth?: () => Promise<boolean>;
 };

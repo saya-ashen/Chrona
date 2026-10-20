@@ -1,5 +1,6 @@
 export { createStewardService } from "./service";
 export { createSchedules } from "./schedules";
+export { createModules } from "./modules";
 export { createRuns, liveRuns, authenticateRun } from "./runs";
 export { createTick } from "./tick";
 export { createTools } from "./tools";

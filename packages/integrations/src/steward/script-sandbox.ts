@@ -1,6 +1,6 @@
-import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, extname, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
 type Language = "python" | "shell" | "typescript";
@@ -42,18 +42,13 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
   // Probe namespace support too: an installed binary is not necessarily usable.
   const available = !!(bwrap && shell && spawnSync(bwrap, [...base, "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status === 0);
   const languages = available ? (Object.keys(interpreters) as Language[]).filter(l => interpreters[l]) : [];
-  return {
-    health: { available, languages },
-    async run({ language, source, input, cwd, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { language: Language; source: string; input: unknown; cwd?: string; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
+  async function execute(language: Language, args: string[], input: unknown, profile: string[], runTimeout: number, outputLimit: number): Promise<ScriptSandboxResult> {
       limits(runTimeout, outputLimit);
-      const directory = workspaceDirectory(cwd);
-      // Mount the workspace after /tmp so OS-temp affair directories remain visible.
-      const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
       const interpreter = interpreters[language];
       if (!available || !bwrap || !shell || !interpreter) return { status: "unavailable", output: "", error: "沙箱不可用" };
       return new Promise(resolve => {
         let output = Buffer.alloc(0), errors = Buffer.alloc(0), timedOut = false;
-        const child = spawn(bwrap, [...profile, "--", shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "sandbox", String(memoryMb * 1024), interpreter, language === "typescript" ? "-e" : "-c", source], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
+        const child = spawn(bwrap, [...profile, "--", shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "sandbox", String(memoryMb * 1024), interpreter, ...args], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
         const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, runTimeout);
         const cap = (previous: Buffer, next: Buffer) => Buffer.concat([previous, next.subarray(0, Math.max(0, outputLimit - previous.length))]);
         child.stdout.on("data", (chunk: Buffer) => { output = cap(output, chunk); });
@@ -66,6 +61,29 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
         });
         child.stdin.end(JSON.stringify(input));
       });
+  }
+  return {
+    health: { available, languages },
+    async run({ language, source, input, cwd, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { language: Language; source: string; input: unknown; cwd?: string; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
+      const directory = workspaceDirectory(cwd);
+      const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
+      return execute(language, [language === "typescript" ? "-e" : "-c", source], input, profile, runTimeout, outputLimit);
+    },
+    async runModule({ codeDir, dataDir: moduleData, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
+      if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
+      const language = ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
+      const code = workspaceDirectory(codeDir)!, data = workspaceDirectory(moduleData)!;
+      // Reuse the P0 root/home/data masks, but never expose a writable code mount.
+      const profile = scriptWorkspaceArguments(code, paths, dataDir);
+      const mount = profile.indexOf("--bind");
+      profile.splice(mount, 5, "--ro-bind", code, "/module", "--bind", data, "/data", "--chdir", "/module");
+      // A private root supplies mount points without creating anything on the host.
+      // Keep the P0 host view read-only, then freeze the private root before exec.
+      profile.splice(profile.indexOf("--ro-bind"), 3, "--tmpfs", "/",
+        ...readdirSync("/").filter(name => !["module", "data", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+      profile.push("--remount-ro", "/");
+      if (!network) profile.splice(profile.indexOf("--share-net"), 1);
+      return execute(language, [`/module/${entry}`], input, profile, runTimeout, outputLimit);
     },
   };
 }

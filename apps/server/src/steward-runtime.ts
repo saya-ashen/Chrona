@@ -80,6 +80,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()) });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
+    runModule: input => scriptSandbox.runModule(input),
     async run({ command, cwd, timeoutMs, maxOutputBytes }) {
       const result = await scriptSandbox.run({ language: "shell", source: command, input: {}, cwd, timeoutMs, maxOutputBytes });
       return { output: result.output, exitCode: result.status === "succeeded" ? 0 : result.exitCode || 1 };

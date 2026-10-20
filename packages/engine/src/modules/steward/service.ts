@@ -2,6 +2,7 @@ import { createUiEvents } from "./ui";
 import type { StewardPorts } from "./ports";
 import { createAffairs } from "./affairs";
 import { createApprovals } from "./approvals";
+import { createModules } from "./modules";
 import { createTools } from "./tools";
 import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
@@ -27,6 +28,12 @@ export function createStewardService(inputPorts: StewardPorts) {
   };
   return { chat, tools: createTools(ports), tick, forWorkspace(workspaceId: string) {
     const ctx = { db: ports.db, workspaceId, now: ports.now };
+    const modules = createModules(ports, workspaceId);
+    const approvals = createApprovals(ctx, async action => {
+      const payload = action.payload;
+      if (payload && typeof payload === "object" && !Array.isArray(payload) && payload.kind === "activate_module") await modules.onApproved(action);
+      else await ports.onApproved?.(action);
+    });
     const projection = createToday(ctx, fs, {
       async provider() {
         if (!ports.provider) return { name: "unconfigured", available: false, sandboxed: false, lastError: null };
@@ -38,7 +45,7 @@ export function createStewardService(inputPorts: StewardPorts) {
       }),
       jobsSandbox: () => ports.sandbox?.available ?? false,
     });
-    return { provider: createProviderControl(ports, workspaceId), uiEvent: createUiEvents(ctx, chat.submit), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), approvals: createApprovals(ctx, ports.onApproved), grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
+    return { provider: createProviderControl(ports, workspaceId), uiEvent: createUiEvents(ctx, chat.submit), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number) => chat.messages(workspaceId, limit) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), affairs: createAffairs(ctx, fs), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

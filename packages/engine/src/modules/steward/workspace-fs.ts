@@ -180,6 +180,46 @@ function affairFiles(affairsRoot: string, root: (dirName: string) => Promise<str
     safeDir(dirName);
     const run = <T>(action: (dir: string) => Promise<T>) => locked(join(affairsRoot, dirName), async () => action(await root(dirName)));
     return {
+      /** Bounded, no-follow snapshot for the module gateway; never traverse git metadata. */
+      snapshotModule: (path: string) => run(async dir => {
+        const result: { path: string; bytes: Uint8Array }[] = [];
+        let total = 0;
+        const walk = async (relative: string, prefix: string): Promise<void> => {
+          const target = await confined(dir, relative), info = await lstat(target);
+          if (info.isDirectory()) {
+            for (const entry of await readdir(target)) await walk(`${relative}/${entry}`, prefix ? `${prefix}/${entry}` : entry);
+          } else {
+            if (result.length >= 200 || total + info.size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+            const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+            try {
+              const stat = await handle.stat();
+              if (!stat.isFile() || stat.nlink !== 1) throw new StewardError("forbidden", "Unsafe module file");
+              const buffer = Buffer.alloc(1024 * 1024 - total + 1);
+              let length = 0;
+              while (length < buffer.length) {
+                const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+                if (!bytesRead) break;
+                length += bytesRead;
+              }
+              total += length;
+              if (total > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+              result.push({ path: prefix, bytes: buffer.subarray(0, length) });
+            } finally { await handle.close(); }
+          }
+        };
+        const target = await confined(dir, path);
+        if (!(await lstat(target)).isDirectory()) throw new StewardError("invalid", "Module must be a directory");
+        await walk(path, "");
+        return result.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+      }),
+      checkoutModule: (path: string, files: { path: string; bytes: Uint8Array }[]) => run(async dir => {
+        const target = await confined(dir, path, true);
+        try {
+          if (!(await lstat(target)).isDirectory() || (await readdir(target)).length) throw new StewardError("conflict", "Checkout directory must be empty");
+        } catch (error) { if (!missing(error)) throw error; await mkdir(target); }
+        for (const file of files) await writeFile(dir, `${path}/${safePath(file.path)}`, file.bytes, true);
+        await commit(dir, "chrona", `Checkout module ${path}`, files.map(file => `${path}/${file.path}`));
+      }),
       /** Absolute cwd for a trusted Provider runtime; not a user-controlled path. */
       directory: () => run(async dir => dir),
       tree: (directory = "") => run(async dir => {
