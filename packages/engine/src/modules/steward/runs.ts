@@ -12,6 +12,7 @@ import { enqueueNotification } from "./notify";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
+import { settleBuildAttempt } from "./module-build-lane";
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
@@ -85,7 +86,7 @@ class RunService {
     const timezone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
     for (const run of await tx.run.findMany({ where: { ...eligible, lane }, include: { affair: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
       if (await this.deferIneligibleRun(tx, run, now, timezone)) continue;
-      const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (lane === "foreground" ? RUN_LIMITS.foregroundTimeoutMs : RUN_LIMITS.backgroundTimeoutMs));
+      const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane]);
       const claimed = await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt } });
       if (!claimed.count) continue;
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane } });
@@ -106,32 +107,23 @@ class RunService {
     if (run.status !== "running") return;
     const cancelled = !!await db.audit.findUnique({ where: { id: providerCancelKey(run.id) } });
     const result = this.finishState(run, outcome, now, cancelled);
-    const changes = await this.commitChanges(run, result);
+    // Build runs work in a Chrona-owned directory; the affair is only their budget owner.
+    const changes = run.lane === "build" ? [] : await this.commitChanges(run, result);
     const chatBound = ports.chat ? await ports.chat.bound() : false;
     const finalized = await db.$transaction(async tx => {
       await this.applyCancellation(tx, run.id, result);
       const { status, error, foregroundDeadline } = result;
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return null;
-      let deadlineMessage = null;
       await this.recordChanges(tx, run, changes, { now, status, sessionId: outcome.sessionId });
-      const history = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
-      let failures = 0;
-      for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
-      if (failures === RUN_LIMITS.maxFailures) await enqueueNotification(tx, { workspaceId, affairId: run.affairId ?? undefined, level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", dedupeKey: `run-failed:${runId}` }, { now, chatBound, publicUrl: ports.publicUrl });
-      if (foregroundDeadline) {
-        deadlineMessage = await this.continueAfterDeadline(tx, run, now);
-      } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
-        // Retry identity is immutable; the attempt status already records why it retried.
-        const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
-        await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
-        const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
-        if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
-      }
+      // Build attempts are settled and retried by the build lane, never by the generic retry path.
+      const deadlineMessage = run.lane === "build" ? null : await this.followUp(tx, run, { status, foregroundDeadline, now, chatBound });
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
       return { deadlineMessage };
     });
     if (!finalized) return;
     liveRuns.delete(runId);
+    // No-op for other lanes.
+    await settleBuildAttempt(ports, workspaceId, runId);
     if (finalized.deadlineMessage) {
       const message = finalized.deadlineMessage;
       try {
@@ -143,6 +135,25 @@ class RunService {
       }
     }
     await ports.onRunFinished?.(workspaceId, runId);
+  }
+  /** Failure notice, foreground deadline continuation or retry after a run ends. */
+  private async followUp(tx: Prisma.TransactionClient, run: RunWithAffair, result: { status: string; foregroundDeadline: boolean; now: Date; chatBound: boolean }) {
+    const { ports, workspaceId } = this, { status, foregroundDeadline, now, chatBound } = result, runId = run.id;
+    let deadlineMessage = null;
+    const history = await tx.run.findMany({ where: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
+    let failures = 0;
+    for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
+    if (failures === RUN_LIMITS.maxFailures) await enqueueNotification(tx, { workspaceId, affairId: run.affairId ?? undefined, level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", dedupeKey: `run-failed:${runId}` }, { now, chatBound, publicUrl: ports.publicUrl });
+    if (foregroundDeadline) {
+      deadlineMessage = await this.continueAfterDeadline(tx, run, now);
+    } else if (["failed", "timed_out", "provider_unavailable"].includes(status) && (!run.affair || run.affair.status === "active")) {
+      // Retry identity is immutable; the attempt status already records why it retried.
+      const retry = await tx.run.create({ data: { workspaceId, affairId: run.affairId, conversationKey: run.conversationKey, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+      await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
+      const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
+      if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
+    }
+    return deadlineMessage;
   }
   async expireLeases(now = this.ports.now()) {
     const { db } = this.ports, { workspaceId } = this;
@@ -194,7 +205,7 @@ class RunService {
   }
   /** Records the session without committing when another run is still writing this affair. */
   private async otherRunWriting(run: RunWithAffair, affairId: string, changes: { affairId: string; commit: string | null; paths: string[] }[]) {
-    if (!await this.ports.db.run.count({ where: { workspaceId: this.workspaceId, affairId, status: "running", id: { not: run.id } } })) return false;
+    if (!await this.ports.db.run.count({ where: { workspaceId: this.workspaceId, affairId, status: "running", lane: { not: "build" }, id: { not: run.id } } })) return false;
     if (run.affairId === affairId) changes.push({ affairId, commit: null, paths: [] });
     return true;
   }

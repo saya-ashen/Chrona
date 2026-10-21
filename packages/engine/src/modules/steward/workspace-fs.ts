@@ -176,7 +176,7 @@ async function confined(dir: string, path: string, createParents = false) {
       return { sha, author: email === "user@local" ? "user" : "chrona", at: new Date(at!).toISOString(), message: message.join("\n").slice(0, 500), paths };
     }));
   }
-async function snapshotModule(dir: string, path: string) {
+export async function snapshotModule(dir: string, path: string) {
   const result: { path: string; bytes: Uint8Array }[] = [];
   let total = 0;
   const walk = async (relative: string, prefix: string): Promise<void> => {

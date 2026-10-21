@@ -23,8 +23,8 @@ export const affairPathSchema = z.string().trim().min(1).max(500)
 // ---------------------------------------------------------------- vocab ----
 
 export const AFFAIR_STATUSES = ["active", "paused", "done"] as const;
-export const RUN_LANES = ["foreground", "background"] as const;
-export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry"] as const;
+export const RUN_LANES = ["foreground", "background", "build"] as const;
+export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
 export const ACTIVITY_ACTORS = ["user", "chrona", "source"] as const;
 export const ACTIVITY_KINDS = ["message", "edit", "run", "schedule", "approval", "notification", "source", "status", "note"] as const;
@@ -64,6 +64,8 @@ export const RUN_LIMITS = {
   /** Inbound items are delivered to the Provider in batches: wait this long after the first item, then wake once. */
   inboundBatchWindowMs: 5 * 60_000, maxItemsPerBatch: 50,
   jobTimeoutMs: 60_000, jobOutputBytes: 64 * 1024,
+  /** Intent-proposal build lane (docs/zh/platform-p4-build-spec.md §5); tentative budget. */
+  buildTimeoutMs: 10 * 60_000, maxBuildAttempts: 3, maxBuildRunsPerDay: 6, maxBuildSubmissionsPerRun: 3,
 } as const;
 
 export type AffairStatus = (typeof AFFAIR_STATUSES)[number];
@@ -368,9 +370,10 @@ export const chronaToolInputSchemas = {
   chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: affairPathSchema.optional() }).strict(),
   chrona_schedule: createScheduleSchema.extend({ affairId: id.optional(), label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on the affair page, in the user's language, e.g. 准备第2天材料") }),
   chrona_propose: z.object({
-    affairId: id.optional(), dir: affairPathSchema,
+    affairId: id.optional(), dir: affairPathSchema.optional(),
+    request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().describe('Submit module dir → building → hash-bound approval or repair wake. module.json {name,entry,triggers,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. stdin {trigger:{id,kind:schedule|inbound|tool,firedAt,item?,args?},now,params}; stdout {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}],handled?,result?} <=20/64KiB. /module ro, /data rw; tests offline, exit 0. Review runs once on a data copy; schema upgrade with data needs migrate (stdin {migrate:{from,to},now}). In authorized affairs, updates with no new effects, no migration and identical simulation auto-activate.'),
+  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples} instead of dir: a budgeted build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,entry,triggers,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. stdin {trigger:{id,kind:schedule|inbound|tool,firedAt,item?,args?},now,params}; stdout {effects:[{type:"notify_user",key,level,title,body}|{type:"wake_provider",key,prompt}],handled?,result?} <=20/64KiB. /module ro, /data rw; tests offline, exit 0. Review runs once on a data copy; schema upgrade with data needs migrate (stdin {migrate:{from,to},now}). In authorized affairs, updates with no new effects, no migration and identical simulation auto-activate.'),
   chrona_modules: z.object({ affairId: id.optional() }).strict().describe("List modules, versions, approval status and recent runs; defaults to this affair, or all workspace modules at the root."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: affairPathSchema }).strict().describe("Copy module files into an empty affair directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),

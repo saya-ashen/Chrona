@@ -12,6 +12,7 @@ import { createWorkspaceFs } from "./workspace-fs";
 import { createSchedules } from "./schedules";
 import { createModules } from "./modules";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
+import { proposeFromBuild, requestBuild } from "./module-build-lane";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { createNotifications, RESPONSE_KEY_PREFIX } from "./notify";
@@ -162,8 +163,14 @@ async function schedule(ctx: ToolContext, raw: unknown) {
   return ctx.schedules.create(id, { mode: input.mode, rule: input.rule, text: input.text, label: input.label, until: input.until }, "chrona");
 }
 async function proposeModule(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_propose, raw);
-  return ctx.modules.propose({ ...input, affairId: await scheduleAffairId(ctx, input.affairId) }, "provider");
+  const { request, dir, ...input } = parseInput(schemas.chrona_propose, raw);
+  if (ctx.run.lane === "build") {
+    if (!dir) throw new StewardError("conflict", "Build runs submit module directories, not build requests");
+    return proposeFromBuild(ctx.ports, ctx.workspaceId, ctx.run, { dir, intent: input.intent });
+  }
+  const affair = await scheduleAffairId(ctx, input.affairId);
+  if (request) return requestBuild(ctx.ports, ctx.workspaceId, ctx.run, { affairId: affair, request, intent: input.intent });
+  return ctx.modules.propose({ ...input, dir: dir!, affairId: affair }, "provider");
 }
 async function listModules(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_modules, raw);
@@ -328,6 +335,7 @@ export function createTools(ports: StewardPorts) {
     const { workspaceId, run, index } = claim;
     let ok = false;
     try {
+      if (run.lane === "build" && name !== "chrona_propose") throw new StewardError("forbidden", "Build runs may only call chrona_propose");
       if (name.startsWith("m_")) {
         const result = await callModuleTool(ports, run, name, raw);
         ok = true;
@@ -351,6 +359,7 @@ export function createTools(ports: StewardPorts) {
   return {
     catalog: async (token: string) => {
       const { run } = await authenticateRun(db, token, now());
+      if (run.lane === "build") return [{ name: "chrona_propose", inputSchema: z.toJSONSchema(schemas.chrona_propose) }];
       return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...await moduleToolCatalog(ports, run)];
     },
     call,

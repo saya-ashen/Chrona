@@ -9,6 +9,7 @@ import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleCo
 import { runTests, checkContinuity } from "./module-continuity";
 import { checkReplay } from "./module-replay";
 import { tryAutoActivate } from "./module-auto";
+import { settleBuildVersion } from "./module-build-lane";
 import { readModuleFiles, codeDifference, continuityPreview, replayPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -114,6 +115,7 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
     });
     if (!claimed) continue;
     const result = await buildVersion(context, version);
-    if (result.status === "rejected" && version.source === "provider") await reportFailure(context, version, result);
+    if (version.source === "build") await settleBuildVersion(context.ports, workspaceId, version.id);
+    else if (result.status === "rejected" && version.source === "provider") await reportFailure(context, version, result);
   }
 }

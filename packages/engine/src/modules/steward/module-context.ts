@@ -13,6 +13,7 @@ export type ReplayResult = { ok: boolean; effects?: ModuleOutput["effects"] };
 export type ReplayReport = { status: "identical" | "different" | "skipped"; reason?: string; steps: number; diffs: { step: number; triggerId: string; firedAt: string; old: ReplayResult; new: ReplayResult }[] };
 export type BuildReport = { tests: TestReport; replay?: ReplayReport; continuity?: ContinuityReport; migration?: TestReport[number]; errors?: string[] };
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };
+export type ModuleSource = "provider" | "user" | "build";
 export const json = (value: unknown) => value as Prisma.InputJsonValue;
 export function moduleContext(ports: StewardPorts, workspaceId: string) {
   const platform = join(ports.dataDir, "platform");

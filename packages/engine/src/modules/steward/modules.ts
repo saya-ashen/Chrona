@@ -3,7 +3,7 @@ import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./approvals";
 import { requireAffair } from "./affairs";
 import { StewardError } from "./errors";
-import { moduleContext, requireModule, type ModuleContext } from "./module-context";
+import { moduleContext, requireModule, type ModuleContext, type ModuleSource } from "./module-context";
 import { propose } from "./module-proposal";
 import { buildPending } from "./module-build";
 import { onApproved, rollback } from "./module-activation";
@@ -27,7 +27,7 @@ async function checkout(context: ModuleContext, moduleId: string, hash: string |
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const context = moduleContext(ports, workspaceId);
   return {
-    propose: (input: Parameters<typeof propose>[1], source: "provider" | "user") => propose(context, input, source),
+    propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
     buildPending: (now = ports.now()) => buildPending(context, now),
     recoverMigrations: (now = ports.now()) => recoverMigrations(context, now),
     activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => ports.db.$transaction(tx => activateIn(context, tx, moduleId, hash, reason)),

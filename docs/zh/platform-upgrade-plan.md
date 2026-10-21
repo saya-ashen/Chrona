@@ -1,6 +1,6 @@
 # Chrona 升级为可自生长平台：改造方案
 
-状态：P0–P3 已实现；P4 的入站触发与模块工具已实现，构建通道待定；P5 未开始。
+状态：P0–P4 已实现（构建通道额度为暂定值，见 [构建通道规格](platform-p4-build-spec.md)）；P5 未开始。
 范式来源：`~/workspace/agent-growth-lab/docs/self-modification-paradigm.md`（下称"范式"）。
 用户已确认：本方案以当前需求为准，旧 AGENTS.md / steward 文档中与之冲突的约束（删除 ManagedTool、沙箱只用于旧脚本调度、不给 Provider 提供工具等）可以修改。
 
@@ -238,7 +238,7 @@ Chrona 既为 Provider 提供工具，又在触发时启动 Provider。这与操
 
 **验收**：故意加入一条意图中未声明的规则（如"再降 200 才通知"），回放报告标出差异并阻止自动启用。
 
-### P4 扩大生长面（入站触发与模块工具已完成，见 [P4 规格](platform-p4-spec.md)；构建通道待用户决定）
+### P4 扩大生长面（已完成，见 [P4 规格](platform-p4-spec.md)、[构建通道规格](platform-p4-build-spec.md) 与 [端到端记录](platform-e2e-p4-build-2026-10-21.md)）
 
 - `inbound` 触发（steward-workspace §9 的"AI 写 Chrona 执行的廉价规则"）。
 - 模块导出工具，经 `/catalog` 按事务暴露。

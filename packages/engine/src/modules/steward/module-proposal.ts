@@ -6,10 +6,11 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { requireAffair } from "./affairs";
 import { effectivePolicyIn } from "./grants";
 import { parseInput, StewardError } from "./errors";
-import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal } from "./module-context";
+import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
+import { snapshotModule } from "./workspace-fs";
 
 type Manifest = z.output<typeof moduleManifestSchema>;
-type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: "provider" | "user"; report: BuildReport };
+type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
@@ -69,13 +70,14 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };
   return { moduleId: module.id, hash, status: "building", report, retained: true };
 }
-export async function propose(context: ModuleContext, input: { affairId: string; dir: string; intent: z.input<typeof intentSchema> }, source: "provider" | "user"): Promise<Proposal> {
+/** `root` is a Chrona-owned build directory (build lane); otherwise `dir` is inside the affair. */
+export async function propose(context: ModuleContext, input: { affairId: string; dir: string; intent: z.input<typeof intentSchema>; root?: string }, source: ModuleSource): Promise<Proposal> {
   const { db, workspaceId, fs, platform } = context;
   const intent = parseInput(intentSchema, input.intent);
   // Validate runtime callers too, without an impossible comparison on the typed union.
-  if (!["provider", "user"].includes(source)) throw new StewardError("invalid", "Invalid module source");
+  if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
   const affair = await requireAffair(db, workspaceId, input.affairId);
-  const files = await fs.forAffair(affair.dirName).snapshotModule(input.dir);
+  const files = input.root ? await snapshotModule(input.root, input.dir) : await fs.forAffair(affair.dirName).snapshotModule(input.dir);
   const digest = createHash("sha256");
   for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
   const hash = digest.digest("hex"), report: BuildReport = { tests: [] };
