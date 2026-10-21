@@ -36,6 +36,16 @@ async function permittedProposal(context: ModuleContext, affairId: string) {
 function hasMigration(manifest: Manifest, files: { path: string }[]) {
   return !manifest.data.migrate || files.some(file => file.path === manifest.data.migrate);
 }
+type Issue = { path: PropertyKey[]; message: string; code?: string; errors?: Issue[][] };
+/** A union's own message is only "Invalid input": report the closest branch's issues so the Provider can fix them. */
+function manifestIssues(issues: readonly Issue[], prefix: PropertyKey[] = []): Issue[] {
+  return issues.flatMap(issue => {
+    const path = [...prefix, ...issue.path];
+    if (issue.code !== "invalid_union" || !issue.errors?.length) return [{ ...issue, path }];
+    const closest = issue.errors.reduce((best, branch) => branch.length < best.length ? branch : best);
+    return manifestIssues(closest, path);
+  });
+}
 async function readManifest(staging: string): Promise<{ manifest: Manifest } | { errors: string[] }> {
   let raw: unknown;
   // Invalid manifests have no validated identity; never expose JSON parser/host diagnostics.
@@ -43,7 +53,7 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
   catch { return { errors: ["module.json: missing or not valid JSON"] }; }
   const parsed = moduleManifestSchema.safeParse(raw);
   // Schema issue paths and messages come from the contract, so the Provider can fix its manifest.
-  return parsed.success ? { manifest: parsed.data } : { errors: parsed.error.issues.slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
+  return parsed.success ? { manifest: parsed.data } : { errors: manifestIssues(parsed.error.issues).slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
 }
 function submissionErrors(manifest: Manifest, permitted: boolean, hasEntry: boolean, hasMigrate: boolean) {
   return [...(permitted ? [] : ["policy: module activation or notifications are set to never"]), ...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];

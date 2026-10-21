@@ -842,6 +842,9 @@ test("invalid manifests reject without inventing a module identity or leaking pa
   // Real Pi run: a human title as name must come back as a fixable field error.
   await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "喝水提醒", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], tests: ["test.ts"] }));
   expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [expect.stringMatching(/^name: /)] } });
+  // Real build run: a trigger union error must name the closest branch's field, not just "Invalid input".
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "water", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00", timezone: "Asia/Shanghai" } }], effects: [], tests: ["test.ts"] }));
+  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: ['triggers.0.schedule: Unrecognized key: "timezone"'] } });
   expect(await f.db.module.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
