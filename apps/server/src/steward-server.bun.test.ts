@@ -80,3 +80,19 @@ test.skipIf(!(await Bun.file("apps/web/dist/index.html").exists()))("unlocalized
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe("/zh/affairs/a1?path=trending.md");
 });
+
+test("owner MCP is owner protected, lists the owner tools and returns only public errors", async () => {
+  const { workspaceId } = await seedWorkspace("Steward");
+  const app = await createServerApp();
+  let id = 0;
+  const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = owner) => {
+    const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
+    return { status: response.status, body: response.status === 200 ? await response.json() as { result: { tools?: { name: string }[]; content?: { type: string; text: string }[]; isError?: boolean } } : null };
+  };
+  expect((await rpc("tools/list", {}, {})).status).toBe(401);
+  expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).status).toBe(200);
+  expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name)).toEqual(["chrona_today", "chrona_affairs", "chrona_affair_read", "chrona_chat", "chrona_approvals", "chrona_approval_resolve", "chrona_modules", "chrona_notifications"]);
+  expect(JSON.parse((await rpc("tools/call", { name: "chrona_affairs", arguments: {} })).body!.result.content![0]!.text)).toEqual([]);
+  expect((await rpc("tools/call", { name: "chrona_affair_read", arguments: { affairId: "missing" } })).body!.result).toEqual({ content: [{ type: "text", text: "not_found: Affair not found" }], isError: true });
+  expect((await app.request(`/api/mcp?workspaceId=${workspaceId}x`, { method: "POST", headers: { ...owner, "content-type": "application/json" }, body: "{}" })).status).toBe(404);
+});

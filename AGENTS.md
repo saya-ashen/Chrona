@@ -44,6 +44,10 @@ Rules that follow from the goals:
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.
 
+The owner MCP (`apps/server/src/routes/steward-mcp.ts`, `/api/mcp`, API_KEY) lets the user's own agents (Pi, Claude Code)
+do what the web UI does: read affairs, chat, list/resolve approvals, list modules and notifications. It is not the removed
+management MCP and never exposes Provider tools or run capabilities.
+
 Never pre-approved: deleting or migrating real user data, deploy/push, live databases,
 real accounts or external sends, disabling auth, approvals or secret redaction.
 
