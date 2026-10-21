@@ -67,12 +67,13 @@ async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
   return version;
 }
 
-test.each(["no grant", "once grant", "new effect", "migration", "network", "triggers", "different", "activation failure"])("requires ordinary approval: %s", async kind => {
+test.each(["no grant", "once grant", "new effect", "migration", "network", "triggers", "different", "repeated key", "activation failure"])("requires ordinary approval: %s", async kind => {
   const f = await fixture();
   await configureManualCase(f, kind);
   const version = await assertManual(f);
   const report = version.report as { replay: { status: string } };
   if (kind === "different") expect(report.replay.status).toBe("different");
+  if (kind === "repeated key") expect(version.report).toMatchObject({ replay: { status: "identical" }, keyProbe: { status: "repeated", keys: ["notify_user:price"] } });
   if (["network", "triggers"].includes(kind)) expect(report.replay.status).toBe("skipped");
   if (kind === "once grant") expect(await f.db.grant.findUniqueOrThrow({ where: { id: f.grantId } })).toMatchObject({ once: true, consumedAt: null });
 });
@@ -88,6 +89,8 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
     f.manifest.data = { schema: 2, migrate: "migrate.ts" };
   }
   if (kind === "different") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.entry === "test.ts" || input.codeDir.endsWith(f.first.hash) ? [] : [{ type: "notify_user", key: "price", level: "digest", title: "Price", body: "Changed" }] }) });
+  // Only the key probe sees an effect, so replay stays identical and the probe alone blocks.
+  if (kind === "repeated key") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.dataDir.includes("chrona-module-probe-") ? [{ type: "notify_user", key: "price", level: "digest", title: "Price", body: "Same" }] : [] }) });
   if (kind === "activation failure") {
     const run = f.ports.sandbox!.runModule!;
     let entries = 0;

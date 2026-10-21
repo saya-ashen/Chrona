@@ -28,7 +28,8 @@ async function dailyBuildRuns(tx: Prisma.TransactionClient, workspaceId: string,
   const recent = await tx.run.findMany({ where: { workspaceId, lane: "build", createdAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { createdAt: true } });
   return recent.filter(run => localDayKey(run.createdAt, timezone) === localDayKey(now, timezone)).length;
 }
-async function enqueueAttempt(ports: StewardPorts, tx: Prisma.TransactionClient, workspaceId: string, request: { id: string; affairId: string; name: string }, attempt: number, report: unknown) {
+async function enqueueAttempt(ports: StewardPorts, tx: Prisma.TransactionClient, workspaceId: string, request: { id: string; affairId: string; name: string }, previous: { attempt: number; report: unknown }) {
+  const { attempt, report } = previous;
   const id = randomUUID();
   await tx.run.create({ data: { id, workspaceId, affairId: request.affairId, lane: "build", trigger: "build", label: `构建模块 ${request.name}`, prompt: "", provider: ports.provider?.name ?? "unconfigured", tokenHash: createHash("sha256").update(randomBytes(32)).digest("hex"), cwd: buildDir(ports.dataDir, id), createdAt: ports.now() } });
   await tx.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "module_build_attempt", subjectId: id, details: { requestId: request.id, attempt, report: (report ?? null) as Prisma.InputJsonValue } } });
@@ -50,7 +51,7 @@ export async function requestBuild(ports: StewardPorts, workspaceId: string, run
     if (blocked) throw new StewardError("conflict", blocked);
     const requestId = randomUUID();
     await tx.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "module_build_request", subjectId: requestId, details: { affairId: affair.id, ...input.request, intent } } });
-    const runId = await enqueueAttempt(ports, tx, workspaceId, { id: requestId, affairId: affair.id, name: input.request.name }, 1, null);
+    const runId = await enqueueAttempt(ports, tx, workspaceId, { id: requestId, affairId: affair.id, name: input.request.name }, { attempt: 1, report: null });
     return { status: "build_queued" as const, requestId, runId };
   });
 }
@@ -119,7 +120,7 @@ export async function settleBuildAttempt(ports: StewardPorts, workspaceId: strin
     if (succeeded) return false;
     const affair = await tx.affair.findFirst({ where: { id: request.affairId, workspaceId, status: "active" } });
     if (affair && attempt < RUN_LIMITS.maxBuildAttempts && !await canQueue(tx, workspaceId, affair.id, now)) {
-      await enqueueAttempt(ports, tx, workspaceId, request, attempt + 1, report);
+      await enqueueAttempt(ports, tx, workspaceId, request, { attempt: attempt + 1, report });
       return false;
     }
     return true;

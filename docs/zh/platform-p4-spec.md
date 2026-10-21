@@ -51,7 +51,7 @@ moduleOutputSchema = z.object({
 2. 重新确定匹配的模块与触发器（模块可能已变化）；无匹配或模块非 active → `status = "new"`，进入原有批处理。
 3. 对每个匹配的（模块，触发器），按模块名排序依次运行，输入：
    `{ trigger: { id, kind: "inbound", firedAt: receivedAt, item: { externalId, from, subject, receivedAt, body } }, now, params }`，`body` 为条目文件正文（去掉头部），截断到 64 KiB。联网规则同 schedule。
-4. 写 ModuleRun（`triggerId` = 触发器 id，`firedAt` = `receivedAt`，新增可空列 `inboundItemId`）；effects 经与 schedule 相同的执行器（同一去重与策略，`wake_provider` 同样带 untrusted 前缀）。
+4. 写 ModuleRun（`triggerId` = 触发器 id，`firedAt` = `receivedAt`，新增可空列 `inboundItemId`）；effects 经与 schedule 相同的执行器（同一策略，`wake_provider` 同样带 untrusted 前缀）；去重键按条目隔离，见 [P5 §2](platform-p5-spec.md)。
 5. 处理结果：任一模块成功且 `handled: true` → `status = "delivered"`、`action = "module"`、`deliveredAt = now`、`ruleNote` 记 `模块 <name> 已处理`；否则 → `status = "new"`（原 `deliverAt` 不变，照常批量交给 Provider）。清除租约。
 6. 失败计数：同一模块最近连续 3 次 ModuleRun（不分触发类型）失败 → 暂停模块（沿用现有暂停与 `now` 通知）。
 

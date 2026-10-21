@@ -23,6 +23,7 @@ async function fixture() {
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
     onApproved: async action => { forwarded.push(action); },
     sandbox: { available: true, async runModule(input) {
+      if (input.dataDir.includes("chrona-module-probe-")) return { status: "succeeded", exitCode: 0, output: "{}", error: null }; // key probe: module-probe.bun.test.ts
       calls.push(input);
       expect(input.network).toBe(false);
       expect(await readdir(input.dataDir)).toEqual([]);

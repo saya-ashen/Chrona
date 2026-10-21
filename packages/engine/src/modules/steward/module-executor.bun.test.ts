@@ -22,6 +22,7 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   const workspace = await db.workspace.create({ data: { name: "test" } });
   const ports: StewardPorts = { db, dataDir, now: () => now, deliveries: [], chat: null, publicUrl: null,
     sandbox: sandbox ?? { available: true, async runModule(input) {
+      if (input.dataDir.includes("chrona-module-probe-")) return { status: "succeeded", exitCode: 0, output: "{}", error: null }; // key probe: module-probe.bun.test.ts
       if (!(input.input as { trigger?: unknown }).trigger) return { status: "succeeded", exitCode: 0, output: "{}", error: null };
       calls.push(input);
       return result;

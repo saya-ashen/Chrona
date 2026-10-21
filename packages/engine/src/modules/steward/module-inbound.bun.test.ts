@@ -124,3 +124,11 @@ test("body is UTF-8 truncated to 64 KiB without connector headers", async () => 
   expect(call.input.trigger.item.body).not.toContain("From:");
   expect(call.input.trigger.item.body).not.toContain("�");
 });
+test("a constant module key does not swallow the next mail", async () => {
+  const f = await fixture();
+  const first = await f.push("first"), second = await f.push("second");
+  await f.run();
+  expect(await f.db.notification.count({ where: { title: "邮件已整理" } })).toBe(2);
+  const executed = Object.fromEntries((await f.db.moduleRun.findMany()).map(run => [run.inboundItemId, run.executed]));
+  expect(executed).toEqual(Object.fromEntries([first, second].map(item => [item.id, [{ type: "notify_user", key: `inbound:${item.id}:sorted`, status: "executed" }]])));
+});

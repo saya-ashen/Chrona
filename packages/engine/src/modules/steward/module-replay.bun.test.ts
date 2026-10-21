@@ -22,7 +22,7 @@ async function fixture(scope: "once" | "affair" = "once") {
   const calls: Input[] = [];
   let run = async (_input: Input) => succeeded();
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
-    sandbox: { available: true, async runModule(input) { calls.push(input); return run(input); } } };
+    sandbox: { available: true, async runModule(input) { if (input.dataDir.includes("chrona-module-probe-")) return { status: "succeeded", exitCode: 0, output: "{}", error: null }; /* key probe: see module-probe.bun.test.ts */ calls.push(input); return run(input); } } };
   const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "price-watch");
   await mkdir(dir);

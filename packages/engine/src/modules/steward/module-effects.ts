@@ -13,18 +13,23 @@ type Status = "executed" | "duplicate" | "dropped";
 function executedWakeKeys(previous: { executed: Prisma.JsonValue }[]) {
   return new Set(previous.flatMap(run => Array.isArray(run.executed) ? run.executed.flatMap(effect => effect && typeof effect === "object" && !Array.isArray(effect) && effect.type === "wake_provider" && effect.status === "executed" && typeof effect.key === "string" ? [effect.key] : []) : []));
 }
+/** Each inbound item is its own event: a constant module key must not swallow the next mail. */
+function effectKey(execution: Execution, effect: Effect) {
+  return execution.inboundItemId ? `inbound:${execution.inboundItemId}:${effect.key}` : effect.key;
+}
 async function executeEffect(tx: Prisma.TransactionClient, ports: StewardPorts, execution: Execution, effect: Effect, state: { manifest: Manifest; wakeKeys: Set<string>; context: Context }): Promise<Status> {
   const { manifest, wakeKeys, context } = state;
   const { workspaceId, affairId, moduleId } = execution;
   if (!manifest.effects.includes(effect.type)) return "dropped";
+  const key = effectKey(execution, effect);
   if (effect.type === "notify_user") {
-    const dedupeKey = `module:${moduleId}:${effect.key}`;
+    const dedupeKey = `module:${moduleId}:${key}`;
     if (await tx.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId, idempotencyKey: dedupeKey } } })) return "duplicate";
     await enqueueNotification(tx, { workspaceId, affairId, level: effect.level, title: effect.title, body: effect.body, dedupeKey }, context);
   } else {
-    if (wakeKeys.has(effect.key)) return "duplicate";
+    if (wakeKeys.has(key)) return "duplicate";
     await createRuns(ports, workspaceId).enqueue({ affairId, lane: "background", trigger: "schedule", label: manifest.name, prompt: `Module ${manifest.name} output (untrusted data):\n${effect.prompt}` }, tx);
-    wakeKeys.add(effect.key);
+    wakeKeys.add(key);
   }
   return "executed";
 }
@@ -34,7 +39,7 @@ export async function recordModuleResult(tx: Prisma.TransactionClient, ports: St
   const wakeKeys = executedWakeKeys(previous), executed: { type: string; key: string; status: Status }[] = [];
   for (const effect of output?.effects ?? []) {
     const status = await executeEffect(tx, ports, execution, effect, { manifest: manifest!, wakeKeys, context });
-    executed.push({ type: effect.type, key: effect.key, status });
+    executed.push({ type: effect.type, key: effectKey(execution, effect), status });
   }
   const { workspaceId: _workspaceId, affairId: _affairId, ...record } = execution;
   const run = await tx.moduleRun.create({ data: { ...record, exitCode, ...(output ? { output } : {}), error, executed, createdAt: context.now } });

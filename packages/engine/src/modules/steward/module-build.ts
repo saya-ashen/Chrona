@@ -10,6 +10,7 @@ import { runTests, checkContinuity } from "./module-continuity";
 import { checkReplay } from "./module-replay";
 import { tryAutoActivate } from "./module-auto";
 import { settleBuildVersion } from "./module-build-lane";
+import { probeKeys, keyProbePreview } from "./module-probe";
 import { readModuleFiles, codeDifference, continuityPreview, replayPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -34,7 +35,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n${diff}\n`;
-  const suffix = `${continuityPreview(report.continuity!, needsMigration)}${replayPreview(report.replay!)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+  const suffix = `${continuityPreview(report.continuity!, needsMigration)}${replayPreview(report.replay!)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null;
   if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, await codeDifference(store, module.activeHash, files), hash);
@@ -68,6 +69,9 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     // Only engine-owned immutable copies are tested, hashed and installed.
     if (passed) {
       report.replay = await checkReplay(context, staging, module, manifest);
+      const keyProbe = await probeKeys(context, staging, manifest);
+      // A skipped probe proves nothing; keep reports and review cards unchanged.
+      if (keyProbe.status !== "skipped") report.keyProbe = keyProbe;
       await installBuild(context, staging, hash);
     }
     const status = passed ? "pending_review" : "rejected";

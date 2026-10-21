@@ -11,7 +11,7 @@ import { createNotifications } from "./notify";
 type ReviewCard = { affairId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
 function replayEligible(report: BuildReport) {
   const continuity = report.continuity;
-  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data")) && report.replay?.status === "identical" && report.replay.steps === 10;
+  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data")) && report.replay?.status === "identical" && report.replay.steps === 10 && report.keyProbe?.status !== "repeated";
 }
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
