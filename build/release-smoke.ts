@@ -113,11 +113,10 @@ async function assertRuntimeStarts(binaryPath: string) {
   try {
     const baseUrl = `http://127.0.0.1:${port}`;
     await waitForJson(`${baseUrl}/health`, "health endpoint");
-    await waitForJson(`${baseUrl}/api/health`, "api health endpoint");
     await waitForText(`${baseUrl}/`, "web index");
-    const workspace = await waitForJson(`${baseUrl}/api/workspaces/default`, "default workspace endpoint") as { id?: string };
-    if (typeof workspace.id !== "string" || workspace.id.length === 0) {
-      throw new Error("Default workspace response missing id");
+    const [workspace] = await waitForJson(`${baseUrl}/api/workspaces`, "workspaces endpoint") as { id?: string }[];
+    if (typeof workspace?.id !== "string" || workspace.id.length === 0) {
+      throw new Error("Workspaces response missing the default workspace");
     }
     await waitForJson(`${baseUrl}/api/steward/today?workspaceId=${encodeURIComponent(workspace.id)}`, "steward today endpoint");
     await assertExists(join(dataDir, "chrona.db"), "Runtime SQLite database");
