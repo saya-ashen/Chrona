@@ -78,11 +78,25 @@ class PiRun {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private poll: ReturnType<typeof setTimeout> | undefined;
   private killTimer: ReturnType<typeof setTimeout> | undefined;
+  private idle: ReturnType<typeof setTimeout> | undefined;
+  private runningTools = 0;
   private complete!: (result: Result) => void;
   readonly done = new Promise<Result>(resolveDone => { this.complete = resolveDone; });
   private pending = new Map<string, { resolve(value: RecordValue): void; reject(error: Error): void }>();
 
-  constructor(private input: ProviderRunInput) { this.sessionId = input.sessionId; }
+  constructor(private input: ProviderRunInput, private idleMs = 5 * 60_000) { this.sessionId = input.sessionId; }
+  /** A stalled model request otherwise holds the run until its deadline (20 min in background). */
+  private touch(event?: RecordValue) {
+    if (event?.type === "tool_execution_start") this.runningTools++;
+    if (event?.type === "tool_execution_end") this.runningTools = Math.max(0, this.runningTools - 1);
+    clearTimeout(this.idle);
+    if (this.inactive()) return;
+    this.idle = setTimeout(() => {
+      // Long tool runs and open user questions are progress the RPC stream does not show.
+      if (this.runningTools > 0 || this.events?.waiting) { this.touch(); return; }
+      void this.abortWith("timed_out", `Pi produced no output for ${Math.round(this.idleMs / 1000)}s`);
+    }, this.idleMs);
+  }
   private redact(text: string) {
     return providerText(stripVTControlCharacters(text), this.secrets, 1000);
   }
@@ -90,7 +104,7 @@ class PiRun {
   private finalize() {
     if (this.settled) return;
     this.settled = true;
-    clearTimeout(this.timer); clearTimeout(this.poll); clearTimeout(this.killTimer);
+    clearTimeout(this.timer); clearTimeout(this.poll); clearTimeout(this.killTimer); clearTimeout(this.idle);
     for (const request of this.pending.values()) request.reject(new Error("Pi run ended"));
     this.pending.clear();
     const result = this.closing ?? this.cancellation ?? { outcome: "failed" as const, sessionId: this.sessionId, error: this.redact(`Pi exited before completion. ${this.stderr}`) };
@@ -102,7 +116,7 @@ class PiRun {
     error = this.cancellation?.error ?? error;
     this.closing = { outcome, sessionId: this.sessionId, error: error === null ? null : this.redact(`${error}${this.stderr ? `: ${this.stderr}` : ""}`) };
     this.events?.interrupt();
-    clearTimeout(this.timer); clearTimeout(this.poll);
+    clearTimeout(this.timer); clearTimeout(this.poll); clearTimeout(this.idle);
     if (!this.child) { this.finalize(); return; }
     this.child.stdin.end();
     // done resolves only after process exit: the engine may commit the cwd immediately.
@@ -201,6 +215,7 @@ class PiRun {
   }
   private receive(value: unknown) {
     const event = object(value);
+    this.touch(event);
     this.events?.receive(event);
     switch (event.type) {
       case "response": this.response(event); break;
@@ -251,6 +266,7 @@ class PiRun {
       this.child = spawn(config.bwrap ?? config.command, piArguments(config, this.input, STEWARD_PROMPT), { cwd: resolve(this.input.cwd), shell: false,
         env: { ...piEnvironment(config), CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token }, stdio: ["pipe", "pipe", "pipe"] });
       this.listen(this.child);
+      this.touch();
       void this.prompt(config);
     } catch { if (!this.inactive()) this.stop("unavailable", "Could not start Pi"); }
   }
@@ -285,7 +301,7 @@ export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
       return { available: error === null, sandboxed: error === null && config.bwrap !== null, error };
     },
     start(input) {
-      const run = new PiRun(input);
+      const run = new PiRun(input, options.idleTimeoutMs);
       run.start(config);
       return { done: run.done, inject: (message, images) => run.inject(message, images), abort: () => run.abort() };
     },

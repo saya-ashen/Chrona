@@ -23,6 +23,7 @@ const mark=name=>writeFileSync(name,'true');
 const end=()=>{streaming=false;emit({type:'agent_end'});mark('settled-'+cycle);emit({type:'agent_settled',aborted:mode==='aborted-settled'})};
 function run(){
  streaming=true;cycle++;emit({type:'agent_start'});
+ if(mode==='tool-hang'){emit({type:'tool_execution_start',toolName:'bash'});return;}
  if(['queued','clear-error','clear-hang'].includes(mode))return;
  if(mode.startsWith('ui-')){emit({type:'extension_ui_request',id:'fixture-ui',method:mode.slice(3),title:'Fixture only'});return;}
  setTimeout(()=>{
@@ -117,6 +118,18 @@ test("deadline uses the same queue clearing without relabelling it as an explici
   expect((await handle.done).outcome).toBe("timed_out");
   expect((await f.commands()).map(c => c.type)).toContain("clear_queue");
   expect(await f.marked("restarted-queued")).toBe(false);
+});
+test("a silent model turn ends on the idle timeout, long before the deadline", async () => {
+  const f = await fixture("queued"), started = Date.now();
+  const result = await createPiProvider({ ...f.options, idleTimeoutMs: 200 }).start(f.input).done;
+  expect(result).toMatchObject({ outcome: "timed_out", error: expect.stringContaining("Pi produced no output for 0s") });
+  expect(Date.now() - started).toBeLessThan(2000);
+  expect((await f.commands()).map(c => c.type)).toContain("clear_queue");
+});
+test("a long-running tool is not cut by the idle timeout", async () => {
+  const f = await fixture("tool-hang");
+  const result = await createPiProvider({ ...f.options, idleTimeoutMs: 100 }).start({ ...f.input, deadline: new Date(Date.now() + 700) }).done;
+  expect(result).toMatchObject({ outcome: "timed_out", error: expect.stringContaining("Pi deadline exceeded") });
 });
 test("cancellation during preflight cannot start a late child", async () => {
   const f = await fixture("slow-version"), handle = f.provider.start(f.input);

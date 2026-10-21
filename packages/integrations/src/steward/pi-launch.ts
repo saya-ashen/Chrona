@@ -10,6 +10,8 @@ export type PiProviderOptions = {
   command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string;
   chronaExtension: string; webExtension?: string | null; agentUrl: string; bwrap?: string | null;
   workspaceRoot?: string; dataDir?: string;
+  /** End a run whose Pi RPC stream is silent this long outside tool runs and user questions (default 5 min). */
+  idleTimeoutMs?: number;
 };
 export type PiLaunchConfig = {
   options: PiProviderOptions; command: string; agentDir: string; version: string;
