@@ -10,7 +10,7 @@ import { runTests, checkContinuity } from "./module-continuity";
 import { checkReplay } from "./module-replay";
 import { tryAutoActivate } from "./module-auto";
 import { settleBuildVersion } from "./module-build-lane";
-import { probeKeys, keyProbePreview } from "./module-probe";
+import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { readModuleFiles, codeDifference, continuityPreview, replayPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -66,6 +66,8 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
       report.continuity = continuity;
       ({ passed, needsMigration } = await checkContinuity(context, staging, module, manifest, continuity));
     }
+    if (passed) report.errors = await smokeRun(context, staging, manifest);
+    if (report.errors?.length) passed = false; else delete report.errors;
     // Only engine-owned immutable copies are tested, hashed and installed.
     if (passed) {
       report.replay = await checkReplay(context, staging, module, manifest);

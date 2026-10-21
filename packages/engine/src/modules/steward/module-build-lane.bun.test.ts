@@ -22,7 +22,7 @@ async function fixture() {
   const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
   let fail = false, build: Build = async () => {};
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-21T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
-    sandbox: { available: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: "", error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
+    sandbox: { available: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: '{"effects":[]}', error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
       starts.push(input);
       const done = build(input, { call: (name, args) => service.tools.call(input.token, name, args) }).then(() => ({ outcome: "finished" as const, sessionId: `session-${input.runId}`, error: null }));

@@ -113,7 +113,7 @@ test("module tools propose, list, checkout and roll back only approved versions"
   const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
   const files = { "module.json": JSON.stringify(manifest), "index.ts": 'console.log(JSON.stringify({effects:[]}))', "test.ts": "process.exit(0)" };
   for (const [path, content] of Object.entries(files)) await writeFile(join(root, "module", path), content);
-  ports.sandbox = { available: true, runModule: async () => ({ status: "succeeded", output: "ok", error: null, exitCode: 0 }) };
+  ports.sandbox = { available: true, runModule: async input => ({ status: "succeeded", output: input.entry === "test.ts" ? "ok" : '{"effects":[]}', error: null, exitCode: 0 }) };
   const intent = { changes: ["Watch prices"] };
   const proposal = await call("chrona_propose", { dir: "module", intent }) as { moduleId: string; hash: string; approvalId: string };
   expect(proposal).toMatchObject({ status: "building" });

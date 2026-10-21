@@ -23,7 +23,7 @@ async function fixture() {
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
     onApproved: async action => { forwarded.push(action); },
     sandbox: { available: true, async runModule(input) {
-      if (input.dataDir.includes("chrona-module-probe-")) return { status: "succeeded", exitCode: 0, output: "{}", error: null }; // key probe: module-probe.bun.test.ts
+      if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
       calls.push(input);
       expect(input.network).toBe(false);
       expect(await readdir(input.dataDir)).toEqual([]);
@@ -93,6 +93,7 @@ async function rollbackFixture() {
   await f.schema(2, "migrate.ts");
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     if (input.entry === "migrate.ts") await writeFile(join(input.dataDir, "nested/state"), "schema 2");
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
@@ -217,6 +218,7 @@ test("activation snapshots and migrates current data, then the next firing reads
   let migrations = 0, liveReads = 0;
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     if (input.entry === "migrate.ts") {
       migrations++;
       expect(input).toMatchObject({ network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { migrate: { from: 1, to: 2 }, now: f.ports.now().toISOString() } });
@@ -266,6 +268,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
   let activation = false;
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     if (input.entry === "migrate.ts") {
       await writeFile(join(input.dataDir, "nested/state"), "migrated copy");
       if (activation && kind === "throw") throw new Error("private host diagnostic");
@@ -345,6 +348,7 @@ test("same-schema continuity runs on a disposable copy, previews effects and nev
   let copy = "";
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     copy = input.dataDir;
     expect(copy).not.toBe(f.live);
     expect(input).toMatchObject({ entry: "index.ts", network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { trigger: { id: "daily", kind: "schedule", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: { threshold: 2 } } });
@@ -372,6 +376,7 @@ test.each(["crash", "json", "shape", "throw"])("continuity %s rejects and wakes 
   let copy = "";
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     copy = input.dataDir;
     await writeFile(join(copy, "nested/state"), "changed");
     if (kind === "throw") throw new Error("private host diagnostic");
@@ -396,6 +401,7 @@ test.each([false, true])("schema upgrade migrates only the copy; migration failu
   let copy = "", entryRan = false;
   f.ports.sandbox!.runModule = async input => {
     if (input.entry === "test.ts") return f.original(input);
+    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     expect(input.network).toBe(false);
     expect(input.timeoutMs).toBe(60_000);
     expect(input.maxOutputBytes).toBe(64 * 1024);

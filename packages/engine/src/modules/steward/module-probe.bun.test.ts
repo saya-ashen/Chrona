@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ModuleManifest } from "@chrona/contracts/steward";
 import type { KeyProbe, ModuleContext } from "./module-context";
-import { keyProbePreview, probeKeys } from "./module-probe";
+import { keyProbePreview, probeKeys, smokeRun } from "./module-probe";
 
 const schedule = { id: "daily", schedule: { kind: "daily" as const, time: "09:00" } };
 const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ name: "reminder", entry: "index.ts", triggers, tools: [], effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
@@ -32,4 +32,20 @@ test("review card warns about repeated keys and stays quiet without a verdict", 
   expect(keyProbePreview({ status: "repeated", keys: ["notify_user:sent"] })).toContain("⚠ 幂等键检查");
   expect(keyProbePreview({ status: "passed" })).toBe("幂等键检查：passed\n");
   expect(keyProbePreview(undefined)).toBe("");
+});
+function smokeContext(result: { status: string; exitCode: number; output: string; error: string | null }, inputs: unknown[]) {
+  return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, async runModule(input: unknown) { inputs.push(input); return result; } } } } as unknown as ModuleContext;
+}
+const inbound = { id: "mail", inbound: { connector: "c", match: {} } };
+test.each([
+  ["valid output", { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }, []],
+  ["crash", { status: "failed", exitCode: 1, output: "", error: "Traceback: boom" }, ["smoke schedule daily: exit 1: Traceback: boom", "smoke inbound mail: exit 1: Traceback: boom"]],
+  ["invalid output", { status: "succeeded", exitCode: 0, output: "ok", error: null }, ["smoke schedule daily: stdout is not valid module output: ok", "smoke inbound mail: stdout is not valid module output: ok"]],
+] as const)("smoke run of schedule and inbound entries: %s", async (_name, result, errors) => {
+  const inputs: unknown[] = [];
+  expect(await smokeRun(smokeContext(result, inputs), "/staging", manifest([schedule, inbound]))).toEqual([...errors]);
+  expect(inputs).toMatchObject([
+    { network: false, input: { trigger: { id: "daily", kind: "schedule", firedAt: "2026-10-21T01:00:00.000Z" } } },
+    { network: false, input: { trigger: { id: "mail", kind: "inbound", item: { externalId: "smoke", from: "smoke@chrona.invalid" } } } },
+  ]);
 });
