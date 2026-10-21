@@ -59,6 +59,19 @@ test("legacy routes and the disabled test seam are absent", async () => {
   for (const path of ["tasks", "pages", "goals", "runtime", "workspaces/default", "test/steward/delivery/sent"]) {
     expect((await app.request(`/api/${path}`, { headers: owner })).status).toBe(404);
   }
+  expect((await app.request("/api/steward-e2e/local-test-items", { method: "POST", headers: owner, body: "{}" })).status).toBe(404);
+});
+
+test("gated local test inbox is owner protected, validated and feeds the local_test connector", async () => {
+  process.env.CHRONA_E2E_TEST_ROUTES = "1";
+  const runtime = createStewardRuntime(db, { provider: null, chatTransport: null });
+  const app = await createApp({ steward: runtime });
+  const post = (body: unknown, headers: Record<string, string> = owner) => app.request("/api/steward-e2e/local-test-items", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const item = { externalId: "m1", from: "a@shop.example", subject: "Order", body: "shipped", receivedAt: "2026-10-21T08:00:00.000Z" };
+  expect((await post({ items: [item] }, {})).status).toBe(401);
+  expect((await post({ items: [{ ...item, extra: 1 }] })).status).toBe(400);
+  expect(await (await post({ items: [item] })).json()).toEqual({ queued: 1 });
+  expect((await runtime.localTest.adapter.poll({ settings: {}, secret: null, cursor: null })).items).toEqual([{ ...item, url: null }]);
 });
 
 test.skipIf(!(await Bun.file("apps/web/dist/index.html").exists()))("unlocalized links keep their query and use the reader's language", async () => {

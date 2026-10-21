@@ -90,9 +90,10 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       return { output: result.output, exitCode: result.status === "succeeded" ? 0 : result.exitCode || 1 };
     },
   };
+  const localTest = createLocalTestSource();
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
-    connectors: [createEmailConnector(), createLocalTestSource().adapter, createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
+    connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
     sandbox: options.sandbox ?? sandbox, chatTimeoutMs: options.chatTimeoutMs,
@@ -116,7 +117,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   }
   function wake() { void tickOnce(); }
   return {
-    ports, service, tickOnce, wake,
+    ports, service, tickOnce, wake, localTest,
     async health() {
       let providerHealth = { name: provider?.name ?? "unconfigured", available: false, sandboxed: false };
       try { if (provider) { const h = await provider.health(); providerHealth = { name: provider.name, available: h.available, sandboxed: h.sandboxed }; } } catch { /* Public health never exposes diagnostic secrets. */ }
