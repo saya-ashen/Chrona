@@ -110,8 +110,10 @@ export const moduleManifestSchema = z.object({
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
   description: z.string().min(1).max(300).optional(),
   entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
-  triggers: z.array(moduleTriggerSchema).min(1).max(10),
+  triggers: z.array(moduleTriggerSchema).max(10),
   tools: z.array(moduleToolSchema).max(5).default([]),
+  /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
+  keepAlive: z.boolean().default(false),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -125,6 +127,7 @@ export const moduleManifestSchema = z.object({
     if (ids.has(trigger.id)) ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
     ids.add(trigger.id);
   });
+  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool or keepAlive" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
@@ -143,6 +146,38 @@ export const moduleOutputSchema = z.object({
   handled: z.boolean().optional(),
   result: z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB"),
 }).strict();
+/**
+ * v2 module channel (`/run/chrona.sock`, one JSON object per line, both directions).
+ * Chrona → module: an event `{ id, event }`; the module answers `{ id, result }` or `{ id, error }`.
+ * Module → Chrona: a call `{ id, method, params }`; Chrona answers `{ id, result }` or `{ id, error }`.
+ * Events of one module are delivered one at a time; calls made meanwhile belong to that event.
+ */
+const channelId = z.string().min(1).max(64);
+const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB");
+export const moduleEventSchema = z.object({
+  trigger: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso }).strict(),
+    z.object({ kind: z.literal("inbound"), id: slug, firedAt: iso, item: z.object({ externalId: z.string(), from: z.string(), subject: z.string(), receivedAt: iso, body: z.string() }).strict() }).strict(),
+    z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()) }).strict(),
+  ]),
+  now: iso,
+  params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
+}).strict();
+export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleEventSchema }).strict();
+/** `handled: false` hands an inbound item back to the Provider; `result` answers a tool call. */
+export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
+  .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
+/** Kernel methods and the capability each needs. */
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+export const moduleCallSchema = z.discriminatedUnion("method", [
+  z.object({ id: channelId, method: z.literal("notify"), params: z.object({ key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict() }).strict(),
+  z.object({ id: channelId, method: z.literal("wakeProvider"), params: z.object({ key: z.string().min(1).max(200), prompt: text.max(4000) }).strict() }).strict(),
+]);
+export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal"] as const;
+export const moduleCallReplySchema = z.object({ id: channelId, result: z.object({ status: z.enum(["executed", "duplicate"]) }).strict() }).strict()
+  .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
+export type ModuleEvent = z.infer<typeof moduleEventSchema>;
+export type ModuleCall = z.infer<typeof moduleCallSchema>;
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 export type ModuleOutput = z.infer<typeof moduleOutputSchema>;
 export type ModuleEffect = (typeof MODULE_EFFECTS)[number];

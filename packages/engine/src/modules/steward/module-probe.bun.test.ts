@@ -4,7 +4,7 @@ import type { KeyProbe, ModuleContext } from "./module-context";
 import { keyProbePreview, probeKeys, smokeRun } from "./module-probe";
 
 const schedule = { id: "daily", schedule: { kind: "daily" as const, time: "09:00" } };
-const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ name: "reminder", entry: "index.ts", triggers, tools: [], effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
+const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
 const notify = (key: string) => ({ type: "notify_user", key, level: "now", title: "t", body: "b" });
 function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[] = []) {
   return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, async runModule(input: { input: { trigger: { firedAt: string } } }) {
