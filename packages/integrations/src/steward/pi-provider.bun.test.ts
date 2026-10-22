@@ -93,9 +93,18 @@ describe("Pi RPC provider", () => {
       const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
       expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).not.toContain("bash"); expect(tools).not.toContain("web_search");
       expect(tools).toContain("m_ledger_add_expense"); expect(tools).not.toContain("m_Bad");
+      expect(tools).not.toContain("tool_search"); expect(launch.args).not.toContain("builtin:tool-search");
       expect((await f.commands()).find(c => c.type === "prompt").images).toEqual([{ type: "image", mimeType: "image/png", data: "YWJj" }]);
       expect(await f.provider.health()).toEqual({ available: true, sandboxed: false, error: null });
     } finally { if (before === undefined) delete process.env.CHRONA_DATABASE_SECRET; else process.env.CHRONA_DATABASE_SECRET = before; }
+  });
+  test("deferred module tools load Pi's tool search and stay behind the m_* pattern", async () => {
+    const f = await fixture();
+    const handle = f.provider.start({ ...f.input, extraTools: ["m_ledger_add_expense"], searchTools: true });
+    await handle.done;
+    const args: string[] = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args;
+    expect(args[args.indexOf("builtin:tool-search") - 1]).toBe("-e");
+    expect(args[args.indexOf("--tools") + 1].split(",")).toEqual(expect.arrayContaining(["m_ledger_add_expense", "tool_search", "m_*"]));
   });
   test("injection queues steering during streaming and waits across agent_end", async () => {
     const f = await fixture(), handle = f.provider.start(f.input);

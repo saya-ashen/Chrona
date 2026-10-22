@@ -10,6 +10,7 @@ import { onApproved, rollback } from "./module-activation";
 import { activateIn } from "./module-generation";
 import { recoverMigrations } from "./module-migration";
 import { readModuleFiles } from "./module-preview";
+import { callModuleTool, moduleTools, moduleToolsets, moduleToolCatalog, moduleToolShape } from "./module-tools";
 
 async function list(context: ModuleContext, affairId?: string) {
   const { db, workspaceId } = context;
@@ -35,5 +36,12 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     rollback: (moduleId: string, hash: string) => rollback(context, moduleId, hash),
     list: (affairId?: string) => list(context, affairId),
     checkout: (moduleId: string, hash: string | undefined, dir: string) => checkout(context, moduleId, hash, dir),
+    /** Owner view (no affair): every module tool, grouped into toolsets. */
+    tools: async () => {
+      const scope = { workspaceId, affairId: null };
+      const tools = (await moduleTools(ports, scope)).map(({ name, module, tool }) => ({ name, description: `[module ${module.name}] ${tool.description}`, shape: moduleToolShape(tool) }));
+      return { tools, toolsets: moduleToolsets(await moduleToolCatalog(ports, scope)) };
+    },
+    callTool: (name: string, args: unknown) => callModuleTool(ports, { workspaceId, affairId: null, runId: null }, name, args),
   };
 }

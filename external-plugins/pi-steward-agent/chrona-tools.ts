@@ -1,9 +1,13 @@
 /** Chrona's scoped HTTP bridge. Files, shell and web remain Provider-native tools. */
-type Catalog = { tools: { name: string; description: string; parameters: Record<string, unknown> }[] };
+type Namespace = { name: string; description: string };
+type Exposure = "direct" | "deferred";
+type Catalog = { tools: { name: string; description: string; parameters: Record<string, unknown>; exposure?: Exposure; namespace?: Namespace }[] };
 type ToolResult = { content: { type: "text"; text: string }[]; details: undefined };
 // Structural subset keeps this extension independent of the host Pi package version.
 type BridgeApi = { registerTool(tool: {
   name: string; label: string; description: string; parameters: Record<string, unknown>;
+  /** Pi ≥1.3: deferred tools wait for tool_search; a namespace groups a module's tools like one MCP server. */
+  exposure?: Exposure; namespace?: Namespace;
   execute(id: string, params: unknown, signal?: AbortSignal): Promise<ToolResult>;
 }): void };
 
@@ -31,7 +35,7 @@ export default async function (pi: BridgeApi) {
   const catalog = await call("/catalog", undefined, 5000) as Catalog;
   for (const tool of catalog.tools) {
     pi.registerTool({
-      name: tool.name, label: tool.name, description: tool.description, parameters: tool.parameters,
+      name: tool.name, label: tool.name, description: tool.description, parameters: tool.parameters, exposure: tool.exposure, namespace: tool.namespace,
       async execute(_id, params, signal) {
         const result = await call(`/tools/${encodeURIComponent(tool.name)}`, params ?? {}, 60_000, signal) as { ok: boolean; data?: unknown; error?: { code: string; message: string } };
         if (!result.ok) throw new Error(`${result.error?.code ?? "ERROR"}: ${result.error?.message ?? "refused"}`.replaceAll(token, "[redacted]"));

@@ -337,7 +337,7 @@ export function createTools(ports: StewardPorts) {
     try {
       if (run.lane === "build" && name !== "chrona_propose") throw new StewardError("forbidden", "Build runs may only call chrona_propose");
       if (name.startsWith("m_")) {
-        const result = await callModuleTool(ports, run, name, raw);
+        const result = await callModuleTool(ports, { workspaceId, affairId: run.affairId, runId: run.id }, name, raw);
         ok = true;
         return result;
       }

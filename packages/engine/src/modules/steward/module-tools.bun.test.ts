@@ -34,17 +34,40 @@ async function fixture() {
     call: (args: unknown = { query: "hello" }, name = "m_mail_sort_find_mail") => service.tools.call(run.token, name, args),
     fail: (message = "public stderr") => { error = message; } };
 }
-test("catalog appends affair module tools with schema and meaningful description", async () => {
+test("catalog appends affair module tools with schema, meaningful description and their toolset", async () => {
   const f = await fixture(), catalog = await f.service.tools.catalog(f.run.token);
   expect(catalog.slice(0, CHRONA_TOOLS.length).map(tool => tool.name)).toEqual([...CHRONA_TOOLS]);
-  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" } });
+  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail (affair: Work)" },
+    inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" } });
 });
-test.each(["other", "root"])("%s runs cannot see or call another affair's module tools", async scope => {
+test.each(["other", "root"])("%s runs find deferred module tools and call them in the module's own affair", async scope => {
   const f = await fixture();
-  await f.db.run.update({ where: { id: f.run.id }, data: { affairId: scope === "other" ? f.other.id : null } });
-  expect((await f.service.tools.catalog(f.run.token)).map(tool => tool.name)).toEqual([...CHRONA_TOOLS]);
-  await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
-  expect(f.calls).toEqual([]);
+  await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, description: "Sort and search work mail" } } });
+  const callerAffairId = scope === "other" ? f.other.id : null;
+  await f.db.run.update({ where: { id: f.run.id }, data: { affairId: callerAffairId } });
+  expect((await f.service.tools.catalog(f.run.token)).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail (affair: Work)" } });
+  expect(await f.call()).toMatchObject({ result: { found: 3 } });
+  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id });
+  expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ affairId: f.affair.id });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "chrona", subjectId: f.module.id, details: { tool: "m_mail_sort_find_mail", callerRunId: f.run.id, callerAffairId } });
+});
+test("same-named modules form one toolset: the caller's affair wins, the owner sees the first", async () => {
+  const f = await fixture();
+  const twin = await f.db.module.create({ data: { workspaceId: f.workspaceId, affairId: f.other.id, name: "mail-sort", activeHash: "twin" } });
+  await f.db.moduleVersion.create({ data: { moduleId: twin.id, hash: "twin", manifest: { ...f.manifest, tools: [f.tool, { ...f.tool, name: "extra" }] }, intent: {}, source: "user", report: {}, status: "approved" } });
+  expect((await f.service.tools.catalog(f.run.token)).filter(tool => tool.name.startsWith("m_")).map(tool => tool.name)).toEqual(["m_mail_sort_find_mail"]);
+  await f.db.run.update({ where: { id: f.run.id }, data: { affairId: f.other.id } });
+  expect((await f.service.tools.catalog(f.run.token)).filter(tool => tool.name.startsWith("m_")).map(tool => [tool.name, "exposure" in tool && tool.exposure])).toEqual([["m_mail_sort_find_mail", "direct"], ["m_mail_sort_extra", "direct"]]);
+  await f.call(); expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ moduleId: twin.id });
+});
+test("owner tools list every toolset and call as the user", async () => {
+  const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
+  const { tools, toolsets } = await api.modules.tools();
+  expect(tools.map(tool => tool.name)).toEqual(["m_mail_sort_find_mail"]);
+  expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail (affair: Work)", tools: ["m_mail_sort_find_mail"] }]);
+  expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerAffairId: null } });
+  await expect(api.modules.callTool("m_mail_sort_find_mail", {})).rejects.toMatchObject({ code: "invalid" });
 });
 test.each([
   [{}, "query"], [{ query: 1 }, "query"], [{ query: "ok", count: "1" }, "count"],

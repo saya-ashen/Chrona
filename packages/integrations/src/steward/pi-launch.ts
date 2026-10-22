@@ -93,9 +93,13 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   const args = ["--mode", "rpc", "--session-dir", resolve(input.sessionDir), "--session-id", input.sessionId ?? randomUUID(),
     "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "-e", config.extension];
   if (config.web) args.push("-e", config.web);
+  // --no-extensions also drops Pi's built-in tool search; deferred module tools need it.
+  if (input.searchTools) args.push("-e", "builtin:tool-search");
   for (const extension of config.resources.extensions) args.push("-e", extension);
   for (const skill of config.resources.skills) args.push("--skill", skill);
-  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", ...(config.bwrap ? ["bash"] : []), ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name))])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
+  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", ...(config.bwrap ? ["bash"] : []), ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
+    // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
+    ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
   if (config.options.model) args.push("--model", config.options.model);
   if (!config.bwrap) return args;
   const cwd = resolve(input.cwd);
