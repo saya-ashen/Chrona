@@ -147,7 +147,7 @@ export const moduleOutputSchema = z.object({
   result: z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB"),
 }).strict();
 /**
- * v2 module channel (`/run/chrona.sock`, one JSON object per line, both directions).
+ * v2 module channel (`/chrona/chrona.sock`, one JSON object per line, both directions).
  * Chrona → module: an event `{ id, event }`; the module answers `{ id, result }` or `{ id, error }`.
  * Module → Chrona: a call `{ id, method, params }`; Chrona answers `{ id, result }` or `{ id, error }`.
  * Events of one module are delivered one at a time; calls made meanwhile belong to that event.

@@ -47,7 +47,7 @@
 
 ### 2.3 与内核的通道
 
-每个模块进程一个 Unix socket，绑定到沙箱内 `/run/chrona.sock`，每行一个 JSON，双向：
+每个模块进程一个 Unix socket，绑定到沙箱内 `/chrona/chrona.sock`，每行一个 JSON，双向：
 
 - 内核 → 模块：事件 `{ "id", "event": { "kind": "schedule" | "inbound" | "tool" | "http" | "content_edit", ... } }`（`http` 见 v2-4，`content_edit` 见 v2-2）；模块回 `{ "id", "result" }` 或 `{ "id", "error" }`。
 - 模块 → 内核：调用 `{ "id", "method", "params" }`；内核回 `{ "id", "result" }` 或 `{ "id", "error": { "code" } }`。
