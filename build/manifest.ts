@@ -16,6 +16,7 @@ export const buildArtifacts = {
     { from: "prisma/migrations", to: "resources/prisma/migrations", required: true },
     { from: ".env.example", to: "resources/.env.example", required: false },
     { from: "external-plugins/pi-steward-agent", to: "resources/external-plugins/pi-steward-agent", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
   ] satisfies ReleaseResource[],
 } as const;
 

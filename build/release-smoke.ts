@@ -156,6 +156,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/migrations"), "Prisma migrations");
 
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/pi-steward-agent"), "Pi steward extension");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/sdk.ts"), "Module SDK");
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);

@@ -3,6 +3,8 @@ import { mkdir, mkdtemp, writeFile, readFile, readlink, rm } from "node:fs/promi
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createScriptSandbox, scriptWorkspaceArguments } from "./script-sandbox";
+import { createModuleChannel } from "@chrona/engine";
+import { createServer } from "node:net";
 const bwrapPath = Bun.which("bwrap") ?? undefined;
 const sandbox = createScriptSandbox({ bwrapPath });
 if (!sandbox.health.available) console.warn("SKIP script sandbox integration tests: bubblewrap missing or namespaces unavailable");
@@ -65,6 +67,62 @@ sandboxTest("module interpreters, timeout, output caps and entry validation", as
     await expect(sandbox.runModule({ codeDir, dataDir, entry: "../test.py", input: {} })).rejects.toThrow("Invalid module entry");
     expect(await createScriptSandbox({}).runModule({ codeDir, dataDir, entry: "test.py", input: {} })).toMatchObject({ status: "unavailable" });
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+sandboxTest("long-running SDK module exchanges events and calls, stays isolated, and can be killed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-channel-"));
+  const codeDir = join(root, "code"), dataDir = join(root, "data"), secret = join(root, "secret");
+  await mkdir(codeDir); await mkdir(dataDir); await writeFile(secret, "synthetic secret");
+  const network = await readlink("/proc/self/ns/net");
+  const calls: unknown[] = [];
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => {
+    calls.push(call);
+    return call.method === "wakeProvider" ? { id: call.id, error: { code: "undeclared", message: "Not allowed" } } : { id: call.id, result: { status: "executed" } };
+  } });
+  // An actual host listener distinguishes isolated loopback from an unused port.
+  const listener = createServer(socket => socket.destroy());
+  await new Promise<void>(resolve => listener.listen(0, "127.0.0.1", resolve));
+  const port = (listener.address() as { port: number }).port;
+  let handle: ReturnType<typeof sandbox.startModule> | undefined;
+  try {
+    await writeFile(join(codeDir, "index.ts"), `import { on, chrona } from "/chrona/sdk.ts";
+import { readdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
+import { createConnection } from "node:net";
+on("schedule", async ev => {
+  if (readdirSync(${JSON.stringify(homedir())}).length) throw new Error("home visible");
+  try { readFileSync(${JSON.stringify(secret)}); throw new Error("secret visible"); } catch (e) { if (e.message === "secret visible") throw e; }
+  if (readlinkSync("/proc/self/ns/net") === ${JSON.stringify(network)}) throw new Error("network shared");
+  await new Promise((resolve, reject) => {
+    const socket = createConnection({ host: "127.0.0.1", port: ${port} });
+    socket.on("connect", () => { socket.destroy(); reject(new Error("host network visible")); });
+    socket.on("error", resolve);
+    socket.setTimeout(500, () => { socket.destroy(); resolve(undefined); });
+  });
+  for (const path of ["/module/index.ts", "/chrona/sdk.ts", "/chrona/new-file", "/new-file"]) {
+    try { writeFileSync(path, "bad"); throw new Error("writable: " + path); } catch (e) { if (e.message.startsWith("writable:")) throw e; }
+  }
+  writeFileSync("/data/result", "ok");
+  const reply = await chrona.notify({ key: ev.id, level: "now", title: "test", body: "hello" });
+  try { await chrona.wakeProvider({ key: "wake", prompt: "hello" }); throw new Error("error reply resolved"); }
+  catch (e) { if (e.message !== "Not allowed") throw e; }
+  return { handled: true, result: reply.status };
+});
+on("tool", () => { throw new Error("handler failed"); });`);
+    handle = createScriptSandbox({ bwrapPath, dataDir: root }).startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "channel.sock") });
+    await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
+    const now = "2026-10-22T09:00:00.000Z";
+    expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "executed" } });
+    expect(calls).toMatchObject([{ method: "notify", params: { key: "daily", body: "hello" } }, { method: "wakeProvider" }]);
+    expect(await channel.send({ trigger: { kind: "tool", id: "test", firedAt: now, args: {} }, now, params: {} }, 2000)).toMatchObject({ error: "handler failed" });
+    expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
+    expect(handle.pid).toBeGreaterThan(0);
+    handle.kill();
+    expect(await handle.exited).toMatchObject({ signal: "SIGKILL" });
+  } finally {
+    handle?.kill(); if (handle) await handle.exited;
+    await channel.close();
+    await new Promise<void>(resolve => listener.close(() => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
 });
 sandboxTest("python reads JSON stdin; shell runs with minimal environment", async () => {
   expect(await sandbox.run({ language: "python", source: "import json,sys; print(json.load(sys.stdin)['value'])", input: { value: 42 } })).toMatchObject({ status: "succeeded", output: "42\n" });

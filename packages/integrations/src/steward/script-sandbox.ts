@@ -2,6 +2,7 @@ import { accessSync, constants, existsSync, readdirSync, realpathSync, statSync 
 import { homedir } from "node:os";
 import { dirname, extname, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 type Language = "python" | "shell" | "typescript";
 export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number };
@@ -28,8 +29,10 @@ export function scriptWorkspaceArguments(directory: string, paths: string[], dat
     "--clearenv", "--setenv", "PATH", paths.map(dirname).join(":"), "--setenv", "LANG", "C.UTF-8"];
 }
 /** Scripts may write only cwd (plus private /tmp); no inherited environment or host fallback. */
-export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512 }: {
+export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512, moduleSdk = fileURLToPath(new URL("./module-sdk/sdk.ts", import.meta.url)) }: {
   bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
+  /** Packaged binaries pass the shipped copy; the source path does not exist inside a compiled binary. */
+  moduleSdk?: string;
 }) {
   limits(timeoutMs, maxOutputBytes, memoryMb);
   const bwrap = executable(bwrapPath);
@@ -68,6 +71,30 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       const directory = workspaceDirectory(cwd);
       const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
       return execute({ language, args: [language === "typescript" ? "-e" : "-c", source], input, profile, runTimeout, outputLimit });
+    },
+    startModule({ codeDir, dataDir: moduleData, entry, socketPath, network = false }: { codeDir: string; dataDir: string; entry: string; socketPath: string; network?: boolean }) {
+      if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
+      const language = ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
+      const interpreter = interpreters[language];
+      if (!available || !bwrap || !shell || !interpreter) throw new Error("沙箱不可用");
+      const code = workspaceDirectory(codeDir)!, data = workspaceDirectory(moduleData)!;
+      const socket = resolve(socketPath);
+      if (!statSync(socket).isSocket()) throw new Error("Invalid module socket");
+      const profile = scriptWorkspaceArguments(code, paths, dataDir);
+      profile.splice(profile.indexOf("--bind"), 5, "--ro-bind", code, "/module", "--bind", data, "/data", "--chdir", "/module");
+      profile.splice(profile.indexOf("--ro-bind"), 3, "--tmpfs", "/",
+        ...readdirSync("/").filter(name => !["module", "data", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+      profile.push("--dir", "/chrona", "--ro-bind", socket, "/chrona/chrona.sock",
+        "--ro-bind", moduleSdk, "/chrona/sdk.ts", "--remount-ro", "/");
+      if (!network) profile.splice(profile.indexOf("--share-net"), 1);
+      const child = spawn(bwrap, [...profile, "--", shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "sandbox", String(memoryMb * 1024), interpreter, `/module/${entry}`], { env: {}, stdio: ["ignore", "ignore", "pipe"] });
+      let errors = Buffer.alloc(0);
+      child.stderr.on("data", (chunk: Buffer) => { errors = Buffer.concat([errors, chunk]).subarray(-16 * 1024); });
+      const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => resolve({ code, signal }));
+      });
+      return { pid: child.pid!, exited, stderr: () => errors.toString("utf8"), kill: () => { child.kill("SIGKILL"); } };
     },
     async runModule({ codeDir, dataDir: moduleData, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
       if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");

@@ -29,12 +29,11 @@ export function stewardDataDir(env = process.env): string {
   if (!file || file === ":memory:") throw new Error("CHRONA_DATA_DIR required for an in-memory database");
   return dirname(resolve(file));
 }
-// Packaged binaries ship the extension under resources/; source runs use the repo copy.
-function chronaExtensionPath(): string {
-  const relative = join("external-plugins", "pi-steward-agent", "chrona-tools.ts");
+// Packaged binaries ship these files under resources/; source runs use the repo copy.
+function resourcePath(relative: string, source = relative): string {
   const packaged = [process.env.CHRONA_RESOURCE_DIR, join(dirname(process.execPath), "resources")]
     .filter((dir): dir is string => Boolean(dir)).map((dir) => join(dir, relative));
-  return packaged.find((path) => existsSync(path)) ?? fileURLToPath(new URL(`../../../${relative}`, import.meta.url));
+  return packaged.find((path) => existsSync(path)) ?? fileURLToPath(new URL(`../../../${source}`, import.meta.url));
 }
 type RuntimeOptions = {
   now?: () => Date; onError?: () => void; port?: number; provider?: ProviderAdapter | null;
@@ -46,7 +45,7 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
-    chronaExtension: chronaExtensionPath(),
+    chronaExtension: resourcePath(join("external-plugins", "pi-steward-agent", "chrona-tools.ts")),
     command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
     agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
     expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
@@ -81,10 +80,11 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const transport = configuredTransport(db, options);
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()) });
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts") });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
     runModule: input => scriptSandbox.runModule(input),
+    startModule: input => scriptSandbox.startModule(input),
     async run({ command, cwd, timeoutMs, maxOutputBytes }) {
       const result = await scriptSandbox.run({ language: "shell", source: command, input: {}, cwd, timeoutMs, maxOutputBytes });
       return { output: result.output, exitCode: result.status === "succeeded" ? 0 : result.exitCode || 1 };
