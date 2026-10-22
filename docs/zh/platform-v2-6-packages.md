@@ -13,8 +13,10 @@
 
 | 类型 | 声明 | 安装位置 |
 |---|---|---|
-| 语言库（npm、pip） | 模块目录内的锁文件（`package.json` + `bun.lock`、`requirements.txt` 带哈希） | 构建时由 Chrona 安装进模块目录（`--ignore-scripts` 或等价方式），随版本按内容 hash 存储，回滚一起回滚 |
+| 语言库（npm、pip） | 模块目录内的声明文件加锁文件：`package.json` + `bun.lock`；`pyproject.toml` + `uv.lock`。由构建 Agent 生成并随代码提交 | 构建时由 Chrona 只按锁文件安装进模块目录（`bun install --frozen-lockfile --ignore-scripts`；`uv sync --frozen`），不重新解析版本；随版本按内容 hash 存储，回滚一起回滚 |
 | 系统程序（ffmpeg、pandoc……） | 清单 `packages: ["ffmpeg", "pandoc"]`，名称按主机后端解释（§3） | 按主机后端 |
+
+锁文件是必需的：声明文件只写版本范围，没有锁文件就无法保证同一模块版本在任何时候装出同一套依赖。`uv` 由 `nix` 后端提供；`system` 后端缺 `uv` 时按缺失系统程序处理（§3.2）。
 
 ## 3. 主机后端
 
