@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, qqBotConfig, type QqChatPort } from "./qq-official-bot";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, parseApprovalDecision, qqBotConfig, type ApprovalDecision, type QqChatPort } from "./qq-official-bot";
 import { createQqTokenSource } from "./qq-official";
 const APP = "1905797537";
 let dir: string, at: Date;
@@ -11,7 +11,8 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 function harness(options: { run?: QqChatPort["handleMessage"]; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> } = {}) {
   const state = createQqBotState(join(dir, "state"), APP);
   const replies: { text: string; sequence: number }[] = [], calls: Parameters<QqChatPort["handleMessage"]>[0][] = [], outbox: string[] = [];
-  const handler = createQqBotHandler({ state, now: () => at, timers: options.timers,
+  const decisions: ApprovalDecision[] = [];
+  const handler = createQqBotHandler({ state, now: () => at, timers: options.timers, resolveApproval: async (_binding, decision) => { decisions.push(decision); return "已批准"; },
     chat: { async handleMessage(input) { calls.push(input); return options.run ? options.run(input) : { reply: "收到" }; } },
     reply: async (_openid, _id, text, sequence) => { replies.push({ text, sequence }); },
     enqueueFinal: async (_binding, _id, text) => { outbox.push(text); },
@@ -19,7 +20,7 @@ function harness(options: { run?: QqChatPort["handleMessage"]; timers?: Pick<typ
   let n = 0;
   const say = (openid: string, content: string, id = `M${++n}`, timestamp = at.toISOString()) => handler.onMessage({ id, openid, content, quoted: "", timestamp });
   const bind = async () => { await say("U1", `绑定 ${(await state.createChallenge({ workspaceId: "ws", now: at })).code}`); replies.length = 0; };
-  return { state, replies, calls, outbox, say, bind };
+  return { state, replies, calls, outbox, say, bind, decisions };
 }
 test("configuration requires numeric app and state directory", () => {
   expect(qqBotConfig({ CHRONA_QQ_APP_ID: APP, CHRONA_DATA_DIR: "/data" })?.stateDir).toBe(`/data/qq-bot/${APP}`);
@@ -87,4 +88,47 @@ test("active delivery allowlist, local rate limit and no passive message id", as
   expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" }); expect(sent[0]!.msg_id).toBeUndefined();
   expect(await delivery.send(message)).toMatchObject({ outcome: "rejected", retryable: true });
   expect(await delivery.send({ ...message, recipient: "chrona_qq:U2" })).toMatchObject({ outcome: "rejected", retryable: false });
+});
+
+test("approval decisions: buttons and owner text commands, never routed to chat", async () => {
+  const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
+  expect(parseApprovalDecision({ button: `approval:${id}:affair` })).toEqual({ ref: id, decision: "approve", scope: "affair" });
+  expect(parseApprovalDecision({ button: `approval:${id}:deny` })).toEqual({ ref: id, decision: "deny", scope: "once" });
+  expect(parseApprovalDecision({ text: "批准 5266F07C 本事务" })).toEqual({ ref: "5266f07c", decision: "approve", scope: "affair" });
+  expect(parseApprovalDecision({ text: "批准一下这个" })).toBeNull();
+  const h = harness(); await h.bind();
+  await h.say("U2", "批准 5266f07c");
+  expect(h.decisions).toEqual([]);
+  h.replies.length = 0;
+  await h.say("U1", "拒绝 5266f07c");
+  expect(h.decisions).toEqual([{ ref: "5266f07c", decision: "deny", scope: "once" }]);
+  expect(h.replies).toEqual([{ text: "已批准", sequence: 1 }]); expect(h.calls).toEqual([]);
+});
+test("approval delivery carries buttons, and falls back to text when buttons are refused", async () => {
+  const sent: Record<string, any>[] = [];
+  let refuse = false;
+  const fetch = async (url: string, init?: RequestInit) => {
+    if (url.includes("getAppAccessToken")) return Response.json({ access_token: "fake", expires_in: 7200 });
+    const body = JSON.parse(String(init!.body)); sent.push(body);
+    return refuse && body.keyboard ? Response.json({ code: 304003 }, { status: 400 }) : Response.json({ id: "receipt" });
+  };
+  const tokens = createQqTokenSource({ appId: APP, readSecret: async () => "fake", fetch });
+  const delivery = createChronaQqDelivery({ tokens, fetch, allowedRecipients: () => new Set(["chrona_qq:U1"]) });
+  const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
+  const message = { idempotencyKey: "k", title: "需要你批准", body: "读 career-ops", link: null, recipient: "chrona_qq:U1", approval: { id, scoped: true } };
+  expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" });
+  expect(sent[0]).toMatchObject({ msg_type: 2, markdown: { content: expect.stringContaining("批准 5266f07c") } });
+  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:affair`, `approval:${id}:deny`]);
+  refuse = true; sent.length = 0;
+  expect(await delivery.send({ ...message, approval: { id, scoped: false } })).toMatchObject({ outcome: "accepted" });
+  expect(sent).toHaveLength(2); expect(sent[0]!.keyboard.content.rows[0].buttons).toHaveLength(2);
+  expect(sent[1]).toMatchObject({ msg_type: 0, content: expect.stringContaining("拒绝 5266f07c") }); expect(sent[1]!.keyboard).toBeUndefined();
+});
+
+test("replies a run sends after its first batch still reach the owner", async () => {
+  async function* later() { yield { reply: "第二条", messageId: "m2", affairId: null }; }
+  const h = harness({ run: async () => ({ reply: "第一条", replies: [{ reply: "第一条", messageId: "m1", affairId: null }], later: later() }) }); await h.bind();
+  await h.say("U1", "看看目录");
+  for (let i = 0; i < 50 && h.replies.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 1));
+  expect(h.replies).toEqual([{ text: "第一条", sequence: 1 }, { text: "第二条", sequence: 2 }]);
 });

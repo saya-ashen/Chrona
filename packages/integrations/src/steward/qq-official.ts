@@ -14,7 +14,8 @@ import { readFile, stat } from "node:fs/promises";
 export const QQ_API_BASE = "https://api.sgroup.qq.com";
 export const QQ_TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken";
 /** GROUP_AND_C2C_EVENT. Group @-messages share this intent and are ignored. */
-const INTENTS = 1 << 25;
+// C2C messages | button interactions; a bot refused interactions (4014) reconnects with messages only.
+const C2C_INTENT = 1 << 25, INTERACTION_INTENT = 1 << 26;
 const BACKOFF_SECONDS = [2, 5, 10, 30, 60];
 const FATAL_CLOSE = new Set([4001, 4002, 4010, 4011, 4012, 4013, 4014, 4914, 4915]);
 const SESSION_INVALID = (code: number) => code === 4006 || code === 4007 || (code >= 4900 && code < 4914);
@@ -81,9 +82,11 @@ export async function uploadQqImage({ tokens, openid, bytes, fetch = globalThis.
 }
 
 /** One C2C send. Never retried here once a request may have reached QQ. */
-export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1, mediaFileInfo }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number; mediaFileInfo?: string }): Promise<QqSendOutcome> {
+export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1, mediaFileInfo, keyboard }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number; mediaFileInfo?: string; keyboard?: QqKeyboard }): Promise<QqSendOutcome> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(openid)) return { outcome: "rejected", retryable: false, error: "Invalid recipient" };
-  const body = JSON.stringify({ content: content.slice(0, 2000), msg_type: mediaFileInfo ? 7 : 0, ...(mediaFileInfo ? { media: { file_info: mediaFileInfo } } : {}), msg_seq: msgSeq, ...(replyTo ? { msg_id: replyTo } : {}) });
+  // Buttons ride on a markdown message (msg_type 2).
+  const message = keyboard ? { markdown: { content: content.slice(0, 2000) }, msg_type: 2, keyboard } : { content: content.slice(0, 2000), msg_type: mediaFileInfo ? 7 : 0, ...(mediaFileInfo ? { media: { file_info: mediaFileInfo } } : {}) };
+  const body = JSON.stringify({ ...message, msg_seq: msgSeq, ...(replyTo ? { msg_id: replyTo } : {}) });
   const post = async (): Promise<QqSendOutcome | { status: 401 }> => {
     let token: string;
     try { token = await tokens.get(); } catch { return { outcome: "rejected", retryable: true, error: "QQ token unavailable" }; }
@@ -100,6 +103,22 @@ export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, cont
   tokens.invalidate();
   const second = await post();
   return "status" in second ? classifySend(401, null) : second;
+}
+
+export type QqKeyboard = { content: { rows: { buttons: { id: string; group_id: string; render_data: { label: string; visited_label: string; style: number }; action: { type: 1; data: string; permission: { type: 2 }; click_limit: 1 } }[] }[] } };
+/** One row of single-use callback buttons; a click arrives as INTERACTION_CREATE with the button's data. */
+export function qqButtons(group: string, buttons: { id: string; label: string; visited: string; data: string; style?: number }[]): QqKeyboard {
+  return { content: { rows: [{ buttons: buttons.map(b => ({ id: b.id, group_id: group, render_data: { label: b.label, visited_label: b.visited, style: b.style ?? 1 }, action: { type: 1, data: b.data, permission: { type: 2 }, click_limit: 1 } })) }] } };
+}
+export type QqInteraction = { id: string; openid: string; data: string };
+export function parseInteractionEvent(d: unknown): QqInteraction | null {
+  const event = record(d), id = text(event.id), openid = text(event.user_openid), data = text(record(record(event.data).resolved).button_data);
+  return id && openid && data ? { id, openid, data } : null;
+}
+/** QQ shows an error on the button unless the click is acknowledged promptly. */
+export async function ackQqInteraction({ tokens, id, fetch = globalThis.fetch }: { tokens: QqTokenSource; id: string; fetch?: Fetch }) {
+  const response = await fetch(`${QQ_API_BASE}/interactions/${encodeURIComponent(id)}`, { method: "PUT", headers: { authorization: `QQBot ${await tokens.get()}`, "content-type": "application/json" }, body: JSON.stringify({ code: 0 }), signal: AbortSignal.timeout(10_000), redirect: "error" });
+  if (!response.ok) throw new QqTransportError(`Interaction ACK failed (${response.status})`);
 }
 
 type WebSocketLike = { readyState: number; send(data: string): void; close(code?: number): void; addEventListener(type: string, listener: (event: { data?: unknown; code?: number }) => void): void };
@@ -165,9 +184,10 @@ export function parseC2cEvent(d: unknown): QqC2cMessage | null {
  * capped backoff. Delivery of the same event twice (resume/replay) is possible; the
  * consumer deduplicates by message id.
  */
-export function createQqGateway({ appId, tokens, onMessage, fetch = globalThis.fetch, WebSocketImpl = globalThis.WebSocket as unknown as new (url: string) => WebSocketLike, log = () => {}, sleep, now = () => new Date(), helloTimeoutMs = 20_000 }: {
-  appId: string; tokens: QqTokenSource; onMessage: (message: QqC2cMessage) => void; fetch?: Fetch; WebSocketImpl?: new (url: string) => WebSocketLike; log?: QqLog; sleep?: (ms: number) => Promise<unknown>; now?: () => Date; helloTimeoutMs?: number;
+export function createQqGateway({ appId, tokens, onMessage, onInteraction, fetch = globalThis.fetch, WebSocketImpl = globalThis.WebSocket as unknown as new (url: string) => WebSocketLike, log = () => {}, sleep, now = () => new Date(), helloTimeoutMs = 20_000 }: {
+  appId: string; tokens: QqTokenSource; onMessage: (message: QqC2cMessage) => void; onInteraction?: (interaction: QqInteraction) => void; fetch?: Fetch; WebSocketImpl?: new (url: string) => WebSocketLike; log?: QqLog; sleep?: (ms: number) => Promise<unknown>; now?: () => Date; helloTimeoutMs?: number;
 }) {
+  let intents = C2C_INTENT | (onInteraction ? INTERACTION_INTENT : 0);
   let running = false, sessionId: string | null = null, seq: number | null = null, loop: Promise<void> | null = null, wake: (() => void) | null = null, endSession: ((code: number) => void) | null = null;
   const status: QqGatewayStatus = { state: "stopped", appId, readyAt: null, lastEventAt: null, reconnects: 0, lastCloseCode: null, resumable: false };
 
@@ -179,6 +199,13 @@ export function createQqGateway({ appId, tokens, onMessage, fetch = globalThis.f
     return data.url;
   }
 
+  function deliver(t: string | undefined, d: unknown) {
+    // Group and other events are ignored (group chat is not enabled).
+    const interaction = t === "INTERACTION_CREATE" ? parseInteractionEvent(d) : null;
+    if (interaction) { try { onInteraction?.(interaction); } catch { log("qq.interaction_failed"); } return; }
+    const message = t === "C2C_MESSAGE_CREATE" ? parseC2cEvent(d) : null;
+    if (message) { try { onMessage(message); } catch { log("qq.handler_failed"); } }
+  }
   /** One connection; resolves with the close code (0 = transport error). */
   function session(url: string) {
     return new Promise<number>((resolve) => {
@@ -198,14 +225,12 @@ export function createQqGateway({ appId, tokens, onMessage, fetch = globalThis.f
         }, Math.max(5_000, interval * 0.8));
         void tokens.get().then(token => send(sessionId && seq !== null
           ? { op: 6, d: { token: `QQBot ${token}`, session_id: sessionId, seq } }
-          : { op: 2, d: { token: `QQBot ${token}`, intents: INTENTS, shard: [0, 1], properties: { $os: "linux", $browser: "chrona", $device: "chrona" } } }), () => finish(0));
+          : { op: 2, d: { token: `QQBot ${token}`, intents, shard: [0, 1], properties: { $os: "linux", $browser: "chrona", $device: "chrona" } } }), () => finish(0));
       };
       const onDispatch = (t: string | undefined, d: unknown) => {
         status.lastEventAt = now().toISOString();
         if (t === "READY" || t === "RESUMED") { clearTimeout(hello); if (t === "READY") sessionId = text(record(d).session_id) || null; markReady(t === "READY" ? "qq.ready" : "qq.resumed"); return; }
-        // Group and other events are ignored (group chat is not enabled).
-        const message = t === "C2C_MESSAGE_CREATE" ? parseC2cEvent(d) : null;
-        if (message) { try { onMessage(message); } catch { log("qq.handler_failed"); } }
+        deliver(t, d);
       };
       const ops: Partial<Record<number, (payload: Payload) => void>> = {
         0: payload => onDispatch(payload.t, payload.d),
@@ -248,6 +273,7 @@ export function createQqGateway({ appId, tokens, onMessage, fetch = globalThis.f
       try { const url = await gatewayUrl(); if (stopped()) break; code = await session(url); }
       catch { log("qq.connect_failed"); }
       if (stopped()) break;
+      if (code === 4014 && intents & INTERACTION_INTENT) { intents = C2C_INTENT; sessionId = null; seq = null; log("qq.interactions_disallowed"); continue; }
       if (FATAL_CLOSE.has(code)) { status.state = "fatal"; status.lastCloseCode = code; log("qq.fatal_close", { code }); running = false; return; }
       failures = Date.now() - started > 60_000 ? 0 : failures + 1;
       await afterClose(code, failures);

@@ -77,7 +77,7 @@ export function createNotifications(ports: StewardPorts, workspaceId: string) {
       if (!claimed) continue;
       let outcome: DeliveryOutcome;
       const adapter = ports.deliveries.find(d => d.channel === row.channel);
-      try { outcome = adapter ? await adapter.send({ idempotencyKey: row.idempotencyKey, title: row.title, body: row.body, link: row.link, recipient: row.recipient }) : { outcome: "rejected", retryable: false, error: "Delivery channel unavailable" }; }
+      try { outcome = adapter ? await adapter.send({ idempotencyKey: row.idempotencyKey, title: row.title, body: row.body, link: row.link, recipient: row.recipient, ...(row.approvalId ? { approval: { id: row.approvalId, scoped: !!row.affairId } } : {}) }) : { outcome: "rejected", retryable: false, error: "Delivery channel unavailable" }; }
       catch { outcome = { outcome: "uncertain", error: "Delivery adapter threw; receipt unknown" }; }
       const attempts = row.attempts + 1;
       const status = deliveryStatus(outcome, attempts);
@@ -120,5 +120,11 @@ export function createNotifications(ports: StewardPorts, workspaceId: string) {
       return toNotification(updated);
     });
   }
-  return { enqueueNotification: enqueue, enqueue: async (input: Omit<NotificationInput, "workspaceId">) => db.$transaction(async tx => toNotification(await enqueue(tx, { ...input, workspaceId }))), deliverDue, sendDigestIfDue, recordFeedback: (id: string, feedback: "useful" | "not_useful") => mutate(id, feedback), acknowledge: (id: string) => mutate(id, "acknowledge"), retry: (id: string) => mutate(id, "retry"), list: async () => (await db.notification.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } })).map(toNotification) };
+  /** Every open approval is announced once, wherever it was created; the user is waiting on it, so caps and quiet hours do not hold it back. */
+  async function announceApprovals(now = ports.now()) {
+    const open = await db.approval.findMany({ where: { workspaceId, status: "open", notifications: { none: {} } }, orderBy: { createdAt: "asc" }, take: 20 });
+    for (const row of open) await db.$transaction(async tx => enqueueNotification(tx, { workspaceId, ...(row.affairId ? { affairId: row.affairId } : {}), approvalId: row.id, level: "now", responds: true,
+      title: `需要你批准：${row.title}`.slice(0, 200), body: [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500), dedupeKey: `approval:${row.id}` }, await context(now)));
+  }
+  return { announceApprovals, enqueueNotification: enqueue, enqueue: async (input: Omit<NotificationInput, "workspaceId">) => db.$transaction(async tx => toNotification(await enqueue(tx, { ...input, workspaceId }))), deliverDue, sendDigestIfDue, recordFeedback: (id: string, feedback: "useful" | "not_useful") => mutate(id, feedback), acknowledge: (id: string) => mutate(id, "acknowledge"), retry: (id: string) => mutate(id, "retry"), list: async () => (await db.notification.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" } })).map(toNotification) };
 }

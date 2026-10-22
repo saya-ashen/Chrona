@@ -44,3 +44,17 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
     effectivePolicy: (action: Action, target: Parameters<typeof decidePolicy>[1]) => effectivePolicyIn(db, workspaceId, action, target, now()),
   };
 }
+/** Host paths the user approved for a run in this affair (or at the root); once grants are spent by the run that mounts them. */
+export async function hostPathsFor(db: Prisma.TransactionClient, workspaceId: string, affairId: string | null, at: Date) {
+  const rows = await db.approval.findMany({ where: { workspaceId, action: "access_host_path", status: "approved", grant: { revokedAt: null } }, include: { grant: true } });
+  const paths: string[] = [];
+  for (const row of rows) {
+    const grant = row.grant, path = (row.payload as { path?: unknown }).path;
+    if (!grant || typeof path !== "string" || (grant.expiresAt && grant.expiresAt <= at) || (grant.once && grant.consumedAt)) continue;
+    const scope = grant.scope as { kind?: string; affairId?: string };
+    if (scope.kind === "affair" && scope.affairId !== affairId) continue;
+    if (grant.once) { try { await consumeOnce(db, workspaceId, grant.id, at); } catch { continue; } }
+    paths.push(path);
+  }
+  return [...new Set(paths)];
+}

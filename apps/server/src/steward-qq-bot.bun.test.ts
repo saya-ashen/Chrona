@@ -7,7 +7,7 @@ import type { ProviderRunInput } from "@chrona/contracts/steward";
 import { testDb } from "@chrona/engine/test-support";
 import { createQqBotState } from "../../../packages/integrations/src/steward/qq-official-bot";
 import { downloadQqAttachment, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
-import { createStewardQqBot, qqReplyText } from "./steward-qq-bot";
+import { createStewardQqBot, lateReplies, qqReplyText } from "./steward-qq-bot";
 
 test("QQ attachment-only message: inbox, images, receipt quote focus, affair storage and file links", async () => {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-v6-"));
@@ -84,4 +84,22 @@ test("outbound file link uses public origin and encoded raw path; no public orig
   expect(page("README.md")).toContain("总览：");
   expect(page("trending.md")).toContain("trending：");
   expect(qqReplyText(message, null, "ws_default")).toContain("请在 Chrona 网页查看附件");
+});
+
+test("late replies: only this run's unsent replies, until the run ends", async () => {
+  const db = testDb(), at = new Date("2026-10-15T04:00:00Z");
+  await db.workspace.create({ data: { id: "w", name: "test" } });
+  const run = await db.run.create({ data: { workspaceId: "w", lane: "foreground", trigger: "message", status: "running", provider: "pi", tokenHash: "h", prompt: "p", cwd: "/x", deadlineAt: at, conversationKey: "chat:chrona_qqbot", createdAt: at } });
+  const reply = async (text: string, externalId: string | null = null) => {
+    const m = await db.message.create({ data: { workspaceId: "w", channel: "chrona_qqbot", direction: "out", conversationKey: "chat:chrona_qqbot", text, externalId, at } });
+    await db.audit.create({ data: { workspaceId: "w", actorKey: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: m.id } } });
+    return m.id;
+  };
+  const first = await reply("first"); await reply("already sent", "qq:out:x");
+  const stream = lateReplies(db as never, "w", run.id, { seen: new Set([first]), publicUrl: null, pollMs: 1 })[Symbol.asyncIterator]();
+  const pending = stream.next();
+  await reply("second");
+  expect((await pending).value).toMatchObject({ reply: "second" });
+  await db.run.update({ where: { id: run.id }, data: { status: "finished" } });
+  expect((await stream.next()).done).toBe(true);
 });

@@ -2,7 +2,9 @@ import { z } from "zod";
 import { compileUiSpec, checkUiSpec, uiGuide } from "@chrona/ui-catalog";
 import { uiSummary } from "./ui-files";
 import { uiUsage } from "./ui";
-import { join, relative } from "node:path";
+import { realpath } from "node:fs/promises";
+import { homedir } from "node:os";
+import { isAbsolute, join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
@@ -264,6 +266,16 @@ async function requestApproval(ctx: ToolContext, raw: unknown) {
   if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
   return approvals.create({ ...input, affairId: run.affairId ?? undefined, payload: { tool, ...input } });
 }
+async function requestPathAccess(ctx: ToolContext, raw: unknown) {
+  const { db, workspaceId, run, now, approvals, tool } = ctx;
+  const input = parseInput(schemas.chrona_request_path_access, raw);
+  const expanded = input.path.replace(/^~(?=\/|$)/, homedir());
+  if (!isAbsolute(expanded)) throw new StewardError("invalid", "Path must be absolute");
+  const path = await realpath(expanded).catch(() => { throw new StewardError("not_found", "Path does not exist"); });
+  const decision = await effectivePolicyIn(db, workspaceId, "access_host_path", { affairId: run.affairId ?? undefined }, now());
+  if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
+  return approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，${run.affairId ? "这件事之后的运行" : "下一次运行"}可以读写：\n${path}\n撤销对应授权即可收回。`, affairId: run.affairId ?? undefined, payload: { tool, kind: "host_path", path } });
+}
 async function sendEmail(ctx: ToolContext, raw: unknown) {
   const { db, workspaceId, run, now, approvals, tool } = ctx;
   const input = parseInput(schemas.chrona_send_email, raw);
@@ -311,7 +323,7 @@ const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unk
   chrona_propose: proposeModule, chrona_modules: listModules, chrona_module_checkout: checkoutModule, chrona_module_rollback: rollbackModule,
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
   chrona_schedule_cancel: cancelSchedule, chrona_affairs: affairs, chrona_affair_create: createAffair,
-  chrona_affair_update: updateAffair, chrona_focus: focus, chrona_request_approval: requestApproval,
+  chrona_affair_update: updateAffair, chrona_focus: focus, chrona_request_approval: requestApproval, chrona_request_path_access: requestPathAccess,
   chrona_send_email: sendEmail, chrona_inbound: inbound, chrona_remember: remember, chrona_forget: forget, chrona_preferences: preferences,
 };
 /** No provider-supplied workspace IDs: all ownership comes from the capability. */

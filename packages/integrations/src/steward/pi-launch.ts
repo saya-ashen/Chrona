@@ -73,6 +73,13 @@ export async function inspectPiLaunch(config: PiLaunchConfig): Promise<string | 
   if (config.bwrap && !(await probe(config.bwrap, env)).ok) return "bubblewrap binary unavailable";
   return null;
 }
+const both = (p: string) => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; };
+/** User-approved host paths are writable; Chrona's data dir is re-masked so a grant of e.g. home cannot reach approvals. */
+function hostMounts(config: PiLaunchConfig, input: ProviderRunInput) {
+  const granted = (input.hostPaths ?? []).filter(p => isAbsolute(p) && existsSync(p)).flatMap(p => ["--bind", p, p]);
+  const data = granted.length && config.options.dataDir ? [...new Set(both(config.options.dataDir))] : [];
+  return [...granted, ...data.flatMap(p => ["--tmpfs", p])];
+}
 function workspaceMounts(config: PiLaunchConfig, input: ProviderRunInput, cwd: string) {
   const rootRun = config.options.workspaceRoot !== undefined && cwd === resolve(config.options.workspaceRoot);
   const mounts = [rootRun ? "--ro-bind" : "--bind", cwd, cwd];
@@ -104,14 +111,14 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   if (!config.bwrap) return args;
   const cwd = resolve(input.cwd);
   // Parent masks precede child masks; all masks precede the explicit resource/workspace mounts.
-  const hidden = [...new Set([homedir(), config.options.dataDir].filter((p): p is string => !!p)
-    .flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
+  const hidden = [...new Set([homedir(), config.options.dataDir].filter((p): p is string => !!p).flatMap(both))]
     .sort((a, b) => a.split(sep).length - b.split(sep).length);
   const resources = [config.command, config.extension, config.web, ...config.resources.extensions, ...config.resources.skills]
     .filter((p): p is string => !!p && isAbsolute(p));
   const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
     .filter(p => hidden.some(root => inside(root, p)));
   return ["--die-with-parent", "--ro-bind", "/", "/", "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]),
+    ...hostMounts(config, input),
     "--dev", "/dev", "--proc", "/proc", ...visible.flatMap(p => ["--ro-bind", p, p]), ...workspaceMounts(config, input, cwd),
     "--bind", config.agentDir, config.agentDir, "--chdir", cwd, "--", config.command, ...args];
 }

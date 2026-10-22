@@ -1,8 +1,8 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { REF_ALPHABET, type DeliveryAdapter, type DeliveryOutcome } from "@chrona/contracts/steward";
-import { sendQqC2c, type QqC2cMessage, type QqLog, type QqTokenSource } from "./qq-official";
+import { REF_ALPHABET, type DeliveryAdapter, type DeliveryMessage, type DeliveryOutcome } from "@chrona/contracts/steward";
+import { qqButtons, sendQqC2c, type QqC2cMessage, type QqKeyboard, type QqLog, type QqSendOutcome, type QqTokenSource } from "./qq-official";
 
 export const DEDICATED_PLATFORM = "chrona_qq";
 export const DEDICATED_CHANNEL = "chrona_qqbot";
@@ -76,12 +76,33 @@ export function createQqBotState(dir: string, appId: string) {
   };
 }
 export type QqBotState = ReturnType<typeof createQqBotState>;
-export type QqChatResult = { reply: string; affairId?: string | null; messageId?: string; workspaceId?: string; replies?: { reply: string; messageId: string; affairId: string | null }[] };
+type QqReplyItem = { reply: string; messageId: string; affairId: string | null };
+/** later: replies the same run sends after the first batch was returned (it keeps working after its first reply). */
+export type QqChatResult = { reply: string; affairId?: string | null; messageId?: string; workspaceId?: string; replies?: QqReplyItem[]; later?: AsyncIterable<QqReplyItem> };
 export type QqChatPort = { handleMessage(input: { workspaceId: string; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<QqChatResult> };
 const HELP_WORDS = new Set(["help", "帮助", "?", "？", "用法", "菜单"]);
 const UNBOUND = "【Chrona】这是 Chrona 的私人管家机器人，尚未绑定主人。主人请在 Chrona 管理端取得一次性绑定码后发送：绑定 <绑定码>。未绑定前不处理任何其他内容。";
 const NOT_OWNER = "【Chrona】这是私人机器人，你没有使用权限。本条未做任何处理。";
 const BIND_FAIL = { no_challenge: "当前没有待使用的绑定码，请重新生成。", expired: "绑定码已过期或尝试次数已用完，请重新生成。", wrong_code: "绑定码不正确（多次错误后会失效）。", already_bound: "这个机器人已经绑定了主人，未做更改。" };
+
+export type ApprovalDecision = { ref: string; decision: "approve" | "deny"; scope: "once" | "affair" };
+const BUTTON = /^approval:([0-9a-f-]{36}):(once|affair|deny)$/;
+/** Button data and the text fallback (批准/拒绝 <编号前缀> [本事务]) both become one decision. */
+export function parseApprovalDecision(input: { button?: string; text?: string }): ApprovalDecision | null {
+  const button = input.button ? BUTTON.exec(input.button) : null;
+  if (button) return { ref: button[1]!, decision: button[2] === "deny" ? "deny" : "approve", scope: button[2] === "affair" ? "affair" : "once" };
+  const text = input.text ? /^\/?(批准|同意|approve|拒绝|deny)\s+([0-9a-f-]{6,36})(?:\s+(本事务|始终|always))?$/i.exec(input.text.trim()) : null;
+  if (!text) return null;
+  return { ref: text[2]!.toLowerCase(), decision: /^(拒绝|deny)$/i.test(text[1]!) ? "deny" : "approve", scope: text[3] ? "affair" : "once" };
+}
+export function approvalButtons(id: string, scoped: boolean) {
+  return qqButtons("approval", [
+    { id: "once", label: "✅ 批准一次", visited: "已批准", data: `approval:${id}:once` },
+    ...(scoped ? [{ id: "affair", label: "⭐ 这件事始终允许", visited: "已始终允许", data: `approval:${id}:affair` }] : []),
+    { id: "deny", label: "❌ 拒绝", visited: "已拒绝", data: `approval:${id}:deny`, style: 0 },
+  ]);
+}
+const approvalHint = (id: string, scoped: boolean) => `回复「批准 ${id.slice(0, 8)}」${scoped ? `（加「本事务」则这件事始终允许）` : ""}或「拒绝 ${id.slice(0, 8)}」。`;
 
 /** Reservations count even failed/uncertain sends; sequence numbers must never be reused. */
 export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>, now = Date.now) {
@@ -99,8 +120,10 @@ export function createQqPassiveReplies(reply: (openid: string, id: string, text:
 }
 export const SLOW_ACK_MS = 30_000;
 const SLOW_ACK = "我还在处理，稍等，好了马上回你。";
-export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound = async () => {}, log = () => {}, now = () => new Date(), timers = globalThis }: {
+export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveApproval, onBound = async () => {}, log = () => {}, now = () => new Date(), timers = globalThis }: {
   state: QqBotState; chat: QqChatPort;
+  /** Owner-only; returns the line to send back. */
+  resolveApproval?: (binding: QqBinding, decision: ApprovalDecision) => Promise<string>;
   reply: (openid: string, messageId: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>;
   enqueueFinal: (binding: QqBinding, messageId: string, text: string, affairId?: string | null) => Promise<void>;
   onBound?: (binding: QqBinding) => Promise<void>; log?: QqLog; now?: () => Date;
@@ -138,13 +161,18 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
       await replyToStranger(message.openid, text, at, binding, send); return;
     }
     if (!text && !message.attachments?.length) return;
-    await handleOwnerMessage(message, binding, send);
+    if (!await handleApprovalText(text, binding, send)) await handleOwnerMessage(message, binding, send);
   }
   async function replyToStranger(openid: string, text: string, at: number, binding: QqBinding | null, send: (text: string) => Promise<boolean>) {
     const last = strangerReplies.get(openid);
     if (last !== undefined && at - last < 3600_000 && !HELP_WORDS.has(text.toLowerCase())) return;
     strangerReplies.set(openid, at);
     await send(binding ? NOT_OWNER : UNBOUND);
+  }
+  async function handleApprovalText(text: string, binding: QqBinding, send: (text: string) => Promise<boolean>) {
+    const decision = resolveApproval ? parseApprovalDecision({ text }) : null;
+    if (decision) await send(await resolveApproval!(binding, decision).catch(() => "【Chrona】审批未处理，请在网页上操作。"));
+    return Boolean(decision);
   }
   async function handleOwnerMessage(message: QqC2cMessage, binding: QqBinding, send: (text: string, result?: QqChatResult) => Promise<boolean>) {
     // Most answers arrive in well under half a minute: only a genuinely slow one gets a holding line,
@@ -156,13 +184,23 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, onBound =
     catch { log("qq.chat_failed"); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
     finally { timers.clearTimeout(timer); }
     await ack;
-    for (const item of result.replies?.length ? result.replies : [result]) {
-      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, message.id, item.reply, item.affairId);
-    }
+    const deliver = async (item: Pick<QqReplyItem, "reply"> & Partial<QqReplyItem>) => {
+      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, `${message.id}:${item.messageId ?? ""}`, item.reply, item.affairId);
+    };
+    for (const item of result.replies?.length ? result.replies : [result]) await deliver(item);
+    // Not awaited: the next owner message must not wait for this run to finish.
+    if (result.later) void (async () => { for await (const item of result.later!) await deliver(item); })().catch(() => log("qq.late_reply_failed"));
   }
   return { onMessage(message: QqC2cMessage) { queue = queue.then(() => handle(message)).catch(() => log("qq.handler_failed")); return queue; }, drain: () => queue };
 }
 
+/** A bot without markdown/button permission is refused before delivery: the text fallback still works. */
+async function sendWithButtons(plain: (content: string) => Promise<QqSendOutcome>, text: string, approval: DeliveryMessage["approval"], withButtons: (content: string, keyboard: QqKeyboard) => Promise<QqSendOutcome>) {
+  if (!approval) return plain(text);
+  const content = `${text}\n\n${approvalHint(approval.id, approval.scoped)}`;
+  const result = await withButtons(content, approvalButtons(approval.id, approval.scoped));
+  return result.outcome === "rejected" && !result.retryable ? plain(content) : result;
+}
 /** Active sends are only called by the notification outbox. */
 export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, fetch, send = sendQqC2c, perMinute = 10, now = Date.now }: {
   tokens: QqTokenSource; allowedRecipients: () => ReadonlySet<string>; publicUrl?: string | null; fetch?: (input: string, init?: RequestInit) => Promise<Response>; send?: typeof sendQqC2c; perMinute?: number; now?: () => number;
@@ -177,7 +215,8 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
     if (window.length >= perMinute) return { outcome: "rejected", retryable: true, error: "Local QQ rate limit" };
     sent.set(recipient, [...window, at]);
     const link = message.link?.startsWith("/") && publicUrl ? `${publicUrl.replace(/\/$/, "")}${message.link}` : message.link;
-    const result = await send({ tokens, fetch, openid, content: [message.title, message.body, link].filter(Boolean).join("\n\n") });
+    const result = await sendWithButtons(content => send({ tokens, fetch, openid, content }), [message.title, message.body, link].filter(Boolean).join("\n\n"), message.approval,
+      (content, keyboard) => send({ tokens, fetch, openid, content, keyboard }));
     return result.outcome === "accepted" ? { outcome: "accepted", receiptRef: `${DEDICATED_PLATFORM}:${result.messageId}` } : result;
   } };
 }

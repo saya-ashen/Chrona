@@ -43,6 +43,20 @@ test("bwrap masks data and home before re-exposing only Pi resources and workspa
   const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
   expect(unsandboxed).not.toContain("--tmpfs");
 });
+test("bwrap binds approved host paths writable and re-masks the data dir under them", async () => {
+  const f = await fixture(), dataDir = join(f.root, "data"), workspace = join(dataDir, "affairs"), sessions = join(workspace, ".chrona", "sessions");
+  const agentDir = join(dataDir, "providers", "pi"), granted = await mkdtemp(join(tmpdir(), "chrona-granted-"));
+  for (const path of [sessions, agentDir]) await mkdir(path, { recursive: true });
+  const config = piLaunchConfig({ command: "/fake-pi", agentDir, dataDir, workspaceRoot: workspace, chronaExtension: f.extension, bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
+  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground", hostPaths: [f.root, granted, join(f.root, "missing")] } as ProviderRunInput, "Fixture");
+  const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
+  expect(mount("--bind", granted)).toBeGreaterThan(mount("--tmpfs", homedir()));
+  expect(mount("--bind", join(f.root, "missing"))).toBe(-1);
+  const remask = args.findLastIndex((arg, i) => arg === "--tmpfs" && args[i + 1] === dataDir);
+  expect(remask).toBeGreaterThan(mount("--bind", f.root));
+  expect(remask).toBeLessThan(mount("--ro-bind", workspace));
+  expect(remask).toBeLessThan(mount("--bind", agentDir));
+});
 test("missing/invalid manifest never falls back to ambient resources", async () => {
   const f = await fixture();
   expect(readPiResources(undefined, f.profile).resources).toEqual({ skills: [], extensions: [], tools: [] });

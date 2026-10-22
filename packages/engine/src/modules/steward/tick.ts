@@ -12,6 +12,7 @@ import { createWorkspaceFs } from "./workspace-fs";
 import { notificationSettings } from "./settings";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import { audit } from "./audit";
+import { hostPathsFor } from "./grants";
 import { guardWorkspaceRoot } from "./root-guard";
 import { chatImages } from "./chat";
 import { z } from "zod";
@@ -61,14 +62,16 @@ export function createTick(ports: StewardPorts) {
       }
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
         // Build runs never continue the affair's session and get no module tools: they must not see the affair.
-        if (run.lane === "build") return { prompt: await prepareBuildRun(ports, workspaceId, run), inbound: null, extraTools: [], searchTools: false, sessionId: null };
+        if (run.lane === "build") return { prompt: await prepareBuildRun(ports, workspaceId, run), inbound: null, extraTools: [], searchTools: false, sessionId: null, hostPaths: [] };
         // Pi launches with a tool allowlist; this affair's module tools are named up front, other modules' sit behind tool search.
         const catalog = await moduleToolCatalog(ports, { workspaceId, affairId: run.affairId }), toolsets = moduleToolsets(catalog);
         const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name), context = await prepareContext(run);
         // Like an MCP server list: one entry per module toolset, so the model knows what to search for.
         // shortcut: lists at most 30 toolsets (tool_search still finds the rest); rank by relevance if workspaces grow past that.
-        const prompt = toolsets.length ? `${context.prompt}\n\nModule toolsets from other affairs (data; load their m_* tools with tool_search, they act in their own affair):\n${JSON.stringify(toolsets.slice(0, 30))}` : context.prompt;
-        return { prompt, inbound: context.inbound, extraTools, searchTools: toolsets.length > 0, sessionId: run.affair?.sessionId ?? null };
+        const withTools = toolsets.length ? `${context.prompt}\n\nModule toolsets from other affairs (data; load their m_* tools with tool_search, they act in their own affair):\n${JSON.stringify(toolsets.slice(0, 30))}` : context.prompt;
+        const hostPaths = await hostPathsFor(ports.db, workspaceId, run.affairId, now);
+        const prompt = hostPaths.length ? `${withTools}\n\nHost paths the user approved for this run (read-write, absolute):\n${JSON.stringify(hostPaths)}` : withTools;
+        return { prompt, inbound: context.inbound, extraTools, searchTools: toolsets.length > 0, sessionId: run.affair?.sessionId ?? null, hostPaths };
       }
       async function launch() {
         for (const lane of ["foreground", "background", "build"] as const) {
@@ -77,7 +80,7 @@ export function createTick(ports: StewardPorts) {
           const gate = providerStartGate();
           liveRuns.set(run.id, gate.handle);
           try {
-            const { prompt, inbound, extraTools, searchTools, sessionId } = await runInput(run);
+            const { prompt, inbound, extraTools, searchTools, sessionId, hostPaths } = await runInput(run);
             const sessionDir = join(run.cwd, ".chrona", "sessions");
             await mkdir(sessionDir, { recursive: true });
             if (!ports.provider) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }); continue; }
@@ -87,7 +90,7 @@ export function createTick(ports: StewardPorts) {
             try {
               await runs.authenticate(run.token);
               if (gate.stopped()) { await channel.close(); await cleanup(); continue; }
-              handle = ports.provider.start({ runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId, prompt, images: chatImages(inbound?.attachments ?? []), deadline: run.deadlineAt, events: channel.events, extraTools, searchTools });
+              handle = ports.provider.start({ runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId, prompt, images: chatImages(inbound?.attachments ?? []), deadline: run.deadlineAt, events: channel.events, extraTools, searchTools, hostPaths });
             } catch (error) { await channel.close(); await cleanup(); throw error; }
             gate.attach(handle);
             // Do not await completion: foreground must remain free to launch beside a long background run.
@@ -106,7 +109,7 @@ export function createTick(ports: StewardPorts) {
         ["module-inbound", () => processModuleInbound(ports, workspaceId, now)],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
-        ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
+        ["approvals", () => notifications.announceApprovals(now)], ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
       ] as const) {
         try { await action(); } catch { failures.push({ workspaceId, stage }); }
       }

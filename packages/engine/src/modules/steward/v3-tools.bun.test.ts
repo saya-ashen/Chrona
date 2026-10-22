@@ -317,3 +317,35 @@ test("fake provider calls authenticated tools in-process through tick", async ()
   expect((await db.run.findUniqueOrThrow({ where: { id: queued.id } })).status).toBe("finished");
   expect(deliveries).toEqual(["provider answer"]);
 });
+test("host path access: approval adds it to the run whitelist; once is spent, revoke removes it", async () => {
+  const { hostPathsFor } = await import("./grants");
+  const owner = service.forWorkspace(workspaceId), affair = await owner.affairs.create({ title: "Career" });
+  await db.run.update({ where: { id: runId }, data: { affairId: affair.id } });
+  await expect(call("chrona_request_path_access", { path: "relative/dir", reason: "r" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(call("chrona_request_path_access", { path: join(ports.dataDir, "missing"), reason: "r" })).rejects.toMatchObject({ code: "not_found" });
+  const once = await call("chrona_request_path_access", { path: ports.dataDir, reason: "look" }) as { id: string; action: string };
+  expect(once.action).toBe("access_host_path");
+  expect(await hostPathsFor(db, workspaceId, affair.id, ports.now())).toEqual([]);
+  await owner.approvals.resolve(once.id, { decision: "approve", scope: "once" });
+  expect(await hostPathsFor(db, workspaceId, affair.id, ports.now())).toEqual([ports.dataDir]);
+  expect(await hostPathsFor(db, workspaceId, affair.id, ports.now())).toEqual([]);
+  const kept = await call("chrona_request_path_access", { path: ports.dataDir, reason: "keep" }) as { id: string };
+  const { grantId } = await owner.approvals.resolve(kept.id, { decision: "approve", scope: "affair" });
+  expect(await hostPathsFor(db, workspaceId, affair.id, ports.now())).toEqual([ports.dataDir]);
+  expect(await hostPathsFor(db, workspaceId, "other-affair", ports.now())).toEqual([]);
+  await owner.grants.revoke(grantId!);
+  expect(await hostPathsFor(db, workspaceId, affair.id, ports.now())).toEqual([]);
+});
+test("every open approval is announced once and delivered with its approval id", async () => {
+  const sends: unknown[] = [];
+  ports.deliveries[0] = { channel: "in_app", send: async m => { sends.push(m); return { outcome: "accepted", receiptRef: null }; } };
+  const a = await call("chrona_request_approval", { action: "send_external_message", title: "Send", detail: "Please", preview: "body" }) as { id: string };
+  const notifications = service.forWorkspace(workspaceId).notifications;
+  await notifications.announceApprovals(); await notifications.announceApprovals();
+  expect(await db.notification.count({ where: { approvalId: a.id } })).toBe(1);
+  await notifications.deliverDue();
+  expect(sends).toMatchObject([{ title: "需要你批准：Send", approval: { id: a.id, scoped: false } }]);
+  await service.forWorkspace(workspaceId).approvals.resolve(a.id, { decision: "deny" });
+  await notifications.announceApprovals();
+  expect(await db.notification.count()).toBe(1);
+});

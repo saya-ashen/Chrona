@@ -38,13 +38,13 @@ export const APPROVAL_SCOPES = ["once", "affair"] as const;
 /** Actions Chrona itself performs for the Provider and therefore gates. Provider-native actions are governed by the Provider runtime/sandbox. */
 export const ACTIONS = [
   "notify_user", "schedule", "activate_module", "read_source", "connect_source",
-  "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials",
+  "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials", "access_host_path",
 ] as const;
 export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
 export const DEFAULT_POLICY = {
   notify_user: "auto", schedule: "auto", activate_module: "ask", read_source: "auto",
   connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
-  share_third_party: "ask", purchase: "ask", change_credentials: "never",
+  share_third_party: "ask", purchase: "ask", change_credentials: "never", access_host_path: "ask",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
 
 export const NOTIFY_LEVELS = ["now", "digest", "web"] as const;
@@ -388,6 +388,7 @@ export const chronaToolInputSchemas = {
   /** Mark which affair this conversation is about, so later messages and the web view connect to it. */
   chrona_focus: z.object({ affairId: id }).strict(),
   chrona_request_approval: z.object({ action: z.enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20_000) }).strict(),
+  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to mount an absolute host directory or file (read-write) into later runs of this affair. The current run cannot see it; after approval, schedule a wake to continue."),
   chrona_send_email: z.object({ connectorId: id, to: z.array(z.string().email()).min(1).max(20), subject: text.max(500), body: text.max(50_000), inReplyTo: z.string().max(500).optional() }).strict(),
   chrona_inbound: z.object({ connectorId: id.optional(), status: z.enum(INBOUND_STATUSES).optional(), limit: z.number().int().min(1).max(100).default(50) }).strict(),
   chrona_remember: z.object({ text: text.max(500), topic: z.enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
@@ -413,7 +414,9 @@ export type ConnectorAdapter = {
   poll(input: { settings: Record<string, unknown>; secret: Record<string, string> | null; cursor: string | null }): Promise<{ items: SourceItem[]; cursor: string | null }>;
   send?(input: { settings: Record<string, unknown>; secret: Record<string, string> | null; to: string[]; subject: string; body: string; inReplyTo?: string }): Promise<{ ok: true; messageId: string | null } | { ok: false; retryable: boolean; error: string }>;
 };
-export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; files?: { name: string; path: string }[] };
+export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; files?: { name: string; path: string }[];
+  /** An open approval this message asks about; chat channels may offer approve/deny buttons (scoped: the affair scope is available). */
+  approval?: { id: string; scoped: boolean } };
 export type DeliveryOutcome = { outcome: "accepted"; receiptRef: string | null } | { outcome: "rejected"; retryable: boolean; error: string } | { outcome: "uncertain"; error: string };
 export type DeliveryAdapter = { channel: DeliveryChannel; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
 
@@ -425,6 +428,8 @@ export type ProviderRunInput = {
   extraTools?: string[];
   /** The catalog also has deferred module tools (m_*); Providers should admit them behind their tool search. */
   searchTools?: boolean;
+  /** Absolute host paths the user approved for this run (read-write). */
+  hostPaths?: string[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;
 };

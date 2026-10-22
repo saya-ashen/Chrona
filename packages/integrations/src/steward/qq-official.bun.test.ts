@@ -167,3 +167,28 @@ test("gateway: stop() during the gateway lookup never opens a socket; a missing 
   expect(silent.status().state).toBe("backoff");
   await silent.stop();
 });
+
+test("gateway: button interactions are subscribed and dispatched; a bot refused them (4014) reconnects with DMs only", async () => {
+  FakeSocket.all = [];
+  const { fetch } = fakeFetch(url => url === QQ_TOKEN_URL ? tokenRoute({ n: 0 })() : json(200, { url: "wss://gateway.test" }));
+  const tokens = createQqTokenSource({ appId: "1", readSecret: async () => SECRET, fetch });
+  const clicks: unknown[] = [];
+  const gateway = createQqGateway({ appId: "1", tokens, fetch, WebSocketImpl: FakeSocket as never, onMessage: () => {}, onInteraction: i => clicks.push(i), sleep: async () => {}, log: () => {} });
+  gateway.start();
+  await until(() => FakeSocket.all.length === 1);
+  const first = FakeSocket.all[0]!;
+  first.server({ op: 10, d: { heartbeat_interval: 41250 } });
+  await until(() => first.sent.length === 1);
+  expect(first.sent[0].d.intents).toBe((1 << 25) | (1 << 26));
+  first.server({ op: 0, s: 1, t: "READY", d: { session_id: "S1" } });
+  first.server({ op: 0, s: 2, t: "INTERACTION_CREATE", d: { id: "I1", user_openid: "U1", data: { resolved: { button_data: "approval:x:once" } } } });
+  expect(clicks).toEqual([{ id: "I1", openid: "U1", data: "approval:x:once" }]);
+  first.close(4014);
+  await until(() => FakeSocket.all.length === 2);
+  const second = FakeSocket.all[1]!;
+  second.server({ op: 10, d: { heartbeat_interval: 41250 } });
+  await until(() => second.sent.length === 1);
+  expect(second.sent[0]).toMatchObject({ op: 2, d: { intents: 1 << 25 } });
+  expect(gateway.status().state).not.toBe("fatal");
+  await gateway.stop();
+});

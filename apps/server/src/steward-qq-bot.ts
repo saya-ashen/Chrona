@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import type { StewardService, StewardChatTransport } from "@chrona/engine";
 import type { PrismaClient } from "@chrona/db";
 import { attachmentSchema } from "@chrona/contracts/steward";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, qqBotConfig, DEDICATED_PLATFORM } from "../../../packages/integrations/src/steward/qq-official-bot";
-import { uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, parseApprovalDecision, qqBotConfig, DEDICATED_PLATFORM, type ApprovalDecision, type QqBinding } from "../../../packages/integrations/src/steward/qq-official-bot";
+import { ackQqInteraction, uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqInteraction, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
 
 /** Pages open in the web reader; other files download through the authenticated raw route. Never expose a local path. */
 export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null, workspaceId: string) {
@@ -28,6 +28,40 @@ function isReplyImage(file: import("@chrona/contracts/steward").Attachment | und
   return file?.path && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024;
 }
 
+/** The bound owner's decision on one open approval, addressed by an id prefix. */
+function approvalResolver(service: StewardService) {
+  return async (binding: QqBinding, decision: ApprovalDecision) => {
+    const api = service.forWorkspace(binding.workspaceId), matches = (await api.approvals.list("open")).filter(a => a.id.startsWith(decision.ref));
+    if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
+    const approval = matches[0]!, scope = decision.scope === "affair" && approval.affairId ? "affair" : "once";
+    await api.approvals.resolve(approval.id, { decision: decision.decision, scope });
+    return `【Chrona】已${decision.decision === "deny" ? "拒绝" : scope === "affair" ? "批准（这件事以后都允许）" : "批准"}：${approval.title}`;
+  };
+}
+
+/** Replies a run sends after its first batch reached QQ; ends when the run does. Each message is claimed once per process. */
+const claimedReplies = new Set<string>();
+export async function* lateReplies(db: PrismaClient, workspaceId: string, runId: string, { seen, publicUrl, pollMs = 2000 }: { seen: Set<string>; publicUrl: string | null; pollMs?: number }) {
+  for (let done = false; !done;) {
+    done = (await db.run.findFirst({ where: { id: runId, workspaceId }, select: { status: true } }))?.status !== "running";
+    const ids = (await db.audit.findMany({ where: { workspaceId, kind: "run_reply", subjectId: runId }, orderBy: { createdAt: "asc" } }))
+      .map(a => (a.details as { messageId?: string } | null)?.messageId).filter((id): id is string => !!id && !seen.has(id) && !claimedReplies.has(id));
+    for (const message of await db.message.findMany({ where: { id: { in: ids }, workspaceId, externalId: null }, orderBy: [{ at: "asc" }, { id: "asc" }] })) {
+      seen.add(message.id); claimedReplies.add(message.id);
+      yield { messageId: message.id, affairId: message.affairId, reply: qqReplyText(toReplyView(message), publicUrl, workspaceId) };
+    }
+    if (!done) await new Promise(resolve => setTimeout(resolve, pollMs));
+  }
+}
+const toReplyView = (row: { text: string; attachments: unknown; affairId: string | null }) => ({ text: row.text, affairId: row.affairId, attachments: Array.isArray(row.attachments) ? row.attachments.flatMap(a => attachmentSchema.safeParse(a).data ?? []) : [] });
+
+/** A button click is the owner's decision only when the bound owner clicked it. */
+async function approvalClick(interaction: QqInteraction, deps: { ack: () => Promise<void>; binding: () => Promise<QqBinding | null>; resolve?: ReturnType<typeof approvalResolver>; log: QqLog }) {
+  await deps.ack().catch(() => deps.log("qq.interaction_ack_failed"));
+  const binding = await deps.binding(), decision = parseApprovalDecision({ button: interaction.data });
+  deps.log("qq.approval_click", { result: decision && deps.resolve && binding?.openid === interaction.openid ? await deps.resolve(binding, decision).catch(() => "failed") : "ignored" });
+}
+
 /** Injectable transport boundary; tests never read secrets or open a gateway. */
 export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env = process.env, transport }: {
   db: PrismaClient; publicUrl: string | null; now?: () => Date; env?: Record<string, string | undefined>;
@@ -36,6 +70,7 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
     gateway: typeof createQqGateway;
     download?: typeof downloadQqAttachment;
     upload?: typeof uploadQqImage;
+    ack?: typeof ackQqInteraction;
   };
 }): StewardChatTransport | null {
   const config = qqBotConfig(env);
@@ -46,8 +81,8 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
   const state = createQqBotState(stateDir, appId);
   let recipients = new Set<string>();
   const delivery = createChronaQqDelivery({ tokens, publicUrl, allowedRecipients: () => recipients, send: transport?.send });
-  let handler: ReturnType<typeof createQqBotHandler> | undefined;
-  const gateway = (transport?.gateway ?? createQqGateway)({ appId, tokens, log, onMessage: (message: QqC2cMessage) => { void handler?.onMessage(message).then(writeStatus); } });
+  let handler: ReturnType<typeof createQqBotHandler> | undefined, resolveApproval: ((binding: QqBinding, decision: ApprovalDecision) => Promise<string>) | undefined;
+  const gateway = (transport?.gateway ?? createQqGateway)({ appId, tokens, log, onMessage: (message: QqC2cMessage) => { void handler?.onMessage(message).then(writeStatus); }, onInteraction: interaction => { void approvalClick(interaction, { ack: () => (transport?.ack ?? ackQqInteraction)({ tokens, id: interaction.id }), binding: refreshBinding, resolve: resolveApproval, log }); } });
   async function refreshBinding() {
     const binding = await state.binding();
     recipients = new Set(binding ? [`${DEDICATED_PLATFORM}:${binding.openid}`] : []);
@@ -90,7 +125,8 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
     bound: async () => Boolean(await refreshBinding()),
     async start(service: StewardService, wake: () => void) {
       if (handler) return;
-      handler = createQqBotHandler({ state, now, log,
+      resolveApproval = approvalResolver(service);
+      handler = createQqBotHandler({ state, now, log, resolveApproval,
         chat: { async handleMessage(input) {
           try {
             const { attachments: remote = [], quotedExternalId, ...chatInput } = input;
@@ -102,7 +138,7 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
             const intake = files.length ? await service.chat.intakeAttachments({ ...chatInput, ...quote }, files) : {};
             const result = await service.chat.handleMessage({ ...chatInput, ...quote, ...intake });
             const replies = result.messages.map(message => ({ messageId: message.id, affairId: message.affairId, reply: qqReplyText(message, publicUrl, input.workspaceId) }));
-            return { reply: replies.map(m => m.reply).join("\n\n") || "处理尚未完成，请稍后在网页查看。", affairId: result.messages.at(-1)?.affairId, workspaceId: input.workspaceId, replies };
+            return { reply: replies.map(m => m.reply).join("\n\n") || "处理尚未完成，请稍后在网页查看。", affairId: result.messages.at(-1)?.affairId, workspaceId: input.workspaceId, replies, ...(result.runId ? { later: lateReplies(db, input.workspaceId, result.runId, { seen: new Set(replies.map(r => r.messageId)), publicUrl }) } : {}) };
           } finally { wake(); }
         } },
         reply: async (openid, messageId, text, msgSeq, message) => {

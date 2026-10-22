@@ -5,7 +5,7 @@ type Target = { affairId?: string; connectorId?: string };
 const labels: Record<Action, string> = {
   read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
   activate_module: "启用模块", send_external_message: "对外发消息", modify_external: "修改外部系统", purchase: "购买",
-  delete_data: "删除数据", connect_source: "接入来源", share_third_party: "向第三方分享", change_credentials: "修改凭据",
+  delete_data: "删除数据", connect_source: "接入来源", share_third_party: "向第三方分享", change_credentials: "修改凭据", access_host_path: "访问本机目录",
 };
 const modes: Record<GrantMode, string> = { auto: "可以直接做", notify_after: "做完告诉你", preapproved: "按授权执行", ask: "需要先问你", never: "留给你处理" };
 function specificity(grant: Grant, target: Target): number {
