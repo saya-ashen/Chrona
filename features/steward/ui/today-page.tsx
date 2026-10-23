@@ -41,6 +41,7 @@ export function TodayPage() {
         {view.sessions.map(session => <Link key={session.id} className="p-3 hover:underline" to={`/${locale}/chat?sessionId=${encodeURIComponent(session.id)}`}>{session.title ?? c.sessions.untitled} · {session.source}</Link>)}
         {!view.sessions.length && <p className="p-3">{c.sessions.empty}</p>}
       </Surface></Section>
+      {!view.health.moduleSandbox && <p role="alert" className="text-sm text-destructive">{c.workspace.noSandbox}</p>}
       <p className="text-xs text-muted-foreground">{workspaceHealthy(view.health) ? c.workspace.healthy : c.workspace.unhealthy}</p>
     </>}
   </PageColumn>;

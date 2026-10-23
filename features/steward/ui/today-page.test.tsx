@@ -48,3 +48,10 @@ it("shows retry when Today fails", async () => {
   vi.mocked(apiJson).mockRejectedValue(new Error("offline"));
   show(); expect(await screen.findByRole("button", { name: en.steward.foundation.retry })).toBeVisible();
 });
+it("says why apps cannot run when the module sandbox is missing", async () => {
+  const view = todayFixture();
+  view.health.moduleSandbox = false;
+  mockView(view); show();
+  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.workspace.noSandbox);
+  expect(screen.getByText(en.steward.workspace.unhealthy)).toBeVisible();
+});

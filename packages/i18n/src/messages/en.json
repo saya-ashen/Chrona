@@ -81,6 +81,7 @@
       "running": "Work in progress",
       "healthy": "Chrona is available",
       "unhealthy": "Chrona needs attention",
+      "noSandbox": "Module sandbox not configured (set CHRONA_STEWARD_SANDBOX_BWRAP to the bwrap path): apps, including files, cannot run; uploads and the inbox are unavailable",
       "empty": "Nothing scheduled today",
       "wake": "Chrona work",
       "remind": "Reminder",
