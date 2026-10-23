@@ -7,7 +7,13 @@ import { ensureSqliteDatabase } from "../../../packages/db/src/sqlite-migrations
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "chrona-drop-jobs-migration-"));
-  return { databaseUrl: `file:${join(root, "test.db")}`, migrationsDir: resolve("prisma/migrations"), root };
+  // Assert 0005 at its own migration point, before later schema changes.
+  const migrationsDir = join(root, "migrations");
+  for (const name of ["0001_initial", "0002_labels", "0003_preference_topic", "0004_modules", "0005_drop_jobs"]) {
+    mkdirSync(join(migrationsDir, name), { recursive: true });
+    copyFileSync(resolve("prisma/migrations", name, "migration.sql"), join(migrationsDir, name, "migration.sql"));
+  }
+  return { databaseUrl: `file:${join(root, "test.db")}`, migrationsDir, root };
 }
 
 test("full migration chain removes obsolete Schedule columns", () => {

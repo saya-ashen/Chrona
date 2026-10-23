@@ -10,7 +10,7 @@ import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-async function fixture(scope: "once" | "module" = "module", network = false) {
+async function fixture(scope: "once" | "always" = "always", network = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-auto-test-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
@@ -37,7 +37,7 @@ async function fixture(scope: "once" | "module" = "module", network = false) {
 }
 
 test.each(["no data", "live data", "empty schema upgrade", "changed triggers", "changed behavior", "existing network"])("tested update auto-activates with module grant: %s", async kind => {
-  const f = await fixture("module", kind === "existing network");
+  const f = await fixture("always", kind === "existing network");
   if (kind === "live data") {
     const live = join(f.dataDir, "platform/data", f.first.moduleId);
     await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "state");

@@ -54,7 +54,7 @@ test("unfocused sessions find deferred module tools", async () => {
 });
 test("module names are unique within the workspace", async () => {
   const f = await fixture();
-  await expect(f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort" } })).rejects.toThrow();
+  await expect((async () => { await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort" } }); })()).rejects.toThrow();
 });
 test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);

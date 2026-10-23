@@ -7,6 +7,7 @@ import { createStewardService } from "./service";
 import { processModuleInbound } from "./module-inbound";
 import { moduleSupervisor } from "./module-supervisor";
 import { testDb } from "./test-db";
+import { testFilesContent } from "./test-content";
 import type { StewardPorts } from "./ports";
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -19,6 +20,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);
+  await testFilesContent(ports, workspace.id);
   const connector = await api.connectors.create({ kind: "local_test", label: "mail" });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "events", activeHash: "sdk" } });
   const manifest = { name: "events", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }, { id: "mail", inbound: { connector: connector.id, match: { from: "*@example.com" } } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };

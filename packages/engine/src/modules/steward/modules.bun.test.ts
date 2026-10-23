@@ -822,7 +822,7 @@ test.each(["symlink", "git", "bytes", "files"])("reject unsafe module contents: 
 
 test.each(["activate_module", "notify_user"] as const)("never policy for %s rejects before sandbox", async action => {
   const f = await fixture();
-  await f.service.grants.create({ action, mode: "never", scope: { kind: "workspace" } });
+  await f.service.grants.create({ action, mode: "never", scope: { kind: "global" } });
   expect((await f.propose()).status).toBe("rejected");
   expect(f.calls).toEqual([]);
   expect(await f.db.approval.count()).toBe(0);

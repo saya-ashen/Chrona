@@ -53,7 +53,7 @@ test("connector files, dedupe, all rules, batch first-arrival window, isolation 
     push("wake_now"); await api.connectors.sync(connector.id); expect(await db.run.count()).toBe(2);
     push("wake_now"); await api.connectors.sync(connector.id); expect(await db.inboundItem.count()).toBe(5);
     const items = await api.connectors.items(connector.id);
-    for (const item of items) expect((await files.read(item.ref!.slice("files/".length))).content).toContain("plain text");
+    for (const item of items) expect((await files.read(item.ref!)).content).toContain("plain text");
     expect((await files.list()).some(f => f.path.includes("attachment"))).toBe(false);
     for (let i = 0; i < RUN_LIMITS.maxItemsPerBatch; i++) push(`batch-${i}`);
     await api.connectors.sync(connector.id); expect(await db.run.count()).toBe(3);
