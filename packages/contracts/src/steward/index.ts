@@ -86,7 +86,7 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
   z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
 ]);
-export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network"] as const;
+export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model"] as const;
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
 const moduleTriggerSchema = z.union([
@@ -114,6 +114,8 @@ export const moduleManifestSchema = z.object({
   content: z.boolean().default(false),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
   dynamicSchedules: z.boolean().default(false),
+  /** Required with the `model` effect; bounded by the user's `moduleModel` setting. */
+  model: z.object({ maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -129,6 +131,7 @@ export const moduleManifestSchema = z.object({
   });
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
+  if (manifest.effects.includes("model") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the model effect is declared" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
@@ -163,13 +166,19 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /** Kernel methods and the capability each needs. */
-export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   z.object({ id: channelId, method: z.literal("notify"), params: z.object({ key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict() }).strict(),
   z.object({ id: channelId, method: z.literal("wakeProvider"), params: z.object({ key: z.string().min(1).max(200), prompt: text.max(4000) }).strict() }).strict(),
+  /** One-shot completion through Chrona's model gateway: no tools, no session, the user's configured model. */
+  z.object({ id: channelId, method: z.literal("model"), params: z.object({ system: z.string().max(20_000).optional(), prompt: text.max(200_000), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict() }).strict(),
 ]);
-export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal"] as const;
-export const moduleCallReplySchema = z.object({ id: channelId, result: z.object({ status: z.enum(["executed", "duplicate"]) }).strict() }).strict()
+export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal", "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
+export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
+  z.object({ status: z.enum(["executed", "duplicate"]) }).strict(),
+  /** `model` replies: the completion is untrusted data. */
+  z.object({ text: z.string(), inputTokens: z.number().int().min(0).nullable(), outputTokens: z.number().int().min(0).nullable() }).strict(),
+]) }).strict()
   .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
 export type ModuleCall = z.infer<typeof moduleCallSchema>;
@@ -288,8 +297,16 @@ export const inboundItemSchema = z.object({
 }).strict();
 
 export const notificationSettingsSchema = z.object({ dailyCap: z.number().int().min(0).max(50), quietHours: z.object({ start: hhmm, end: hhmm }).strict().nullable(), timezone: z.string().min(1).max(80), digestAt: hhmm }).strict();
+/** The exact model modules may call (L1, user-only). No automatic fallback to another model. */
+export const moduleModelSettingsSchema = z.object({
+  model: z.string().trim().min(1).max(200).describe("Exact provider/model id passed to Pi, e.g. openai/gpt-6-luna"),
+  maxCallsPerEvent: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000),
+  dailyCalls: z.number().int().min(1).max(10_000), timeoutMs: z.number().int().min(5_000).max(600_000),
+}).strict();
 export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
+  /** null: modules cannot use the `model` effect (builds declaring it fail). */
+  moduleModel: moduleModelSettingsSchema.nullable(),
   chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
 }).strict();
 export const healthSchema = z.object({
@@ -334,7 +351,7 @@ export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
 export const createPreferenceSchema = z.object({ text: text.max(500) }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial() }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 export const createConnectorSchema = z.object({
   kind: z.enum(CONNECTOR_KINDS), label: short, settings: z.record(z.string(), z.unknown()).default({}),
   /** Write-only secret (e.g. { password } or app password). Stored by Chrona outside the database, never returned. */
@@ -392,7 +409,7 @@ export const chronaToolInputSchemas = {
     dir: relativePathSchema.optional().describe("Module directory relative to the session directory"),
     request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples} instead of dir: a budgeted build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. Entry is a long-running process using the SDK: import {on, chrona} from "/chrona/sdk.ts"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call await chrona.notify({key,level,title,body}) / chrona.wakeProvider({key,prompt}) only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in /data (process may restart); /module ro; keepAlive:true for long connections. Tests: import {startModule} from "/chrona/testing.ts" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it for the module, updates with no new effects, no migration and passing checks auto-activate.'),
+  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network|model; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "/chrona/sdk.ts"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call chrona.notify({key,level,title,body}) / wakeProvider({key,prompt}) / model({system?,prompt,maxOutputTokens})→{text} only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in /data (process may restart); /module ro; keepAlive:true for long connections. Tests: import {startModule} from "/chrona/testing.ts" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it for the module, updates with no new effects, no migration and passing checks auto-activate.'),
   chrona_modules: z.object({}).strict().describe("List modules (apps), versions, approval status and recent runs."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema }).strict().describe("Copy module files into an empty directory of the session directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),
