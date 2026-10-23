@@ -1,6 +1,6 @@
 # v2-4 规格：交互入口模块化与不可变救援控制台
 
-状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c–e（入口模块化）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
+状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）已实现；v2-4d/e（`qq`、`web`）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 目标
@@ -97,7 +97,7 @@ chrona admin approve|reject <approvalId>
 |---|---|---|---|
 | `web` | `listen: "/"` | `owner` | 现有网页。源码与锁文件在模块内；构建沙箱只读挂载 Chrona 已审查的依赖缓存，v1 不允许新增依赖 |
 | `qq` | `keepAlive` | `owner`、`network`、`secret:qq_bot` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
-| `mcp` | `listen: "/api/mcp"` | `owner` | 现有 owner MCP，按 owner API 映射为 MCP 工具 |
+| `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
 
 通知投递：入口模块经 `owner.notifications` 订阅待投递通知，投递成功后确认；预算、安静时段、去重仍由内核判定。
 

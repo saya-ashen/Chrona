@@ -1,0 +1,11 @@
+{
+  "name": "mcp",
+  "description": "Owner MCP endpoint at /api/mcp for the user's own agents.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "listen": "/api/mcp",
+  "triggers": [],
+  "effects": ["owner"],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

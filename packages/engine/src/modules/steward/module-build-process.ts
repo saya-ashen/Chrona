@@ -24,7 +24,9 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     } });
     const contentDir = manifest.content ? join(data, ".build-content") : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });
-    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false });
+    const httpDir = manifest.listen ? join(dir, "http") : undefined;
+    if (httpDir) await mkdir(httpDir, { mode: 0o700 });
+    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false });
     const exited = process.exited.then(() => { throw new Error("Module process exited"); });
     void exited.catch(() => {});
     return await run(async event => {

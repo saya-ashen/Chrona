@@ -78,6 +78,9 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.get("/preferences", async c => c.json({ items: await c.get("steward").preferences.list() }));
   router.post("/preferences", async c => c.json(await c.get("steward").preferences.add(s.createPreferenceSchema.parse(await c.req.json()))));
   router.delete("/preferences/:id", async c => { await c.get("steward").preferences.delete(c.req.param("id")); return c.body(null, 204); });
+  router.get("/modules", async c => c.json({ items: await c.get("steward").modules.list() }));
+  router.get("/modules/tools", async c => c.json(s.moduleToolListSchema.parse(await c.get("steward").modules.tools())));
+  router.post("/modules/tools/:name", async c => c.json(await c.get("steward").modules.callTool(c.req.param("name"), await c.req.json())));
   router.get("/notifications", async c => c.json({ items: await c.get("steward").notifications.list() }));
   router.post("/notifications/:id/feedback", async c => c.json(await c.get("steward").notifications.recordFeedback(c.req.param("id"), z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict().parse(await c.req.json()).feedback)));
   router.post("/notifications/:id/retry", async c => c.json(await c.get("steward").notifications.retry(c.req.param("id"))));

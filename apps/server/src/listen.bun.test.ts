@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleSupervisor } from "@chrona/engine";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 import { resetEnvCacheForTests } from "./config/env";
@@ -54,3 +55,25 @@ chrona.serve(async request => {
   expect((await (await app.request("/api/echo", { headers: { authorization: "Bearer listen-test" } })).json()).path).toBe("/api/echo");
   expect((await app.request("/api/nothing/x", { headers: { authorization: "Bearer listen-test" } })).status).toBe(404);
 }, 30_000);
+
+(sandbox.health.available ? test : test.skip)("the built-in mcp module serves owner tools at /api/mcp", async () => {
+  await seedWorkspace("Mcp");
+  const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
+  process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!;
+  const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir });
+  if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP; else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
+  stop = () => steward.stop();
+  await moduleSupervisor(steward.ports).start();
+  const app = await createServerApp({ steward });
+  let id = 0;
+  const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
+    const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
+    return { status: response.status, body: response.status === 200 ? await response.json() : null };
+  };
+  expect((await rpc("tools/list", {}, {})).status).toBe(401);
+  expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).body.result.instructions).toContain("- module_files:");
+  const names = (await rpc("tools/list")).body.result.tools.map((tool: { name: string }) => tool.name);
+  expect(names).toEqual(expect.arrayContaining(["chrona_today", "chrona_chat", "chrona_approval_resolve", "m_files_list"]));
+  expect((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "missing" } })).body.result).toEqual({ content: [{ type: "text", text: "not_found: Content area not found" }], isError: true });
+  expect(JSON.parse((await rpc("tools/call", { name: "m_files_list", arguments: {} })).body.result.content[0].text)).toHaveProperty("result");
+}, 120_000);

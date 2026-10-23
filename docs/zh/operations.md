@@ -74,7 +74,7 @@ bun run packages/cli/src/index.ts doctor
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
 - QQ：`CHRONA_QQ_APP_ID`、`CHRONA_QQ_SECRET_FILE`、`CHRONA_QQ_STATE_DIR`；链接用 `CHRONA_PUBLIC_URL`。
-- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`；多工作区时加 `?workspaceId=`）供用户自己的 Pi / Claude Code 使用，工具与网页 owner 操作相同：`chrona_today`、`chrona_affairs`、`chrona_affair_read`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`。客户端应对 `chrona_approval_resolve` 要求逐次确认。
+- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用，需要模块沙箱（bwrap）。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本的 Vite 监听所有网卡，不应向不可信网络开放。
 

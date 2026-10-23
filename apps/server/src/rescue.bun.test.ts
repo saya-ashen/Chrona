@@ -6,7 +6,6 @@ import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { createStewardRoutes } from "./routes/steward.routes";
-import { createStewardMcpRoutes } from "./routes/steward-mcp";
 import { approvalResolver } from "./steward-qq-bot";
 import { resetEnvCacheForTests } from "./config/env";
 import { buildArtifacts } from "../../../build/manifest";
@@ -67,6 +66,7 @@ test("rescue chat uses only session rescue; Provider failure points to chrona ad
   expect(messages.items.at(-1).text).toContain("chrona admin");
   expect((await f.request("/api/chat", { text: "hi", attachments: [] })).status).toBe(400);
 });
+// The mcp module resolves through this same owner HTTP route.
 test("HTTP, MCP and QQ cannot resolve rescue-only approvals", async () => {
   const f = await fixture();
   const saved = process.env.API_KEY;
@@ -79,11 +79,6 @@ test("HTTP, MCP and QQ cannot resolve rescue-only approvals", async () => {
     const response = await http.request(`/approvals/${approval.id}/resolve?workspaceId=ws_default`, { method: "POST", headers, body: JSON.stringify({ decision: "approve" }) });
     expect(response.status).toBe(403);
     expect((await response.json()).message).toContain("rescue console");
-    const mcp = createStewardMcpRoutes(f.ports, f.service, () => {});
-    const rpc = await mcp.request("/", { method: "POST", headers: { ...headers, Accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "chrona_approval_resolve", arguments: { approvalId: approval.id, decision: "approve" } } }) });
-    const result = await rpc.json();
-    expect(result.result.isError).toBe(true);
-    expect(result.result.content[0].text).toContain("rescue console");
     const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
     expect(await approvalResolver(f.service)(binding, { ref: approval.id, decision: "approve", scope: "once" })).toContain("救援控制台");
     expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(1);

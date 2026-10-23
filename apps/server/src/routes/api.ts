@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { createStewardRoutes } from "./steward.routes";
 import { createStewardAgentRoutes } from "./steward-agent.routes";
-import { createStewardMcpRoutes } from "./steward-mcp";
 import type { StewardRuntime } from "../steward-runtime";
 
 export type ApiRouterOptions = { steward: StewardRuntime };
@@ -18,8 +17,7 @@ export function createApiRouter({ steward }: ApiRouterOptions) {
   const router = new Hono()
     .get("/workspaces", async c => c.json(await steward.ports.db.workspace.findMany({ select: { id: true, name: true } })))
     .route("/steward", createStewardRoutes(steward.ports, service, steward.wake))
-    .route("/steward-agent", createStewardAgentRoutes(steward.ports, service))
-    .route("/mcp", createStewardMcpRoutes(steward.ports, service, steward.wake));
+    .route("/steward-agent", createStewardAgentRoutes(steward.ports, service));
   // Test-only inbox for real-Provider runs of inbound flows; items still go through connector sync.
   if (process.env.CHRONA_E2E_TEST_ROUTES === "1") router.post("/steward-e2e/local-test-items", async c => {
     const parsed = localTestItems.safeParse(await c.req.json().catch(() => null));

@@ -334,6 +334,11 @@ export const settingsSchema = z.object({
   moduleModel: moduleModelSettingsSchema.nullable(),
   chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
 }).strict();
+/** Active module tools as `m_<module>_<tool>`, grouped into toolsets like MCP servers. */
+export const moduleToolListSchema = z.object({
+  tools: z.array(z.object({ name: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.unknown()) }).strict()),
+  toolsets: z.array(z.object({ name: z.string(), description: z.string(), tools: z.array(z.string()) }).strict()),
+}).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
   moduleSandbox: z.boolean(),
@@ -406,6 +411,8 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /settings | PATCH ; GET /grants | POST ; POST /grants/:id/revoke ; GET /preferences | POST | DELETE /preferences/:id
  *   GET  /notifications ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
+ *   GET  /modules                                 -> {items: object[]} (modules, versions and recent runs; engine-shaped)
+ *   GET  /modules/tools                           -> ModuleToolList ; POST /modules/tools/:name (arguments) -> {result}
  *   GET  /provider/runs?sessionId=                -> {items: ProviderRunView[]} (recent runs, owner-scoped)
  *   POST /provider/interactions/:id/answer        -> {ok: true} (ProviderAnswer, no grants/replay)
  *   POST /provider/runs/:id/cancel                -> {ok: true} (no automatic retry)
