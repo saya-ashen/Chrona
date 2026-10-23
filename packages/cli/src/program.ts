@@ -4,6 +4,7 @@ import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-b
 import cliPackage from "../package.json" with { type: "json" };
 import { getChronaDataDir } from "./start-server.js";
 import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
+import { migrateAffairs, recordAffairBackup } from "./migrate-affairs.js";
 
 export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
 type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void> };
@@ -23,7 +24,19 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .action((output: string) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
       const result = backupSqliteDatabase(databaseUrl, resolve(output), getChronaDataDir());
-      console.log(`Chrona backup created: ${result.backupPath} + ${result.backupPath}.tar`);
+      recordAffairBackup(databaseUrl, getChronaDataDir(), result.backupPath);
+      console.log(`Chrona backup created: ${result.backupPath} + ${result.backupPath}.tar + ${result.backupPath}.affairs.tar`);
+    });
+  program.command("migrate-affairs").description("Copy legacy affair documents into files while the server is stopped")
+    .requiredOption("--backup <file>", "Fresh backup created by chrona backup")
+    .option("--dry-run", "Report without copying (default)")
+    .option("--apply", "Copy documents and write a migration report")
+    .action((input: { backup: string; dryRun?: boolean; apply?: boolean }) => {
+      if (input.dryRun && input.apply) throw new Error("Choose either --dry-run or --apply.");
+      const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
+      const result = migrateAffairs(databaseUrl, getChronaDataDir(), input);
+      console.log(JSON.stringify(result.report, null, 2));
+      if (result.reportPath) console.log(`Chrona affair migration report: ${result.reportPath}`);
     });
   program.command("restore").description("Restore SQLite and its platform, sessions and secrets tar while the server is stopped")
     .argument("<input>", "Backup database path")
