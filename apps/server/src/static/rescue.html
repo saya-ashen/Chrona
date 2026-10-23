@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chrona rescue (immutable)</title>
+<style>
+:root{color-scheme:light dark;font:16px system-ui}body{max-width:800px;margin:auto;padding:20px;overflow-wrap:anywhere}h1{font-size:24px}section{margin:24px 0;border-top:1px solid #888;padding-top:12px}input,textarea,button{font:inherit;max-width:100%;box-sizing:border-box;padding:8px}textarea{width:100%}button{margin:4px}pre{white-space:pre-wrap;overflow-wrap:anywhere}article{border-bottom:1px solid #888;padding:12px 0}[role=alert]{color:#cf3f4f}
+</style>
+</head>
+<body>
+<h1>Chrona rescue (immutable)</h1>
+<p>Independent recovery console. If the Provider is unavailable, use <code>chrona admin</code> on the host.</p>
+<form id="login"><label>Rescue key <input id="key" type="password" autocomplete="off" required></label><button>Connect</button></form>
+<p id="error" role="alert"></p>
+<main hidden id="console">
+<section><h2>Chat</h2><div id="messages" aria-live="polite"></div><form id="chat"><label for="text">Message</label><textarea id="text" required maxlength="20000"></textarea><button>Send</button></form></section>
+<section><h2>Approvals</h2><button id="refresh">Refresh</button><div id="approvals"></div></section>
+</main>
+<script>
+"use strict";
+let key = "";
+const el = id => document.getElementById(id);
+const node = (tag, text) => { const n = document.createElement(tag); n.textContent = text; return n; };
+async function api(path, data) {
+  const response = await fetch(path, { method: data ? "POST" : "GET", credentials: "omit", headers: { Authorization: "Bearer " + key, ...(data ? { "Content-Type": "application/json" } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || result.code || "Request failed");
+  return result;
+}
+async function run(action) { el("error").textContent = ""; try { await action(); } catch (error) { el("error").textContent = error.message; } }
+async function refresh() {
+  const [messages, approvals] = await Promise.all([api("/api/messages"), api("/api/approvals")]);
+  el("messages").replaceChildren(...messages.items.map(m => node("p", (m.direction === "in" ? "You: " : "Chrona: ") + m.text)));
+  el("approvals").replaceChildren();
+  if (!approvals.items.length) el("approvals").append(node("p", "No pending approvals."));
+  for (const approval of approvals.items) {
+    const article = node("article", "");
+    article.append(node("h3", approval.title), node("p", approval.detail));
+    if (approval.rescueOnly) article.append(node("p", "Rescue-only approval"));
+    const details = node("details", ""); details.append(node("summary", "Preview (manifest diff, intent, build report)"), node("pre", approval.preview)); article.append(details);
+    for (const [label, decision, scope] of [["Approve once", "approve", "once"], ["Always allow", "approve", "always"], ["Deny", "deny", "once"]]) {
+      const button = node("button", label);
+      button.onclick = () => run(async () => { button.disabled = true; try { await api("/api/approvals/" + encodeURIComponent(approval.id) + "/resolve", { decision, scope }); await refresh(); } finally { button.disabled = false; } });
+      article.append(button);
+    }
+    el("approvals").append(article);
+  }
+}
+el("login").onsubmit = event => { event.preventDefault(); run(async () => { key = el("key").value; el("key").value = ""; await refresh(); el("console").hidden = false; el("login").hidden = true; }); };
+el("refresh").onclick = () => run(refresh);
+el("chat").onsubmit = event => { event.preventDefault(); run(async () => { const button = el("chat").querySelector("button"); button.disabled = true; try { const reply = await api("/api/chat", { text: el("text").value }); el("text").value = ""; await refresh(); if (!reply.messages.length) el("messages").append(node("p", "No reply yet. If the Provider is unavailable, use chrona admin.")); } finally { button.disabled = false; } }); };
+</script>
+</body>
+</html>

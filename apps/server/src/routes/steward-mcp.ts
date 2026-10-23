@@ -40,7 +40,7 @@ async function ownerServer(api: Api) {
     safe(async input => json(s.chatReplySchema.parse(await api.chat.handleMessage({ channel: "in_app", ...input, ...(!input.sessionId && !input.key ? { key: `mcp:${crypto.randomUUID()}` } : {}) })))));
   server.registerTool("chrona_approvals", { description: "List approvals; defaults to open ones waiting for the user.", inputSchema: { status: z.enum(s.APPROVAL_STATUSES).default("open") } }, safe(async ({ status }) => json(await api.approvals.list(status))));
   server.registerTool("chrona_approval_resolve", { description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", inputSchema: { approvalId: id, decision: z.enum(["approve", "deny"]), scope: z.enum(s.APPROVAL_SCOPES).default("once") }, annotations: { destructiveHint: true } },
-    safe(async ({ approvalId, decision, scope }) => json((await api.approvals.resolve(approvalId, { decision, scope })).approval)));
+    safe(async ({ approvalId, decision, scope }) => json((await api.approvals.resolve(approvalId, { decision, scope }, "mcp")).approval)));
   server.registerTool("chrona_modules", { description: "List modules (apps Chrona runs without the Provider), their versions and recent runs." }, safe(async () => json(await api.modules.list())));
   server.registerTool("chrona_notifications", { description: "Recent notifications Chrona sent or queued." }, safe(async () => json(await api.notifications.list())));
   for (const tool of modules.tools) server.registerTool(tool.name, { description: tool.description, inputSchema: tool.shape }, safe(async args => json(await api.modules.callTool(tool.name, args))));

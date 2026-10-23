@@ -8,7 +8,7 @@ export function sessionFixture() {
   return sessionSchema.parse({ id: "session-1", key: "web:session-1", source: "web", title: "相机选购", status: "active", moduleId: null, originSessionId: null, focus: ["files"], running: false, lastActivityAt: fixtureTime, createdAt: fixtureTime, endedAt: null });
 }
 export function approvalFixture() {
-  return approvalSchema.parse({ id: "email", moduleId: "camera", action: "send_external_message", status: "open", title: "发送询价邮件", detail: "向卖家询价", preview: "请问相机还在吗？", createdAt: fixtureTime, resolvedAt: null });
+  return approvalSchema.parse({ id: "email", moduleId: "camera", action: "send_external_message", rescueOnly: false, status: "open", title: "发送询价邮件", detail: "向卖家询价", preview: "请问相机还在吗？", createdAt: fixtureTime, resolvedAt: null });
 }
 export function fileFixture() {
   return fileContentSchema.parse({ path: "README.md", content: "# 相机\n\n- [ ] 比较镜头", mime: "text/markdown", revision: "abc123", updatedAt: fixtureTime });

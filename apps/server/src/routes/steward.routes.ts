@@ -27,7 +27,7 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.use("*", bodyLimit({ maxSize: 21 * 1024 * 1024 }));
   router.onError((error, c) => {
     if (error instanceof SyntaxError || error instanceof z.ZodError) return c.json({ code: "INVALID_REQUEST" }, 400);
-    if (error instanceof StewardError) return c.json({ code: error.code }, { not_found: 404, conflict: 409, invalid: 400, forbidden: 403 }[error.code] as 404 | 409 | 400 | 403);
+    if (error instanceof StewardError) return c.json({ code: error.code, message: error.message }, { not_found: 404, conflict: 409, invalid: 400, forbidden: 403 }[error.code] as 404 | 409 | 400 | 403);
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return c.json({ code: "NOT_FOUND" }, 404);
     if (code === "EEXIST") return c.json({ code: "CONFLICT" }, 409);
@@ -69,7 +69,7 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.post("/schedules", async c => c.json(await c.get("steward").schedules.create(z.string().min(1).max(128).optional().parse(c.req.query("sessionId")), s.createScheduleSchema.parse(await c.req.json()))));
   router.patch("/schedules/:id", async c => c.json(await c.get("steward").schedules.update(c.req.param("id"), s.updateScheduleSchema.parse(await c.req.json()))));
   router.get("/approvals", async c => c.json({ items: await c.get("steward").approvals.list(z.enum(s.APPROVAL_STATUSES).optional().parse(c.req.query("status"))) }));
-  router.post("/approvals/:id/resolve", async c => c.json((await c.get("steward").approvals.resolve(c.req.param("id"), s.resolveApprovalSchema.parse(await c.req.json()))).approval));
+  router.post("/approvals/:id/resolve", async c => c.json((await c.get("steward").approvals.resolve(c.req.param("id"), s.resolveApprovalSchema.parse(await c.req.json()), "web")).approval));
   router.get("/settings", async c => c.json(await c.get("steward").settings.get()));
   router.patch("/settings", async c => c.json(await c.get("steward").settings.update(s.updateSettingsSchema.parse(await c.req.json()))));
   router.get("/grants", async c => c.json({ items: await c.get("steward").grants.list() }));

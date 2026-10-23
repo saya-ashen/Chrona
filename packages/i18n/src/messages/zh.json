@@ -72,6 +72,7 @@
       "today": "今日",
       "approvals": "待批准",
       "preview": "查看动作预览",
+      "rescueOnly": "请在救援控制台批准或拒绝",
       "once": "同意这次",
       "always": "始终允许（应用或全局）",
       "deny": "拒绝",
@@ -512,7 +513,8 @@
         "connect_source": "接入来源",
         "share_third_party": "分享给第三方",
         "change_credentials": "修改凭据",
-        "access_host_path": "访问本机目录"
+        "access_host_path": "访问本机目录",
+        "change_policy": "修改权限与设置"
       },
       "grantModes": {
         "auto": "直接做",

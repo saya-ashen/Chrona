@@ -11,6 +11,7 @@ export const buildArtifacts = {
   webDist: "apps/web/dist",
   resourcesRoot: "resources",
   resources: [
+    { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
     { from: "apps/web/dist", to: "resources/apps/web/dist", required: true },
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },
     { from: "prisma/migrations", to: "resources/prisma/migrations", required: true },

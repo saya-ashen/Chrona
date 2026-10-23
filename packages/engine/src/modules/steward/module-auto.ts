@@ -17,9 +17,11 @@ function checksPassed(report: BuildReport) {
 }
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
+  if (manifest.effects.includes("owner")) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
   const effects = moduleManifestSchema.parse(active.manifest).effects;
+  if (effects.includes("owner")) return false;
   if (!manifest.effects.every(effect => effects.includes(effect))) return false;
   if (manifest.data.schema !== module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) return false;
   return checksPassed(report);

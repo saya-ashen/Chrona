@@ -67,6 +67,7 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
+  if (manifest.name === "rescue") throw new StewardError("forbidden", "The rescue console is immutable");
   const module = await db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: submission.source === "builtin", createdAt: ports.now() }, update: submission.source === "builtin" ? { builtin: true } : {} });
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);

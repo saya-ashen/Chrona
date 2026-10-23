@@ -3,6 +3,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
 import { checkoutModule } from "./module-files";
+import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { moduleContext, requireModule, type ModuleContext, type ModuleSource } from "./module-context";
 import { propose } from "./module-proposal";
@@ -38,6 +39,13 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile(ports.db.$transaction(tx => activateIn(context, tx, moduleId, hash, reason))),
     onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
     rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
+    disable: (moduleId: string, source: "cli") => ports.db.$transaction(async tx => {
+      await requireModule(context, tx, moduleId);
+      await tx.module.update({ where: { id: moduleId }, data: { status: "paused" } });
+      await tx.schedule.updateMany({ where: { workspaceId, moduleId, status: "active" }, data: { status: "paused", nextAt: null } });
+      await audit(tx, { workspaceId, actor: "user", kind: "module_disabled", subjectId: moduleId, details: { source } });
+      return { moduleId, status: "paused" };
+    }),
     list: () => list(context),
     checkout: (moduleId: string, hash: string | undefined, dir: string, root: string) => checkout(context, moduleId, hash, dir, root),
     /** Owner view: every workspace module tool, grouped into toolsets. */

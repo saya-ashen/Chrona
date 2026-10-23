@@ -32,12 +32,13 @@ function isReplyImage(file: import("@chrona/contracts/steward").Attachment | und
 }
 
 /** The bound owner's decision on one open approval, addressed by an id prefix. */
-function approvalResolver(service: StewardService) {
+export function approvalResolver(service: StewardService) {
   return async (binding: QqBinding, decision: ApprovalDecision) => {
     const api = service.forWorkspace(binding.workspaceId), matches = (await api.approvals.list("open")).filter(a => a.id.startsWith(decision.ref));
     if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
     const approval = matches[0]!, scope = decision.scope;
-    await api.approvals.resolve(approval.id, { decision: decision.decision, scope });
+    if (approval.rescueOnly) return "【Chrona】请在救援控制台处理这条审批（或使用 chrona admin）。";
+    await api.approvals.resolve(approval.id, { decision: decision.decision, scope }, "qq");
     return `【Chrona】已${decision.decision === "deny" ? "拒绝" : scope === "always" ? "批准（始终允许）" : "批准"}：${approval.title}`;
   };
 }

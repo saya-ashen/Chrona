@@ -27,17 +27,17 @@ async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClien
   }
   if (action.grantId) await consumeOnce(tx, workspaceId, action.grantId, ports.now());
 }
-async function approvedVersion(tx: Prisma.TransactionClient, moduleId: string, hash: string, restore?: Restore) {
+async function approvedVersion(tx: Prisma.TransactionClient, moduleId: string, hash: string, restore?: Restore, rollback = false) {
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
-  if (!version || version.status !== (restore ? "approved" : "pending_review")) throw new StewardError("conflict", restore ? "Module version is not approved" : "Module version is not pending review");
+  if (!version || version.status !== (restore || rollback ? "approved" : "pending_review")) throw new StewardError("conflict", restore || rollback ? "Module version is not approved" : "Module version is not pending review");
   return version;
 }
-async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, target: { moduleId: string; hash: string; restore?: Restore }) {
+async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, target: { moduleId: string; hash: string; restore?: Restore; rollback?: boolean }) {
   const { moduleId, hash, restore } = target;
   const module = await requireModule(context, tx, moduleId);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await checkApproval(context, tx, action, module.id);
-  const version = await approvedVersion(tx, moduleId, hash, restore);
+  const version = await approvedVersion(tx, moduleId, hash, restore, target.rollback);
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
   if (restore || (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId)))) {
@@ -46,7 +46,7 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   }
   await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
   await tx.module.update({ where: { id: moduleId }, data: { dataSchema: to } });
-  await activateIn(context, tx, moduleId, hash, "activate");
+  await activateIn(context, tx, moduleId, hash, target.rollback ? "rollback" : "activate");
   return null;
 }
 export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction) {
@@ -54,13 +54,13 @@ export async function activateApprovedIn(context: ModuleContext, tx: Prisma.Tran
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
-  return prepareApproved(context, tx, action, { moduleId, hash, restore });
+  return prepareApproved(context, tx, action, { moduleId, hash, restore, rollback: payload.rollback === true });
 }
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
   const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);
-  await migrateData(context, prepared, restore ? "rollback" : "activate", restore);
+  await migrateData(context, prepared, restore || payload.rollback === true ? "rollback" : "activate", restore);
 }
 async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
   const module = await requireModule(context, tx, moduleId);
@@ -81,6 +81,20 @@ async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionCli
   return { migration: { module, version, manifest, from, to } };
 }
 export async function rollback(context: ModuleContext, moduleId: string, hash: string) {
+  const module = await requireModule(context, context.db, moduleId);
+  const version = await approvedVersion(context.db, moduleId, hash, undefined, true);
+  const active = module.activeHash ? await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } }) : null;
+  if (moduleManifestSchema.parse(version.manifest).effects.includes("owner") || (active && moduleManifestSchema.parse(active.manifest).effects.includes("owner"))) {
+    if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
+    const schema = moduleManifestSchema.parse(version.manifest).data.schema;
+    const needsRestore = module.dataSchema !== null && schema < module.dataSchema && !await dataEmpty(join(context.platform, "data", moduleId));
+    const at = needsRestore ? await snapshotAt(context, moduleId, schema) : null;
+    if (needsRestore && !at) throw new StewardError("conflict", `没有 schema ${schema} 的数据快照，无法回滚到该版本`);
+    const restore = at ? { schema, snapshotAt: at } : undefined;
+    await expireModuleApprovals(context, moduleId);
+    const approval = await createApprovals(context).create({ moduleId, action: "activate_module", title: `回滚模块 ${module.name}`, detail: "入口模块回滚需要救援控制台批准", payload: { kind: "activate_module", moduleId, hash, rollback: true, ...(restore ? { restore } : {}) }, preview: `${restore ? `将恢复 ${at} 的数据，此后写入的数据会丢失；当前数据会另存为 before-rollback-<iso>。\n` : ""}hash: ${hash}` });
+    return { status: "pending_approval" as const, approvalId: approval.id };
+  }
   const prepared = await context.db.$transaction(tx => prepareRollback(context, tx, moduleId, hash));
   if (prepared.restore) {
     await expireModuleApprovals(context, moduleId);

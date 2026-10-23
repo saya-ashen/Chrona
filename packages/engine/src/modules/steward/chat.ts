@@ -52,7 +52,9 @@ class ChatService {
         const saved = callerSchema.safeParse(caller.details);
         if (!saved.success || saved.data.runId !== runId) continue;
         const inbound = caller.subjectId ? await db.message.findUnique({ where: { id: caller.subjectId } }) : null;
-        if (inbound && !(await this.replies(inbound, saved.data.before)).length) await db.message.create({ data: { workspaceId, sessionId: inbound.sessionId, channel: inbound.channel, direction: "out", text: unavailable, quotedMessageId: inbound.id, at: new Date(Math.max(this.ports.now().getTime(), inbound.at.getTime())) } });
+        const session = inbound ? await db.session.findUnique({ where: { id: inbound.sessionId } }) : null;
+        const failureText = session?.key === "rescue" ? "Provider unavailable. Use chrona admin on the host to repair Chrona; approvals remain available here." : unavailable;
+        if (inbound && !(await this.replies(inbound, saved.data.before)).length) await db.message.create({ data: { workspaceId, sessionId: inbound.sessionId, channel: inbound.channel, direction: "out", text: failureText, quotedMessageId: inbound.id, at: new Date(Math.max(this.ports.now().getTime(), inbound.at.getTime())) } });
       }
     }
     await audit(db, { workspaceId, actor: "chrona", kind: "chat_run_finished", subjectId: runId, details: {} });

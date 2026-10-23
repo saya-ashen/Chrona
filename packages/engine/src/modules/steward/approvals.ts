@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
-import { approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
+import { approvalSchema, moduleManifestSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
 import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -23,14 +23,25 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       const input = parseInput(inputSchema, raw);
       if (input.moduleId && !await tx.module.findFirst({ where: { workspaceId, id: input.moduleId } })) throw new StewardError("not_found", "Module not found");
       if (input.payload === null) throw new StewardError("invalid", "Approval payload must not be null");
-      const row = await tx.approval.create({ data: { ...input, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
+      let rescueOnly = input.action === "change_policy";
+      if (input.action === "activate_module") {
+        const payload = input.payload;
+        if (!input.moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
+        const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: input.moduleId, hash: payload.hash } } });
+        if (!version) throw new StewardError("not_found", "Module version not found");
+        const module = await tx.module.findUniqueOrThrow({ where: { id: input.moduleId } });
+        const active = module.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
+        rescueOnly = moduleManifestSchema.parse(version.manifest).effects.includes("owner") || Boolean(active && moduleManifestSchema.parse(active.manifest).effects.includes("owner"));
+      }
+      const row = await tx.approval.create({ data: { ...input, rescueOnly, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
       return toApproval(row);
     }),
-    resolve: (id: string, raw: unknown) => db.$transaction(async tx => {
+    resolve: (id: string, raw: unknown, source: "rescue" | "cli" | "web" | "mcp" | "qq" | "entry" = "entry") => db.$transaction(async tx => {
       const input = parseInput(resolveApprovalSchema, raw);
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
+      if (row.rescueOnly && source !== "rescue" && source !== "cli") throw new StewardError("forbidden", "Approve or reject this item in the rescue console (or chrona admin)");
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
       let grantId: string | null = null;
       if (input.decision === "approve") {
@@ -38,7 +49,7 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       }
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
-      await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId } });
+      await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
       return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null };
     }).then(async result => {
       if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });

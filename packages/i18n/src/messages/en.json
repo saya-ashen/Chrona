@@ -72,6 +72,7 @@
       "today": "Today",
       "approvals": "Waiting for approval",
       "preview": "Preview action",
+      "rescueOnly": "Approve or reject in the rescue console",
       "once": "Allow once",
       "always": "Always allow (module or global)",
       "deny": "Deny",
@@ -512,7 +513,8 @@
         "connect_source": "Connect a source",
         "share_third_party": "Share with third parties",
         "change_credentials": "Change credentials",
-        "access_host_path": "Access host folders"
+        "access_host_path": "Access host folders",
+        "change_policy": "Change permissions and settings"
       },
       "grantModes": {
         "auto": "Do directly",

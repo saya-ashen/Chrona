@@ -3,7 +3,7 @@ import { DEFAULT_POLICY, type Action, type Grant, type GrantMode, type PolicyDec
 export const MODE_STRICTNESS = { auto: 0, notify_after: 1, preapproved: 2, ask: 3, never: 4 } as const satisfies Record<GrantMode, number>;
 type Target = { moduleId?: string; connectorId?: string };
 const labels: Record<Action, string> = {
-  read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
+  change_policy: "修改权限与设置", read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
   activate_module: "启用模块", send_external_message: "对外发消息", modify_external: "修改外部系统", purchase: "购买",
   delete_data: "删除数据", connect_source: "接入来源", share_third_party: "向第三方分享", change_credentials: "修改凭据", access_host_path: "访问本机目录",
 };

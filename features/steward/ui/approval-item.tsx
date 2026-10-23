@@ -19,11 +19,11 @@ export function ApprovalItem({ approval, client, refresh }: { approval: Approval
       <time className="ml-auto text-xs text-muted-foreground tabular-nums" dateTime={approval.createdAt}>{formatShortDateTime(approval.createdAt, locale)}</time>
     </div><p className="max-w-[72ch] text-[13px] text-muted-foreground">{approval.detail}</p>
     <details><summary>{copy.preview}</summary><pre className="whitespace-pre-wrap break-words">{approval.preview}</pre></details>
-    <div className="flex flex-wrap gap-2">
+    {approval.rescueOnly ? <p role="status">{copy.rescueOnly}</p> : <div className="flex flex-wrap gap-2">
       <Button disabled={mutation.pending} onClick={() => void resolve("approve", "once")}>{copy.once}</Button>
       <Button variant="outline" disabled={mutation.pending} onClick={() => void resolve("approve", "always")}>{copy.always}</Button>
       <Button variant="outline" disabled={mutation.pending} onClick={() => void resolve("deny", "once")}>{copy.deny}</Button>
-    </div>
+    </div>}
     {mutation.error && <Alert variant="destructive"><AlertDescription>{messages.steward.foundation[mutation.error.messageKey]}</AlertDescription></Alert>}
   </article>;
 }
