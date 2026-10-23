@@ -1,8 +1,8 @@
-import { sessionSchema, type Health, type TodayView } from "@chrona/contracts/steward";
+import { type Health, type TodayView } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
-import { toApproval, toNotification } from "./store";
+import { toApproval, toNotification, toSession } from "./store";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 export type HealthPorts = { provider(): Promise<Health["provider"]>; moduleSandbox(): boolean };
 export function createToday({ db, workspaceId, now }: RecordContext, ports: HealthPorts, apps: () => Promise<TodayView["apps"]> = async () => []) {
@@ -30,7 +30,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
       apps(), health(),
     ]);
     return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), updates: notifications.map(toNotification), apps: applications,
-      sessions: sessions.map(row => sessionSchema.parse({ id: row.id, key: row.key, source: row.source, title: row.title, status: row.status, moduleId: row.moduleId, originSessionId: row.originSessionId, focus: row.focus, running: row.runs.length > 0, lastActivityAt: row.lastActivityAt.toISOString(), createdAt: row.createdAt.toISOString(), endedAt: row.endedAt?.toISOString() ?? null })),
+      sessions: sessions.map(toSession),
       upcoming: schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.mode === "remind" ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() })), health: status };
   }
   return { get, health };

@@ -37,6 +37,12 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.get("/health", async c => c.json(s.healthSchema.parse(await c.get("steward").health())));
   providerRoutes(router);
   router.post("/chat", async c => c.json(s.chatReplySchema.parse(await c.get("steward").chat.handleMessage({ channel: "in_app", ...s.chatInputSchema.parse(await c.req.json()) }))));
+  router.get("/sessions", async c => c.json({ items: s.sessionSchema.array().parse(await c.get("steward").sessions.list({ source: c.req.query("source"), status: c.req.query("status") })) }));
+  router.post("/sessions/new", async c => c.json(s.sessionSchema.parse(await c.get("steward").sessions.new(s.newSessionSchema.parse(await c.req.json())))));
+  router.get("/sessions/:id", async c => c.json(s.sessionSchema.parse(await c.get("steward").sessions.get(c.req.param("id")))));
+  router.patch("/sessions/:id", async c => c.json(s.sessionSchema.parse(await c.get("steward").sessions.update(c.req.param("id"), s.updateSessionSchema.parse(await c.req.json())))));
+  router.get("/sessions/:id/messages", async c => c.json({ items: s.messageSchema.array().parse(await c.get("steward").sessions.messages(c.req.param("id"), c.req.query("limit"))) }));
+  router.get("/apps", async c => c.json({ items: s.appSchema.array().parse(await c.get("steward").apps.list()) }));
   router.get("/apps/:id/tree", async c => c.json({ items: await c.get("steward").content.tree(c.req.param("id")) }));
   router.get("/apps/:id/file", async c => c.json(await c.get("steward").content.read(c.req.param("id"), s.relativePathSchema.parse(c.req.query("path")))));
   router.put("/apps/:id/file", async c => c.json(await c.get("steward").content.save(c.req.param("id"), s.saveFileSchema.parse(await c.req.json()))));

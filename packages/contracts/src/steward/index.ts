@@ -365,7 +365,8 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   POST /provider/interactions/:id/answer        -> {ok: true} (ProviderAnswer, no grants/replay)
  *   POST /provider/runs/:id/cancel                -> {ok: true} (no automatic retry)
  *   GET  /health
- * Module versions, rollback and module tools stay on the existing module routes and the owner MCP.
+ * There are no HTTP module routes: activation and rollback go through approvals and Provider tools; module
+ * versions and module tools are reached through the owner MCP (`chrona_modules`, `m_*` tools).
  */
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";

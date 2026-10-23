@@ -1,4 +1,6 @@
 import { createContent } from "./content";
+import { createApps } from "./apps";
+import { createSessions } from "./sessions";
 import type { StewardPorts } from "./ports";
 import { createApprovals } from "./approvals";
 import { createModules } from "./modules";
@@ -26,6 +28,7 @@ export function createStewardService(inputPorts: StewardPorts) {
   return { chat, tools: createTools(ports), tick, forWorkspace(workspaceId: string) {
     const ctx = { db: ports.db, workspaceId, now: ports.now };
     const modules = createModules(ports, workspaceId);
+    const apps = createApps(ports, workspaceId);
     const approvals = createApprovals(ctx, async action => {
       const payload = action.payload;
       if (payload && typeof payload === "object" && !Array.isArray(payload) && payload.kind === "activate_module") await modules.onApproved(action);
@@ -38,8 +41,8 @@ export function createStewardService(inputPorts: StewardPorts) {
         catch { return { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
       },
       moduleSandbox: () => ports.sandbox?.available ?? false,
-    });
-    return { content: createContent(ports, workspaceId, chat.submit), provider: createProviderControl(ports, workspaceId), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number, sessionId?: string) => chat.messages(workspaceId, limit, sessionId) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
+    }, apps.list);
+    return { apps, sessions: createSessions(ports, workspaceId), content: createContent(ports, workspaceId, chat.submit), provider: createProviderControl(ports, workspaceId), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number, sessionId?: string) => chat.messages(workspaceId, limit, sessionId) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

@@ -5,6 +5,7 @@ function project<T>(schema: { shape: Record<string, unknown>; parse(value: unkno
   const source = row as Record<string, unknown>;
   return schema.parse(Object.fromEntries(Object.keys(schema.shape).map(key => [key, source[key] instanceof Date ? source[key].toISOString() : source[key]])));
 }
+export const toSession = (row: db.Session & { runs: { id: string }[] }) => project(c.sessionSchema, { ...row, running: row.runs.length > 0 });
 export const toSchedule = (row: db.Schedule) => project(c.scheduleSchema, row);
 export const toRun = (row: db.Run) => project(c.runSchema, row);
 export const toApproval = (row: db.Approval) => project(c.approvalSchema, row);

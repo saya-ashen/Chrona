@@ -25,6 +25,12 @@ async function ownerServer(api: Api) {
   const instructions = `Chrona, the user's personal steward. Tools named m_<module>_<tool> come from modules (apps Chrona runs without the Provider). Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
   const server = new McpServer({ name: "chrona", version: "1" }, { instructions });
   server.registerTool("chrona_today", { description: "What needs the user now: waiting approvals and questions, running work, today's agenda." }, safe(async () => json(await api.today())));
+  server.registerTool("chrona_apps", { description: "List apps, their content areas and entry pages." }, safe(async () => json(await api.apps.list())));
+  server.registerTool("chrona_sessions", { description: "List conversations, optionally filtered by source and status.", inputSchema: { source: z.enum(s.SESSION_SOURCES).optional(), status: z.enum(s.SESSION_STATUSES).optional() } }, safe(async input => json(await api.sessions.list(input))));
+  server.registerTool("chrona_session", { description: "Get a conversation.", inputSchema: { sessionId: id } }, safe(async ({ sessionId }) => json(await api.sessions.get(sessionId))));
+  server.registerTool("chrona_session_update", { description: "Rename or end a conversation.", inputSchema: { sessionId: id, ...s.updateSessionSchema.shape } }, safe(async ({ sessionId, ...input }) => json(await api.sessions.update(sessionId, input))));
+  server.registerTool("chrona_session_new", { description: "End the active conversation for a key; the next message starts a new one.", inputSchema: s.newSessionSchema.shape }, safe(async input => json(await api.sessions.new(input))));
+  server.registerTool("chrona_session_messages", { description: "Read a conversation's recent messages.", inputSchema: { sessionId: id, limit: z.number().int().min(1).max(200).optional() } }, safe(async ({ sessionId, limit }) => json(await api.sessions.messages(sessionId, limit))));
   server.registerTool("chrona_content_tree", { description: "List an app's content files.", inputSchema: { appId: id } }, safe(async ({ appId }) => json(await api.content.tree(appId))));
   server.registerTool("chrona_content_read", { description: "Read an app's content file; defaults to its README.md home page.", inputSchema: { appId: id, path: s.relativePathSchema.default("README.md") } },
     safe(async ({ appId, path }) => json(await api.content.read(appId, path))));
