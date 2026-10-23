@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, DEFAULT_POLICY, moduleManifestSchema, moduleOutputSchema, scheduleSchema, chronaToolInputSchemas, type ModuleTrigger } from "@chrona/contracts/steward";
+import { createScheduleSchema, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas, type ModuleTrigger } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -55,31 +55,31 @@ describe("module manifest contract", () => {
   });
 });
 
-const notify = { type: "notify_user", key: "price", level: "now", title: "Price changed", body: "New price" };
-const wake = { type: "wake_provider", key: "analyse", prompt: "Analyse the change" };
-describe("module output contract", () => {
-  test("defaults effects and accepts notify and wake", () => {
-    expect(moduleOutputSchema.parse({})).toEqual({ effects: [] });
-    expect(moduleOutputSchema.parse({ effects: [notify, { ...notify, level: "digest" }, wake] }).effects).toHaveLength(3);
-    expect(moduleOutputSchema.safeParse({ effects: Array(20).fill(wake) }).success).toBe(true);
+const notify = { key: "price", level: "now", title: "Price changed", body: "New price" };
+const wake = { key: "analyse", prompt: "Analyse the change" };
+describe("module channel contract", () => {
+  test("accepts notify and wakeProvider calls", () => {
+    expect(moduleCallSchema.safeParse({ id: "1", method: "notify", params: notify }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "notify", params: { ...notify, level: "digest" } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "wakeProvider", params: wake }).success).toBe(true);
   });
-  test("accepts handled and JSON result up to 16 KiB serialized", () => {
+  test("event replies default result and cap it at 16 KiB serialized", () => {
     const result = "x".repeat(16 * 1024 - 2);
-    expect(moduleOutputSchema.parse({ handled: true, result })).toEqual({ effects: [], handled: true, result });
-    expect(moduleOutputSchema.safeParse({ result: `${result}x` }).success).toBe(false);
-    expect(moduleOutputSchema.safeParse({ result: "界".repeat(6000) }).success).toBe(false);
+    expect(moduleEventReplySchema.parse({ id: "1" })).toEqual({ id: "1", result: {} });
+    expect(moduleEventReplySchema.parse({ id: "1", result: { handled: true, result } })).toEqual({ id: "1", result: { handled: true, result } });
+    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: `${result}x` } }).success).toBe(false);
+    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: "界".repeat(6000) } }).success).toBe(false);
   });
   test.each([
-    { effects: [{ ...notify, level: "web" }] }, { effects: [{ ...notify, key: "" }] },
-    { effects: [{ ...notify, key: "x".repeat(201) }] },
-    { effects: [{ ...notify, title: " " }] }, { effects: [{ ...notify, title: "x".repeat(201) }] },
-    { effects: [{ ...notify, body: "" }] }, { effects: [{ ...notify, body: "x".repeat(4001) }] },
-    { effects: [{ ...wake, prompt: " " }] }, { effects: [{ ...wake, prompt: "x".repeat(4001) }] },
-    { effects: [{ ...wake, extra: true }] }, { effects: [{ ...notify, extra: true }] },
-    { effects: [{ type: "network", key: "net" }] }, { effects: Array(21).fill(wake) },
-    { extra: true }, { effects: null },
-  ])("rejects invalid output %j", output => {
-    expect(moduleOutputSchema.safeParse(output).success).toBe(false);
+    { method: "notify", params: { ...notify, level: "web" } }, { method: "notify", params: { ...notify, key: "" } },
+    { method: "notify", params: { ...notify, key: "x".repeat(201) } },
+    { method: "notify", params: { ...notify, title: " " } }, { method: "notify", params: { ...notify, title: "x".repeat(201) } },
+    { method: "notify", params: { ...notify, body: "" } }, { method: "notify", params: { ...notify, body: "x".repeat(4001) } },
+    { method: "wakeProvider", params: { ...wake, prompt: " " } }, { method: "wakeProvider", params: { ...wake, prompt: "x".repeat(4001) } },
+    { method: "wakeProvider", params: { ...wake, extra: true } }, { method: "notify", params: { ...notify, extra: true } },
+    { method: "network", params: { key: "net" } }, { method: "notify", params: notify, extra: true },
+  ])("rejects invalid call %j", call => {
+    expect(moduleCallSchema.safeParse({ id: "1", ...call }).success).toBe(false);
   });
 });
 

@@ -1,14 +1,15 @@
 import { join } from "node:path";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
-import type { ModuleOutput } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { createWorkspaceFs } from "./workspace-fs";
 import { StewardError } from "./errors";
 
 export const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
 export type TestReport = { stdout: string; stderr: string; exitCode: number }[];
-export type ContinuityReport = { status: "passed" | "failed" | "skipped"; reason?: string; fromSchema: number | null; toSchema: number; migrated: boolean; effects?: ModuleOutput["effects"]; migration?: TestReport[number]; output?: TestReport[number] };
+/** Recorded kernel calls shown in the review preview, in the old effect wording. */
+type PreviewEffect = { type: "notify_user"; key: string; level: "now" | "digest"; title: string; body: string } | { type: "wake_provider"; key: string; prompt: string };
+export type ContinuityReport = { status: "passed" | "failed" | "skipped"; reason?: string; fromSchema: number | null; toSchema: number; migrated: boolean; effects?: PreviewEffect[]; migration?: TestReport[number]; output?: TestReport[number] };
 export type KeyProbe = { status: "passed" | "repeated" | "skipped"; reason?: string; keys?: string[] };
 export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; keyProbe?: KeyProbe; migration?: TestReport[number]; errors?: string[] };
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };

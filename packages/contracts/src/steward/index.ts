@@ -138,14 +138,6 @@ export const moduleManifestSchema = z.object({
 });
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
-export const moduleOutputSchema = z.object({
-  effects: z.array(z.discriminatedUnion("type", [
-    z.object({ type: z.literal("notify_user"), key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
-    z.object({ type: z.literal("wake_provider"), key: z.string().min(1).max(200), prompt: text.max(4000) }).strict(),
-  ])).max(20).default([]),
-  handled: z.boolean().optional(),
-  result: z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB"),
-}).strict();
 /**
  * v2 module channel (`/chrona/chrona.sock`, one JSON object per line, both directions).
  * Chrona → module: an event `{ id, event }`; the module answers `{ id, result }` or `{ id, error }`.
@@ -179,7 +171,6 @@ export const moduleCallReplySchema = z.object({ id: channelId, result: z.object(
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
 export type ModuleCall = z.infer<typeof moduleCallSchema>;
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
-export type ModuleOutput = z.infer<typeof moduleOutputSchema>;
 export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 export const scheduleSchema = z.object({
