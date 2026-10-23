@@ -26,7 +26,7 @@ export async function enqueueNotification(tx: Prisma.TransactionClient, raw: Not
   const sent = await tx.notification.findMany({ where: { workspaceId, level: "now", OR: [{ sentAt: { gte: new Date(context.now.getTime() - 48 * 3600000) } }, { status: "queued" }] } });
   const sentToday = sent.filter(r => localDayKey(r.sentAt ?? r.createdAt, settings.timezone) === day && !r.idempotencyKey.startsWith("digest:") && !r.idempotencyKey.startsWith(RESPONSE_KEY_PREFIX)).length;
   const negative = input.moduleId ? await tx.notification.count({ where: { workspaceId, moduleId: input.moduleId, feedback: "not_useful", createdAt: { gte: new Date(context.now.getTime() - 30 * 86400000) } } }) : 0;
-  const responds = input.responds ?? false;
+  const responds = input.responds ?? dedupeKey.startsWith(RESPONSE_KEY_PREFIX);
   const route = routeNotification(!responds && negative >= 2 && input.level === "now" ? "digest" : input.level, { ...settings, now: context.now, urgent: input.urgent ?? false, sentToday, responds });
   const row = await tx.notification.create({ data: { workspaceId, moduleId: input.moduleId, sessionId: input.sessionId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, recipient: input.recipient, ...notificationRouting(input, context, route), createdAt: context.now, nextAttemptAt: context.now } });
   await audit(tx, { workspaceId, kind: "notification_enqueued", actor: "chrona", subjectId: row.id, details: { status: row.status, route } });

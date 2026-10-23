@@ -62,3 +62,12 @@ test("inline images reject host paths, malformed bytes and excessive images", ()
   expect(() => chatImages(Array(5).fill(image))).toThrow();
   expect(chatImages([{ ...image, base64: undefined }])).toEqual([]);
 });
+test("replies skip notifications the transport already delivered into the session", async () => {
+  chat = createChat({ ...ports, chatTimeoutMs: 100 }, async () => {
+    const inbound = await db.message.findFirstOrThrow({ where: { direction: "in" } });
+    await db.message.create({ data: { workspaceId, sessionId: inbound.sessionId, direction: "out", channel: "in_app", text: "Reply", at: ports.now() } });
+    await chat.recordMessage(workspaceId, { key: "qq:dm", channel: "in_app", text: "Delivered notification", externalId: "qq-sent-1" });
+  });
+  const result = await chat.handleMessage({ workspaceId, channel: "in_app", text: "Input", key: "qq:dm" });
+  expect(result.messages.map(m => m.text)).toEqual(["Reply"]);
+});

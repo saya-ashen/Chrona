@@ -124,7 +124,8 @@ class ChatService {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     return serial(`result:${inbound.id}`, async () => {
-      const rows = await this.replies(inbound, before);
+      // Rows with an externalId were already delivered (e.g. a notification the transport recorded into this session).
+      const rows = (await this.replies(inbound, before)).filter(m => !m.externalId);
       if (!await db.audit.findFirst({ where: { workspaceId: inbound.workspaceId, kind: "chat_result", subjectId: inbound.id } })) await audit(db, { workspaceId: inbound.workspaceId, actor: "chrona", kind: "chat_result", subjectId: inbound.id, details: { runId, messageIds: rows.map(m => m.id) } });
       return { runId, sessionId: inbound.sessionId, messages: rows.map(toMessage) };
     });

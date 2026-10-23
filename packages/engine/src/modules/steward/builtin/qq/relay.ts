@@ -103,7 +103,7 @@ export function createRelay({ owner, publicUrl, download, pollMs = 2000 }: { own
     },
     setExternalId: (messageId: string, externalId: string) => call(owner, { method: "PATCH", path: `/messages/${encodeURIComponent(messageId)}`, body: { externalId } }),
     /** The normal budget may fold this into a digest; never bypass quiet hours/caps. Pinned to its sender. */
-    enqueueFinal: (key: string, text: string, recipient: string, sessionId?: string | null) => call(owner, { method: "POST", path: "/notifications", body: { title: "Chrona", body: text, dedupeKey: `qq-final:${key}`, recipient, ...(sessionId ? { sessionId } : {}) } }),
+    enqueueFinal: (key: string, text: string, recipient: string, sessionId?: string | null) => call(owner, { method: "POST", path: "/notifications", body: { title: "Chrona", body: text, dedupeKey: `response:qq-final:${key}`, recipient, ...(sessionId ? { sessionId } : {}) } }),
     /** A notification QQ accepted joins the QQ session, so quoting it works. */
     recordDelivered: (text: string, externalId: string) => call(owner, { method: "POST", path: "/messages", body: { key: "qq:dm", channel: "chrona_qqbot", text: text.slice(0, 8000), externalId } }),
   };

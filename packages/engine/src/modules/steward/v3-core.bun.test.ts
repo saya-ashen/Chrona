@@ -2,12 +2,13 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { todayViewSchema } from "@chrona/contracts/steward";
+import { DEFAULT_NOTIFICATION_SETTINGS, todayViewSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { createSchedules } from "./schedules";
 import { createRuns } from "./runs";
 import { createTools } from "./tools";
 import { createToday } from "./today";
+import { enqueueNotification } from "./notify";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
 beforeEach(async () => {
@@ -48,4 +49,11 @@ test("today projects sessions and agenda without leaking wake instructions", asy
   const result = todayViewSchema.parse(await today.get());
   expect(result.sessions[0]?.id).toBe(sessionId); expect(result.upcoming[0]?.label).toBe("User label");
   expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
+});
+test("response-keyed notifications bypass the proactive cap", async () => {
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { notifications: { ...DEFAULT_NOTIFICATION_SETTINGS, dailyCap: 0 } } } });
+  const context = { now: ports.now(), chatBound: true, publicUrl: null };
+  const proactive = await enqueueNotification(db, { workspaceId, level: "now", title: "t", body: "b", dedupeKey: "qq-final:1" }, context);
+  const response = await enqueueNotification(db, { workspaceId, level: "now", title: "t", body: "b", dedupeKey: "response:qq-final:2" }, context);
+  expect([proactive.status, response.status]).toEqual(["folded", "queued"]);
 });
