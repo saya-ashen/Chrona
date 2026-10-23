@@ -91,13 +91,13 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   expect(await f.db.notification.count()).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(1);
   expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ prompt: expect.stringContaining("(untrusted data)") });
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null, executed: [] });
+  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null });
   expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ tool: "m_mail_sort_find_mail", ok: true }, { tool: "m_mail_sort_find_mail", ok: true }]);
   expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(2);
 });
 test("module failure returns truncated public stderr and shares the consecutive failure pause", async () => {
   const f = await fixture();
-  await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "hash", triggerId: "daily", firedAt: f.ports.now(), exitCode: 1, error: "scheduled failure", executed: [] } });
+  await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "hash", triggerId: "daily", firedAt: f.ports.now(), exitCode: 1, error: "scheduled failure" } });
   f.fail("x".repeat(3000));
   for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "conflict", message: "x".repeat(2000) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");

@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { StewardError } from "./errors";
-import type { ContinuityReport, ReplayReport } from "./module-context";
+import type { ContinuityReport } from "./module-context";
 
 export async function readModuleFiles(root: string, unsafe: string) {
   const files: { path: string; bytes: Buffer }[] = [];
@@ -57,11 +57,6 @@ export async function codeDifference(store: string, activeHash: string | null, f
 export function continuityPreview(continuity: ContinuityReport, needsMigration: boolean) {
   const effects = JSON.stringify(continuity.effects ?? []), effectLimit = 6000;
   return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n按当前数据新版本会产生的 effects：\n${effects.length > effectLimit ? effects.slice(0, effectLimit) + "\n…effects 过长，已截断；完整列表见构建报告" : effects}\n`;
-}
-export function replayPreview(replay: ReplayReport) {
-  const details = replay.diffs.map(diff => `步骤 ${diff.step}；${diff.triggerId}；${diff.firedAt}\n旧 effects：${JSON.stringify(diff.old)}\n新 effects：${JSON.stringify(diff.new)}`).join("\n");
-  const limit = 6000, marker = "\n…模拟差异过长，已截断；完整列表见构建报告";
-  return `并行模拟：${replay.status}${replay.reason ? ` (${replay.reason})` : ""}；步数：${replay.steps}\n${details.length > limit ? details.slice(0, limit) + marker : details}\n`;
 }
 export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string) {
   const available = 20_000 - (prefix.length + suffix.length);

@@ -62,7 +62,7 @@ test("approved module fires through notification budget without a Provider Run; 
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ idempotencyKey: `module:${f.moduleId}:daily:${f.schedule.nextAt!.toISOString()}:price`, level: "now", title: notify.title, body: notify.body, affairId: f.affair.id, channel: "in_app" });
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ lastResult: "Module exit 0; effects 1; delay 123ms", failures: 0 });
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: {}, error: null, executed: [] });
+  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: {}, error: null });
   expect(await f.service.schedules.fireDue()).toBe(0);
   await f.fire();
   expect(await f.db.notification.count()).toBe(2);
@@ -101,7 +101,7 @@ test.each(["json", "schema", "exit", "timeout", "unavailable", "throw"])("module
   const records = await f.db.moduleRun.findMany();
   expect(records).toHaveLength(3);
   for (const row of records) {
-    expect(row.output).toBeNull(); expect(row.error).toBeTruthy(); expect(row.error!.length).toBeLessThanOrEqual(2000); expect(row.executed).toEqual([]);
+    expect(row.output).toBeNull(); expect(row.error).toBeTruthy(); expect(row.error!.length).toBeLessThanOrEqual(2000);
   }
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("paused");
   for (const id of [f.schedule.id, other.id]) expect((await f.db.schedule.findUniqueOrThrow({ where: { id } })).status).toBe("paused");

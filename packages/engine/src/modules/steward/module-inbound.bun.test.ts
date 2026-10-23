@@ -120,7 +120,7 @@ test("migration completion retries queued mail and processing is capped at ten o
 });
 test("schedule and inbound failures share the three-run pause counter", async () => {
   const f = await fixture();
-  await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "hash", triggerId: "daily", firedAt: f.ports.now(), exitCode: 1, error: "schedule failed", executed: [], createdAt: f.ports.now() } });
+  await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "hash", triggerId: "daily", firedAt: f.ports.now(), exitCode: 1, error: "schedule failed", createdAt: f.ports.now() } });
   f.fail();
   for (let i = 0; i < 2; i++) { f.advance(1); await f.push(`failed-${i}`); await f.run(); }
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");

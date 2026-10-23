@@ -111,7 +111,6 @@ model ModuleRun {
   exitCode Int
   output Json?
   error String?
-  executed Json
   createdAt DateTime @default(now())
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@index([moduleId, createdAt])

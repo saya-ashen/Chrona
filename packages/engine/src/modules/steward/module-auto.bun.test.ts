@@ -9,7 +9,7 @@ import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-async function fixture(scope: "once" | "affair" = "affair") {
+async function fixture(scope: "once" | "affair" = "affair", network = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-auto-test-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
@@ -18,7 +18,7 @@ async function fixture(scope: "once" | "affair" = "affair") {
   const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "prices");
   await mkdir(dir);
-  const manifest: ModuleManifest = { name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: ["notify_user"], params: {}, data: { schema: 1 } };
+  const manifest: ModuleManifest = { name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
   let revision = 0;
   const propose = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
@@ -34,25 +34,28 @@ async function fixture(scope: "once" | "affair" = "affair") {
   return { db, dataDir, ports, service, workspace, affair, manifest, propose, first, grantId: resolved.grantId! };
 }
 
-test.each(["no data", "live data", "empty schema upgrade"])("identical refactor auto-activates with affair grant: %s", async kind => {
-  const f = await fixture();
+test.each(["no data", "live data", "empty schema upgrade", "changed triggers", "changed behavior", "existing network"])("tested update auto-activates with affair grant: %s", async kind => {
+  const f = await fixture("affair", kind === "existing network");
   if (kind === "live data") {
     const live = join(f.dataDir, "platform/data", f.first.moduleId);
     await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "state");
   }
   if (kind === "empty schema upgrade") f.manifest.data.schema = 2;
+  if (kind === "changed triggers") f.manifest.triggers[0]!.id = "changed";
+  if (kind === "changed behavior") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.entry === "test.ts" ? [] : [{ type: "notify_user", key: `price:${JSON.stringify(input.input)}`, level: "digest", title: "Price", body: "Changed" }] }) });
   const version = await f.propose();
   expect(version.status).toBe("approved");
   const approval = await f.db.approval.findFirstOrThrow({ where: { payload: { path: "$.hash", equals: version.hash } } });
   expect(approval).toMatchObject({ status: "approved", grantId: f.grantId });
-  expect(approval.preview).toContain("并行模拟：");
+  expect(approval.preview).toContain("代码差异：");
   expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: version.moduleId } })).toMatchObject({ activeHash: version.hash, status: "active" });
   expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "activate", seq: 2 });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_auto_activated" } })).toMatchObject({ details: { versionId: version.id, hash: version.hash, grantId: f.grantId } });
   expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "digest", title: "模块 prices 已自动更新" });
   const notification = await f.db.notification.findFirstOrThrow();
-  expect(notification.body).toContain("Refactor prices"); expect(notification.body).toContain("可在模块历史中回滚");
+  expect(notification.body).toContain("Refactor prices"); expect(notification.body).toContain("Rules");
+  expect(notification.body).toContain(`版本 hash: ${version.hash}`); expect(notification.body).toContain("可在模块历史中回滚");
 });
 
 async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
@@ -67,14 +70,12 @@ async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
   return version;
 }
 
-test.each(["no grant", "once grant", "new effect", "migration", "network", "triggers", "different", "repeated key", "activation failure"])("requires ordinary approval: %s", async kind => {
+test.each(["no grant", "once grant", "new effect", "migration", "network", "repeated key", "probe failure", "activation failure"])("requires ordinary approval: %s", async kind => {
   const f = await fixture();
   await configureManualCase(f, kind);
   const version = await assertManual(f);
-  const report = version.report as { replay: { status: string } };
-  if (kind === "different") expect(report.replay.status).toBe("different");
-  if (kind === "repeated key") expect(version.report).toMatchObject({ replay: { status: "identical" }, keyProbe: { status: "repeated", keys: ["notify_user:price"] } });
-  if (["network", "triggers"].includes(kind)) expect(report.replay.status).toBe("skipped");
+  if (kind === "repeated key") expect(version.report).toMatchObject({ keyProbe: { status: "repeated", keys: ["notify_user:price"] } });
+  if (kind === "probe failure") expect(version.report).toMatchObject({ keyProbe: { status: "skipped", reason: "entry failed or invalid output" } });
   if (kind === "once grant") expect(await f.db.grant.findUniqueOrThrow({ where: { id: f.grantId } })).toMatchObject({ once: true, consumedAt: null });
 });
 async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind: string) {
@@ -82,24 +83,36 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
   if (kind === "once grant") await f.db.grant.update({ where: { id: f.grantId }, data: { revokedAt: null, once: true } });
   if (kind === "new effect") f.manifest.effects.push("wake_provider");
   if (kind === "network") f.manifest.effects.push("network");
-  if (kind === "triggers") f.manifest.triggers[0]!.id = "changed";
   if (kind === "migration") {
     const live = join(f.dataDir, "platform/data", f.first.moduleId);
     await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "state");
     f.manifest.data = { schema: 2, migrate: "migrate.ts" };
   }
-  if (kind === "different") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.entry === "test.ts" || input.codeDir.endsWith(f.first.hash) ? [] : [{ type: "notify_user", key: "price", level: "digest", title: "Price", body: "Changed" }] }) });
-  // Only the key probe sees an effect, so replay stays identical and the probe alone blocks.
+  if (kind === "probe failure") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: input.dataDir.includes("chrona-module-probe-") ? "invalid" : '{"effects":[]}' });
+  // A repeated key blocks automatic activation even when smoke checks pass.
   if (kind === "repeated key") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.dataDir.includes("chrona-module-probe-") ? [{ type: "notify_user", key: "price", level: "digest", title: "Price", body: "Same" }] : [] }) });
   if (kind === "activation failure") {
     const run = f.ports.sandbox!.runModule!;
     let entries = 0;
     f.ports.sandbox!.runModule = async input => {
-      if (input.entry === "index.ts" && ++entries === 20) await f.service.grants.create({ action: "notify_user", mode: "never", scope: { kind: "affair", affairId: f.affair.id } });
+      if (input.entry === "index.ts" && ++entries === 3) await f.service.grants.create({ action: "notify_user", mode: "never", scope: { kind: "affair", affairId: f.affair.id } });
       return run(input);
     };
   }
 }
+
+test.each(["tests", "smoke"])("failed %s rejects the update despite an affair grant", async kind => {
+  const f = await fixture();
+  f.ports.sandbox!.runModule = async input => {
+    const failed = kind === "tests" ? input.entry === "test.ts" : input.dataDir.includes("chrona-module-smoke-");
+    return { status: failed ? "failed" : "succeeded", exitCode: failed ? 1 : 0, output: '{"effects":[]}', error: failed ? "failed check" : null };
+  };
+  const version = await f.propose();
+  expect(version.status).toBe("rejected");
+  expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash });
+  expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(0);
+  expect(await f.db.notification.count()).toBe(0);
+});
 
 test.each(["auto", "notify_after"] as const)("explicit %s policy uses its non-once grant", async mode => {
   const f = await fixture();

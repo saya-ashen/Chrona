@@ -9,9 +9,11 @@ import { intentSchema, requireModule, type BuildReport, type ModuleContext, type
 import { createNotifications } from "./notify";
 
 type ReviewCard = { affairId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
-function replayEligible(report: BuildReport) {
+function checksPassed(report: BuildReport) {
   const continuity = report.continuity;
-  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data")) && report.replay?.status === "identical" && report.replay.steps === 10 && report.keyProbe?.status !== "repeated";
+  return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data"))
+    && !continuity.migrated && report.tests.length > 0 && report.tests.every(test => test.exitCode === 0)
+    && !report.errors?.length && (!report.keyProbe || report.keyProbe.status === "passed");
 }
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
@@ -20,7 +22,7 @@ async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, ve
   const effects = moduleManifestSchema.parse(active.manifest).effects;
   if (!manifest.effects.every(effect => effects.includes(effect))) return false;
   if (manifest.data.schema !== module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) return false;
-  return replayEligible(report);
+  return checksPassed(report);
 }
 async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport, card: ReviewCard) {
   if (!await eligible(context, tx, version, report)) return null;
@@ -43,6 +45,6 @@ export async function tryAutoActivate(context: ModuleContext, version: ModuleVer
   catch { return null; }
   if (!approval) return null;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await createNotifications(context.ports, context.workspaceId).enqueue({ affairId: card.affairId, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${intent.changes.join("；").slice(0, 3500)}\n可在模块历史中回滚`, dedupeKey: `module-auto-activated:${version.id}` });
+  await createNotifications(context.ports, context.workspaceId).enqueue({ affairId: card.affairId, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n完整意图与代码差异见审批预览；版本 hash: ${version.hash}\n可在模块历史中回滚`, dedupeKey: `module-auto-activated:${version.id}` });
   return approval;
 }

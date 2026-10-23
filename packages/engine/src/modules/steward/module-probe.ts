@@ -53,6 +53,7 @@ export async function smokeRun(context: ModuleContext, staging: string, manifest
 }
 export function keyProbePreview(probe: KeyProbe | undefined) {
   if (!probe) return "";
+  if (probe.status === "skipped") return `⚠ 幂等键检查：${probe.reason}；不会自动启用\n`;
   if (probe.status === "repeated") return `⚠ 幂等键检查：不同日期的两次触发产生了相同的 key（${probe.keys!.join("、")}），后一次会被当作重复丢弃；不会自动启用\n`;
   return "幂等键检查：passed\n";
 }

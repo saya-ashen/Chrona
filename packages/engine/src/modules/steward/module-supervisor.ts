@@ -48,7 +48,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     failures.set(instance.moduleId, (failures.get(instance.moduleId) ?? 0) + 1);
     const context = { now, chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
     await ports.db.$transaction(async tx => {
-      const run = runId ? await tx.moduleRun.update({ where: { id: runId }, data: { error, exitCode: -1 } }) : await tx.moduleRun.create({ data: { moduleId: instance.moduleId, hash: instance.hash, triggerId: execution.triggerId, firedAt: execution.firedAt, exitCode: -1, error, executed: [], createdAt: now } });
+      const run = runId ? await tx.moduleRun.update({ where: { id: runId }, data: { error, exitCode: -1 } }) : await tx.moduleRun.create({ data: { moduleId: instance.moduleId, hash: instance.hash, triggerId: execution.triggerId, firedAt: execution.firedAt, exitCode: -1, error, createdAt: now } });
       await pauseFailedModule(tx, execution, context, run.id);
     });
   }
@@ -147,7 +147,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     const result = instance.queue.then(async () => {
       const module = await ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
       if (stopped || module.status !== "active") throw new Error("Module is not active");
-      const run = await ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.id, inboundItemId, firedAt: new Date(event.trigger.firedAt), exitCode: -1, executed: [], createdAt: ports.now() } });
+      const run = await ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.id, inboundItemId, firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: ports.now() } });
       instance.busy = true;
       instance.scope.moduleRunId = run.id;
       instance.scope.eventKey = inboundItemId ? `inbound:${inboundItemId}` : `${event.trigger.id}:${event.trigger.firedAt}`;
