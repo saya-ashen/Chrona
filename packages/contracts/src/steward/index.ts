@@ -92,6 +92,7 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
 export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model", "owner"] as const;
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
+export const RESERVED_LISTEN_PATHS = ["/api/steward", "/api/workspaces", "/api/health"] as const;
 const moduleTriggerSchema = z.union([
   z.object({ id: slug, schedule: scheduleRuleSchema }).strict(),
   z.object({ id: slug, inbound: z.object({ connector: id, match: z.object({ from: z.string().max(200).optional(), subject: z.string().max(200).optional() }).strict().default({}) }).strict() }).strict(),
@@ -115,6 +116,12 @@ export const moduleManifestSchema = z.object({
   keepAlive: z.boolean().default(false),
   /** Owns a content area (pages, panels, files) the user and the Provider can read and edit; the module sees it at /content. */
   content: z.boolean().default(false),
+  /**
+   * Serves HTTP under this path (v2-4 entry modules): the module runs an HTTP server on the Unix socket `/chrona/http/s`
+   * and Chrona proxies authenticated requests to it, without `Authorization` and `Cookie`. One active module per path;
+   * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
+   */
+  listen: z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/).optional(),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
   dynamicSchedules: z.boolean().default(false),
   /** Required with the `model` effect; bounded by the user's `moduleModel` setting. */
@@ -134,6 +141,8 @@ export const moduleManifestSchema = z.object({
   });
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
+  if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
+  if (manifest.listen && RESERVED_LISTEN_PATHS.some(path => manifest.listen === path || manifest.listen!.startsWith(`${path}-`))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (manifest.effects.includes("model") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the model effect is declared" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
@@ -169,18 +178,29 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /** Kernel methods and the capability each needs. */
-export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   z.object({ id: channelId, method: z.literal("notify"), params: z.object({ key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict() }).strict(),
   z.object({ id: channelId, method: z.literal("wakeProvider"), params: z.object({ key: z.string().min(1).max(200), prompt: text.max(4000) }).strict() }).strict(),
   /** One-shot completion through Chrona's model gateway: no tools, no session, the user's configured model. */
   z.object({ id: channelId, method: z.literal("model"), params: z.object({ system: z.string().max(20_000).optional(), prompt: text.max(200_000), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict() }).strict(),
+  /**
+   * Owner API: one request of the HTTP map below, as the user (`path` relative to /api/steward, JSON bodies only;
+   * Chrona sets `workspaceId`). Not serialized with other calls; rescue-only approvals stay refused.
+   */
+  z.object({ id: channelId, method: z.literal("owner"), params: z.object({
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+    path: z.string().max(2000).regex(/^\/[A-Za-z0-9_\-./?=&%:~+,]*$/).refine(path => !path.split("?")[0]!.split("/").includes(".."), "No .. segments"),
+    body: z.json().optional(),
+  }).strict() }).strict(),
 ]);
 export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal", "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   z.object({ status: z.enum(["executed", "duplicate"]) }).strict(),
   /** `model` replies: the completion is untrusted data. */
   z.object({ text: z.string(), inputTokens: z.number().int().min(0).nullable(), outputTokens: z.number().int().min(0).nullable() }).strict(),
+  /** `owner` replies: the HTTP status and JSON body the route returned. */
+  z.object({ status: z.number().int().min(100).max(599), body: z.json() }).strict(),
 ]) }).strict()
   .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
@@ -394,8 +414,9 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  * never proxied to a module:  GET / (static page) · POST /api/chat {text} -> ChatReply (session key "rescue") ·
  *   GET /api/messages -> {items: Message[]} · GET /api/approvals -> {items: Approval[]} (open, incl. rescueOnly) ·
  *   POST /api/approvals/:id/resolve (ResolveApproval) -> Approval. Other entries refuse rescueOnly approvals with 403.
- * There are no HTTP module routes: activation and rollback go through approvals and Provider tools; module
- * versions and module tools are reached through the owner MCP (`chrona_modules`, `m_*` tools).
+ * Modules declaring `listen` serve /api/<name> (see the manifest). Activation and rollback go through approvals
+ * and Provider tools; module versions and module tools are reached through the owner MCP (`chrona_modules`, `m_*` tools).
+ * Entry modules reach this map through the `owner` call; multipart uploads and raw downloads are not available there.
  */
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
