@@ -51,7 +51,7 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
     resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
-    workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "affairs"),
+    workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
     dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
 }

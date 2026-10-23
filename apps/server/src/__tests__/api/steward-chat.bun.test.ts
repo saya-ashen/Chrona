@@ -23,6 +23,6 @@ test("HTTP chat drives a fake provider and returns only chrona_reply messages", 
     const reply = await post({ text: "Hi" });
     expect(reply.status).toBe(200); expect((await reply.json()).messages.map((m: { text: string }) => m.text)).toEqual(["Hello from Chrona"]);
     expect((await post({ wrong: true })).status).toBe(400);
-    expect((await post({ text: "Hi", affairId: "missing" })).status).toBe(404);
+    expect((await post({ text: "Hi", sessionId: "missing" })).status).toBe(404);
   } finally { await db.$disconnect(); if (saved === undefined) delete process.env.API_KEY; else process.env.API_KEY = saved; }
 });

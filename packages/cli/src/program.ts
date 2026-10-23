@@ -18,7 +18,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       if (!options.startServer) throw new Error("chrona start is only available in packaged Chrona binaries.");
       await options.startServer(input);
     });
-  program.command("backup").description("Back up SQLite, affairs and secrets while the server is stopped")
+  program.command("backup").description("Back up SQLite and supported local data while the server is stopped")
     .argument("<output>", "Backup database path")
     .action((output: string) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
@@ -31,7 +31,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .action((input: string, restoreOptions: { force?: boolean }) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
       const result = restoreSqliteDatabase(databaseUrl, resolve(input), { force: restoreOptions.force, dataDir: getChronaDataDir() });
-      console.log(`Chrona database, affairs and secrets restored: ${result.backupPath}`);
+      console.log(`Chrona backup restored: ${result.backupPath}`);
     });
   program.command("doctor").description("Inspect local database and network safety")
     .option("--repair-stale-lock", "Quarantine a confirmed stale runtime lock; never removes the database")

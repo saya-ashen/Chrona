@@ -76,9 +76,9 @@ test("gated local test inbox is owner protected, validated and feeds the local_t
 
 test.skipIf(!(await Bun.file("apps/web/dist/index.html").exists()))("unlocalized links keep their query and use the reader's language", async () => {
   const app = await createServerApp();
-  const response = await app.request("/affairs/a1?path=trending.md", { headers: { "accept-language": "zh-CN,zh;q=0.9" } });
+  const response = await app.request("/apps/a1?path=trending.md", { headers: { "accept-language": "zh-CN,zh;q=0.9" } });
   expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("/zh/affairs/a1?path=trending.md");
+  expect(response.headers.get("location")).toBe("/zh/apps/a1?path=trending.md");
 });
 
 test("owner MCP is owner protected, lists the owner tools and returns only public errors", async () => {
@@ -91,16 +91,15 @@ test("owner MCP is owner protected, lists the owner tools and returns only publi
   };
   expect((await rpc("tools/list", {}, {})).status).toBe(401);
   expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).status).toBe(200);
-  expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name)).toEqual(["chrona_today", "chrona_affairs", "chrona_affair_read", "chrona_chat", "chrona_approvals", "chrona_approval_resolve", "chrona_modules", "chrona_notifications"]);
-  expect(JSON.parse((await rpc("tools/call", { name: "chrona_affairs", arguments: {} })).body!.result.content![0]!.text)).toEqual([]);
-  expect((await rpc("tools/call", { name: "chrona_affair_read", arguments: { affairId: "missing" } })).body!.result).toEqual({ content: [{ type: "text", text: "not_found: Affair not found" }], isError: true });
-  const affair = await db.affair.create({ data: { workspaceId, title: "Mail", dirName: "a".repeat(32) } });
-  const module = await db.module.create({ data: { workspaceId, affairId: affair.id, name: "mail-sort", activeHash: "hash" } });
+  expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name)).toEqual(["chrona_today", "chrona_content_tree", "chrona_content_read", "chrona_content_write", "chrona_chat", "chrona_approvals", "chrona_approval_resolve", "chrona_modules", "chrona_notifications"]);
+  expect(JSON.parse((await rpc("tools/call", { name: "chrona_modules", arguments: {} })).body!.result.content![0]!.text)).toEqual([]);
+  expect((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "missing" } })).body!.result).toEqual({ content: [{ type: "text", text: "not_found: Content area not found" }], isError: true });
+  const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const manifest = { name: "mail-sort", description: "Sort work mail", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }],
     tools: [{ name: "find", description: "Find mail", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } }) as { body: { result: { instructions?: string } } };
-  expect(init.body.result.instructions).toContain("- module_mail_sort: Sort work mail (affair: Mail)");
+  expect(init.body.result.instructions).toContain("- module_mail_sort: Sort work mail");
   expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name).at(-1)).toBe("m_mail_sort_find");
   expect((await rpc("tools/call", { name: "m_mail_sort_find", arguments: {} })).body!.result.isError).toBe(true);
   expect((await app.request(`/api/mcp?workspaceId=${workspaceId}x`, { method: "POST", headers: { ...owner, "content-type": "application/json" }, body: "{}" })).status).toBe(404);
