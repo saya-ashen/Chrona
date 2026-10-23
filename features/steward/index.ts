@@ -1,5 +1,6 @@
-export { AffairsPage } from "./ui/affairs-page";
-export { AffairDetailPage } from "./ui/affair-detail-page";
+export { ChatPage } from "./ui/chat-page";
+export { AppsPage } from "./ui/apps-page";
+export { AppDetailPage } from "./ui/app-detail-page";
 export { PageColumn } from "./ui/layout";
 export { TodayPage } from "./ui/today-page";
 export { SettingsPage } from "./ui/settings-page";

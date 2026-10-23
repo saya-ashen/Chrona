@@ -18,14 +18,14 @@
   font-weight: 400;
   box-shadow: none;
 }
-.affair-result-body { max-width: 70ch; font-size: 15px; line-height: 1.6; }
-.affair-result-body article { padding: 0; overflow-x: auto; font-size: inherit; line-height: inherit; }
-.affair-result-body article > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.affair-result-body article > div > * { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.affair-result-body h1 { font-size: 18px; font-weight: 600; }
-.affair-result-body h2, .affair-result-body h3 { margin-top: 6px; font-size: 15px; font-weight: 600; }
-.affair-result-body table { table-layout: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
-.affair-result-body td, .affair-result-body th { border: 0; border-bottom: 1px solid var(--border); padding: 4px 12px 4px 0; background: transparent; text-align: left; }
+.app-result-body { max-width: 70ch; font-size: 15px; line-height: 1.6; }
+.app-result-body article { padding: 0; overflow-x: auto; font-size: inherit; line-height: inherit; }
+.app-result-body article > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.app-result-body article > div > * { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.app-result-body h1 { font-size: 18px; font-weight: 600; }
+.app-result-body h2, .app-result-body h3 { margin-top: 6px; font-size: 15px; font-weight: 600; }
+.app-result-body table { table-layout: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.app-result-body td, .app-result-body th { border: 0; border-bottom: 1px solid var(--border); padding: 4px 12px 4px 0; background: transparent; text-align: left; }
 @media (max-width: 860px) {
   .steward-shell [data-slot="button"] { min-height: 40px; }
 }

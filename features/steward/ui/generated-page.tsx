@@ -11,24 +11,24 @@ import { FilePanel } from "./file-panel";
 import { uiCatalog } from "@chrona/ui-catalog";
 import { compactUiTable, pageTasks, recordUiEvent } from "../model/ui-page";
 import { pageHref } from "../model/workspace";
-import { pageName } from "../model/affair-file";
+import { pageName } from "../model/app-file";
 import { useStewardResource } from "../hooks/use-steward";
 import { useGeneratedState } from "../hooks/use-generated-state";
 import { ResourceStatus } from "./resource-status";
-import { useAffairMarkdown } from "./affair-markdown";
+import { useAppMarkdown } from "./app-markdown";
 
-type PageContext = { client: StewardClient; affairId: string; readOnly: boolean; refresh: () => void; path?: string; refreshVersion?: string };
+type PageContext = { client: StewardClient; appId: string; sessionId?: string; readOnly: boolean; refresh: () => void; path?: string; refreshVersion?: string };
 const Page = createContext<PageContext | null>(null);
 // json-render skips registry actions without a setState; Chrona actions never write page state.
 const keepState = () => {};
 const emptyState = {};
-const usePage = () => { const page = useContext(Page); if (!page) throw new Error("Generated page outside its affair"); return page; };
+const usePage = () => { const page = useContext(Page); if (!page) throw new Error("Generated page outside its app"); return page; };
 
 function TaskList({ props }: { props: { path: string; section: string | null; title: string | null; showProgress: boolean | null } }) {
-  const { client, affairId, readOnly, refreshVersion } = usePage();
-  const c = useI18n().messages.steward.affairFile;
+  const { client, appId, readOnly, refreshVersion } = usePage();
+  const c = useI18n().messages.steward.appFile;
   const [notice, setNotice] = useState<"conflict" | "error" | null>(null);
-  const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(affairId, props.path, signal), [client, affairId, props.path]), false, refreshVersion);
+  const file = useStewardResource(useCallback((signal?: AbortSignal) => client.file(appId, props.path, signal), [client, appId, props.path]), false, refreshVersion);
   const [pending, setPending] = useState(false);
   // Show the tick at once; the page file stays the source of truth once it is re-read.
   const [optimistic, setOptimistic] = useState<Record<number, boolean>>({});
@@ -39,7 +39,7 @@ function TaskList({ props }: { props: { path: string; section: string | null; ti
     if (!file.data) return;
     setOptimistic(previous => ({ ...previous, [line]: checked }));
     setPending(true); setNotice(null);
-    try { await client.toggleCheckbox(affairId, { path: props.path, line, checked, baseRevision: file.data.revision }); recordUiEvent(client, affairId, { kind: "toggle", path: props.path }); file.refresh(); }
+    try { await client.toggleCheckbox(appId, { path: props.path, line, checked, baseRevision: file.data.revision }); recordUiEvent(client, appId, { kind: "toggle", path: props.path }); file.refresh(); }
     catch (error) {
       setOptimistic(({ [line]: _failed, ...rest }) => rest);
       const conflict = error instanceof StewardClientError && error.status === 409;
@@ -63,29 +63,28 @@ function TaskText({ text, checked, pagePath }: { text: string; checked: boolean;
   return <div className={checked ? "text-muted-foreground line-through decoration-border" : ""}><GeneratedMarkdown pagePath={pagePath}>{text}</GeneratedMarkdown></div>;
 }
 function GeneratedMarkdown({ children, className, pagePath }: { children: string; className?: string; pagePath?: string }) {
-  const { client, affairId, path, refreshVersion } = usePage();
-  const components = useAffairMarkdown(client, affairId, pagePath ?? path ?? "README.md", refreshVersion);
+  const { client, appId, path, refreshVersion } = usePage();
+  const components = useAppMarkdown(client, appId, pagePath ?? path ?? "README.md", refreshVersion);
   return <MarkdownContent className={className} components={components}>{children}</MarkdownContent>;
 }
 function Panel({ props }: { props: PanelBlock }) {
-  const { client, affairId, readOnly, path } = usePage();
-  return <FilePanel spec={props} client={client} affairId={affairId} readOnly={readOnly} onSubmit={() => recordUiEvent(client, affairId, { kind: "action", path: path ?? props.data, name: "panel" })} />;
+  const { client, appId, readOnly, path } = usePage();
+  return <FilePanel spec={props} client={client} appId={appId} readOnly={readOnly} onSubmit={() => recordUiEvent(client, appId, { kind: "action", path: path ?? props.data, name: "panel" })} />;
 }
 function PageLink({ props }: { props: { label: string; path: string; hint: string | null } }) {
-  const { affairId } = usePage();
+  const { appId } = usePage();
   const { locale } = useI18n();
-  return <Link className="group grid gap-0.5 text-primary" to={pageHref(locale, affairId, props.path)}><span className="group-hover:underline">{props.label} ›</span>{props.hint && <span className="text-xs text-muted-foreground">{props.hint}</span>}</Link>;
+  return <Link className="group grid gap-0.5 text-primary" to={pageHref(locale, appId, props.path)}><span className="group-hover:underline">{props.label} ›</span>{props.hint && <span className="text-xs text-muted-foreground">{props.hint}</span>}</Link>;
 }
 function Upload({ props }: { props: { label: string; folder: string; note: string | null } }) {
-  const { client, affairId, readOnly, refresh } = usePage();
+  const { client, appId, readOnly, refresh } = usePage();
   const input = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const upload = async (files: File[]) => {
     if (!files.length) return;
     setPending(true);
     try {
-      for (const file of files) await client.upload(affairId, file, props.folder);
-      await client.chat({ affairId, text: `${props.note ?? props.label}：${files.map(file => file.name).join("、")}` });
+      for (const file of files) await client.upload(appId, file, props.folder);
       refresh();
     } finally { setPending(false); }
   };
@@ -121,7 +120,7 @@ const generic: Partial<Components<typeof uiCatalog>> = {
 };
 
 /** Renders a page the Provider composed from the catalog (`*.ui.json`); actions go through Chrona. */
-export function GeneratedPage({ spec, client, affairId, readOnly, refresh, path, refreshVersion }: PageContext & { spec: unknown; path?: string }) {
+export function GeneratedPage({ spec, client, appId, sessionId, readOnly, refresh, path, refreshVersion }: PageContext & { spec: unknown; path?: string }) {
   const { locale } = useI18n();
   const navigate = useNavigate();
   const valid = uiCatalog.validate(spec);
@@ -129,21 +128,21 @@ export function GeneratedPage({ spec, client, affairId, readOnly, refresh, path,
   useEffect(() => {
     if (valid.success && path && !opened.current) {
       opened.current = true;
-      recordUiEvent(client, affairId, { kind: "open", path });
+      recordUiEvent(client, appId, { kind: "open", path });
     }
-  }, [valid.success, path, client, affairId]);
+  }, [valid.success, path, client, appId]);
   const { registry, handlers } = useMemo(() => defineRegistry(uiCatalog, {
-    components: { ...generic, TaskList, PageLink, Upload, Panel } as Components<typeof uiCatalog>,
+    components: { ...generic, TaskList, PageLink, Upload, Panel } as unknown as Components<typeof uiCatalog>,
     actions: {
-      say: async params => { if (params && !readOnly) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "say" }); await client.chat({ affairId, text: params.text }); refresh(); } },
-      open: async params => { if (params) { if (path) recordUiEvent(client, affairId, { kind: "action", path, name: "open" }); navigate(pageHref(locale, affairId, params.path)); } },
+      say: async params => { if (params && !readOnly) { await client.uiEvent(appId, { kind: "feedback", path: path ?? "README.md", name: "say", text: params.text }); refresh(); } },
+      open: async params => { if (params) { if (path) recordUiEvent(client, appId, { kind: "action", path, name: "open" }); navigate(pageHref(locale, appId, params.path)); } },
     },
-  }), [client, affairId, readOnly, refresh, navigate, locale, path]);
+  }), [client, appId, sessionId, readOnly, refresh, navigate, locale, path]);
   const state = useGeneratedState(valid.success ? (spec as Spec).state ?? emptyState : emptyState);
   if (!valid.success) return <p role="alert">{valid.error?.issues[0]?.message ?? "Invalid page"}</p>;
   // Render the checked original: json-render 0.21's catalog.validate output drops elements' `on` bindings.
   const page = spec as Spec;
-  return <Page.Provider value={{ client, affairId, readOnly, refresh, path, refreshVersion }}>
+  return <Page.Provider value={{ client, appId, sessionId, readOnly, refresh, path, refreshVersion }}>
     <div className="min-w-0 text-[13px] [overflow-wrap:anywhere] [&_input]:h-8 [&_button[data-slot=button]]:h-8 [&_button[data-slot=button]]:rounded-md [&_button[data-slot=button]]:px-3 [&_button[data-slot=button]]:text-[13px] [&_[data-slot=card]]:gap-3 [&_[data-slot=card]]:py-3.5 [&_[data-slot=card-content]]:px-3.5 [&_[data-slot=card-header]]:px-3.5">
     <JSONUIProvider registry={registry} store={state} handlers={handlers(() => keepState, state.getSnapshot)}>
       <Renderer spec={page} registry={registry} />

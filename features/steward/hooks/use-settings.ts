@@ -8,8 +8,8 @@ import type { StewardClient } from "../model/client";
 export function useSettings() {
   const session = useStewardSession(), client = session.today.client;
   const load = useCallback(async (signal?: AbortSignal) => {
-    const [settings, grants, preferences, notifications, connectors, affairs, health] = await Promise.all([client.settings(signal), client.grants(signal), client.preferences(signal), client.notifications(signal), client.connectors(signal), client.affairs(undefined, signal), client.health(signal)]);
-    return { settings, grants: grants.items, preferences: preferences.items, notifications: notifications.items, connectors: connectors.items, affairs: affairs.items, health };
+    const [settings, grants, preferences, notifications, connectors, apps, health] = await Promise.all([client.settings(signal), client.grants(signal), client.preferences(signal), client.notifications(signal), client.connectors(signal), client.apps(signal), client.health(signal)]);
+    return { settings, grants: grants.items, preferences: preferences.items, notifications: notifications.items, connectors: connectors.items, apps: apps.items, health };
   }, [client]);
   const resource = useStewardResource(load);
   const refresh = () => { resource.refresh(); session.refresh(); };

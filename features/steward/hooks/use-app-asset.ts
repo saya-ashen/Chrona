@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { StewardClientError, type StewardClient } from "../model/client";
-import { affairAssetType } from "../model/affair-asset";
+import { appAssetType } from "../model/app-asset";
 import { useStewardResource } from "./use-steward";
 
-export function useAffairAsset(client: StewardClient, affairId: string, path: string, revision?: string) {
-  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.raw(affairId, path, signal), [client, affairId, path]), false, revision);
+export function useAppAsset(client: StewardClient, appId: string, path: string, revision?: string) {
+  const resource = useStewardResource(useCallback((signal?: AbortSignal) => client.raw(appId, path, signal), [client, appId, path]), false, revision);
   const [object, setObject] = useState<{ blob: Blob | null; url: string | null; error: StewardClientError | null }>({ blob: null, url: null, error: null });
-  const mime = affairAssetType(path);
+  const mime = appAssetType(path);
   useEffect(() => {
     if (!resource.data || !mime) { setObject({ blob: null, url: null, error: null }); return; }
     try {

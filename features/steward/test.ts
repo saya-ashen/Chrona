@@ -1,1 +1,1 @@
-export { emptyToday, chatFixture, detailFixture, fileFixture } from "./model/fixtures";
+export { emptyToday, chatFixture, appFixture, detailFixture, fileFixture } from "./model/fixtures";

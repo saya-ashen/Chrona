@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localAffairPath, omitReadmeSummary } from "./affair-file";
+import { fileTree, fileKind, markdownParts, panelRows, toggleCheckbox, localAppPath, omitReadmeSummary } from "./app-file";
 import { fixtureTime } from "./fixtures";
 import { scheduleDescription } from "./workspace";
 import zh from "../../../packages/i18n/src/messages/zh.json";
 export const panelSpec = { title: "Weight", data: "weight.csv", fields: [{ key: "day", label: "Day", type: "date" as const }, { key: "kg", label: "Weight (kg)", type: "number" as const }], views: [{ kind: "trend" as const, x: "day", y: "kg" }, { kind: "table" as const, columns: ["day", "kg"] }] };
 export const panelMarkdown = '```chrona-panel\n' + JSON.stringify(panelSpec) + '\n```';
-describe("affair files", () => {
+describe("app files", () => {
   it.each([
     ["# Title\n\nSummary with [link](page.md).\nMore summary.\n\n## Result\n- [ ] Go", "# Title\n\n\n\n\n## Result\n- [ ] Go"],
     ["Summary only", ""],
@@ -43,7 +43,7 @@ describe("affair files", () => {
     ["https://example.com/a.png", "README.md", null], [".chrona/a.png", "README.md", null],
     ["记录%20资料.md#section", "days/one.md", "days/记录 资料.md"], ["%2e%2e/%2e%2e/private.md", "days/one.md", null],
     ["%2fprivate", "README.md", null], ["bad%ZZ", "README.md", null],
-  ])("resolves local asset/page %s within the affair", (source, page, expected) => expect(localAffairPath(source!, page!)).toBe(expected));
+  ])("resolves local asset/page %s within the app", (source, page, expected) => expect(localAppPath(source!, page!)).toBe(expected));
   it.each([
     [{ kind: "daily", time: "09:00" } as const, "每天 09:00"],
     [{ kind: "every", minutes: 30 } as const, "每 30 分钟"],

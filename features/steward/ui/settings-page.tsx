@@ -42,7 +42,7 @@ function NotificationForm({ settings, client, refresh }: { settings: Settings; c
       <label className="self-center" htmlFor="notification-digest">{c.digest}</label><Input id="notification-digest" type="time" value={f.digest} onChange={e => f.setDigest(e.target.value)} />
       <p className="col-span-full text-xs text-muted-foreground">{c.timezone}: {settings.notifications.timezone}</p>
       {f.invalid && <p role="alert">{c.invalid}</p>}
-      <Button size="sm" variant="outline" className="col-span-full w-auto justify-self-start">{messages.steward.affairs.save}</Button>
+      <Button size="sm" variant="outline" className="col-span-full w-auto justify-self-start">{messages.steward.apps.save}</Button>
     </fieldset>
     <MutationStatus mutation={f} />
     {f.saved && <p role="status">{c.saved}</p>}
@@ -55,7 +55,7 @@ function NotificationsSection({ s, d }: SectionProps) {
     <NotificationForm settings={d.settings} client={s.client} refresh={s.refresh} />
     <p className="text-sm text-muted-foreground">{c.sent}: {d.settings.chat.sentToday} / {d.settings.notifications.dailyCap}</p>
     <details><summary className="cursor-pointer text-sm">{c.recent}</summary>
-      {!d.notifications.length && <p>{messages.steward.affairs.none}</p>}
+      {!d.notifications.length && <p>{messages.steward.apps.none}</p>}
       <ul className="grid gap-4 pt-3">{d.notifications.map(n => <li key={n.id} className="grid gap-2">
         <p>{n.title} · {c.notificationStates[n.status]}</p>
         <p className="break-words">{n.body}</p>
@@ -71,15 +71,15 @@ function NotificationsSection({ s, d }: SectionProps) {
 }
 
 function ScopedGrants({ s }: { s: SettingsState }) {
-  const { messages } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs;
+  const { messages } = useI18n(), c = messages.steward.settings, a = messages.steward.apps;
   return <ul className="grid gap-3">{s.grants.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 break-words">
-    <p>{a.actions[g.action]} · {c.modes[g.mode]} · {c[g.scope.kind]} {g.scope.kind === "affair" ? g.scope.affairId : g.scope.kind === "connector" ? g.scope.connectorId : ""}</p>
+    <p>{a.actions[g.action]} · {c.modes[g.mode]} · {c[g.scope.kind]} {g.scope.kind === "module" ? g.scope.moduleId : g.scope.kind === "connector" ? g.scope.connectorId : ""}</p>
     <Button size="sm" variant="ghost" disabled={s.mutation.pending} onClick={() => void s.mutation.run(() => s.client.revokeGrant(g.id))}>{a.revoke}</Button>
   </li>)}</ul>;
 }
 
 function PermissionsSection({ s }: { s: SettingsState }) {
-  const { messages } = useI18n(), c = messages.steward.settings, a = messages.steward.affairs;
+  const { messages } = useI18n(), c = messages.steward.settings, a = messages.steward.apps;
   return <SettingsSection name="permissions">
     <div className="overflow-x-auto" aria-label={c.permissions} tabIndex={0}>
       <table className="w-full min-w-[460px] text-left text-[13px] [&_th]:border-b [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:border-b [&_td]:p-2">
@@ -101,7 +101,7 @@ function PermissionsSection({ s }: { s: SettingsState }) {
 function PreferencesSection({ s, d }: SectionProps) {
   const { messages, locale } = useI18n(), c = messages.steward.settings, m = s.mutation;
   return <SettingsSection name="preferences">
-    {!d.preferences.length && <p>{messages.steward.affairs.none}</p>}
+    {!d.preferences.length && <p>{messages.steward.apps.none}</p>}
     <ul className="grid">{d.preferences.map(p => <li key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2.5 border-t py-2 first:border-0 min-[1000px]:grid-cols-[minmax(0,1fr)_auto_auto]">
       <p className="break-words">{p.text}</p>
       <p className="col-start-1 text-xs text-muted-foreground min-[1000px]:col-start-2">{c[p.origin]} · {new Date(p.createdAt).toLocaleDateString(locale)}</p>
@@ -118,12 +118,11 @@ function HealthSection({ d }: { d: LoadedSettings }) {
   const { messages, locale } = useI18n(), c = messages.steward.settings;
   return <SettingsSection name="health">
     <div className="flex flex-wrap gap-2">
-      <Badge variant="secondary">{c.git} · {d.health.git ? c.available : c.unavailable}</Badge>
       <Badge variant="outline">{c.sandbox} · {d.health.moduleSandbox ? c.available : c.unavailable}</Badge>
     </div>
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px] [&_dt]:text-muted-foreground [&_dd]:tabular-nums">
       {(["queuedRuns", "runningRuns", "failedRunsToday", "dueSchedules", "failingConnectors", "queuedNotifications", "failedNotifications"] as const).map(key => <div key={key} className="contents"><dt>{c[key]}</dt><dd>{d.health[key]}</dd></div>)}
-      <dt>{c.lastTick}</dt><dd>{d.health.lastTickAt ? new Date(d.health.lastTickAt).toLocaleString(locale) : messages.steward.affairs.none}</dd>
+      <dt>{c.lastTick}</dt><dd>{d.health.lastTickAt ? new Date(d.health.lastTickAt).toLocaleString(locale) : messages.steward.apps.none}</dd>
     </dl>
   </SettingsSection>;
 }
@@ -146,7 +145,7 @@ export function SettingsPage() {
           <NotificationsSection s={s} d={d} />
           <PermissionsSection s={s} />
           <PreferencesSection s={s} d={d} />
-          <SettingsSection name="connections"><ConnectorsSection client={s.client} connectors={d.connectors} affairs={d.affairs} refresh={s.refresh} /></SettingsSection>
+          <SettingsSection name="connections"><ConnectorsSection client={s.client} connectors={d.connectors} refresh={s.refresh} /></SettingsSection>
           <SettingsSection name="provider">
             <p>{d.health.provider.name} · {d.health.provider.available ? c.available : c.unavailable}</p>
             <p>{d.health.provider.sandboxed ? c.bashEnabled : c.bashDisabled}</p>

@@ -3,7 +3,7 @@ import { defaultLocale, hasLocale, resolveLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import { TodayRoutePage } from "./pages";
-import { SettingsPage, AffairsPage, AffairDetailPage } from "@features/steward";
+import { SettingsPage, AppsPage, AppDetailPage, ChatPage } from "@features/steward";
 import { NotFoundPage } from "@/components/not-found-page";
 import { loadAppBootData } from "./loaders";
 
@@ -32,8 +32,9 @@ export function createAppRouter() {
       children: [
         { index: true, element: <TodayRoutePage /> },
         { path: "today", element: <LocaleRedirect today /> },
-        { path: "affairs", element: <AffairsPage /> },
-        { path: "affairs/:affairId", element: <AffairDetailPage /> },
+        { path: "chat", element: <ChatPage /> },
+        { path: "apps", element: <AppsPage /> },
+        { path: "apps/:appId", element: <AppDetailPage /> },
         { path: "settings", element: <SettingsPage /> },
         { path: "*", element: <NotFoundPage /> },
       ],

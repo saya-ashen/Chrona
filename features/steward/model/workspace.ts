@@ -1,7 +1,7 @@
-import type { Affair, Health, ScheduleRule } from "@chrona/contracts";
+import type { App, Health, ScheduleRule } from "@chrona/contracts";
 
-export function groupWorkspaceAffairs(affairs: Affair[]) {
-  return (["waiting", "active", "paused", "done"] as const).map(key => ({ key, items: affairs.filter(affair => key === "waiting" ? affair.openApprovals > 0 : affair.openApprovals === 0 && affair.status === key).sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt) || a.id.localeCompare(b.id)) }));
+export function groupWorkspaceApps(apps: App[]) {
+  return (["active", "paused"] as const).map(key => ({ key, items: apps.filter(app => app.status === key).sort((a, b) => a.name.localeCompare(b.name)) }));
 }
 export function scheduleDescription(rule: ScheduleRule, locale: string, copy: { daily: string; weekly: string; every: string }) {
   switch (rule.kind) {
@@ -12,8 +12,8 @@ export function scheduleDescription(rule: ScheduleRule, locale: string, copy: { 
   }
 }
 export function workspaceHealthy(health: Health) {
-  return health.provider.available && health.git && !health.provider.lastError && health.failedRunsToday === 0 && health.failingConnectors === 0 && health.failedNotifications === 0;
+  return health.provider.available && health.moduleSandbox && !health.provider.lastError && health.failedRunsToday === 0 && health.failingConnectors === 0 && health.failedNotifications === 0;
 }
-export function pageHref(locale: string, affairId: string, path?: string) {
-  return `/${locale}/affairs/${encodeURIComponent(affairId)}${path ? `?${new URLSearchParams({ path })}` : ""}`;
+export function pageHref(locale: string, appId: string, path?: string) {
+  return `/${locale}/apps/${encodeURIComponent(appId)}${path ? `?${new URLSearchParams({ path })}` : ""}`;
 }

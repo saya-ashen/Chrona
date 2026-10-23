@@ -17,18 +17,12 @@ export function useConnector(client: StewardClient, id: string, refresh: () => v
 }
 
 export function useEmailConnector(client: StewardClient, refresh: () => void) {
-  const [fields, setFields] = useState({ address: "", imapHost: "", imapPort: "993", smtpHost: "", smtpPort: "465", folders: "INBOX", affairId: "new", password: "" });
+  const [fields, setFields] = useState({ address: "", imapHost: "", imapPort: "993", smtpHost: "", smtpPort: "465", folders: "INBOX", password: "" });
   const mutation = useStewardMutation(refresh);
   const update = (key: keyof typeof fields, value: string) => setFields(previous => ({ ...previous, [key]: value }));
-  async function save(mailboxTitle: string) {
-    // Retain a newly-created target on failure so retry cannot create duplicate affairs.
+  async function save() {
     await mutation.run(async () => {
-      let affairId = fields.affairId;
-      if (affairId === "new") {
-        affairId = (await client.createAffair({ title: mailboxTitle })).id;
-        update("affairId", affairId);
-      }
-      await client.createConnector({ kind: "email", label: fields.address, affairId,
+      await client.createConnector({ kind: "email", label: fields.address,
         settings: { address: fields.address, imapHost: fields.imapHost, imapPort: Number(fields.imapPort), folders: fields.folders.split(",").map(folder => folder.trim()).filter(Boolean),
           ...(fields.smtpHost ? { smtpHost: fields.smtpHost, smtpPort: Number(fields.smtpPort) } : {}) },
         secret: { password: fields.password },

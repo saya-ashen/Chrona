@@ -6,16 +6,16 @@ import { I18nProvider } from "@chrona/i18n/react";
 import { apiJson } from "@shared/http";
 import en from "../../../packages/i18n/src/messages/en.json";
 import { createStewardClient, StewardClientError } from "../model/client";
-import { fileFixture, detailFixture, emptyToday, fixtureTime } from "../model/fixtures";
+import { fileFixture, appFixture, emptyToday, fixtureTime } from "../model/fixtures";
 import { StewardSession } from "../hooks/use-steward-session";
-import { AffairFileView, EditableFile } from "./affair-file-view";
-import { AffairDetailPage, FileTree } from "./affair-detail-page";
-import { fileTree } from "../model/affair-file";
+import { AppFileView, EditableFile } from "./app-file-view";
+import { AppDetailPage, FileTree } from "./app-detail-page";
+import { fileTree } from "../model/app-file";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const client = () => createStewardClient("ws");
 function editor(c = client(), content = "# Camera\n\n- [ ] Compare lenses") {
-  render(<I18nProvider locale="en" messages={en}><EditableFile client={c} affairId="camera" initial={{ ...fileFixture(), content }} refresh={vi.fn()} /></I18nProvider>);
+  render(<I18nProvider locale="en" messages={en}><EditableFile client={c} appId="camera" initial={{ ...fileFixture(), content }} refresh={vi.fn()} /></I18nProvider>);
   return c;
 }
 it("optimistically checks a task and sends the exact source line and revision", async () => {
@@ -50,7 +50,7 @@ it("keeps an editor draft on a network failure", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Edit" }));
   await userEvent.clear(screen.getByRole("textbox")); await userEvent.type(screen.getByRole("textbox"), "Unsaved notes");
   await userEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.affairFile.error);
+  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.appFile.error);
   expect(screen.getByRole("textbox")).toHaveValue("Unsaved notes");
 });
 it("keeps the editor draft, shows both versions after conflict and explicitly retries with the new revision", async () => {
@@ -68,13 +68,13 @@ it("keeps the editor draft, shows both versions after conflict and explicitly re
 it("shows invalid panel declarations without making a data request", () => {
   const c = client(); const load = vi.spyOn(c, "file");
   editor(c, '```chrona-panel\n{}\n```');
-  expect(screen.getByRole("alert")).toHaveTextContent(en.steward.affairFile.invalidPanel);
+  expect(screen.getByRole("alert")).toHaveTextContent(en.steward.appFile.invalidPanel);
   expect(load).not.toHaveBeenCalled();
 });
 it("shows file loading and a recoverable error", async () => {
   const c = client(); let reject!: (error: Error) => void;
   vi.spyOn(c, "file").mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
-  render(<I18nProvider locale="en" messages={en}><AffairFileView client={c} affairId="camera" path="notes.txt" refresh={vi.fn()} /></I18nProvider>);
+  render(<I18nProvider locale="en" messages={en}><AppFileView client={c} appId="camera" path="notes.txt" refresh={vi.fn()} /></I18nProvider>);
   expect(screen.getByRole("status")).toBeVisible();
   reject(new Error("offline"));
   expect(await screen.findByRole("alert")).toBeVisible();
@@ -95,7 +95,7 @@ it("renders a markdown panel from its CSV file and posts typed entries", async (
 it("applies refreshed saved content without overwriting an editor draft", async () => {
   const c = client();
   const initial = { ...fileFixture(), content: "# Original", revision: "r1" };
-  const renderEditor = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} affairId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
+  const renderEditor = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} appId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
   const view = render(renderEditor(initial));
   await userEvent.click(screen.getByRole("button", { name: "Edit" }));
   await userEvent.clear(screen.getByRole("textbox"));
@@ -110,7 +110,7 @@ it.each(["save", "checkbox"])("does not revert a successful %s to a refresh rece
   const initial = { ...fileFixture(), content: "- [ ] Practice", revision: "r1" };
   let finish!: (value: typeof initial) => void;
   vi.spyOn(c, action === "save" ? "saveFile" : "toggleCheckbox").mockImplementation(() => new Promise<typeof initial>(resolve => { finish = resolve; }));
-  const content = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} affairId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
+  const content = (file: typeof initial) => <I18nProvider locale="en" messages={en}><EditableFile client={c} appId="camera" initial={file} refresh={() => {}} /></I18nProvider>;
   const view = render(content(initial));
   if (action === "save") {
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -127,23 +127,27 @@ it.each(["save", "checkbox"])("does not revert a successful %s to a refresh rece
 });
 it("renders a collapsible tree with README first and no metadata", async () => {
   const nodes = fileTree(["notes/day.md", ".chrona/state.json", "README.md"].map(path => ({ path, kind: "file", size: 0, updatedAt: fixtureTime })));
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><FileTree nodes={nodes} selected="README.md" affairId="camera" /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><FileTree nodes={nodes} selected="README.md" appId="camera" /></I18nProvider></MemoryRouter>);
   expect(screen.getAllByRole("link")[0]).toHaveTextContent("README");
   expect(screen.queryByText(".chrona")).not.toBeInTheDocument(); expect(screen.getByText("day")).not.toBeVisible();
   await userEvent.click(screen.getByText("notes")); expect(screen.getByText("day")).toBeVisible();
 });
-it("loads the selected page, schedules, approvals and affair status controls", async () => {
+it("loads the selected app page without legacy schedule, approval or lifecycle controls", async () => {
   vi.mocked(apiJson).mockImplementation(async url => {
-    const path = String(url); if (path.includes("/file?")) return { ...fileFixture(), path: "notes.txt", mime: "text/plain", content: "Selected notes" };
-    if (path.includes("/affairs/camera?")) return { ...detailFixture(), files: [{ path: "notes.txt", kind: "file", size: 10, updatedAt: fixtureTime }] };
+    const path = String(url).split("?")[0]!;
+    if (path.endsWith("/apps/camera/file")) return { ...fileFixture(), path: "notes.txt", mime: "text/plain", content: "Selected notes" };
+    if (path.endsWith("/apps")) return { items: [appFixture()] };
+    if (path.endsWith("/apps/camera/tree")) return { items: [{ path: "notes.txt", kind: "file", size: 10, updatedAt: fixtureTime }] };
     return emptyToday();
   });
-  render(<MemoryRouter initialEntries={["/en/affairs/camera?path=notes.txt"]}><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><Routes><Route path="/:lang/affairs/:affairId" element={<AffairDetailPage />} /></Routes></StewardSession></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/en/apps/camera?path=notes.txt"]}><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><Routes><Route path="/:lang/apps/:appId" element={<AppDetailPage />} /></Routes></StewardSession></I18nProvider></MemoryRouter>);
   expect(await screen.findByText("Selected notes")).toBeVisible();
-  expect(screen.getByRole("link", { name: "Back to home" })).toBeVisible();
-  expect(screen.getByText(/Daily at 18:00/)).not.toBeVisible();
-  expect(screen.getByRole("button", { name: "Allow once" })).toBeVisible();
-  await userEvent.click(screen.getByText(en.steward.affairCenter.secondLevel, { selector: "summary" }));
-  expect(screen.getByText(/Daily at 18:00/)).toBeVisible();
-  expect(screen.getByRole("button", { name: "Cancel arrangement" })).toBeVisible(); expect(screen.getByRole("button", { name: "End" })).toBeVisible();
+  expect(screen.getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/en/apps");
+  expect(screen.getByRole("link", { name: "notes.txt" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByLabelText(en.steward.appActions.upload)).toBeEnabled();
+  expect(apiJson).toHaveBeenCalledWith("/api/steward/apps/camera/file?workspaceId=ws&path=notes.txt", expect.anything());
+  expect(screen.queryByText(/Daily at 18:00/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Cancel arrangement" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "End" })).not.toBeInTheDocument();
 });

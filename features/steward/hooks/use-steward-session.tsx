@@ -3,11 +3,12 @@ import { useSteward, useStewardResource } from "./use-steward";
 
 function useSession(workspaceId: string) {
   const [chatPending, setChatPending] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>();
   const [revision, setRevision] = useState(0);
   const today = useSteward(workspaceId, chatPending);
   const settings = useStewardResource(today.client.settings, true);
   const refresh = () => { today.refresh(); settings.refresh(); setRevision(value => value + 1); };
-  return { today, settings, refresh, setChatPending, revision };
+  return { today, settings, refresh, setChatPending, revision, sessionId, setSessionId };
 }
 const SessionContext = createContext<ReturnType<typeof useSession> | null>(null);
 export function StewardSession({ workspaceId, children }: { workspaceId: string; children: ReactNode }) {

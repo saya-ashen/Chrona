@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import en from "../../../packages/i18n/src/messages/en.json";
 import zh from "../../../packages/i18n/src/messages/zh.json";
-import { affairFixture, emptyToday } from "./fixtures";
-import { groupWorkspaceAffairs, scheduleDescription, workspaceHealthy } from "./workspace";
+import { appFixture, emptyToday } from "./fixtures";
+import { groupWorkspaceApps, scheduleDescription, workspaceHealthy } from "./workspace";
 
 describe("workspace view models", () => {
-  it("groups decisions first, then status without duplicating affairs", () => {
-    const affair = affairFixture();
-    const groups = groupWorkspaceAffairs([affair, { ...affair, id: "active", openApprovals: 0 }, { ...affair, id: "paused", status: "paused", openApprovals: 0 }, { ...affair, id: "done", status: "done", openApprovals: 0 }]);
-    expect(groups.map(group => [group.key, group.items[0]?.id])).toEqual([["waiting", "camera"], ["active", "active"], ["paused", "paused"], ["done", "done"]]);
+  it("groups apps by status without duplication", () => {
+    const app = appFixture();
+    const groups = groupWorkspaceApps([app, { ...app, id: "paused", status: "paused" }]);
+    expect(groups.map(group => [group.key, group.items.map(item => item.id)])).toEqual([["active", ["camera"]], ["paused", ["paused"]]]);
   });
   it.each([
     [{ kind: "daily", time: "09:00" }, "每天 09:00"],

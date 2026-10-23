@@ -20,9 +20,9 @@ export function stewardError(error: unknown): StewardClientError {
   return new StewardClientError(status === 401 ? "unauthorized" : status ? "requestError" : "networkError", status, detail);
 }
 
-async function rawAffairFile(workspaceId: string, affairId: string, path: string, signal?: AbortSignal): Promise<Blob> {
-  if (!c.affairPathSchema.safeParse(path).success) throw new StewardClientError("invalidInput");
-  const url = `${c.STEWARD_API_BASE}/affairs/${encodeURIComponent(affairId)}/raw?${new URLSearchParams({ workspaceId, path })}`;
+async function rawAppFile(workspaceId: string, appId: string, path: string, signal?: AbortSignal): Promise<Blob> {
+  if (!c.relativePathSchema.safeParse(path).success) throw new StewardClientError("invalidInput");
+  const url = `${c.STEWARD_API_BASE}/apps/${encodeURIComponent(appId)}/raw?${new URLSearchParams({ workspaceId, path })}`;
   let response: Response;
   try { response = await fetch(url, { headers: buildAccessKeyHeaders(), signal, redirect: "error" }); }
   catch (error) { if (signal?.aborted) throw error; throw stewardError(error); }
@@ -60,27 +60,29 @@ export function createStewardClient(workspaceId: string) {
     return request(path, outputSchema, { method, body: parsed.data });
   }
   return {
-    uiEvent: (affairId: string, input: z.input<typeof c.uiEventSchema>) => mutate(`/affairs/${id(affairId)}/ui-event`, c.uiEventSchema, z.object({ ok: z.literal(true) }).strict(), input),
+    uiEvent: (appId: string, input: z.input<typeof c.uiEventSchema>) => mutate(`/apps/${id(appId)}/ui-event`, c.uiEventSchema, z.object({ ok: z.literal(true) }).strict(), input),
     today: (signal?: AbortSignal) => request("/today", c.todayViewSchema, { signal }),
     health: (signal?: AbortSignal) => request("/health", c.healthSchema, { signal }),
-    providerRuns: (affairId?: string, signal?: AbortSignal) => request("/provider/runs", list(c.providerRunViewSchema), { query: { affairId }, signal }),
+    providerRuns: (sessionId?: string, signal?: AbortSignal) => request("/provider/runs", list(c.providerRunViewSchema), { query: { sessionId }, signal }),
     answerProvider: (requestId: string, input: c.ProviderAnswer) => mutate(`/provider/interactions/${id(requestId)}/answer`, c.providerAnswerSchema, z.object({ ok: z.literal(true) }).strict(), input),
     cancelProviderRun: (runId: string) => request(`/provider/runs/${id(runId)}/cancel`, z.object({ ok: z.literal(true) }).strict(), { method: "POST" }),
     chat: (input: z.input<typeof c.chatInputSchema>) => mutate("/chat", c.chatInputSchema, c.chatReplySchema, input),
-    chatMessages: (limit?: number, signal?: AbortSignal) => request("/chat/messages", list(c.messageSchema), { query: { limit: limit?.toString() }, signal }),
-    affairs: (status?: c.AffairStatus, signal?: AbortSignal) => request("/affairs", list(c.affairSchema), { query: { status }, signal }),
-    createAffair: (input: z.input<typeof c.createAffairSchema>) => mutate("/affairs", c.createAffairSchema, c.affairSchema, input),
-    affair: (affairId: string, signal?: AbortSignal) => request(`/affairs/${id(affairId)}`, c.affairDetailSchema, { signal }),
-    updateAffair: (affairId: string, input: z.input<typeof c.updateAffairSchema>) => mutate(`/affairs/${id(affairId)}`, c.updateAffairSchema, c.affairSchema, input, "PATCH"),
-    file: (affairId: string, path: string, signal?: AbortSignal) => request(`/affairs/${id(affairId)}/file`, c.fileContentSchema, { query: { path }, signal }),
-    upload: async (affairId: string, file: File, dir?: string) => {
-      if (dir !== undefined && !c.affairPathSchema.safeParse(dir).success) throw new StewardClientError("invalidInput");
+    sessions: (signal?: AbortSignal) => request("/sessions", list(c.sessionSchema), { query: { source: "web" }, signal }),
+    newSession: (key: string) => mutate("/sessions/new", c.newSessionSchema, c.sessionSchema, { key }),
+    session: (sessionId: string, signal?: AbortSignal) => request(`/sessions/${id(sessionId)}`, c.sessionSchema, { signal }),
+    updateSession: (sessionId: string, input: z.input<typeof c.updateSessionSchema>) => mutate(`/sessions/${id(sessionId)}`, c.updateSessionSchema, c.sessionSchema, input, "PATCH"),
+    chatMessages: (sessionId: string, signal?: AbortSignal) => request(`/sessions/${id(sessionId)}/messages`, list(c.messageSchema), { signal }),
+    apps: (signal?: AbortSignal) => request("/apps", list(c.appSchema), { signal }),
+    tree: (appId: string, signal?: AbortSignal) => request(`/apps/${id(appId)}/tree`, list(c.fileNodeSchema), { signal }),
+    file: (appId: string, path: string, signal?: AbortSignal) => request(`/apps/${id(appId)}/file`, c.fileContentSchema, { query: { path }, signal }),
+    upload: async (appId: string, file: File, dir?: string) => {
+      if (dir !== undefined && !c.relativePathSchema.safeParse(dir).success) throw new StewardClientError("invalidInput");
       const form = new FormData();
       form.set("file", file);
       if (dir !== undefined) form.set("dir", dir);
       let response: Response;
       try {
-        response = await fetch(`${c.STEWARD_API_BASE}/affairs/${id(affairId)}/upload?${new URLSearchParams({ workspaceId })}`, { method: "POST", headers: buildAccessKeyHeaders(), body: form });
+        response = await fetch(`${c.STEWARD_API_BASE}/apps/${id(appId)}/upload?${new URLSearchParams({ workspaceId })}`, { method: "POST", headers: buildAccessKeyHeaders(), body: form });
       } catch (error) { throw stewardError(error); }
       if (!response.ok) {
         handleUnauthorizedResponse(response);
@@ -92,15 +94,11 @@ export function createStewardClient(workspaceId: string) {
       if (!parsed.success) throw new StewardClientError("invalidResponse");
       return parsed.data;
     },
-    raw: (affairId: string, path: string, signal?: AbortSignal) => rawAffairFile(workspaceId, affairId, path, signal),
-    saveFile: (affairId: string, input: z.input<typeof c.saveFileSchema>) => mutate(`/affairs/${id(affairId)}/file`, c.saveFileSchema, c.fileContentSchema, input, "PUT"),
-    toggleCheckbox: (affairId: string, input: z.input<typeof c.toggleCheckboxSchema>) => mutate(`/affairs/${id(affairId)}/checkbox`, c.toggleCheckboxSchema, c.fileContentSchema, input),
-    addPanelEntry: (affairId: string, input: z.input<typeof c.panelEntrySchema>) => mutate(`/affairs/${id(affairId)}/panel-entry`, c.panelEntrySchema, c.fileContentSchema, input),
-    revisions: (affairId: string, path?: string, signal?: AbortSignal) => request(`/affairs/${id(affairId)}/revisions`, list(c.revisionSchema), { query: { path }, signal }),
-    diff: (affairId: string, sha: string, signal?: AbortSignal) => request(`/affairs/${id(affairId)}/revisions/${id(sha)}/diff`, z.object({ diff: z.string() }).strict(), { signal }),
-    revert: (affairId: string, sha: string) => request(`/affairs/${id(affairId)}/revisions/${id(sha)}/revert`, c.revisionSchema, { method: "POST" }),
-    schedules: (affairId: string, signal?: AbortSignal) => request(`/affairs/${id(affairId)}/schedules`, list(c.scheduleSchema), { signal }),
-    createSchedule: (affairId: string, input: z.input<typeof c.createScheduleSchema>) => mutate(`/affairs/${id(affairId)}/schedules`, c.createScheduleSchema, c.scheduleSchema, input),
+    raw: (appId: string, path: string, signal?: AbortSignal) => rawAppFile(workspaceId, appId, path, signal),
+    saveFile: (appId: string, input: z.input<typeof c.saveFileSchema>) => mutate(`/apps/${id(appId)}/file`, c.saveFileSchema, c.fileContentSchema, input, "PUT"),
+    toggleCheckbox: (appId: string, input: z.input<typeof c.toggleCheckboxSchema>) => mutate(`/apps/${id(appId)}/checkbox`, c.toggleCheckboxSchema, c.fileContentSchema, input),
+    addPanelEntry: (appId: string, input: z.input<typeof c.panelEntrySchema>) => mutate(`/apps/${id(appId)}/panel-entry`, c.panelEntrySchema, c.fileContentSchema, input),
+    schedules: (signal?: AbortSignal) => request("/schedules", list(c.scheduleSchema), { signal }),
     updateSchedule: (scheduleId: string, input: z.input<typeof c.updateScheduleSchema>) => mutate(`/schedules/${id(scheduleId)}`, c.updateScheduleSchema, c.scheduleSchema, input, "PATCH"),
     approvals: (status?: c.Approval["status"], signal?: AbortSignal) => request("/approvals", list(c.approvalSchema), { query: { status }, signal }),
     resolveApproval: (approvalId: string, input: z.input<typeof c.resolveApprovalSchema>) => mutate(`/approvals/${id(approvalId)}/resolve`, c.resolveApprovalSchema, c.approvalSchema, input),
