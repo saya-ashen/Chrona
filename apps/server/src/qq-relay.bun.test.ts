@@ -22,7 +22,7 @@ async function fixture(reply: (input: ProviderRunInput, service: ReturnType<type
   const service = createStewardService(ports);
   ports.owner = ownerApi(ports, service, () => {});
   const relay = createRelay({ owner: request => ports.owner!("w", request), publicUrl: ports.publicUrl,
-    download: a => downloadQqAttachment(a, async (_url, init) => { expect(init?.redirect).toBe("error"); return new Response("abc", { headers: { "content-type": a.mime } }); }), pollMs: 5 });
+    download: a => downloadQqAttachment(a, async (_url, init) => { expect(init?.redirect).toBe("error"); return new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), { headers: { "content-type": a.mime } }); }), pollMs: 5 });
   return { db, dataDir, now, prompts, service, relay };
 }
 
@@ -42,12 +42,12 @@ test("QQ attachments and quoted replies stay in qq:dm and link to app content", 
   const message = (id: string, extra: Partial<QqC2cMessage> = {}): QqC2cMessage => ({ id, openid: "owner", content: "", quoted: "", timestamp: f.now().toISOString(), ...extra });
   try {
     await handler.onMessage(message("first", { attachments: [{ url: "https://multimedia.nt.qq.com/a", name: "picture.png", mime: "image/png" }] }));
-    expect(f.prompts[0]!.images).toEqual([{ mime: "image/png", base64: "YWJj" }]);
+    expect(f.prompts[0]!.images).toEqual([{ mime: "image/png", base64: "iVBORw0KGgo=" }]);
     const first = await f.db.message.findFirstOrThrow({ where: { direction: "in" } });
     expect(first).toMatchObject({ channel: "chrona_qqbot", externalId: "first" });
     const attachment = (first.attachments as { ref: string }[])[0]!;
     expect(attachment.ref).toStartWith("files/uploads/");
-    expect(await readFile(join(f.dataDir, "platform", "content", module.id, attachment.ref.slice(6)), "utf8")).toBe("abc");
+    expect(await readFile(join(f.dataDir, "platform", "content", module.id, attachment.ref.slice(6)))).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     expect(await f.db.session.findUnique({ where: { id: first.sessionId } })).toMatchObject({ key: "qq:dm", source: "qq" });
     const outbound = await f.db.message.findFirstOrThrow({ where: { direction: "out" } });
     expect(outbound.externalId).toBe("qq:out:sent-1");

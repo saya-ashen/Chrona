@@ -127,6 +127,15 @@ function validAttachmentMime(mime: string, expected: string): boolean {
     && (!expected || expected === mime || mime === "application/octet-stream")
     && (!expected.startsWith("image/") || mime.startsWith("image/"));
 }
+// QQ's CDN headers do not reliably match the event's declared image type, so images are identified by their bytes.
+function sniffImage(bytes: Buffer): string | null {
+  const starts = (...b: number[]) => b.every((v, i) => bytes[i] === v);
+  if (starts(0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (starts(0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (starts(0x47, 0x49, 0x46, 0x38)) return "image/gif";
+  if (starts(0x52, 0x49, 0x46, 0x46) && bytes.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  return null;
+}
 /** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
 export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
   const url = attachmentUrl(attachment);
@@ -134,8 +143,9 @@ export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetc
   const response = await fetch(url.href, { redirect: "error", signal: AbortSignal.timeout(20_000) });
   const mime = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
   const expected = attachment.mime.split(";")[0]!.trim().toLowerCase();
-  if (!response.ok || !response.body || !validAttachmentMime(mime, expected)) {
-    await response.body?.cancel(); throw new QqTransportError("Invalid attachment content type");
+  const image = expected.startsWith("image");
+  if (!response.ok || !response.body || (!image && !validAttachmentMime(mime, expected))) {
+    await response.body?.cancel(); throw new QqTransportError(`Invalid attachment content type (${response.status} ${mime || "none"}, declared ${expected || "none"})`);
   }
   if (Number(response.headers.get("content-length")) > cap) { await response.body.cancel(); throw new QqTransportError("Attachment exceeds size limit"); }
   const reader = response.body.getReader(), chunks: Uint8Array[] = [];
@@ -149,7 +159,11 @@ export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetc
       chunk = await reader.read();
     }
   } finally { await reader.cancel(); reader.releaseLock(); }
-  return { name: attachment.name, mime, bytes: Buffer.concat(chunks, size) };
+  const bytes = Buffer.concat(chunks, size);
+  if (!image) return { name: attachment.name, mime, bytes };
+  const sniffed = sniffImage(bytes);
+  if (!sniffed) throw new QqTransportError(`Attachment is not a supported image (${mime || "none"}, declared ${expected})`);
+  return { name: attachment.name, mime: sniffed, bytes };
 }
 export type QqGatewayStatus = { state: "stopped" | "connecting" | "ready" | "backoff" | "fatal"; appId: string; readyAt: string | null; lastEventAt: string | null; reconnects: number; lastCloseCode: number | null; resumable: boolean };
 type Payload = { op?: number; t?: string; s?: unknown; d?: unknown };
