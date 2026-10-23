@@ -3,14 +3,14 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { dirname, join, resolve } from "node:path";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url";
 
-export const backupDataRoots = ["platform", "sessions", "secrets"] as const;
+export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as const;
 
 function assertRegularTree(path: string): void {
   const stat = lstatSync(path);
   if (stat.isDirectory()) {
     for (const name of readdirSync(path)) assertRegularTree(join(path, name));
   } else if (!stat.isFile()) {
-    throw new Error("Backup refuses symlinks and special files in platform, sessions or secrets.");
+    throw new Error("Backup refuses symlinks and special files in platform, sessions, secrets or qq-bot.");
   }
 }
 

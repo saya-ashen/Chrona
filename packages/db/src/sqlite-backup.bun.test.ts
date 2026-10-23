@@ -38,6 +38,7 @@ describe("SQLite backup and restore", () => {
         ["platform/data/app/state.json", '{"count":1}'],
         ["sessions/session/notes.md", "session notes"],
         ["secrets/email.json", "test-secret"],
+        ["qq-bot/binding.json", '{"userId":"test-owner"}'],
       ] as const;
       for (const [path, content] of files) {
         mkdirSync(join(data, path, ".."), { recursive: true });
@@ -48,19 +49,19 @@ describe("SQLite backup and restore", () => {
       createDatabase(db, "saved");
       backupSqliteDatabase(`file:${db}`, backup, data);
       expect(statSync(`${backup}.tar`).mode & 0o777).toBe(0o600);
-      for (const root of ["platform", "sessions", "secrets"]) writeFileSync(join(data, root, "stale.md"), "stale");
+      for (const root of ["platform", "sessions", "secrets", "qq-bot"]) writeFileSync(join(data, root, "stale.md"), "stale");
       for (const [path] of files) writeFileSync(join(data, path), "changed");
       expect(() => restoreSqliteDatabase(`file:${db}`, backup, { dataDir: data })).toThrow("Pass --force");
       restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
       expect(readValue(db)).toBe("saved");
       for (const [path, content] of files) expect(readFileSync(join(data, path), "utf8")).toBe(content);
-      for (const root of ["platform", "sessions", "secrets"]) expect(existsSync(join(data, root, "stale.md"))).toBe(false);
+      for (const root of ["platform", "sessions", "secrets", "qq-bot"]) expect(existsSync(join(data, root, "stale.md"))).toBe(false);
       expect(statSync(join(data, "secrets", "email.json")).mode & 0o777).toBe(0o600);
       expect(statSync(join(data, "platform/store/app/version/check.sh")).mode & 0o777).toBe(0o700);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
-  for (const root of ["platform", "sessions", "secrets"]) {
+  for (const root of ["platform", "sessions", "secrets", "qq-bot"]) {
     it(`protects ${root} paths and requires force only for non-empty roots`, () => {
       const directory = mkdtempSync(join(tmpdir(), "chrona-root-safety-"));
       try {
@@ -70,11 +71,11 @@ describe("SQLite backup and restore", () => {
         const db = join(directory, "active.db"), backup = join(directory, "backup.db");
         createDatabase(db, "saved");
         const nestedDb = join(rootPath, "nested.db");
-        expect(() => backupSqliteDatabase(`file:${db}`, nestedDb, data)).toThrow("outside platform, sessions and secrets");
+        expect(() => backupSqliteDatabase(`file:${db}`, nestedDb, data)).toThrow("outside platform, sessions, secrets and qq-bot");
         createDatabase(nestedDb, "nested");
-        expect(() => backupSqliteDatabase(`file:${nestedDb}`, backup, data)).toThrow("outside platform, sessions and secrets");
-        expect(() => restoreSqliteDatabase(`file:${db}`, nestedDb, { dataDir: data })).toThrow("outside platform, sessions and secrets");
-        expect(() => restoreSqliteDatabase(`file:${nestedDb}`, db, { dataDir: data })).toThrow("outside platform, sessions and secrets");
+        expect(() => backupSqliteDatabase(`file:${nestedDb}`, backup, data)).toThrow("outside platform, sessions, secrets and qq-bot");
+        expect(() => restoreSqliteDatabase(`file:${db}`, nestedDb, { dataDir: data })).toThrow("outside platform, sessions, secrets and qq-bot");
+        expect(() => restoreSqliteDatabase(`file:${nestedDb}`, db, { dataDir: data })).toThrow("outside platform, sessions, secrets and qq-bot");
         rmSync(nestedDb);
         backupSqliteDatabase(`file:${db}`, backup, data);
         const restoredDb = join(directory, "restored.db");
@@ -109,7 +110,7 @@ describe("SQLite backup and restore", () => {
       createDatabase(db, "current");
       backupSqliteDatabase(`file:${db}`, backup, directory);
       restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
-      for (const root of ["platform", "sessions", "secrets"]) expect(existsSync(join(data, root))).toBe(true);
+      for (const root of ["platform", "sessions", "secrets", "qq-bot"]) expect(existsSync(join(data, root))).toBe(true);
       renameSync(`${backup}.tar`, `${backup}.saved.tar`);
       expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data })).toThrow();
       writeFileSync(`${backup}.tar`, "corrupt");

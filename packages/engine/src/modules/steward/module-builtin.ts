@@ -1,5 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { Prisma } from "@chrona/db/generated/prisma/client";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { moduleContext } from "./module-context";
 import { proposeBuiltin } from "./module-proposal";
@@ -16,4 +18,9 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
     if (result.status === "rejected") throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
   }
   await buildPending(context);
+  const remind = await ports.db.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } });
+  if (remind?.activeHash) {
+    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } });
+    if (version && moduleManifestSchema.parse(version.manifest).dynamicSchedules) await ports.db.schedule.updateMany({ where: { workspaceId, mode: "module", payload: { not: Prisma.DbNull }, moduleId: null }, data: { moduleId: remind.id } });
+  }
 }

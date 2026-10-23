@@ -1,4 +1,4 @@
-import type { Prisma } from "@chrona/db";
+import { Prisma } from "@chrona/db/generated/prisma/client";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
@@ -13,7 +13,7 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
   const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
-  await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "cancelled", nextAt: null } });
+  await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active", payload: { equals: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
   for (const trigger of manifest.triggers) {
     if (!("schedule" in trigger)) continue;
     let nextAt = nextOccurrence(trigger.schedule, now, zone);

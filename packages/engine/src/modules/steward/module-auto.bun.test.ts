@@ -20,7 +20,7 @@ async function fixture(scope: "once" | "always" = "always", network = false) {
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "prices");
   await mkdir(dir, { recursive: true });
-  const manifest: ModuleManifest = { content: false, name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
+  const manifest: ModuleManifest = { dynamicSchedules: false, content: false, name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
   let revision = 0;
   const propose = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));

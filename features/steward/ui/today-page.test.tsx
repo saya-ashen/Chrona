@@ -20,11 +20,13 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
 it("shows decisions before upcoming, updates, apps and sessions", async () => {
   const view = todayFixture();
   view.upcoming.push({ ...view.upcoming[0]!, scheduleId: "work", mode: "wake", label: "Prepare comparison" });
+  view.upcoming.push({ ...view.upcoming[0]!, scheduleId: "reminder", mode: "module", label: "Drink water" });
   mockView(view); show();
   await screen.findByRole("heading", { name: approvalFixture().title });
   const headings = screen.getAllByRole("heading").map(h => h.textContent);
   expect(headings.indexOf(en.steward.foundation.decisions)).toBeLessThan(headings.indexOf(en.steward.foundation.upcoming));
   expect(screen.getByText("Prepare comparison")).toBeVisible();
+  expect(screen.getByText("Drink water")).toBeVisible();
   expect(screen.getByRole("link", { name: /^camera二手/ })).toHaveAttribute("href", "/en/apps/camera");
   expect(screen.getByRole("link", { name: "相机选购 · web" })).toHaveAttribute("href", "/en/chat?sessionId=session-1");
   expect(screen.getByText(en.steward.workspace.healthy)).toBeVisible();

@@ -1,11 +1,10 @@
 import type { Prisma } from "@chrona/db";
-import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema } from "@chrona/contracts/steward";
+import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
 import { toSchedule } from "./store";
 import { notificationSettings } from "./settings";
-import { enqueueNotification } from "./notify";
 import { createRuns, createRunSession } from "./runs";
 import { audit } from "./audit";
 import { moduleSupervisor } from "./module-supervisor";
@@ -22,7 +21,7 @@ function nextDueOccurrence(rule: Parameters<typeof nextOccurrence>[0], now: Date
 async function runScheduledModule(ports: StewardPorts, row: Prisma.ScheduleGetPayload<object>, moduleId: string, hash: string, now: Date) {
   let error: string | null = null, exitCode = -1;
   try {
-    await moduleSupervisor(ports).deliver(moduleId, hash, { trigger: { id: row.triggerId!, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: {} });
+    await moduleSupervisor(ports).deliver(moduleId, hash, { trigger: { id: row.triggerId ?? `s-${row.id}`, kind: "schedule", firedAt: row.nextAt!.toISOString(), ...(row.payload !== null ? { scheduleId: row.id, payload: row.payload as Record<string, unknown> } : {}) }, now: now.toISOString(), params: {} });
     exitCode = 0;
   } catch (cause) {
     error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
@@ -46,7 +45,13 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     return db.$transaction(async tx => {
       if (originSessionId && !await tx.session.findFirst({ where: { id: originSessionId, workspaceId } })) throw new StewardError("not_found", "Session not found");
       if (input.mode === "wake" && !originSessionId) throw new StewardError("invalid", "Wake requires an origin session");
-      const row = await tx.schedule.create({ data: { ...input, label: input.label ?? null, workspaceId, originSessionId, createdBy, createdAt: now, until, nextAt, status: nextAt ? "active" : "done" } });
+      const remind = input.mode === "remind" ? await tx.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } }) : null;
+      if (input.mode === "remind") {
+        const version = remind?.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } }) : null;
+        const manifest = moduleManifestSchema.safeParse(version?.manifest);
+        if (!remind || !manifest.success || !manifest.data.dynamicSchedules) throw new StewardError("conflict", "Built-in remind module does not accept dynamic schedules");
+      }
+      const row = await tx.schedule.create({ data: { ...input, ...(remind ? { mode: "module", moduleId: remind.id, payload: { text: input.text } } : {}), label: input.label ?? null, workspaceId, originSessionId, createdBy, createdAt: now, until, nextAt, status: nextAt ? "active" : "done" } });
       await audit(tx, { workspaceId, actor: createdBy, kind: "schedule_created", subjectId: row.id, details: {} });
       return toSchedule(row);
     });
@@ -56,7 +61,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     return db.$transaction(async tx => {
       const row = await tx.schedule.findFirst({ where: { id, workspaceId } });
       if (!row) throw new StewardError("not_found", "Schedule not found");
-      if (row.mode === "module") throw new StewardError("conflict", "Module schedules change only through module activation or rollback; the active version keeps running until a new version is approved");
+      if (row.mode === "module" && row.payload === null) throw new StewardError("conflict", "Module schedules change only through module activation or rollback; the active version keeps running until a new version is approved");
       let nextAt = row.nextAt;
       if (input.status === "active") nextAt = nextOccurrence(scheduleRuleSchema.parse(row.rule), ports.now(), zone);
       if (row.until && nextAt && nextAt > row.until) nextAt = null;
@@ -75,12 +80,11 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     }
     const hash = module.activeHash;
     const { error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
-    const callCount = await db.moduleCall.count({ where: { moduleId: module.id, hash, eventKey: `${row.triggerId}:${row.nextAt!.toISOString()}` } });
+    const callCount = await db.moduleCall.count({ where: { moduleId: module.id, hash, eventKey: `${row.triggerId ?? `s-${row.id}`}:${row.nextAt!.toISOString()}` } });
     await db.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, callCount, delayMs, error) } });
   }
   async function fireDue(now = ports.now()) {
-    const zone = await timezone(), chatBound = ports.chat ? await ports.chat.bound() : false;
-    const context = { now, chatBound, publicUrl: ports.publicUrl };
+    const zone = await timezone();
     const rows = await db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { lte: now } }, orderBy: { nextAt: "asc" } });
     let fired = 0;
     for (const row of rows) {
@@ -92,7 +96,6 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       const claimed = await db.$transaction(async tx => {
         const changed = await tx.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt }, data: { nextAt, status: nextAt ? "active" : "done", ...(!expired ? { lastAt: now, lastResult: `Firing; delay ${delayMs}ms` } : {}) } });
         if (!changed.count || expired) return false;
-        if (row.mode === "remind") await enqueueNotification(tx, { workspaceId, level: "now", title: row.label ?? "提醒", body: row.text, dedupeKey: `schedule:${row.id}:${row.nextAt!.toISOString()}` }, context);
         if (row.mode === "wake") {
           const session = await createRunSession(tx, workspaceId, "wake", now, { originSessionId: row.originSessionId ?? undefined });
           await runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", label: row.label, prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late.` }, tx);

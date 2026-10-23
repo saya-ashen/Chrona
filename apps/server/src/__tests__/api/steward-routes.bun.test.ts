@@ -4,8 +4,9 @@ import { symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
-import { createStewardService, type StewardPorts } from "@chrona/engine";
+import { createStewardService, moduleSupervisor, type StewardPorts } from "@chrona/engine";
 import { createStewardRoutes } from "../../routes/steward.routes";
+import { createScriptSandbox } from "../../../../../packages/integrations/src/steward/script-sandbox";
 let db: ReturnType<typeof testDb>, app: ReturnType<typeof createStewardRoutes>, service: ReturnType<typeof createStewardService>, dataDir: string;
 let savedKey: string | undefined;
 beforeEach(async () => {
@@ -74,6 +75,8 @@ test("panel entries use engine declarations", async () => {
   expect((await request(`${base}/panel-entry`, "POST", { dataPath: "unknown.csv", values: { weight: 70 } })).status).toBe(400);
 });
 test("schedule and approval lifecycle", async () => {
+  const module = await db.module.create({ data: { workspaceId: "w", name: "remind", builtin: true, status: "active", activeHash: "hash" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", status: "active", intent: "fixture", source: "builtin", report: {}, manifest: { name: "remind", entry: "index.ts", tests: ["test.ts"], triggers: [], dynamicSchedules: true, effects: ["notify_user"], params: {}, data: { schema: 1 } } } });
   const response = await request("/schedules", "POST", { mode: "remind", rule: { kind: "daily", time: "09:00" }, text: "Remember" });
   expect(response.status).toBe(200); const schedule = await response.json();
   expect((await request(`/schedules/${schedule.id}`, "PATCH", { status: "paused" })).status).toBe(200);
@@ -83,3 +86,25 @@ test("schedule and approval lifecycle", async () => {
   expect((await request(`/approvals/${approval.id}/resolve`, "POST", { decision: "deny" })).status).toBe(200);
   expect((await request(`/approvals/${approval.id}/resolve`, "POST", { decision: "deny" })).status).toBe(409);
 });
+
+const reminderSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
+(reminderSandbox.health.available ? test : test.skip)("POST /schedules reminder fires through the built-in module without a Provider run", async () => {
+  const now = new Date("2026-10-22T12:00:00Z");
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null,
+    moduleBuiltinResources: join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"),
+    sandbox: { available: true, runModule: reminderSandbox.runModule, startModule: reminderSandbox.startModule } };
+  service = createStewardService(ports); app = createStewardRoutes(ports, service);
+  try {
+    await moduleSupervisor(ports).start();
+    const response = await request("/schedules", "POST", { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "Remember from HTTP" });
+    expect(response.status).toBe(200);
+    const schedule = await response.json();
+    expect(await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toMatchObject({ mode: "module", payload: { text: "Remember from HTTP" } });
+    expect((await service.forWorkspace("w").today()).upcoming).toContainEqual(expect.objectContaining({ scheduleId: schedule.id, label: "Remember from HTTP" }));
+    expect(await service.forWorkspace("w").schedules.fireDue()).toBe(1);
+    expect(await db.notification.findFirstOrThrow()).toMatchObject({ title: "提醒", body: "Remember from HTTP", moduleId: expect.any(String) });
+    expect(await db.moduleRun.findFirstOrThrow()).toMatchObject({ exitCode: 0 });
+    expect(await db.run.count()).toBe(0);
+    expect(await service.forWorkspace("w").schedules.fireDue()).toBe(0);
+  } finally { await moduleSupervisor(ports).stop(); }
+}, 30_000);

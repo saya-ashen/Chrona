@@ -87,7 +87,7 @@ test("files fresh workspace: author SDK tests, automatic activation, owner tools
     expect(item!.ref).toStartWith(`inbox/${connector.id}/`);
     expect(await f.call("read", { path: item!.ref })).toMatchObject({ content: expect.stringContaining("Connector document") });
     expect(await f.db.audit.findFirst({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user" });
-    await f.start(); expect(await f.db.moduleVersion.count()).toBe(1);
+    await f.start(); expect(await f.db.moduleVersion.count({ where: { moduleId: app.id } })).toBe(1);
   } finally { await f.close(); }
 }, 30_000);
 

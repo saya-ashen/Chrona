@@ -14,7 +14,7 @@ export function fileFixture() {
   return fileContentSchema.parse({ path: "README.md", content: "# 相机\n\n- [ ] 比较镜头", mime: "text/markdown", revision: "abc123", updatedAt: fixtureTime });
 }
 export function scheduleFixture() {
-  return scheduleSchema.parse({ id: "reminder", originSessionId: "session-1", moduleId: null, mode: "remind", label: null, rule: { kind: "daily", time: "18:00" }, text: "比较镜头", until: null, status: "active", nextAt: fixtureTime, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: fixtureTime });
+  return scheduleSchema.parse({ id: "reminder", originSessionId: "session-1", moduleId: "remind", mode: "module", payload: { text: "比较镜头" }, label: null, rule: { kind: "daily", time: "18:00" }, text: "比较镜头", until: null, status: "active", nextAt: fixtureTime, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: fixtureTime });
 }
 export function runFixture() {
   return runSchema.parse({ id: "run-1", sessionId: "session-1", lane: "background", trigger: "schedule", status: "failed", provider: "fake", toolCalls: [], error: "Internal provider detail", startedAt: fixtureTime, endedAt: fixtureTime, createdAt: fixtureTime, label: "Prepare day two" });
@@ -26,6 +26,6 @@ export function emptyToday() {
   return todayViewSchema.parse({ generatedAt: fixtureTime, approvals: [], upcoming: [], updates: [], apps: [], sessions: [], health: { provider: { available: true, name: "Pi", sandboxed: true, lastError: null }, moduleSandbox: true, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, failingConnectors: 0, queuedNotifications: 0, failedNotifications: 0, lastTickAt: fixtureTime } });
 }
 export function todayFixture() {
-  return todayViewSchema.parse({ ...emptyToday(), approvals: [approvalFixture()], upcoming: [{ scheduleId: "reminder", mode: "remind", label: "比较镜头", at: fixtureTime }], apps: [appFixture()], sessions: [sessionFixture()] });
+  return todayViewSchema.parse({ ...emptyToday(), approvals: [approvalFixture()], upcoming: [{ scheduleId: "reminder", mode: "module", label: "比较镜头", at: fixtureTime }], apps: [appFixture()], sessions: [sessionFixture()] });
 }
 export const chatFixture = chatReplySchema.parse({ runId: "chat-1", sessionId: "session-1", messages: [{ id: "reply-1", sessionId: "session-1", direction: "out", channel: "in_app", text: "好，我把预算改成 6000 并加上富士。", attachments: [{ name: "相机比较", ref: "camera/README.md", mime: "text/markdown", size: 50 }], quotedMessageId: null, at: fixtureTime }] });

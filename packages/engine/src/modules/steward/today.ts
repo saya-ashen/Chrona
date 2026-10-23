@@ -31,7 +31,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
     ]);
     return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), updates: notifications.map(toNotification), apps: applications,
       sessions: sessions.map(toSession),
-      upcoming: schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.mode === "remind" ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() })), health: status };
+      upcoming: schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.payload !== null ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() })), health: status };
   }
   return { get, health };
 }

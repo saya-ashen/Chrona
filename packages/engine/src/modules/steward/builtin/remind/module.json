@@ -1,0 +1,10 @@
+{
+  "name": "remind",
+  "entry": "index.ts",
+  "triggers": [],
+  "dynamicSchedules": true,
+  "effects": ["notify_user"],
+  "params": {},
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

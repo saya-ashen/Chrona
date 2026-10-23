@@ -24,7 +24,7 @@ export function TodayPage() {
       <ProviderWork client={resource.client} mode="summary" onChange={resource.refresh} />
       <Section title={c.foundation.upcoming} count={view.upcoming.length}><Surface>
         {view.upcoming.map(schedule => <article key={schedule.scheduleId} className="flex flex-wrap gap-3 p-3">
-          <p>{schedule.label ?? c.workspace[schedule.mode === "remind" ? "remind" : "wake"]}</p>
+          <p>{schedule.label ?? (schedule.mode === "module" ? c.apps.title : c.workspace.wake)}</p>
           <time className="ml-auto text-xs" dateTime={schedule.at}>{formatShortDateTime(schedule.at, locale)}</time>
         </article>)}
         {!view.upcoming.length && <p className="p-3">{c.apps.none}</p>}
