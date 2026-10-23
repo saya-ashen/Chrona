@@ -13,6 +13,7 @@ export type StewardPorts = {
   chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
   provider?: ProviderAdapter;
   moduleBuildResources?: { sdk: string; testing: string };
+  moduleBuiltinResources?: string;
   chatTimeoutMs?: number;
   onQueued?: () => Promise<unknown>;
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;

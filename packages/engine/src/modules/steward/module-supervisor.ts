@@ -2,6 +2,7 @@ import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
+import { registerBuiltins } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
 import { handleModuleCall, pauseFailedModule, type CallScope } from "./module-effects";
 
@@ -178,6 +179,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     async start() {
       if (started) return;
       stopped = false; started = true;
+      for (const workspace of await ports.db.workspace.findMany()) await registerBuiltins(ports, workspace.id);
       const loop = async () => { try { await reconcile(); } finally { if (!stopped) poll = timers.setTimeout(() => { void loop().catch(() => {}); }, 30_000); } };
       await loop();
     },

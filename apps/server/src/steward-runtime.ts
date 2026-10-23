@@ -100,7 +100,9 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
-    sandbox: options.sandbox ?? sandbox, moduleBuildResources, chatTimeoutMs: options.chatTimeoutMs,
+    sandbox: options.sandbox ?? sandbox, moduleBuildResources,
+    moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
+    chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;

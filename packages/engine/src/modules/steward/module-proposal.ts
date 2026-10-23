@@ -9,7 +9,7 @@ import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal
 import { snapshotModule } from "./module-files";
 
 type Manifest = z.output<typeof moduleManifestSchema>;
-type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
+type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource | "builtin"; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
@@ -67,7 +67,7 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
-  const module = await db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, createdAt: ports.now() }, update: {} });
+  const module = await db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: submission.source === "builtin", createdAt: ports.now() }, update: submission.source === "builtin" ? { builtin: true } : {} });
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);
@@ -81,10 +81,16 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
 }
 /** Proposals are read only from an explicitly supplied build or session directory. */
 export async function propose(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string }, source: ModuleSource): Promise<Proposal> {
+  if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
+  return submitProposal(context, input, source);
+}
+/** Only the release-resource registrar may submit trusted built-in code. */
+export async function proposeBuiltin(context: ModuleContext, root: string, dir: string) {
+  return submitProposal(context, { root, dir, intent: { changes: ["Chrona built-in release"], preserves: [] } }, "builtin");
+}
+async function submitProposal(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string }, source: ModuleSource | "builtin"): Promise<Proposal> {
   const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
-  // Validate runtime callers too, without an impossible comparison on the typed union.
-  if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
   const files = await snapshotModule(input.root, input.dir);
   const digest = createHash("sha256");
   for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");

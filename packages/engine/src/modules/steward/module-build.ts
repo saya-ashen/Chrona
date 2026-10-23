@@ -7,6 +7,7 @@ import { createNotifications } from "./notify";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
 import { tryAutoActivate } from "./module-auto";
+import { activateIn } from "./module-generation";
 import { settleBuildVersion } from "./module-build-lane";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { readModuleFiles, codeDifference, continuityPreview, insertCodeDiff } from "./module-preview";
@@ -43,7 +44,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   }
   await expireModuleApprovals(context, module.id);
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
-  const automatic = await tryAutoActivate(context, version, report, card);
+  const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
   if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
@@ -75,6 +76,20 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     const status = passed ? "pending_review" : "rejected";
     await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
     if (!passed) return { moduleId: module.id, hash, status, report };
+    if (version.source === "builtin") {
+      const activated = await db.$transaction(async tx => {
+        const current = await requireModule(context, tx, module.id);
+        const previous = await tx.moduleVersion.findFirst({ where: { moduleId: module.id, source: "builtin", id: { not: version.id } }, orderBy: { createdAt: "desc" } });
+        if (current.status === "migrating" || (current.activeHash !== null && current.activeHash !== previous?.hash) || needsMigration) return false;
+        await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
+        await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
+        await activateIn(context, tx, module.id, hash, "activate");
+        return true;
+      });
+      if (activated) return { moduleId: module.id, hash, status: "approved", report };
+      await createNotifications(context.ports, workspaceId).enqueue({ moduleId: module.id, level: "web", title: `内置模块 ${module.name} 有新版本`, body: "已保留当前版本；新内置版本可在模块历史中审查启用。", dedupeKey: `builtin:${module.id}:${hash}` });
+      // Candidates use the same review/activation gateway as user proposals.
+    }
     return await requestReview(context, { version, module, report, files, needsMigration });
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
