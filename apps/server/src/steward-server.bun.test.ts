@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createServerApp as createApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
-const createServerApp = () => createApp({ steward: createStewardRuntime(db, { provider: null, chatTransport: null }) });
+const createServerApp = () => createApp({ steward: createStewardRuntime(db, { provider: null }) });
 import { resetEnvCacheForTests } from "./config/env";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
@@ -64,7 +64,7 @@ test("legacy routes and the disabled test seam are absent", async () => {
 
 test("gated local test inbox is owner protected, validated and feeds the local_test connector", async () => {
   process.env.CHRONA_E2E_TEST_ROUTES = "1";
-  const runtime = createStewardRuntime(db, { provider: null, chatTransport: null });
+  const runtime = createStewardRuntime(db, { provider: null });
   const app = await createApp({ steward: runtime });
   const post = (body: unknown, headers: Record<string, string> = owner) => app.request("/api/steward-e2e/local-test-items", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) });
   const item = { externalId: "m1", from: "a@shop.example", subject: "Order", body: "shipped", receivedAt: "2026-10-21T08:00:00.000Z" };

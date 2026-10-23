@@ -84,7 +84,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       if (contentDir) await mkdir(contentDir, { recursive: true });
       const httpDir = instance.manifest.listen ? join(instance.dir, "http") : undefined;
       if (httpDir) await mkdir(httpDir, { mode: 0o700 });
-      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
+      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
       instance.process = process;
       const exited = process.exited.then(() => { throw new Error("Module process exited"); });
       void exited.catch(() => {});
@@ -163,7 +163,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
         const dynamic = event.trigger.kind === "schedule" && event.trigger.scheduleId !== undefined && event.trigger.payload !== undefined;
         if (dynamic) {
           if (!module.builtin || !instance.manifest.dynamicSchedules || !await ports.db.schedule.findFirst({ where: { id: event.trigger.kind === "schedule" ? event.trigger.scheduleId : undefined, moduleId, mode: "module" } })) throw new Error("Dynamic schedule requires a built-in module declaring dynamicSchedules");
-        } else if (event.trigger.kind === "content_edit" ? !instance.manifest.content : event.trigger.kind === "tool" ? !instance.manifest.tools.some(tool => tool.name === event.trigger.id) : !instance.manifest.triggers.some(trigger => trigger.id === event.trigger.id)) throw new Error("Module trigger missing");
+        } else if (event.trigger.kind === "content_edit" ? !instance.manifest.content : event.trigger.kind === "deliver" ? !instance.manifest.channel : event.trigger.kind === "tool" ? !instance.manifest.tools.some(tool => tool.name === event.trigger.id) : !instance.manifest.triggers.some(trigger => trigger.id === event.trigger.id)) throw new Error("Module trigger missing");
         await (instance.start ??= start(instance));
         const workspace = instance.manifest.model ? await ports.db.workspace.findUniqueOrThrow({ where: { id: module.workspaceId } }) : null;
         const timeoutMs = workspace ? moduleModelSettings(workspace.settings)?.timeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs;

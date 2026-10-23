@@ -33,7 +33,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as Record<string, string>)[call.method];
+      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", channel: "owner", secret: "owner" } as Record<string, string>)[call.method];
       let reply: unknown;
       if (!capability || !manifest.effects.includes(capability)) reply = { error: { code: "undeclared", message: "Undeclared capability" } };
       else {
@@ -41,7 +41,8 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
         const duplicate = call.params.key !== undefined && seen.has(key);
         if (call.params.key !== undefined) seen.add(key);
         if (duplicate) reply = { result: { status: "duplicate" } };
-        else if (call.method === "notify" || call.method === "wakeProvider") reply = { result: { status: "executed" } };
+        else if (call.method === "notify" || call.method === "wakeProvider" || (call.method === "channel" && !stubs.channel)) reply = { result: { status: "executed" } };
+        else if (call.method === "secret" && !stubs.secret) reply = { error: { code: "unconfigured", message: "No secrets in tests" } };
         else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : call.method === "owner" ? { status: 200, body: null } : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       }
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
@@ -58,11 +59,11 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       buffer += chunk.toString();
       let end: number;
       while ((end = buffer.indexOf("\n")) >= 0) {
-        if (end > 2 * 1024 * 1024) { client.destroy(); return; }
+        if (end > 32 * 1024 * 1024) { client.destroy(); return; }
         const text = buffer.slice(0, end); buffer = buffer.slice(end + 1);
         void line(text).catch(() => client.destroy());
       }
-      if (buffer.length > 2 * 1024 * 1024) client.destroy();
+      if (buffer.length > 32 * 1024 * 1024) client.destroy();
     });
     client.on("error", fail); client.on("close", fail); connect();
   });

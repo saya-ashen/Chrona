@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, parseApprovalDecision, qqBotConfig, type ApprovalDecision, type QqChatPort } from "./qq-official-bot";
-import { createQqTokenSource } from "./qq-official";
+import { createChronaQqDelivery, createQqBotHandler, createQqBotState, createQqPassiveReplies, parseApprovalDecision, type ApprovalDecision, type QqChatPort } from "./builtin/qq/bot";
+import { createQqTokenSource } from "./builtin/qq/official";
 const APP = "1905797537";
 let dir: string, at: Date;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "qq-bot-")); at = new Date("2026-10-15T08:00:00Z"); });
@@ -22,10 +22,6 @@ function harness(options: { run?: QqChatPort["handleMessage"]; timers?: Pick<typ
   const bind = async () => { await say("U1", `绑定 ${(await state.createChallenge({ workspaceId: "ws", now: at })).code}`); replies.length = 0; };
   return { state, replies, calls, outbox, say, bind, decisions };
 }
-test("configuration requires numeric app and state directory", () => {
-  expect(qqBotConfig({ CHRONA_QQ_APP_ID: APP, CHRONA_DATA_DIR: "/data" })?.stateDir).toBe(`/data/qq-bot/${APP}`);
-  expect(qqBotConfig({ CHRONA_QQ_APP_ID: "bad" })).toBeNull();
-});
 test("unbound and non-owner cannot reach concierge; stranger rate limit preserves help", async () => {
   const h = harness();
   await h.say("U2", "需求"); await h.say("U2", "进度"); await h.say("U2", "帮助");

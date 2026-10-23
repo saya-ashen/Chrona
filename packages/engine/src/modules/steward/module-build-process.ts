@@ -18,6 +18,8 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
       if (!manifest.effects.includes(MODULE_METHODS[call.method])) return { id: call.id, error: { code: "undeclared", message: "Undeclared capability" } };
       if (call.method === "model") return { id: call.id, result: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       if (call.method === "owner") return { id: call.id, result: { status: 503, body: { error: "Owner API unavailable during build" } } };
+      if (call.method === "channel") return { id: call.id, result: { status: "executed" } };
+      if (call.method === "secret") return { id: call.id, error: { code: "unconfigured", message: "No secrets during build" } };
       const key = `${call.method}:${call.params.key}`, duplicate = seen.has(key);
       seen.add(key);
       return { id: call.id, result: { status: duplicate ? "duplicate" : "executed" } };

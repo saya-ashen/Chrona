@@ -37,6 +37,14 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.get("/health", async c => c.json(s.healthSchema.parse(await c.get("steward").health())));
   providerRoutes(router);
   router.post("/chat", async c => c.json(s.chatReplySchema.parse(await c.get("steward").chat.handleMessage({ channel: "in_app", ...s.chatInputSchema.parse(await c.req.json()) }))));
+  router.post("/chat/attachments", async c => {
+    const input = s.chatAttachmentInputSchema.parse(await c.req.json());
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.base64)) throw new StewardError("invalid", "Attachment must be base64");
+    return c.json(await c.get("steward").chat.intakeAttachment({ name: input.name, mime: input.mime, bytes: Buffer.from(input.base64, "base64") }));
+  });
+  router.get("/chat/runs/:id", async c => c.json(z.object({ done: z.boolean(), items: s.messageSchema.array() }).parse(await c.get("steward").chat.runReplies(c.req.param("id")))));
+  router.post("/messages", async c => c.json(await c.get("steward").chat.recordMessage(s.recordMessageSchema.parse(await c.req.json()))));
+  router.patch("/messages/:id", async c => c.json(await c.get("steward").chat.setExternalId(c.req.param("id"), s.updateMessageSchema.parse(await c.req.json()).externalId)));
   router.get("/sessions", async c => c.json({ items: s.sessionSchema.array().parse(await c.get("steward").sessions.list({ source: c.req.query("source"), status: c.req.query("status") })) }));
   router.post("/sessions/new", async c => c.json(s.sessionSchema.parse(await c.get("steward").sessions.new(s.newSessionSchema.parse(await c.req.json())))));
   router.get("/sessions/:id", async c => c.json(s.sessionSchema.parse(await c.get("steward").sessions.get(c.req.param("id")))));
@@ -81,6 +89,7 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.get("/modules", async c => c.json({ items: await c.get("steward").modules.list() }));
   router.get("/modules/tools", async c => c.json(s.moduleToolListSchema.parse(await c.get("steward").modules.tools())));
   router.post("/modules/tools/:name", async c => c.json(await c.get("steward").modules.callTool(c.req.param("name"), await c.req.json())));
+  router.post("/notifications", async c => c.json(s.notificationSchema.parse(await c.get("steward").notifications.enqueue({ level: "now", ...s.createNotificationSchema.parse(await c.req.json()) }))));
   router.get("/notifications", async c => c.json({ items: await c.get("steward").notifications.list() }));
   router.post("/notifications/:id/feedback", async c => c.json(await c.get("steward").notifications.recordFeedback(c.req.param("id"), z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict().parse(await c.req.json()).feedback)));
   router.post("/notifications/:id/retry", async c => c.json(await c.get("steward").notifications.retry(c.req.param("id"))));

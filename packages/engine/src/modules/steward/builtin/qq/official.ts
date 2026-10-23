@@ -1,5 +1,3 @@
-import { readFile, stat } from "node:fs/promises";
-
 /**
  * Chrona's own QQ official bot transport: access token, REST sends and the WebSocket
  * gateway (private C2C messages only). Protocol per the QQ bot v2 docs and the working
@@ -7,7 +5,7 @@ import { readFile, stat } from "node:fs/promises";
  * gateway op 10 Hello → op 2 Identify | op 6 Resume, op 0 READY/RESUMED/dispatch,
  * op 1/11 heartbeat, op 7 reconnect, op 9 invalid session.
  *
- * The AppSecret is read from a protected file only when a token is needed and is never
+ * The AppSecret is fetched from Chrona (`secret`) only when a token is needed and is never
  * logged, returned or stored beyond that call. Logs carry fixed event names, numbers and
  * the public AppID only — never tokens, message text or openids.
  */
@@ -26,14 +24,6 @@ type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export class QqTransportError extends Error {}
 
-/** Reads a secret only if it is a private regular file of this user (mode 600). */
-export async function readProtectedSecret(path: string): Promise<string> {
-  const info = await stat(path);
-  if (!info.isFile() || (info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid())) throw new QqTransportError("Secret file must be a private file owned by this user");
-  const secret = (await readFile(path, "utf8")).trim();
-  if (!secret || /\s/.test(secret)) throw new QqTransportError("Secret file is empty or malformed");
-  return secret;
-}
 
 export function createQqTokenSource({ appId, readSecret, fetch = globalThis.fetch, now = Date.now, log = () => {} }: { appId: string; readSecret: () => Promise<string>; fetch?: Fetch; now?: () => number; log?: QqLog }) {
   let token: string | null = null, expiresAt = 0, inflight: Promise<string> | null = null;

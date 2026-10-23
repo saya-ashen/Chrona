@@ -5,7 +5,7 @@ import { keyProbePreview, probeKeys, smokeRun } from "./module-probe";
 import { testModuleProcess } from "./module-test-process";
 
 const schedule = { id: "daily", schedule: { kind: "daily" as const, time: "09:00" } };
-const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ dynamicSchedules: false, content: false, name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
+const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ dynamicSchedules: false, content: false, secrets: [], name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
 function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[] = []) {
   const peer = testModuleProcess(async (event, call) => {
     inputs.push(event);

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 type Language = "python" | "shell" | "typescript";
 export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number };
-type ModuleDirs = { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; socketPath?: string };
+type ModuleDirs = { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; socketPath?: string; env?: Record<string, string> };
 function executable(path: string | null | undefined): string | null {
   try { if (!path) return null; accessSync(path, constants.X_OK); return realpathSync(path); } catch { return null; }
 }
@@ -58,8 +58,10 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     const socket = dirs.socketPath ? resolve(dirs.socketPath) : undefined;
     if (socket && !statSync(socket).isSocket()) throw new Error("Invalid module socket");
     const http = dirs.httpDir ? directory(dirs.httpDir) : undefined;
+    // Only non-secret CHRONA_* settings (e.g. CHRONA_PUBLIC_URL) pass through.
+    const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key)));
     if (!isolated) {
-      const env = { PATH: process.env.PATH ?? paths.map(dirname).join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
+      const env = { ...extra, PATH: process.env.PATH ?? paths.map(dirname).join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
         CHRONA_MODULE: code, CHRONA_DATA: data, ...(content ? { CHRONA_CONTENT: content } : {}), ...(socket ? { CHRONA_SOCKET: socket } : {}), ...(http ? { CHRONA_HTTP_SOCKET: join(http, "s") } : {}) };
       const [file, ...args] = command(entry, code);
       // Own process group, so kill() also ends anything the module started.
@@ -69,7 +71,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       .sort((a, b) => a.split(sep).length - b.split(sep).length);
     // A private root supplies mount points without creating anything on the host; it is frozen read-only before exec.
     const root = readdirSync("/").filter(name => !["module", "data", "content", "chrona", "node_modules", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
-    const env = { PATH: paths.map(dirname).join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
+    const env = { ...extra, PATH: paths.map(dirname).join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
       ...(socket ? { CHRONA_SOCKET: "/chrona/chrona.sock" } : {}), ...(http ? { CHRONA_HTTP_SOCKET: "/chrona/http/s" } : {}) };
     const profile = ["--unshare-all", ...(network ? ["--share-net"] : []), "--die-with-parent", "--new-session", "--tmpfs", "/", ...root,
       "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]), "--proc", "/proc", "--dev", "/dev", ...paths.flatMap(p => ["--ro-bind", p, p]),
@@ -84,8 +86,8 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
   }
   return {
     health: { available, isolated },
-    startModule({ codeDir, dataDir: moduleData, contentDir, httpDir, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; entry: string; socketPath: string; network?: boolean }) {
-      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir, httpDir, socketPath }, entry, network);
+    startModule({ codeDir, dataDir: moduleData, contentDir, httpDir, env, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean }) {
+      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir, httpDir, socketPath, env }, entry, network);
       child.stdin!.end();
       child.stdout!.resume();
       let errors = Buffer.alloc(0);

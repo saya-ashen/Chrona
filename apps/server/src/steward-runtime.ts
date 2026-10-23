@@ -1,13 +1,14 @@
 import { startRescueListener } from "./rescue";
-import { createStewardRoutes } from "./routes/steward.routes";
-import { readEnv } from "./config/env";
+import { migrateQqState } from "./qq-state-migration";
+import { readProtectedSecret } from "../../../packages/integrations/src/steward/protected-secret";
+import { ownerApi } from "./owner-api";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@chrona/db";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
-import { moduleSupervisor, createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
-import type { DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
+import { moduleChannel, moduleSupervisor, createStewardService, type StewardPorts } from "@chrona/engine";
+import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createPiModelGateway } from "../../../packages/integrations/src/steward/pi-model-gateway";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
@@ -17,10 +18,6 @@ import { createEmailConnector } from "../../../packages/integrations/src/steward
 import { createLocalTestSource } from "../../../packages/integrations/src/steward/local-test-source";
 import { createChinoServiceHealthSource } from "../../../packages/integrations/src/steward/chino-health-source";
 
-export type StewardChatTransport = {
-  delivery: DeliveryAdapter; bound(): Promise<boolean>;
-  start(service: StewardService, wake: () => void): Promise<void>; stop(): Promise<void>;
-};
 function publicOrigin(): string | null {
   try {
     const url = new URL(process.env.CHRONA_PUBLIC_URL ?? "");
@@ -41,7 +38,7 @@ function resourcePath(relative: string, source = relative): string {
 }
 type RuntimeOptions = {
   now?: () => Date; onError?: () => void; port?: number; provider?: ProviderAdapter | null;
-  dataDir?: string; chatTransport?: StewardChatTransport | null; tickSeconds?: number; chatTimeoutMs?: number;
+  dataDir?: string; tickSeconds?: number; chatTimeoutMs?: number;
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
@@ -59,18 +56,10 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
 }
-function configuredTransport(db: PrismaClient, options: RuntimeOptions): StewardChatTransport | null {
-  let qq: Promise<StewardChatTransport | null> | undefined;
-  const loadQq = () => qq ??= import("./steward-qq-bot").then(({ createStewardQqBot }) => createStewardQqBot({ db, publicUrl: publicOrigin(), now: options.now }));
-  // Do not load optional QQ dependencies or inspect its state when unconfigured.
-  if (options.chatTransport !== undefined) return options.chatTransport;
-  if (!process.env.CHRONA_QQ_APP_ID || !process.env.CHRONA_QQ_SECRET_FILE) return null;
-  return {
-    delivery: { channel: "chrona_qqbot", async send(input) { const bot = await loadQq(); return bot ? bot.delivery.send(input) : { outcome: "rejected", retryable: false, error: "QQ unconfigured" }; } },
-    bound: async () => Boolean(await (await loadQq())?.bound()),
-    start: async (service, wake) => { await (await loadQq())?.start(service, wake); },
-    stop: async () => { if (qq) await (await qq)?.stop(); },
-  };
+/** Kernel-held module credentials (manifest `secrets`); read from protected files only when asked. */
+async function configuredSecret(name: string) {
+  const appId = process.env.CHRONA_QQ_APP_ID?.trim(), file = process.env.CHRONA_QQ_SECRET_FILE?.trim();
+  return name === "qq_bot" && appId && file ? { appId, clientSecret: await readProtectedSecret(file) } : null;
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
@@ -83,7 +72,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});
     return handle;
   } } : undefined;
-  const transport = configuredTransport(db, options);
   const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
   const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
   const sandbox: StewardPorts["sandbox"] = {
@@ -102,13 +90,16 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       agentUrl: "", workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
     }),
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
-    deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
-    chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
+    // QQ is the built-in qq module's channel: bound once it reports an owner binding.
+    deliveries: [createInAppDelivery(), { channel: "chrona_qqbot", send: message => qq.delivery.send(message) }],
+    chat: { channel: "chrona_qqbot", bound: () => qq.bound() },
+    secrets: configuredSecret,
     sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
+  const qq = moduleChannel(ports, "chrona_qqbot");
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;
@@ -127,20 +118,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return running;
   }
   function wake() { void tickOnce(); }
-  let ownerRoutes: ReturnType<typeof createStewardRoutes> | undefined;
-  ports.owner = async (workspaceId, { method, path, body }) => {
-    ownerRoutes ??= createStewardRoutes(ports, service, wake);
-    const url = new URL(path, "http://owner");
-    url.searchParams.set("workspaceId", workspaceId);
-    const key = readEnv().API_KEY, headers = new Headers(key ? { authorization: `Bearer ${key}` } : {});
-    if (body !== undefined) headers.set("content-type", "application/json");
-    const response = await ownerRoutes.request(url.pathname + url.search, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
-    const text = await response.text();
-    // The module's channel drops lines over 2 MiB.
-    if (text.length > 1_000_000) return { status: 413, body: { code: "TOO_LARGE" } };
-    try { return { status: response.status, body: text ? JSON.parse(text) : null }; }
-    catch { return { status: response.status, body: null }; }
-  };
+  ports.owner = ownerApi(ports, service, wake);
   return {
     ports, service, tickOnce, wake, localTest,
     /** HTTP socket of the module declaring `listen: path`, or null. */
@@ -156,8 +134,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
       rescue ??= startRescueListener(ports, service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
-      void moduleSupervisor(ports).start().catch(() => options.onError?.());
-      void transport?.start(service, wake).catch(() => options.onError?.());
+      void moduleSupervisor(ports).start().then(() => migrateQqState(db, ports.dataDir)).catch(() => options.onError?.());
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
       wake();
@@ -171,7 +148,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       await moduleSupervisor(ports).stop();
       await running;
       await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.done; }));
-      await transport?.stop();
     },
   };
 }

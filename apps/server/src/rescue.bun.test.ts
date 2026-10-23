@@ -6,7 +6,8 @@ import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { createStewardRoutes } from "./routes/steward.routes";
-import { approvalResolver } from "./steward-qq-bot";
+import { createRelay } from "@chrona/engine/test-support";
+import { ownerApi } from "./owner-api";
 import { resetEnvCacheForTests } from "./config/env";
 import { buildArtifacts } from "../../../build/manifest";
 
@@ -80,7 +81,10 @@ test("HTTP, MCP and QQ cannot resolve rescue-only approvals", async () => {
     expect(response.status).toBe(403);
     expect((await response.json()).message).toContain("rescue console");
     const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
-    expect(await approvalResolver(f.service)(binding, { ref: approval.id, decision: "approve", scope: "once" })).toContain("救援控制台");
+    // The qq module resolves through the owner API, as an entry: refused.
+    const owner = ownerApi(f.ports, f.service, () => {});
+    const relay = createRelay({ owner: request => owner("ws_default", request), publicUrl: null, download: async () => { throw new Error("unused"); } });
+    expect(await relay.resolveApproval(binding, { ref: approval.id, decision: "approve", scope: "once" })).toContain("救援控制台");
     expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(1);
   } finally {
     if (saved === undefined) delete process.env.API_KEY; else process.env.API_KEY = saved;

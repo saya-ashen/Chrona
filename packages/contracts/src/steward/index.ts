@@ -122,6 +122,10 @@ export const moduleManifestSchema = z.object({
    * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
    */
   listen: z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/).optional(),
+  /** Delivers this channel's notifications (`deliver` events) and reports readiness with `channel`; requires `owner`. */
+  channel: z.literal("chrona_qqbot").optional(),
+  /** Kernel-held credentials this module may read with `secret` (e.g. qq_bot); requires `owner`. */
+  secrets: z.array(z.string().regex(/^[a-z][a-z0-9_]{1,40}$/)).max(5).default([]),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
   dynamicSchedules: z.boolean().default(false),
   /** Required with the `model` effect; bounded by the user's `moduleModel` setting. */
@@ -141,6 +145,8 @@ export const moduleManifestSchema = z.object({
   });
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
+  if ((manifest.channel || manifest.secrets.length) && !manifest.effects.includes("owner")) ctx.addIssue({ code: "custom", path: ["effects"], message: "channel and secrets require the owner capability" });
+  if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (manifest.listen && RESERVED_LISTEN_PATHS.some(path => manifest.listen === path || manifest.listen!.startsWith(`${path}-`))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (manifest.effects.includes("model") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the model effect is declared" });
@@ -170,6 +176,11 @@ export const moduleEventSchema = z.object({
     z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()) }).strict(),
     /** The user or the Provider changed files in this module's content area (`id` is always "content"). */
     z.object({ kind: z.literal("content_edit"), id: z.literal("content"), firedAt: iso, paths: z.array(relativePathSchema).min(1).max(200), by: z.enum(["user", "provider"]) }).strict(),
+    /** One outbox notification for the module's `channel`; `result` must be a DeliveryOutcome. Budget, quiet hours and retries stay with Chrona. */
+    z.object({ kind: z.literal("deliver"), id: z.literal("deliver"), firedAt: iso, message: z.object({
+      idempotencyKey: z.string().max(500), title: z.string().max(200), body: z.string().max(4000), link: z.string().max(2000).nullable(), recipient: z.string().max(200).nullable(),
+      approval: z.object({ id: z.string().max(128), scoped: z.boolean() }).strict().optional(),
+    }).strict() }).strict(),
   ]),
   now: iso,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
@@ -179,7 +190,7 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /** Kernel methods and the capability each needs. */
-export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", channel: "owner", secret: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   z.object({ id: channelId, method: z.literal("notify"), params: z.object({ key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict() }).strict(),
   z.object({ id: channelId, method: z.literal("wakeProvider"), params: z.object({ key: z.string().min(1).max(200), prompt: text.max(4000) }).strict() }).strict(),
@@ -194,14 +205,20 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
     path: z.string().max(2000).regex(/^\/[A-Za-z0-9_\-./?=&%:~+,]*$/).refine(path => !path.split("?")[0]!.split("/").includes(".."), "No .. segments"),
     body: z.json().optional(),
   }).strict() }).strict(),
+  /** Channel modules: whether notifications can be delivered now (e.g. QQ owner bound); unready routes them to the web. */
+  z.object({ id: channelId, method: z.literal("channel"), params: z.object({ ready: z.boolean() }).strict() }).strict(),
+  /** A credential the manifest lists in `secrets`; never logged or stored by Chrona's module records. */
+  z.object({ id: channelId, method: z.literal("secret"), params: z.object({ name: z.string().max(41) }).strict() }).strict(),
 ]);
 export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal", "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   z.object({ status: z.enum(["executed", "duplicate"]) }).strict(),
   /** `model` replies: the completion is untrusted data. */
   z.object({ text: z.string(), inputTokens: z.number().int().min(0).nullable(), outputTokens: z.number().int().min(0).nullable() }).strict(),
-  /** `owner` replies: the HTTP status and JSON body the route returned. */
+  /** `owner` replies: the HTTP status and JSON body the route returned (non-JSON bodies as { contentType, base64 }). */
   z.object({ status: z.number().int().min(100).max(599), body: z.json() }).strict(),
+  /** `secret` replies. */
+  z.object({ value: z.record(z.string(), z.string()) }).strict(),
 ]) }).strict()
   .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
@@ -365,7 +382,20 @@ export const todayViewSchema = z.object({
 // ------------------------------------------------------------- requests ----
 
 /** Without `sessionId`, the active session for `key` is used (created if missing); without both, a new web session. */
-export const chatInputSchema = z.object({ text: z.string().max(8000), sessionId: id.optional(), key: z.string().max(200).optional() }).strict();
+export const chatInputSchema = z.object({
+  text: z.string().max(8000), sessionId: id.optional(), key: z.string().max(200).optional(),
+  /** Entry modules: their channel, the transport's message id (deduplicates redelivery) and the quoted message's externalId. */
+  channel: z.enum(DELIVERY_CHANNELS).optional(), externalId: z.string().min(1).max(1000).optional(), quotedExternalId: z.string().min(1).max(1000).optional(),
+  /** From POST /chat/attachments. */
+  attachments: z.array(attachmentSchema.extend({ base64: z.string().max(7_000_000).optional() }).strict()).max(10).optional(),
+}).strict();
+/** One received file (entry modules); stored in files/uploads. */
+export const chatAttachmentInputSchema = z.object({ name: z.string().min(1).max(300), mime: z.string().max(100), base64: z.string().max(21_000_000) }).strict();
+/** Records an outbound message an entry module delivered outside a chat reply (e.g. a notification), or its transport id. */
+export const recordMessageSchema = z.object({ key: z.string().min(1).max(200), channel: z.enum(DELIVERY_CHANNELS), text: z.string().max(8000), externalId: z.string().min(1).max(1000) }).strict();
+export const updateMessageSchema = z.object({ externalId: z.string().min(1).max(1000) }).strict();
+/** Entry modules: a message that missed the conversation (e.g. QQ's reply window closed), through the normal budget. */
+export const createNotificationSchema = z.object({ title: text.max(200), body: text.max(4000), dedupeKey: z.string().min(1).max(500), sessionId: id.optional(), recipient: z.string().max(200).optional() }).strict();
 export const chatReplySchema = z.object({ runId: id.nullable(), sessionId: id, messages: z.array(messageSchema) }).strict();
 /** Ends the active session for `key` (QQ `/new`); the next message starts a new one. */
 export const newSessionSchema = z.object({ key: z.string().min(1).max(200) }).strict();
@@ -396,6 +426,8 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  * All under /api/steward, owner-only, `?workspaceId=` on every request. Lists return `{ items: T[] }`.
  *   GET  /today                                   -> TodayView
  *   POST /chat (ChatInput)                        -> ChatReply (waits for the foreground run's replies, up to ~2 min)
+ *   POST /chat/attachments (ChatAttachmentInput)  -> Attachment & {base64?} (image ≤5 MB inline) ; GET /chat/runs/:id -> {done, items: Message[]} (replies not yet delivered by a transport)
+ *   POST /messages (RecordMessage) -> {ok} ; PATCH /messages/:id (UpdateMessage) -> {ok} (outbound only)
  *   GET  /sessions?source=&status= | POST /sessions/new (NewSession) -> {items: Session[]} | Session
  *   GET  /sessions/:id | PATCH (UpdateSession)    -> Session
  *   GET  /sessions/:id/messages?limit=            -> {items: Message[]}
@@ -411,7 +443,7 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /schedules | POST (CreateSchedule, wake origin = ?sessionId) ; PATCH /schedules/:id (UpdateSchedule)
  *   GET  /approvals?status= ; POST /approvals/:id/resolve (ResolveApproval) -> Approval
  *   GET  /settings | PATCH ; GET /grants | POST ; POST /grants/:id/revoke ; GET /preferences | POST | DELETE /preferences/:id
- *   GET  /notifications ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
+ *   GET  /notifications | POST (CreateNotification, level now) ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
  *   GET  /modules                                 -> {items: object[]} (modules, versions and recent runs; engine-shaped)
  *   GET  /modules/tools                           -> ModuleToolList ; POST /modules/tools/:name (arguments) -> {result}

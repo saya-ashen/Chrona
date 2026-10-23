@@ -1,18 +1,16 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { REF_ALPHABET, type DeliveryAdapter, type DeliveryMessage, type DeliveryOutcome } from "@chrona/contracts/steward";
-import { qqButtons, sendQqC2c, type QqC2cMessage, type QqKeyboard, type QqLog, type QqSendOutcome, type QqTokenSource } from "./qq-official";
+import { qqButtons, sendQqC2c, type QqC2cMessage, type QqKeyboard, type QqLog, type QqSendOutcome, type QqTokenSource } from "./official";
+
+// Built-in modules run standalone: these mirror Chrona's contract (REF_ALPHABET, the deliver event and its outcome).
+const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; approval?: { id: string; scoped: boolean } };
+export type DeliveryOutcome = { outcome: "accepted"; receiptRef: string | null } | { outcome: "rejected"; retryable: boolean; error: string } | { outcome: "uncertain"; error: string };
 
 export const DEDICATED_PLATFORM = "chrona_qq";
 export const DEDICATED_CHANNEL = "chrona_qqbot";
 const OPENID = /^[A-Za-z0-9_-]{1,128}$/;
-export function qqBotConfig(env: Record<string, string | undefined> = process.env) {
-  const appId = env.CHRONA_QQ_APP_ID?.trim() ?? "";
-  if (!/^\d{5,20}$/.test(appId)) return null;
-  const stateDir = env.CHRONA_QQ_STATE_DIR?.trim() || (env.CHRONA_DATA_DIR?.trim() ? join(env.CHRONA_DATA_DIR.trim(), "qq-bot", appId) : "");
-  return stateDir ? { appId, stateDir, secretFile: env.CHRONA_QQ_SECRET_FILE?.trim() || null } : null;
-}
 export type QqBinding = { version: 1; appId: string; openid: string; workspaceId: string; boundAt: string };
 type Challenge = { appId: string; workspaceId: string; codeSha256: string; expiresAt: string; attemptsLeft: number; replace: boolean };
 async function readJson<T>(path: string): Promise<T | null> {
@@ -204,9 +202,9 @@ async function sendWithButtons(plain: (content: string) => Promise<QqSendOutcome
 /** Active sends are only called by the notification outbox. */
 export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, fetch, send = sendQqC2c, perMinute = 10, now = Date.now }: {
   tokens: QqTokenSource; allowedRecipients: () => ReadonlySet<string>; publicUrl?: string | null; fetch?: (input: string, init?: RequestInit) => Promise<Response>; send?: typeof sendQqC2c; perMinute?: number; now?: () => number;
-}): DeliveryAdapter & { idempotent: false } {
+}) {
   const sent = new Map<string, number[]>();
-  return { channel: DEDICATED_CHANNEL, idempotent: false, async send(message): Promise<DeliveryOutcome> {
+  return { channel: DEDICATED_CHANNEL, async send(message: DeliveryMessage): Promise<DeliveryOutcome> {
     const allowed = allowedRecipients();
     const recipient = message.recipient ?? (allowed.size === 1 ? [...allowed][0]! : "");
     const openid = recipient.startsWith(`${DEDICATED_PLATFORM}:`) ? recipient.slice(DEDICATED_PLATFORM.length + 1) : "";

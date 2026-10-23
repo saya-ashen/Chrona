@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 export type Trigger = { kind: "schedule"; id: string; firedAt: string }
   | { kind: "inbound"; id: string; firedAt: string; item: { externalId: string; from: string; subject: string; receivedAt: string; body: string } }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown> }
-  | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" };
+  | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
+  | { kind: "deliver"; id: "deliver"; firedAt: string; message: { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; approval?: { id: string; scoped: boolean } } };
 type EventResult = { handled?: boolean; result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
@@ -15,7 +16,7 @@ export class ModelError extends Error {
 }
 const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
 const socket = createConnection(process.env.CHRONA_SOCKET ?? "/chrona/chrona.sock");
-let stopped = false, buffer = Buffer.alloc(0), queue = Promise.resolve();
+let stopped = false, queue = Promise.resolve();
 function fail() {
   stopped = true;
   for (const call of pending.values()) call.reject(new Error("Chrona disconnected"));
@@ -32,13 +33,15 @@ async function event(message: { id: string; event: { trigger: Trigger; now: stri
     send({ id: message.id, result: result ?? {} });
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000) }); }
 }
+// Lines may carry attachments (up to 32 MiB); collect chunks instead of re-copying the buffer.
+const MAX_LINE = 32 * 1024 * 1024;
+let parts: Buffer[] = [], size = 0;
 socket.on("data", (chunk: Buffer) => {
-  buffer = Buffer.concat([buffer, chunk]);
-  let end: number;
-  while ((end = buffer.indexOf(10)) !== -1) {
-    if (end > 2 * 1024 * 1024) { socket.destroy(); return; }
-    const text = buffer.subarray(0, end).toString("utf8");
-    buffer = buffer.subarray(end + 1);
+  let start = 0, end: number;
+  while ((end = chunk.indexOf(10, start)) !== -1) {
+    if (size + end - start > MAX_LINE) { socket.destroy(); return; }
+    const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
+    parts = []; size = 0; start = end + 1;
     try {
       const message = JSON.parse(text);
       if (message.event) queue = queue.then(() => event(message)).catch(() => { socket.destroy(); });
@@ -51,7 +54,8 @@ socket.on("data", (chunk: Buffer) => {
       }
     } catch { socket.destroy(); return; }
   }
-  if (buffer.length > 2 * 1024 * 1024) socket.destroy();
+  if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
+  if (size > MAX_LINE) socket.destroy();
 });
 export function on<K extends Trigger["kind"]>(kind: K, handler: (event: Extract<Trigger, { kind: K }> & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>) {
   handlers.set(kind, handler as Handler);
@@ -76,6 +80,10 @@ export const chrona = {
   paths,
   /** Owner API (`owner` capability): one request of Chrona's /api/steward HTTP map, as the user. */
   owner: (params: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown }) => call<OwnerResult>("owner", params),
+  /** Channel modules: whether notifications can be delivered now (`owner`, manifest `channel`). */
+  channel: (params: { ready: boolean }) => call("channel", params),
+  /** A credential listed in the manifest's `secrets` (`owner`). Never log or store it. */
+  secret: (params: { name: string }) => call<{ value: Record<string, string> }>("secret", params),
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
   serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
   model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => call<ModelResult>("model", params),

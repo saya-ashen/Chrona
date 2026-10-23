@@ -1,6 +1,6 @@
 # v2-4 规格：交互入口模块化与不可变救援控制台
 
-状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）已实现；v2-4d/e（`qq`、`web`）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
+状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）、v2-4d（内置 `qq` 模块）已实现；v2-4e（`web`）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 目标
@@ -29,8 +29,9 @@
   "name": "qq",
   "entry": "index.ts",
   "keepAlive": true,
-  "listen": null,
-  "effects": ["owner", "network", "secret:qq_bot"],
+  "channel": "chrona_qqbot",
+  "secrets": ["qq_bot"],
+  "effects": ["owner", "network"],
   "data": { "schema": 1 },
   "tests": ["test.ts"]
 }
@@ -38,7 +39,8 @@
 
 - `keepAlive: true`：保持 QQ 长连接等外连。
 - `listen: "/api/mcp"`：模块在 `/chrona/http/s`（unix socket）上运行自己的 HTTP 服务（SDK：`chrona.serve(fetch)`）；内核认证后把 `/api/mcp` 与 `/api/mcp/*` 反向代理过去，去掉 `Authorization` 与 `Cookie`（响应去掉 `Set-Cookie`）。并发、流式响应和大响应体都由 HTTP 本身承担，不经事件通道。要求 `keepAlive`；同一路径只能有一个启用的模块；`/api/steward*`、`/api/workspaces`、`/api/health` 保留给内核。网页（`listen: "/"`）的形式留到 v2-4e 再定。
-- `owner`：可调用 `owner`（SDK：`chrona.owner({ method, path, body })`）。owner API 就是 `/api/steward` 的 HTTP 映射（见 contract），由内核在进程内转发、注入 `workspaceId`；只支持 JSON，不含上传与原始下载；不与模块的其他调用排队。`secret:<connector>`：可用 `secret.get` 取该连接器凭据（v2-4d）。
+- `channel` / `secrets`：见 §6 通知投递。
+- `owner`：可调用 `owner`（SDK：`chrona.owner({ method, path, body })`）。owner API 就是 `/api/steward` 的 HTTP 映射（见 contract），由内核在进程内转发、注入 `workspaceId`；只支持 JSON，不含上传与原始下载；不与模块的其他调用排队。清单 `secrets` 列出的凭据用 `secret({ name })` 读取（v2-4d）。
 
 ### 3.1 `owner` 能力 = 用户的权力
 
@@ -96,10 +98,10 @@ chrona admin approve|reject <approvalId>
 | 模块 | 运行 | 能力 | 说明 |
 |---|---|---|---|
 | `web` | `listen: "/"` | `owner` | 现有网页。源码与锁文件在模块内；构建沙箱只读挂载 Chrona 已审查的依赖缓存，v1 不允许新增依赖 |
-| `qq` | `keepAlive` | `owner`、`network`、`secret:qq_bot` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
+| `qq` | `keepAlive`、`channel` | `owner`、`network`、`secrets: [qq_bot]` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
 | `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
 
-通知投递：入口模块经 `owner.notifications` 订阅待投递通知，投递成功后确认；预算、安静时段、去重仍由内核判定。
+通知投递（v2-4d 实现）：清单声明 `channel: "chrona_qqbot"` 的入口模块是该通道的投递者。内核发件箱照旧决定发不发、何时发、重试（预算、安静时段、去重、租约都不变），每条通知以 `deliver` 事件交给模块，模块回 DeliveryOutcome；模块用 `channel({ ready })` 报告能否投递（QQ：是否已绑定主人），未就绪时通知只进网页。凭据经清单 `secrets` 与 `secret` 方法按需读取，二者都要求 `owner`。QQ 模块用 owner API 的 `/chat`（带 `channel`、`externalId`、`quotedExternalId`、附件）、`/chat/attachments`、`/chat/runs/:id`、`/messages`、`/notifications` 完成对话、附件、后续回复、引用与超出回复窗口的补发。绑定码仍由 `chrona qq bind-code` 生成，写入模块数据目录。
 
 ## 7. 分阶段
 

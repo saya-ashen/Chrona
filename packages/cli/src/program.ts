@@ -70,11 +70,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .option("--ttl <minutes>", "Validity in minutes (1-60)", "10")
     .option("--replace", "Allow replacing an existing owner binding")
     .action(async (input: { workspace: string; ttl: string; replace?: boolean }) => {
-      const { createQqBotState, qqBotConfig } = await import("@chrona/integrations/steward");
-      const config = qqBotConfig();
-      if (!config) throw new Error("CHRONA_QQ_APP_ID and CHRONA_QQ_STATE_DIR (or CHRONA_DATA_DIR) are required");
-      const challenge = await createQqBotState(config.stateDir, config.appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) });
-      console.log(JSON.stringify({ appId: config.appId, ...challenge }));
+      const { qqBindCode } = await import("./admin");
+      console.log(JSON.stringify(await qqBindCode({ workspace: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) })));
     });
   return program;
 }

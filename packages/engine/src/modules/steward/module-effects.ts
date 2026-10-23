@@ -4,6 +4,7 @@ import type { StewardPorts } from "./ports";
 import { enqueueNotification } from "./notify";
 import { createRuns, createRunSession } from "./runs";
 import { handleModuleModel, type CallScope } from "./module-model";
+import { setChannelReady } from "./module-channel-state";
 export type { CallScope } from "./module-model";
 
 type Context = Parameters<typeof enqueueNotification>[2];
@@ -18,6 +19,16 @@ export async function handleModuleCall(ports: StewardPorts, scope: CallScope, ca
     if (!ports.owner) return { id: call.id, error: { code: "unconfigured", message: "Owner API unavailable" } };
     try { return { id: call.id, result: await ports.owner(scope.workspaceId, call.params) }; }
     catch { return { id: call.id, error: { code: "internal", message: "Owner API call failed" } }; }
+  }
+  if (call.method === "channel") {
+    if (!scope.manifest.effects.includes("owner") || !scope.manifest.channel) return { id: call.id, error: { code: "undeclared", message: "Module channel not declared" } };
+    setChannelReady(ports, scope.moduleId, call.params.ready);
+    return { id: call.id, result: { status: "executed" } };
+  }
+  if (call.method === "secret") {
+    if (!scope.manifest.effects.includes("owner") || !scope.manifest.secrets.includes(call.params.name)) return { id: call.id, error: { code: "undeclared", message: "Secret not declared" } };
+    const value = await ports.secrets?.(call.params.name).catch(() => null);
+    return value ? { id: call.id, result: { value } } : { id: call.id, error: { code: "unconfigured", message: "Secret not configured" } };
   }
   const context = { now: ports.now(), chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
   const key = scope.eventKey ? `${scope.eventKey}:${call.params.key}` : call.params.key;

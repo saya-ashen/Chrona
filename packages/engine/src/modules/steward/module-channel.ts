@@ -4,8 +4,8 @@ import { moduleEventMessageSchema, moduleEventReplySchema, moduleCallSchema, mod
 
 type EventReply = ReturnType<typeof moduleEventReplySchema.parse>;
 type CallReply = ReturnType<typeof moduleCallReplySchema.parse>;
-// Model prompts allow 200k characters; account for UTF-8 and JSON escaping.
-const maxLine = 2 * 1024 * 1024;
+// Owner calls carry attachments as base64 (20 MiB files); chunks are collected, not re-copied.
+const maxLine = 32 * 1024 * 1024;
 
 export async function createModuleChannel(socketPath: string, { onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
   let socket: Socket | undefined, accepted = false, closed = false;
@@ -47,17 +47,18 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
   const server = createServer(client => {
     if (accepted || closed) { client.destroy(); return; }
     accepted = true; socket = client;
-    let buffer = Buffer.alloc(0);
+    let parts: Buffer[] = [], size = 0;
+    const overflow = () => { record("Module line overflow"); fail(new Error("Module disconnected")); client.destroy(); };
     client.on("data", (chunk: Buffer) => {
-      buffer = Buffer.concat([buffer, chunk]);
-      let end: number;
-      while ((end = buffer.indexOf(10)) !== -1) {
-        if (end > maxLine) { record("Module line overflow"); fail(new Error("Module disconnected")); client.destroy(); return; }
-        const text = buffer.subarray(0, end).toString("utf8");
-        buffer = buffer.subarray(end + 1);
+      let start = 0, end: number;
+      while ((end = chunk.indexOf(10, start)) !== -1) {
+        if (size + end - start > maxLine) { overflow(); return; }
+        const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
+        parts = []; size = 0; start = end + 1;
         void line(text).catch(() => { record("Module line failed"); });
       }
-      if (buffer.length > maxLine) { record("Module line overflow"); fail(new Error("Module disconnected")); client.destroy(); }
+      if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
+      if (size > maxLine) overflow();
     });
     client.on("error", () => fail(new Error("Module connection failed")));
     client.on("close", () => fail(new Error("Module disconnected")));

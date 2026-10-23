@@ -46,7 +46,7 @@ chrona.serve(async request => {
   const denied = await chrona.owner({ method: "GET", path: "/today?workspaceId=other" });
   return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), today: today.status, overridden: denied.status, apps: Array.isArray((today.body as { apps?: unknown }).apps) });
 });`);
-  const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
+  const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
   stop = () => steward.stop();
   const app = await createServerApp({ steward });
   expect((await app.request("/api/echo/x")).status).toBe(401);
@@ -60,11 +60,13 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   await seedWorkspace("Mcp");
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   if (isolated) process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!; else delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir });
+  const steward = createStewardRuntime(db, { provider: null, dataDir });
   if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP; else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
   stop = () => steward.stop();
   expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();
+  // Every built-in, including qq (unconfigured here), builds, passes its author tests and activates.
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)])).toEqual(["files", "mcp", "qq", "remind"].map(name => [name, "active", true]));
   const app = await createServerApp({ steward });
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {

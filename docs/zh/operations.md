@@ -73,14 +73,14 @@ bun run packages/cli/src/index.ts doctor
 - Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
-- QQ：`CHRONA_QQ_APP_ID`、`CHRONA_QQ_SECRET_FILE`、`CHRONA_QQ_STATE_DIR`；链接用 `CHRONA_PUBLIC_URL`。
+- QQ：由内置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经 `secret` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本的 Vite 监听所有网卡，不应向不可信网络开放。
 
 ## 日志与健康
 
-日志输出到服务标准输出/错误；由运行终端或进程管理器收集，没有统一固定日志文件路径。注意启动失败、迁移拒绝、`STEWARD_TICK_FAILED` 和 `qq-bot` 组件事件。分享日志前检查是否含私人文本或路径，不要附上密钥、绑定文件或数据库。
+日志输出到服务标准输出/错误；由运行终端或进程管理器收集，没有统一固定日志文件路径。注意启动失败、迁移拒绝和 `STEWARD_TICK_FAILED`。`qq` 模块的 `qq-bot` 事件写在模块的标准错误里，Chrona 只保留最近 16 KiB 用于失败记录。分享日志前检查是否含私人文本或路径，不要附上密钥、绑定文件或数据库。
 
 - **设置 → 运行状况**：Agent、来源积压、发件箱等应用级状态。
 - API 端口的 **`/health`**：服务存活与 Agent 配置状态；Agent 显示可用不代表已成功调用模型。
@@ -99,7 +99,7 @@ chrona qq bind-code --workspace ws_default
 
 发送 `绑定 <码>` 到独立 Bot 私聊。默认有效十分钟，可用 `--ttl <minutes>` 指定 1–60 分钟。已有绑定时，只有明确授权更换主人才能用 `--replace`；替换必须留在同一工作区。正常对话不需要前缀。
 
-状态文件为 `CHRONA_QQ_STATE_DIR/status.json`；未指定状态目录时为 `CHRONA_DATA_DIR/qq-bot/<appId>/status.json`。服务启动、消息处理后及每 30 秒更新，包含更新时间、gateway、token、bound、绑定时间、ownerHash 和 challengePending。检查时间是否仍在更新、网关与 token 状态以及是否已绑定。绑定成功不代表后续推送必然被 QQ 接受。
+状态文件在 `qq` 模块的数据目录：`<dataDir>/platform/data/<qq 模块 id>/status.json`（`chrona admin modules` 可查模块 id）。升级到模块化版本后，旧目录（`CHRONA_QQ_STATE_DIR` 或 `<dataDir>/qq-bot/<appId>`）中的 `binding.json`、`seen.json` 会在首次启动时复制过去，旧目录保留不动。模块启动、消息处理后及每 30 秒更新状态，包含更新时间、gateway、token、bound、绑定时间、ownerHash 和 challengePending。检查时间是否仍在更新、网关与 token 状态以及是否已绑定。绑定成功不代表后续推送必然被 QQ 接受。
 
 同目录的绑定与挑战文件是私有状态，不要公开；绑定码只存哈希，CLI 输出的明文码应保密。QQ 平台的发送限制与 Chrona 打扰预算都可能影响通知，先看网页发件箱状态，不要绕过预算补发。
 

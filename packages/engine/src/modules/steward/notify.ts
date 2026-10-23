@@ -8,10 +8,10 @@ import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toNotification } from "./store";
-export type NotificationInput = { workspaceId: string; moduleId?: string; sessionId?: string; approvalId?: string; level: NotifyLevel; title: string; body: string; urgent?: boolean; responds?: boolean; dedupeKey: string };
+export type NotificationInput = { workspaceId: string; moduleId?: string; sessionId?: string; approvalId?: string; level: NotifyLevel; title: string; body: string; urgent?: boolean; responds?: boolean; dedupeKey: string; recipient?: string };
 export { RESPONSE_KEY_PREFIX };
 export type NotificationContext = { now: Date; chatBound: boolean; publicUrl: string | null };
-const notificationInputSchema = notificationSchema.pick({ level: true, title: true, body: true }).extend({ workspaceId: z.string().min(1), moduleId: z.string().min(1).optional(), sessionId: z.string().min(1).optional(), approvalId: z.string().min(1).optional(), urgent: z.boolean().optional(), responds: z.boolean().optional(), dedupeKey: z.string().min(1).max(500) }).strict();
+const notificationInputSchema = notificationSchema.pick({ level: true, title: true, body: true }).extend({ workspaceId: z.string().min(1), moduleId: z.string().min(1).optional(), sessionId: z.string().min(1).optional(), approvalId: z.string().min(1).optional(), urgent: z.boolean().optional(), responds: z.boolean().optional(), dedupeKey: z.string().min(1).max(500), recipient: z.string().min(1).max(200).optional() }).strict();
 export async function enqueueNotification(tx: Prisma.TransactionClient, raw: NotificationInput, context: NotificationContext) {
   const input = parseInput(notificationInputSchema, raw);
   const { workspaceId, dedupeKey } = input;
@@ -28,7 +28,7 @@ export async function enqueueNotification(tx: Prisma.TransactionClient, raw: Not
   const negative = input.moduleId ? await tx.notification.count({ where: { workspaceId, moduleId: input.moduleId, feedback: "not_useful", createdAt: { gte: new Date(context.now.getTime() - 30 * 86400000) } } }) : 0;
   const responds = input.responds ?? false;
   const route = routeNotification(!responds && negative >= 2 && input.level === "now" ? "digest" : input.level, { ...settings, now: context.now, urgent: input.urgent ?? false, sentToday, responds });
-  const row = await tx.notification.create({ data: { workspaceId, moduleId: input.moduleId, sessionId: input.sessionId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, ...notificationRouting(input, context, route), createdAt: context.now, nextAttemptAt: context.now } });
+  const row = await tx.notification.create({ data: { workspaceId, moduleId: input.moduleId, sessionId: input.sessionId, approvalId: input.approvalId, level: input.level, title: input.title, body: input.body, idempotencyKey: dedupeKey, recipient: input.recipient, ...notificationRouting(input, context, route), createdAt: context.now, nextAttemptAt: context.now } });
   await audit(tx, { workspaceId, kind: "notification_enqueued", actor: "chrona", subjectId: row.id, details: { status: row.status, route } });
   return row;
 }

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, QQ_TOKEN_URL, type QqC2cMessage } from "./qq-official";
+import { createQqGateway, createQqTokenSource, sendQqC2c, QQ_TOKEN_URL, type QqC2cMessage } from "./builtin/qq/official";
 
 const SECRET = "test-secret-value";
 const dirs: string[] = [];
@@ -17,13 +17,6 @@ function tokenRoute(counter: { n: number }, expires: unknown = "7200") {
   return () => { counter.n++; return json(200, { access_token: `tok${counter.n}`, expires_in: expires }); };
 }
 
-test("secret file must be private and owned; content is returned only to the caller", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "qq-secret-")); dirs.push(dir);
-  const file = join(dir, "s"); writeFileSync(file, SECRET + "\n", { mode: 0o644 });
-  await expect(readProtectedSecret(file)).rejects.toThrow("private");
-  chmodSync(file, 0o600);
-  expect(await readProtectedSecret(file)).toBe(SECRET);
-});
 
 test("token: cached until a minute before expiry, single-flight, string expires_in, secret and token never logged", async () => {
   const counter = { n: 0 }, logs: string[] = [];

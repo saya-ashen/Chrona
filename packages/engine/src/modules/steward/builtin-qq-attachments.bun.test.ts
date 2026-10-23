@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { downloadQqAttachment, parseC2cEvent, sendQqC2c, uploadQqImage } from "./qq-official";
+import { downloadQqAttachment, parseC2cEvent, sendQqC2c, uploadQqImage } from "./builtin/qq/official";
 
 const attachment = { url: "https://multimedia.nt.qq.com/file", name: "a.png", mime: "image/png" };
 test("event retains attachments and reference id, including attachment-only events", () => {

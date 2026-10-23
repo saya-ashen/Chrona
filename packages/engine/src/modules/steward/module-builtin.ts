@@ -17,7 +17,8 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
     const result = await proposeBuiltin(context, root, entry.name);
     if (result.status === "rejected") throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
   }
-  await buildPending(context);
+  // buildPending takes three versions at a time; built-ins must all be ready before modules start.
+  for (let round = 0; round < 10 && await ports.db.moduleVersion.count({ where: { module: { workspaceId }, status: "building" } }); round++) await buildPending(context);
   const remind = await ports.db.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } });
   if (remind?.activeHash) {
     const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } });

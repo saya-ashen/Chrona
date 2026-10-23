@@ -4,7 +4,7 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createStewardService, moduleSupervisor } from "@chrona/engine";
+import { createQqBotState, createStewardService, moduleSupervisor } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
 
 export type AdminCommand = "modules" | "rollback" | "disable" | "approvals" | "approve" | "reject";
@@ -49,4 +49,21 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
     await db.$disconnect();
     lock?.release();
   }
+}
+
+/** A one-time QQ owner binding code, written into the qq module's data directory (only its hash is stored). */
+export async function qqBindCode(input: { workspace: string; ttlMinutes: number; replace: boolean }, options: { dataDir?: string; databaseUrl?: string } = {}) {
+  const appId = process.env.CHRONA_QQ_APP_ID?.trim() ?? "";
+  if (!/^\d{5,20}$/.test(appId)) throw new Error("CHRONA_QQ_APP_ID is required");
+  const dataDir = options.dataDir ?? getChronaDataDir();
+  const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL ?? `file:${join(dataDir, "chrona.db")}`;
+  const path = sqlitePathFromFileUrl(databaseUrl);
+  if (!path || !existsSync(path)) throw new Error("Chrona database not found. Start Chrona once first.");
+  const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
+  try {
+    const module = await db.module.findFirst({ where: { workspaceId: input.workspace, name: "qq" } });
+    if (!module) throw new Error("The qq module is not registered in this workspace. Start Chrona once first.");
+    const challenge = await createQqBotState(join(dataDir, "platform", "data", module.id), appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: input.ttlMinutes, replace: input.replace });
+    return { appId, ...challenge };
+  } finally { await db.$disconnect(); }
 }

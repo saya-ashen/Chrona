@@ -1,0 +1,12 @@
+{
+  "name": "qq",
+  "description": "Chrona's private QQ bot: owner binding, chat in the qq:dm session, approval buttons and notification delivery.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "channel": "chrona_qqbot",
+  "secrets": ["qq_bot"],
+  "triggers": [],
+  "effects": ["owner", "network"],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

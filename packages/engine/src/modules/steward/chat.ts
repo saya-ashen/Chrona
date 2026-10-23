@@ -14,7 +14,7 @@ const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
 const inputSchema = z.object({
   workspaceId: z.string().min(1), channel: messageSchema.shape.channel, text: messageSchema.shape.text,
   attachments: z.array(attachmentSchema.extend({ base64: image.optional() })).max(10).default([]),
-  externalId: z.string().min(1).max(1000).optional(), quotedMessageId: z.string().min(1).optional(),
+  externalId: z.string().min(1).max(1000).optional(), quotedMessageId: z.string().min(1).optional(), quotedExternalId: z.string().min(1).max(1000).optional(),
   sessionId: z.string().min(1).max(128).optional(), key: z.string().min(1).max(200).optional(),
 });
 export type ChatInput = z.input<typeof inputSchema>;
@@ -36,7 +36,8 @@ async function serial<T>(key: string, action: () => Promise<T>): Promise<T> {
 }
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   const chat = new ChatService(ports, wake);
-  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat) };
+  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
+    runReplies: chat.runReplies.bind(chat), recordMessage: chat.recordMessage.bind(chat), setExternalId: chat.setExternalId.bind(chat) };
 }
 class ChatService {
   constructor(private readonly ports: StewardPorts, private readonly wake: () => Promise<unknown>) {}
@@ -89,10 +90,12 @@ class ChatService {
         const source = SESSION_SOURCES.find(source => source === prefix) ?? "web";
         return row ?? tx.session.create({ data: { workspaceId: input.workspaceId, key, source, createdAt: ports.now(), lastActivityAt: ports.now() } });
       });
-      const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } }) : null;
+      const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } })
+        // A transport quote of something Chrona never recorded (or from an older session) is just ignored.
+        : input.quotedExternalId ? await db.message.findFirst({ where: { externalId: input.quotedExternalId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } }) : null;
       if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found in session");
-      const { key: _key, sessionId: _sessionId, ...message } = input;
-      const inbound = existing ?? await db.message.create({ data: { ...message, sessionId: session.id, direction: "in", at: ports.now() } });
+      const { key: _key, sessionId: _sessionId, quotedExternalId: _quoted, ...message } = input;
+      const inbound = existing ?? await db.message.create({ data: { ...message, ...(quoted ? { quotedMessageId: quoted.id } : {}), sessionId: session.id, direction: "in", at: ports.now() } });
       await db.session.update({ where: { id: session.id }, data: { lastActivityAt: ports.now() } });
       const before = (await this.replies(inbound, [])).map(m => m.id);
       const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, sessionId: session.id, status: "running" } });
@@ -144,6 +147,28 @@ class ChatService {
       attachments.push({ name, ref: `files/uploads/${unique}`, mime: file.mime, size: file.bytes.byteLength, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
     }
     return { attachments };
+  }
+  /** Replies a run has sent so far that no transport has delivered yet (entry modules relay ones arriving after the chat call returned). */
+  async runReplies(workspaceId: string, runId: string) {
+    const { db } = this.ports;
+    const run = await db.run.findFirst({ where: { id: runId, workspaceId }, select: { status: true } });
+    if (!run) throw new StewardError("not_found", "Run not found");
+    const ids = (await db.audit.findMany({ where: { workspaceId, kind: "run_reply", subjectId: runId }, orderBy: { createdAt: "asc" } }))
+      .flatMap(row => { const id = (row.details as { messageId?: unknown } | null)?.messageId; return typeof id === "string" ? [id] : []; });
+    const rows = await db.message.findMany({ where: { id: { in: ids }, workspaceId, externalId: null }, orderBy: [{ at: "asc" }, { id: "asc" }] });
+    return { done: !["queued", "running"].includes(run.status), items: rows.map(toMessage) };
+  }
+  /** Outbound only: an entry module records what it delivered outside a chat reply, or the transport id of a reply. */
+  async recordMessage(workspaceId: string, input: { key: string; channel: MessageRow["channel"]; text: string; externalId: string }) {
+    const { db } = this.ports;
+    const session = await db.session.findFirst({ where: { workspaceId, key: input.key, status: "active" } });
+    if (session) await db.message.upsert({ where: { workspaceId_externalId: { workspaceId, externalId: input.externalId } }, update: {}, create: { workspaceId, sessionId: session.id, channel: input.channel, direction: "out", text: input.text, externalId: input.externalId, at: this.ports.now() } });
+    return { ok: true as const };
+  }
+  async setExternalId(workspaceId: string, id: string, externalId: string) {
+    const changed = await this.ports.db.message.updateMany({ where: { id, workspaceId, direction: "out" }, data: { externalId } });
+    if (!changed.count) throw new StewardError("not_found", "Outbound message not found");
+    return { ok: true as const };
   }
   async messages(workspaceId: string, limit = 50, sessionId?: string) {
     return (await this.ports.db.message.findMany({ where: { workspaceId, ...(sessionId ? { sessionId } : {}) }, orderBy: [{ at: "desc" }, { id: "desc" }], take: Math.max(1, Math.min(200, Math.trunc(limit) || 50)) })).reverse().map(toMessage);
