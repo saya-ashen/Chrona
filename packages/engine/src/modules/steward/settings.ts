@@ -1,6 +1,7 @@
 import { DEFAULT_NOTIFICATION_SETTINGS, notificationSettingsSchema, updateSettingsSchema, type NotificationSettings } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/notify-budget";
-import type { RecordContext } from "./affairs";
+import type { StewardPorts } from "./ports";
+type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { RESPONSE_KEY_PREFIX } from "@chrona/domain/steward/notify-budget";
 import { parseInput, StewardError } from "./errors";

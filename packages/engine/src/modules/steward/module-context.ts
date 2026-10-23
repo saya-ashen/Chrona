@@ -2,7 +2,6 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { createWorkspaceFs } from "./workspace-fs";
 import { StewardError } from "./errors";
 
 export const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
@@ -17,7 +16,7 @@ export type ModuleSource = "provider" | "user" | "build";
 export const json = (value: unknown) => value as Prisma.InputJsonValue;
 export function moduleContext(ports: StewardPorts, workspaceId: string) {
   const platform = join(ports.dataDir, "platform");
-  return { ports, workspaceId, db: ports.db, now: ports.now, platform, store: join(platform, "store"), fs: createWorkspaceFs(ports.dataDir) };
+  return { ports, workspaceId, db: ports.db, now: ports.now, platform, store: join(platform, "store") };
 }
 export type ModuleContext = ReturnType<typeof moduleContext>;
 export type ModuleVersion = Awaited<ReturnType<ModuleContext["db"]["moduleVersion"]["findFirstOrThrow"]>>;

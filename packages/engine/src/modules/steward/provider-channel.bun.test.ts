@@ -20,11 +20,11 @@ beforeEach(async () => {
 });
 afterEach(async () => { await Promise.all(channels.splice(0).map(channel => channel.close())); liveRuns.clear(); await db.$disconnect(); });
 async function fixture() {
-  const affair = await api.affairs.create({ title: "Independent work" });
-  await api.runs.enqueue({ affairId: affair.id, lane: "foreground", trigger: "message", prompt: "Work" });
+  const session = await db.session.create({ data: { workspaceId, key: "web:test", source: "web" } });
+  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Work" });
   const run = (await api.runs.claimNext("foreground"))!, controller = new AbortController(), channel = createProviderChannel(ports, run); channels.push(channel);
   liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { controller.abort(); await channel.close(); await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Abort" }); } });
-  return { affair, run, channel, controller };
+  return { session, run, channel, controller };
 }
 const question = (method: ProviderQuestion["method"] = "confirm", timeoutMs = 1000): ProviderQuestion => ({ method, title: "Fixture question", message: "Only this run", options: method === "select" ? ["A", "B"] : [], timeoutMs });
 async function waiting() {
@@ -69,18 +69,17 @@ test("expiry rejects late approval and returns cancellation; queued notice is su
   expect((await api.provider.list())[0]!.interactions[0]!.status).toBe("expired");
   expect((await db.notification.findFirstOrThrow()).status).toBe("suppressed");
 });
-test("restart/no live process and paused affairs cannot reuse pending requests", async () => {
+test("restart/no live process cannot reuse pending requests", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   liveRuns.delete(f.run.id);
   const views = await providerRuns({ db, workspaceId, now: ports.now }, undefined, () => false, () => false);
   expect(views[0]!.interactions[0]!.status).toBe("interrupted");
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
-  await api.affairs.update(f.affair.id, { status: "paused" });
   f.controller.abort(); expect(await result).toEqual({ decision: "cancel" });
 });
 test("owner cancel blocks tools immediately, retains input and never retries the aborted run", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  await db.message.create({ data: { workspaceId, affairId: f.affair.id, channel: "in_app", direction: "in", conversationKey: "chat:in_app", text: "Keep my input", at: time } });
+  await db.message.create({ data: { workspaceId, sessionId: f.session.id, channel: "in_app", direction: "in", text: "Keep my input", at: time } });
   await api.provider.cancel(f.run.id);
   expect(await result).toEqual({ decision: "cancel" });
   expect((await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).status).toBe("cancelled");
@@ -132,8 +131,8 @@ test("a pending launch publishes cancellation before it can start work", async (
 test("a recorded late cancel stops only linked automatic retries, not unrelated work or schedules", async () => {
   const f = await fixture(); await api.runs.finish(f.run.id, { outcome: "failed", sessionId: null, error: "Synthetic" });
   const retry = await db.run.findFirstOrThrow({ where: { status: "queued" } });
-  const unrelated = await api.runs.enqueue({ affairId: f.affair.id, lane: "background", trigger: "schedule", prompt: "Separate work" });
-  const schedule = await api.schedules.create(f.affair.id, { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Future arrangement" });
+  const unrelated = await api.runs.enqueue({ sessionId: f.session.id, lane: "background", trigger: "schedule", prompt: "Separate work" });
+  const schedule = await api.schedules.create(f.session.id, { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Future arrangement" });
   await db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: f.run.id, details: {} } });
   await api.provider.cancel(f.run.id);
   expect((await db.run.findUniqueOrThrow({ where: { id: retry.id } })).status).toBe("cancelled");
@@ -157,8 +156,8 @@ test("QQ state failure still permits a budgeted Web question", async () => {
   expect(await result).toEqual({ decision: "submit", value: false });
 });
 test("a durable queued cancel is never claimed after restart", async () => {
-  const affair = await api.affairs.create({ title: "Queued" });
-  const run = await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Keep" });
+  const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "web" } });
+  const run = await api.runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", prompt: "Keep" });
   await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: run.id, details: {} } });
   expect(await api.runs.claimNext("background")).toBeNull();
   expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("cancelled");

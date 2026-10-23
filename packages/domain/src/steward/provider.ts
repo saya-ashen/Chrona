@@ -25,8 +25,8 @@ export function providerToolPhase(name: unknown): ProviderProgress {
   const phase = tool ? phases.get(tool) ?? "executing" : "executing";
   return { phase, tool };
 }
-export function providerRunActive(run: { status: string; deadlineAt: Date | null; leaseUntil: Date | null; affair?: { status: string } | null }, connected: boolean, now: Date): boolean {
-  return run.status === "running" && connected && !!run.deadlineAt && run.deadlineAt > now && !!run.leaseUntil && run.leaseUntil > now && (!run.affair || run.affair.status === "active");
+export function providerRunActive(run: { status: string; deadlineAt: Date | null; leaseUntil: Date | null }, connected: boolean, now: Date): boolean {
+  return run.status === "running" && connected && !!run.deadlineAt && run.deadlineAt > now && !!run.leaseUntil && run.leaseUntil > now;
 }
 export function providerRequestStatus(question: ProviderInteraction, receipt: ProviderInteraction["status"] | undefined, alive: boolean, waiting: boolean, now: Date): ProviderInteraction["status"] {
   if (receipt) return receipt;

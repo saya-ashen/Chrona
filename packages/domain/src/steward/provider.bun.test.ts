@@ -23,15 +23,15 @@ test("usage distinguishes delta, session total, reset and unknown", () => {
   for (const invalid of [null, {}, stats(-1, 0), stats(10, -1), stats(10, Infinity)]) expect(providerUsage(invalid)).toBeNull();
 });
 test.each([
-  ["running", true, "active", true], ["running", false, "active", false], ["running", true, "paused", false], ["finished", true, "active", false],
-])("run %s connected=%s affair=%s", (status, connected, affairStatus, active) => {
+  ["running", true, true], ["running", false, false], ["finished", true, false],
+])("run %s connected=%s", (status, connected, active) => {
   const now = new Date("2026-10-17T04:00:00Z");
-  expect(providerRunActive({ status: String(status), affair: { status: String(affairStatus) }, deadlineAt: new Date(now.getTime() + 1000), leaseUntil: new Date(now.getTime() + 1000) }, Boolean(connected), now)).toBe(Boolean(active));
+  expect(providerRunActive({ status: String(status), deadlineAt: new Date(now.getTime() + 1000), leaseUntil: new Date(now.getTime() + 1000) }, Boolean(connected), now)).toBe(Boolean(active));
 });
 test.each([
   [undefined, true, true, "pending"], [undefined, false, true, "interrupted"], [undefined, true, false, "interrupted"], ["answered", false, false, "answered"], ["cancelled", false, false, "cancelled"],
 ] as const)("request receipt=%s live=%s waiting=%s -> %s", (receipt, alive, waiting, status) => {
-  const request = { id: "id", runId: "run", affairId: null, question: question("confirm"), status: "pending" as const, createdAt: "2026-10-17T04:00:00Z", expiresAt: "2026-10-17T04:01:00Z" };
+  const request = { id: "id", runId: "run", sessionId: null, question: question("confirm"), status: "pending" as const, createdAt: "2026-10-17T04:00:00Z", expiresAt: "2026-10-17T04:01:00Z" };
   expect(providerRequestStatus(request, receipt, alive, waiting, new Date(request.createdAt))).toBe(status);
   if (!receipt) expect(providerRequestStatus(request, receipt, alive, waiting, new Date(request.expiresAt))).toBe("expired");
 });

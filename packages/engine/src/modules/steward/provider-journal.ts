@@ -1,8 +1,8 @@
 import type { PrismaClient, Prisma } from "@chrona/db";
 import { providerInteractionSchema, providerProgressSchema, providerResourcesSchema, providerRunViewSchema, providerUsageSchema, type ProviderInteraction, type ProviderRunView, type ProviderQuestion } from "@chrona/contracts/steward";
 import { providerRequestStatus, providerRunActive } from "@chrona/domain/steward/provider";
-import type { RecordContext } from "./affairs";
-import { requireAffair } from "./affairs";
+import type { StewardPorts } from "./ports";
+type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 
 export const providerCancelKey = (runId: string) => `provider-cancel:${runId}`;
 export const providerAnswerKey = (id: string) => `provider-answer:${id}`;
@@ -20,13 +20,12 @@ function eventValue(row: { details: unknown }) {
   const details = row.details as { type?: unknown; value?: unknown; at?: string } | null;
   return details ?? {};
 }
-export async function providerRuns(ctx: RecordContext, affairId: string | undefined, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
+export async function providerRuns(ctx: RecordContext, sessionId: string | undefined, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
   const { db, workspaceId, now } = ctx;
-  if (affairId) await requireAffair(db, workspaceId, affairId);
-  const scope = { workspaceId, ...(affairId ? { affairId } : {}) };
+  const scope = { workspaceId, ...(sessionId ? { sessionId } : {}) };
   const [active, recent] = await Promise.all([
-    db.run.findMany({ where: { ...scope, status: "running" }, include: { affair: true }, orderBy: { createdAt: "desc" }, take: 2 }),
-    db.run.findMany({ where: scope, include: { affair: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15 }),
+    db.run.findMany({ where: { ...scope, status: "running" }, include: { session: true }, orderBy: { createdAt: "desc" }, take: 2 }),
+    db.run.findMany({ where: scope, include: { session: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 15 }),
   ]);
   const runs = [...new Map([...active, ...recent].map(run => [run.id, run])).values()];
   return Promise.all(runs.map(async run => {
@@ -46,7 +45,7 @@ export async function providerRuns(ctx: RecordContext, affairId: string | undefi
     });
     const last = (type: string) => records.filter(row => row.kind === "provider_event").map(eventValue).findLast(value => value.type === type)?.value;
     const progress = providerProgressSchema.safeParse(last("progress")), usage = providerUsageSchema.safeParse(last("usage")), resources = providerResourcesSchema.safeParse(last("resources"));
-    return providerRunViewSchema.parse({ id: run.id, affairId: run.affairId, affairTitle: run.affair?.title ?? null, active: alive, status: run.status,
+    return providerRunViewSchema.parse({ id: run.id, sessionId: run.sessionId, sessionTitle: run.session?.title ?? null, active: alive, status: run.status,
       progress: progress.success ? progress.data : null, usage: usage.success ? usage.data : null, resources: resources.success ? resources.data : null,
       interactions, updatedAt: (run.endedAt ?? run.startedAt ?? run.createdAt).toISOString() });
   }));

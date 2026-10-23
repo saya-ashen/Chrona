@@ -57,8 +57,7 @@ try {
     const entry = await readFile(join(code, "index.ts"), "utf8");
     await writeFile(join(code, "index.ts"), entry.replace("key: 'no'", "key: 'no:' + ev.firedAt"));
     expect(await probeKeys(context, code, manifest)).toEqual({ status: "passed" });
-    const affair = await db.affair.create({ data: { workspaceId: workspace.id, title: "SDK", dirName: "sdk" } });
-    const module = await db.module.create({ data: { workspaceId: workspace.id, affairId: affair.id, name: "sdk-check", activeHash: "old", dataSchema: 1 } });
+    const module = await db.module.create({ data: { workspaceId: workspace.id, name: "sdk-check", activeHash: "old", dataSchema: 1 } });
     const live = join(dir, "platform/data", module.id); await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "original");
     const continuity: ContinuityReport = { status: "skipped", fromSchema: 1, toSchema: 2, migrated: false };
     expect(await checkContinuity(context, code, module, manifest, continuity)).toEqual({ passed: true, needsMigration: true });

@@ -3,11 +3,10 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { requireAffair } from "./affairs";
 import { effectivePolicyIn } from "./grants";
 import { parseInput, StewardError } from "./errors";
 import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
-import { snapshotModule } from "./workspace-fs";
+import { snapshotModule } from "./module-files";
 
 type Manifest = z.output<typeof moduleManifestSchema>;
 type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
@@ -26,10 +25,10 @@ async function queueVersion(context: ModuleContext, submission: Submission) {
     return row;
   });
 }
-async function permittedProposal(context: ModuleContext, affairId: string) {
+async function permittedProposal(context: ModuleContext, moduleId: string) {
   let permitted = true;
   for (const action of ["activate_module", "notify_user"] as const) {
-    if ((await effectivePolicyIn(context.db, context.workspaceId, action, { affairId }, context.ports.now())).mode === "never") permitted = false;
+    if ((await effectivePolicyIn(context.db, context.workspaceId, action, { moduleId }, context.ports.now())).mode === "never") permitted = false;
   }
   return permitted;
 }
@@ -58,7 +57,7 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
 function submissionErrors(manifest: Manifest, permitted: boolean, hasEntry: boolean, hasMigrate: boolean) {
   return [...(permitted ? [] : ["policy: module activation or notifications are set to never"]), ...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
 }
-async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, affairId: string, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
+async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
   const { db, workspaceId, ports } = context, { hash, report, versionId } = submission;
   for (const file of files) {
     const target = join(staging, file.path);
@@ -68,11 +67,11 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
-  const module = await db.module.upsert({ where: { affairId_name: { affairId, name: manifest.name } }, create: { workspaceId, affairId, name: manifest.name, createdAt: ports.now() }, update: {} });
+  const module = await db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, createdAt: ports.now() }, update: {} });
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);
-  const permitted = await permittedProposal(context, affairId);
+  const permitted = await permittedProposal(context, module.id);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: permitted ? "approved" : "rejected", report: existing.report as BuildReport };
   if (!permitted || !hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, permitted, hasEntry, hasMigrate) } };
   if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash, status: existing.status as Proposal["status"], report: existing.report as BuildReport };
@@ -80,14 +79,13 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };
   return { moduleId: module.id, hash, status: "building", report, retained: true };
 }
-/** `root` is a Chrona-owned build directory (build lane); otherwise `dir` is inside the affair. */
-export async function propose(context: ModuleContext, input: { affairId: string; dir: string; intent: z.input<typeof intentSchema>; root?: string }, source: ModuleSource): Promise<Proposal> {
-  const { db, workspaceId, fs, platform } = context;
+/** Proposals are read only from an explicitly supplied build or session directory. */
+export async function propose(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string }, source: ModuleSource): Promise<Proposal> {
+  const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
   // Validate runtime callers too, without an impossible comparison on the typed union.
   if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
-  const affair = await requireAffair(db, workspaceId, input.affairId);
-  const files = input.root ? await snapshotModule(input.root, input.dir) : await fs.forAffair(affair.dirName).snapshotModule(input.dir);
+  const files = await snapshotModule(input.root, input.dir);
   const digest = createHash("sha256");
   for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
   const hash = digest.digest("hex"), report: BuildReport = { tests: [] };
@@ -95,7 +93,7 @@ export async function propose(context: ModuleContext, input: { affairId: string;
   let retained = false;
   await mkdir(staging, { recursive: true });
   try {
-    const result = await submitStaging(context, { hash, report, versionId, intent, source }, affair.id, staging, files);
+    const result = await submitStaging(context, { hash, report, versionId, intent, source }, staging, files);
     retained = result.retained ?? false;
     const { retained: _retained, ...proposal } = result;
     return proposal;

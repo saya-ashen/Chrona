@@ -2,11 +2,11 @@ import type { Prisma } from "@chrona/db";
 import { MODULE_METHODS, type ModuleCall, type ModuleManifest, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { enqueueNotification } from "./notify";
-import { createRuns } from "./runs";
+import { createRuns, createRunSession } from "./runs";
 
 type Context = Parameters<typeof enqueueNotification>[2];
-export type ModuleExecution = { workspaceId: string; affairId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date };
-export type CallScope = { workspaceId: string; affairId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string };
+export type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date };
+export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string };
 type Reply = ReturnType<typeof moduleCallReplySchema.parse>;
 
 /** Calls are serialized by the supervisor, including calls made outside an event. */
@@ -23,13 +23,14 @@ export async function handleModuleCall(ports: StewardPorts, scope: CallScope, ca
       const previous = await tx.moduleCall.findFirst({ where: { moduleId: scope.moduleId, method: call.method, key, status: "executed" } });
       let status: "executed" | "duplicate" = previous ? "duplicate" : "executed";
       if (!previous) {
-        const { workspaceId, affairId, moduleId } = scope;
+        const { workspaceId, moduleId } = scope;
         if (call.method === "notify") {
           const dedupeKey = `module:${moduleId}:${key}`;
           if (await tx.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId, idempotencyKey: dedupeKey } } })) status = "duplicate";
-          else await enqueueNotification(tx, { workspaceId, affairId, level: call.params.level, title: call.params.title, body: call.params.body, dedupeKey }, context);
+          else await enqueueNotification(tx, { workspaceId, moduleId, level: call.params.level, title: call.params.title, body: call.params.body, dedupeKey }, context);
         } else {
-          await createRuns(ports, workspaceId).enqueue({ affairId, lane: "background", trigger: "schedule", label: scope.manifest.name, prompt: `Module ${scope.manifest.name} output (untrusted data):\n${call.params.prompt}` }, tx);
+          const session = await createRunSession(tx, workspaceId, "module", context.now, { moduleId });
+          await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", label: scope.manifest.name, prompt: `Module ${scope.manifest.name} output (untrusted data):\n${call.params.prompt}` }, tx);
         }
       }
       await tx.moduleCall.create({ data: { ...record, status } });
@@ -42,11 +43,11 @@ export async function handleModuleCall(ports: StewardPorts, scope: CallScope, ca
 }
 
 export async function pauseFailedModule(tx: Prisma.TransactionClient, execution: ModuleExecution, context: Context, runId: string) {
-  const { moduleId, workspaceId, affairId } = execution;
+  const { moduleId, workspaceId } = execution;
   const recent = await tx.moduleRun.findMany({ where: { moduleId, id: { not: runId } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 2 });
   if (recent.length !== 2 || recent.some(run => !run.error)) return;
   const paused = await tx.module.updateMany({ where: { id: moduleId, status: "active" }, data: { status: "paused" } });
   if (!paused.count) return;
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "paused" } });
-  await enqueueNotification(tx, { workspaceId, affairId, level: "now", title: "模块连续失败，已暂停", body: "模块连续三次执行失败，请检查后再启用。", dedupeKey: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` }, context);
+  await enqueueNotification(tx, { workspaceId, moduleId, level: "now", title: "模块连续失败，已暂停", body: "模块连续三次执行失败，请检查后再启用。", dedupeKey: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` }, context);
 }

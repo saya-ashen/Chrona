@@ -1,5 +1,6 @@
 import { chronaToolInputSchemas } from "@chrona/contracts/steward";
-import type { RecordContext } from "./affairs";
+import type { StewardPorts } from "./ports";
+type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toPreference } from "./store";

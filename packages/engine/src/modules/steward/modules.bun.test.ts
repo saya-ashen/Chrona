@@ -36,10 +36,8 @@ async function fixture() {
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   cleanups.push(() => moduleSupervisor(ports).stop());
   const service = createStewardService(ports).forWorkspace(workspace.id);
-  const affair = await service.affairs.create({ title: "Prices" });
-  const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } });
-  const root = join(dataDir, "affairs", row.dirName), dir = join(root, "price-watch");
-  await mkdir(dir);
+  const root = join(dataDir, "sessions", "test"), dir = join(root, "price-watch");
+  await mkdir(dir, { recursive: true });
   const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
   async function write(value = 1) {
     await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, params: { threshold: { type: "number", value } } }));
@@ -47,7 +45,7 @@ async function fixture() {
     await writeFile(join(dir, "test.ts"), "process.exit(0)");
   }
   await write();
-  const submit = () => service.modules.propose({ affairId: affair.id, dir: "price-watch", intent }, "provider");
+  const submit = () => service.modules.propose({ root, dir: "price-watch", intent }, "provider");
   const propose = async () => {
     const result = await submit();
     if (result.status !== "building") return result;
@@ -57,7 +55,7 @@ async function fixture() {
     return { ...result, status: version.status, report: version.report, approvalId: approval?.id };
   };
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" });
-  return { db, dataDir, workspace, ports, service, affair, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
+  return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
 
 test.each([true, false])("activation schedules only schedule triggers (inbound only: %s)", async only => {
@@ -640,7 +638,7 @@ test("queued failures sharing a timestamp still stop at two wakes and one digest
 
 test("user proposals do not wake a provider and rejected hashes can be resubmitted", async () => {
   const f = await fixture(); f.fail();
-  const first = await f.service.modules.propose({ affairId: f.affair.id, dir: "price-watch", intent }, "user");
+  const first = await f.service.modules.propose({ root: f.root, dir: "price-watch", intent }, "user");
   await f.service.modules.buildPending();
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected" });
@@ -768,20 +766,20 @@ test("hash follows sorted path-NUL-content-NUL; identical content reuses approve
   expect(await f.db.moduleVersion.count()).toBe(1);
 });
 
-test("affair edits after propose never change store hash/content; checkout makes editable copies", async () => {
+test("session edits after propose never change store hash/content; checkout makes editable copies", async () => {
   const f = await fixture(), result = await f.propose();
   await f.write(99);
   const stored = join(f.dataDir, "platform/store", result.hash, "index.ts");
   expect(await readFile(stored, "utf8")).toBe("console.log(1)");
   expect((await stat(stored)).mode & 0o222).toBe(0);
   await f.approve(result.approvalId!);
-  await f.service.modules.checkout(result.moduleId!, undefined, "checkout");
+  await f.service.modules.checkout(result.moduleId!, undefined, "checkout", f.root);
   const copy = join(f.root, "checkout/index.ts");
   expect(await readFile(copy, "utf8")).toBe("console.log(1)");
   await writeFile(copy, "edited");
   expect(await readFile(stored, "utf8")).toBe("console.log(1)");
-  await expect(f.service.modules.checkout(result.moduleId!, result.hash, "checkout")).rejects.toThrow("empty");
-  await expect(f.service.modules.checkout(result.moduleId!, result.hash, "../escape")).rejects.toThrow();
+  await expect(f.service.modules.checkout(result.moduleId!, result.hash, "checkout", f.root)).rejects.toThrow("empty");
+  await expect(f.service.modules.checkout(result.moduleId!, result.hash, "../escape", f.root)).rejects.toThrow();
 });
 
 test("failing tests reject with public outputs only, no approval, staging cleaned", async () => {
@@ -791,7 +789,7 @@ test("failing tests reject with public outputs only, no approval, staging cleane
   expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.run.count()).toBe(1);
-  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id, lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n{"tests":[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]}' });
+  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n{"tests":[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]}' });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -808,7 +806,7 @@ test("new successful proposal expires older open approvals; expired approval can
 
 test.each(["../escape", "/tmp", "price-watch/../price-watch", "price-watch/.git"])("reject unsafe proposal path %s", async dir => {
   const f = await fixture();
-  await expect(f.service.modules.propose({ affairId: f.affair.id, dir, intent }, "provider")).rejects.toThrow();
+  await expect(f.service.modules.propose({ root: f.root, dir, intent }, "provider")).rejects.toThrow();
   expect(await f.db.approval.count()).toBe(0);
 });
 
@@ -824,7 +822,7 @@ test.each(["symlink", "git", "bytes", "files"])("reject unsafe module contents: 
 
 test.each(["activate_module", "notify_user"] as const)("never policy for %s rejects before sandbox", async action => {
   const f = await fixture();
-  await f.service.grants.create({ action, mode: "never", scope: { kind: "affair", affairId: f.affair.id } });
+  await f.service.grants.create({ action, mode: "never", scope: { kind: "workspace" } });
   expect((await f.propose()).status).toBe("rejected");
   expect(f.calls).toEqual([]);
   expect(await f.db.approval.count()).toBe(0);
@@ -869,11 +867,9 @@ test("oversized review text fails closed instead of hiding manifest changes", as
   expect(await f.db.approval.count()).toBe(0);
 });
 
-test("pending versions cannot activate directly, and failed approval activation rolls back all module writes", async () => {
+test("pending versions cannot activate directly", async () => {
   const f = await fixture(), result = await f.propose();
   await expect(f.service.modules.activate(result.moduleId!, result.hash, "activate")).rejects.toThrow("not approved");
-  await f.db.affair.update({ where: { id: f.affair.id }, data: { status: "paused" } });
-  await expect(f.approve(result.approvalId!)).rejects.toThrow("Affair is not active");
   expect((await f.db.moduleVersion.findFirstOrThrow()).status).toBe("pending_review");
   expect((await f.db.module.findFirstOrThrow()).activeHash).toBeNull();
   expect(await f.db.generation.count()).toBe(0);
@@ -887,13 +883,12 @@ test("workspace isolation, full snapshots, last five run summaries and nonmodule
   const foreign = createModules(f.ports, other.id);
   expect(await foreign.list()).toEqual([]);
   await expect(foreign.rollback(first.moduleId!, first.hash)).rejects.toThrow("not found");
-  await expect(foreign.checkout(first.moduleId!, first.hash, "copy")).rejects.toThrow("not found");
-  await expect(foreign.list(f.affair.id)).rejects.toThrow("not found");
-  const pending = await f.db.module.create({ data: { workspaceId: f.workspace.id, affairId: f.affair.id, name: "another" } });
+  await expect(foreign.checkout(first.moduleId!, first.hash, "copy", f.root)).rejects.toThrow("not found");
+  const pending = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "another" } });
   await f.approve(first.approvalId!);
   expect((await f.db.generation.findFirstOrThrow()).modules).toEqual({ [first.moduleId!]: first.hash, [pending.id]: null });
   for (let i = 0; i < 7; i++) await f.db.moduleRun.create({ data: { moduleId: first.moduleId!, hash: first.hash, triggerId: "daily", firedAt: f.ports.now(), exitCode: 0, createdAt: new Date(i * 1000) } });
-  const listed = (await f.service.modules.list(f.affair.id)).find(row => row.id === first.moduleId)!;
+  const listed = (await f.service.modules.list()).find(row => row.id === first.moduleId)!;
   expect(listed.runs).toHaveLength(5);
   expect(listed.runs.map(row => row.createdAt.getTime())).toEqual([6000, 5000, 4000, 3000, 2000]);
   const approval = await f.service.approvals.create({ action: "send_external_message", title: "Send", detail: "Test", preview: "Draft", payload: { kind: "email", value: 1 } });

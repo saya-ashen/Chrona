@@ -1,7 +1,8 @@
 import type { Prisma } from "@chrona/db";
 import { createGrantSchema, DEFAULT_POLICY, type Action } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
-import { type RecordContext, requireAffair } from "./affairs";
+import type { StewardPorts } from "./ports";
+type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toGrant } from "./store";
@@ -15,7 +16,7 @@ export async function consumeOnce(tx: Prisma.TransactionClient, workspaceId: str
   await audit(tx, { workspaceId: row.workspaceId, kind: "grant_consumed", actor: "chrona", subjectId: grantId, details: {} });
 }
 export async function effectivePolicyIn(db: Prisma.TransactionClient, workspaceId: string, action: Action, target: Parameters<typeof decidePolicy>[1], now: Date) {
-  if (target.affairId) await requireAffair(db, workspaceId, target.affairId);
+  if (target.moduleId && !await db.module.findFirst({ where: { workspaceId, id: target.moduleId } })) throw new StewardError("not_found", "Module not found");
   if (target.connectorId && !await db.connector.findFirst({ where: { workspaceId, id: target.connectorId } })) throw new StewardError("not_found", "Connector not found");
   return decidePolicy(action, target, (await db.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now);
 }
@@ -29,7 +30,7 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
     create: (raw: unknown) => db.$transaction(async tx => {
       const input = parseInput(createGrantSchema, raw), scope = input.scope;
       if (DEFAULT_POLICY[input.action] === "never" && input.mode !== "never") throw new StewardError("forbidden", "Built-in never cannot be loosened");
-      if (scope.kind === "affair") await requireAffair(tx, workspaceId, scope.affairId);
+      if (scope.kind === "module" && !await tx.module.findFirst({ where: { workspaceId, id: scope.moduleId } })) throw new StewardError("not_found", "Module not found");
       if (scope.kind === "connector" && !await tx.connector.findFirst({ where: { workspaceId, id: scope.connectorId } })) throw new StewardError("not_found", "Connector not found");
       const row = await tx.grant.create({ data: { ...input, workspaceId, createdAt: now(), expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } });
       await audit(tx, { workspaceId, kind: "grant_created", actor: "user", subjectId: row.id, details: input });
@@ -44,15 +45,15 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
     effectivePolicy: (action: Action, target: Parameters<typeof decidePolicy>[1]) => effectivePolicyIn(db, workspaceId, action, target, now()),
   };
 }
-/** Host paths the user approved for a run in this affair (or at the root); once grants are spent by the run that mounts them. */
-export async function hostPathsFor(db: Prisma.TransactionClient, workspaceId: string, affairId: string | null, at: Date) {
+/** Host paths approved globally or for focused modules; mounting spends once grants. */
+export async function hostPathsFor(db: Prisma.TransactionClient, workspaceId: string, moduleIds: readonly string[], at: Date) {
   const rows = await db.approval.findMany({ where: { workspaceId, action: "access_host_path", status: "approved", grant: { revokedAt: null } }, include: { grant: true } });
   const paths: string[] = [];
   for (const row of rows) {
     const grant = row.grant, path = (row.payload as { path?: unknown }).path;
     if (!grant || typeof path !== "string" || (grant.expiresAt && grant.expiresAt <= at) || (grant.once && grant.consumedAt)) continue;
-    const scope = grant.scope as { kind?: string; affairId?: string };
-    if (scope.kind === "affair" && scope.affairId !== affairId) continue;
+    const scope = grant.scope as { kind?: string; moduleId?: string };
+    if (scope.kind !== "global" && !(scope.kind === "module" && scope.moduleId && moduleIds.includes(scope.moduleId))) continue;
     if (grant.once) { try { await consumeOnce(db, workspaceId, grant.id, at); } catch { continue; } }
     paths.push(path);
   }

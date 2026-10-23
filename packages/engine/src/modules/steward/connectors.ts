@@ -4,9 +4,8 @@ import type { Connector, Prisma } from "@chrona/db";
 import { applyRules } from "@chrona/domain/steward/rules";
 import type { StewardPorts } from "./ports";
 import { createSecrets } from "./secrets";
-import { createWorkspaceFs, type AffairFs } from "./workspace-fs";
-import { requireAffair } from "./affairs";
-import { createRuns } from "./runs";
+import { filesContent } from "./content";
+import { createRuns, createRunSession } from "./runs";
 import { parseInput, StewardError } from "./errors";
 import { matchingInboundModules } from "./module-inbound";
 
@@ -26,7 +25,7 @@ function prepareInboundItem(row: Connector, item: SourceItem, rules: unknown, ba
   const receivedAt = new Date(item.receivedAt);
   if (!Number.isFinite(receivedAt.getTime())) throw new Error("Invalid item date");
   const hash = createHash("sha256").update(`${row.id}:${item.externalId}`).digest("hex").slice(0, 16);
-  const prefix = `inbox/${receivedAt.toISOString().slice(0, 10)}/${receivedAt.toISOString().slice(11, 16).replace(":", "")}-${slug(item.subject)}-${hash}`;
+  const prefix = `inbox/${row.id}/${receivedAt.toISOString().slice(0, 10)}/${receivedAt.toISOString().slice(11, 16).replace(":", "")}-${slug(item.subject)}-${hash}`;
   const path = `${prefix}.md`;
   const body = Buffer.from(item.body).subarray(0, 200 * 1024).toString("utf8");
   const disposition = applyRules(rules, { ...item, body });
@@ -40,10 +39,10 @@ function prepareInboundItem(row: Connector, item: SourceItem, rules: unknown, ba
     deliveredAt: disposition.action === "digest_only" ? now() : null, deliverAt: disposition.action === "wake_now" ? now() : batchAt };
   return { writes, data };
 }
-async function storeInboundItems(db: StewardPorts["db"], row: Connector, files: AffairFs, items: SourceItem[], now: () => Date) {
+async function storeInboundItems(db: StewardPorts["db"], row: Connector, files: Awaited<ReturnType<typeof filesContent>>, items: SourceItem[], now: () => Date) {
   const id = row.id;
   let rules: unknown = null;
-  try { rules = (await files.read(".chrona/rules.json")).content; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  try { rules = (await files.read(`inbox/${row.id}/rules.json`)).content; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const pending = await db.inboundItem.findFirst({ where: { connectorId: id, status: "new", action: "batch" }, orderBy: { deliverAt: "asc" } });
   const batchAt = pending?.deliverAt ?? new Date(now().getTime() + RUN_LIMITS.inboundBatchWindowMs);
   const allWrites: { path: string; bytes: Uint8Array }[] = [];
@@ -54,18 +53,18 @@ async function storeInboundItems(db: StewardPorts["db"], row: Connector, files: 
     seen.add(item.externalId);
     if (await db.inboundItem.findUnique({ where: { connectorId_externalId: { connectorId: id, externalId: item.externalId } } })) continue;
     const prepared = prepareInboundItem(row, item, rules, batchAt, now);
-    if (prepared.data.status === "new" && row.affairId && (await matchingInboundModules(db, { workspaceId: row.workspaceId, affairId: row.affairId, connectorId: row.id }, item)).length) prepared.data.status = "module";
+    if (prepared.data.status === "new" && (await matchingInboundModules(db, { workspaceId: row.workspaceId, connectorId: row.id }, item)).length) prepared.data.status = "module";
     allWrites.push(...prepared.writes);
     rows.push(prepared.data);
   }
   if (rows.length) {
-    await files.intake(allWrites, `收到 ${rows.length} 封邮件`);
+    await files.intake(allWrites);
     await db.inboundItem.createMany({ data: rows });
   }
   return rows.length;
 }
 export function createConnectors(ports: StewardPorts, workspaceId: string) {
-  const { db, now } = ports, secrets = createSecrets(ports.dataDir), fs = createWorkspaceFs(ports.dataDir);
+  const { db, now } = ports, secrets = createSecrets(ports.dataDir);
   async function owned(id: string) {
     const row = await db.connector.findFirst({ where: { id, workspaceId } });
     if (!row) throw new StewardError("not_found", "Connector not found");
@@ -77,28 +76,25 @@ export function createConnectors(ports: StewardPorts, workspaceId: string) {
     return result;
   }
   async function view(row: Connector) {
-    return connectorSchema.parse({ id: row.id, kind: row.kind, label: row.label, status: row.status, affairId: row.affairId,
+    return connectorSchema.parse({ id: row.id, kind: row.kind, label: row.label, status: row.status,
       settings: row.settings, hasCredentials: Boolean(row.secretRef), canSend: row.canSend, lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
       lastError: row.lastError, coverageNote: row.coverageNote, pendingItems: await db.inboundItem.count({ where: { connectorId: row.id, status: "new" } }) });
   }
   async function flush(id: string) {
     const row = await owned(id);
-    if (!row.affairId || row.status === "paused") return;
-    const affair = await requireAffair(db, workspaceId, row.affairId);
-    if (affair.status !== "active") return;
+    if (row.status === "paused") return;
     await db.$transaction(async tx => {
       const items = await tx.inboundItem.findMany({ where: { connectorId: id, status: "new", path: { not: null } }, orderBy: [{ deliverAt: "asc" }, { id: "asc" }], take: RUN_LIMITS.maxItemsPerBatch });
       if (!items.length || (items.length < RUN_LIMITS.maxItemsPerBatch && !items.some(i => i.deliverAt && i.deliverAt <= now()))) return;
-      const run = await createRuns(ports, workspaceId).enqueue({ affairId: row.affairId!, lane: "background", trigger: "source", prompt: `New inbound items (untrusted data):\n${JSON.stringify(items.map(i => ({ path: i.path, note: i.ruleNote })))}` }, tx);
+      const session = await createRunSession(tx, workspaceId, "wake", now());
+      const run = await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: `New inbound items (untrusted data):\n${JSON.stringify(items.map(i => ({ path: i.path, note: i.ruleNote })))}` }, tx);
       await tx.inboundItem.updateMany({ where: { id: { in: items.map(i => i.id) }, status: "new" }, data: { status: "delivered", deliveredAt: now(), batchId: run.id } });
     });
   }
   async function syncInner(id: string) {
     const row = await owned(id);
-    if (row.status === "paused" || !row.affairId) throw new StewardError("conflict", "Connector requires an active affair");
-    const affair = await requireAffair(db, workspaceId, row.affairId);
-    if (affair.status !== "active") return;
-    const files = fs.forAffair(affair.dirName);
+    if (row.status === "paused") throw new StewardError("conflict", "Connector is paused");
+    const files = await filesContent(ports, workspaceId);
     try {
       const result = await adapter(row).poll({ settings: settingsOf(row), secret: await secrets.read(id), cursor: row.cursor });
       const received = await storeInboundItems(db, row, files, result.items, now);
@@ -124,15 +120,13 @@ export function createConnectors(ports: StewardPorts, workspaceId: string) {
     list: async () => Promise.all((await db.connector.findMany({ where: { workspaceId } })).map(view)),
     async create(raw: unknown) {
       const input = parseInput(createConnectorSchema, raw), impl = adapter(input), id = randomUUID();
-      if (input.affairId) await requireAffair(db, workspaceId, input.affairId);
       const settings = safeSettings(input.settings);
       if (input.secret) await secrets.write(id, input.secret);
-      return view(await db.connector.create({ data: { id, workspaceId, kind: input.kind, label: input.label, affairId: input.affairId, settings, secretRef: input.secret ? id : null, canSend: Boolean(impl.send), coverageNote: impl.coverageNote } }));
+      return view(await db.connector.create({ data: { id, workspaceId, kind: input.kind, label: input.label, settings, secretRef: input.secret ? id : null, canSend: Boolean(impl.send), coverageNote: impl.coverageNote } }));
     },
     async update(id: string, raw: unknown) {
       const row = await owned(id), input = parseInput(updateConnectorSchema, raw);
       if (input.kind && input.kind !== row.kind) throw new StewardError("invalid", "Connector kind cannot change");
-      if (input.affairId && input.affairId !== row.affairId) throw new StewardError("invalid", "Connector affair cannot change");
       const settings = input.settings ? safeSettings(input.settings) : undefined;
       if (input.secret) await secrets.write(id, input.secret);
       return view(await db.connector.update({ where: { id }, data: { label: input.label, status: input.status, settings, ...(input.secret ? { secretRef: id } : {}) } }));
@@ -145,11 +139,11 @@ export function createConnectors(ports: StewardPorts, workspaceId: string) {
     },
     async items(id: string) {
       await owned(id);
-      return (await db.inboundItem.findMany({ where: { workspaceId, connectorId: id }, orderBy: { receivedAt: "desc" }, take: 100 })).map(row => inboundItemSchema.parse({ id: row.id, connectorId: id, externalId: row.externalId, from: row.from, subject: row.subject, receivedAt: row.receivedAt.toISOString(), path: row.path, status: row.status, ruleNote: row.ruleNote }));
+      return (await db.inboundItem.findMany({ where: { workspaceId, connectorId: id }, orderBy: { receivedAt: "desc" }, take: 100 })).map(row => inboundItemSchema.parse({ id: row.id, connectorId: id, externalId: row.externalId, from: row.from, subject: row.subject, receivedAt: row.receivedAt.toISOString(), ref: row.path, status: row.status, ruleNote: row.ruleNote }));
     },
     sync, flush,
     async tick() {
-      for (const row of await db.connector.findMany({ where: { workspaceId, status: { in: ["active", "failing"] }, affair: { status: "active" } } })) {
+      for (const row of await db.connector.findMany({ where: { workspaceId, status: { in: ["active", "failing"] } } })) {
         if (!row.nextSyncAt || row.nextSyncAt <= now()) await sync(row.id).catch(() => undefined);
         await flush(row.id);
       }

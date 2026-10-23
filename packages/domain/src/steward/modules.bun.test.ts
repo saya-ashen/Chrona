@@ -92,7 +92,7 @@ test("public schedule creation accepts only wake/remind and no command; stored m
     expect(createScheduleSchema.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
     expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
   }
-  expect(scheduleSchema.safeParse({ ...input, id: "module-schedule", affairId: "affair", mode: "module", until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
+  expect(scheduleSchema.safeParse({ ...input, id: "module-schedule", originSessionId: null, moduleId: null, mode: "module", until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
 });
 
 test("module activation defaults to ask with its policy label", () => {

@@ -43,8 +43,8 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     instance.retiring = true;
     void instance.queue.finally(() => close(instance)).catch(() => {});
   }
-  async function failure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId" | "affairId"> }, error: string, runId?: string, event?: ModuleEvent) {
-    const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, affairId: instance.scope.affairId, moduleId: instance.moduleId, hash: instance.hash, triggerId: event ? event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.id : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
+  async function failure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> }, error: string, runId?: string, event?: ModuleEvent) {
+    const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, triggerId: event ? event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.id : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
     failures.set(instance.moduleId, (failures.get(instance.moduleId) ?? 0) + 1);
     const context = { now, chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
     await ports.db.$transaction(async tx => {
@@ -110,7 +110,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       instance = instances.get(key);
       if (!instance) {
         const manifest = moduleManifestSchema.parse(version.manifest);
-        instance = { moduleId, hash, manifest, scope: { workspaceId: module.workspaceId, affairId: module.affairId, moduleId, hash, manifest }, queue: Promise.resolve(), calls: Promise.resolve(), retiring: false, closing: false, busy: false };
+        instance = { moduleId, hash, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, manifest }, queue: Promise.resolve(), calls: Promise.resolve(), retiring: false, closing: false, busy: false };
         instances.set(key, instance);
       }
     }
@@ -152,7 +152,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       instance.scope.moduleRunId = run.id;
       instance.scope.eventKey = inboundItemId ? `inbound:${inboundItemId}` : `${event.trigger.id}:${event.trigger.firedAt}`;
       try {
-        if (event.trigger.kind === "tool" ? !instance.manifest.tools.some(tool => tool.name === event.trigger.id) : !instance.manifest.triggers.some(trigger => trigger.id === event.trigger.id)) throw new Error("Module trigger missing");
+        if (event.trigger.kind === "content_edit" ? !instance.manifest.content : event.trigger.kind === "tool" ? !instance.manifest.tools.some(tool => tool.name === event.trigger.id) : !instance.manifest.triggers.some(trigger => trigger.id === event.trigger.id)) throw new Error("Module trigger missing");
         await (instance.start ??= start(instance));
         const reply = await instance.channel!.send({ ...event, params: Object.fromEntries(Object.entries(instance.manifest.params).map(([key, param]) => [key, param.value])) }, RUN_LIMITS.jobTimeoutMs);
         await instance.calls;

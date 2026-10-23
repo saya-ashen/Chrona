@@ -2,205 +2,63 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
-import { createStewardService } from "./service";
-import type { StewardPorts } from "./ports";
-import { liveRuns } from "./runs";
+import { createChat, chatImages } from "./chat";
+import { createRuns, liveRuns } from "./runs";
 import { testDb } from "./test-db";
-
-let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string;
-let service: ReturnType<typeof createStewardService>;
-function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
-type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
-const success: Outcome = { outcome: "finished", sessionId: null, error: null };
-function provider() {
-  const started = deferred<ProviderRunInput>(), injected = deferred<{ text: string; images: unknown }>(), done = deferred<Outcome>();
-  let starts = 0;
-  ports.provider = { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
-    starts++; started.resolve(input);
-    return { done: done.promise, abort: async () => {}, inject: async (text, images) => { injected.resolve({ text, images }); } };
-  } };
-  return { started: started.promise, injected: injected.promise, finish: done.resolve, starts: () => starts };
-}
-const send = (text: string, extra: Partial<Parameters<typeof service.chat.handleMessage>[0]> = {}) => service.chat.handleMessage({ workspaceId, channel: "in_app", text, ...extra });
+import type { StewardPorts } from "./ports";
+let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, chat: ReturnType<typeof createChat>;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "chat" } })).id;
-  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-chat-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chat: null, deliveries: [] };
-  service = createStewardService(ports);
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-chat-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], chatTimeoutMs: 1 };
+  chat = createChat(ports, async () => {});
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
-
-for (const fails of [false, true]) test(`affair chat forwards to background work without failing chat: ${fails}`, async () => {
-  const api = service.forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Work" });
-  const background = await api.runs.enqueue({ affairId: affair.id, lane: "background", trigger: "schedule", prompt: "Prepare" });
-  await api.runs.claimNext("background");
-  const forwarded: { text: string; images: unknown }[] = [];
-  liveRuns.set(background.id, { done: new Promise(() => {}), abort: async () => {}, inject: async (text, images) => { forwarded.push({ text, images }); if (fails) throw new Error("fake failure"); } });
-  const p = provider(), pending = send("New detail", { affairId: affair.id, attachments: [{ name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" }] });
-  const run = await p.started;
-  expect(forwarded).toEqual([{ text: "The user just wrote in chat (data; a separate conversation run replies to them; take it into account in your work): New detail", images: [{ mime: "image/png", base64: "YWJj" }] }]);
-  expect(await db.audit.count({ where: { kind: fails ? "message_forward_failed" : "message_forwarded", subjectId: background.id } })).toBe(1);
-  await service.tools.call(run.token, "chrona_reply", { text: "Noted" });
-  p.finish(success);
-  expect((await pending).messages.map(m => m.text)).toEqual(["Noted"]);
-  expect(await db.run.count({ where: { lane: "background" } })).toBe(1);
+const send = (text: string, extra: Partial<Parameters<typeof chat.handleMessage>[0]> = {}) => chat.handleMessage({ workspaceId, channel: "in_app", text, ...extra });
+test("no address creates independent web sessions", async () => {
+  const first = await send("One"), second = await send("Two");
+  expect(first.sessionId).not.toBe(second.sessionId);
+  const sessions = await db.session.findMany();
+  expect(sessions).toHaveLength(2);
+  for (const session of sessions) { expect(session.key).toMatch(/^web:/); expect(session.source).toBe("web"); expect(session.focus).toEqual(["files"]); }
 });
-
-for (const routing of ["focus", "web", "quote"] as const) test(`Provider routes new topics; arrival forwarding requires explicit choice: ${routing}`, async () => {
-  const api = service.forWorkspace(workspaceId), a = await api.affairs.create({ title: "A" });
-  await db.audit.create({ data: { workspaceId, actorKey: "chrona", kind: "conversation_focus", subjectId: "chat:in_app", details: { affairId: a.id } } });
-  const quoted = await db.message.create({ data: { workspaceId, channel: "in_app", conversationKey: "chat:in_app", direction: "out", text: "Old topic", affairId: a.id, at: ports.now() } });
-  const background = await api.runs.enqueue({ affairId: a.id, lane: "background", trigger: "schedule", prompt: "Old work" });
-  await api.runs.claimNext("background");
-  const forwarded: string[] = [];
-  liveRuns.set(background.id, { done: new Promise(() => {}), abort: async () => {}, inject: async text => { forwarded.push(text); } });
-  const extra = routing === "web" ? { affairId: a.id } : routing === "quote" ? { quotedMessageId: quoted.id } : {};
-  const p = provider(), pending = send("New topic", extra), run = await p.started;
-  expect(forwarded).toHaveLength(routing === "focus" ? 0 : 1);
-  await service.tools.call(run.token, "chrona_reply", { text: "Before routing" });
-  const b = await service.tools.call(run.token, "chrona_affair_create", { title: "B" }) as { id: string };
-  await service.tools.call(run.token, "chrona_reply", { text: "After routing" });
-  const target = routing === "focus" ? b.id : a.id;
-  for (const text of ["New topic", "Before routing", "After routing"]) expect((await db.message.findFirstOrThrow({ where: { text } })).affairId).toBe(target);
-  if (routing === "focus") {
-    await api.settings.update({ notifications: { dailyCap: 0 } });
-    await api.runs.enqueue({ affairId: b.id, lane: "background", trigger: "schedule", prompt: "Finish page" });
-    // Release A's background slot without invoking a Provider.
-    await api.runs.finish(background.id, success);
-    const work = (await api.runs.claimNext("background"))!;
-    expect(await service.tools.call(work.token, "chrona_notify", { level: "now", title: "Page ready", body: "Done" })).toMatchObject({ status: "queued" });
-    expect((await db.notification.findFirstOrThrow({ where: { title: "Page ready" } })).idempotencyKey).toMatch(/^response:/);
-  }
-  p.finish(success);
-  await pending;
+test("same key resolves one active session across service instances and concurrent input", async () => {
+  const other = createChat(ports, async () => {});
+  await Promise.all(Array.from({ length: 8 }, (_, i) => (i % 2 ? other : chat).submit({ workspaceId, channel: "in_app", key: "web:shared", text: `${i}` })));
+  expect(await db.session.count({ where: { key: "web:shared", status: "active" } })).toBe(1);
+  expect(new Set((await db.message.findMany()).map(message => message.sessionId)).size).toBe(1);
 });
-
-test("simple tools reply and persisted externalId dedupe (including new service)", async () => {
-  const p = provider(), pending = send("hello", { externalId: "one" });
-  const run = await p.started;
-  expect(run.cwd).toBe(join(ports.dataDir, "affairs"));
-  await service.tools.call(run.token, "chrona_reply", { text: "Hello", files: [] });
-  p.finish(success);
-  const reply = await pending;
-  expect(reply.messages.map(m => m.text)).toEqual(["Hello"]);
-  await db.message.create({ data: { workspaceId, conversationKey: "chat:in_app", direction: "out", channel: "in_app", text: "unrelated later", at: ports.now() } });
-  service = createStewardService(ports);
-  expect(await send("hello", { externalId: "one" })).toEqual(reply);
-  expect(p.starts()).toBe(1);
-  expect(await db.message.count({ where: { direction: "in" } })).toBe(1);
-  expect((await service.forWorkspace(workspaceId).chat.messages(2)).length).toBe(2);
+test("ended key starts a fresh context and explicit ids remain scoped", async () => {
+  const first = await send("Old", { key: "qq:dm" });
+  await db.session.update({ where: { id: first.sessionId }, data: { status: "ended", endedAt: ports.now() } });
+  const second = await send("New", { key: "qq:dm" });
+  expect(second.sessionId).not.toBe(first.sessionId);
+  await expect(send("Ended", { sessionId: first.sessionId })).rejects.toMatchObject({ code: "not_found" });
+  const foreign = await db.workspace.create({ data: { name: "Other" } });
+  await expect(chat.submit({ workspaceId: foreign.id, channel: "in_app", sessionId: second.sessionId, text: "No" })).rejects.toMatchObject({ code: "not_found" });
 });
-
-test("live run receives second text and inline image; both callers receive later reply", async () => {
-  const p = provider(), first = send("first"), run = await p.started;
-  await service.tools.call(run.token, "chrona_reply", { text: "early", files: [] });
-  const second = send("second", { attachments: [{ name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" }] });
-  expect(await p.injected).toEqual({ text: "second", images: [{ mime: "image/png", base64: "YWJj" }] });
-  const affair = await service.tools.call(run.token, "chrona_affair_create", { title: "Both messages" }) as { id: string };
-  await service.tools.call(run.token, "chrona_reply", { text: "later", files: [] });
-  expect(await db.message.count({ where: { affairId: affair.id } })).toBe(4);
-  p.finish(success);
-  expect((await first).messages.map(m => m.text)).toEqual(expect.arrayContaining(["early", "later"]));
-  expect((await second).messages.map(m => m.text)).toEqual(["later"]);
-  expect(p.starts()).toBe(1);
+test("running session receives injected input, another session queues independently", async () => {
+  const first = await send("Start", { key: "web:shared" });
+  const runs = createRuns(ports, workspaceId), active = (await runs.claimNext("foreground"))!;
+  const injected: string[] = [];
+  liveRuns.set(active.id, { done: new Promise(() => {}), inject: async text => { injected.push(text); }, abort: async () => {} });
+  await chat.submit({ workspaceId, channel: "in_app", sessionId: first.sessionId, text: "Continue" });
+  expect(injected).toEqual(["Continue"]);
+  expect(await db.run.count()).toBe(1);
+  await chat.submit({ workspaceId, channel: "in_app", text: "Separate" });
+  expect(await db.run.count()).toBe(2);
 });
-
-test("quoted outbound affair overrides last chrona_focus and passes affair cwd", async () => {
-  const affairs = service.forWorkspace(workspaceId).affairs;
-  const a = await affairs.create({ title: "A" }), b = await affairs.create({ title: "B" });
-  let p = provider(); const first = send("focus"), initial = await p.started;
-  await service.tools.call(initial.token, "chrona_focus", { affairId: a.id });
-  p.finish(success); await first;
-  p = provider(); const focused = send("follow up"), focusedRun = await p.started;
-  expect(focusedRun.cwd).toBe(join(ports.dataDir, "affairs", (await db.affair.findUniqueOrThrow({ where: { id: a.id } })).dirName));
-  p.finish(success); await focused;
-  const quote = await db.message.create({ data: { workspaceId, channel: "in_app", conversationKey: "chat:in_app", direction: "out", affairId: b.id, text: "B news", at: ports.now() } });
-  p = provider(); const quoted = send("about B", { quotedMessageId: quote.id }), quotedRun = await p.started;
-  expect(quotedRun.cwd).toBe(join(ports.dataDir, "affairs", (await db.affair.findUniqueOrThrow({ where: { id: b.id } })).dirName));
-  p.finish(success); await quoted;
+test("external ids are idempotent and replies expose required session ids", async () => {
+  const first = await send("Input", { key: "web:shared", externalId: "transport-1" });
+  const duplicate = await send("Input", { key: "web:shared", externalId: "transport-1" });
+  expect(duplicate).toEqual(first);
+  expect(await db.message.count()).toBe(1);
+  await db.message.create({ data: { workspaceId, sessionId: first.sessionId, direction: "out", channel: "in_app", text: "Reply" } });
+  expect((await chat.messages(workspaceId, 50, first.sessionId)).every(message => message.sessionId === first.sessionId)).toBe(true);
 });
-
-for (const outcome of ["unconfigured", "unavailable", "failed"] as const) test(`${outcome}: honest reply and queued retry`, async () => {
-  const p = outcome === "unconfigured" ? null : provider();
-  const pending = send("remember me");
-  if (p) { await p.started; p.finish({ outcome: outcome === "failed" ? "failed" : "unavailable", sessionId: null, error: "offline" }); }
-  const reply = await pending;
-  expect(reply.messages.map(m => m.text)).toEqual(["模型暂时不可用，消息已记下，恢复后会继续处理。"]);
-  expect(await db.run.count({ where: { status: "queued", trigger: "message", conversationKey: "chat:in_app", prompt: "remember me" } })).toBe(1);
-});
-
-test("provider deadline resolves waiting caller with honest message and queues background only", async () => {
-  const affair = await service.forWorkspace(workspaceId).affairs.create({ title: "Study" });
-  const delivered: string[] = [];
-  ports.deliveries = [{ channel: "in_app", send: async input => { delivered.push(input.body); return { outcome: "accepted", receiptRef: null }; } }];
-  const p = provider(), pending = send("prepare materials", { affairId: affair.id });
-  const run = await p.started;
-  ports.now = () => run.deadline;
-  p.finish({ outcome: "timed_out", sessionId: null, error: "Pi deadline exceeded" });
-  expect((await pending).messages.map(m => m.text)).toEqual(["这次处理超时了，我会在后台继续。"]);
-  expect(delivered).toEqual(["这次处理超时了，我会在后台继续。"]);
-  expect(await db.run.count({ where: { status: "queued", lane: "foreground" } })).toBe(0);
-  expect(await db.run.count({ where: { status: "queued", lane: "background", affairId: affair.id, prompt: "prepare materials" } })).toBe(1);
-});
-
-test("timeout returns existing replies; late replies still use delivery", async () => {
-  ports.chatTimeoutMs = 80;
-  const delivered: string[] = [];
-  ports.deliveries = [{ channel: "in_app", send: async m => { delivered.push(m.body); return { outcome: "accepted", receiptRef: null }; } }];
-  const p = provider(), pending = send("slow"), run = await p.started;
-  await service.tools.call(run.token, "chrona_reply", { text: "working", files: [] });
-  expect((await pending).messages.map(m => m.text)).toEqual(["working"]);
-  await service.tools.call(run.token, "chrona_reply", { text: "late", files: [] });
-  const finished = deferred<void>(); ports.onRunFinished = async () => { finished.resolve(); };
-  p.finish(success); await finished.promise;
-  expect(delivered).toEqual(["working", "late"]);
-});
-
-test("first reply returns after three-second grace while run remains active; later replies deliver", async () => {
-  const delivered: string[] = [];
-  ports.deliveries = [{ channel: "in_app", send: async m => { delivered.push(m.body); return { outcome: "accepted", receiptRef: null }; } }];
-  const p = provider(), pending = send("long work"), run = await p.started;
-  const start = Date.now();
-  await service.tools.call(run.token, "chrona_reply", { text: "working" });
-  expect((await pending).messages.map(m => m.text)).toEqual(["working"]);
-  expect(Date.now() - start).toBeGreaterThanOrEqual(3000);
-  expect(Date.now() - start).toBeLessThan(4500);
-  expect((await db.run.findUniqueOrThrow({ where: { id: run.runId } })).status).toBe("running");
-  await service.tools.call(run.token, "chrona_reply", { text: "done" });
-  expect(delivered).toEqual(["working", "done"]);
-  const finished = deferred<void>(); ports.onRunFinished = async () => { finished.resolve(); };
-  p.finish(success); await finished.promise;
-});
-
-test("concurrent externalId duplicates share one inbound and one run", async () => {
-  const p = provider();
-  const first = send("once", { externalId: "concurrent" });
-  const second = send("once", { externalId: "concurrent" });
-  const run = await p.started;
-  await service.tools.call(run.token, "chrona_reply", { text: "once", files: [] });
-  p.finish(success);
-  expect(await second).toEqual(await first);
-  expect(await db.message.count({ where: { direction: "in" } })).toBe(1);
-  expect(p.starts()).toBe(1);
-});
-
-test("empty timeout returns without cancelling queued work or waiting for a stuck wake hook", async () => {
-  ports.chatTimeoutMs = 20;
-  ports.onQueued = () => new Promise(() => {});
-  const reply = await send("queued");
-  expect(reply.messages).toEqual([]);
-  expect((await db.run.findUniqueOrThrow({ where: { id: reply.runId! } })).status).toBe("queued");
-});
-
-test("initial image forwarded; invalid/oversized images rejected before storing", async () => {
-  const attachment = { name: "x.png", path: null, mime: "image/png", size: 3, base64: "YWJj" };
-  await expect(send("bad", { attachments: Array(5).fill(attachment) })).rejects.toMatchObject({ code: "invalid" });
-  await expect(send("bad", { attachments: [{ ...attachment, base64: "?" }] })).rejects.toMatchObject({ code: "invalid" });
-  await expect(send("bad", { attachments: [{ ...attachment, base64: Buffer.alloc(5 * 1024 * 1024 + 1).toString("base64") }] })).rejects.toThrow();
-  expect(await db.message.count()).toBe(0);
-  const p = provider(), pending = send("image", { attachments: [attachment] }), run = await p.started;
-  expect(run.images).toEqual([{ mime: "image/png", base64: "YWJj" }]);
-  expect(run.prompt).not.toContain("YWJj");
-  p.finish(success); await pending;
-  expect((await service.chat.messages(workspaceId))[0].attachments[0]).toEqual({ name: "x.png", path: null, mime: "image/png", size: 3 });
+test("inline images reject host paths, malformed bytes and excessive images", () => {
+  const image = { name: "image.png", ref: null, mime: "image/png", size: 1, base64: "YQ==" };
+  expect(chatImages([image])).toEqual([{ mime: "image/png", base64: "YQ==" }]);
+  expect(() => chatImages([{ ...image, base64: "bad" }])).toThrow();
+  expect(() => chatImages(Array(5).fill(image))).toThrow();
+  expect(chatImages([{ ...image, base64: undefined }])).toEqual([]);
 });

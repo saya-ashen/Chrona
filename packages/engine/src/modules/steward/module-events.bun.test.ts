@@ -19,9 +19,8 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);
-  const affair = await api.affairs.create({ title: "Events" });
-  const connector = await api.connectors.create({ kind: "local_test", label: "mail", affairId: affair.id });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, affairId: affair.id, name: "events", activeHash: "sdk" } });
+  const connector = await api.connectors.create({ kind: "local_test", label: "mail" });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "events", activeHash: "sdk" } });
   const manifest = { name: "events", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }, { id: "mail", inbound: { connector: connector.id, match: { from: "*@example.com" } } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
@@ -32,7 +31,7 @@ on('schedule', async () => { count++; await chrona.notify({ key: 'schedule', lev
 on('inbound', async ev => { count++; await chrona.notify({ key: 'mail', level: 'now', title: 'Mail', body: ev.item.body }); return { handled: ev.item.subject !== 'fallback' }; });
 on('tool', async () => ({ result: { count } }));
 `);
-  await db.schedule.create({ data: { workspaceId: workspace.id, affairId: affair.id, moduleId: module.id, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "daily", createdBy: "chrona", nextAt: now } });
+  await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "daily", createdBy: "chrona", nextAt: now } });
   expect(await api.schedules.fireDue()).toBe(1);
   for (const subject of ["handled", "fallback"]) {
     source.push([{ externalId: subject, from: "sender@example.com", subject, body: "mail body", receivedAt: now.toISOString(), url: null }]);

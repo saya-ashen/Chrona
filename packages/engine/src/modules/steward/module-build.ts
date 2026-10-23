@@ -1,9 +1,8 @@
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { requireAffair } from "./affairs";
 import { createApprovals } from "./approvals";
-import { createRuns } from "./runs";
+import { createRuns, createRunSession } from "./runs";
 import { createNotifications } from "./notify";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
@@ -26,9 +25,9 @@ async function installBuild(context: ModuleContext, staging: string, hash: strin
   try { await rename(staging, join(context.store, hash)); }
   catch (error) { if (!["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error; }
 }
-type Review = { version: ModuleVersion; module: Awaited<ReturnType<typeof requireModule>>; affairId: string; report: BuildReport; files: { path: string; bytes: Buffer }[]; needsMigration: boolean };
+type Review = { version: ModuleVersion; module: Awaited<ReturnType<typeof requireModule>>; report: BuildReport; files: { path: string; bytes: Buffer }[]; needsMigration: boolean };
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
-  const { db, store } = context, { version, module, affairId, report, files, needsMigration } = review, { hash } = version;
+  const { db, store } = context, { version, module, report, files, needsMigration } = review, { hash } = version;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
@@ -43,7 +42,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
-  const card = { affairId, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   const automatic = await tryAutoActivate(context, version, report, card);
   if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
   const approval = await createApprovals(context).create(card);
@@ -54,7 +53,6 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
   const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [] };
   try {
     const module = await requireModule(context, db, version.moduleId);
-    const affair = await requireAffair(db, workspaceId, module.affairId);
     const manifest = moduleManifestSchema.parse(version.manifest);
     intentSchema.parse(version.intent);
     const files = await stagingFiles(context, version, report);
@@ -77,7 +75,7 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     const status = passed ? "pending_review" : "rejected";
     await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
     if (!passed) return { moduleId: module.id, hash, status, report };
-    return await requestReview(context, { version, module, affairId: affair.id, report, files, needsMigration });
+    return await requestReview(context, { version, module, report, files, needsMigration });
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
 async function recoverBuilds(context: ModuleContext, now: Date) {
@@ -99,12 +97,15 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
   for (const row of versions) { if (row.status !== "rejected") break; failures++; }
   if (failures >= 3) {
     // Key streak by preceding successful build; failures may share timestamps.
-    await createNotifications(ports, workspaceId).enqueue({ affairId: module.affairId, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", dedupeKey: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
+    await createNotifications(ports, workspaceId).enqueue({ moduleId: module.id, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", dedupeKey: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
   } else {
     // Keep continuity diagnostics visible even when successful tests printed a lot.
     const summary = result.report.continuity ? { continuity: result.report.continuity } : result.report;
     const publicReport = JSON.stringify(summary, (key, value: unknown) => ["stdout", "stderr"].includes(key) && typeof value === "string" ? value.slice(0, 1500) : value);
-    await createRuns(ports, workspaceId).enqueue({ affairId: module.affairId, lane: "background", trigger: "schedule", label: module.name, prompt: `Module ${module.name} build failed (untrusted test output):\n${publicReport.slice(0, 8000)}` });
+    await db.$transaction(async tx => {
+      const session = await createRunSession(tx, workspaceId, "module", ports.now(), { moduleId: module.id });
+      await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", label: module.name, prompt: `Module ${module.name} build failed (untrusted test output):\n${publicReport.slice(0, 8000)}` }, tx);
+    });
   }
 }
 export async function buildPending(context: ModuleContext, now = context.ports.now()) {

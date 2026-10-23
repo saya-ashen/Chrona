@@ -3,13 +3,13 @@ import { moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { InboundItem } from "@chrona/db";
 import { inboundMatches } from "@chrona/domain/steward/inbound-match";
 import type { StewardPorts } from "./ports";
-import { createWorkspaceFs } from "./workspace-fs";
+import { filesContent } from "./content";
 import { moduleSupervisor } from "./module-supervisor";
 type ModuleResult = { output: { handled?: boolean } | null; error: string | null };
 
-export async function matchingInboundModules(db: StewardPorts["db"], scope: { workspaceId: string; affairId: string; connectorId: string }, item: { from: string; subject: string }, statuses = ["active"]) {
-  const { workspaceId, affairId, connectorId } = scope;
-  const modules = await db.module.findMany({ where: { workspaceId, affairId, status: { in: statuses }, activeHash: { not: null } }, orderBy: { name: "asc" } });
+export async function matchingInboundModules(db: StewardPorts["db"], scope: { workspaceId: string; connectorId: string }, item: { from: string; subject: string }, statuses = ["active"]) {
+  const { workspaceId, connectorId } = scope;
+  const modules = await db.module.findMany({ where: { workspaceId, status: { in: statuses }, activeHash: { not: null } }, orderBy: { name: "asc" } });
   const matches = [];
   for (const module of modules) {
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
@@ -33,38 +33,37 @@ async function runInbound(ports: StewardPorts, match: Match, item: InboundItem, 
     return { output: null, error: (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000) };
   }
 }
-async function inboundBody(ports: StewardPorts, dirName: string, path: string | null) {
+async function inboundBody(ports: StewardPorts, workspaceId: string, path: string | null) {
   if (!path) throw new Error("Inbound item file missing");
-  const { content } = await createWorkspaceFs(ports.dataDir).forAffair(dirName).read(path);
+  const { content } = await (await filesContent(ports, workspaceId)).read(path);
   const boundary = /\r?\n\r?\n/.exec(content);
   const body = boundary ? content.slice(boundary.index + boundary[0].length) : "";
   return new TextDecoder().decode(Buffer.from(body).subarray(0, 64 * 1024), { stream: true });
 }
 async function processItem(ports: StewardPorts, item: InboundItem, token: string, now: Date) {
   const { db } = ports;
-  const connector = await db.connector.findUnique({ where: { id: item.connectorId }, include: { affair: true } });
+  const connector = await db.connector.findUnique({ where: { id: item.connectorId } });
   const finish = (data: { status: string; action?: string; deliveredAt?: Date; ruleNote?: string }) => db.inboundItem.updateMany({ where: { id: item.id, status: "module", leaseToken: token }, data: { ...data, leaseToken: null, leaseUntil: null } });
   // receivedAt, not createdAt, anchors the 30-minute fallback (including old mail at intake).
-  if (now.getTime() - item.receivedAt.getTime() > 30 * 60000 || connector?.affair?.status !== "active") return finish({ status: "new" });
-  const affair = connector.affair;
-  const matches = await matchingInboundModules(db, { workspaceId: item.workspaceId, affairId: affair.id, connectorId: connector.id }, item, ["active", "migrating"]);
+  if (now.getTime() - item.receivedAt.getTime() > 30 * 60000 || connector?.status !== "active") return finish({ status: "new" });
+  const matches = await matchingInboundModules(db, { workspaceId: item.workspaceId, connectorId: connector.id }, item, ["active", "migrating"]);
   if (matches.some(match => match.module.status === "migrating")) return finish({ status: "module" });
-  const handled = await executeMatches(ports, { item, token, now, affair }, matches);
+  const handled = await executeMatches(ports, { item, token, now }, matches);
   return finish(handled ? { status: "delivered", action: "module", deliveredAt: now, ruleNote: `模块 ${handled} 已处理` } : { status: "new" });
 }
-async function runItem(ports: StewardPorts, match: Match, item: InboundItem, dirName: string, now: Date): Promise<ModuleResult> {
-  try { return await runInbound(ports, match, item, await inboundBody(ports, dirName, item.path), now); }
+async function runItem(ports: StewardPorts, match: Match, item: InboundItem, now: Date): Promise<ModuleResult> {
+  try { return await runInbound(ports, match, item, await inboundBody(ports, item.workspaceId, item.path), now); }
   catch (cause) { return { output: null, error: String(cause).slice(0, 2000) }; }
 }
-async function executeMatches(ports: StewardPorts, scope: { item: InboundItem; token: string; now: Date; affair: { id: string; dirName: string } }, matches: Match[]) {
-  const { item, token, now, affair } = scope, { db } = ports;
+async function executeMatches(ports: StewardPorts, scope: { item: InboundItem; token: string; now: Date }, matches: Match[]) {
+  const { item, token, now } = scope, { db } = ports;
   let handled: string | undefined;
   for (const match of matches) {
     const current = await db.module.findUnique({ where: { id: match.module.id } });
     if (current?.status !== "active" || current.activeHash !== match.module.activeHash) continue;
     const renewed = await db.inboundItem.updateMany({ where: { id: item.id, status: "module", leaseToken: token }, data: { leaseUntil: new Date(ports.now().getTime() + RUN_LIMITS.jobTimeoutMs + 60000) } });
     if (!renewed.count) break;
-    const result = await runItem(ports, match, item, affair.dirName, now);
+    const result = await runItem(ports, match, item, now);
     const recorded = await db.$transaction(async tx => {
       const owned = await tx.inboundItem.updateMany({ where: { id: item.id, status: "module", leaseToken: token }, data: { leaseUntil: new Date(ports.now().getTime() + RUN_LIMITS.jobTimeoutMs + 60000) } });
       if (!owned.count) return false;

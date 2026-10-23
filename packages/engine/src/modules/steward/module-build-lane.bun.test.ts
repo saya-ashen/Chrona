@@ -41,8 +41,8 @@ async function fixture() {
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports);
   const workspaceId = (await db.workspace.create({ data: { name: "build" } })).id, api = service.forWorkspace(workspaceId);
-  const affair = await api.affairs.create({ title: "Mail" });
-  await api.runs.enqueue({ affairId: affair.id, lane: "foreground", trigger: "message", prompt: "Sort mail" });
+  const session = await db.session.create({ data: { workspaceId, key: "web:build", source: "web" } });
+  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Sort mail" });
   const requester = (await api.runs.claimNext("foreground"))!;
   const tick = createTick(ports);
   /** One tick, then wait for launched runs to finish and builds to settle. */
@@ -58,7 +58,7 @@ async function fixture() {
     await writeFile(join(cwd, "mail-sort", "index.ts"), "console.log(JSON.stringify({ effects: [], handled: true }))");
     await writeFile(join(cwd, "mail-sort", "test.ts"), "process.exit(0)");
   }
-  return { db, dataDir, ports, service, workspaceId, affair, requester, starts, step, writeModule,
+  return { db, dataDir, ports, service, workspaceId, session, requester, starts, step, writeModule,
     request: () => service.tools.call(requester.token, "chrona_propose", { request, intent }),
     onBuild: (next: Build) => { build = next; }, fail: (value = true) => { fail = value; } };
 }
@@ -82,7 +82,7 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
     await expect(run.call("chrona_reply", { text: "hi" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(run.call("chrona_propose", { request, intent })).rejects.toMatchObject({ code: "conflict" });
     for (const dir of ["chrona", "./chrona/", "mail-sort/../chrona", "."]) {
-      await expect(proposeFromBuild(f.ports, f.workspaceId, { id: queued.runId, workspaceId: f.workspaceId, affairId: f.affair.id, lane: "build", status: "running", toolCalls: [], cwd: input.cwd }, { dir, intent })).rejects.toMatchObject({ code: "forbidden" });
+      await expect(proposeFromBuild(f.ports, f.workspaceId, { id: queued.runId, workspaceId: f.workspaceId, lane: "build", status: "running", toolCalls: [], cwd: input.cwd }, { dir, intent })).rejects.toMatchObject({ code: "forbidden" });
     }
     await f.writeModule(input.cwd);
     expect(await run.call("chrona_propose", { dir: "mail-sort", intent })).toMatchObject({ status: "building" });
@@ -95,7 +95,8 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
   expect(await f.db.approval.count({ where: { status: "open", action: "activate_module" } })).toBe(1);
   expect(await f.db.audit.count({ where: { kind: "module_build_settled" } })).toBe(1);
   expect(await f.db.run.count({ where: { lane: "build" } })).toBe(1);
-  expect((await f.db.affair.findUniqueOrThrow({ where: { id: f.affair.id } })).sessionId).toBeNull();
+  expect((await f.db.session.findUniqueOrThrow({ where: { id: f.session.id } })).providerSessionId).toBeNull();
+  expect((await f.db.run.findUniqueOrThrow({ where: { id: queued.runId } })).sessionId).toBeNull();
   expect(existsSync(join(f.dataDir, "builds", queued.runId))).toBe(false);
 });
 

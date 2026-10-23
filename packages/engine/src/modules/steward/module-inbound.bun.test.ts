@@ -11,6 +11,8 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { filesContent } from "./content";
+import { testFilesContent } from "./test-content";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -28,9 +30,10 @@ async function fixture() {
   };
   cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
-  const api = createStewardService(ports).forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Mail" });
-  const connector = await api.connectors.create({ kind: "local_test", label: "mail", affairId: affair.id });
-  const module = await db.module.create({ data: { workspaceId, affairId: affair.id, name: "mail-sort", activeHash: "hash" } });
+  const api = createStewardService(ports).forWorkspace(workspaceId);
+  await testFilesContent(ports, workspaceId);
+  const connector = await api.connectors.create({ kind: "local_test", label: "mail" });
+  const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["notify_user"], triggers: [{ id: "mail", inbound: { connector: connector.id, match: { from: "*@shop.example" } } }] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const push = async (externalId = "first", from = "buyer@SHOP.example", body = "mail body") => {
@@ -66,8 +69,8 @@ test("a reply without handled does not swallow mail", async () => {
   expect((await f.db.moduleRun.findFirstOrThrow()).output).toEqual({});
 });
 test("ignore, digest and no-match retain connector behavior; wake_now routes before flush", async () => {
-  const f = await fixture(), files = await f.api.affairs.files(f.module.affairId);
-  await files.intake([{ path: ".chrona/rules.json", bytes: Buffer.from(JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action })), default: "batch" })) }], "rules");
+  const f = await fixture(), files = await filesContent(f.ports, f.workspaceId);
+  await files.intake([{ path: `inbox/${f.connector.id}/rules.json`, bytes: Buffer.from(JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action })), default: "batch" })) }]);
   expect((await f.push("ignore")).status).toBe("ignored");
   expect((await f.push("digest_only")).status).toBe("delivered");
   expect((await f.push("no-match", "other@example.com")).status).toBe("new");

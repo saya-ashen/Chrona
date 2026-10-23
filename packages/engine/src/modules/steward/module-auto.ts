@@ -8,7 +8,7 @@ import { dataEmpty } from "./module-data";
 import { intentSchema, requireModule, type BuildReport, type ModuleContext, type ModuleVersion } from "./module-context";
 import { createNotifications } from "./notify";
 
-type ReviewCard = { affairId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
+type ReviewCard = { moduleId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
 function checksPassed(report: BuildReport) {
   const continuity = report.continuity;
   return (continuity?.status === "passed" || (continuity?.status === "skipped" && continuity.reason === "no data"))
@@ -27,10 +27,13 @@ async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, ve
 async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport, card: ReviewCard) {
   if (!await eligible(context, tx, version, report)) return null;
   const { workspaceId, now } = context;
-  const decision = await effectivePolicyIn(tx, workspaceId, "activate_module", { affairId: card.affairId }, now());
+  const decision = await effectivePolicyIn(tx, workspaceId, "activate_module", { moduleId: card.moduleId }, now());
   if (!["auto", "notify_after", "preapproved"].includes(decision.mode)) return null;
   const grantId = decision.grantId ?? null;
-  if (grantId && (await tx.grant.findUniqueOrThrow({ where: { id: grantId } })).once) return null;
+  if (!grantId) return null;
+  const grant = await tx.grant.findUniqueOrThrow({ where: { id: grantId } });
+  const scope = grant.scope as { kind?: string; moduleId?: string };
+  if (grant.once || scope.kind !== "module" || scope.moduleId !== card.moduleId) return null;
   const approval = await tx.approval.create({ data: { ...card, workspaceId, status: "approved", grantId, createdAt: now(), resolvedAt: now() } });
   await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action: card.action } });
   const migration = await activateApprovedIn(context, tx, { workspaceId, approvalId: approval.id, grantId, payload: approval.payload });
@@ -45,6 +48,6 @@ export async function tryAutoActivate(context: ModuleContext, version: ModuleVer
   catch { return null; }
   if (!approval) return null;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await createNotifications(context.ports, context.workspaceId).enqueue({ affairId: card.affairId, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n完整意图与代码差异见审批预览；版本 hash: ${version.hash}\n可在模块历史中回滚`, dedupeKey: `module-auto-activated:${version.id}` });
+  await createNotifications(context.ports, context.workspaceId).enqueue({ moduleId: card.moduleId, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n完整意图与代码差异见审批预览；版本 hash: ${version.hash}\n可在模块历史中回滚`, dedupeKey: `module-auto-activated:${version.id}` });
   return approval;
 }

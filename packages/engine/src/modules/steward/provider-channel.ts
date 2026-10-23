@@ -3,7 +3,6 @@ import { providerAnswerSchema, providerInteractionSchema, providerProgressSchema
 import { providerRunActive, providerText, safeProviderQuestion, validProviderAnswer } from "@chrona/domain/steward/provider";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
-import { requireAffair } from "./affairs";
 import { liveRuns } from "./runs";
 import { cancelProviderRun } from "./provider-cancel";
 import { enqueueNotification } from "./notify";
@@ -24,7 +23,7 @@ async function chatAvailable(chat: StewardPorts["chat"]): Promise<boolean> {
   catch { return false; } // An optional QQ failure must not hide a Web question.
   finally { clearTimeout(timer); }
 }
-type RunIdentity = { id: string; workspaceId: string; affairId: string | null; deadlineAt: Date; token?: string };
+type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; deadlineAt: Date; token?: string };
 
 /** Technical event journal only: no raw RPC, answer body, new permission grant or replayable authorization. */
 export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
@@ -39,7 +38,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
     if (!safe) throw new StewardError("invalid", "Sensitive request context cannot be approved here");
     const at = now(), expires = new Date(Math.min(run.deadlineAt.getTime(), at.getTime() + input.timeoutMs));
     if (expires <= at) throw new StewardError("conflict", "Provider interaction expired");
-    const request = providerInteractionSchema.parse({ id: randomUUID(), runId: run.id, affairId: run.affairId, question: safe, createdAt: at.toISOString(), expiresAt: expires.toISOString(), status: "pending" });
+    const request = providerInteractionSchema.parse({ id: randomUUID(), runId: run.id, sessionId: run.sessionId, question: safe, createdAt: at.toISOString(), expiresAt: expires.toISOString(), status: "pending" });
     let resolve!: (value: ProviderAnswer) => void;
     const answer = new Promise<ProviderAnswer>(done => { resolve = done; });
     const entry: Pending = { ...run, runId: run.id, db, request, claimed: false, closed: false, async settle(value, status) {
@@ -62,7 +61,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
         const { method, title, message, options, timeoutMs } = safe;
         const stored = { ...request, question: { method, title, message, options, timeoutMs } };
         await tx.audit.create({ data: { id: `provider-request:${request.id}`, workspaceId: run.workspaceId, actorKey: "chrona", subjectId: run.id, kind: "provider_question", details: stored } });
-        if (!signal.aborted && !closed && !entry.closed) await enqueueNotification(tx, { workspaceId: run.workspaceId, affairId: run.affairId ?? undefined, level: "now", title: safe.title, body: safe.message || safe.title, dedupeKey: `provider-input:${run.id}` }, { now: at, chatBound, publicUrl: ports.publicUrl });
+        if (!signal.aborted && !closed && !entry.closed) await enqueueNotification(tx, { workspaceId: run.workspaceId, level: "now", title: safe.title, body: safe.message || safe.title, dedupeKey: `provider-input:${run.id}` }, { now: at, chatBound, publicUrl: ports.publicUrl });
       });
       if (signal.aborted || closed) abort();
       if (entry.closed && !owned.size) await db.notification.updateMany({ where: { workspaceId: run.workspaceId, idempotencyKey: `provider-input:${run.id}`, status: { in: ["queued", "folded"] } }, data: { status: "suppressed" } });
@@ -93,14 +92,14 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
 export function createProviderControl(ports: StewardPorts, workspaceId: string) {
   const { db, now } = ports;
   async function activeRun(id: string) {
-    const run = await db.run.findFirst({ where: { workspaceId, id }, include: { affair: true } });
+    const run = await db.run.findFirst({ where: { workspaceId, id }, include: { session: true } });
     if (!run) throw new StewardError("not_found", "Run not found");
     if (!providerRunActive(run, liveRuns.has(id), now())) throw new StewardError("conflict", "Run is no longer active");
     return run;
   }
   const cancel = (id: string) => cancelProviderRun(ports, workspaceId, id);
   return {
-    list: (affairId?: string) => providerRuns({ db, workspaceId, now }, affairId, id => liveRuns.has(id), id => pending.has(id), id => {
+    list: (sessionId?: string) => providerRuns({ db, workspaceId, now }, sessionId, id => liveRuns.has(id), id => pending.has(id), id => {
       const entry = pending.get(id);
       return entry && entry.db === db && entry.workspaceId === workspaceId ? entry.request.question : null;
     }),
@@ -120,10 +119,5 @@ export function createProviderControl(ports: StewardPorts, workspaceId: string) 
       } catch (error) { entry.claimed = false; throw error; }
     },
     cancel,
-    async stopAffair(id: string) {
-      await requireAffair(db, workspaceId, id);
-      const rows = await db.run.findMany({ where: { workspaceId, affairId: id, status: { in: ["running", "queued"] } }, select: { id: true } });
-      for (const run of rows) { try { await cancel(run.id); } catch (error) { if (!(error instanceof StewardError) || error.code !== "conflict") throw error; } }
-    },
   };
 }

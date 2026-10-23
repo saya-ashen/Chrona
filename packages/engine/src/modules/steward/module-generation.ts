@@ -1,7 +1,6 @@
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
-import { requireAffair } from "./affairs";
 import { audit } from "./audit";
 import { notificationSettings } from "./settings";
 import { StewardError } from "./errors";
@@ -12,8 +11,6 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
   const module = await requireModule(context, tx, moduleId);
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
-  const affair = await requireAffair(tx, workspaceId, module.affairId);
-  if (affair.status !== "active") throw new StewardError("conflict", "Affair is not active");
   const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "cancelled", nextAt: null } });
@@ -21,7 +18,7 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
     if (!("schedule" in trigger)) continue;
     let nextAt = nextOccurrence(trigger.schedule, now, zone);
     if (!nextAt && trigger.schedule.kind === "at") nextAt = now;
-    await tx.schedule.create({ data: { workspaceId, affairId: module.affairId, moduleId, triggerId: trigger.id, mode: "module", rule: json(trigger.schedule), text: `${manifest.name}:${trigger.id}`, label: manifest.name, createdBy: "chrona", createdAt: now, nextAt, status: nextAt ? "active" : "done" } });
+    await tx.schedule.create({ data: { workspaceId, moduleId, triggerId: trigger.id, mode: "module", rule: json(trigger.schedule), text: `${manifest.name}:${trigger.id}`, label: manifest.name, createdBy: "chrona", createdAt: now, nextAt, status: nextAt ? "active" : "done" } });
   }
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active" } });
   const modules = await tx.module.findMany({ where: { workspaceId }, orderBy: { id: "asc" } });

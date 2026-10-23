@@ -26,50 +26,43 @@ async function fixture() {
   cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   const service = createStewardService(ports), api = service.forWorkspace(workspaceId);
-  const affair = await api.affairs.create({ title: "Work" }), other = await api.affairs.create({ title: "Other" });
-  const module = await db.module.create({ data: { workspaceId, affairId: affair.id, name: "mail-sort", activeHash: "hash" } });
+  const session = await db.session.create({ data: { workspaceId, source: "web", key: "web:test", focus: ["mail-sort"] } });
+  const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "wake_provider", "network"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  await api.runs.enqueue({ affairId: affair.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
+  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
   const run = (await api.runs.claimNext("foreground"))!;
-  return { db, ports, service, module, manifest, tool, affair, other, run, calls, workspaceId,
+  return { db, ports, service, module, manifest, tool, session, run, calls, workspaceId,
     call: (args: unknown = { query: "hello" }, name = "m_mail_sort_find_mail") => service.tools.call(run.token, name, args),
     fail: (message = "public stderr") => { error = message; } };
 }
-test("catalog appends affair module tools with schema, meaningful description and their toolset", async () => {
+test("catalog appends focused module tools with schema, meaningful description and their toolset", async () => {
   const f = await fixture(), catalog = await f.service.tools.catalog(f.run.token);
   expect(catalog.slice(0, CHRONA_TOOLS.length).map(tool => tool.name)).toEqual([...CHRONA_TOOLS]);
-  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail (affair: Work)" },
+  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" },
     inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" } });
 });
-test.each(["other", "root"])("%s runs find deferred module tools and call them in the module's own affair", async scope => {
+test("unfocused sessions find deferred module tools", async () => {
   const f = await fixture();
   await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, description: "Sort and search work mail" } } });
-  const callerAffairId = scope === "other" ? f.other.id : null;
-  await f.db.run.update({ where: { id: f.run.id }, data: { affairId: callerAffairId } });
-  expect((await f.service.tools.catalog(f.run.token)).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail (affair: Work)" } });
+  await f.db.session.update({ where: { id: f.session.id }, data: { focus: [] } });
+  expect((await f.service.tools.catalog(f.run.token)).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail" } });
   expect(await f.call()).toMatchObject({ result: { found: 3 } });
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id });
-  expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ affairId: f.affair.id });
-  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "chrona", subjectId: f.module.id, details: { tool: "m_mail_sort_find_mail", callerRunId: f.run.id, callerAffairId } });
+  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ moduleId: f.module.id });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "chrona", subjectId: f.module.id, details: { tool: "m_mail_sort_find_mail", callerRunId: f.run.id, callerSessionId: f.session.id } });
 });
-test("same-named modules form one toolset: the caller's affair wins, the owner sees the first", async () => {
+test("module names are unique within the workspace", async () => {
   const f = await fixture();
-  const twin = await f.db.module.create({ data: { workspaceId: f.workspaceId, affairId: f.other.id, name: "mail-sort", activeHash: "twin" } });
-  await f.db.moduleVersion.create({ data: { moduleId: twin.id, hash: "twin", manifest: { ...f.manifest, tools: [f.tool, { ...f.tool, name: "extra" }] }, intent: {}, source: "user", report: {}, status: "approved" } });
-  expect((await f.service.tools.catalog(f.run.token)).filter(tool => tool.name.startsWith("m_")).map(tool => tool.name)).toEqual(["m_mail_sort_find_mail"]);
-  await f.db.run.update({ where: { id: f.run.id }, data: { affairId: f.other.id } });
-  expect((await f.service.tools.catalog(f.run.token)).filter(tool => tool.name.startsWith("m_")).map(tool => [tool.name, "exposure" in tool && tool.exposure])).toEqual([["m_mail_sort_find_mail", "direct"], ["m_mail_sort_extra", "direct"]]);
-  await f.call(); expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ moduleId: twin.id });
+  await expect(f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort" } })).rejects.toThrow();
 });
 test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
   expect(tools.map(tool => tool.name)).toEqual(["m_mail_sort_find_mail"]);
-  expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail (affair: Work)", tools: ["m_mail_sort_find_mail"] }]);
+  expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
-  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerAffairId: null } });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
   await expect(api.modules.callTool("m_mail_sort_find_mail", {})).rejects.toMatchObject({ code: "invalid" });
 });
 test.each([
@@ -116,7 +109,7 @@ test.each(["paused", "migrating", "no-hash"])("catalog and call re-resolve modul
 });
 test("ambiguous concatenated names expose and call only the first tool; overlong names are hidden", async () => {
   const f = await fixture();
-  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, affairId: f.affair.id, name: "mail-sort-find", activeHash: "later" } });
+  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort-find", activeHash: "later" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "later", manifest: { ...f.manifest, name: module.name, tools: [{ ...f.tool, name: "mail", description: "Hidden collision" }] }, intent: {}, source: "user", report: {}, status: "approved" } });
   const catalog = await f.service.tools.catalog(f.run.token);
   expect(catalog.filter(tool => tool.name === "m_mail_sort_find_mail")).toHaveLength(1);

@@ -1,4 +1,4 @@
-import { affairPathSchema } from "@chrona/contracts/steward";
+import { relativePathSchema } from "@chrona/contracts/steward";
 import { toolSpecSchema, validatePanelEntry, type ToolSpec } from "./tool-spec";
 
 /** Lines are 1-based, matching the HTTP contract. Preserve original newlines. */
@@ -11,7 +11,7 @@ export function toggleCheckbox(content: string, line: number, checked: boolean):
 }
 
 export const panelSpecSchema = toolSpecSchema.safeExtend({
-  data: affairPathSchema.endsWith(".csv").regex(/^[^\\]*$/, "面板数据必须是相对 CSV 路径"),
+  data: relativePathSchema.endsWith(".csv").regex(/^[^\\]*$/, "面板数据必须是相对 CSV 路径"),
 });
 export type PanelBlock = ToolSpec & { data: string };
 function parsePanelBody(body: string[]): PanelBlock {

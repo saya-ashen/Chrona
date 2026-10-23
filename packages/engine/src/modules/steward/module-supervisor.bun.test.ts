@@ -20,8 +20,7 @@ function clock() {
 async function fixture({ keepAlive = false, effects = ["notify_user", "wake_provider"], handler = async () => ({}) }: { keepAlive?: boolean; effects?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
-  const affair = await db.affair.create({ data: { workspaceId: workspace.id, title: "Module", dirName: "module" } });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, affairId: affair.id, name: "example", activeHash: "v1" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, effects, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();

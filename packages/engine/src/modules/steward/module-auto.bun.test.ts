@@ -10,34 +10,34 @@ import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-async function fixture(scope: "once" | "affair" = "affair", network = false) {
+async function fixture(scope: "once" | "module" = "module", network = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-auto-test-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
     sandbox: { available: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
-  const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
-  const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "prices");
-  await mkdir(dir);
-  const manifest: ModuleManifest = { name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
+  const service = createStewardService(ports).forWorkspace(workspace.id);
+  const root = join(dataDir, "sessions", "test"), dir = join(root, "prices");
+  await mkdir(dir, { recursive: true });
+  const manifest: ModuleManifest = { content: false, name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
   let revision = 0;
   const propose = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
     await writeFile(join(dir, "index.ts"), `entry ${revision++}`); await writeFile(join(dir, "test.ts"), "test");
     if (manifest.data.migrate) await writeFile(join(dir, manifest.data.migrate), "migrate");
-    const proposal = await service.modules.propose({ affairId: affair.id, dir: "prices", intent: { changes: ["Refactor prices"], preserves: ["Rules"] } }, "user");
+    const proposal = await service.modules.propose({ root, dir: "prices", intent: { changes: ["Refactor prices"], preserves: ["Rules"] } }, "user");
     await service.modules.buildPending();
     return db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: proposal.moduleId!, hash: proposal.hash } } });
   };
   const first = await propose(), card = await db.approval.findFirstOrThrow({ where: { status: "open" } });
   expect(first.status).toBe("pending_review");
   const resolved = await service.approvals.resolve(card.id, { decision: "approve", scope });
-  return { db, dataDir, ports, service, workspace, affair, manifest, propose, first, grantId: resolved.grantId! };
+  return { db, dataDir, ports, service, workspace, manifest, propose, first, grantId: resolved.grantId! };
 }
 
-test.each(["no data", "live data", "empty schema upgrade", "changed triggers", "changed behavior", "existing network"])("tested update auto-activates with affair grant: %s", async kind => {
-  const f = await fixture("affair", kind === "existing network");
+test.each(["no data", "live data", "empty schema upgrade", "changed triggers", "changed behavior", "existing network"])("tested update auto-activates with module grant: %s", async kind => {
+  const f = await fixture("module", kind === "existing network");
   if (kind === "live data") {
     const live = join(f.dataDir, "platform/data", f.first.moduleId);
     await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "state");
@@ -97,13 +97,13 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
     const run = f.ports.sandbox!.runModule!;
     let entries = 0;
     f.ports.sandbox!.runModule = async input => {
-      if (input.entry === "index.ts" && ++entries === 3) await f.service.grants.create({ action: "notify_user", mode: "never", scope: { kind: "affair", affairId: f.affair.id } });
+      if (input.entry === "index.ts" && ++entries === 3) await f.service.grants.create({ action: "notify_user", mode: "never", scope: { kind: "module", moduleId: f.first.moduleId } });
       return run(input);
     };
   }
 }
 
-test.each(["tests", "smoke"])("failed %s rejects the update despite an affair grant", async kind => {
+test.each(["tests", "smoke"])("failed %s rejects the update despite a module grant", async kind => {
   const f = await fixture();
   f.ports.sandbox!.runModule = async input => {
     const failed = kind === "tests" ? input.entry === "test.ts" : input.dataDir.includes("chrona-module-smoke-");
@@ -119,7 +119,7 @@ test.each(["tests", "smoke"])("failed %s rejects the update despite an affair gr
 test.each(["auto", "notify_after"] as const)("explicit %s policy uses its non-once grant", async mode => {
   const f = await fixture();
   await f.service.grants.revoke(f.grantId);
-  const grant = await f.service.grants.create({ action: "activate_module", mode, scope: { kind: "affair", affairId: f.affair.id } });
+  const grant = await f.service.grants.create({ action: "activate_module", mode, scope: { kind: "module", moduleId: f.first.moduleId } });
   const version = await f.propose();
   expect(version.status).toBe("approved");
   expect(await f.db.approval.findFirstOrThrow({ where: { grantId: grant.id } })).toMatchObject({ status: "approved" });

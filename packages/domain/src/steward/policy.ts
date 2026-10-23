@@ -1,7 +1,7 @@
 import { DEFAULT_POLICY, type Action, type Grant, type GrantMode, type PolicyDecision } from "@chrona/contracts/steward";
 
 export const MODE_STRICTNESS = { auto: 0, notify_after: 1, preapproved: 2, ask: 3, never: 4 } as const satisfies Record<GrantMode, number>;
-type Target = { affairId?: string; connectorId?: string };
+type Target = { moduleId?: string; connectorId?: string };
 const labels: Record<Action, string> = {
   read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
   activate_module: "启用模块", send_external_message: "对外发消息", modify_external: "修改外部系统", purchase: "购买",
@@ -12,7 +12,7 @@ function specificity(grant: Grant, target: Target): number {
   const scope = grant.scope;
   switch (scope.kind) {
     case "global": return 0;
-    case "affair": return scope.affairId === target.affairId ? 1 : -1;
+    case "module": return scope.moduleId === target.moduleId ? 1 : -1;
     case "connector": return scope.connectorId === target.connectorId ? 1 : -1;
   }
 }
@@ -22,7 +22,7 @@ function isUsableGrant(grant: Grant, action: Action, now: Date): boolean {
     && (grant.expiresAt === null || Date.parse(grant.expiresAt) > now.getTime());
 }
 function policyReason(action: Action, mode: GrantMode, chosen?: Grant): string {
-  const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "affair" ? "你在这件事里允许过：" : "你的授权规则：";
+  const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "module" ? "你为这个模块允许过：" : "你的授权规则：";
   return `${prefix}${labels[action]}${modes[mode]}`;
 }
 function chooseGrant(action: Action, target: Target, grants: readonly Grant[], now: Date): Grant | undefined {

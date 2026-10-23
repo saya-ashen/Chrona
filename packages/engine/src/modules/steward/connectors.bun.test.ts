@@ -6,6 +6,8 @@ import { createSecrets } from "./secrets";
 import { createStewardService } from "./service";
 import { createLocalTestSource } from "../../../../integrations/src/steward/local-test-source";
 import { testDb } from "./test-db";
+import { filesContent } from "./content";
+import { testFilesContent } from "./test-content";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 
 test("secrets atomic replacement, permissions, invalid paths and symlinks", async () => {
@@ -29,9 +31,10 @@ test("connector files, dedupe, all rules, batch first-arrival window, isolation 
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
     const api = createStewardService(ports).forWorkspace(workspaceId);
-    const affair = await api.affairs.create({ title: "Mail" }), files = await api.affairs.files(affair.id);
-    await files.intake([{ path: ".chrona/rules.json", bytes: new TextEncoder().encode(JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action, note: `note:${action}` })), default: "batch" })) }], "Configure inbound rules");
-    const connector = await api.connectors.create({ kind: "local_test", label: "mail", affairId: affair.id, secret: { password: "never-expose" } });
+    await testFilesContent(ports, workspaceId);
+    const files = await filesContent(ports, workspaceId);
+    const connector = await api.connectors.create({ kind: "local_test", label: "mail", secret: { password: "never-expose" } });
+    await files.intake([{ path: `inbox/${connector.id}/rules.json`, bytes: new TextEncoder().encode(JSON.stringify({ rules: ["ignore", "digest_only", "wake_now"].map(action => ({ match: { subject: action }, action, note: `note:${action}` })), default: "batch" })) }]);
     expect(connector.hasCredentials).toBe(true); expect(JSON.stringify(await api.connectors.list())).not.toContain("never-expose");
     expect(connector).not.toHaveProperty("secretRef");
     await expect(api.connectors.create({ kind: "local_test", label: "bad", settings: { password: "leak" } })).rejects.toThrow();
@@ -50,12 +53,10 @@ test("connector files, dedupe, all rules, batch first-arrival window, isolation 
     push("wake_now"); await api.connectors.sync(connector.id); expect(await db.run.count()).toBe(2);
     push("wake_now"); await api.connectors.sync(connector.id); expect(await db.inboundItem.count()).toBe(5);
     const items = await api.connectors.items(connector.id);
-    for (const item of items) expect((await files.read(item.path!)).content).toContain("plain text");
-    expect((await files.tree()).some(f => f.path.includes("attachment"))).toBe(false);
-    expect((await files.revisions()).some(r => r.author === "chrona" && r.message.includes("收到"))).toBe(true);
+    for (const item of items) expect((await files.read(item.ref!.slice("files/".length))).content).toContain("plain text");
+    expect((await files.list()).some(f => f.path.includes("attachment"))).toBe(false);
     for (let i = 0; i < RUN_LIMITS.maxItemsPerBatch; i++) push(`batch-${i}`);
     await api.connectors.sync(connector.id); expect(await db.run.count()).toBe(3);
-    expect((await files.revisions())[0]!.message).toBe(`收到 ${RUN_LIMITS.maxItemsPerBatch} 封邮件`);
     local.failNext(Object.assign(new Error("never-expose"), { code: "AUTHENTICATION_FAILED" }));
     await expect(api.connectors.sync(connector.id)).rejects.toThrow("Connector authorization required");
     expect((await api.connectors.list())[0]!.status).toBe("needs_authorization");
