@@ -118,7 +118,7 @@ export type QqC2cMessage = { id: string; openid: string; content: string; quoted
 const attachmentSizeCap = 20 * 1024 * 1024;
 function attachmentUrl(attachment: QqAttachment): URL {
   const url = new URL(attachment.url);
-  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !["multimedia.nt.qq.com", "gchat.qpic.cn", "c2cpicdw.qpic.cn", "file.bot.qq.com"].includes(url.hostname)) throw new QqTransportError("Invalid QQ attachment URL");
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !["multimedia.nt.qq.com", "multimedia.nt.qq.com.cn", "gchat.qpic.cn", "c2cpicdw.qpic.cn", "file.bot.qq.com"].includes(url.hostname)) throw new QqTransportError("Invalid QQ attachment URL");
   if (attachment.size !== undefined && (!Number.isFinite(attachment.size) || attachment.size < 0 || attachment.size > attachmentSizeCap)) throw new QqTransportError("Attachment exceeds size limit");
   return url;
 }

@@ -179,7 +179,7 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     const timer = timers.setTimeout(() => { ack = send(SLOW_ACK); }, SLOW_ACK_MS);
     let result: QqChatResult;
     try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, key: "qq:dm", text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
-    catch { log("qq.chat_failed"); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
+    catch (error) { log("qq.chat_failed", { error: String(error).slice(0, 500) }); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
     finally { timers.clearTimeout(timer); }
     await ack;
     const deliver = async (item: Pick<QqReplyItem, "reply"> & Partial<QqReplyItem>) => {

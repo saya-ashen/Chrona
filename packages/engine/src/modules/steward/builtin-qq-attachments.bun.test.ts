@@ -11,6 +11,10 @@ test("event retains attachments and reference id, including attachment-only even
 for (const url of ["http://multimedia.nt.qq.com/a", "https://localhost/a", "https://multimedia.nt.qq.com.evil.test/a", "https://user@multimedia.nt.qq.com/a", "https://multimedia.nt.qq.com:444/a"]) test(`reject unsafe attachment URL ${url}`, async () => {
   await expect(downloadQqAttachment({ ...attachment, url }, async () => { throw new Error("must not fetch"); })).rejects.toThrow("Invalid QQ attachment URL");
 });
+test("download accepts the .cn media host QQ actually sends", async () => {
+  const file = await downloadQqAttachment({ ...attachment, url: "https://multimedia.nt.qq.com.cn/download?fileid=x" }, async () => new Response(new Uint8Array([1, 2]), { headers: { "content-type": "image/png" } }));
+  expect(file.bytes.byteLength).toBe(2);
+});
 test("download checks MIME, status, declared and streaming byte limits", async () => {
   await expect(downloadQqAttachment(attachment, async () => new Response("bad", { headers: { "content-type": "text/html" } }))).rejects.toThrow("content type");
   await expect(downloadQqAttachment(attachment, async () => new Response("", { status: 302 }))).rejects.toThrow();

@@ -38,6 +38,11 @@ function lineDiff(before: string, after: string): string[] {
   }
   return lines;
 }
+// Compiled caches (e.g. .pyc) are not text; diffing their bytes shows as mojibake in approvals.
+function isText(bytes: Buffer) {
+  if (bytes.includes(0)) return false;
+  try { new TextDecoder("utf-8", { fatal: true }).decode(bytes); return true; } catch { return false; }
+}
 function changeKind(before: Buffer | undefined, after: Buffer | undefined) {
   return !before ? "added" : !after ? "removed" : "changed";
 }
@@ -51,6 +56,7 @@ export async function codeDifference(store: string, activeHash: string | null, f
     const before = previous.get(path), after = proposed.get(path);
     if (before && after && before.equals(after)) { unchanged.push(path); continue; }
     code.push(`=== ${path} (${changeKind(before, after)}) ===`);
+    if ([before, after].some(bytes => bytes && !isText(bytes))) { code.push(`（二进制文件：${before?.length ?? 0} → ${after?.length ?? 0} 字节）`); continue; }
     for (const line of lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? "")) code.push(line);
   }
   if (unchanged.length) code.push("未变化:", ...unchanged);

@@ -102,7 +102,8 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       child.stdin!.end();
       child.stdout!.resume();
       let errors = Buffer.alloc(0);
-      child.stderr!.on("data", (chunk: Buffer) => { errors = Buffer.concat([errors, chunk]).subarray(-16 * 1024); });
+      // Long-running modules have no other log: their stderr goes to the host log too.
+      child.stderr!.on("data", (chunk: Buffer) => { errors = Buffer.concat([errors, chunk]).subarray(-16 * 1024); process.stderr.write(chunk); });
       const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
         child.once("error", reject);
         child.once("close", (code, signal) => resolve({ code, signal }));
