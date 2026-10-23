@@ -29,10 +29,11 @@ export function scriptWorkspaceArguments(directory: string, paths: string[], dat
     "--clearenv", "--setenv", "PATH", paths.map(dirname).join(":"), "--setenv", "LANG", "C.UTF-8"];
 }
 /** Scripts may write only cwd (plus private /tmp); no inherited environment or host fallback. */
-export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512, moduleSdk = fileURLToPath(new URL("./module-sdk/sdk.ts", import.meta.url)) }: {
+export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512, moduleSdk = fileURLToPath(new URL("./module-sdk/sdk.ts", import.meta.url)), moduleTesting = fileURLToPath(new URL("./module-sdk/testing.ts", import.meta.url)) }: {
   bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
   /** Packaged binaries pass the shipped copy; the source path does not exist inside a compiled binary. */
   moduleSdk?: string;
+  moduleTesting?: string;
 }) {
   limits(timeoutMs, maxOutputBytes, memoryMb);
   const bwrap = executable(bwrapPath);
@@ -107,8 +108,9 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       // A private root supplies mount points without creating anything on the host.
       // Keep the P0 host view read-only, then freeze the private root before exec.
       profile.splice(profile.indexOf("--ro-bind"), 3, "--tmpfs", "/",
-        ...readdirSync("/").filter(name => !["module", "data", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
-      profile.push("--remount-ro", "/");
+        ...readdirSync("/").filter(name => !["module", "data", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+      profile.push("--dir", "/chrona", "--ro-bind", moduleSdk, "/chrona/sdk.ts",
+        "--ro-bind", moduleTesting, "/chrona/testing.ts", "--remount-ro", "/");
       if (!network) profile.splice(profile.indexOf("--share-net"), 1);
       return execute({ language, args: [`/module/${entry}`], input, profile, runTimeout, outputLimit });
     },

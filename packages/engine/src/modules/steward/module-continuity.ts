@@ -1,8 +1,9 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { moduleManifestSchema, moduleOutputSchema, RUN_LIMITS } from "@chrona/contracts/steward";
+import { moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { z } from "zod";
+import { syntheticEvents, withBuildProcess } from "./module-build-process";
 import { copyData, dataEmpty, runOffline } from "./module-data";
 import type { ModuleContext, ContinuityReport, TestReport, requireModule } from "./module-context";
 
@@ -30,15 +31,18 @@ function fail(continuity: ContinuityReport, reason: string) {
 type ContinuityCopy = { staging: string; data: string; manifest: Manifest; continuity: ContinuityReport };
 async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: string) {
   const { staging, data, manifest, continuity } = copy;
-  const first = manifest.triggers.find(trigger => "schedule" in trigger) ?? manifest.triggers[0]!;
-  const trigger = "schedule" in first ? { id: first.id, kind: "schedule", firedAt: now } : { id: first.id, kind: "inbound", firedAt: now, item: { externalId: "continuity", from: "continuity@chrona.invalid", subject: "", receivedAt: now, body: "" } };
-  const entry = await runOffline(context.ports, staging, data, manifest.entry, { trigger, now, params: moduleParams(manifest) });
-  continuity.output = entry.output;
-  if (!entry.succeeded) { fail(continuity, "entry failed"); return; }
-  let output;
-  try { output = moduleOutputSchema.parse(JSON.parse(entry.result.output)); } catch { /* Public output only; no parser diagnostics. */ }
-  if (!output) { fail(continuity, "invalid moduleOutput"); return; }
-  continuity.status = "passed"; delete continuity.reason; continuity.effects = output.effects;
+  await withBuildProcess(context, staging, data, manifest, async send => {
+    continuity.effects = [];
+    for (const event of syntheticEvents(manifest, now)) {
+      const { reply, calls } = await send(event);
+      continuity.output = { stdout: JSON.stringify(reply), stderr: "", exitCode: "error" in reply ? 1 : 0 };
+      if ("error" in reply) { fail(continuity, "entry failed"); return; }
+      continuity.effects.push(...calls.map(call => call.method === "notify"
+        ? { type: "notify_user" as const, ...call.params }
+        : { type: "wake_provider" as const, ...call.params }));
+    }
+    continuity.status = "passed"; delete continuity.reason;
+  });
 }
 async function checkCopy(context: ModuleContext, live: string, copy: ContinuityCopy) {
   const { staging, data, manifest, continuity } = copy;

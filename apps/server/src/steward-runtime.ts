@@ -80,7 +80,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const transport = configuredTransport(db, options);
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts") });
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts"), moduleTesting: resourcePath(join("module-sdk", "testing.ts"), "packages/integrations/src/steward/module-sdk/testing.ts") });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
     runModule: input => scriptSandbox.runModule(input),

@@ -9,7 +9,7 @@ type CallResult = { status: "executed" | "duplicate" };
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<Trigger["kind"], Handler>();
 const pending = new Map<string, { resolve(result: CallResult): void; reject(error: Error): void }>();
-const socket = createConnection("/chrona/chrona.sock");
+const socket = createConnection(process.env.CHRONA_SOCKET ?? "/chrona/chrona.sock");
 let stopped = false, buffer = Buffer.alloc(0), queue = Promise.resolve();
 function fail() {
   stopped = true;

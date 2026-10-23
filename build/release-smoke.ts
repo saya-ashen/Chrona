@@ -157,6 +157,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
 
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/pi-steward-agent"), "Pi steward extension");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/sdk.ts"), "Module SDK");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/testing.ts"), "Module test helper");
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);

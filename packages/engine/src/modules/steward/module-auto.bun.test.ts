@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DEFAULT_NOTIFICATION_SETTINGS, type ModuleManifest } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
+import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -15,6 +16,7 @@ async function fixture(scope: "once" | "affair" = "affair", network = false) {
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
     sandbox: { available: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
+  ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports).forWorkspace(workspace.id), affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } }), dir = join(dataDir, "affairs", row.dirName, "prices");
   await mkdir(dir);

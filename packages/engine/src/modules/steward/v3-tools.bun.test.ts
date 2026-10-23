@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CHRONA_TOOLS, RUN_LIMITS } from "@chrona/contracts/steward";
+import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
@@ -114,6 +115,7 @@ test("module tools propose, list, checkout and roll back only approved versions"
   const files = { "module.json": JSON.stringify(manifest), "index.ts": 'console.log(JSON.stringify({effects:[]}))', "test.ts": "process.exit(0)" };
   for (const [path, content] of Object.entries(files)) await writeFile(join(root, "module", path), content);
   ports.sandbox = { available: true, runModule: async input => ({ status: "succeeded", output: input.entry === "test.ts" ? "ok" : '{"effects":[]}', error: null, exitCode: 0 }) };
+  ports.sandbox.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const intent = { changes: ["Watch prices"] };
   const proposal = await call("chrona_propose", { dir: "module", intent }) as { moduleId: string; hash: string; approvalId: string };
   expect(proposal).toMatchObject({ status: "building" });

@@ -7,6 +7,7 @@ import { RUN_LIMITS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
+import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -30,6 +31,7 @@ async function fixture() {
       return { async inject() {}, async abort() {}, done };
     } },
   };
+  ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports);
   const workspaceId = (await db.workspace.create({ data: { name: "build" } })).id, api = service.forWorkspace(workspaceId);
   const affair = await api.affairs.create({ title: "Mail" });

@@ -907,7 +907,7 @@ test("tick starts builds without waiting for them and reports build errors on th
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const run = f.ports.sandbox!.runModule!;
-  f.ports.sandbox = { available: true, runModule: async input => { await gate; return run(input); } };
+  f.ports.sandbox = testModuleSandbox(async input => { await gate; return run(input); });
   const tick = createStewardService(f.ports).tick;
   const proposal = await f.submit();
   expect((await tick()).failures).toEqual([]);
