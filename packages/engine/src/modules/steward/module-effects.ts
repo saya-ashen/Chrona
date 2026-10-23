@@ -10,9 +10,15 @@ type Context = Parameters<typeof enqueueNotification>[2];
 export type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date };
 type Reply = ReturnType<typeof moduleCallReplySchema.parse>;
 
-/** Calls are serialized by the supervisor, including calls made outside an event. */
+/** Effect calls are serialized by the supervisor, including calls made outside an event; owner calls are not. */
 export async function handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<Reply> {
   if (call.method === "model") return handleModuleModel(ports, scope, call);
+  if (call.method === "owner") {
+    if (!scope.manifest.effects.includes("owner")) return { id: call.id, error: { code: "undeclared", message: "Module capability not declared" } };
+    if (!ports.owner) return { id: call.id, error: { code: "unconfigured", message: "Owner API unavailable" } };
+    try { return { id: call.id, result: await ports.owner(scope.workspaceId, call.params) }; }
+    catch { return { id: call.id, error: { code: "internal", message: "Owner API call failed" } }; }
+  }
   const context = { now: ports.now(), chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
   const key = scope.eventKey ? `${scope.eventKey}:${call.params.key}` : call.params.key;
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: call.method, key, createdAt: context.now };

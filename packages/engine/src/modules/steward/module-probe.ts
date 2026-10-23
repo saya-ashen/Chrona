@@ -21,7 +21,7 @@ export async function probeKeys(context: ModuleContext, staging: string, manifes
         const event = syntheticEvents(manifest, at).find(event => event.trigger.id === trigger.id)!;
         const output = await send(event);
         if ("error" in output.reply) throw new Error("Entry failed");
-        fires.push(output.calls.filter(call => call.method !== "model").map(call => `${call.method === "notify" ? "notify_user" : "wake_provider"}:${call.params.key}`));
+        fires.push(output.calls.flatMap(call => call.method === "notify" ? [`notify_user:${call.params.key}`] : call.method === "wakeProvider" ? [`wake_provider:${call.params.key}`] : []));
       }
       return fires;
     });

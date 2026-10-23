@@ -73,6 +73,8 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       await mkdir(dataDir, { recursive: true });
       instance.channel = await createModuleChannel(join(instance.dir, "s"), { timers, onCall: call => {
         const scope = { ...instance.scope };
+        // A chat request waits minutes for a reply; it must not hold back the module's other calls.
+        if (call.method === "owner") return handleModuleCall(ports, scope, call);
         const result = instance.calls.then(() => handleModuleCall(ports, scope, call));
         instance.calls = result.catch(() => {});
         return result;
@@ -80,7 +82,9 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       if (stopped || instance.closing) throw new Error("Module supervisor stopped");
       const contentDir = instance.manifest.content ? join(ports.dataDir, "platform/content", instance.moduleId) : undefined;
       if (contentDir) await mkdir(contentDir, { recursive: true });
-      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
+      const httpDir = instance.manifest.listen ? join(instance.dir, "http") : undefined;
+      if (httpDir) await mkdir(httpDir, { mode: 0o700 });
+      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
       instance.process = process;
       const exited = process.exited.then(() => { throw new Error("Module process exited"); });
       void exited.catch(() => {});
@@ -182,8 +186,20 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     instance.queue = result.catch(() => {});
     return result;
   }
+  /** The HTTP socket of the active module serving `path`, started if needed; null when none can serve it. */
+  async function listener(path: string) {
+    for (const module of await ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })) {
+      const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+      if (moduleManifestSchema.safeParse(version?.manifest).data?.listen !== path) continue;
+      await ensureActive(module.id);
+      const instance = instances.get(keyOf(module.id, module.activeHash!));
+      await instance?.start?.catch(() => {});
+      return instance?.dir && !instance.closing ? join(instance.dir, "http/s") : null;
+    }
+    return null;
+  }
   return {
-    deliver, reconcile,
+    deliver, reconcile, listener,
     async start() {
       if (started) return;
       stopped = false; started = true;

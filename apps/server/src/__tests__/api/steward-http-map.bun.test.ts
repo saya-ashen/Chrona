@@ -88,7 +88,7 @@ test("every contract HTTP route returns a successful, schema-valid response", as
     expect((await walk("/today", s.todayViewSchema)).apps).toEqual(expect.arrayContaining([expect.objectContaining({ id: module.id, status: "active", entry: "daily.ui.json" })]));
     await db.module.update({ where: { id: module.id }, data: { status: "paused" } });
 
-    const schedule = await walk("/schedules", s.scheduleSchema, "POST", { mode: "remind", rule: { kind: "daily", time: "09:00" }, text: "Remember" });
+    const schedule = await walk(`/schedules?sessionId=${chat.sessionId}`, s.scheduleSchema, "POST", { mode: "wake", rule: { kind: "daily", time: "09:00" }, text: "Check the inbox" });
     await walk("/schedules", list(s.scheduleSchema));
     await walk(`/schedules/${schedule.id}`, s.scheduleSchema, "PATCH", { status: "paused" });
     const approval = await api.approvals.create({ action: "send_external_message", title: "Send?", detail: "Fixture", preview: "Offline", payload: {} });

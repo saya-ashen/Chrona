@@ -31,7 +31,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model" } as Record<string, string>)[call.method];
+      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as Record<string, string>)[call.method];
       let reply: unknown;
       if (!capability || !manifest.effects.includes(capability)) reply = { error: { code: "undeclared", message: "Undeclared capability" } };
       else {
@@ -40,7 +40,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
         if (call.params.key !== undefined) seen.add(key);
         if (duplicate) reply = { result: { status: "duplicate" } };
         else if (call.method === "notify" || call.method === "wakeProvider") reply = { result: { status: "executed" } };
-        else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
+        else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : call.method === "owner" ? { status: 200, body: null } : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       }
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
     } else {
@@ -66,11 +66,14 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   });
   try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(path, resolve); }); }
   catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
-  const child = spawn(process.execPath, [entry], { env: { ...process.env, CHRONA_SOCKET: path }, stdio: "ignore" });
+  const httpSocket = join(dir, "http");
+  const child = spawn(process.execPath, [entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
   const exited = new Promise<void>(resolve => { child.once("error", () => { fail(); resolve(); }); child.once("close", () => { fail(); resolve(); }); });
   let queue: Promise<unknown> = Promise.resolve();
   return {
     calls,
+    /** Where `chrona.serve` listens: `fetch("http://module/...", { unix: httpSocket })`. */
+    httpSocket,
     send(event: Event): Promise<Reply> {
       const run = queue.then(() => new Promise<Reply>((resolve, reject) => {
         const id = randomUUID();

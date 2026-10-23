@@ -1,4 +1,6 @@
 import { startRescueListener } from "./rescue";
+import { createStewardRoutes } from "./routes/steward.routes";
+import { readEnv } from "./config/env";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,8 +134,24 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return running;
   }
   function wake() { void tickOnce(); }
+  let ownerRoutes: ReturnType<typeof createStewardRoutes> | undefined;
+  ports.owner = async (workspaceId, { method, path, body }) => {
+    ownerRoutes ??= createStewardRoutes(ports, service, wake);
+    const url = new URL(path, "http://owner");
+    url.searchParams.set("workspaceId", workspaceId);
+    const key = readEnv().API_KEY, headers = new Headers(key ? { authorization: `Bearer ${key}` } : {});
+    if (body !== undefined) headers.set("content-type", "application/json");
+    const response = await ownerRoutes.request(url.pathname + url.search, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    const text = await response.text();
+    // The module's channel drops lines over 2 MiB.
+    if (text.length > 1_000_000) return { status: 413, body: { code: "TOO_LARGE" } };
+    try { return { status: response.status, body: text ? JSON.parse(text) : null }; }
+    catch { return { status: response.status, body: null }; }
+  };
   return {
     ports, service, tickOnce, wake, localTest,
+    /** HTTP socket of the module declaring `listen: path`, or null. */
+    listener: (path: string) => moduleSupervisor(ports).listener(path),
     async health() {
       let providerHealth = { name: provider?.name ?? "unconfigured", available: false, sandboxed: false };
       try { if (provider) { const h = await provider.health(); providerHealth = { name: provider.name, available: h.available, sandboxed: h.sandboxed }; } } catch { /* Public health never exposes diagnostic secrets. */ }

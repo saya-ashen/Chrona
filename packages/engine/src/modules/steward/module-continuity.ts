@@ -39,9 +39,10 @@ async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: str
       const { reply, calls } = await send(event);
       continuity.output = { stdout: JSON.stringify(reply), stderr: "", exitCode: "error" in reply ? 1 : 0 };
       if ("error" in reply) { fail(continuity, "entry failed"); return; }
-      continuity.effects.push(...calls.filter(call => call.method !== "model").map(call => call.method === "notify"
-        ? { type: "notify_user" as const, ...call.params }
-        : { type: "wake_provider" as const, ...call.params }));
+      for (const call of calls) {
+        if (call.method === "notify") continuity.effects.push({ type: "notify_user", ...call.params });
+        else if (call.method === "wakeProvider") continuity.effects.push({ type: "wake_provider", ...call.params });
+      }
     }
     continuity.status = "passed"; delete continuity.reason;
   });

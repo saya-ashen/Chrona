@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@chrona/db";
-import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
+import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter, moduleCallReplySchema } from "@chrona/contracts/steward";
+type OwnerReply = Extract<Extract<ReturnType<typeof moduleCallReplySchema.parse>, { result: unknown }>["result"], { body: unknown }>;
 /** Only trusted owner routes may resolve. The caller executes the returned payload,
  * rechecking policy and atomically consuming a once grant with its action claim. */
 export type ApprovedAction = { workspaceId: string; approvalId: string; grantId: string; payload: Prisma.JsonValue };
@@ -15,6 +16,8 @@ export type StewardPorts = {
   modelGateway?: {
     complete(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
   };
+  /** Owner API for entry modules (v2-4): one request of the HTTP map, as the user. */
+  owner?(workspaceId: string, request: { method: string; path: string; body?: unknown }): Promise<OwnerReply>;
   moduleBuildResources?: { sdk: string; testing: string };
   moduleBuiltinResources?: string;
   chatTimeoutMs?: number;
@@ -24,7 +27,7 @@ export type StewardPorts = {
   connectors?: ConnectorAdapter[];
   sandbox?: {
     available: boolean;
-    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; socketPath: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void };
+    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; entry: string; socketPath: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void };
     run?(input: { command: string; cwd: string; timeoutMs: number; maxOutputBytes: number }): Promise<{ output: string; exitCode: number }>;
     runModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;
   };

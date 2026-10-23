@@ -91,7 +91,7 @@ test("owner MCP is owner protected, lists the owner tools and returns only publi
   };
   expect((await rpc("tools/list", {}, {})).status).toBe(401);
   expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).status).toBe(200);
-  expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name)).toEqual(["chrona_today", "chrona_content_tree", "chrona_content_read", "chrona_content_write", "chrona_chat", "chrona_approvals", "chrona_approval_resolve", "chrona_modules", "chrona_notifications"]);
+  expect((await rpc("tools/list")).body!.result.tools!.map(tool => tool.name)).toEqual(["chrona_today", "chrona_apps", "chrona_sessions", "chrona_session", "chrona_session_update", "chrona_session_new", "chrona_session_messages", "chrona_content_tree", "chrona_content_read", "chrona_content_write", "chrona_chat", "chrona_approvals", "chrona_approval_resolve", "chrona_modules", "chrona_notifications"]);
   expect(JSON.parse((await rpc("tools/call", { name: "chrona_modules", arguments: {} })).body!.result.content![0]!.text)).toEqual([]);
   expect((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "missing" } })).body!.result).toEqual({ content: [{ type: "text", text: "not_found: Content area not found" }], isError: true });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });

@@ -101,6 +101,22 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   mountHealthRoutes(app, steward);
 
   app.route("/api", api);
+  // Paths no kernel route claimed go to the module declaring `listen` for them (v2-4).
+  app.all("/api/:name/*", async (c) => {
+    const socket = await steward.listener(`/api/${c.req.param("name")}`);
+    if (!socket) return c.json({ code: "NOT_FOUND" }, 404);
+    const url = new URL(c.req.url), headers = new Headers(c.req.raw.headers);
+    headers.delete("authorization");
+    headers.delete("cookie");
+    try {
+      const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: c.req.method, headers, body: c.req.raw.body, redirect: "manual" });
+      const out = new Headers(response.headers);
+      out.delete("set-cookie");
+      return new Response(response.body, { status: response.status, headers: out });
+    } catch {
+      return c.json({ code: "MODULE_UNAVAILABLE" }, 503);
+    }
+  });
   if (spaAvailable) {
     const serveSpaAsset = createSpaAssetMiddleware();
     const serveSpaIndex = createSpaIndexMiddleware();

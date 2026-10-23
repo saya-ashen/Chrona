@@ -73,7 +73,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
       return execute({ language, args: [language === "typescript" ? "-e" : "-c", source], input, profile, runTimeout, outputLimit });
     },
-    startModule({ codeDir, dataDir: moduleData, contentDir, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; socketPath: string; network?: boolean }) {
+    startModule({ codeDir, dataDir: moduleData, contentDir, httpDir, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; entry: string; socketPath: string; network?: boolean }) {
       if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
       const language = ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
       const interpreter = interpreters[language];
@@ -88,7 +88,10 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       // The module's own content area, read-write; other modules' areas are never mounted.
       if (contentDir) profile.push("--bind", workspaceDirectory(contentDir)!, "/content");
       profile.push("--dir", "/chrona", "--ro-bind", socket, "/chrona/chrona.sock",
-        "--ro-bind", moduleSdk, "/chrona/sdk.ts", "--remount-ro", "/");
+        "--ro-bind", moduleSdk, "/chrona/sdk.ts");
+      // `listen` modules create their HTTP socket here; Chrona proxies to it.
+      if (httpDir) profile.push("--bind", resolve(httpDir), "/chrona/http");
+      profile.push("--remount-ro", "/");
       if (!network) profile.splice(profile.indexOf("--share-net"), 1);
       const child = spawn(bwrap, [...profile, "--", shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "sandbox", String(memoryMb * 1024), interpreter, `/module/${entry}`], { env: {}, stdio: ["ignore", "ignore", "pipe"] });
       let errors = Buffer.alloc(0);

@@ -64,7 +64,12 @@ function call<T = CallResult>(method: string, params: unknown): Promise<T> {
     try { send({ id, method, params }); } catch (error) { pending.delete(id); reject(error); }
   });
 }
+export type OwnerResult = { status: number; body: unknown };
 export const chrona = {
+  /** Owner API (`owner` capability): one request of Chrona's /api/steward HTTP map, as the user. */
+  owner: (params: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown }) => call<OwnerResult>("owner", params),
+  /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
+  serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
   model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => call<ModelResult>("model", params),
   notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => call("notify", params),
   wakeProvider: (params: { key: string; prompt: string }) => call("wakeProvider", params),

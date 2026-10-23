@@ -1,6 +1,6 @@
 # v2-4 规格：交互入口模块化与不可变救援控制台
 
-状态：草案，未实现（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
+状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c–e（入口模块化）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 目标
@@ -37,8 +37,8 @@
 ```
 
 - `keepAlive: true`：保持 QQ 长连接等外连。
-- `listen: "/api/mcp"`：内核把该路径的请求（已认证）作为 `http` 事件投递给模块；`listen: "/"` 表示该模块提供网页。
-- `owner`：可调用 `owner.*`（owner API）。`secret:<connector>`：可用 `secret.get` 取该连接器凭据。
+- `listen: "/api/mcp"`：模块在 `/chrona/http/s`（unix socket）上运行自己的 HTTP 服务（SDK：`chrona.serve(fetch)`）；内核认证后把 `/api/mcp` 与 `/api/mcp/*` 反向代理过去，去掉 `Authorization` 与 `Cookie`（响应去掉 `Set-Cookie`）。并发、流式响应和大响应体都由 HTTP 本身承担，不经事件通道。要求 `keepAlive`；同一路径只能有一个启用的模块；`/api/steward*`、`/api/workspaces`、`/api/health` 保留给内核。网页（`listen: "/"`）的形式留到 v2-4e 再定。
+- `owner`：可调用 `owner`（SDK：`chrona.owner({ method, path, body })`）。owner API 就是 `/api/steward` 的 HTTP 映射（见 contract），由内核在进程内转发、注入 `workspaceId`；只支持 JSON，不含上传与原始下载；不与模块的其他调用排队。`secret:<connector>`：可用 `secret.get` 取该连接器凭据（v2-4d）。
 
 ### 3.1 `owner` 能力 = 用户的权力
 
@@ -105,7 +105,7 @@ chrona admin approve|reject <approvalId>
 
 每阶段结束 Chrona 都完整可用；**救援控制台必须先于任何入口模块可修改上线。**
 
-1. v2-4a：owner API 定型（从现有 HTTP 映射与 owner MCP 提取）；`listen` 的 HTTP 事件投递。
+1. v2-4a：owner API = 现有 HTTP 映射（`owner` 调用）；`listen` 反向代理到模块的 HTTP socket。
 2. v2-4b：救援控制台；§4 的仅救援审批与 `change_policy`。
 3. v2-4c：`mcp` 模块化（最小，用来验证 listen + owner）。
 4. v2-4d：`qq` 模块化。
@@ -123,6 +123,5 @@ chrona admin approve|reject <approvalId>
 ## 9. 未决问题
 
 - 网页模块的离线构建：依赖缓存的范围、如何审查新增依赖。
-- HTTP 事件经 socket 投递的延迟与流式响应（对话流、SSE）。
 - 救援端口在 NixOS 部署中的暴露方式（仅本机 + SSH 隧道，或局域网）。
 - 入口模块持有 QQ 凭据后可以外传；按主机放行网络（P5 HTTP 代理）是前提还是并行项。
