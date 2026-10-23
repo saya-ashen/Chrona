@@ -80,7 +80,11 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const transport = configuredTransport(db, options);
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts"), moduleTesting: resourcePath(join("module-sdk", "testing.ts"), "packages/integrations/src/steward/module-sdk/testing.ts") });
+  const moduleBuildResources = {
+    sdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts"),
+    testing: resourcePath(join("module-sdk", "testing.ts"), "packages/integrations/src/steward/module-sdk/testing.ts"),
+  };
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: moduleBuildResources.sdk, moduleTesting: moduleBuildResources.testing });
   const sandbox: StewardPorts["sandbox"] = {
     available: scriptSandbox.health.available,
     runModule: input => scriptSandbox.runModule(input),
@@ -96,7 +100,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
-    sandbox: options.sandbox ?? sandbox, chatTimeoutMs: options.chatTimeoutMs,
+    sandbox: options.sandbox ?? sandbox, moduleBuildResources, chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;

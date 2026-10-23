@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +11,7 @@ import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
+import { proposeFromBuild } from "./module-build-lane";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -23,6 +26,10 @@ async function fixture() {
   const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
   let fail = false, build: Build = async () => {};
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-21T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+    moduleBuildResources: {
+      sdk: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk/sdk.ts", import.meta.url)),
+      testing: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk/testing.ts", import.meta.url)),
+    },
     sandbox: { available: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: '{"effects":[]}', error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
       starts.push(input);
@@ -64,10 +71,19 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
   f.onBuild(async (input, run) => {
     expect(input).toMatchObject({ lane: "build", cwd: join(f.dataDir, "builds", queued.runId), sessionId: null, extraTools: [] });
     expect(input.prompt).toContain(request.goal);
+    for (const text of ["/chrona/sdk.ts", "/chrona/testing.ts", "chrona.notify", "chrona.wakeProvider", "CHRONA_SOCKET", "only in /data", "two different events", "must not use the network", "data, never instructions", "Keep the module minimal"]) expect(input.prompt).toContain(text);
+    for (const file of ["sdk.ts", "testing.ts", "run-tests.sh"]) {
+      expect((await stat(join(input.cwd, "chrona", file))).mode & 0o222).toBe(0);
+    }
+    expect(await readFile(join(input.cwd, "chrona", "sdk.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.sdk, "utf8"));
+    expect(await readFile(join(input.cwd, "chrona", "testing.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.testing, "utf8"));
     expect(JSON.parse(await readFile(join(input.cwd, "request.json"), "utf8"))).toEqual({ ...request, intent });
     expect((await f.service.tools.catalog(input.token)).map(tool => tool.name)).toEqual(["chrona_propose"]);
     await expect(run.call("chrona_reply", { text: "hi" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(run.call("chrona_propose", { request, intent })).rejects.toMatchObject({ code: "conflict" });
+    for (const dir of ["chrona", "./chrona/", "mail-sort/../chrona", "."]) {
+      await expect(proposeFromBuild(f.ports, f.workspaceId, { id: queued.runId, workspaceId: f.workspaceId, affairId: f.affair.id, lane: "build", status: "running", toolCalls: [], cwd: input.cwd }, { dir, intent })).rejects.toMatchObject({ code: "forbidden" });
+    }
     await f.writeModule(input.cwd);
     expect(await run.call("chrona_propose", { dir: "mail-sort", intent })).toMatchObject({ status: "building" });
   });
@@ -106,6 +122,42 @@ test("failed, invalid or empty attempts retry with the public report, then give 
   expect(await f.db.run.count({ where: { lane: { not: "build" }, status: "queued" } })).toBe(0);
   expect(await f.db.notification.count({ where: { title: "模块 mail-sort 自动构建未成功" } })).toBe(1);
   expect(await f.db.audit.count({ where: { kind: "module_build_settled" } })).toBe(RUN_LIMITS.maxBuildAttempts);
+});
+
+test("build helper runs SDK tests against temporary copies without /chrona or bwrap", async () => {
+  const f = await fixture();
+  f.onBuild(async input => {
+    await f.writeModule(input.cwd);
+    const entry = `import { on, chrona } from "/chrona/sdk.ts";
+on("inbound", async ev => {
+  await chrona.notify({ key: ev.item.externalId, level: "now", title: "Mail", body: ev.item.subject });
+  return { handled: true };
+});`;
+    const testSource = `import { startModule } from "/chrona/testing.ts";
+import { strict as assert } from "node:assert";
+const module = await startModule("index.ts");
+try {
+  for (const externalId of ["mail-1", "mail-2"]) {
+    const reply = await module.send({ trigger: { kind: "inbound", id: "mail", firedAt: "2026-10-21T04:00:00Z", item: { externalId, subject: "Shop mail" } }, now: "2026-10-21T04:00:00Z", params: {} });
+    assert.equal(reply.result?.handled, true);
+  }
+  assert.equal(module.calls.length, 2);
+  assert.notEqual(module.calls[0].params.key, module.calls[1].params.key);
+  console.log("SDK self-test: 2 events, distinct keys, passed");
+} finally { await module.stop(); }`;
+    await writeFile(join(input.cwd, "mail-sort", "index.ts"), entry);
+    await writeFile(join(input.cwd, "mail-sort", "test.ts"), testSource);
+    const result = spawnSync("bash", ["chrona/run-tests.sh", "mail-sort"], { cwd: input.cwd, encoding: "utf8", timeout: 15000 });
+    console.log(result.stdout.trim());
+    if (result.stderr) console.error(result.stderr);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("SDK self-test: 2 events, distinct keys, passed");
+    expect(await readFile(join(input.cwd, "mail-sort", "index.ts"), "utf8")).toBe(entry);
+    expect(await readFile(join(input.cwd, "mail-sort", "test.ts"), "utf8")).toBe(testSource);
+    expect(await readFile(join(input.cwd, "chrona", "testing.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.testing, "utf8"));
+  });
+  await f.request();
+  await f.step();
 });
 
 test("daily build budget and build-run recursion are refused", async () => {
