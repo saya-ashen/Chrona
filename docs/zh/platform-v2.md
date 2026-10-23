@@ -1,6 +1,6 @@
 # Chrona 平台 v2：总体架构
 
-状态：v2-1、v2-2（含内置模块机制与 `files`）已在 `v2-2` 分支实现（2026-10-23），其余分篇为草案。本文是 v2 的总纲，细节见 §10 列出的分篇规格。
+状态：v2-1、v2-2（含内置模块机制与 `files`）、v2-3（内置 `remind`、模块 `model` 能力）已在 `platform-v2` 分支实现（2026-10-23），其余分篇为草案。本文是 v2 的总纲，细节见 §10 列出的分篇规格。
 用户 2026-10-22 决定：**删除"事务"概念**，以本文的模块（应用）与会话重新设计。[steward-goals](steward-goals.md) 已按本文改写；原 `steward-workspace.md`（事务工作区模型）已删除。
 P0–P5 的实现记录见 [platform-upgrade-plan](platform-upgrade-plan.md)。
 

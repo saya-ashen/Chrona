@@ -1,6 +1,6 @@
 # v2-3 规格：内置模块、`remind` 与模块的 `model` 能力
 
-状态：草案，未实现（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §0、§3.4 与范式 `~/workspace/agent-growth-lab/docs/self-modification-paradigm.md` §3–§4。
+状态：已实现（2026-10-23，`platform-v2`）；真实模型调用尚未验证（需另行授权）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)。背景见 [platform-upgrade-plan](platform-upgrade-plan.md) §0、§3.4 与范式 `~/workspace/agent-growth-lab/docs/self-modification-paradigm.md` §3–§4。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 问题
