@@ -44,12 +44,12 @@ test("rescue listener refuses to start without a key", async () => {
   expect(startRescueListener(f.ports, f.service, htmlPath, { CHRONA_RESCUE_PORT: "3199" }, message => logs.push(message))).toBeUndefined();
   expect(logs).toEqual(["Rescue listener not started: RESCUE_KEY is required"]);
 });
-test("rescue approval list includes rescueOnly and resolve allows once/always", async () => {
+test("rescue approval list shows previews and resolve allows once/always", async () => {
   const f = await fixture();
   for (const scope of ["once", "always"]) {
     const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Changes", preview: "diff", payload: {} });
     const list = await (await f.request("/api/approvals")).json();
-    expect(list.items).toContainEqual(expect.objectContaining({ id: approval.id, rescueOnly: true, preview: "diff" }));
+    expect(list.items).toContainEqual(expect.objectContaining({ id: approval.id, preview: "diff" }));
     const result = await f.request(`/api/approvals/${approval.id}/resolve`, { decision: "approve", scope });
     expect(result.status).toBe(200);
     expect((await result.json()).status).toBe("approved");
@@ -68,24 +68,24 @@ test("rescue chat uses only session rescue; Provider failure points to chrona ad
   expect((await f.request("/api/chat", { text: "hi", attachments: [] })).status).toBe(400);
 });
 // The mcp module resolves through this same owner HTTP route.
-test("HTTP, MCP and QQ cannot resolve rescue-only approvals", async () => {
+test("HTTP and QQ resolve policy approvals like any other", async () => {
   const f = await fixture();
   const saved = process.env.API_KEY;
   process.env.API_KEY = "owner-test-key";
   resetEnvCacheForTests();
   try {
-    const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });
+    const create = () => f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });
+    const viaHttp = await create(), viaQq = await create();
     const headers = { Authorization: "Bearer owner-test-key", "Content-Type": "application/json" };
     const http = createStewardRoutes(f.ports, f.service);
-    const response = await http.request(`/approvals/${approval.id}/resolve?workspaceId=ws_default`, { method: "POST", headers, body: JSON.stringify({ decision: "approve" }) });
-    expect(response.status).toBe(403);
-    expect((await response.json()).message).toContain("rescue console");
+    const response = await http.request(`/approvals/${viaHttp.id}/resolve?workspaceId=ws_default`, { method: "POST", headers, body: JSON.stringify({ decision: "approve" }) });
+    expect(response.status).toBe(200);
     const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
-    // The qq module resolves through the owner API, as an entry: refused.
+    // The qq module resolves through the owner API, as an entry.
     const owner = ownerApi(f.ports, f.service, () => {});
     const relay = createRelay({ owner: request => owner("ws_default", request), publicUrl: null, download: async () => { throw new Error("unused"); } });
-    expect(await relay.resolveApproval(binding, { ref: approval.id, decision: "approve", scope: "once" })).toContain("救援控制台");
-    expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(1);
+    expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
+    expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
   } finally {
     if (saved === undefined) delete process.env.API_KEY; else process.env.API_KEY = saved;
     resetEnvCacheForTests();

@@ -6,7 +6,6 @@ export type Owner = (request: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELE
 type Attachment = { name: string; ref: string | null; mime: string; size: number };
 type Message = { id: string; sessionId: string; text: string; attachments: Attachment[] };
 type Download = (attachment: QqAttachment) => Promise<{ name: string; mime: string; bytes: Uint8Array }>;
-export const RESCUE_ONLY = "【Chrona】请在救援控制台处理这条审批（或使用 chrona admin）。";
 
 async function call<T>(owner: Owner, request: Parameters<Owner>[0]): Promise<T> {
   const reply = await owner(request);
@@ -82,13 +81,11 @@ export function createRelay({ owner, publicUrl, download, pollMs = 2000 }: { own
     chat, later,
     /** The bound owner's decision on one open approval, addressed by an id prefix. */
     async resolveApproval(_binding: QqBinding, decision: ApprovalDecision) {
-      const open = (await call<{ items: { id: string; title: string; rescueOnly: boolean }[] }>(owner, { method: "GET", path: "/approvals?status=open" })).items;
+      const open = (await call<{ items: { id: string; title: string }[] }>(owner, { method: "GET", path: "/approvals?status=open" })).items;
       const matches = open.filter(approval => approval.id.startsWith(decision.ref));
       if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
       const approval = matches[0]!;
-      if (approval.rescueOnly) return RESCUE_ONLY;
       const reply = await owner({ method: "POST", path: `/approvals/${encodeURIComponent(approval.id)}/resolve`, body: { decision: decision.decision, scope: decision.scope } });
-      if (reply.status === 403) return RESCUE_ONLY;
       if (reply.status >= 400) throw new Error(`Approval resolve failed (${reply.status})`);
       return `【Chrona】已${decision.decision === "deny" ? "拒绝" : decision.scope === "always" ? "批准（始终允许）" : "批准"}：${approval.title}`;
     },

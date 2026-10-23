@@ -33,7 +33,7 @@ test("admin reads while runtime locked but refuses writes; approval audit source
   const approval = await f.api.approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
   try {
-    expect(await runAdmin("approvals", [], f.options)).toContainEqual(expect.objectContaining({ rescueOnly: true }));
+    expect(await runAdmin("approvals", [], f.options)).toContainEqual(expect.objectContaining({ id: approval.id }));
     expect(await runAdmin("modules", [], f.options)).toContainEqual({ name: "rescue", status: "immutable" });
     await expect(runAdmin("approve", [approval.id], f.options)).rejects.toThrow("already in use");
   } finally { lock.release(); }
@@ -46,12 +46,12 @@ test("admin reads while runtime locked but refuses writes; approval audit source
     expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
   } finally { log.mockRestore(); }
 });
-test("admin rollback uses hash-bound rescue approvals, supports builtin, and disable pauses schedules", async () => {
+test("admin rollback activates entry modules directly, supports builtin, and disable pauses schedules", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   try {
     await runAdmin("rollback", [f.module.name, "b".repeat(64)], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: "b".repeat(64) });
-    expect(await f.db.approval.findFirst({ where: { moduleId: f.module.id } })).toMatchObject({ rescueOnly: true, status: "approved", payload: { hash: "b".repeat(64) } });
+    expect(await f.db.approval.count({ where: { moduleId: f.module.id } })).toBe(0);
     await runAdmin("rollback", [f.module.name, "builtin"], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: "a".repeat(64) });
     await runAdmin("disable", [f.module.name], f.options);

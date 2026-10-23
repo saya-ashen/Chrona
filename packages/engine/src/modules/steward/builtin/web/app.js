@@ -45,10 +45,8 @@ function approvalItem(approval, after) {
     h("div", {}, h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
     approval.detail && h("div", {}, approval.detail),
     approval.preview && h("details", {}, h("summary", {}, "详情"), h("pre", {}, approval.preview)),
-    approval.rescueOnly
-      ? h("p", { class: "muted" }, "这条只能在救援控制台或用 chrona admin 处理。")
-      : h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"),
-          approval.moduleId && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
+    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"),
+      approval.moduleId && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
 }
 async function today() {
   const view = await api("/today");

@@ -88,7 +88,7 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
   z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
 ]);
-/** `owner` acts as the user (entry modules, v2-4): its activation and policy changes are approved only in the rescue console. */
+/** `owner` acts as the user (entry modules, v2-4): its activation always needs an approval. */
 export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model", "owner"] as const;
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
@@ -166,7 +166,7 @@ export const moduleManifestSchema = z.object({
   });
 });
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
-/** Acts as the user, or serves the page holding the user's key: approved only in the rescue console, never automatic. */
+/** Acts as the user, or serves the page holding the user's key: never activated automatically. */
 export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string }) => manifest.effects.includes("owner") || manifest.listen === "/";
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
@@ -302,8 +302,6 @@ export const approvalSchema = z.object({
   /** Exactly what will be done, shown to the user (e.g. the email draft). */
   preview: z.string().max(20_000),
   status: z.enum(APPROVAL_STATUSES), createdAt: iso, resolvedAt: iso.nullable(),
-  /** Only the rescue console or `chrona admin` may resolve it (entry-module changes, change_policy). */
-  rescueOnly: z.boolean(),
 }).strict();
 
 export const grantScopeSchema = z.discriminatedUnion("kind", [
@@ -463,8 +461,8 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /health
  * Rescue console (v2-4 §5): separate listener (`CHRONA_RESCUE_PORT`, loopback by default), `Authorization: Bearer <RESCUE_KEY>`,
  * never proxied to a module:  GET / (static page) · POST /api/chat {text} -> ChatReply (session key "rescue") ·
- *   GET /api/messages -> {items: Message[]} · GET /api/approvals -> {items: Approval[]} (open, incl. rescueOnly) ·
- *   POST /api/approvals/:id/resolve (ResolveApproval) -> Approval. Other entries refuse rescueOnly approvals with 403.
+ *   GET /api/messages -> {items: Message[]} · GET /api/approvals -> {items: Approval[]} (open) ·
+ *   POST /api/approvals/:id/resolve (ResolveApproval) -> Approval.
  * Modules declaring `listen` serve /api/<name> (see the manifest). Activation and rollback go through approvals
  * and Provider tools; module versions and module tools are reached through the owner MCP (`chrona_modules`, `m_*` tools).
  * Entry modules reach this map through the `owner` call; multipart uploads and raw downloads are not available there.

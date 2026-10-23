@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
-import { approvalSchema, moduleManifestSchema, resolveApprovalSchema, isEntryModule } from "@chrona/contracts/steward";
+import { approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
 import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -23,17 +23,12 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       const input = parseInput(inputSchema, raw);
       if (input.moduleId && !await tx.module.findFirst({ where: { workspaceId, id: input.moduleId } })) throw new StewardError("not_found", "Module not found");
       if (input.payload === null) throw new StewardError("invalid", "Approval payload must not be null");
-      let rescueOnly = input.action === "change_policy";
       if (input.action === "activate_module") {
         const payload = input.payload;
         if (!input.moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
-        const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: input.moduleId, hash: payload.hash } } });
-        if (!version) throw new StewardError("not_found", "Module version not found");
-        const module = await tx.module.findUniqueOrThrow({ where: { id: input.moduleId } });
-        const active = module.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-        rescueOnly = isEntryModule(moduleManifestSchema.parse(version.manifest)) || Boolean(active && isEntryModule(moduleManifestSchema.parse(active.manifest)));
+        if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: input.moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
       }
-      const row = await tx.approval.create({ data: { ...input, rescueOnly, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
+      const row = await tx.approval.create({ data: { ...input, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
       return toApproval(row);
     }),
@@ -41,7 +36,6 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       const input = parseInput(resolveApprovalSchema, raw);
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
-      if (row.rescueOnly && source !== "rescue" && source !== "cli") throw new StewardError("forbidden", "Approve or reject this item in the rescue console (or chrona admin)");
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
       let grantId: string | null = null;
       if (input.decision === "approve") {
