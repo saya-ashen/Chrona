@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { testDb } from "./test-db";
 import { registerBuiltins } from "./module-builtin";
@@ -50,6 +50,14 @@ test("built-in fresh registration and second start: validated, tested, active, n
   } finally { await f.close(); }
 });
 
+test("built-ins register from a release directory whose files are hard-linked (Nix store optimisation)", async () => {
+  const f = await fixture();
+  try {
+    for (const name of ["module.json", "index.ts", "test.ts"]) await link(join(f.code, name), join(f.root, `${name}.link`));
+    await f.start();
+    expect(await f.current()).toMatchObject({ builtin: true, status: "active" });
+  } finally { await f.close(); }
+});
 test.each([false, true])("built-in upgrade preserves user version: %s", async user => {
   const f = await fixture();
   try {
