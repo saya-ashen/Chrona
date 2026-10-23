@@ -25,11 +25,11 @@ export const providerAnswerSchema = z.discriminatedUnion("decision", [
   z.object({ decision: z.literal("submit"), value: z.union([z.boolean(), z.number().int().nonnegative(), z.string().max(8000)]) }).strict(),
 ]);
 export const providerInteractionSchema = z.object({
-  id, runId: id, affairId: id.nullable(), question: providerQuestionSchema, createdAt: iso, expiresAt: iso,
+  id, runId: id, sessionId: id.nullable(), question: providerQuestionSchema, createdAt: iso, expiresAt: iso,
   status: z.enum(["pending", "answered", "cancelled", "expired", "interrupted"]),
 }).strict();
 export const providerRunViewSchema = z.object({
-  id, affairId: id.nullable(), affairTitle: z.string().max(200).nullable(), active: z.boolean(),
+  id, sessionId: id.nullable(), sessionTitle: z.string().max(200).nullable(), active: z.boolean(),
   status: z.string().max(40), progress: providerProgressSchema.nullable(), usage: providerUsageSchema.nullable(),
   resources: providerResourcesSchema.nullable(), interactions: z.array(providerInteractionSchema).max(12), updatedAt: iso,
 }).strict();

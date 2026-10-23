@@ -1,11 +1,8 @@
 /**
- * Personal-steward shared contract, v3 (workspace model). Supervisor-owned.
- * Design: docs/zh/steward-workspace.md. The AI is a Provider (Pi first) that brings its own
- * file editing, shell, web and session tools. Chrona only supplies what a Provider cannot:
- * scheduling, triggers, persistence/history, delivery, external connectors and credentials,
- * approvals, resource limits, file intake and rendering.
- *
- * An affair is a git-versioned directory of Markdown files that the Provider organizes freely.
+ * Chrona shared contract, platform v2. Supervisor-owned.
+ * Design: docs/zh/platform-v2.md. Chrona's features are modules (apps); each module may own a
+ * content area the user and the Provider read and edit. Conversations with the Provider are
+ * sessions, keyed by the entry that owns them. There are no affairs.
  */
 import { z } from "zod";
 import type { ProviderEvents } from "./provider";
@@ -16,24 +13,25 @@ const iso = z.string().datetime({ offset: true }).max(40);
 const short = z.string().trim().min(1).max(200);
 const text = z.string().trim().min(1);
 const hhmm = z.string().regex(/^\d\d:\d\d$/);
-/** Path inside an affair directory: relative, no `..`, no leading slash, not under `.git`. */
-export const affairPathSchema = z.string().trim().min(1).max(500)
+/** Relative path inside a content area or session directory: no `..`, no leading slash, not under `.git`. */
+export const relativePathSchema = z.string().trim().min(1).max(500)
   .refine(p => !p.startsWith("/") && !p.split("/").some(s => s === ".." || s === "" || s === ".git"), "invalid path");
 
 // ---------------------------------------------------------------- vocab ----
 
-export const AFFAIR_STATUSES = ["active", "paused", "done"] as const;
+export const SESSION_SOURCES = ["web", "qq", "mcp", "rescue", "wake", "module"] as const;
+export const SESSION_STATUSES = ["active", "ended"] as const;
 export const RUN_LANES = ["foreground", "background", "build"] as const;
 export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
-export const ACTIVITY_ACTORS = ["user", "chrona", "source"] as const;
-export const ACTIVITY_KINDS = ["message", "edit", "run", "schedule", "approval", "notification", "source", "status", "note"] as const;
-/** `wake` runs the Provider; `remind` sends stored text without a model call.
+/** `wake` runs the Provider in a fresh session and reports back to the session that created it;
+ * `remind` sends stored text without a model call (moves into the built-in remind module in v2-3);
  * `module` rows are created only by Chrona on module activation/rollback. */
 export const SCHEDULE_MODES = ["wake", "remind", "module"] as const;
 export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
-export const APPROVAL_SCOPES = ["once", "affair"] as const;
+/** `always` turns the decision into a grant: scoped to the module the approval is about, else global. */
+export const APPROVAL_SCOPES = ["once", "always"] as const;
 
 /** Actions Chrona itself performs for the Provider and therefore gates. Provider-native actions are governed by the Provider runtime/sandbox. */
 export const ACTIONS = [
@@ -54,13 +52,13 @@ export const DEFAULT_NOTIFICATION_SETTINGS = { dailyCap: 5, quietHours: { start:
 
 export const CONNECTOR_KINDS = ["email", "chino_service_health", "local_test"] as const;
 export const CONNECTOR_STATUSES = ["active", "paused", "needs_authorization", "failing"] as const;
-/** What happens to one inbound item. Rules are written by the Provider (`.chrona/rules.json` in the affair dir) and executed by Chrona without a model. */
+/** What happens to one inbound item. Rules live in the `files` content area at `inbox/<connectorId>/rules.json` (until sources become modules in v2-5) and run without a model. */
 export const RULE_ACTIONS = ["wake_now", "batch", "digest_only", "ignore"] as const;
 export const INBOUND_STATUSES = ["new", "delivered", "ignored"] as const;
 
 export const RUN_LIMITS = {
   foregroundTimeoutMs: 5 * 60_000, backgroundTimeoutMs: 20 * 60_000,
-  maxChronaToolCalls: 60, maxRunsPerAffairPerDay: 24, maxFailures: 3,
+  maxChronaToolCalls: 60, maxRunsPerSessionPerDay: 24, maxRunsPerDay: 200, maxFailures: 3,
   /** Inbound items are delivered to the Provider in batches: wait this long after the first item, then wake once. */
   inboundBatchWindowMs: 5 * 60_000, maxItemsPerBatch: 50,
   jobTimeoutMs: 60_000, jobOutputBytes: 64 * 1024,
@@ -68,12 +66,10 @@ export const RUN_LIMITS = {
   buildTimeoutMs: 10 * 60_000, maxBuildAttempts: 3, maxBuildRunsPerDay: 6, maxBuildSubmissionsPerRun: 3,
 } as const;
 
-export type AffairStatus = (typeof AFFAIR_STATUSES)[number];
+export type SessionSource = (typeof SESSION_SOURCES)[number];
 export type RunLane = (typeof RUN_LANES)[number];
 export type RunTrigger = (typeof RUN_TRIGGERS)[number];
 export type RunStatus = (typeof RUN_STATUSES)[number];
-export type ActivityActor = (typeof ACTIVITY_ACTORS)[number];
-export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
 export type Action = (typeof ACTIONS)[number];
 export type GrantMode = (typeof GRANT_MODES)[number];
@@ -114,6 +110,8 @@ export const moduleManifestSchema = z.object({
   tools: z.array(moduleToolSchema).max(5).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
+  /** Owns a content area (pages, panels, files) the user and the Provider can read and edit; the module sees it at /content. */
+  content: z.boolean().default(false),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -151,6 +149,8 @@ export const moduleEventSchema = z.object({
     z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso }).strict(),
     z.object({ kind: z.literal("inbound"), id: slug, firedAt: iso, item: z.object({ externalId: z.string(), from: z.string(), subject: z.string(), receivedAt: iso, body: z.string() }).strict() }).strict(),
     z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()) }).strict(),
+    /** The user or the Provider changed files in this module's content area (`id` is always "content"). */
+    z.object({ kind: z.literal("content_edit"), id: z.literal("content"), firedAt: iso, paths: z.array(relativePathSchema).min(1).max(200), by: z.enum(["user", "provider"]) }).strict(),
   ]),
   now: iso,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
@@ -174,9 +174,12 @@ export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 export const scheduleSchema = z.object({
-  id, affairId: id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
-  /** wake: instruction to the future Provider run; remind: the exact text sent to the user. */
+  id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
+  /** wake: self-contained instruction for a fresh Provider session; remind: the exact text sent to the user. */
   text: z.string().max(4000),
+  /** wake: the session the result is posted back to. */
+  originSessionId: id.nullable(),
+  moduleId: id.nullable(),
   /** Optional end: after this time the schedule stops. */
   until: iso.nullable(),
   status: z.enum(SCHEDULE_STATUSES), nextAt: iso.nullable(), lastAt: iso.nullable(), lastResult: z.string().max(2000).nullable(),
@@ -187,53 +190,51 @@ export const scheduleSchema = z.object({
 
 // ---------------------------------------------------------------- views ----
 
-export const affairSchema = z.object({
-  id, title: short, status: z.enum(AFFAIR_STATUSES),
-  /** First paragraph of README.md, as written by the Provider. */
-  summary: z.string().max(1000),
-  /** `label` is the schedule's label, or a reminder's own text; null for an unlabelled wake/module (its text is internal). */
-  nextSchedule: z.object({ at: iso, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable() }).strict().nullable(),
-  running: z.boolean(),
-  /** Work Chrona is doing or about to do on this affair right now. */
-  work: z.object({ state: z.enum(["queued", "running"]), since: iso, label: z.string().max(80).nullable() }).strict().nullable(),
-  openApprovals: z.number().int().min(0),
-  lastActivityAt: iso, createdAt: iso,
+/** A conversation with the Provider. Entries decide keys (`qq:dm`, `web:<id>`, `rescue`); `wake`/`module` sessions are created per run. */
+export const sessionSchema = z.object({
+  id, key: z.string().max(200), source: z.enum(SESSION_SOURCES), title: z.string().max(200).nullable(),
+  status: z.enum(SESSION_STATUSES), moduleId: id.nullable(), originSessionId: id.nullable(),
+  /** Module names whose content areas Provider runs in this session may write. */
+  focus: z.array(slug).max(10),
+  running: z.boolean(), lastActivityAt: iso, createdAt: iso, endedAt: iso.nullable(),
+}).strict();
+
+/** A module as an app: identity, state and whether it has a content area (its pages). */
+export const appSchema = z.object({
+  id, name: slug, description: z.string().max(300).nullable(), status: z.enum(["active", "paused"]),
+  builtin: z.boolean(), content: z.boolean(), activeHash: z.string().max(64).nullable(),
+  /** Content page the app opens on (`.chrona/entry`, else README.md); null without content. */
+  entry: relativePathSchema.nullable(),
 }).strict();
 
 export const fileNodeSchema = z.object({
-  path: affairPathSchema, kind: z.enum(["file", "dir"]), size: z.number().int().min(0), updatedAt: iso,
+  path: relativePathSchema, kind: z.enum(["file", "dir"]), size: z.number().int().min(0), updatedAt: iso,
 }).strict();
 export const fileContentSchema = z.object({
-  path: affairPathSchema, content: z.string(), mime: z.string().max(100),
-  /** Commit id of the last change to this file; pass it back as `baseRevision` when saving. */
+  path: relativePathSchema, content: z.string(), mime: z.string().max(100),
+  /** Content hash of this file; pass it back as `baseRevision` when saving. */
   revision: z.string().max(64).nullable(), updatedAt: iso,
-}).strict();
-export const revisionSchema = z.object({
-  sha: z.string().max(64), author: z.enum(["user", "chrona"]), message: z.string().max(500), at: iso, paths: z.array(z.string()).max(200),
 }).strict();
 
 export const runSchema = z.object({
-  id, affairId: id.nullable(), lane: z.enum(RUN_LANES), trigger: z.enum(RUN_TRIGGERS), status: z.enum(RUN_STATUSES),
+  id, sessionId: id.nullable(), lane: z.enum(RUN_LANES), trigger: z.enum(RUN_TRIGGERS), status: z.enum(RUN_STATUSES),
   provider: short, toolCalls: z.array(z.object({ tool: short, at: iso, ok: z.boolean() }).strict()).max(200),
   error: z.string().max(1000).nullable(), startedAt: iso.nullable(), endedAt: iso.nullable(), createdAt: iso,
-  /** Short user-facing description (from the schedule that started it); null for conversation runs. */
+  /** Short user-facing description (from the schedule or module that started it); null for conversation runs. */
   label: z.string().max(80).nullable(),
 }).strict();
 
-export const attachmentSchema = z.object({ name: short, path: affairPathSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
+/** A content file reference: `<module>/<path>` (what the Provider sees under /content). */
+export const contentRefSchema = z.string().trim().min(3).max(542).regex(/^[a-z][a-z0-9-]{1,40}\//, "starts with a module name")
+  .refine(ref => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
+export const attachmentSchema = z.object({ name: short, ref: contentRefSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
 export const messageSchema = z.object({
-  id, direction: z.enum(["in", "out"]), channel: z.enum(DELIVERY_CHANNELS), text: z.string().max(8000),
-  attachments: z.array(attachmentSchema).max(10), affairId: id.nullable(), quotedMessageId: id.nullable(), at: iso,
-}).strict();
-
-export const activitySchema = z.object({
-  id, affairId: id, at: iso, actor: z.enum(ACTIVITY_ACTORS), kind: z.enum(ACTIVITY_KINDS), text: z.string().max(4000),
-  /** e.g. { commit, paths } for edits, { scheduleId } … */
-  data: z.record(z.string(), z.unknown()).nullable(),
+  id, sessionId: id, direction: z.enum(["in", "out"]), channel: z.enum(DELIVERY_CHANNELS), text: z.string().max(8000),
+  attachments: z.array(attachmentSchema).max(10), quotedMessageId: id.nullable(), at: iso,
 }).strict();
 
 export const approvalSchema = z.object({
-  id, affairId: id.nullable(), affairTitle: z.string().max(200).nullable(), action: z.enum(ACTIONS),
+  id, action: z.enum(ACTIONS), moduleId: id.nullable(),
   title: short, detail: z.string().max(4000),
   /** Exactly what will be done, shown to the user (e.g. the email draft). */
   preview: z.string().max(20_000),
@@ -242,7 +243,7 @@ export const approvalSchema = z.object({
 
 export const grantScopeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("global") }).strict(),
-  z.object({ kind: z.literal("affair"), affairId: id }).strict(),
+  z.object({ kind: z.literal("module"), moduleId: id }).strict(),
   z.object({ kind: z.literal("connector"), connectorId: id }).strict(),
 ]);
 export const grantSchema = z.object({
@@ -255,7 +256,7 @@ export const PREFERENCE_TOPICS = ["general", "ui"] as const;
 export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), topic: z.enum(PREFERENCE_TOPICS), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
 
 export const notificationSchema = z.object({
-  id, affairId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: z.enum(DELIVERY_CHANNELS), status: z.enum(NOTIFICATION_STATUSES),
+  id, moduleId: id.nullable(), sessionId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: z.enum(DELIVERY_CHANNELS), status: z.enum(NOTIFICATION_STATUSES),
   title: short, body: z.string().max(4000), link: z.string().max(2048).nullable(),
   attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), createdAt: iso, sentAt: iso.nullable(),
   feedback: z.enum(["useful", "not_useful"]).nullable(),
@@ -266,13 +267,11 @@ export const ruleSchema = z.object({
   match: z.object({ from: z.string().max(200).optional(), subject: z.string().max(200).optional(), body: z.string().max(200).optional() }).strict(),
   action: z.enum(RULE_ACTIONS), note: z.string().max(300).default(""),
 }).strict();
-/** Content of `.chrona/rules.json` in an affair directory (written by the Provider). */
+/** Content of `inbox/<connectorId>/rules.json` in the `files` content area (written by the Provider). */
 export const rulesFileSchema = z.object({ rules: z.array(ruleSchema).max(200), default: z.enum(RULE_ACTIONS).default("batch") }).strict();
 
 export const connectorSchema = z.object({
   id, kind: z.enum(CONNECTOR_KINDS), label: short, status: z.enum(CONNECTOR_STATUSES),
-  /** Affair whose directory receives inbound items (inbox/<date>/<item>.md). */
-  affairId: id.nullable(),
   /** Non-secret settings, e.g. email: { address, imapHost, imapPort, smtpHost, smtpPort, folders, sinceDays }. */
   settings: z.record(z.string(), z.unknown()),
   hasCredentials: z.boolean(), canSend: z.boolean(),
@@ -281,7 +280,8 @@ export const connectorSchema = z.object({
 }).strict();
 export const inboundItemSchema = z.object({
   id, connectorId: id, externalId: z.string().max(500), from: z.string().max(500), subject: z.string().max(1000),
-  receivedAt: iso, path: affairPathSchema.nullable(), status: z.enum(INBOUND_STATUSES), ruleNote: z.string().max(300).nullable(),
+  /** Item file in the `files` content area (`files/inbox/<connectorId>/…`). */
+  receivedAt: iso, ref: contentRefSchema.nullable(), status: z.enum(INBOUND_STATUSES), ruleNote: z.string().max(300).nullable(),
 }).strict();
 
 export const notificationSettingsSchema = z.object({ dailyCap: z.number().int().min(0).max(50), quietHours: z.object({ start: hhmm, end: hhmm }).strict().nullable(), timezone: z.string().min(1).max(80), digestAt: hhmm }).strict();
@@ -291,7 +291,7 @@ export const settingsSchema = z.object({
 }).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
-  git: z.boolean(), moduleSandbox: z.boolean(),
+  moduleSandbox: z.boolean(),
   queuedRuns: z.number().int().min(0), runningRuns: z.number().int().min(0), failedRunsToday: z.number().int().min(0),
   dueSchedules: z.number().int().min(0), failingConnectors: z.number().int().min(0),
   queuedNotifications: z.number().int().min(0), failedNotifications: z.number().int().min(0), lastTickAt: iso.nullable(),
@@ -301,45 +301,31 @@ export const todayViewSchema = z.object({
   generatedAt: iso,
   approvals: z.array(approvalSchema),
   /** Coming up in the next 7 days, soonest first. Pages show `label` (or a reminder's text), never a wake instruction. */
-  upcoming: z.array(z.object({ scheduleId: id, affairId: id, affairTitle: short, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable(), at: iso }).strict()).max(50),
-  /** What happened, per affair: affairs with current work or activity in the last 7 days, most recent first. */
-  progress: z.array(z.object({
-    affair: affairSchema,
-    /** Latest messages Chrona sent about this affair (notifications), newest first. */
-    updates: z.array(z.object({ title: short, body: z.string().max(4000), at: iso }).strict()).max(3),
-    /** Distinct pages changed in the last 7 days. */
-    changedPages: z.number().int().min(0),
-    /** The Provider's Today card for this affair (json-render spec), if it composed one. */
-    card: z.record(z.string(), z.unknown()).nullable(),
-  }).strict()).max(50),
-  /** Optional page the Provider maintains for today (any affair file it marks via `.chrona/today` pointer). */
-  todayPage: z.object({ affairId: id, path: affairPathSchema }).strict().nullable(),
+  upcoming: z.array(z.object({ scheduleId: id, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable(), at: iso }).strict()).max(50),
+  /** Recent notifications, newest first. */
+  updates: z.array(notificationSchema).max(20),
+  apps: z.array(appSchema).max(200),
+  /** Recent user-facing sessions (web, qq, mcp), most recent first. */
+  sessions: z.array(sessionSchema).max(20),
   health: healthSchema,
-}).strict();
-
-export const affairDetailSchema = z.object({
-  affair: affairSchema, files: z.array(fileNodeSchema).max(2000), schedules: z.array(scheduleSchema),
-  approvals: z.array(approvalSchema), activity: z.array(activitySchema), runs: z.array(runSchema), revisions: z.array(revisionSchema),
-  /** Recent chat messages linked to this affair, oldest first. */
-  messages: z.array(messageSchema).max(100),
-  /** Page this affair opens on: the Provider's chosen `*.ui.json` entry, else README.md. */
-  entry: affairPathSchema,
 }).strict();
 
 // ------------------------------------------------------------- requests ----
 
-export const chatInputSchema = z.object({ text: z.string().max(8000), affairId: id.optional() }).strict();
-export const chatReplySchema = z.object({ runId: id.nullable(), messages: z.array(messageSchema) }).strict();
-export const createAffairSchema = z.object({ title: short, request: z.string().max(8000).default("") }).strict();
-export const updateAffairSchema = z.object({ title: short.optional(), status: z.enum(AFFAIR_STATUSES).optional() }).strict();
-export const saveFileSchema = z.object({ path: affairPathSchema, content: z.string().max(2_000_000), baseRevision: z.string().max(64).nullable() }).strict();
-/** Usage signal from a composed page; `feedback` also reaches the Provider as a chat message about this affair. */
+/** Without `sessionId`, the active session for `key` is used (created if missing); without both, a new web session. */
+export const chatInputSchema = z.object({ text: z.string().max(8000), sessionId: id.optional(), key: z.string().max(200).optional() }).strict();
+export const chatReplySchema = z.object({ runId: id.nullable(), sessionId: id, messages: z.array(messageSchema) }).strict();
+/** Ends the active session for `key` (QQ `/new`); the next message starts a new one. */
+export const newSessionSchema = z.object({ key: z.string().min(1).max(200) }).strict();
+export const updateSessionSchema = z.object({ title: short.optional(), status: z.literal("ended").optional() }).strict();
+export const saveFileSchema = z.object({ path: relativePathSchema, content: z.string().max(2_000_000), baseRevision: z.string().max(64).nullable() }).strict();
+/** Usage signal from a composed page; `feedback` also reaches the Provider in the user's web session. */
 export const uiEventSchema = z.object({
-  path: affairPathSchema, kind: z.enum(["open", "action", "toggle", "feedback"]),
+  path: relativePathSchema, kind: z.enum(["open", "action", "toggle", "feedback"]),
   name: z.string().max(100).optional(), text: z.string().max(2000).optional(),
 }).strict();
-export const toggleCheckboxSchema = z.object({ path: affairPathSchema, line: z.number().int().min(1), checked: z.boolean(), baseRevision: z.string().max(64).nullable() }).strict();
-export const panelEntrySchema = z.object({ dataPath: affairPathSchema, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
+export const toggleCheckboxSchema = z.object({ path: relativePathSchema, line: z.number().int().min(1), checked: z.boolean(), baseRevision: z.string().max(64).nullable() }).strict();
+export const panelEntrySchema = z.object({ dataPath: relativePathSchema, values: z.record(z.string(), z.union([z.string().max(2000), z.number(), z.null()])) }).strict();
 export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
@@ -347,7 +333,7 @@ export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enu
 export const createPreferenceSchema = z.object({ text: text.max(500) }).strict();
 export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial() }).strict();
 export const createConnectorSchema = z.object({
-  kind: z.enum(CONNECTOR_KINDS), label: short, affairId: id.optional(), settings: z.record(z.string(), z.unknown()).default({}),
+  kind: z.enum(CONNECTOR_KINDS), label: short, settings: z.record(z.string(), z.unknown()).default({}),
   /** Write-only secret (e.g. { password } or app password). Stored by Chrona outside the database, never returned. */
   secret: z.record(z.string(), z.string().max(2000)).optional(),
 }).strict();
@@ -358,28 +344,28 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  * All under /api/steward, owner-only, `?workspaceId=` on every request. Lists return `{ items: T[] }`.
  *   GET  /today                                   -> TodayView
  *   POST /chat (ChatInput)                        -> ChatReply (waits for the foreground run's replies, up to ~2 min)
- *   GET  /chat/messages?limit=                    -> {items: Message[]}
- *   GET  /affairs?status= | POST (CreateAffair)   -> {items: Affair[]} | Affair
- *   GET  /affairs/:id | PATCH (UpdateAffair)      -> AffairDetail | Affair
- *   GET  /affairs/:id/file?path=                  -> FileContent
- *   PUT  /affairs/:id/file (SaveFile)             -> FileContent (409 on stale baseRevision; commits as user; wakes the Provider)
- *   POST /affairs/:id/checkbox (ToggleCheckbox)   -> FileContent
- *   POST /affairs/:id/ui-event (UiEvent)         -> {ok: true} (feedback is also sent to the Provider)
- *   POST /affairs/:id/panel-entry (PanelEntry)    -> FileContent of the data file
- *   POST /affairs/:id/upload (multipart file, dir)-> FileNode
- *   GET  /affairs/:id/raw?path=                   -> file bytes (download)
- *   GET  /affairs/:id/revisions?path=             -> {items: Revision[]}
- *   GET  /affairs/:id/revisions/:sha/diff         -> { diff: string }
- *   POST /affairs/:id/revisions/:sha/revert       -> Revision
- *   GET  /affairs/:id/schedules | POST (CreateSchedule) ; PATCH /schedules/:id (UpdateSchedule)
+ *   GET  /sessions?source=&status= | POST /sessions/new (NewSession) -> {items: Session[]} | Session
+ *   GET  /sessions/:id | PATCH (UpdateSession)    -> Session
+ *   GET  /sessions/:id/messages?limit=            -> {items: Message[]}
+ *   GET  /apps                                    -> {items: App[]}
+ *   GET  /apps/:id/tree                           -> {items: FileNode[]} (content area)
+ *   GET  /apps/:id/file?path=                     -> FileContent
+ *   PUT  /apps/:id/file (SaveFile)                -> FileContent (409 on stale baseRevision; sends content_edit)
+ *   POST /apps/:id/checkbox (ToggleCheckbox)      -> FileContent
+ *   POST /apps/:id/ui-event (UiEvent)             -> {ok: true}
+ *   POST /apps/:id/panel-entry (PanelEntry)       -> FileContent of the data file
+ *   POST /apps/:id/upload (multipart file, dir)   -> FileNode
+ *   GET  /apps/:id/raw?path=                      -> file bytes (download)
+ *   GET  /schedules | POST (CreateSchedule, wake origin = ?sessionId) ; PATCH /schedules/:id (UpdateSchedule)
  *   GET  /approvals?status= ; POST /approvals/:id/resolve (ResolveApproval) -> Approval
  *   GET  /settings | PATCH ; GET /grants | POST ; POST /grants/:id/revoke ; GET /preferences | POST | DELETE /preferences/:id
  *   GET  /notifications ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
- *   GET  /provider/runs?affairId=                 -> {items: ProviderRunView[]} (recent runs, owner-scoped)
+ *   GET  /provider/runs?sessionId=                -> {items: ProviderRunView[]} (recent runs, owner-scoped)
  *   POST /provider/interactions/:id/answer        -> {ok: true} (ProviderAnswer, no grants/replay)
  *   POST /provider/runs/:id/cancel                -> {ok: true} (no automatic retry)
  *   GET  /health
+ * Module versions, rollback and module tools stay on the existing module routes and the owner MCP.
  */
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -393,37 +379,36 @@ export const STEWARD_API_BASE = "/api/steward";
  */
 export const chronaToolInputSchemas = {
   /** Reply to the user in the current conversation (foreground runs). May be called several times. */
-  chrona_reply: z.object({ text: text.max(8000), files: z.array(affairPathSchema).max(10).default([]) }).strict(),
+  chrona_reply: z.object({ text: text.max(8000), files: z.array(contentRefSchema).max(10).default([]).describe("Content files to attach, as <module>/<path> (see /content)") }).strict(),
   /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
-  chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: affairPathSchema.optional() }).strict(),
-  chrona_schedule: createScheduleSchema.extend({ affairId: id.optional(), label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on the affair page, in the user's language, e.g. 准备第2天材料") }),
+  chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: contentRefSchema.optional() }).strict(),
+  chrona_schedule: createScheduleSchema.extend({ label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on pages, in the user's language, e.g. 准备第2天材料") })
+    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under /content, what to report) and posts the result back to this session. remind: sends `text` to the user without a model."),
   chrona_propose: z.object({
-    affairId: id.optional(), dir: affairPathSchema.optional(),
+    dir: relativePathSchema.optional().describe("Module directory relative to the session directory"),
     request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples} instead of dir: a budgeted build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. Entry is a long-running process using the SDK: import {on, chrona} from "/chrona/sdk.ts"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call await chrona.notify({key,level,title,body}) / chrona.wakeProvider({key,prompt}) only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in /data (process may restart); /module ro; keepAlive:true for long connections. Tests: import {startModule} from "/chrona/testing.ts" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). In authorized affairs, updates with no new effects, no migration and passing checks auto-activate.'),
-  chrona_modules: z.object({ affairId: id.optional() }).strict().describe("List modules, versions, approval status and recent runs; defaults to this affair, or all workspace modules at the root."),
-  chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: affairPathSchema }).strict().describe("Copy module files into an empty affair directory for editing; hash defaults to the active version."),
+  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples} instead of dir: a budgeted build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} (titles go in notify text); files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network; params number|string|boolean. Invalid: rejected+report.errors. Entry is a long-running process using the SDK: import {on, chrona} from "/chrona/sdk.ts"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call await chrona.notify({key,level,title,body}) / chrona.wakeProvider({key,prompt}) only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in /data (process may restart); /module ro; keepAlive:true for long connections. Tests: import {startModule} from "/chrona/testing.ts" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it for the module, updates with no new effects, no migration and passing checks auto-activate.'),
+  chrona_modules: z.object({}).strict().describe("List modules (apps), versions, approval status and recent runs."),
+  chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema }).strict().describe("Copy module files into an empty directory of the session directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),
-  chrona_schedules: z.object({ affairId: id.optional() }).strict(),
+  chrona_schedules: z.object({}).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
-  chrona_affairs: z.object({ status: z.enum(AFFAIR_STATUSES).optional() }).strict(),
-  /** Create an affair (directory) and return its path; later runs for it start inside that directory. */
-  chrona_affair_create: z.object({ title: text.max(200), readme: z.string().max(20_000).default("") }).strict(),
-  chrona_affair_update: z.object({ affairId: id, title: text.max(200).optional(), status: z.enum(AFFAIR_STATUSES).optional() }).strict(),
-  /** Mark which affair this conversation is about, so later messages and the web view connect to it. */
-  chrona_focus: z.object({ affairId: id }).strict(),
+  /** Choose which apps' content areas this session may write (others stay read-only under /content); takes effect from the next run. */
+  chrona_focus: z.object({ modules: z.array(slug).min(1).max(10) }).strict(),
+  /** Full-text search over past sessions' messages; returns matching sessions with snippets. */
+  chrona_session_search: z.object({ query: text.max(200), limit: z.number().int().min(1).max(10).default(3) }).strict(),
   chrona_request_approval: z.object({ action: z.enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20_000) }).strict(),
-  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to mount an absolute host directory or file (read-write) into later runs of this affair. The current run cannot see it; after approval, schedule a wake to continue."),
+  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to mount an absolute host directory or file (read-write) into later runs of this session. The current run cannot see it; after approval, schedule a wake to continue."),
   chrona_send_email: z.object({ connectorId: id, to: z.array(z.string().email()).min(1).max(20), subject: text.max(500), body: text.max(50_000), inReplyTo: z.string().max(500).optional() }).strict(),
   chrona_inbound: z.object({ connectorId: id.optional(), status: z.enum(INBOUND_STATUSES).optional(), limit: z.number().int().min(1).max(100).default(50) }).strict(),
   chrona_remember: z.object({ text: text.max(500), topic: z.enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
-  chrona_ui_guide: z.object({ affairId: id.optional() }).strict(),
+  chrona_ui_guide: z.object({}).strict(),
   chrona_ui_set: z.object({
-    affairId: id.optional(),
-    path: affairPathSchema.refine(path => path.endsWith(".ui.json"), "Page files end with .ui.json"),
+    module: slug.describe("App whose content area receives the page; must be focused"),
+    path: relativePathSchema.refine(path => path.endsWith(".ui.json"), "Page files end with .ui.json"),
     spec: z.union([z.record(z.string(), z.unknown()), z.string().max(200_000)]).describe("json-render spec {root, elements, state}, or its JSONL patch stream"),
-    role: z.enum(["page", "entry", "card"]).default("page").describe("entry: the page this affair opens on; card: this affair's card on Today"),
+    role: z.enum(["page", "entry"]).default("page").describe("entry: the page this app opens on"),
   }).strict(),
   chrona_forget: z.object({ preferenceId: id }).strict(),
   chrona_preferences: z.object({}).strict(),
@@ -441,7 +426,7 @@ export type ConnectorAdapter = {
   send?(input: { settings: Record<string, unknown>; secret: Record<string, string> | null; to: string[]; subject: string; body: string; inReplyTo?: string }): Promise<{ ok: true; messageId: string | null } | { ok: false; retryable: boolean; error: string }>;
 };
 export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; files?: { name: string; path: string }[];
-  /** An open approval this message asks about; chat channels may offer approve/deny buttons (scoped: the affair scope is available). */
+  /** An open approval this message asks about; chat channels may offer approve/deny buttons (scoped: an "always" scope is available). */
   approval?: { id: string; scoped: boolean } };
 export type DeliveryOutcome = { outcome: "accepted"; receiptRef: string | null } | { outcome: "rejected"; retryable: boolean; error: string } | { outcome: "uncertain"; error: string };
 export type DeliveryAdapter = { channel: DeliveryChannel; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
@@ -456,6 +441,8 @@ export type ProviderRunInput = {
   searchTools?: boolean;
   /** Absolute host paths the user approved for this run (read-write). */
   hostPaths?: string[];
+  /** Module content areas mounted at /content/<name>; only focused ones are writable. */
+  content?: { name: string; dir: string; writable: boolean }[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;
 };
@@ -470,14 +457,13 @@ export type ProviderAdapter = {
 
 export type ScheduleRule = z.infer<typeof scheduleRuleSchema>;
 export type Schedule = z.infer<typeof scheduleSchema>;
-export type Affair = z.infer<typeof affairSchema>;
+export type Session = z.infer<typeof sessionSchema>;
+export type App = z.infer<typeof appSchema>;
 export type FileNode = z.infer<typeof fileNodeSchema>;
 export type FileContent = z.infer<typeof fileContentSchema>;
-export type Revision = z.infer<typeof revisionSchema>;
 export type Run = z.infer<typeof runSchema>;
 export type Attachment = z.infer<typeof attachmentSchema>;
 export type Message = z.infer<typeof messageSchema>;
-export type Activity = z.infer<typeof activitySchema>;
 export type Approval = z.infer<typeof approvalSchema>;
 export type GrantScope = z.infer<typeof grantScopeSchema>;
 export type Grant = z.infer<typeof grantSchema>;
@@ -492,6 +478,5 @@ export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type Health = z.infer<typeof healthSchema>;
 export type TodayView = z.infer<typeof todayViewSchema>;
-export type AffairDetail = z.infer<typeof affairDetailSchema>;
 export type UiEvent = z.infer<typeof uiEventSchema>;
 export type ChatReply = z.infer<typeof chatReplySchema>;
