@@ -1,8 +1,8 @@
 import { strict as assert } from "node:assert";
-// @ts-expect-error Chrona supplies the test kernel at this sandbox-only path.
-import { startModule } from "/chrona/testing.ts";
+// @ts-expect-error Chrona supplies the test kernel at this at run time.
+import { startModule } from "chrona/testing";
 
-const module = await startModule("/module/index.ts");
+const module = await startModule("index.ts");
 const now = "2026-10-22T00:00:00Z";
 try {
   for (const [scheduleId, text] of [["first", "喝水"], ["second", "Take a break"]]) {

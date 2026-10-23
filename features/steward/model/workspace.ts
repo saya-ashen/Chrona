@@ -12,7 +12,8 @@ export function scheduleDescription(rule: ScheduleRule, locale: string, copy: { 
   }
 }
 export function workspaceHealthy(health: Health) {
-  return health.provider.available && health.moduleSandbox && !health.provider.lastError && health.failedRunsToday === 0 && health.failingConnectors === 0 && health.failedNotifications === 0;
+  // Running without bwrap is a supported mode, not a fault.
+  return health.provider.available && !health.provider.lastError && health.failedRunsToday === 0 && health.failingConnectors === 0 && health.failedNotifications === 0;
 }
 export function pageHref(locale: string, appId: string, path?: string) {
   return `/${locale}/apps/${encodeURIComponent(appId)}${path ? `?${new URLSearchParams({ path })}` : ""}`;

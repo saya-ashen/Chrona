@@ -92,7 +92,7 @@ const reminderSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? u
   const now = new Date("2026-10-22T12:00:00Z");
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null,
     moduleBuiltinResources: join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"),
-    sandbox: { available: true, runModule: reminderSandbox.runModule, startModule: reminderSandbox.startModule } };
+    sandbox: { available: true, isolated: true, runModule: reminderSandbox.runModule, startModule: reminderSandbox.startModule } };
   service = createStewardService(ports); app = createStewardRoutes(ports, service);
   try {
     await moduleSupervisor(ports).start();

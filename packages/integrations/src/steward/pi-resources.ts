@@ -29,9 +29,8 @@ export function readPiResources(file: string | undefined, profile: string, works
     return { resources: { skills: [...new Set(resources.skills)], extensions: [...new Set(resources.extensions)], tools: [...new Set(resources.tools)] }, error: null };
   } catch { return { resources: empty(), error: "Pi resource manifest must be a private canonical JSON file with reviewed external entry files" }; }
 }
-export function resourceVersionError(resources: PiResources, version: string, sandboxed: boolean): string | null {
+export function resourceVersionError(resources: PiResources, version: string): string | null {
   if (resources.extensions.some(value => builtins.has(value)) && version !== "1.3.0") return "Native Pi builtins require the explicit 1.3.0 pin";
-  if (!sandboxed && (resources.tools.some(tool => tool === "bash" || tool === "codemode") || resources.extensions.includes("builtin:codemode"))) return "Pi code execution resources require bubblewrap";
   return null;
 }
 export function resourceCommand(resources: PiResources, source: unknown, path: unknown, baseExtensions: string[]): boolean {

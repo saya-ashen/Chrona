@@ -29,7 +29,7 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
     }
     return { ...(output.handled === undefined ? {} : { handled: output.handled }), ...(output.result === undefined ? {} : { result: output.result }) };
   });
-  return { available: true, runModule, startModule: peer.startModule };
+  return { available: true, isolated: true, runModule, startModule: peer.startModule };
 }
 
 type Start = NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>;

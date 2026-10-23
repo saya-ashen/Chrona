@@ -27,8 +27,9 @@ Rules that follow from the goals:
   fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
-- Providers own file, shell, web and session tools; each run sees all content areas read-only under `/content`
-  and the session's focused apps writable. Chrona supplies scheduling, events, sessions, connectors/credentials,
+- Providers own file, shell, web and session tools; each run sees all content areas read-only under `content/` in
+  its cwd and the session's focused apps writable. bwrap isolation is optional hardening, never a prerequisite:
+  without it modules and the Provider run as the Chrona user, and every module version needs approval. Chrona supplies scheduling, events, sessions, connectors/credentials,
   approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module submitted via `chrona_propose`, built and checked in the Chrona sandbox
   (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated through an `activate_module`

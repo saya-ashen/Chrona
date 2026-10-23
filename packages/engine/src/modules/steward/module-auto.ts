@@ -17,7 +17,8 @@ function checksPassed(report: BuildReport) {
 }
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
-  if (manifest.effects.includes("owner")) return false;
+  // Without isolation any code change can do anything the Chrona user can: every version needs the user.
+  if (!context.ports.sandbox?.isolated || manifest.effects.includes("owner")) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
   const effects = moduleManifestSchema.parse(active.manifest).effects;

@@ -65,7 +65,15 @@ function call<T = CallResult>(method: string, params: unknown): Promise<T> {
   });
 }
 export type OwnerResult = { status: number; body: unknown };
+/** Where this module's directories are; set by Chrona with or without a sandbox. */
+export const paths = {
+  module: process.env.CHRONA_MODULE ?? process.cwd(),
+  data: process.env.CHRONA_DATA ?? "/data",
+  /** Only for modules declaring `content`. */
+  content: process.env.CHRONA_CONTENT ?? "/content",
+};
 export const chrona = {
+  paths,
   /** Owner API (`owner` capability): one request of Chrona's /api/steward HTTP map, as the user. */
   owner: (params: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown }) => call<OwnerResult>("owner", params),
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */

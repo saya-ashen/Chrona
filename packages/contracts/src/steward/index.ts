@@ -114,10 +114,10 @@ export const moduleManifestSchema = z.object({
   tools: z.array(moduleToolSchema).max(10).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
-  /** Owns a content area (pages, panels, files) the user and the Provider can read and edit; the module sees it at /content. */
+  /** Owns a content area (pages, panels, files) the user and the Provider can read and edit; the module sees it at `chrona.paths.content`. */
   content: z.boolean().default(false),
   /**
-   * Serves HTTP under this path (v2-4 entry modules): the module runs an HTTP server on the Unix socket `/chrona/http/s`
+   * Serves HTTP under this path (v2-4 entry modules): the module runs an HTTP server on the Unix socket `CHRONA_HTTP_SOCKET` (SDK `chrona.serve`)
    * and Chrona proxies authenticated requests to it, without `Authorization` and `Cookie`. One active module per path;
    * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
    */
@@ -154,7 +154,8 @@ export const moduleManifestSchema = z.object({
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
- * v2 module channel (`/chrona/chrona.sock`, one JSON object per line, both directions).
+ * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as
+ * `chrona` and find their directories through `chrona.paths`, with or without a sandbox.
  * Chrona → module: an event `{ id, event }`; the module answers `{ id, result }` or `{ id, error }`.
  * Module → Chrona: a call `{ id, method, params }`; Chrona answers `{ id, result }` or `{ id, error }`.
  * Events of one module are delivered one at a time; calls made meanwhile belong to that event.
@@ -259,7 +260,7 @@ export const runSchema = z.object({
   label: z.string().max(80).nullable(),
 }).strict();
 
-/** A content file reference: `<module>/<path>` (what the Provider sees under /content). */
+/** A content file reference: `<module>/<path>` (what the Provider sees under content/ in its working directory). */
 export const contentRefSchema = z.string().trim().min(3).max(542).regex(/^[a-z][a-z0-9-]{1,40}\//, "starts with a module name")
   .refine(ref => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
 export const attachmentSchema = z.object({ name: short, ref: contentRefSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
@@ -341,6 +342,7 @@ export const moduleToolListSchema = z.object({
 }).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
+  /** Modules and the Provider run inside bubblewrap; false means they run unisolated as the Chrona user. */
   moduleSandbox: z.boolean(),
   queuedRuns: z.number().int().min(0), runningRuns: z.number().int().min(0), failedRunsToday: z.number().int().min(0),
   dueSchedules: z.number().int().min(0), failingConnectors: z.number().int().min(0),
@@ -437,22 +439,22 @@ export const STEWARD_API_BASE = "/api/steward";
  */
 export const chronaToolInputSchemas = {
   /** Reply to the user in the current conversation (foreground runs). May be called several times. */
-  chrona_reply: z.object({ text: text.max(8000), files: z.array(contentRefSchema).max(10).default([]).describe("Content files to attach, as <module>/<path> (see /content)") }).strict(),
+  chrona_reply: z.object({ text: text.max(8000), files: z.array(contentRefSchema).max(10).default([]).describe("Content files to attach, as <module>/<path> (see content/)") }).strict(),
   /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
   chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000), file: contentRefSchema.optional() }).strict(),
   chrona_schedule: createScheduleSchema.extend({ label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on pages, in the user's language, e.g. 准备第2天材料") })
-    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under /content, what to report) and posts the result back to this session. remind: sends `text` to the user without a model."),
+    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model."),
   chrona_propose: z.object({
     dir: relativePathSchema.optional().describe("Module directory relative to the session directory"),
     request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network|model; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "/chrona/sdk.ts"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call chrona.notify({key,level,title,body}) / wakeProvider({key,prompt}) / model({system?,prompt,maxOutputTokens})→{text} only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in /data (process may restart); /module ro; keepAlive:true for long connections. Tests: import {startModule} from "/chrona/testing.ts" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it for the module, updates with no new effects, no migration and passing checks auto-activate.'),
+  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network|model; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call chrona.notify({key,level,title,body}) / wakeProvider({key,prompt}) / model({system?,prompt,maxOutputTokens})→{text} only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   chrona_modules: z.object({}).strict().describe("List modules (apps), versions, approval status and recent runs."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema }).strict().describe("Copy module files into an empty directory of the session directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),
   chrona_schedules: z.object({}).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
-  /** Choose which apps' content areas this session may write (others stay read-only under /content); takes effect from the next run. */
+  /** Choose which apps' content areas this session may write (others stay read-only under content/); takes effect from the next run. */
   chrona_focus: z.object({ modules: z.array(slug).min(1).max(10) }).strict(),
   /** Full-text search over past sessions' messages; returns matching sessions with snippets. */
   chrona_session_search: z.object({ query: text.max(200), limit: z.number().int().min(1).max(10).default(3) }).strict(),
@@ -499,7 +501,7 @@ export type ProviderRunInput = {
   searchTools?: boolean;
   /** Absolute host paths the user approved for this run (read-write). */
   hostPaths?: string[];
-  /** Module content areas mounted at /content/<name>; only focused ones are writable. */
+  /** Module content areas at <cwd>/content/<name>; only focused ones are writable (enforced under bubblewrap). */
   content?: { name: string; dir: string; writable: boolean }[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;

@@ -1,8 +1,8 @@
-// @ts-expect-error Chrona supplies the SDK at this sandbox-only path.
-import { chrona } from "/chrona/sdk.ts";
+// @ts-expect-error Chrona supplies the SDK at this at run time.
+import { chrona } from "chrona";
 
 // Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed.
-type Args = Record<string, any>;
+type Args = Record<string, unknown>;
 type Request = { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown };
 const q = (value: unknown) => encodeURIComponent(String(value));
 const query = (args: Args, keys: string[]) => {
@@ -40,7 +40,8 @@ const tools: { name: string; description: string; inputSchema: Args; request(arg
 
 async function owner(request: Request) {
   const reply = await chrona.owner(request);
-  if (reply.status >= 400) throw new Error(reply.body?.code ? `${reply.body.code}${reply.body.message ? `: ${reply.body.message}` : ""}` : `failed (${reply.status})`);
+  const failure = reply.body as { code?: string; message?: string } | null;
+  if (reply.status >= 400) throw new Error(failure?.code ? `${failure.code}${failure.message ? `: ${failure.message}` : ""}` : `failed (${reply.status})`);
   return reply.body;
 }
 async function moduleTools() {
@@ -61,7 +62,7 @@ async function handle(method: string, params: Args) {
     ...(await moduleTools()).tools,
   ] };
   if (method === "tools/call") {
-    const name = String(params.name ?? ""), args: Args = params.arguments ?? {};
+    const name = String(params.name ?? ""), args = (params.arguments ?? {}) as Args;
     const tool = tools.find(tool => tool.name === name);
     try {
       if (tool) return text(await owner(tool.request(args)));
@@ -79,6 +80,9 @@ chrona.serve(async (request: globalThis.Request) => {
   if (!message || typeof message !== "object" || typeof message.method !== "string") return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid request" } }, { status: 400 });
   // Notifications (no id) need no answer.
   if (message.id === undefined) return new Response(null, { status: 202 });
-  try { return Response.json({ jsonrpc: "2.0", id: message.id, result: await handle(message.method, message.params ?? {}) }); }
-  catch (error: any) { return Response.json({ jsonrpc: "2.0", id: message.id, error: { code: error?.code ?? -32603, message: error?.message ?? "Internal error" } }); }
+  try { return Response.json({ jsonrpc: "2.0", id: message.id, result: await handle(message.method, (message.params ?? {}) as Args) }); }
+  catch (error) {
+    const { code = -32603, message: text = "Internal error" } = error as { code?: number; message?: string };
+    return Response.json({ jsonrpc: "2.0", id: message.id, error: { code, message: text } });
+  }
 });

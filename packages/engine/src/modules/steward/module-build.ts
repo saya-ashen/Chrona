@@ -44,7 +44,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
-  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: "审查此版本的清单、意图与测试结果", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
   if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
   const approval = await createApprovals(context).create(card);

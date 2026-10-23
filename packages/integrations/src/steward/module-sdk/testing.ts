@@ -8,9 +8,11 @@ import type { Trigger } from "./sdk";
 type Call = { id: string; method: string; params: Record<string, unknown> };
 type Event = { trigger: Trigger; now: string; params: Record<string, string | number | boolean> };
 type Reply = { id: string; result?: { handled?: boolean; result?: unknown }; error?: string };
+/** The directories the module under test sees (same variables as `chrona.paths`). */
+export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
 /** Fake kernel for author tests. No call ever executes a real external effect. */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
-  const manifest = JSON.parse(await readFile("/module/module.json", "utf8")) as { effects: string[] };
+  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
   const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>();
@@ -67,7 +69,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(path, resolve); }); }
   catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
   const httpSocket = join(dir, "http");
-  const child = spawn(process.execPath, [entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
+  const child = spawn(process.execPath, ["--no-install", entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
   const exited = new Promise<void>(resolve => { child.once("error", () => { fail(); resolve(); }); child.once("close", () => { fail(); resolve(); }); });
   let queue: Promise<unknown> = Promise.resolve();
   return {

@@ -42,7 +42,7 @@ test("owner writes and provider edit batches reach content modules without a dec
   Object.assign(ports.db.moduleVersion, { findUniqueOrThrow: async () => version });
   db.moduleRun = { create: async () => ({ id: "run" }), update: async () => ({}) };
   ports.now = () => new Date("2026-10-22T04:00:00Z");
-  ports.sandbox = { available: true, startModule: peer.startModule };
+  ports.sandbox = { available: true, isolated: true, startModule: peer.startModule };
   try {
     const api = createContent(ports, "workspace", async () => {});
     await api.save(module.id, { path: "README.md", content: "Notes", baseRevision: null });

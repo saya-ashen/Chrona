@@ -16,7 +16,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   const db = testDb(), dataDir = await mkdtemp("/tmp/cm-events-");
   const source = createLocalTestSource();
   const now = new Date("2026-10-21T04:00:00Z");
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null, connectors: [source.adapter], sandbox: { available: true, startModule: sandbox.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null, connectors: [source.adapter], sandbox: { available: true, isolated: true, startModule: sandbox.startModule } };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);
@@ -27,7 +27,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `
-import { on, chrona } from '/chrona/sdk.ts';
+import { on, chrona } from 'chrona';
 let count = 0;
 on('schedule', async () => { count++; await chrona.notify({ key: 'schedule', level: 'now', title: 'Scheduled', body: String(count) }); });
 on('inbound', async ev => { count++; await chrona.notify({ key: 'mail', level: 'now', title: 'Mail', body: ev.item.body }); return { handled: ev.item.subject !== 'fallback' }; });

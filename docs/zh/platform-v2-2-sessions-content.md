@@ -58,7 +58,7 @@
 每个模块可以有内容区：`<dataDir>/platform/content/<moduleId>/`，与私有数据 `platform/data/<moduleId>/` 分开。清单声明 `"content": true` 才创建。
 
 - 内容只能是**内容**：Markdown、`*.csv` / `*.json` 面板数据、`*.ui.json`、图片与附件。内核拒绝写入可执行扩展名；内容区里的任何文件都不会被执行。
-- 模块进程在沙箱内以 `/content` 读写自己的内容区。
+- 模块进程以 `chrona.paths.content` 读写自己的内容区（沙箱内是 `/content`）。
 - 网页模块把每个模块的内容区渲染为该应用的页面（入口为 `README.md`，或 `.chrona/entry` 指定的页面）；渲染约定沿用现有的复选框、`chrona-panel`、json-render。
 
 ### 3.2 编辑事件
@@ -67,7 +67,7 @@
 
 ### 3.3 Provider 访问
 
-- 每次 Provider 运行，所有模块的内容区以**只读**挂载到 `/content/<模块名>/`。
+- 每次 Provider 运行，所有模块的内容区出现在工作目录下的 `content/<模块名>/`：有 bwrap 时以**只读**绑定挂载；没有时是符号链接，只读不被强制。
 - 当前会话的**聚焦模块**以可写挂载。`chrona_focus {modules: [...]}` 设置聚焦（`auto`；入口模块 `web` / `qq` / `mcp` 的内容区不可聚焦）。新会话默认聚焦 `files`。
 - 运行结束后，内核比较聚焦模块内容区的变化，向对应模块投递 `content_edit`。
 
@@ -99,7 +99,7 @@
 1. 网页新建两个会话、来回切换，各自上下文独立；QQ 消息只进 `qq:dm`，`/new` 后开始新会话。
 2. 闲置超过设定时间后，下一条消息进入新会话；重置前 Provider 保存了偏好；`chrona_session_search` 能找回旧会话内容。
 3. `wake` 在全新会话中运行，结果出现在创建它的会话里并有通知。
-4. Provider 写报告到 `/content/files/…` → 网页 `files` 中可见、可编辑、可看历史并恢复；未聚焦模块的内容区写入失败。
+4. Provider 写报告到 `content/files/…` → 网页 `files` 中可见、可编辑、可看历史并恢复；未聚焦模块的内容区写入失败。
 5. 用户在网页修改某模块内容区的配置文件 → 该模块收到 `content_edit` 并生效，Provider 未被唤起。
 6. 迁移：现有事务的文件、消息、调度、模块按 §5 迁移，迁移报告完整；数据库中不再有 `Affair`。
 

@@ -24,7 +24,7 @@ async function fixture() {
   let fail = false;
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
     onApproved: async action => { forwarded.push(action); },
-    sandbox: { available: true, async runModule(input) {
+    sandbox: { available: true, isolated: true, async runModule(input) {
       if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
       calls.push(input);
       expect(input.network).toBe(false);
@@ -912,7 +912,7 @@ test("tick starts builds without waiting for them and reports build errors on th
   await tick.settled();
   expect((await f.db.moduleVersion.findFirstOrThrow({ where: { hash: proposal.hash } })).status).toBe("pending_review");
   expect(f.calls).toHaveLength(1);
-  f.ports.sandbox = { available: true, runModule: async () => { throw new Error("sandbox crashed"); } };
+  f.ports.sandbox = { available: true, isolated: true, runModule: async () => { throw new Error("sandbox crashed"); } };
   const findMany = f.db.moduleVersion.findMany.bind(f.db.moduleVersion);
   f.db.moduleVersion.findMany = (async () => { throw new Error("db down"); }) as unknown as typeof findMany;
   await tick();

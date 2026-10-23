@@ -43,19 +43,21 @@
 - **崩溃**：按退避重启；连续 3 次启动失败或事件处理失败 → 模块 `paused`，发通知（沿用现有规则）。
 - **切换版本**：启动新版本进程；新事件发给新进程；旧进程处理完在途事件后停止。
 - **状态**：持久状态只能写数据目录 `platform/data/<moduleId>/`；内存只作缓存，内核可随时重启进程。
-- 沙箱不变：bwrap、只读代码、可写数据目录、默认无网络、内存上限；声明 `network` 才联网。
+- **隔离是可选加固**（2026-10-23 用户决定）：有可用的 bwrap 时模块在沙箱中运行（只读代码、可写数据目录、默认无网络，声明 `network` 才联网）；没有时以 Chrona 运行用户身份作为普通子进程运行（同 Hermes 的 local 后端），环境变量只保留 `PATH`/`HOME`/`LANG` 与 `CHRONA_*`，独立进程组，停止时整组结束。两种方式都有内存上限与超时。
+- 未隔离时：经内核的方法（`notify`、`model`、`owner`、凭据……）照常检查；`network` 与文件范围只是声明、不被强制；模块新版本一律需要用户批准（不自动启用），审批卡注明"未隔离"。
+- 模块代码不写死路径：`chrona.paths.{module,data,content}`（来自 `CHRONA_MODULE`/`CHRONA_DATA`/`CHRONA_CONTENT`），沙箱内分别是 `/module`、`/data`、`/content`。
 
 ### 2.3 与内核的通道
 
-每个模块进程一个 Unix socket，绑定到沙箱内 `/chrona/chrona.sock`，每行一个 JSON，双向：
+每个模块进程一个 Unix socket（路径在 `CHRONA_SOCKET`；沙箱内是 `/chrona/chrona.sock`），每行一个 JSON，双向：
 
 - 内核 → 模块：事件 `{ "id", "event": { "kind": "schedule" | "inbound" | "tool" | "http" | "content_edit", ... } }`（`http` 见 v2-4，`content_edit` 见 v2-2）；模块回 `{ "id", "result" }` 或 `{ "id", "error" }`。
 - 模块 → 内核：调用 `{ "id", "method", "params" }`；内核回 `{ "id", "result" }` 或 `{ "id", "error": { "code" } }`。
 
-只读挂载的 `/chrona/sdk.ts` 封装协议：
+SDK 是名为 `chrona` 的包（`sdk.ts`、`testing.ts`），封装协议。沙箱内挂载在 `/node_modules/chrona`；未隔离时内核把它放在 `<dataDir>/platform/node_modules/chrona`（模块代码目录的上级），构建目录里放在 `node_modules/chrona`。Bun 以 `--no-install` 运行，缺包时不会去 npm 下载同名包。
 
 ```ts
-import { on, chrona } from "/chrona/sdk.ts";
+import { on, chrona } from "chrona";
 on("schedule", async ev => {
   const list = await (await fetch("https://github.com/trending")).text();
   const brief = await chrona.model({ system: "总结为中文简报……", prompt: list, maxOutputTokens: 1500 });
@@ -77,7 +79,7 @@ on("schedule", async ev => {
 | `model` | `model` | v2-3 |
 | `owner` | `owner.*` | v2-4 |
 | `secret:<connector>` | `secret.get` | v2-4 |
-| `network` | — | 沙箱联网，不经内核 |
+| `network` | — | 沙箱联网，不经内核（未隔离时不强制） |
 
 对外动作（发邮件等）不作为内核方法开放，改由声明了 `action` 的模块工具执行并经策略层审批（v2-5 §2）。
 
@@ -94,7 +96,7 @@ on("schedule", async ev => {
 构建（`module-build.ts`）保留：
 
 1. 清单校验；能力 ⊆ L1。
-2. 测试（构建沙箱中的 socket 由假内核应答，`model` 返回占位文本，`notify` 等只记录不执行）。
+2. 测试（`chrona/testing` 的假内核应答，`model` 返回占位文本，`notify` 等只记录不执行）。
 3. 试启动：进程启动并正确应答一个合成事件（每个 trigger 一个；`tools` 每个一次）。
 4. 数据：在副本上执行迁移、连续性检查（P2）。
 5. 幂等键检查（P5）：对同一 trigger 送两个不同时刻的合成事件，比较 `notify` 等调用的键。

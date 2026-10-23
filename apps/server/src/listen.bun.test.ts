@@ -33,20 +33,20 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   for (const listen of ["/api/steward", "/api/steward-agent", "/api/workspaces", "/api/health", "/api/a/b", "/"]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
 });
 
-(sandbox.health.available ? test : test.skip)("authenticated requests reach the listening module, which calls the owner API", async () => {
+(sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which calls the owner API", async () => {
   const { workspaceId } = await seedWorkspace("Listen");
   const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: ["owner"], keepAlive: true, listen: "/api/echo" });
   const module = await db.module.create({ data: { workspaceId, name: "echo", activeHash: "v1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/v1");
   await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `import { chrona } from "/chrona/sdk.ts";
+  await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
   const today = await chrona.owner({ method: "GET", path: "/today" });
   const denied = await chrona.owner({ method: "GET", path: "/today?workspaceId=other" });
   return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), today: today.status, overridden: denied.status, apps: Array.isArray((today.body as { apps?: unknown }).apps) });
 });`);
-  const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir, sandbox: { available: true, startModule: sandbox.startModule } });
+  const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
   stop = () => steward.stop();
   const app = await createServerApp({ steward });
   expect((await app.request("/api/echo/x")).status).toBe(401);
@@ -56,13 +56,14 @@ chrona.serve(async request => {
   expect((await app.request("/api/nothing/x", { headers: { authorization: "Bearer listen-test" } })).status).toBe(404);
 }, 30_000);
 
-(sandbox.health.available ? test : test.skip)("the built-in mcp module serves owner tools at /api/mcp", async () => {
+for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? test.skip : test)(`the built-in mcp module serves owner tools at /api/mcp (${isolated ? "bwrap" : "no sandbox"})`, async () => {
   await seedWorkspace("Mcp");
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!;
+  if (isolated) process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!; else delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   const steward = createStewardRuntime(db, { provider: null, chatTransport: null, dataDir });
   if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP; else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
   stop = () => steward.stop();
+  expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();
   const app = await createServerApp({ steward });
   let id = 0;

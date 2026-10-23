@@ -20,11 +20,11 @@ async function fixture(real = false) {
     return { status: "succeeded", exitCode: 0, output: '{"effects":[],"result":"ok"}', error: null };
   });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-22T00:00:00Z"), deliveries: [], chat: null, publicUrl: null, moduleBuiltinResources: root,
-    sandbox: real ? { available: true, runModule: sandbox.runModule, startModule: sandbox.startModule } : sandbox as StewardPorts["sandbox"] };
+    sandbox: real ? { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } : sandbox as StewardPorts["sandbox"] };
   async function write(revision: number) {
     await writeFile(join(code, "module.json"), JSON.stringify({ name: "sample", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] }));
-    await writeFile(join(code, "index.ts"), `import { on } from '/chrona/sdk.ts'; on('tool', () => ({ result: ${revision} }));`);
-    await writeFile(join(code, "test.ts"), `import { startModule } from '/chrona/testing.ts'; import { strict as assert } from 'node:assert'; const m = await startModule('/module/index.ts'); try { const now = '2026-10-22T00:00:00Z'; const reply = await m.send({ trigger: { kind: 'tool', id: 'lookup', firedAt: now, args: {} }, now, params: {} }); assert.equal(reply.result.result, ${revision}); } finally { await m.stop(); }`);
+    await writeFile(join(code, "index.ts"), `import { on } from 'chrona'; on('tool', () => ({ result: ${revision} }));`);
+    await writeFile(join(code, "test.ts"), `import { startModule } from 'chrona/testing'; import { strict as assert } from 'node:assert'; const m = await startModule('index.ts'); try { const now = '2026-10-22T00:00:00Z'; const reply = await m.send({ trigger: { kind: 'tool', id: 'lookup', firedAt: now, args: {} }, now, params: {} }); assert.equal(reply.result.result, ${revision}); } finally { await m.stop(); }`);
   }
   await write(1);
   const current = () => db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: workspace.id, name: "sample" } } });

@@ -15,7 +15,7 @@ async function fixture(scope: "once" | "always" = "always", network = false) {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
-    sandbox: { available: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
+    sandbox: { available: true, isolated: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "prices");

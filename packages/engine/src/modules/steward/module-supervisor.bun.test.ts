@@ -25,7 +25,7 @@ async function fixture({ keepAlive = false, effects = ["notify_user", "wake_prov
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, deliveries: [], chat: null, sandbox: { available: true, startModule: peer.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, deliveries: [], chat: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   const supervisor = createModuleSupervisor(ports, { timers: fakeClock.timers });
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   return { db, module, manifest, ports, supervisor, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };

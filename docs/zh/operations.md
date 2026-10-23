@@ -74,7 +74,7 @@ bun run packages/cli/src/index.ts doctor
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
 - QQ：`CHRONA_QQ_APP_ID`、`CHRONA_QQ_SECRET_FILE`、`CHRONA_QQ_STATE_DIR`；链接用 `CHRONA_PUBLIC_URL`。
-- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用，需要模块沙箱（bwrap）。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
+- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本的 Vite 监听所有网卡，不应向不可信网络开放。
 
@@ -129,6 +129,6 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 
 ## 脚本限制
 
-Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_SANDBOX_BWRAP` 配置 Provider 的 bubblewrap 包装；未配置时 Pi 关闭 bash，保留文件与可选网页工具。Provider 包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
+Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_SANDBOX_BWRAP` 配置 Provider 的 bubblewrap 包装；未配置时 Pi 不隔离运行（含 bash，同 Hermes 的 local 后端），健康状态显示未隔离。Provider 包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
 
-同一变量也配置模块沙箱；模块通过隔离测试并经绑定内容 hash 的批准启用后执行，保留超时/输出限制，网络访问按模块声明与策略控制。目前假定 `/nix/store`，不能视为通用部署支持。未通过探测时不回退到宿主执行。以实际执行结果为准，不以模型文字为准。
+同一变量也配置模块沙箱；探测不通过或未配置时，模块以 Chrona 运行用户身份作为普通进程运行（保留超时、内存与输出限制），网络与文件范围不再受限，模块每个新版本都需要批准。以实际执行结果为准，不以模型文字为准。

@@ -40,7 +40,7 @@ export function createStewardService(inputPorts: StewardPorts) {
         try { const h = await ports.provider.health(); return { name: ports.provider.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
         catch { return { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
       },
-      moduleSandbox: () => ports.sandbox?.available ?? false,
+      moduleSandbox: () => ports.sandbox?.isolated ?? false,
     }, apps.list);
     return { apps, sessions: createSessions(ports, workspaceId), content: createContent(ports, workspaceId, chat.submit), provider: createProviderControl(ports, workspaceId), connectors: createConnectors(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number, sessionId?: string) => chat.messages(workspaceId, limit, sessionId) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, ports.chat), notifications: createNotifications(ports, workspaceId), today: projection.get, health: projection.health };
   } };

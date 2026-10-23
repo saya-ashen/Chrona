@@ -84,19 +84,12 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const transport = configuredTransport(db, options);
-  const moduleBuildResources = {
-    sdk: resourcePath(join("module-sdk", "sdk.ts"), "packages/integrations/src/steward/module-sdk/sdk.ts"),
-    testing: resourcePath(join("module-sdk", "testing.ts"), "packages/integrations/src/steward/module-sdk/testing.ts"),
-  };
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk: moduleBuildResources.sdk, moduleTesting: moduleBuildResources.testing });
+  const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
   const sandbox: StewardPorts["sandbox"] = {
-    available: scriptSandbox.health.available,
+    ...scriptSandbox.health,
     runModule: input => scriptSandbox.runModule(input),
     startModule: input => scriptSandbox.startModule(input),
-    async run({ command, cwd, timeoutMs, maxOutputBytes }) {
-      const result = await scriptSandbox.run({ language: "shell", source: command, input: {}, cwd, timeoutMs, maxOutputBytes });
-      return { output: result.output, exitCode: result.status === "succeeded" ? 0 : result.exitCode || 1 };
-    },
   };
   const localTest = createLocalTestSource();
   const ports: StewardPorts = {
@@ -111,7 +104,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
-    sandbox: options.sandbox ?? sandbox, moduleBuildResources,
+    sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
@@ -157,7 +150,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       try { if (provider) { const h = await provider.health(); providerHealth = { name: provider.name, available: h.available, sandboxed: h.sandboxed }; } } catch { /* Public health never exposes diagnostic secrets. */ }
       let git = false;
       try { git = await Bun.spawn(["git", "--version"], { stdout: "ignore", stderr: "ignore" }).exited === 0; } catch { /* Missing git. */ }
-      return { provider: providerHealth, git, moduleSandbox: ports.sandbox?.available ?? false };
+      return { provider: providerHealth, git, moduleSandbox: ports.sandbox?.isolated ?? false };
     },
     start() {
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;

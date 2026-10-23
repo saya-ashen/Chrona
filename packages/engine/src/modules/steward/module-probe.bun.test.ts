@@ -14,7 +14,7 @@ function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[]
     for (const key of keys) await call("notify", { key, level: "now", title: "t", body: "b" });
     return {};
   });
-  return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, startModule: peer.startModule } } } as unknown as ModuleContext;
+  return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, isolated: true, startModule: peer.startModule } } } as unknown as ModuleContext;
 }
 test.each<[string, (at: string) => string[] | null, KeyProbe]>([
   ["constant key", () => ["sent"], { status: "repeated", keys: ["notify_user:sent"] }],

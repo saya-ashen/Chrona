@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
@@ -40,7 +40,7 @@ function configurationError(config: PiLaunchConfig): string | null {
   if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve(config.options.workspaceRoot))) return "Pi profile must be separate from the session workspace";
   if (!supportedVersions.has(config.version)) return "Unsupported Pi version pin";
   if (config.resourceError) return config.resourceError;
-  const resourceError = resourceVersionError(config.resources, config.version, !!config.bwrap);
+  const resourceError = resourceVersionError(config.resources, config.version);
   if (resourceError) return resourceError;
   if (!existsSync(config.extension)) return "Chrona tools extension missing";
   if (config.web && !existsSync(config.web)) return "Pi web extension missing";
@@ -84,6 +84,22 @@ function workspaceMounts(input: ProviderRunInput, cwd: string) {
   if (realpathSync(cwd) !== cwd || realpathSync(resolve(input.sessionDir)) !== resolve(input.sessionDir)) throw new Error("Unsafe session directory");
   return ["--bind", cwd, cwd, "--bind", resolve(input.sessionDir), resolve(input.sessionDir)];
 }
+function contentAreas(input: ProviderRunInput) {
+  return (input.content ?? []).map(area => {
+    if (!/^[a-z][a-z0-9-]{1,40}$/.test(area.name) || !isAbsolute(area.dir) || realpathSync(area.dir) !== area.dir) throw new Error("Unsafe content mount");
+    return area;
+  });
+}
+/**
+ * Content areas appear at <cwd>/content/<name>: bind mounts under bubblewrap, symlinks otherwise
+ * (then read-only areas are not enforced). Stale links go first so a mount never follows one.
+ */
+export function prepareContent(input: ProviderRunInput, link: boolean) {
+  const root = join(resolve(input.cwd), "content"), areas = contentAreas(input);
+  mkdirSync(root, { recursive: true });
+  for (const entry of readdirSync(root, { withFileTypes: true })) if (entry.isSymbolicLink()) unlinkSync(join(root, entry.name));
+  if (link) for (const area of areas) if (!existsSync(join(root, area.name))) symlinkSync(area.dir, join(root, area.name));
+}
 export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string) {
   const args = ["--mode", "rpc", "--session-dir", resolve(input.sessionDir), "--session-id", input.sessionId ?? randomUUID(),
     "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "-e", config.extension];
@@ -92,7 +108,7 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   if (input.searchTools) args.push("-e", "builtin:tool-search");
   for (const extension of config.resources.extensions) args.push("-e", extension);
   for (const skill of config.resources.skills) args.push("--skill", skill);
-  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", ...(config.bwrap ? ["bash"] : []), ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
+  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
     // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
     ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
   if (config.options.model) args.push("--model", config.options.model);
@@ -105,15 +121,12 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
     .filter((p): p is string => !!p && isAbsolute(p));
   const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
     .filter(p => hidden.some(root => inside(root, p)));
-  // A private root (host entries bound read-only) lets /content exist without touching the host.
-  const root = readdirSync("/").filter(name => !["proc", "dev", "tmp", "content"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
+  // A private root (host entries bound read-only), frozen before exec.
+  const root = readdirSync("/").filter(name => !["proc", "dev", "tmp"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
   return ["--die-with-parent", "--tmpfs", "/", ...root, "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]),
     ...hostMounts(config, input),
     "--dev", "/dev", "--proc", "/proc", ...visible.flatMap(p => ["--ro-bind", p, p]), ...workspaceMounts(input, cwd),
-    "--dir", "/content", ...(input.content ?? []).flatMap(area => {
-      if (!/^[a-z][a-z0-9-]{1,40}$/.test(area.name) || !isAbsolute(area.dir) || realpathSync(area.dir) !== area.dir) throw new Error("Unsafe content mount");
-      return [area.writable ? "--bind" : "--ro-bind", area.dir, `/content/${area.name}`];
-    }),
+    ...contentAreas(input).flatMap(area => [area.writable ? "--bind" : "--ro-bind", area.dir, join(cwd, "content", area.name)]),
     "--bind", config.agentDir, config.agentDir, "--remount-ro", "/", "--chdir", cwd, "--", config.command, ...args];
 }
 /** Detect command resources appended by a wrapper. Not a proof that arbitrary executable code is safe. */

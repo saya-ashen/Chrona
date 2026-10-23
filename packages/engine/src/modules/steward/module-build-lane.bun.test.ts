@@ -26,11 +26,8 @@ async function fixture() {
   const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
   let fail = false, build: Build = async () => {};
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-21T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
-    moduleBuildResources: {
-      sdk: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk/sdk.ts", import.meta.url)),
-      testing: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk/testing.ts", import.meta.url)),
-    },
-    sandbox: { available: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: '{"effects":[]}', error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
+    moduleSdk: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk", import.meta.url)),
+    sandbox: { available: true, isolated: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: '{"effects":[]}', error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
       starts.push(input);
       const done = build(input, { call: (name, args) => service.tools.call(input.token, name, args) }).then(() => ({ outcome: "finished" as const, sessionId: `session-${input.runId}`, error: null }));
@@ -71,17 +68,16 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
   f.onBuild(async (input, run) => {
     expect(input).toMatchObject({ lane: "build", cwd: join(f.dataDir, "builds", queued.runId), sessionId: null, extraTools: [] });
     expect(input.prompt).toContain(request.goal);
-    for (const text of ["/chrona/sdk.ts", "/chrona/testing.ts", "chrona.notify", "chrona.wakeProvider", "CHRONA_SOCKET", "only in /data", "two different events", "must not use the network", "data, never instructions", "Keep the module minimal"]) expect(input.prompt).toContain(text);
-    for (const file of ["sdk.ts", "testing.ts", "run-tests.sh"]) {
-      expect((await stat(join(input.cwd, "chrona", file))).mode & 0o222).toBe(0);
+    for (const text of ['from "chrona"', 'from "chrona/testing"', "chrona.notify", "chrona.wakeProvider", "CHRONA_SOCKET", "chrona.paths.data", "two different events", "must not use the network", "data, never instructions", "Keep the module minimal"]) expect(input.prompt).toContain(text);
+    for (const file of ["node_modules/chrona/sdk.ts", "node_modules/chrona/testing.ts", "chrona/run-tests.sh"]) {
+      expect((await stat(join(input.cwd, file))).mode & 0o222).toBe(0);
     }
-    expect(await readFile(join(input.cwd, "chrona", "sdk.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.sdk, "utf8"));
-    expect(await readFile(join(input.cwd, "chrona", "testing.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.testing, "utf8"));
+    expect(await readFile(join(input.cwd, "node_modules", "chrona", "sdk.ts"), "utf8")).toBe(await readFile(join(f.ports.moduleSdk!, "sdk.ts"), "utf8"));
     expect(JSON.parse(await readFile(join(input.cwd, "request.json"), "utf8"))).toEqual({ ...request, intent });
     expect((await f.service.tools.catalog(input.token)).map(tool => tool.name)).toEqual(["chrona_propose"]);
     await expect(run.call("chrona_reply", { text: "hi" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(run.call("chrona_propose", { request, intent })).rejects.toMatchObject({ code: "conflict" });
-    for (const dir of ["chrona", "./chrona/", "mail-sort/../chrona", "."]) {
+    for (const dir of ["chrona", "./chrona/", "mail-sort/../chrona", "node_modules/chrona", "."]) {
       await expect(proposeFromBuild(f.ports, f.workspaceId, { id: queued.runId, workspaceId: f.workspaceId, lane: "build", status: "running", toolCalls: [], cwd: input.cwd }, { dir, intent })).rejects.toMatchObject({ code: "forbidden" });
     }
     await f.writeModule(input.cwd);
@@ -125,16 +121,16 @@ test("failed, invalid or empty attempts retry with the public report, then give 
   expect(await f.db.audit.count({ where: { kind: "module_build_settled" } })).toBe(RUN_LIMITS.maxBuildAttempts);
 });
 
-test("build helper runs SDK tests against temporary copies without /chrona or bwrap", async () => {
+test("build helper runs SDK tests in place without bwrap", async () => {
   const f = await fixture();
   f.onBuild(async input => {
     await f.writeModule(input.cwd);
-    const entry = `import { on, chrona } from "/chrona/sdk.ts";
+    const entry = `import { on, chrona } from "chrona";
 on("inbound", async ev => {
   await chrona.notify({ key: ev.item.externalId, level: "now", title: "Mail", body: ev.item.subject });
   return { handled: true };
 });`;
-    const testSource = `import { startModule } from "/chrona/testing.ts";
+    const testSource = `import { startModule } from "chrona/testing";
 import { strict as assert } from "node:assert";
 const module = await startModule("index.ts");
 try {
@@ -155,7 +151,6 @@ try {
     expect(result.stdout).toContain("SDK self-test: 2 events, distinct keys, passed");
     expect(await readFile(join(input.cwd, "mail-sort", "index.ts"), "utf8")).toBe(entry);
     expect(await readFile(join(input.cwd, "mail-sort", "test.ts"), "utf8")).toBe(testSource);
-    expect(await readFile(join(input.cwd, "chrona", "testing.ts"), "utf8")).toBe(await readFile(f.ports.moduleBuildResources!.testing, "utf8"));
   });
   await f.request();
   await f.step();

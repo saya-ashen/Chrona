@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
-import { piArguments, piLaunchConfig } from "./pi-launch";
+import { piArguments, piLaunchConfig, prepareContent } from "./pi-launch";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
 
 // Only fake subprocesses, never the installed model runner. Temp artifacts deliberately
@@ -92,7 +93,7 @@ describe("Pi RPC provider", () => {
       expect(launch.tokenMatches).toBe(true);
       expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
       const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
-      expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).not.toContain("bash"); expect(tools).not.toContain("web_search");
+      expect(tools).toContain("read"); expect(tools).toContain("chrona_reply"); expect(tools).toContain("bash"); expect(tools).not.toContain("web_search");
       expect(tools).toContain("m_ledger_add_expense"); expect(tools).not.toContain("m_Bad");
       expect(tools).not.toContain("tool_search"); expect(launch.args).not.toContain("builtin:tool-search");
       expect((await f.commands()).find(c => c.type === "prompt").images).toEqual([{ type: "image", mimeType: "image/png", data: "YWJj" }]);
@@ -175,16 +176,27 @@ describe("Pi RPC provider", () => {
 });
 
 const realBwrap = Bun.which("bwrap");
-test.skipIf(!realBwrap)("real bwrap: content areas appear under /content, writable only when focused, root stays read-only", async () => {
+test.skipIf(!realBwrap)("real bwrap: content areas appear under content/, writable only when focused, root stays read-only", async () => {
   const f = await fixture();
   await mkdir(f.input.sessionDir, { recursive: true });
   const files = join(f.cwd, "content-files"), notes = join(f.cwd, "content-notes");
   await mkdir(files); await mkdir(notes); await writeFile(join(files, "a.md"), "hi\n");
   const config = piLaunchConfig({ ...f.options, bwrap: realBwrap! });
-  const args = piArguments(config, { ...f.input, content: [{ name: "files", dir: files, writable: false }, { name: "notes", dir: notes, writable: true }] }, "p");
-  const script = "cat /content/files/a.md; echo x > /content/notes/b && echo notes-rw; (echo y > /content/files/c) 2>/dev/null || echo files-ro; touch /chrona-root-probe 2>/dev/null || echo root-ro";
+  const input = { ...f.input, content: [{ name: "files", dir: files, writable: false }, { name: "notes", dir: notes, writable: true }] };
+  prepareContent(input, false);
+  const args = piArguments(config, input, "p");
+  const script = "cat content/files/a.md; echo x > content/notes/b && echo notes-rw; (echo y > content/files/c) 2>/dev/null || echo files-ro; touch /chrona-root-probe 2>/dev/null || echo root-ro";
   const proc = Bun.spawn([realBwrap!, ...args.slice(0, args.indexOf("--") + 1), "/bin/sh", "-c", script], { stdout: "pipe", stderr: "pipe" });
   const [out, err] = [await new Response(proc.stdout).text(), await new Response(proc.stderr).text()];
   expect({ code: await proc.exited, err }).toEqual({ code: 0, err: "" });
   expect(out.split("\n").filter(Boolean)).toEqual(["hi", "notes-rw", "files-ro", "root-ro"]);
+});
+test("without bwrap content areas are symlinks under content/ and stale links are replaced", async () => {
+  const f = await fixture();
+  const files = join(f.cwd, "content-files"), old = join(f.cwd, "content-old");
+  await mkdir(files); await mkdir(old); await writeFile(join(files, "a.md"), "hi\n");
+  prepareContent({ ...f.input, content: [{ name: "old", dir: old, writable: true }] }, true);
+  prepareContent({ ...f.input, content: [{ name: "files", dir: files, writable: false }] }, true);
+  expect(await readFile(join(f.input.cwd, "content", "files", "a.md"), "utf8")).toBe("hi\n");
+  expect(existsSync(join(f.input.cwd, "content", "old"))).toBe(false);
 });

@@ -9,7 +9,7 @@ const digest = (value: string | Uint8Array) => createHash("sha256").update(value
 const fits = (value: unknown) => Buffer.byteLength(JSON.stringify(value)) <= 16_384;
 
 /** Roots are fixed by the sandbox. Tests supply isolated temporary roots. */
-export function createFiles(content = "/content", data = "/data") {
+export function createFiles(content: string, data: string) {
   const root = resolve(content), historyRoot = join(data, "history");
   function relative(value: unknown, allowRoot = false): string {
     if (typeof value !== "string" || (!value && !allowRoot) || value.length > 2000 || isAbsolute(value) || value.includes("\\") || value.includes("\0") || (value && value.split("/").some(part => !part || part === "." || part === ".." || part === ".git"))) throw new Error("Invalid content path");

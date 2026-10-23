@@ -170,7 +170,7 @@ test("rollback-replaced schedule cannot execute, including stale rows selected b
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (realSandbox.health.available ? test : test.skip)("real bwrap module persists /data counter across two scheduled fires", async () => {
   const f = await fixture(["notify_user"], undefined, `
-import { on, chrona } from '/chrona/sdk.ts';
+import { on, chrona } from 'chrona';
 on('schedule', async () => {
   const file = Bun.file('/data/counter');
   const count = await file.exists() ? Number(await file.text()) + 1 : 1;
@@ -178,7 +178,7 @@ on('schedule', async () => {
   await chrona.notify({ key: 'counter-' + count, level: 'now', title: 'Counter', body: String(count) });
 });
 `);
-  f.ports.sandbox = { available: realSandbox.health.available, runModule: realSandbox.runModule, startModule: realSandbox.startModule };
+  f.ports.sandbox = { ...realSandbox.health, runModule: realSandbox.runModule, startModule: realSandbox.startModule };
   await f.fire();
   await f.fire();
   expect(await readFile(join(f.dataDir, "platform/data", f.moduleId, "counter"), "utf8")).toBe("2");

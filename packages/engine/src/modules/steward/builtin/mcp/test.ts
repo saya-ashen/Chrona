@@ -1,9 +1,9 @@
 import { strict as assert } from "node:assert";
-// @ts-expect-error Chrona supplies the test kernel at this sandbox-only path.
-import { startModule } from "/chrona/testing.ts";
+// @ts-expect-error Chrona supplies the test kernel at this at run time.
+import { startModule } from "chrona/testing";
 
 const owner: { method: string; path: string; body?: unknown }[] = [];
-const module = await startModule("/module/index.ts", { stubs: { owner: (params: { method: string; path: string; body?: unknown }) => {
+const module = await startModule("index.ts", { stubs: { owner: (params: { method: string; path: string; body?: unknown }) => {
   owner.push(params);
   if (params.path === "/modules/tools") return { status: 200, body: { tools: [{ name: "m_files_list", description: "[module files] List", inputSchema: { type: "object", properties: {}, required: [] } }], toolsets: [{ name: "module_files", description: "Files", tools: ["m_files_list"] }] } };
   if (params.path.startsWith("/approvals/")) return { status: 403, body: { code: "forbidden", message: "rescue only" } };

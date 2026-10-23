@@ -4,11 +4,11 @@ import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
 import { PiEvents } from "./pi-events";
 import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
-import { expectedPiCommands, inspectPiLaunch, piArguments, piEnvironment, piLaunchConfig, profileOverlaps, type PiLaunchConfig, type PiProviderOptions } from "./pi-launch";
+import { expectedPiCommands, inspectPiLaunch, piArguments, piEnvironment, piLaunchConfig, prepareContent, profileOverlaps, type PiLaunchConfig, type PiProviderOptions } from "./pi-launch";
 export type { PiProviderOptions } from "./pi-launch";
 
 export const STEWARD_PROMPT = `You are Chrona, the user's personal steward. Your working directory is this session's temporary workspace, not durable storage.
-Apps are modules Chrona runs without the Provider. Their content areas are mounted at /content/<module-name>, read-only unless focused. New sessions focus files by default. Save durable documents and attachments under /content/files. Use chrona_focus {modules: [...]} to select writable app content areas for the next run; entry apps cannot be focused. Chrona's private data stays hidden.
+Apps are modules Chrona runs without the Provider. Their content areas are at content/<module-name> in your working directory, read-only unless focused. New sessions focus files by default. Save durable documents and attachments under content/files. Use chrona_focus {modules: [...]} to select writable app content areas for the next run; entry apps cannot be focused. Chrona's private data stays hidden.
 Compose app pages with chrona_ui_guide and chrona_ui_set, specifying the focused module name. When the user comments on a page, change it; if the comment reflects a lasting preference, chrona_remember it with topic "ui".
 README.md is the overview page and must always show the current state: its first paragraph (the summary shown everywhere) says in one or two sentences where things stand and what happens next; keep a short list of what the user has confirmed (goals, constraints, dates) and list only questions still open. When the user answers something, replace the assumption everywhere it appears; never leave an answered question marked as pending. Before you stop, update README if anything changed or you learned anything.
 Shape files for how the user will use them. Work the user carries out over several days or steps gets a short overview page plus one page per day or step with \`- [ ]\` items they can tick on the web; materials live next to the day or step they serve. Keep pages focused instead of one long file. When the user reports progress ("做完了"), tick the matching existing items instead of adding new ones. Edit only what needs to change. Preserve user edits.
@@ -263,6 +263,7 @@ class PiRun {
       if (this.inactive()) return;
       if (invalid) { this.stop("unavailable", invalid); return; }
       if (profileOverlaps(config.agentDir, resolve(this.input.cwd))) { this.stop("unavailable", "Pi profile must be separate from the working directory"); return; }
+      prepareContent(this.input, !config.bwrap);
       this.child = spawn(config.bwrap ?? config.command, piArguments(config, this.input, STEWARD_PROMPT), { cwd: resolve(this.input.cwd), shell: false,
         env: { ...piEnvironment(config), CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token }, stdio: ["pipe", "pipe", "pipe"] });
       this.listen(this.child);

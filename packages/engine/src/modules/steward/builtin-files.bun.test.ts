@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createFiles } from "./builtin/files/files";
@@ -13,40 +13,22 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { createLocalTestSource } from "../../../../integrations/src/steward/local-test-source";
 
 const resources = fileURLToPath(new URL("./builtin", import.meta.url));
-const sdk = fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk", import.meta.url));
 const now = new Date("2026-10-22T00:00:00Z");
 
-/** Test-only host runner: rewrites sandbox mounts to disposable paths. Never used by production. */
-async function authorTests(input: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0]) {
-  const root = await mkdtemp("/tmp/chrona-files-author-");
-  try {
-    const code = join(root, "module"), content = input.contentDir!;
-    await mkdir(code);
-    for (const name of await readdir(input.codeDir)) {
-      let text = await readFile(join(input.codeDir, name), "utf8");
-      if (name.endsWith(".ts")) text = text.replaceAll("/module/", code + "/").replaceAll("/chrona/sdk.ts", join(code, "sdk.ts")).replaceAll("/chrona/testing.ts", join(code, "testing.ts")).replaceAll("/content", content).replaceAll('"/data"', JSON.stringify(input.dataDir));
-      await writeFile(join(code, name), text);
-    }
-    await writeFile(join(code, "sdk.ts"), await readFile(join(sdk, "sdk.ts")));
-    await writeFile(join(code, "testing.ts"), (await readFile(join(sdk, "testing.ts"), "utf8")).replaceAll("/module/module.json", join(code, "module.json")));
-    const child = Bun.spawn([process.execPath, join(code, input.entry)], { stdout: "pipe", stderr: "pipe", env: { PATH: process.env.PATH } });
-    const [output, error, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-    return { status: exitCode === 0 ? "succeeded" as const : "failed" as const, exitCode, output, error: error || null };
-  } finally { await rm(root, { recursive: true, force: true }); }
-}
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-files-engine-");
   const workspaceId = (await db.workspace.create({ data: { name: "files" } })).id;
   const local = createLocalTestSource();
   const peer = testModuleProcess(async (event, _call, input) => {
-    const app = createFiles(input.contentDir, input.dataDir);
+    const app = createFiles(input.contentDir!, input.dataDir);
     if (event.trigger.kind === "content_edit") { await app.contentEdit(event.trigger.paths, event.now); return {}; }
     if (event.trigger.kind === "tool") return { result: await app.tool(event.trigger.id, event.trigger.args, event.now) };
     throw new Error("Unexpected event");
   });
   const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined }) : null;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, chat: null, deliveries: [], connectors: [local.adapter], moduleBuiltinResources: resources,
-    sandbox: { available: true, runModule: sandbox?.runModule ?? authorTests, startModule: sandbox?.startModule ?? peer.startModule } };
+    // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
+    sandbox: { available: true, isolated: true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   const api = createStewardService(ports).forWorkspace(workspaceId);
   return { db, ports, workspaceId, api, local,
     async start() {

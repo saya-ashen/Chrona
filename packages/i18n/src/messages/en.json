@@ -82,7 +82,7 @@
       "running": "Work in progress",
       "healthy": "Chrona is available",
       "unhealthy": "Chrona needs attention",
-      "noSandbox": "Module sandbox not configured (set CHRONA_STEWARD_SANDBOX_BWRAP to the bwrap path): apps, including files, cannot run; uploads and the inbox are unavailable",
+      "noSandbox": "Running without isolation: apps and the Provider act with the Chrona user's permissions, and every new app version needs your approval (set CHRONA_STEWARD_SANDBOX_BWRAP to isolate them with bwrap)",
       "empty": "Nothing scheduled today",
       "wake": "Chrona work",
       "remind": "Reminder",

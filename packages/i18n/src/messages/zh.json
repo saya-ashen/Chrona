@@ -82,7 +82,7 @@
       "running": "正在工作",
       "healthy": "Chrona 运行正常",
       "unhealthy": "Chrona 需要留意",
-      "noSandbox": "模块沙箱未配置（设置 CHRONA_STEWARD_SANDBOX_BWRAP 为 bwrap 路径）：应用（包括文件）无法运行，上传与收件箱不可用",
+      "noSandbox": "未隔离运行：应用和 Provider 以 Chrona 运行用户的权限执行，应用的每个新版本都需要你批准（配置 CHRONA_STEWARD_SANDBOX_BWRAP 可启用 bwrap 隔离）",
       "empty": "今天没有调度",
       "wake": "Chrona 工作",
       "remind": "提醒你",

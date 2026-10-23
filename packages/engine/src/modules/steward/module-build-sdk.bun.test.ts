@@ -18,7 +18,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
     await writeFile(join(code, "index.ts"), `
-import { on, chrona } from '/chrona/sdk.ts';
+import { on, chrona } from 'chrona';
 import { existsSync, readFileSync } from 'node:fs';
 on('schedule', async ev => {
   if (existsSync('/data/state') && readFileSync('/data/state', 'utf8') !== 'migrated') throw new Error('migration missing');
@@ -35,11 +35,11 @@ on('tool', () => ({ result: 'tool answered' }));
 `);
     await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync('/data/state', 'migrated');`);
     await writeFile(join(code, "test.ts"), `
-import { startModule } from '/chrona/testing.ts';
+import { startModule } from 'chrona/testing';
 import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
-for (const path of ['/chrona/sdk.ts', '/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
-const module = await startModule('/module/index.ts', { stubs: { model: () => ({ text: 'Stub summary', inputTokens: 1, outputTokens: 2 }) } });
+for (const path of ['chrona', 'chrona/testing']) assert.throws(() => writeFileSync(path, 'changed'));
+const module = await startModule('index.ts', { stubs: { model: () => ({ text: 'Stub summary', inputTokens: 1, outputTokens: 2 }) } });
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await module.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
@@ -48,7 +48,7 @@ try {
   assert.equal(module.calls[1].params.body, 'Stub summary');
   assert.equal(module.calls[3].method, 'wakeProvider');
 } finally { await module.stop(); }
-const defaultModule = await startModule('/module/index.ts');
+const defaultModule = await startModule('index.ts');
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await defaultModule.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
@@ -57,7 +57,7 @@ try {
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });
-    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], sandbox: { available: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);
+    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], sandbox: { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);
     const tests: TestReport = [];
     expect(await runTests(context, code, manifest, tests)).toBe(true);
     expect(tests).toMatchObject([{ exitCode: 0 }]);

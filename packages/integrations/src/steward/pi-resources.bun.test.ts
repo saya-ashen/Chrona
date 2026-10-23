@@ -38,8 +38,8 @@ test("bwrap masks data and home before re-exposing only Pi resources and workspa
     for (const path of [command, f.extension, f.skill, readonly]) expect(mask).toBeLessThan(mount("--ro-bind", path));
     for (const path of [sessions, workspace, writable, agentDir]) expect(mask).toBeLessThan(mount("--bind", path));
   }
-  expect(args.slice(mount("--bind", writable), mount("--bind", writable) + 3)).toEqual(["--bind", writable, "/content/files"]);
-  expect(args.slice(mount("--ro-bind", readonly), mount("--ro-bind", readonly) + 3)).toEqual(["--ro-bind", readonly, "/content/calendar"]);
+  expect(args.slice(mount("--bind", writable), mount("--bind", writable) + 3)).toEqual(["--bind", writable, join(workspace, "content", "files")]);
+  expect(args.slice(mount("--ro-bind", readonly), mount("--ro-bind", readonly) + 3)).toEqual(["--ro-bind", readonly, join(workspace, "content", "calendar")]);
   expect(mount("--bind", dataDir)).toBe(-1);
   expect(mount("--bind", homedir())).toBe(-1);
   const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
@@ -80,12 +80,12 @@ test("refuses profile/workspace-owned manifests, symlinks and writable extension
     await chmod(f.extension, 0o666); expect(readPiResources(f.file, f.profile).error).not.toBeNull();
   }
 });
-test("native MCP stays in Pi, explicit 1.3 and sandbox rules are enforced", () => {
+test("native MCP stays in Pi and Pi builtins need the explicit 1.3 pin", () => {
   const selected = { skills: [], extensions: ["builtin:mcp"], tools: ["mcp__fixture__ping"] };
-  expect(resourceVersionError(selected, "0.85.0", true)).toContain("1.3.0");
-  expect(resourceVersionError(selected, "1.3.0", false)).toBeNull();
+  expect(resourceVersionError(selected, "0.85.0")).toContain("1.3.0");
+  expect(resourceVersionError(selected, "1.3.0")).toBeNull();
   expect(resourceCommand(selected, "extension", "builtin:mcp", [])).toBe(true);
   expect(resourceCommand(selected, "extension", "builtin:codemode", [])).toBe(false);
-  expect(resourceVersionError({ ...selected, extensions: ["builtin:codemode"] }, "1.3.0", false)).toContain("bubblewrap");
-  expect(resourceVersionError({ ...selected, tools: ["bash"] }, "1.3.0", false)).toContain("bubblewrap");
+  // Code execution no longer requires bubblewrap (unsandboxed like Hermes' local backend).
+  expect(resourceVersionError({ ...selected, tools: ["bash"] }, "1.3.0")).toBeNull();
 });

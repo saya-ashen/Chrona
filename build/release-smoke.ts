@@ -158,6 +158,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/pi-steward-agent"), "Pi steward extension");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "builtin"), "Built-in module resources");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/sdk.ts"), "Module SDK");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/package.json"), "Module SDK package");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "rescue.html"), "Immutable rescue console");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/testing.ts"), "Module test helper");
 
