@@ -24,7 +24,8 @@ function ShellContent({ data }: { data: AppBootData }) {
   const settings = session.settings;
   const navigation = [
     { href: "/", label: copy.today },
-    { href: "/affairs", label: copy.affairs },
+    { href: "/apps", label: copy.apps },
+    { href: "/chat", label: messages.steward.sessions.title },
     { href: "/settings", label: copy.settings },
   ];
   return <div className="steward-shell min-h-screen min-w-0 text-[15px] leading-[1.6] [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
@@ -47,8 +48,8 @@ function ShellContent({ data }: { data: AppBootData }) {
     </header>
     <main className="min-w-0">
       <PageColumn className="pb-0">
-        <Composer client={session.today.client} lang={locale} refresh={session.refresh} onPendingChange={session.setChatPending} />
-        <ProviderWork client={session.today.client} mode="questions" onChange={session.refresh} />
+        <Composer client={session.today.client} lang={locale} refresh={session.refresh} onPendingChange={session.setChatPending} sessionId={session.sessionId} onSession={session.setSessionId} />
+        <ProviderWork client={session.today.client} mode="questions" sessionId={session.sessionId} onChange={session.refresh} />
       </PageColumn>
       <Outlet context={data} />
     </main>

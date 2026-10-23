@@ -7,10 +7,10 @@ import { useFilePanel } from "../hooks/use-file-panel";
 import { ResourceStatus, MutationStatus } from "./resource-status";
 import { Section, Surface } from "./layout";
 
-/** The existing panel form/table/trend composition, backed by an affair CSV rather than a tool. */
-export function FilePanel({ spec, client, affairId, readOnly = false, onSubmit }: { spec: PanelBlock; client: StewardClient; affairId: string; readOnly?: boolean; onSubmit?: () => void }) {
+/** The existing panel form/table/trend composition, backed by an app CSV rather than a tool. */
+export function FilePanel({ spec, client, appId, readOnly = false, onSubmit }: { spec: PanelBlock; client: StewardClient; appId: string; readOnly?: boolean; onSubmit?: () => void }) {
   const c = useI18n().messages.steward.panel;
-  const f = useFilePanel(client, affairId, spec);
+  const f = useFilePanel(client, appId, spec);
   return <Section title={spec.title}>
     {spec.description && <p>{spec.description}</p>}
     <ResourceStatus resource={f.resource} />

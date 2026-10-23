@@ -1,5 +1,5 @@
 import type { FileNode } from "@chrona/contracts";
-import { affairPathSchema } from "@chrona/contracts";
+import { relativePathSchema } from "@chrona/contracts";
 import { parsePanelBlocks, toggleCheckbox, type PanelBlock } from "@chrona/domain";
 import { validatePanelEntry } from "./panel";
 export { toggleCheckbox };
@@ -50,7 +50,7 @@ export function omitReadmeSummary(content: string, path: string): string {
   return lines.join("\n");
 }
 export function visiblePath(path: string) {
-  return affairPathSchema.safeParse(path).success && !path.split("/").some(part => part === ".chrona" || part === ".git");
+  return relativePathSchema.safeParse(path).success && !path.split("/").some(part => part === ".chrona" || part === ".git");
 }
 export function fileKind(path: string, mime = "") {
   if (/\.md(?:own)?$|\.markdown$/i.test(path)) return "markdown";
@@ -130,7 +130,7 @@ export function panelRows(csv: string, spec: PanelBlock) {
   });
 }
 
-export function localAffairPath(source: string, pagePath: string): string | null {
+export function localAppPath(source: string, pagePath: string): string | null {
   try { source = decodeURIComponent(source.split(/[?#]/, 1)[0]!); } catch { return null; }
   if (!source || /^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(source)) return null;
   const parts = pagePath.split("/").slice(0, -1);

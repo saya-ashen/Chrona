@@ -11,7 +11,7 @@ import { Composer } from "./composer";
 afterEach(cleanup);
 function setup(chat = vi.fn().mockResolvedValue(chatFixture)) {
   const client = { chat } as unknown as StewardClient;
-  render(<MemoryRouter initialEntries={["/en"]}><I18nProvider locale="en" messages={en}><Composer client={client} lang="en" refresh={() => {}} /><Link to="/en/affairs/camera">Read matter</Link></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/en"]}><I18nProvider locale="en" messages={en}><Composer client={client} lang="en" refresh={() => {}} /><Link to="/en/apps/camera">Read matter</Link></I18nProvider></MemoryRouter>);
   return chat;
 }
 it("does not carry an old exchange into a reading page or lose an unsent draft", async () => {

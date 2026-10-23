@@ -22,25 +22,30 @@ const spec = (on: unknown, extra: Record<string, unknown> = {}) => ({
 function setup(page: unknown, readOnly = false) {
   const chat = vi.fn(async () => ({ runId: null, messages: [] }));
   const client = { chat, uiEvent: vi.fn().mockResolvedValue({ ok: true }) } as unknown as StewardClient;
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
-  return chat;
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} appId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  return client;
 }
-it("sends the say action with state interpolated, linked to the affair", async () => {
-  const chat = setup(spec({ press: { action: "say", params: { text: { $template: "Result: ${/answer}" } } } }));
+it("sends the say action with state interpolated, linked to the app", async () => {
+  const client = setup(spec({ press: { action: "say", params: { text: { $template: "Result: ${/answer}" } } } }));
   await userEvent.type(screen.getByLabelText("Answer"), "16/20");
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(chat).toHaveBeenCalledWith({ affairId: "a1", text: "Result: 16/20" }));
+  await waitFor(() => expect(client.uiEvent).toHaveBeenCalledWith("a1", { kind: "feedback", path: "README.md", name: "say", text: "Result: 16/20" }));
+  expect(client.chat).not.toHaveBeenCalled();
 });
 it("records open once even in StrictMode and records a say action without surfacing usage failures", async () => {
-  const uiEvent = vi.fn().mockRejectedValue(new Error("offline"));
+  const uiEvent = vi.fn().mockImplementation(async (_appId, event) => {
+    if (event.kind === "open") throw new Error("offline");
+    return { ok: true };
+  });
   const chat = vi.fn().mockResolvedValue({ runId: null, messages: [] });
   const client = { uiEvent, chat } as unknown as StewardClient;
-  render(<StrictMode><MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={spec({ press: { action: "say", params: { text: "done" } } })} path="home.ui.json" client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter></StrictMode>);
+  render(<StrictMode><MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={spec({ press: { action: "say", params: { text: "done" } } })} path="home.ui.json" client={client} appId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter></StrictMode>);
   await waitFor(() => expect(uiEvent).toHaveBeenCalledTimes(1));
   expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "open", path: "home.ui.json" });
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "action", path: "home.ui.json", name: "say" }));
-  expect(chat).toHaveBeenCalledWith({ affairId: "a1", text: "done" });
+  await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { kind: "feedback", path: "home.ui.json", name: "say", text: "done" }));
+  expect(uiEvent).toHaveBeenCalledTimes(2);
+  expect(chat).not.toHaveBeenCalled();
 });
 it("toggles TaskList source lines and records the task path", async () => {
   const file = vi.fn().mockResolvedValue({ content: "# Day\n- [ ] Practice", revision: "r1" });
@@ -48,7 +53,7 @@ it("toggles TaskList source lines and records the task path", async () => {
   const uiEvent = vi.fn().mockResolvedValue({ ok: true });
   const client = { file, toggleCheckbox, uiEvent } as unknown as StewardClient;
   const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day-1.md", section: null, title: "Today", showProgress: true }, children: [] } } };
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} appId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
   await userEvent.click(await screen.findByRole("checkbox", { name: "Practice" }));
   expect(toggleCheckbox).toHaveBeenCalledWith("a1", { path: "day-1.md", line: 2, checked: true, baseRevision: "r1" });
   await waitFor(() => expect(uiEvent).toHaveBeenCalledWith("a1", { path: "day-1.md", kind: "toggle" }));
@@ -59,9 +64,9 @@ it("shows a failed task save, refreshes a conflict, and retries only when the us
   const uiEvent = vi.fn().mockResolvedValue({ ok: true });
   const client = { file, toggleCheckbox, uiEvent } as unknown as StewardClient;
   const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", title: "Today", showProgress: true }, children: [] } } };
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} appId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>);
   await userEvent.click(await screen.findByRole("checkbox", { name: "Practice" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.affairFile.conflict);
+  expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.appFile.conflict);
   await waitFor(() => expect(file).toHaveBeenCalledTimes(2));
   expect(screen.getByRole("checkbox")).not.toBeChecked();
   expect(uiEvent).not.toHaveBeenCalled();
@@ -75,7 +80,7 @@ it.each([[false, "existing"], [true, "existing"], [false, "missing"]] as const)(
   const client = { file, addPanelEntry, uiEvent } as unknown as StewardClient;
   const props = { title: "Daily weight", data: "records.csv", fields: [{ key: "weight", label: "Weight", type: "number", required: true }], views: [{ kind: "table", columns: ["weight"] }] };
   const page = { root: "panel", elements: { panel: { type: "Panel", props, children: [] } } };
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} path="home.ui.json" client={client} affairId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} path="home.ui.json" client={client} appId="a1" readOnly={readOnly} refresh={() => {}} /></I18nProvider></MemoryRouter>);
   const input = await screen.findByLabelText("Weight");
   if (readOnly) { expect(input).toBeDisabled(); expect(addPanelEntry).not.toHaveBeenCalled(); return; }
   await userEvent.type(input, "70");
@@ -87,10 +92,10 @@ function Location() { const location = useLocation(); return <output aria-label=
 it("renders TaskList Markdown links and bold", async () => {
   const client = { file: vi.fn().mockResolvedValue({ content: "- [ ] 按[诊断材料](01-口语诊断材料.md)完成 **练习** [source](https://example.com)", revision: "r1" }) } as unknown as StewardClient;
   const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", section: null, title: null, showProgress: false }, children: [] } } };
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refresh={() => {}} /><Location /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} appId="a1" readOnly={false} refresh={() => {}} /><Location /></I18nProvider></MemoryRouter>);
   const link = await screen.findByRole("link", { name: "诊断材料" });
   await userEvent.click(link);
-  expect(screen.getByLabelText("location")).toHaveTextContent(`/en/affairs/a1?${new URLSearchParams({ path: "01-口语诊断材料.md" })}`);
+  expect(screen.getByLabelText("location")).toHaveTextContent(`/en/apps/a1?${new URLSearchParams({ path: "01-口语诊断材料.md" })}`);
   expect(screen.getByRole("link", { name: "source" })).toHaveAttribute("href", "https://example.com");
   expect(screen.getByText("练习").tagName).toBe("STRONG");
 });
@@ -99,7 +104,7 @@ it("refreshes source tasks after background work without recording a user toggle
   const uiEvent = vi.fn().mockResolvedValue({ ok: true });
   const client = { file, uiEvent } as unknown as StewardClient;
   const page = { root: "tasks", elements: { tasks: { type: "TaskList", props: { path: "day.md", title: "Today", showProgress: true }, children: [] } } };
-  const content = (version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} affairId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const content = (version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={page} client={client} appId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
   const view = render(content("first"));
   expect(await screen.findByRole("checkbox")).not.toBeChecked();
   view.rerender(content("second"));
@@ -110,14 +115,14 @@ it("refreshes source tasks after background work without recording a user toggle
 it("keeps an unsent form answer when a refreshed spec changes its initial state", async () => {
   const client = { chat: vi.fn() } as unknown as StewardClient;
   const page = spec({ press: { action: "say", params: { text: "answer" } } });
-  const content = (value: unknown, version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={value} client={client} affairId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const content = (value: unknown, version: string) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={value} client={client} appId="a1" readOnly={false} refreshVersion={version} refresh={() => {}} /></I18nProvider></MemoryRouter>;
   const view = render(content(page, "first"));
   await userEvent.type(screen.getByLabelText("Answer"), "My unsent answer");
   view.rerender(content({ ...page, state: { answer: "new default" } }, "second"));
   expect(screen.getByLabelText("Answer")).toHaveValue("My unsent answer");
 });
 it("refreshes untouched defaults and read-only state alongside a dirty answer", async () => {
-  const client = { chat: vi.fn().mockResolvedValue({ messages: [] }) } as unknown as StewardClient;
+  const client = { chat: vi.fn(), uiEvent: vi.fn().mockResolvedValue({ ok: true }) } as unknown as StewardClient;
   const page = spec({ press: { action: "say", params: { text: { $template: "Result: ${/answer}" } } } });
   const elements = {
     ...page.elements,
@@ -125,7 +130,7 @@ it("refreshes untouched defaults and read-only state alongside a dirty answer", 
     other: { type: "Input", props: { label: "Other", name: "other", value: { $bindState: "/other" } }, children: [] },
     count: { type: "Text", props: { text: { $template: "Count: ${/count}" } }, children: [] },
   };
-  const content = (state: Record<string, unknown>) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={{ ...page, elements, state }} client={client} affairId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>;
+  const content = (state: Record<string, unknown>) => <MemoryRouter><I18nProvider locale="en" messages={en}><GeneratedPage spec={{ ...page, elements, state }} client={client} appId="a1" readOnly={false} refresh={() => {}} /></I18nProvider></MemoryRouter>;
   const view = render(content({ answer: "", other: "old", count: 1 }));
   await userEvent.type(screen.getByLabelText("Answer"), "draft");
   view.rerender(content({ answer: "server", other: "new", count: 2 }));
@@ -135,12 +140,14 @@ it("refreshes untouched defaults and read-only state alongside a dirty answer", 
   view.rerender(content({ answer: "another default", other: "newest", count: 3 }));
   expect(screen.getByLabelText("Answer")).toHaveValue("draft");
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(client.chat).toHaveBeenCalledWith({ affairId: "a1", text: "Result: draft" }));
+  await waitFor(() => expect(client.uiEvent).toHaveBeenCalledWith("a1", { kind: "feedback", path: "README.md", name: "say", text: "Result: draft" }));
+  expect(client.chat).not.toHaveBeenCalled();
 });
-it("does not act on an ended affair and rejects specs outside the catalog", async () => {
-  const chat = setup(spec({ press: { action: "say", params: { text: "done" } } }), true);
+it("does not act on an ended app and rejects specs outside the catalog", async () => {
+  const client = setup(spec({ press: { action: "say", params: { text: "done" } } }), true);
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(chat).not.toHaveBeenCalled();
+  expect(client.chat).not.toHaveBeenCalled();
+  expect(client.uiEvent).not.toHaveBeenCalled();
   cleanup();
   setup({ root: "x", elements: { x: { type: "Script", props: {}, children: [] } } });
   expect(screen.getByRole("alert")).toBeInTheDocument();

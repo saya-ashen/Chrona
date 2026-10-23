@@ -11,8 +11,8 @@ afterEach(cleanup);
 const copy = en.steward.providerWork;
 function run(method: "confirm" | "select" | "input" | "editor" = "confirm"): ProviderRunView {
   const now = new Date().toISOString();
-  return { id: "run", affairId: "affair", affairTitle: "Independent IELTS", active: true, status: "running", progress: { phase: "waiting", tool: null }, usage: null, resources: null, updatedAt: now,
-    interactions: [{ id: "request", runId: "run", affairId: "affair", status: "pending", createdAt: now, expiresAt: new Date(Date.now() + 60_000).toISOString(), question: { method, title: "Fixture request", message: "Only this attempt", options: method === "select" ? ["First", "Second"] : [], timeoutMs: 60_000 } }] };
+  return { id: "run", sessionId: "session", sessionTitle: "Independent IELTS", active: true, status: "running", progress: { phase: "waiting", tool: null }, usage: null, resources: null, updatedAt: now,
+    interactions: [{ id: "request", runId: "run", sessionId: "session", status: "pending", createdAt: now, expiresAt: new Date(Date.now() + 60_000).toISOString(), question: { method, title: "Fixture request", message: "Only this attempt", options: method === "select" ? ["First", "Second"] : [], timeoutMs: 60_000 } }] };
 }
 function show(items: ProviderRunView[] = [run()], error?: Error) {
   const client = createStewardClient("workspace");
@@ -20,13 +20,13 @@ function show(items: ProviderRunView[] = [run()], error?: Error) {
   if (error) load.mockRejectedValueOnce(error);
   const answer = vi.spyOn(client, "answerProvider").mockResolvedValue({ ok: true });
   const stop = vi.spyOn(client, "cancelProviderRun").mockResolvedValue({ ok: true });
-  render(<MemoryRouter><I18nProvider locale="en" messages={en}><ProviderWork client={client} affairId="affair" /></I18nProvider></MemoryRouter>);
+  render(<MemoryRouter><I18nProvider locale="en" messages={en}><ProviderWork client={client} sessionId="session" /></I18nProvider></MemoryRouter>);
   return { load, answer, stop };
 }
 it("shows safe current work and never approves on rendering", async () => {
   const { answer, load } = show(); await screen.findByText("Fixture request");
-  expect(answer).not.toHaveBeenCalled(); expect(load).toHaveBeenCalledWith("affair", expect.any(AbortSignal));
-  expect(screen.getByText(copy.boundary)).toBeVisible(); expect(screen.getByRole("link", { name: "Independent IELTS" })).toHaveAttribute("href", "/en/affairs/affair");
+  expect(answer).not.toHaveBeenCalled(); expect(load).toHaveBeenCalledWith("session", expect.any(AbortSignal));
+  expect(screen.getByText(copy.boundary)).toBeVisible(); expect(screen.getByRole("link", { name: "Independent IELTS" })).toHaveAttribute("href", "/en/chat?sessionId=session");
   await userEvent.click(screen.getByRole("button", { name: copy.deny }));
   expect(answer).toHaveBeenCalledWith("request", { decision: "submit", value: false });
 });

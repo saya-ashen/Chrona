@@ -1,7 +1,7 @@
 import type { UiEvent } from "@chrona/contracts";
 import type { StewardClient } from "./client";
-import { markdownParts } from "./affair-file";
-import { plainSummary } from "./affair-overview";
+import { markdownParts } from "./app-file";
+const plainSummary = (text: string) => text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[#*_`\[\]]/g, "").trim();
 
 export type PageTask = { line: number; text: string; checked: boolean };
 /** `- [ ]` items of a Markdown page, optionally only those under one heading (until the next heading of the same or higher level). */
@@ -16,7 +16,7 @@ export function pageTasks(content: string, section: string | null): PageTask[] {
   return pageTasks(content, null).filter(task => inside(task.line));
 }
 /** Explicit navigation wins over the Provider-selected entry. */
-export function selectedPage(entry: string | undefined, path: string | null) {
+export function selectedPage(entry: string | null | undefined, path: string | null) {
   return path || entry || "README.md";
 }
 
@@ -39,6 +39,6 @@ export function pageStateUpdates(previous: Record<string, unknown>, local: Recor
 }
 
 /** Usage is best-effort and must never interfere with the user's action. */
-export function recordUiEvent(client: StewardClient, affairId: string, input: UiEvent) {
-  void Promise.resolve().then(() => client.uiEvent(affairId, input)).catch(() => {});
+export function recordUiEvent(client: StewardClient, appId: string, input: UiEvent) {
+  void Promise.resolve().then(() => client.uiEvent(appId, input)).catch(() => {});
 }

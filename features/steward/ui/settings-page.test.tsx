@@ -10,7 +10,7 @@ import { StewardSession } from "../hooks/use-steward-session";
 import { SettingsPage } from "./settings-page";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
 const settings = { notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" }, chat: { channel: "chrona_qqbot", bound: false, sentToday: 2 } };
-const source = { id: "mail", kind: "email", label: "My mail", status: "active", affairId: "a", settings: { folders: ["INBOX"] }, hasCredentials: true, canSend: false, lastSyncAt: null, lastError: null, pendingItems: 3, coverageNote: "INBOX only" };
+const source = { id: "mail", kind: "email", label: "My mail", status: "active", settings: { folders: ["INBOX"] }, hasCredentials: true, canSend: false, lastSyncAt: null, lastError: null, pendingItems: 3, coverageNote: "INBOX only" };
 let fail = false;
 function show() { render(<MemoryRouter><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><SettingsPage /></StewardSession></I18nProvider></MemoryRouter>); }
 beforeEach(() => {
@@ -24,8 +24,7 @@ beforeEach(() => {
     if (path.endsWith("/test")) return { ok: false, error: "Invalid credentials" } as never;
     if (path.endsWith("/sync") || path.endsWith("/mail")) return source as never;
     if (path.endsWith("/connectors")) return (options?.method === "POST" ? source : { items: [source] }) as never;
-    if (path.endsWith("/affairs") && options?.method === "POST") return { id: "a", title: "Mailbox", status: "active", summary: "", nextSchedule: null, running: false, work: null, openApprovals: 0, lastActivityAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z" } as never;
-    if (path.endsWith("/items")) return { items: [{ id: "i", connectorId: "mail", externalId: "e", from: "A sender", subject: "Hello", receivedAt: "2026-01-01T00:00:00Z", path: "inbox/mail.md", status: "delivered", ruleNote: "Batch rule" }] } as never;
+    if (path.endsWith("/items")) return { items: [{ id: "i", connectorId: "mail", externalId: "e", from: "A sender", subject: "Hello", receivedAt: "2026-01-01T00:00:00Z", ref: "files/inbox/mail.md", status: "delivered", ruleNote: "Batch rule" }] } as never;
     return { items: [] } as never;
   });
 });
@@ -35,7 +34,7 @@ it("saves notifications and supports retry after failure", async () => {
   const cap = await screen.findByRole("spinbutton", { name: "Daily notification cap" });
   await userEvent.clear(cap); await userEvent.type(cap, "7"); fail = true;
   await userEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Could not connect");
+  await waitFor(() => expect(screen.getAllByRole("alert").some(alert => alert.textContent?.includes("Could not connect"))).toBe(true));
   fail = false; await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("Saved")).toBeVisible();
 });
@@ -63,7 +62,7 @@ it("shows provider, v3 permissions and connector details; test failures remain f
   expect(within(screen.getByText("Change credentials").closest("tr")!).queryByRole("combobox")).toBeNull();
   await userEvent.click(screen.getByText("Recent inbound items"));
   expect(await screen.findByText("Batch rule")).toBeVisible();
-  expect(screen.getByRole("link", { name: "inbox/mail.md" })).toHaveAttribute("href", "/en/affairs/a?path=inbox%2Fmail.md");
+  expect(screen.getByRole("link", { name: "files/inbox/mail.md" })).toHaveAttribute("href", "/en/apps/files?path=inbox%2Fmail.md");
   await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
   expect(await screen.findByText("Connection test failed: Invalid credentials")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
@@ -72,7 +71,7 @@ it("shows provider, v3 permissions and connector details; test failures remain f
   await userEvent.click(screen.getByRole("button", { name: "Pause" }));
   expect(apiJson).toHaveBeenCalledWith("/api/steward/connectors/mail?workspaceId=ws", expect.objectContaining({ method: "PATCH", body: '{"settings":{"folders":["INBOX"]},"status":"paused"}' }));
 });
-it("adds email with a write-only password and a new mailbox affair", async () => {
+it("adds email with a write-only password without creating an app", async () => {
   show(); await screen.findByText("My mail");
   await userEvent.click(screen.getByText("Add email connector", { selector: "summary" }));
   await userEvent.type(screen.getByLabelText("Email address"), "me@example.test");
@@ -81,6 +80,6 @@ it("adds email with a write-only password and a new mailbox affair", async () =>
   expect(password).toHaveAttribute("type", "password");
   await userEvent.type(password, "test-password");
   await userEvent.click(screen.getByRole("button", { name: "Add email connector" }));
-  expect(apiJson).toHaveBeenCalledWith("/api/steward/connectors?workspaceId=ws", expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "email", label: "me@example.test", affairId: "a", settings: { address: "me@example.test", imapHost: "imap.example.test", imapPort: 993, folders: ["INBOX"] }, secret: { password: "test-password" } }) }));
+  expect(apiJson).toHaveBeenCalledWith("/api/steward/connectors?workspaceId=ws", expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "email", label: "me@example.test", settings: { address: "me@example.test", imapHost: "imap.example.test", imapPort: 993, folders: ["INBOX"] }, secret: { password: "test-password" } }) }));
   expect(password).toHaveValue("");
 });

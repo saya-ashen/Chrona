@@ -3,7 +3,7 @@ import { useI18n } from "@chrona/i18n";
 import { Button, Textarea } from "@shared/ui";
 import type { StewardClient } from "../model/client";
 
-export function GeneratedPageFeedback({ client, affairId, path, readOnly }: { client: StewardClient; affairId: string; path: string; readOnly: boolean }) {
+export function GeneratedPageFeedback({ client, appId, path, readOnly }: { client: StewardClient; appId: string; path: string; readOnly: boolean }) {
   const { messages } = useI18n();
   const c = messages.steward.generatedPage;
   const [expanded, setExpanded] = useState(false);
@@ -12,7 +12,7 @@ export function GeneratedPageFeedback({ client, affairId, path, readOnly }: { cl
   if (readOnly) return null;
   const send = async () => {
     setStatus("pending");
-    try { await client.uiEvent(affairId, { kind: "feedback", path, text: text.trim() }); setStatus("sent"); }
+    try { await client.uiEvent(appId, { kind: "feedback", path, text: text.trim() }); setStatus("sent"); }
     catch { setStatus("error"); }
   };
   return <div className="mt-4 grid justify-items-start gap-2">

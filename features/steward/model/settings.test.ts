@@ -10,7 +10,7 @@ it.each(ACTIONS)("default and editability: %s", action => {
 it.each([
   ["global override", [grant()], "auto"],
   ["most restrictive global", [grant(), grant({ mode: "never" })], "never"],
-  ["scoped excluded", [grant({ scope: { kind: "affair", affairId: "a" } })], "ask"],
+  ["scoped excluded", [grant({ scope: { kind: "module", moduleId: "a" } })], "ask"],
   ["revoked", [grant({ revokedAt: "2025-12-31T00:00:00Z" })], "ask"],
   ["expired", [grant({ expiresAt: "2026-01-01T00:00:00Z" })], "ask"],
   ["consumed", [grant({ once: true, consumedAt: "2025-12-31T00:00:00Z" })], "ask"],
