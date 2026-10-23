@@ -1,9 +1,10 @@
 import { createConnection } from "node:net";
 import { randomUUID } from "node:crypto";
 
-type Trigger = { kind: "schedule"; id: string; firedAt: string }
+export type Trigger = { kind: "schedule"; id: string; firedAt: string }
   | { kind: "inbound"; id: string; firedAt: string; item: { externalId: string; from: string; subject: string; receivedAt: string; body: string } }
-  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown> };
+  | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown> }
+  | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" };
 type EventResult = { handled?: boolean; result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;

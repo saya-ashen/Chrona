@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
@@ -17,7 +17,9 @@ export async function runTests(context: ModuleContext, staging: string, manifest
     const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
     try {
       if (!ports.sandbox?.available || !ports.sandbox.runModule) { passed = false; break; }
-      const result = await ports.sandbox.runModule({ codeDir: staging, dataDir: data, entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
+      const contentDir = manifest.content ? join(data, ".build-content") : undefined;
+      if (contentDir) await mkdir(contentDir, { recursive: true });
+      const result = await ports.sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
       tests.push({ stdout: result.output.slice(0, RUN_LIMITS.jobOutputBytes), stderr: (result.error ?? "").slice(0, RUN_LIMITS.jobOutputBytes), exitCode: result.exitCode ?? 1 });
       if (result.status !== "succeeded" || result.exitCode !== 0) passed = false;
     } catch { passed = false; }

@@ -77,7 +77,9 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
         return result;
       } });
       if (stopped || instance.closing) throw new Error("Module supervisor stopped");
-      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
+      const contentDir = instance.manifest.content ? join(ports.dataDir, "platform/content", instance.moduleId) : undefined;
+      if (contentDir) await mkdir(contentDir, { recursive: true });
+      const process = ports.sandbox.startModule({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
       instance.process = process;
       const exited = process.exited.then(() => { throw new Error("Module process exited"); });
       void exited.catch(() => {});

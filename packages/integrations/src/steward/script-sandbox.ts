@@ -73,7 +73,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       const profile = directory ? scriptWorkspaceArguments(directory, paths, dataDir) : base;
       return execute({ language, args: [language === "typescript" ? "-e" : "-c", source], input, profile, runTimeout, outputLimit });
     },
-    startModule({ codeDir, dataDir: moduleData, entry, socketPath, network = false }: { codeDir: string; dataDir: string; entry: string; socketPath: string; network?: boolean }) {
+    startModule({ codeDir, dataDir: moduleData, contentDir, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; socketPath: string; network?: boolean }) {
       if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
       const language = ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
       const interpreter = interpreters[language];
@@ -84,7 +84,9 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       const profile = scriptWorkspaceArguments(code, paths, dataDir);
       profile.splice(profile.indexOf("--bind"), 5, "--ro-bind", code, "/module", "--bind", data, "/data", "--chdir", "/module");
       profile.splice(profile.indexOf("--ro-bind"), 3, "--tmpfs", "/",
-        ...readdirSync("/").filter(name => !["module", "data", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+        ...readdirSync("/").filter(name => !["module", "data", "content", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+      // The module's own content area, read-write; other modules' areas are never mounted.
+      if (contentDir) profile.push("--bind", workspaceDirectory(contentDir)!, "/content");
       profile.push("--dir", "/chrona", "--ro-bind", socket, "/chrona/chrona.sock",
         "--ro-bind", moduleSdk, "/chrona/sdk.ts", "--remount-ro", "/");
       if (!network) profile.splice(profile.indexOf("--share-net"), 1);
@@ -97,7 +99,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       });
       return { pid: child.pid!, exited, stderr: () => errors.toString("utf8"), kill: () => { child.kill("SIGKILL"); } };
     },
-    async runModule({ codeDir, dataDir: moduleData, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
+    async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
       if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
       const language = ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
       const code = workspaceDirectory(codeDir)!, data = workspaceDirectory(moduleData)!;
@@ -108,7 +110,8 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       // A private root supplies mount points without creating anything on the host.
       // Keep the P0 host view read-only, then freeze the private root before exec.
       profile.splice(profile.indexOf("--ro-bind"), 3, "--tmpfs", "/",
-        ...readdirSync("/").filter(name => !["module", "data", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+        ...readdirSync("/").filter(name => !["module", "data", "content", "chrona", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]));
+      if (contentDir) profile.push("--bind", workspaceDirectory(contentDir)!, "/content");
       profile.push("--dir", "/chrona", "--ro-bind", moduleSdk, "/chrona/sdk.ts",
         "--ro-bind", moduleTesting, "/chrona/testing.ts", "--remount-ro", "/");
       if (!network) profile.splice(profile.indexOf("--share-net"), 1);

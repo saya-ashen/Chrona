@@ -3,9 +3,10 @@ import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, type Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import type { Trigger } from "./sdk";
 
 type Call = { id: string; method: string; params: Record<string, unknown> };
-type Event = { trigger: { kind: string; id: string; firedAt: string; [key: string]: unknown }; now: string; params: Record<string, string | number | boolean> };
+type Event = { trigger: Trigger; now: string; params: Record<string, string | number | boolean> };
 type Reply = { id: string; result?: { handled?: boolean; result?: unknown }; error?: string };
 /** Fake kernel for author tests. No call ever executes a real external effect. */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {

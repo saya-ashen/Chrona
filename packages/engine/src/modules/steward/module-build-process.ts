@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { MODULE_METHODS, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
@@ -20,7 +20,9 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
       seen.add(key);
       return { id: call.id, result: { status: duplicate ? "duplicate" : "executed" } };
     } });
-    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, entry: manifest.entry, socketPath: join(dir, "s"), network: false });
+    const contentDir = manifest.content ? join(data, ".build-content") : undefined;
+    if (contentDir) await mkdir(contentDir, { recursive: true });
+    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false });
     const exited = process.exited.then(() => { throw new Error("Module process exited"); });
     void exited.catch(() => {});
     return await run(async event => {

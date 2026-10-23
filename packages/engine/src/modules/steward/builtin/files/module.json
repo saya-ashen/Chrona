@@ -1,0 +1,19 @@
+{
+  "name": "files",
+  "description": "Browse, read, write and organize documents; inspect and restore file history.",
+  "entry": "index.ts",
+  "content": true,
+  "triggers": [],
+  "effects": [],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"],
+  "tools": [
+    { "name": "list", "description": "List a document directory.", "parameters": { "type": "object", "properties": { "dir": { "type": "string" } } } },
+    { "name": "read", "description": "Read text (truncated to fit); binary files return size and MIME only.", "parameters": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } },
+    { "name": "write", "description": "Write a text document, keeping its history.", "parameters": { "type": "object", "properties": { "path": { "type": "string" }, "content": { "type": "string" } }, "required": ["path", "content"] } },
+    { "name": "move", "description": "Move a file or directory without overwriting an existing item.", "parameters": { "type": "object", "properties": { "from": { "type": "string" }, "to": { "type": "string" } }, "required": ["from", "to"] } },
+    { "name": "delete", "description": "Move a file or directory into .trash, preserving its history.", "parameters": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } },
+    { "name": "history", "description": "List the last 20 file versions, oldest first; deleted versions are marked.", "parameters": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } },
+    { "name": "restore", "description": "Restore a file from a version returned by history.", "parameters": { "type": "object", "properties": { "path": { "type": "string" }, "version": { "type": "string" } }, "required": ["path", "version"] } }
+  ]
+}
