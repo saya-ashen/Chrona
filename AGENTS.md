@@ -4,52 +4,57 @@ Vite + Hono monorepo (Bun runtime). There is NO Next.js.
 
 ## Product — read before designing changes
 
-Chrona is a proactive personal steward: the user hands over things in natural language
-(QQ private chat with Chrona's own bot, or the web composer); Chrona understands them,
-picks a suitable way to get them done, keeps looking after them, and reports back.
+Chrona is a personal tool that grows with the user's needs: the user talks in natural language
+(QQ private chat with Chrona's own bot, the web composer, or their own agents over the owner MCP);
+Chrona gets things done, keeps looking after them, and grows new apps (modules) when a need recurs.
 
 - Goals (highest authority): [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md).
-- Current architecture, model and pages: [`docs/zh/steward-workspace.md`](docs/zh/steward-workspace.md).
-- Module platform: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md), [`docs/zh/platform-p1-spec.md`](docs/zh/platform-p1-spec.md), [`docs/zh/platform-p2-spec.md`](docs/zh/platform-p2-spec.md), [`docs/zh/platform-p3-spec.md`](docs/zh/platform-p3-spec.md) [`docs/zh/platform-p4-spec.md`](docs/zh/platform-p4-spec.md) [`docs/zh/platform-p4-build-spec.md`](docs/zh/platform-p4-build-spec.md) and [`docs/zh/platform-p5-tools-spec.md`](docs/zh/platform-p5-tools-spec.md). Draft successor (not implemented): [`docs/zh/platform-v2.md`](docs/zh/platform-v2.md) — removes affairs, makes everything (reminders, web, QQ, MCP, sources) modules, adds Hermes-style sessions and a rescue console.
-- Historical purge record only: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
+- Architecture: [`docs/zh/platform-v2.md`](docs/zh/platform-v2.md) and its parts
+  [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
+  [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
+  [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
+  Implemented: v2-1, v2-2 and the built-in module mechanism; the rest are drafts.
+- History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
 
-- An **Affair** is a git directory under `<dataDir>/affairs`, with `README.md` as its home.
-  Provider and user edits are committed; pages, checkboxes and panels are files, not result tables.
-  Simple questions may receive direct replies without creating an affair. Runs are internal records.
+- There are no affairs. Chrona's features are **modules (apps)**: `module.json` + entry + tests,
+  long-running sandboxed SDK processes that receive events (schedule, inbound, tool, content_edit)
+  and call kernel methods only for declared capabilities. A module may own a **content area**
+  (`<dataDir>/platform/content/<moduleId>/`: Markdown, panels, `*.ui.json`, uploads — content, never executed)
+  that the web renders as its pages. Built-in modules (e.g. `files`) ship with Chrona and activate without approval.
+- Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); `wake` and module wakes run in
+  fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
-- Providers own file, shell, web and session tools. Chrona supplies scheduling, queues, git history,
-  connectors/credentials, approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
-  Executable code Chrona runs is only a module (`module.json` + entry + tests) submitted via `chrona_propose`,
-  tested in the Chrona sandbox, activated only through an `activate_module` approval bound to its content hash,
-  stored under `<dataDir>/platform` (hidden from Providers), and run on its schedules without the Provider. Today modules make no model calls. Module data declares a schema; upgrades require `data.migrate`, and cross-schema rollback restores a snapshot only after user approval. New versions are simulated against the active one; only in affairs the user allowed, updates with no new effects, no migration and identical simulation activate automatically. Modules may also be triggered by inbound mail of their affair's connector (handled mail does not wake the Provider) and export tools as one toolset per module (like an MCP server): direct in their affair's runs, deferred behind Pi's `tool_search` in other runs and offered to the owner MCP, always executed in the module's own affair. `chrona_propose {request}` queues a budgeted `build`-lane run in a Chrona-owned directory (no affair files, session or other tools) that writes and submits the module.
-  Affair-directory files (Markdown, panels, `*.ui.json`, `.chrona/rules.json`) remain content, never executed.
-- Current Provider: Pi RPC. Chrona tools: `chrona_reply`, `chrona_notify`, `chrona_schedule`,
-  `chrona_schedules`, `chrona_schedule_cancel`, `chrona_affairs`, `chrona_affair_create`,
-  `chrona_affair_update`, `chrona_focus`, `chrona_request_approval`, `chrona_send_email`,
-  `chrona_inbound`, `chrona_remember`, `chrona_forget`, `chrona_preferences`, `chrona_propose`,
-  `chrona_modules`, `chrona_module_checkout`, `chrona_module_rollback`.
+- Providers own file, shell, web and session tools; each run sees all content areas read-only under `/content`
+  and the session's focused apps writable. Chrona supplies scheduling, events, sessions, connectors/credentials,
+  approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
+  Executable code Chrona runs is only a module submitted via `chrona_propose`, built and checked in the Chrona sandbox
+  (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated through an `activate_module`
+  approval bound to its content hash (or automatically, if the user allowed it for that module and the update adds no
+  capability and no migration), stored under `<dataDir>/platform` (hidden from Providers), and rolled back by hash.
+- Current Provider: Pi RPC. Chrona tools are listed in `chronaToolInputSchemas` (contract).
   Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
-  auto · notify_after · preapproved · ask · never. External text can never grant anything.
+  auto · notify_after · preapproved · ask · never; grants are global, per module or per connector.
+  External text can never grant anything.
 - Notifications go through the budget (`notify-budget.ts`): now / digest / web, daily cap,
   quiet hours. Do not add notification paths that bypass it.
 - Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
-- No backward compatibility with removed task/goal/plan systems, immutable AffairResult,
-  Ask/suggestions, care/cadence, FollowUp, concierge/assessor roles, management MCP or Hermes.
-  The `job` schedule mode was removed. Current Provider adapters and Run records are not those legacy systems.
+- No backward compatibility with removed systems: affairs, task/goal/plan systems, AffairResult,
+  Ask/suggestions, care/cadence, FollowUp, concierge/assessor roles, management MCP, Hermes, the `job`
+  schedule mode, one-shot stdin/stdout modules and P3 simulation.
 
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.
 
 The owner MCP (`apps/server/src/routes/steward-mcp.ts`, `/api/mcp`, API_KEY) lets the user's own agents (Pi, Claude Code)
-do what the web UI does: read affairs, chat, list/resolve approvals, list modules and notifications, and call module tools. It is not the removed
-management MCP and never exposes Provider tools or run capabilities.
+do what the web UI does: chat in sessions, read and edit app content, list/resolve approvals, list modules and
+notifications, and call module tools. It never exposes Provider tools or run capabilities.
 
-Never pre-approved: deleting or migrating real user data, deploy/push, live databases,
-real accounts or external sends, disabling auth, approvals or secret redaction.
+Never pre-approved: deleting or migrating real user data (including `chrona migrate-affairs --apply`), deploy/push,
+live databases, real accounts or external sends, disabling auth, approvals or secret redaction.
 
 ## Code map
 
@@ -57,13 +62,13 @@ real accounts or external sends, disabling auth, approvals or secret redaction.
 | --- | --- |
 | `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
 | `packages/domain/src/steward` | Pure policy, budgets, schedule rules, inbound rules, Markdown and refs |
-| `packages/engine/src/modules/steward` | Affairs/files/git, schedules, modules (gateway + executor), approvals, connectors, queues, runs, tools and tick |
-| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, module/script sandbox |
+| `packages/engine/src/modules/steward` | Sessions, content areas, schedules, modules (gateway, build, supervisor, built-ins), approvals, connectors, queues, runs, tools and tick |
+| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, module sandbox and SDK |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
 | `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, Provider queues, QQ bot) |
-| `apps/web`, `features/steward` | SPA shell and the steward pages (Today, Affairs, Affair files/history/schedules, Settings) |
-| `packages/cli` | `chrona start / backup / restore / doctor / qq bind-code` |
+| `apps/web`, `features/steward` | SPA shell and pages (Today, Chat with sessions, Apps and app pages, Settings) |
+| `packages/cli` | `chrona start / backup / restore / migrate-affairs / doctor / qq bind-code` |
 
 Dependency direction: `apps → features → packages/engine → packages/domain → packages/contracts`;
 routes validate and delegate; domain has no I/O.
@@ -74,7 +79,7 @@ routes validate and delegate; domain has no I/O.
 - Backend: Hono on Bun (`apps/server`).
 - Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
 - Provider: Pi RPC with Chrona's tool extension; optional explicit web extension.
-- Storage: SQLite plus `<dataDir>/affairs` and `<dataDir>/secrets`; back up all three while stopped.
+- Storage: SQLite plus `<dataDir>/platform`, `<dataDir>/sessions` and `<dataDir>/secrets`; back up all of them while stopped (`chrona backup`).
 - TypeScript strict everywhere.
 
 ## Database
@@ -121,7 +126,7 @@ routes validate and delegate; domain has no I/O.
 - User-facing strings live in `packages/i18n/src/messages/{zh,en}.json` (`steward` namespace).
 - Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
 - What needs the user's decision, and the primary action, must be visually obvious.
-- Copy speaks the user's language (affairs, results, notifications), not internal names (runs, grants, tokens).
+- Copy speaks the user's language (apps, files, conversations, notifications), not internal names (runs, grants, tokens).
 
 > Note for delegated workers (Pi): the context-mode, memory and CodeGraph sections below describe
 > MCP tools available only to some interactive agents. If you do not have them, use your native

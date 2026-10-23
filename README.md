@@ -97,7 +97,7 @@ In a source checkout, replace `chrona` with `bun run packages/cli/src/index.ts`.
 
 Local-first is not offline-only: model requests, web tools, QQ and email can contact external services. Protect backups, review approvals and verify model claims. The Provider environment filters Chrona credentials but retains its own model access. No compatibility with pre-rebuild databases; only Pi is currently implemented, not every future Provider described in design notes.
 
-[Documentation](docs/README.md) · [Goals](docs/zh/steward-goals.md) · [Workspace model](docs/zh/steward-workspace.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](docs/README.md) · [Goals](docs/zh/steward-goals.md) · [Architecture](docs/zh/platform-v2.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 

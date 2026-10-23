@@ -97,7 +97,7 @@ chrona qq bind-code --workspace ws_default
 
 本地优先不等于离线：模型、网页、QQ 和邮件可能访问外部服务。保护备份、审核批准并验证模型结论。Provider 环境过滤 Chrona 凭据，但保留其自身模型访问配置。不兼容重构前数据库；目前只实现 Pi，设计文档中的其他 Provider 不代表已经可用。
 
-[文档](docs/README.md) · [目标](docs/zh/steward-goals.md) · [工作区模型](docs/zh/steward-workspace.md) · [贡献](CONTRIBUTING.md)
+[文档](docs/README.md) · [目标](docs/zh/steward-goals.md) · [架构](docs/zh/platform-v2.md) · [贡献](CONTRIBUTING.md)
 
 ## 许可
 
