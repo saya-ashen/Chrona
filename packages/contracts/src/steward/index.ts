@@ -146,7 +146,8 @@ const channelId = z.string().min(1).max(64);
 const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB");
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso }).strict(),
+    /** `scheduleId` and `payload` are set for dynamic schedules (e.g. reminders created through `chrona_schedule`). */
+    z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso, scheduleId: z.string().max(128).optional(), payload: z.record(z.string(), z.unknown()).optional() }).strict(),
     z.object({ kind: z.literal("inbound"), id: slug, firedAt: iso, item: z.object({ externalId: z.string(), from: z.string(), subject: z.string(), receivedAt: iso, body: z.string() }).strict() }).strict(),
     z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()) }).strict(),
     /** The user or the Provider changed files in this module's content area (`id` is always "content"). */

@@ -147,6 +147,8 @@ model Schedule {
   text String
   moduleId String?
   triggerId String?
+  /// Dynamic module schedules (reminders) carry their data here.
+  payload Json?
   module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   until DateTime?
   status String @default("active")
