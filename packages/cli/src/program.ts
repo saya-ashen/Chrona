@@ -18,14 +18,14 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       if (!options.startServer) throw new Error("chrona start is only available in packaged Chrona binaries.");
       await options.startServer(input);
     });
-  program.command("backup").description("Back up SQLite and supported local data while the server is stopped")
+  program.command("backup").description("Back up SQLite, platform, sessions and secrets while the server is stopped")
     .argument("<output>", "Backup database path")
     .action((output: string) => {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
       const result = backupSqliteDatabase(databaseUrl, resolve(output), getChronaDataDir());
       console.log(`Chrona backup created: ${result.backupPath} + ${result.backupPath}.tar`);
     });
-  program.command("restore").description("Restore SQLite and its companion data tar while the server is stopped")
+  program.command("restore").description("Restore SQLite and its platform, sessions and secrets tar while the server is stopped")
     .argument("<input>", "Backup database path")
     .option("--force", "Replace the current Chrona database", false)
     .action((input: string, restoreOptions: { force?: boolean }) => {

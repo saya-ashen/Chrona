@@ -1,6 +1,11 @@
-import type { PrismaClient } from "@chrona/db";
+import type { Prisma, PrismaClient } from "@chrona/db";
 import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
-import type { OnApproved } from "./approvals";
+/** Only trusted owner routes may resolve. The caller executes the returned payload,
+ * rechecking policy and atomically consuming a once grant with its action claim. */
+export type ApprovedAction = { workspaceId: string; approvalId: string; grantId: string; payload: Prisma.JsonValue };
+/** V5 seam: the executor must claim idempotently, recheck policy, consume once grants,
+ * and record delivery outcomes. A resolved approval alone never means sent. */
+export type OnApproved = (action: ApprovedAction) => Promise<void>;
 
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;

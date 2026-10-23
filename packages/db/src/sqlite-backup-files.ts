@@ -3,20 +3,20 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { dirname, join, resolve } from "node:path";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url";
 
-const roots = ["affairs", "secrets"] as const;
+export const backupDataRoots = ["platform", "sessions", "secrets"] as const;
 
 function assertRegularTree(path: string): void {
   const stat = lstatSync(path);
   if (stat.isDirectory()) {
     for (const name of readdirSync(path)) assertRegularTree(join(path, name));
   } else if (!stat.isFile()) {
-    throw new Error("Backup refuses symlinks and special files in affairs or secrets.");
+    throw new Error("Backup refuses symlinks and special files in platform, sessions or secrets.");
   }
 }
 
 export function backupDataFiles(dataDir: string, archivePath: string): void {
   if (existsSync(archivePath)) throw new Error("Backup archive already exists.");
-  const present = roots.filter(root => existsSync(join(dataDir, root)));
+  const present = backupDataRoots.filter(root => lstatSync(join(dataDir, root), { throwIfNoEntry: false }) !== undefined);
   for (const root of present) {
     if (!lstatSync(join(dataDir, root)).isDirectory()) throw new Error("Backup roots must be directories.");
     assertRegularTree(join(dataDir, root));
@@ -31,7 +31,7 @@ type Entry = { path: string; directory: boolean; executable: boolean; content: B
 
 function safePath(path: string, directory: boolean, seen: Set<string>): boolean {
   const parts = path.split("/");
-  return roots.includes(parts[0] as typeof roots[number])
+  return backupDataRoots.includes(parts[0] as typeof backupDataRoots[number])
     && !parts.some(part => !part || part === "." || part === ".." || part.includes("\\"))
     && !seen.has(path) && (parts.length > 1 || directory);
 }
@@ -75,7 +75,7 @@ export function stageDataFiles(dataDir: string, archivePath: string): string {
   ensurePrivateDirectory(dataDir);
   const stage = mkdtempSync(join(dataDir, ".restore-files-"));
   try {
-    for (const root of roots) mkdirSync(join(stage, root), { mode: 0o700 });
+    for (const root of backupDataRoots) mkdirSync(join(stage, root), { mode: 0o700 });
     for (const file of files) {
       const target = join(stage, file.path);
       if (file.directory) mkdirSync(target, { recursive: true, mode: 0o700 });
@@ -96,9 +96,9 @@ export function replaceDataFiles(dataDir: string, stage: string, restoreDatabase
   const installed: string[] = [];
   const retired: string[] = [];
   try {
-    for (const root of roots) {
+    for (const root of backupDataRoots) {
       const target = join(dataDir, root);
-      if (existsSync(target)) {
+      if (lstatSync(target, { throwIfNoEntry: false })) {
         renameSync(target, `${stage}-prior-${root}`);
         retired.push(root);
       }

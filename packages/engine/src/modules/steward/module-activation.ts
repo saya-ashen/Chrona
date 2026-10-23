@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { createApprovals, type ApprovedAction } from "./approvals";
+import { createApprovals } from "./approvals";
+import type { ApprovedAction } from "./ports";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { StewardError } from "./errors";
 import { expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";

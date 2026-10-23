@@ -7,7 +7,7 @@ import { createStewardService } from "./service";
 import { createModules } from "./modules";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
-import type { ApprovedAction } from "./approvals";
+import type { ApprovedAction } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";

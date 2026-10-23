@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,34 +28,77 @@ function readValue(path: string): string {
 }
 
 describe("SQLite backup and restore", () => {
-  it("round trips affairs including git history and private connector secrets, replacing stale files", () => {
+  it("round trips app content, module store/data, sessions and private connector secrets, replacing stale files", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-files-backup-"));
     try {
       const data = join(directory, "data");
-      mkdirSync(join(data, "affairs", "a", ".git"), { recursive: true });
-      mkdirSync(join(data, "secrets"));
-      writeFileSync(join(data, "affairs", "a", "README.md"), "- [x] done");
-      writeFileSync(join(data, "affairs", "a", ".git", "HEAD"), "ref: refs/heads/main\n");
-      writeFileSync(join(data, "secrets", "email.json"), "test-secret");
-      writeFileSync(join(data, "affairs", "a", "check.sh"), "#!/bin/sh\n", { mode: 0o700 });
+      const files = [
+        ["platform/content/app/README.md", "- [x] done"],
+        ["platform/store/app/version/check.sh", "#!/bin/sh\n"],
+        ["platform/data/app/state.json", '{"count":1}'],
+        ["sessions/session/notes.md", "session notes"],
+        ["secrets/email.json", "test-secret"],
+      ] as const;
+      for (const [path, content] of files) {
+        mkdirSync(join(data, path, ".."), { recursive: true });
+        writeFileSync(join(data, path), content, { mode: path.endsWith(".sh") ? 0o700 : 0o600 });
+      }
       const db = join(directory, "outside-data.db");
       const backup = join(directory, "backup.db");
       createDatabase(db, "saved");
       backupSqliteDatabase(`file:${db}`, backup, data);
       expect(statSync(`${backup}.tar`).mode & 0o777).toBe(0o600);
-      writeFileSync(join(data, "affairs", "stale.md"), "stale");
-      writeFileSync(join(data, "secrets", "email.json"), "changed");
+      for (const root of ["platform", "sessions", "secrets"]) writeFileSync(join(data, root, "stale.md"), "stale");
+      for (const [path] of files) writeFileSync(join(data, path), "changed");
       expect(() => restoreSqliteDatabase(`file:${db}`, backup, { dataDir: data })).toThrow("Pass --force");
       restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
       expect(readValue(db)).toBe("saved");
-      expect(readFileSync(join(data, "affairs", "a", "README.md"), "utf8")).toBe("- [x] done");
-      expect(readFileSync(join(data, "affairs", "a", ".git", "HEAD"), "utf8")).toContain("refs/heads/main");
-      expect(readFileSync(join(data, "secrets", "email.json"), "utf8")).toBe("test-secret");
+      for (const [path, content] of files) expect(readFileSync(join(data, path), "utf8")).toBe(content);
+      for (const root of ["platform", "sessions", "secrets"]) expect(existsSync(join(data, root, "stale.md"))).toBe(false);
       expect(statSync(join(data, "secrets", "email.json")).mode & 0o777).toBe(0o600);
-      expect(existsSync(join(data, "affairs", "stale.md"))).toBe(false);
-      expect(statSync(join(data, "affairs", "a", "check.sh")).mode & 0o777).toBe(0o700);
+      expect(statSync(join(data, "platform/store/app/version/check.sh")).mode & 0o777).toBe(0o700);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
+
+  for (const root of ["platform", "sessions", "secrets"]) {
+    it(`protects ${root} paths and requires force only for non-empty roots`, () => {
+      const directory = mkdtempSync(join(tmpdir(), "chrona-root-safety-"));
+      try {
+        const data = join(directory, "data");
+        const rootPath = join(data, root);
+        mkdirSync(rootPath, { recursive: true });
+        const db = join(directory, "active.db"), backup = join(directory, "backup.db");
+        createDatabase(db, "saved");
+        const nestedDb = join(rootPath, "nested.db");
+        expect(() => backupSqliteDatabase(`file:${db}`, nestedDb, data)).toThrow("outside platform, sessions and secrets");
+        createDatabase(nestedDb, "nested");
+        expect(() => backupSqliteDatabase(`file:${nestedDb}`, backup, data)).toThrow("outside platform, sessions and secrets");
+        expect(() => restoreSqliteDatabase(`file:${db}`, nestedDb, { dataDir: data })).toThrow("outside platform, sessions and secrets");
+        expect(() => restoreSqliteDatabase(`file:${nestedDb}`, db, { dataDir: data })).toThrow("outside platform, sessions and secrets");
+        rmSync(nestedDb);
+        backupSqliteDatabase(`file:${db}`, backup, data);
+        const restoredDb = join(directory, "restored.db");
+        writeFileSync(join(rootPath, "current.md"), "current");
+        expect(() => restoreSqliteDatabase(`file:${restoredDb}`, backup, { dataDir: data })).toThrow("Pass --force");
+        expect(existsSync(restoredDb)).toBe(false);
+        rmSync(join(rootPath, "current.md"));
+        restoreSqliteDatabase(`file:${restoredDb}`, backup, { dataDir: data });
+        expect(readValue(restoredDb)).toBe("saved");
+        const link = join(rootPath, "link");
+        symlinkSync(join(directory, "missing"), link);
+        expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "link.db"), data)).toThrow("symlinks");
+        rmSync(link);
+        if (process.platform !== "win32") {
+          execFileSync("mkfifo", [join(rootPath, "pipe")]);
+          expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "special.db"), data)).toThrow("special files");
+          rmSync(join(rootPath, "pipe"));
+        }
+        rmSync(rootPath, { recursive: true });
+        symlinkSync(join(directory, "missing"), rootPath);
+        expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "root-link.db"), data)).toThrow("roots must be directories");
+      } finally { rmSync(directory, { recursive: true, force: true }); }
+    });
+  }
 
   it("supports absent data roots and rejects missing/corrupt archives before changing the database", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-empty-backup-"));
@@ -65,7 +109,7 @@ describe("SQLite backup and restore", () => {
       createDatabase(db, "current");
       backupSqliteDatabase(`file:${db}`, backup, directory);
       restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data });
-      expect(existsSync(join(data, "affairs"))).toBe(true);
+      for (const root of ["platform", "sessions", "secrets"]) expect(existsSync(join(data, root))).toBe(true);
       renameSync(`${backup}.tar`, `${backup}.saved.tar`);
       expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: data })).toThrow();
       writeFileSync(`${backup}.tar`, "corrupt");
@@ -80,19 +124,19 @@ describe("SQLite backup and restore", () => {
       const db = join(directory, "active.db");
       const backup = join(directory, "backup.db");
       createDatabase(db, "current");
-      mkdirSync(join(directory, "affairs"));
-      writeFileSync(join(directory, "affairs", "README.md"), "saved");
+      mkdirSync(join(directory, "platform"));
+      writeFileSync(join(directory, "platform", "README.md"), "saved");
       const lock = acquireSqliteRuntimeLock(`file:${db}`);
       try { expect(() => backupSqliteDatabase(`file:${db}`, backup, directory)).toThrow("already in use"); }
       finally { lock.release(); }
       backupSqliteDatabase(`file:${db}`, backup, directory);
-      writeFileSync(join(directory, "affairs", "README.md"), "current");
+      writeFileSync(join(directory, "platform", "README.md"), "current");
       expect(() => restoreSqliteDatabase(`file:${db}`, backup, {
         force: true, dataDir: directory,
         rename() { throw new Error("injected failure"); },
       })).toThrow("injected failure");
-      expect(readFileSync(join(directory, "affairs", "README.md"), "utf8")).toBe("current");
-      symlinkSync(db, join(directory, "affairs", "link"));
+      expect(readFileSync(join(directory, "platform", "README.md"), "utf8")).toBe("current");
+      symlinkSync(db, join(directory, "platform", "link"));
       expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "unsafe.db"), directory)).toThrow("symlinks");
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
@@ -101,10 +145,10 @@ describe("SQLite backup and restore", () => {
     try {
       const db = join(directory, "active.db"), backup = join(directory, "backup.db");
       createDatabase(db, "current");
-      mkdirSync(join(directory, "affairs"));
+      mkdirSync(join(directory, "platform"));
       backupSqliteDatabase(`file:${db}`, backup, directory);
       const original = readFileSync(`${backup}.tar`);
-      for (const [name, type] of [["affairs/../../escaped", "5"], ["/affairs", "5"], ["affairs/link", "2"]]) {
+      for (const [name, type] of [["platform/../../escaped", "5"], ["/platform", "5"], ["sessions/link", "2"], ["secrets/special", "6"]]) {
         const malicious = Buffer.from(original);
         malicious.fill(0, 0, 100);
         malicious.write(name!, 0);

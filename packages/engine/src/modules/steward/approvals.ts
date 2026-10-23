@@ -2,18 +2,12 @@ import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
-import type { StewardPorts } from "./ports";
+import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toApproval, toGrant } from "./store";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
-/** Only trusted owner routes may resolve. The caller executes the returned payload,
- * rechecking policy and atomically consuming a once grant with its action claim. */
-export type ApprovedAction = { workspaceId: string; approvalId: string; grantId: string; payload: Prisma.JsonValue };
-/** V5 seam: the executor must claim idempotently, recheck policy, consume once grants,
- * and record delivery outcomes. A resolved approval alone never means sent. */
-export type OnApproved = (action: ApprovedAction) => Promise<void>;
 async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
   const { workspaceId, now } = context;
   const action = toApproval(row).action;

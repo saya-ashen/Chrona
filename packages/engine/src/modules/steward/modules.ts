@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
-import type { ApprovedAction } from "./approvals";
+import type { ApprovedAction } from "./ports";
 import { checkoutModule } from "./module-files";
 import { StewardError } from "./errors";
 import { moduleContext, requireModule, type ModuleContext, type ModuleSource } from "./module-context";

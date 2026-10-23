@@ -4,7 +4,7 @@ export { createModules } from "./modules";
 export { createRuns, liveRuns, authenticateRun, enqueueModuleWake } from "./runs";
 export { createTick } from "./tick";
 export { createTools, sessionContentFocus, searchSessions } from "./tools";
-export type { ApprovedAction, OnApproved } from "./approvals";
+export type { ApprovedAction, OnApproved } from "./ports";
 export type { StewardPorts } from "./ports";
 export type { StewardService } from "./service";
 export { StewardError } from "./errors";

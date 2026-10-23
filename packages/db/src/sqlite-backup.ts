@@ -1,6 +1,8 @@
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -12,7 +14,7 @@ import { Database } from "bun:sqlite";
 import { acquireSqliteRuntimeLock, type SqliteRuntimeLock } from "./sqlite-runtime-lock";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
 
-import { backupDataFiles, replaceDataFiles, stageDataFiles } from "./sqlite-backup-files";
+import { backupDataFiles, backupDataRoots, replaceDataFiles, stageDataFiles } from "./sqlite-backup-files";
 
 const RESTORE_MARKER_VERSION = 1;
 
@@ -86,10 +88,10 @@ function vacuumInto(sourcePath: string, destinationPath: string): void {
 }
 
 function assertOutsideDataRoots(dataDir: string, ...paths: string[]): void {
-  for (const root of ["affairs", "secrets"]) {
+  for (const root of backupDataRoots) {
     const directory = resolve(dataDir, root);
     if (paths.some(path => path === directory || path.startsWith(`${directory}${sep}`))) {
-      throw new Error("Database and backup paths must be outside affairs and secrets directories.");
+      throw new Error("Database and backup paths must be outside platform, sessions and secrets directories.");
     }
   }
 }
@@ -297,8 +299,12 @@ export function restoreSqliteDatabase(
     if (!options.dataDir) return restoreWithLock(lock, databaseUrl, inputPath, options);
     // Check SQLite and overwrite guards before staging or replacing any directories.
     prepareRestore(lock, databaseUrl, inputPath, options.force);
-    if (!options.force && ["affairs", "secrets"].some(root => existsSync(resolve(options.dataDir!, root)))) {
-      throw new Error("Chrona data directories already exist. Pass --force to replace them.");
+    if (!options.force && backupDataRoots.some(root => {
+      const path = resolve(options.dataDir!, root);
+      const stat = lstatSync(path, { throwIfNoEntry: false });
+      return stat && (!stat.isDirectory() || readdirSync(path).length > 0);
+    })) {
+      throw new Error("Chrona platform, sessions or secrets directories are non-empty or unsafe. Pass --force to replace them.");
     }
     const stage = stageDataFiles(options.dataDir, `${resolve(inputPath)}.tar`);
     let result: ReturnType<typeof restoreWithLock> | undefined;

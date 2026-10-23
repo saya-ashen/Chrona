@@ -52,7 +52,7 @@ function hasRequiredDelegates(client: PrismaClient | undefined) {
     return false;
   }
 
-  return typeof client.affair === "object";
+  return typeof client.session === "object";
 }
 
 function resolveCachedClient(globalForPrisma: typeof globalThis & {
