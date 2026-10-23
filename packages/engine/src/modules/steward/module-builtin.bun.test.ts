@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "./test-db";
 import { registerBuiltins } from "./module-builtin";
@@ -53,10 +54,14 @@ test("built-in fresh registration and second start: validated, tested, active, n
 test("built-ins register from a release directory whose files are hard-linked (Nix store optimisation)", async () => {
   const f = await fixture();
   try {
-    for (const name of ["module.json", "index.ts", "test.ts"]) await link(join(f.code, name), join(f.root, `${name}.link`));
-    await f.start();
+    for (const name of ["module.json", "index.ts", "test.ts"]) { await link(join(f.code, name), join(f.root, `${name}.link`)); await chmod(join(f.code, name), 0o444); }
+    // Read-only like the store: registration must still clean up its private copy, every start.
+    await chmod(f.code, 0o555); await chmod(f.root, 0o555);
+    const before = (await readdir(tmpdir())).filter(name => name.startsWith("chrona-builtin-")).length;
+    await f.start(); await f.start();
     expect(await f.current()).toMatchObject({ builtin: true, status: "active" });
-  } finally { await f.close(); }
+    expect((await readdir(tmpdir())).filter(name => name.startsWith("chrona-builtin-")).length).toBe(before);
+  } finally { await chmod(f.root, 0o755); await chmod(f.code, 0o755); await f.close(); }
 });
 test.each([false, true])("built-in upgrade preserves user version: %s", async user => {
   const f = await fixture();

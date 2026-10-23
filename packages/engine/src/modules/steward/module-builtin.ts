@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
+import { chmod, cp, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Prisma } from "@chrona/db/generated/prisma/client";
@@ -8,6 +8,14 @@ import { moduleContext } from "./module-context";
 import { proposeBuiltin } from "./module-proposal";
 import { buildPending } from "./module-build";
 
+/** Store copies keep the store's read-only modes; the private copy must be removable. */
+async function writable(dir: string) {
+  await chmod(dir, 0o700);
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) await writable(join(dir, entry.name));
+    else if (entry.isFile()) await chmod(join(dir, entry.name), 0o600);
+  }
+}
 /** Release resources, never Provider-controlled directories. Repeated starts are idempotent. */
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
@@ -16,6 +24,7 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
   const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-builtin-")));
   try {
     await cp(resolve(ports.moduleBuiltinResources), root, { recursive: true });
+    await writable(root);
     for (const entry of await readdir(root, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
       const result = await proposeBuiltin(context, root, entry.name);
