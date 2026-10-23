@@ -222,6 +222,8 @@ model Approval {
   preview String
   payload Json
   scope String @default("once")
+  /// Only the rescue console or `chrona admin` may resolve it.
+  rescueOnly Boolean @default(false)
   grantId String?
   status String @default("open")
   createdAt DateTime @default(now())

@@ -37,12 +37,14 @@ export const APPROVAL_SCOPES = ["once", "always"] as const;
 export const ACTIONS = [
   "notify_user", "schedule", "activate_module", "read_source", "connect_source",
   "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials", "access_host_path",
+  /** Owner-level policy changes (grants, budgets, moduleModel, notification settings) requested through an entry module. */
+  "change_policy",
 ] as const;
 export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
 export const DEFAULT_POLICY = {
   notify_user: "auto", schedule: "auto", activate_module: "ask", read_source: "auto",
   connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
-  share_third_party: "ask", purchase: "ask", change_credentials: "never", access_host_path: "ask",
+  share_third_party: "ask", purchase: "ask", change_credentials: "never", access_host_path: "ask", change_policy: "ask",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
 
 export const NOTIFY_LEVELS = ["now", "digest", "web"] as const;
@@ -86,7 +88,8 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
   z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
 ]);
-export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model"] as const;
+/** `owner` acts as the user (entry modules, v2-4): its activation and policy changes are approved only in the rescue console. */
+export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model", "owner"] as const;
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
 const moduleTriggerSchema = z.union([
@@ -251,6 +254,8 @@ export const approvalSchema = z.object({
   /** Exactly what will be done, shown to the user (e.g. the email draft). */
   preview: z.string().max(20_000),
   status: z.enum(APPROVAL_STATUSES), createdAt: iso, resolvedAt: iso.nullable(),
+  /** Only the rescue console or `chrona admin` may resolve it (entry-module changes, change_policy). */
+  rescueOnly: z.boolean(),
 }).strict();
 
 export const grantScopeSchema = z.discriminatedUnion("kind", [
@@ -385,6 +390,10 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   POST /provider/interactions/:id/answer        -> {ok: true} (ProviderAnswer, no grants/replay)
  *   POST /provider/runs/:id/cancel                -> {ok: true} (no automatic retry)
  *   GET  /health
+ * Rescue console (v2-4 §5): separate listener (`CHRONA_RESCUE_PORT`, loopback by default), `Authorization: Bearer <RESCUE_KEY>`,
+ * never proxied to a module:  GET / (static page) · POST /api/chat {text} -> ChatReply (session key "rescue") ·
+ *   GET /api/messages -> {items: Message[]} · GET /api/approvals -> {items: Approval[]} (open, incl. rescueOnly) ·
+ *   POST /api/approvals/:id/resolve (ResolveApproval) -> Approval. Other entries refuse rescueOnly approvals with 403.
  * There are no HTTP module routes: activation and rollback go through approvals and Provider tools; module
  * versions and module tools are reached through the owner MCP (`chrona_modules`, `m_*` tools).
  */
