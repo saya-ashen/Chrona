@@ -73,6 +73,7 @@ bun run packages/cli/src/index.ts doctor
 - Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
+- 模块依赖：有 `nix` 时用 `CHRONA_NIXPKGS`（flake 引用，建议固定为系统 nixpkgs）构建系统程序；没有时只检查主机已安装的程序。语言库只按模块的 `bun.lock` / `uv.lock` 安装，构建时需要能访问 npm / PyPI。
 - QQ：由内置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经 `secret` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 

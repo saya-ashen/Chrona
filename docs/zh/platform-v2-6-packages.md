@@ -1,6 +1,6 @@
 # v2-6 规格：模块的软件依赖
 
-状态：草案，未实现（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)。实现顺序：v2-1 完成后即可做，与 v2-2 至 v2-5 无依赖。
+状态：已在 `platform-v2` 分支实现（2026-10-23），与本文的差异见 §8。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)。实现顺序：v2-1 完成后即可做，与 v2-2 至 v2-5 无依赖。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 原则
@@ -66,3 +66,13 @@ Chrona 启动时检测后端，写入设置并在网页可见；构建 Agent 的
 - Windows 模块运行时的沙箱方案。
 - `system` 后端下，系统程序升级导致模块失效时如何发现（是否定期试启动）。
 - NixOS 上带原生代码的 pip / npm 包（manylinux wheel 等）需要标准动态链接器，是否在沙箱内用 Nix 提供。
+
+## 8. 实现说明（2026-10-23）
+
+- 安装器在内核侧（`module-packages.ts`），构建时、测试与试启动之前把依赖装进 staging 副本，随版本 hash 进入 store；提交中的 `node_modules`、`.venv`、`.chrona` 一律忽略，也不计入 hash 与代码 diff。安装命令只拿到 `PATH`/`HOME`/`LANG`/`NIX_*` 等工具链变量，不拿 Chrona 的密钥。
+- `nix` 后端：`nix build <CHRONA_NIXPKGS>#<名称> --out-link <dataDir>/platform/gcroots/<hash>/<名称>`；`CHRONA_NIXPKGS` 未设置时用 flake 注册表里的 `nixpkgs`（不固定，部署时应设为系统的 nixpkgs，例如 `path:${pkgs.path}`）。store 路径的 `bin` 记在 `.chrona/packages.json`，运行时加到 `PATH` 最前；回滚随版本回到旧路径。被拒绝的版本删除其 GC root；已批准版本的 GC root 暂不清理（目前也没有删除版本的操作）。
+- `system` 后端：**没有做 `install_packages` 审批**。缺少的程序让构建以错误拒绝，错误里带检测到的包管理器的安装命令（如 `sudo apt install pandoc`）；用户装好后重新提交即可。按程序名检查（包名与程序名不同的包需要写程序名）。
+- Python：`uv sync --frozen --python <主机 python3> --no-python-downloads`，模块用 `.venv/bin/python` 运行。
+- 依赖变化（`packages` 新增、`package.json`/`bun.lock`/`pyproject.toml`/`uv.lock` 任一变化）不自动启用；审批卡列出系统程序与语言库种类。
+- 后端写在构建 Agent 的提示词里；网页上还没有显示。Windows 未处理。
+- 修了一个相关问题：模块的 shell 由 Bun 以 socket 作 stdin 启动，bash 会因此读取 `~/.bashrc`，覆盖 `PATH` 并带入用户的 shell 环境；现在模块进程以 `SHLVL=1` 启动避免这一点。

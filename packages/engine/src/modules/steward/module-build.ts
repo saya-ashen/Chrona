@@ -1,4 +1,5 @@
 import { moduleModelSettings } from "./settings";
+import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -22,6 +23,12 @@ async function stagingFiles(context: ModuleContext, version: ModuleVersion, repo
     return null;
   }
 }
+/** Lockfile libraries and system programs go into the staging copy before anything runs it. */
+async function installDependencies(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string) {
+  if (!manifest.packages.length && !existsSync(join(staging, "package.json")) && !existsSync(join(staging, "pyproject.toml"))) return null;
+  if (!context.ports.packages) return { errors: ["Dependency installation is not available on this host"], installed: { npm: false, python: false, packages: {} } };
+  return context.ports.packages.install({ dir: staging, packages: manifest.packages, gcroot: join(context.platform, "gcroots", hash) });
+}
 async function installBuild(context: ModuleContext, staging: string, hash: string) {
   await mkdir(context.store, { recursive: true });
   try { await rename(staging, join(context.store, hash)); }
@@ -34,7 +41,8 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
-  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n${diff}\n`;
+  const libraries = [report.dependencies?.npm && "npm（bun.lock）", report.dependencies?.python && "Python（uv.lock）"].filter(Boolean).join("、") || "无";
+  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
   const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null;
@@ -69,6 +77,14 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
         return { moduleId: module.id, hash, status: "rejected", report };
       }
     }
+    const dependencies = await installDependencies(context, staging, manifest, hash);
+    if (dependencies) report.dependencies = dependencies.installed;
+    if (dependencies?.errors.length) {
+      report.errors = dependencies.errors.map(error => error.slice(0, 4000));
+      await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
+      await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+      return { moduleId: module.id, hash, status: "rejected", report };
+    }
     let passed = await runTests(context, staging, manifest, report.tests), needsMigration = false;
     if (passed) {
       const continuity = { status: "skipped" as const, reason: "no data", fromSchema: module.dataSchema, toSchema: manifest.data.schema, migrated: false };
@@ -84,6 +100,8 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
       if (keyProbe.status !== "skipped" || !["no schedule trigger", "no effects on both fires"].includes(keyProbe.reason ?? "")) report.keyProbe = keyProbe;
       await installBuild(context, staging, hash);
     }
+    // shortcut: GC roots of approved versions are kept until the version is deleted; nothing deletes versions yet.
+    if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
     const status = passed ? "pending_review" : "rejected";
     await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
     if (!passed) return { moduleId: module.id, hash, status, report };

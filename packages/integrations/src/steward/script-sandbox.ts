@@ -1,4 +1,4 @@
-import { accessSync, constants, cpSync, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { accessSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -17,6 +17,13 @@ function directory(path: string) {
   const resolved = realpathSync(path);
   if (!statSync(resolved).isDirectory() || resolved === "/") throw new Error("Invalid module directory");
   return resolved;
+}
+/** Store `bin` directories Chrona recorded for the module's system programs (v2-6). */
+function packageBins(code: string): string[] {
+  try {
+    const bin = (JSON.parse(readFileSync(join(code, ".chrona", "packages.json"), "utf8")) as { bin?: unknown }).bin;
+    return Array.isArray(bin) ? bin.filter((path): path is string => typeof path === "string" && path.startsWith("/nix/store/") && !path.includes(":")) : [];
+  } catch { return []; }
 }
 function language(entry: string): Language {
   if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
@@ -47,8 +54,10 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     mkdirSync(dirname(target), { recursive: true });
     cpSync(moduleSdk, target, { recursive: true });
   }
-  function command(entry: string, code: string) {
-    const kind = language(entry), interpreter = interpreters[kind];
+  /** v2-6: the module's installed Python environment wins over the host interpreter. */
+  function command(entry: string, code: string, host: string) {
+    const kind = language(entry), venv = kind === "python" && existsSync(join(host, ".venv", "bin", "python"));
+    const interpreter = venv ? join(code, ".venv", "bin", "python") : interpreters[kind];
     if (!shell || !interpreter) throw new Error("模块运行环境不可用");
     // --no-install: never let Bun fetch an npm package named like a missing import.
     return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install"] : []), join(code, entry)];
@@ -58,12 +67,14 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     const socket = dirs.socketPath ? resolve(dirs.socketPath) : undefined;
     if (socket && !statSync(socket).isSocket()) throw new Error("Invalid module socket");
     const http = dirs.httpDir ? directory(dirs.httpDir) : undefined;
-    // Only non-secret CHRONA_* settings (e.g. CHRONA_PUBLIC_URL) pass through.
-    const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key)));
+    const bin = packageBins(code);
+    // Only non-secret CHRONA_* settings (e.g. CHRONA_PUBLIC_URL) pass through. SHLVL=1: bash sources ~/.bashrc
+    // when stdin is a socket (Bun's pipes are), which would replace PATH and leak the user's shell setup.
+    const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
     if (!isolated) {
-      const env = { ...extra, PATH: process.env.PATH ?? paths.map(dirname).join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
+      const env = { ...extra, PATH: [...bin, process.env.PATH ?? paths.map(dirname).join(":")].join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
         CHRONA_MODULE: code, CHRONA_DATA: data, ...(content ? { CHRONA_CONTENT: content } : {}), ...(socket ? { CHRONA_SOCKET: socket } : {}), ...(http ? { CHRONA_HTTP_SOCKET: join(http, "s") } : {}) };
-      const [file, ...args] = command(entry, code);
+      const [file, ...args] = command(entry, code, code);
       // Own process group, so kill() also ends anything the module started.
       return spawn(file!, args, { cwd: code, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     }
@@ -71,7 +82,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       .sort((a, b) => a.split(sep).length - b.split(sep).length);
     // A private root supplies mount points without creating anything on the host; it is frozen read-only before exec.
     const root = readdirSync("/").filter(name => !["module", "data", "content", "chrona", "node_modules", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
-    const env = { ...extra, PATH: paths.map(dirname).join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
+    const env = { ...extra, PATH: [...bin, ...paths.map(dirname), "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
       ...(socket ? { CHRONA_SOCKET: "/chrona/chrona.sock" } : {}), ...(http ? { CHRONA_HTTP_SOCKET: "/chrona/http/s" } : {}) };
     const profile = ["--unshare-all", ...(network ? ["--share-net"] : []), "--die-with-parent", "--new-session", "--tmpfs", "/", ...root,
       "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]), "--proc", "/proc", "--dev", "/dev", ...paths.flatMap(p => ["--ro-bind", p, p]),
@@ -79,7 +90,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       "--ro-bind", resolve(moduleSdk), "/node_modules/chrona", "--dir", "/chrona", ...(socket ? ["--ro-bind", socket, "/chrona/chrona.sock"] : []),
       ...(http ? ["--bind", http, "/chrona/http"] : []), "--remount-ro", "/", "--chdir", "/module",
       "--clearenv", ...Object.entries(env).flatMap(([key, value]) => ["--setenv", key, value])];
-    return spawn(bwrap!, [...profile, "--", ...command(entry, "/module")], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
+    return spawn(bwrap!, [...profile, "--", ...command(entry, "/module", code)], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
   }
   function kill(child: ReturnType<typeof spawn>) {
     try { if (!isolated && child.pid) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* Already exited. */ }

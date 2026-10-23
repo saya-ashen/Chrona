@@ -124,6 +124,12 @@ export const moduleManifestSchema = z.object({
   listen: z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/).optional(),
   /** Delivers this channel's notifications (`deliver` events) and reports readiness with `channel`; requires `owner`. */
   channel: z.literal("chrona_qqbot").optional(),
+  /**
+   * System programs (v2-6), named for the host backend: nixpkgs attributes under Nix, the distribution's package names
+   * otherwise. Language libraries come from lockfiles instead (package.json + bun.lock, pyproject.toml + uv.lock), which
+   * Chrona installs at build time; `node_modules`, `.venv` and `.chrona` are never submitted.
+   */
+  packages: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,80}$/)).max(20).default([]),
   /** Kernel-held credentials this module may read with `secret` (e.g. qq_bot); requires `owner`. */
   secrets: z.array(z.string().regex(/^[a-z][a-z0-9_]{1,40}$/)).max(5).default([]),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */

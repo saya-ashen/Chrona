@@ -2,11 +2,13 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { StewardError } from "./errors";
 import type { ContinuityReport } from "./module-context";
+import { INSTALLED_DIRS } from "./module-files";
 
 export async function readModuleFiles(root: string, unsafe: string) {
   const files: { path: string; bytes: Buffer }[] = [];
   async function walk(relative: string): Promise<void> {
     for (const entry of await readdir(join(root, relative), { withFileTypes: true })) {
+      if (!relative && INSTALLED_DIRS.has(entry.name)) continue;
       const path = relative ? `${relative}/${entry.name}` : entry.name;
       if (entry.isDirectory()) await walk(path);
       else if (entry.isFile()) files.push({ path, bytes: await readFile(join(root, path)) });

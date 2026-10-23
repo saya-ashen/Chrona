@@ -14,6 +14,7 @@ import { createPiModelGateway } from "../../../packages/integrations/src/steward
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createInAppDelivery } from "../../../packages/integrations/src/steward/in-app-delivery";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
+import { createModulePackages } from "../../../packages/integrations/src/steward/module-packages";
 import { createEmailConnector } from "../../../packages/integrations/src/steward/email";
 import { createLocalTestSource } from "../../../packages/integrations/src/steward/local-test-source";
 import { createChinoServiceHealthSource } from "../../../packages/integrations/src/steward/chino-health-source";
@@ -93,7 +94,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     // QQ is the built-in qq module's channel: bound once it reports an owner binding.
     deliveries: [createInAppDelivery(), { channel: "chrona_qqbot", send: message => qq.delivery.send(message) }],
     chat: { channel: "chrona_qqbot", bound: () => qq.bound() },
-    secrets: configuredSecret,
+    secrets: configuredSecret, packages: createModulePackages(),
     sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,

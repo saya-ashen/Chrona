@@ -13,7 +13,7 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
   [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`) and v2-4a–d (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp` and `qq`); v2-4e and v2-5/v2-6 are drafts.
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`) and v2-4a–d (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp` and `qq`) and v2-6 (module dependencies); v2-4e and v2-5 are drafts.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:

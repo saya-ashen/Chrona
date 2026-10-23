@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -24,6 +25,12 @@ async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, ve
   const effects = moduleManifestSchema.parse(active.manifest).effects;
   if (effects.includes("owner")) return false;
   if (!manifest.effects.every(effect => effects.includes(effect))) return false;
+  // New or changed dependencies count as new capabilities (v2-6 §4).
+  if (!manifest.packages.every(name => moduleManifestSchema.parse(active.manifest).packages.includes(name))) return false;
+  for (const lockfile of ["package.json", "bun.lock", "pyproject.toml", "uv.lock"]) {
+    const [next, current] = await Promise.all([version.hash, active.hash].map(hash => readFile(join(context.store, hash, lockfile)).catch(() => null)));
+    if (!(next === null ? current === null : current !== null && next.equals(current))) return false;
+  }
   if (manifest.data.schema !== module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) return false;
   return checksPassed(report);
 }

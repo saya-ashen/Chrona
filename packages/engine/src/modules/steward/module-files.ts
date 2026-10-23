@@ -22,13 +22,15 @@ async function confined(root: string, path: string, parents = false) {
   }
   return current;
 }
+/** Installed by Chrona at build time (v2-6), never submitted, hashed or shown in diffs. */
+export const INSTALLED_DIRS = new Set(["node_modules", ".venv", ".chrona"]);
 export async function snapshotModule(root: string, path: string) {
   const files: { path: string; bytes: Uint8Array }[] = [];
   let total = 0;
   async function walk(path: string, relative: string): Promise<void> {
     const target = await confined(root, path), info = await lstat(target);
     if (info.isDirectory()) {
-      for (const entry of await readdir(target)) await walk(`${path}/${entry}`, relative ? `${relative}/${entry}` : entry);
+      for (const entry of await readdir(target)) if (relative || !INSTALLED_DIRS.has(entry)) await walk(`${path}/${entry}`, relative ? `${relative}/${entry}` : entry);
       return;
     }
     if (files.length >= 200 || total + info.size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");

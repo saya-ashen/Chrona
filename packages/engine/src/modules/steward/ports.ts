@@ -18,6 +18,11 @@ export type StewardPorts = {
   };
   /** Kernel-held credentials for modules declaring them in `secrets` (e.g. qq_bot: { appId, clientSecret }). */
   secrets?(name: string): Promise<Record<string, string> | null>;
+  /** v2-6 dependency installer: lockfile libraries and host system programs, into a staging module directory. */
+  packages?: {
+    backend: "nix" | "system";
+    install(input: { dir: string; packages: string[]; gcroot: string }): Promise<{ errors: string[]; installed: { npm: boolean; python: boolean; packages: Record<string, string[]> } }>;
+  };
   /** Owner API for entry modules (v2-4): one request of the HTTP map, as the user. */
   owner?(workspaceId: string, request: { method: string; path: string; body?: unknown }): Promise<OwnerReply>;
   /** The `chrona` SDK package directory (sdk.ts, testing.ts) given to module builds. */
