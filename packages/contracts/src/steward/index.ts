@@ -25,9 +25,9 @@ export const RUN_LANES = ["foreground", "background", "build"] as const;
 export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
 /** `wake` runs the Provider in a fresh session and reports back to the session that created it;
- * `remind` sends stored text without a model call (moves into the built-in remind module in v2-3);
+ * `remind` is accepted as input only: it creates a `module` schedule of the built-in remind module with `payload: { text }`;
  * `module` rows are created only by Chrona on module activation/rollback. */
-export const SCHEDULE_MODES = ["wake", "remind", "module"] as const;
+export const SCHEDULE_MODES = ["wake", "module"] as const;
 export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
 /** `always` turns the decision into a grant: scoped to the module the approval is about, else global. */
@@ -112,6 +112,8 @@ export const moduleManifestSchema = z.object({
   keepAlive: z.boolean().default(false),
   /** Owns a content area (pages, panels, files) the user and the Provider can read and edit; the module sees it at /content. */
   content: z.boolean().default(false),
+  /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
+  dynamicSchedules: z.boolean().default(false),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
@@ -125,7 +127,7 @@ export const moduleManifestSchema = z.object({
     if (ids.has(trigger.id)) ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
     ids.add(trigger.id);
   });
-  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool or keepAlive" });
+  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
