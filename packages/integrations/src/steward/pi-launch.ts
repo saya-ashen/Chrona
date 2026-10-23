@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
@@ -37,7 +37,7 @@ function privateProfile(path: string): boolean {
 function configurationError(config: PiLaunchConfig): string | null {
   if (!isAbsolute(config.command)) return "Configure an absolute, service-specific Pi executable";
   if (!isAbsolute(config.agentDir) || !privateProfile(config.agentDir)) return "Pi profile must be an existing private canonical directory";
-  if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve(config.options.workspaceRoot))) return "Pi profile must be separate from the affair workspace";
+  if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve(config.options.workspaceRoot))) return "Pi profile must be separate from the session workspace";
   if (!supportedVersions.has(config.version)) return "Unsupported Pi version pin";
   if (config.resourceError) return config.resourceError;
   const resourceError = resourceVersionError(config.resources, config.version, !!config.bwrap);
@@ -80,21 +80,9 @@ function hostMounts(config: PiLaunchConfig, input: ProviderRunInput) {
   const data = granted.length && config.options.dataDir ? [...new Set(both(config.options.dataDir))] : [];
   return [...granted, ...data.flatMap(p => ["--tmpfs", p])];
 }
-function workspaceMounts(config: PiLaunchConfig, input: ProviderRunInput, cwd: string) {
-  const rootRun = config.options.workspaceRoot !== undefined && cwd === resolve(config.options.workspaceRoot);
-  const mounts = [rootRun ? "--ro-bind" : "--bind", cwd, cwd];
-  if (!config.bwrap || !rootRun) return mounts;
-  if (realpathSync(cwd) !== cwd) throw new Error("Unsafe workspace root");
-  const sessions = join(cwd, ".chrona", "sessions");
-  if (resolve(input.sessionDir) !== sessions || realpathSync(sessions) !== sessions) throw new Error("Unsafe root session directory");
-  mounts.push("--bind", sessions, sessions);
-  for (const entry of readdirSync(cwd, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !/^[a-f0-9]{32}$/.test(entry.name)) continue;
-    const directory = join(cwd, entry.name);
-    if (realpathSync(directory) !== directory) throw new Error("Unsafe affair directory");
-    mounts.push("--bind", directory, directory);
-  }
-  return mounts;
+function workspaceMounts(input: ProviderRunInput, cwd: string) {
+  if (realpathSync(cwd) !== cwd || realpathSync(resolve(input.sessionDir)) !== resolve(input.sessionDir)) throw new Error("Unsafe session directory");
+  return ["--bind", cwd, cwd, "--bind", resolve(input.sessionDir), resolve(input.sessionDir)];
 }
 export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string) {
   const args = ["--mode", "rpc", "--session-dir", resolve(input.sessionDir), "--session-id", input.sessionId ?? randomUUID(),
@@ -117,10 +105,16 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
     .filter((p): p is string => !!p && isAbsolute(p));
   const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
     .filter(p => hidden.some(root => inside(root, p)));
-  return ["--die-with-parent", "--ro-bind", "/", "/", "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]),
+  // A private root (host entries bound read-only) lets /content exist without touching the host.
+  const root = readdirSync("/").filter(name => !["proc", "dev", "tmp", "content"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
+  return ["--die-with-parent", "--tmpfs", "/", ...root, "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]),
     ...hostMounts(config, input),
-    "--dev", "/dev", "--proc", "/proc", ...visible.flatMap(p => ["--ro-bind", p, p]), ...workspaceMounts(config, input, cwd),
-    "--bind", config.agentDir, config.agentDir, "--chdir", cwd, "--", config.command, ...args];
+    "--dev", "/dev", "--proc", "/proc", ...visible.flatMap(p => ["--ro-bind", p, p]), ...workspaceMounts(input, cwd),
+    "--dir", "/content", ...(input.content ?? []).flatMap(area => {
+      if (!/^[a-z][a-z0-9-]{1,40}$/.test(area.name) || !isAbsolute(area.dir) || realpathSync(area.dir) !== area.dir) throw new Error("Unsafe content mount");
+      return [area.writable ? "--bind" : "--ro-bind", area.dir, `/content/${area.name}`];
+    }),
+    "--bind", config.agentDir, config.agentDir, "--remount-ro", "/", "--chdir", cwd, "--", config.command, ...args];
 }
 /** Detect command resources appended by a wrapper. Not a proof that arbitrary executable code is safe. */
 export function expectedPiCommands(config: PiLaunchConfig, commands: unknown): boolean {

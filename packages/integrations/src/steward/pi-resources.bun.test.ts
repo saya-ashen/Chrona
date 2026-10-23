@@ -24,27 +24,29 @@ test("loads only reviewed explicit resources, keeping no-discovery and scoped co
   expect(expectedPiCommands(config, [{ source: "prompt", path: f.skill }])).toBe(false);
 });
 test("bwrap masks data and home before re-exposing only Pi resources and workspaces", async () => {
-  const f = await fixture(), dataDir = f.root, workspace = join(dataDir, "affairs"), sessions = join(workspace, ".chrona", "sessions");
-  const affair = join(workspace, "a".repeat(32)), agentDir = join(dataDir, "providers", "pi");
-  for (const path of [sessions, affair, agentDir]) await mkdir(path, { recursive: true });
+  const f = await fixture(), dataDir = f.root, workspace = join(dataDir, "sessions", "session-id"), sessions = join(workspace, "pi");
+  const writable = join(dataDir, "platform", "content", "files"), readonly = join(dataDir, "platform", "content", "calendar"), agentDir = join(dataDir, "providers", "pi");
+  for (const path of [sessions, writable, readonly, agentDir]) await mkdir(path, { recursive: true });
   const command = join(dataDir, "fake-pi"); await writeFile(command, "synthetic executable");
   const config = piLaunchConfig({ command, agentDir, dataDir, workspaceRoot: workspace,
     chronaExtension: f.extension, resourcesFile: f.file, bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
-  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
+  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground", content: [{ name: "files", dir: writable, writable: true }, { name: "calendar", dir: readonly, writable: false }] } as ProviderRunInput, "Fixture");
   const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
   for (const path of [dataDir, homedir()]) {
     const mask = mount("--tmpfs", path);
     expect(mask).toBeGreaterThan(mount("--ro-bind", "/") + 2);
-    for (const path of [command, f.extension, f.skill, workspace]) expect(mask).toBeLessThan(mount("--ro-bind", path));
-    for (const path of [sessions, affair, agentDir]) expect(mask).toBeLessThan(mount("--bind", path));
+    for (const path of [command, f.extension, f.skill, readonly]) expect(mask).toBeLessThan(mount("--ro-bind", path));
+    for (const path of [sessions, workspace, writable, agentDir]) expect(mask).toBeLessThan(mount("--bind", path));
   }
+  expect(args.slice(mount("--bind", writable), mount("--bind", writable) + 3)).toEqual(["--bind", writable, "/content/files"]);
+  expect(args.slice(mount("--ro-bind", readonly), mount("--ro-bind", readonly) + 3)).toEqual(["--ro-bind", readonly, "/content/calendar"]);
   expect(mount("--bind", dataDir)).toBe(-1);
   expect(mount("--bind", homedir())).toBe(-1);
   const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
   expect(unsandboxed).not.toContain("--tmpfs");
 });
 test("bwrap binds approved host paths writable and re-masks the data dir under them", async () => {
-  const f = await fixture(), dataDir = join(f.root, "data"), workspace = join(dataDir, "affairs"), sessions = join(workspace, ".chrona", "sessions");
+  const f = await fixture(), dataDir = join(f.root, "data"), workspace = join(dataDir, "sessions", "session-id"), sessions = join(workspace, "pi");
   const agentDir = join(dataDir, "providers", "pi"), granted = await mkdtemp(join(tmpdir(), "chrona-granted-"));
   for (const path of [sessions, agentDir]) await mkdir(path, { recursive: true });
   const config = piLaunchConfig({ command: "/fake-pi", agentDir, dataDir, workspaceRoot: workspace, chronaExtension: f.extension, bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
@@ -54,7 +56,7 @@ test("bwrap binds approved host paths writable and re-masks the data dir under t
   expect(mount("--bind", join(f.root, "missing"))).toBe(-1);
   const remask = args.findLastIndex((arg, i) => arg === "--tmpfs" && args[i + 1] === dataDir);
   expect(remask).toBeGreaterThan(mount("--bind", f.root));
-  expect(remask).toBeLessThan(mount("--ro-bind", workspace));
+  expect(remask).toBeLessThan(mount("--bind", workspace));
   expect(remask).toBeLessThan(mount("--bind", agentDir));
 });
 test("missing/invalid manifest never falls back to ambient resources", async () => {

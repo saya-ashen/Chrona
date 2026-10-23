@@ -76,33 +76,33 @@ export function createQqBotState(dir: string, appId: string) {
   };
 }
 export type QqBotState = ReturnType<typeof createQqBotState>;
-type QqReplyItem = { reply: string; messageId: string; affairId: string | null };
+type QqReplyItem = { reply: string; messageId: string; sessionId: string | null };
 /** later: replies the same run sends after the first batch was returned (it keeps working after its first reply). */
-export type QqChatResult = { reply: string; affairId?: string | null; messageId?: string; workspaceId?: string; replies?: QqReplyItem[]; later?: AsyncIterable<QqReplyItem> };
-export type QqChatPort = { handleMessage(input: { workspaceId: string; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<QqChatResult> };
+export type QqChatResult = { reply: string; sessionId?: string | null; messageId?: string; workspaceId?: string; replies?: QqReplyItem[]; later?: AsyncIterable<QqReplyItem> };
+export type QqChatPort = { handleMessage(input: { workspaceId: string; key: "qq:dm"; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<QqChatResult> };
 const HELP_WORDS = new Set(["help", "帮助", "?", "？", "用法", "菜单"]);
 const UNBOUND = "【Chrona】这是 Chrona 的私人管家机器人，尚未绑定主人。主人请在 Chrona 管理端取得一次性绑定码后发送：绑定 <绑定码>。未绑定前不处理任何其他内容。";
 const NOT_OWNER = "【Chrona】这是私人机器人，你没有使用权限。本条未做任何处理。";
 const BIND_FAIL = { no_challenge: "当前没有待使用的绑定码，请重新生成。", expired: "绑定码已过期或尝试次数已用完，请重新生成。", wrong_code: "绑定码不正确（多次错误后会失效）。", already_bound: "这个机器人已经绑定了主人，未做更改。" };
 
-export type ApprovalDecision = { ref: string; decision: "approve" | "deny"; scope: "once" | "affair" };
-const BUTTON = /^approval:([0-9a-f-]{36}):(once|affair|deny)$/;
-/** Button data and the text fallback (批准/拒绝 <编号前缀> [本事务]) both become one decision. */
+export type ApprovalDecision = { ref: string; decision: "approve" | "deny"; scope: "once" | "always" };
+const BUTTON = /^approval:([0-9a-f-]{36}):(once|always|deny)$/;
+/** Button data and the text fallback (批准/拒绝 <编号前缀> [始终]) both become one decision. */
 export function parseApprovalDecision(input: { button?: string; text?: string }): ApprovalDecision | null {
   const button = input.button ? BUTTON.exec(input.button) : null;
-  if (button) return { ref: button[1]!, decision: button[2] === "deny" ? "deny" : "approve", scope: button[2] === "affair" ? "affair" : "once" };
-  const text = input.text ? /^\/?(批准|同意|approve|拒绝|deny)\s+([0-9a-f-]{6,36})(?:\s+(本事务|始终|always))?$/i.exec(input.text.trim()) : null;
+  if (button) return { ref: button[1]!, decision: button[2] === "deny" ? "deny" : "approve", scope: button[2] === "always" ? "always" : "once" };
+  const text = input.text ? /^\/?(批准|同意|approve|拒绝|deny)\s+([0-9a-f-]{6,36})(?:\s+(始终|always))?$/i.exec(input.text.trim()) : null;
   if (!text) return null;
-  return { ref: text[2]!.toLowerCase(), decision: /^(拒绝|deny)$/i.test(text[1]!) ? "deny" : "approve", scope: text[3] ? "affair" : "once" };
+  return { ref: text[2]!.toLowerCase(), decision: /^(拒绝|deny)$/i.test(text[1]!) ? "deny" : "approve", scope: text[3] ? "always" : "once" };
 }
 export function approvalButtons(id: string, scoped: boolean) {
   return qqButtons("approval", [
     { id: "once", label: "✅ 批准一次", visited: "已批准", data: `approval:${id}:once` },
-    ...(scoped ? [{ id: "affair", label: "⭐ 这件事始终允许", visited: "已始终允许", data: `approval:${id}:affair` }] : []),
+    ...(scoped ? [{ id: "always", label: "⭐ 始终允许", visited: "已始终允许", data: `approval:${id}:always` }] : []),
     { id: "deny", label: "❌ 拒绝", visited: "已拒绝", data: `approval:${id}:deny`, style: 0 },
   ]);
 }
-const approvalHint = (id: string, scoped: boolean) => `回复「批准 ${id.slice(0, 8)}」${scoped ? `（加「本事务」则这件事始终允许）` : ""}或「拒绝 ${id.slice(0, 8)}」。`;
+const approvalHint = (id: string, scoped: boolean) => `回复「批准 ${id.slice(0, 8)}」${scoped ? `（加「始终」则始终允许）` : ""}或「拒绝 ${id.slice(0, 8)}」。`;
 
 /** Reservations count even failed/uncertain sends; sequence numbers must never be reused. */
 export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>, now = Date.now) {
@@ -125,7 +125,7 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
   /** Owner-only; returns the line to send back. */
   resolveApproval?: (binding: QqBinding, decision: ApprovalDecision) => Promise<string>;
   reply: (openid: string, messageId: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>;
-  enqueueFinal: (binding: QqBinding, messageId: string, text: string, affairId?: string | null) => Promise<void>;
+  enqueueFinal: (binding: QqBinding, messageId: string, text: string, sessionId?: string | null) => Promise<void>;
   onBound?: (binding: QqBinding) => Promise<void>; log?: QqLog; now?: () => Date;
   timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 }) {
@@ -180,12 +180,12 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     let ack: Promise<boolean> | undefined;
     const timer = timers.setTimeout(() => { ack = send(SLOW_ACK); }, SLOW_ACK_MS);
     let result: QqChatResult;
-    try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
+    try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, key: "qq:dm", text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
     catch { log("qq.chat_failed"); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
     finally { timers.clearTimeout(timer); }
     await ack;
     const deliver = async (item: Pick<QqReplyItem, "reply"> & Partial<QqReplyItem>) => {
-      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, `${message.id}:${item.messageId ?? ""}`, item.reply, item.affairId);
+      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, `${message.id}:${item.messageId ?? ""}`, item.reply, item.sessionId);
     };
     for (const item of result.replies?.length ? result.replies : [result]) await deliver(item);
     // Not awaited: the next owner message must not wait for this run to finish.

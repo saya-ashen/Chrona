@@ -37,7 +37,7 @@ test("owner text goes unchanged to concierge; replay and restart dedupe", async 
   const h = harness(); await h.bind();
   for (const text of ["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]) await h.say("U1", text, text);
   expect(h.calls.map(c => c.text)).toEqual(["帮我准备答辩", "/chrona 暂停", "帮助", "进度"]);
-  expect(h.calls[0]).toEqual({ workspaceId: "ws", channel: "chrona_qqbot", externalId: "帮我准备答辩", text: "帮我准备答辩" });
+  expect(h.calls[0]).toEqual({ workspaceId: "ws", key: "qq:dm", channel: "chrona_qqbot", externalId: "帮我准备答辩", text: "帮我准备答辩" });
   expect(h.replies).toEqual(Array.from({ length: 4 }, () => ({ text: "收到", sequence: 1 })));
   await h.say("U1", "duplicate", "帮助"); expect(h.calls).toHaveLength(4);
   const restart = harness(); await restart.say("U1", "duplicate", "帮助"); expect(restart.calls).toHaveLength(0);
@@ -92,9 +92,9 @@ test("active delivery allowlist, local rate limit and no passive message id", as
 
 test("approval decisions: buttons and owner text commands, never routed to chat", async () => {
   const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
-  expect(parseApprovalDecision({ button: `approval:${id}:affair` })).toEqual({ ref: id, decision: "approve", scope: "affair" });
+  expect(parseApprovalDecision({ button: `approval:${id}:always` })).toEqual({ ref: id, decision: "approve", scope: "always" });
   expect(parseApprovalDecision({ button: `approval:${id}:deny` })).toEqual({ ref: id, decision: "deny", scope: "once" });
-  expect(parseApprovalDecision({ text: "批准 5266F07C 本事务" })).toEqual({ ref: "5266f07c", decision: "approve", scope: "affair" });
+  expect(parseApprovalDecision({ text: "批准 5266F07C 始终" })).toEqual({ ref: "5266f07c", decision: "approve", scope: "always" });
   expect(parseApprovalDecision({ text: "批准一下这个" })).toBeNull();
   const h = harness(); await h.bind();
   await h.say("U2", "批准 5266f07c");
@@ -118,7 +118,7 @@ test("approval delivery carries buttons, and falls back to text when buttons are
   const message = { idempotencyKey: "k", title: "需要你批准", body: "读 career-ops", link: null, recipient: "chrona_qq:U1", approval: { id, scoped: true } };
   expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" });
   expect(sent[0]).toMatchObject({ msg_type: 2, markdown: { content: expect.stringContaining("批准 5266f07c") } });
-  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:affair`, `approval:${id}:deny`]);
+  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:always`, `approval:${id}:deny`]);
   refuse = true; sent.length = 0;
   expect(await delivery.send({ ...message, approval: { id, scoped: false } })).toMatchObject({ outcome: "accepted" });
   expect(sent).toHaveLength(2); expect(sent[0]!.keyboard.content.rows[0].buttons).toHaveLength(2);
@@ -126,8 +126,8 @@ test("approval delivery carries buttons, and falls back to text when buttons are
 });
 
 test("replies a run sends after its first batch still reach the owner", async () => {
-  async function* later() { yield { reply: "第二条", messageId: "m2", affairId: null }; }
-  const h = harness({ run: async () => ({ reply: "第一条", replies: [{ reply: "第一条", messageId: "m1", affairId: null }], later: later() }) }); await h.bind();
+  async function* later() { yield { reply: "第二条", messageId: "m2", sessionId: null }; }
+  const h = harness({ run: async () => ({ reply: "第一条", replies: [{ reply: "第一条", messageId: "m1", sessionId: null }], later: later() }) }); await h.bind();
   await h.say("U1", "看看目录");
   for (let i = 0; i < 50 && h.replies.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 1));
   expect(h.replies).toEqual([{ text: "第一条", sequence: 1 }, { text: "第二条", sequence: 2 }]);

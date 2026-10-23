@@ -6,10 +6,13 @@ import { createChronaQqDelivery, createQqBotHandler, createQqBotState, parseAppr
 import { ackQqInteraction, uploadQqImage, downloadQqAttachment, createQqGateway, createQqTokenSource, readProtectedSecret, sendQqC2c, type QqInteraction, type QqLog, type QqC2cMessage } from "../../../packages/integrations/src/steward/qq-official";
 
 /** Pages open in the web reader; other files download through the authenticated raw route. Never expose a local path. */
-export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments" | "affairId">, publicUrl: string | null, workspaceId: string) {
-  return [message.text, ...message.attachments.map(file => file.path && message.affairId && publicUrl
-    ? `${linkLabel(file.name)}：${fileLink(publicUrl.replace(/\/$/, ""), message.affairId, file.path, workspaceId)}`
-    : `${file.name}（请在 Chrona 网页查看附件）`)].join("\n\n");
+export function qqReplyText(message: Pick<import("@chrona/contracts/steward").Message, "text" | "attachments">, publicUrl: string | null, workspaceId: string, apps: { id: string; name: string }[] = []) {
+  return [message.text, ...message.attachments.map(file => {
+    const [name, ...parts] = file.ref?.split("/") ?? [], app = apps.find(app => app.name === name);
+    return app && parts.length && publicUrl
+      ? `${linkLabel(file.name)}：${fileLink(publicUrl.replace(/\/$/, ""), app.id, parts.join("/"), workspaceId)}`
+      : `${file.name}（请在 Chrona 网页查看附件）`;
+  })].join("\n\n");
 }
 /** People see page names, not file names: composed pages are "the page", Markdown pages drop their extension. */
 function linkLabel(name: string) {
@@ -17,15 +20,15 @@ function linkLabel(name: string) {
   if (/^readme\.md$/i.test(name)) return "总览";
   return name.replace(/\.md$/i, "");
 }
-function fileLink(origin: string, affairId: string, path: string, workspaceId: string) {
-  const affair = encodeURIComponent(affairId);
+function fileLink(origin: string, appId: string, path: string, workspaceId: string) {
+  const app = encodeURIComponent(appId);
   return /\.(md|ui\.json)$/i.test(path)
-    ? `${origin}/affairs/${affair}?${new URLSearchParams({ path })}`
-    : `${origin}/api/steward/affairs/${affair}/raw?${new URLSearchParams({ workspaceId, path })}`;
+    ? `${origin}/apps/${app}?${new URLSearchParams({ path })}`
+    : `${origin}/api/steward/apps/${app}/raw?${new URLSearchParams({ workspaceId, path })}`;
 }
 
 function isReplyImage(file: import("@chrona/contracts/steward").Attachment | undefined) {
-  return file?.path && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024;
+  return file?.ref && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024;
 }
 
 /** The bound owner's decision on one open approval, addressed by an id prefix. */
@@ -33,9 +36,9 @@ function approvalResolver(service: StewardService) {
   return async (binding: QqBinding, decision: ApprovalDecision) => {
     const api = service.forWorkspace(binding.workspaceId), matches = (await api.approvals.list("open")).filter(a => a.id.startsWith(decision.ref));
     if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
-    const approval = matches[0]!, scope = decision.scope === "affair" && approval.affairId ? "affair" : "once";
+    const approval = matches[0]!, scope = decision.scope;
     await api.approvals.resolve(approval.id, { decision: decision.decision, scope });
-    return `【Chrona】已${decision.decision === "deny" ? "拒绝" : scope === "affair" ? "批准（这件事以后都允许）" : "批准"}：${approval.title}`;
+    return `【Chrona】已${decision.decision === "deny" ? "拒绝" : scope === "always" ? "批准（始终允许）" : "批准"}：${approval.title}`;
   };
 }
 
@@ -48,12 +51,12 @@ export async function* lateReplies(db: PrismaClient, workspaceId: string, runId:
       .map(a => (a.details as { messageId?: string } | null)?.messageId).filter((id): id is string => !!id && !seen.has(id) && !claimedReplies.has(id));
     for (const message of await db.message.findMany({ where: { id: { in: ids }, workspaceId, externalId: null }, orderBy: [{ at: "asc" }, { id: "asc" }] })) {
       seen.add(message.id); claimedReplies.add(message.id);
-      yield { messageId: message.id, affairId: message.affairId, reply: qqReplyText(toReplyView(message), publicUrl, workspaceId) };
+      yield { messageId: message.id, sessionId: message.sessionId, reply: qqReplyText(toReplyView(message), publicUrl, workspaceId, await db.module.findMany({ where: { workspaceId }, select: { id: true, name: true } })) };
     }
     if (!done) await new Promise(resolve => setTimeout(resolve, pollMs));
   }
 }
-const toReplyView = (row: { text: string; attachments: unknown; affairId: string | null }) => ({ text: row.text, affairId: row.affairId, attachments: Array.isArray(row.attachments) ? row.attachments.flatMap(a => attachmentSchema.safeParse(a).data ?? []) : [] });
+const toReplyView = (row: { text: string; attachments: unknown }) => ({ text: row.text, attachments: Array.isArray(row.attachments) ? row.attachments.flatMap(a => attachmentSchema.safeParse(a).data ?? []) : [] });
 
 /** A button click is the owner's decision only when the bound owner clicked it. */
 async function approvalClick(interaction: QqInteraction, deps: { ack: () => Promise<void>; binding: () => Promise<QqBinding | null>; resolve?: ReturnType<typeof approvalResolver>; log: QqLog }) {
@@ -97,9 +100,12 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
   async function uploadReplyImage(service: StewardService, openid: string, messageId: string, workspaceId: string) {
     const row = await db.message.findFirst({ where: { id: messageId, workspaceId, channel: "chrona_qqbot", direction: "out" } });
     const image = Array.isArray(row?.attachments) ? row.attachments.map(a => attachmentSchema.safeParse(a).data).find(isReplyImage) : null;
-    if (image?.path && row?.affairId) {
+    if (image?.ref) {
       try {
-        const bytes = await (await service.forWorkspace(workspaceId).affairs.files(row.affairId)).raw(image.path);
+        const [name, ...parts] = image.ref.split("/"), api = service.forWorkspace(workspaceId);
+        const app = (await api.modules.list()).find(app => app.name === name);
+        if (!app) return undefined;
+        const { bytes } = await api.content.raw(app.id, parts.join("/"));
         return await (transport?.upload ?? uploadQqImage)({ tokens, openid, bytes }) ?? undefined;
       } catch { /* Unsupported media remains available through the authenticated web link. */ }
     }
@@ -115,9 +121,9 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
       const result = await delivery.send(input);
       if (binding && result.outcome === "accepted" && result.receiptRef) {
         try {
-          const notification = await db.notification.findUnique({ where: { workspaceId_idempotencyKey: { workspaceId: binding.workspaceId, idempotencyKey: input.idempotencyKey } } });
           const externalId = `qq:out:${result.receiptRef.slice(`${DEDICATED_PLATFORM}:`.length)}`;
-          await db.message.upsert({ where: { workspaceId_externalId: { workspaceId: binding.workspaceId, externalId } }, update: {}, create: { workspaceId: binding.workspaceId, externalId, conversationKey: "chat:chrona_qqbot", channel: "chrona_qqbot", direction: "out", text: [input.title, input.body].filter(Boolean).join("\n\n").slice(0, 8000), affairId: notification?.affairId, at: now() } });
+          const session = await db.session.findFirst({ where: { workspaceId: binding.workspaceId, key: "qq:dm", status: "active" } });
+          if (session) await db.message.upsert({ where: { workspaceId_externalId: { workspaceId: binding.workspaceId, externalId } }, update: {}, create: { workspaceId: binding.workspaceId, externalId, sessionId: session.id, channel: "chrona_qqbot", direction: "out", text: [input.title, input.body].filter(Boolean).join("\n\n").slice(0, 8000), at: now() } });
         } catch { log("qq.receipt_store_failed"); } // Never retry a send that QQ accepted.
       }
       return result;
@@ -136,9 +142,10 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
             const files = [];
             for (const attachment of remote) files.push(await (transport?.download ?? downloadQqAttachment)(attachment));
             const intake = files.length ? await service.chat.intakeAttachments({ ...chatInput, ...quote }, files) : {};
-            const result = await service.chat.handleMessage({ ...chatInput, ...quote, ...intake });
-            const replies = result.messages.map(message => ({ messageId: message.id, affairId: message.affairId, reply: qqReplyText(message, publicUrl, input.workspaceId) }));
-            return { reply: replies.map(m => m.reply).join("\n\n") || "处理尚未完成，请稍后在网页查看。", affairId: result.messages.at(-1)?.affairId, workspaceId: input.workspaceId, replies, ...(result.runId ? { later: lateReplies(db, input.workspaceId, result.runId, { seen: new Set(replies.map(r => r.messageId)), publicUrl }) } : {}) };
+            const result = await service.chat.handleMessage({ ...chatInput, ...quote, ...intake, key: "qq:dm" });
+            const apps = await service.forWorkspace(input.workspaceId).modules.list();
+            const replies = result.messages.map(message => ({ messageId: message.id, sessionId: message.sessionId, reply: qqReplyText(message, publicUrl, input.workspaceId, apps) }));
+            return { reply: replies.map(m => m.reply).join("\n\n") || "处理尚未完成，请稍后在网页查看。", sessionId: result.sessionId, workspaceId: input.workspaceId, replies, ...(result.runId ? { later: lateReplies(db, input.workspaceId, result.runId, { seen: new Set(replies.map(r => r.messageId)), publicUrl }) } : {}) };
           } finally { wake(); }
         } },
         reply: async (openid, messageId, text, msgSeq, message) => {
@@ -148,10 +155,10 @@ export function createStewardQqBot({ db, publicUrl, now = () => new Date(), env 
           if (result.outcome !== "accepted") throw new Error("Passive reply not accepted");
           if (message?.messageId && message.workspaceId) await db.message.updateMany({ where: { id: message.messageId, workspaceId: message.workspaceId, direction: "out", channel: "chrona_qqbot" }, data: { externalId: `qq:out:${result.messageId}` } });
         },
-        async enqueueFinal(binding, messageId, text, affairId) {
+        async enqueueFinal(binding, messageId, text, sessionId) {
           // The normal budget may fold this into a digest; never bypass quiet hours/caps.
           await db.$transaction(async tx => {
-            const row = await service.forWorkspace(binding.workspaceId).notifications.enqueueNotification(tx, { workspaceId: binding.workspaceId, level: "now", title: "Chrona", body: text, dedupeKey: `qq-final:${messageId}`, ...(affairId ? { affairId } : {}) });
+            const row = await service.forWorkspace(binding.workspaceId).notifications.enqueueNotification(tx, { workspaceId: binding.workspaceId, level: "now", title: "Chrona", body: text, dedupeKey: `qq-final:${messageId}`, ...(sessionId ? { sessionId } : {}) });
             // Pin this reply to its sender. A replacement owner must not receive
             // an old final reply; the adapter rejects recipients no longer bound.
             await tx.notification.update({ where: { id: row.id }, data: { recipient: `${DEDICATED_PLATFORM}:${binding.openid}` } });

@@ -22,18 +22,20 @@ const id = z.string().min(1).max(128);
 async function ownerServer(api: Api) {
   const modules = await api.modules.tools();
   // Module toolsets play the part of MCP servers inside this one; clients with tool search find their tools by these lines.
-  const instructions = `Chrona, the user's personal steward. Tools named m_<module>_<tool> come from modules (rules Chrona runs without a model); each acts in its module's affair. Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
+  const instructions = `Chrona, the user's personal steward. Tools named m_<module>_<tool> come from modules (apps Chrona runs without the Provider). Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
   const server = new McpServer({ name: "chrona", version: "1" }, { instructions });
   server.registerTool("chrona_today", { description: "What needs the user now: waiting approvals and questions, running work, today's agenda." }, safe(async () => json(await api.today())));
-  server.registerTool("chrona_affairs", { description: "List affairs (things Chrona looks after).", inputSchema: { status: z.enum(s.AFFAIR_STATUSES).optional() } }, safe(async ({ status }) => json(await api.affairs.list(status))));
-  server.registerTool("chrona_affair_read", { description: "Read a file of an affair; defaults to its README.md home page.", inputSchema: { affairId: id, path: s.affairPathSchema.default("README.md") } },
-    safe(async ({ affairId, path }) => json(await (await api.affairs.files(affairId)).read(path))));
-  server.registerTool("chrona_chat", { description: "Send the user's message to Chrona, optionally about one affair, and return its reply. Chrona decides how to handle it.", inputSchema: { text: z.string().min(1).max(8000), affairId: id.optional() } },
-    safe(async ({ text, affairId }) => json(s.chatReplySchema.parse(await api.chat.handleMessage({ channel: "in_app", text, affairId })))));
+  server.registerTool("chrona_content_tree", { description: "List an app's content files.", inputSchema: { appId: id } }, safe(async ({ appId }) => json(await api.content.tree(appId))));
+  server.registerTool("chrona_content_read", { description: "Read an app's content file; defaults to its README.md home page.", inputSchema: { appId: id, path: s.relativePathSchema.default("README.md") } },
+    safe(async ({ appId, path }) => json(await api.content.read(appId, path))));
+  server.registerTool("chrona_content_write", { description: "Save an app's content file, checking its base revision and sending content_edit.", inputSchema: { appId: id, ...s.saveFileSchema.shape } },
+    safe(async ({ appId, ...input }) => json(await api.content.save(appId, input))));
+  server.registerTool("chrona_chat", { description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: s.chatInputSchema.shape },
+    safe(async input => json(s.chatReplySchema.parse(await api.chat.handleMessage({ channel: "in_app", ...input, ...(!input.sessionId && !input.key ? { key: `mcp:${crypto.randomUUID()}` } : {}) })))));
   server.registerTool("chrona_approvals", { description: "List approvals; defaults to open ones waiting for the user.", inputSchema: { status: z.enum(s.APPROVAL_STATUSES).default("open") } }, safe(async ({ status }) => json(await api.approvals.list(status))));
   server.registerTool("chrona_approval_resolve", { description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", inputSchema: { approvalId: id, decision: z.enum(["approve", "deny"]), scope: z.enum(s.APPROVAL_SCOPES).default("once") }, annotations: { destructiveHint: true } },
     safe(async ({ approvalId, decision, scope }) => json((await api.approvals.resolve(approvalId, { decision, scope })).approval)));
-  server.registerTool("chrona_modules", { description: "List modules (rules Chrona runs without a model), their versions and recent runs.", inputSchema: { affairId: id.optional() } }, safe(async ({ affairId }) => json(await api.modules.list(affairId))));
+  server.registerTool("chrona_modules", { description: "List modules (apps Chrona runs without the Provider), their versions and recent runs." }, safe(async () => json(await api.modules.list())));
   server.registerTool("chrona_notifications", { description: "Recent notifications Chrona sent or queued." }, safe(async () => json(await api.notifications.list())));
   for (const tool of modules.tools) server.registerTool(tool.name, { description: tool.description, inputSchema: tool.shape }, safe(async args => json(await api.modules.callTool(tool.name, args))));
   return server;

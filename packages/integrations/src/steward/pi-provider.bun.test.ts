@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, symlink, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
+import { piArguments, piLaunchConfig } from "./pi-launch";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
 
 // Only fake subprocesses, never the installed model runner. Temp artifacts deliberately
@@ -153,13 +154,9 @@ describe("Pi RPC provider", () => {
     const noExtension = createPiProvider({ ...f.options, chronaExtension: join(f.cwd, "missing.ts") });
     expect((await noExtension.health()).error).toContain("extension missing");
   });
-  test.each([false, true])("bwrap mounts (root=%s), share network, and enable bash/web", async rootRun => {
+  test.each([false, true])("bwrap mounts session cwd (configured root=%s), shares network, and enables bash/web", async rootRun => {
     const f = await fixture();
-    const affair = join(f.cwd, "a".repeat(32));
-    await mkdir(affair);
     await mkdir(f.input.sessionDir, { recursive: true });
-    await mkdir(join(f.cwd, "unrelated"));
-    await symlink(affair, join(f.cwd, "b".repeat(32)));
     const bwrap = join(f.cwd, "bwrap");
     await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
     const provider = createPiProvider({ ...f.options, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, webExtension: join(f.cwd, "web.ts") });
@@ -170,14 +167,24 @@ describe("Pi RPC provider", () => {
     expect(args[args.indexOf("--tools") + 1].split(",")).toContain("web_search");
     expect((await provider.health()).sandboxed).toBe(true);
     const mounts = args.flatMap((arg: string, i: number) => arg === "--bind" || arg === "--ro-bind" ? [{ mode: arg, source: args[i + 1], target: args[i + 2] }] : []);
-    expect(mounts).toContainEqual({ mode: rootRun ? "--ro-bind" : "--bind", source: f.cwd, target: f.cwd });
+    expect(mounts).toContainEqual({ mode: "--bind", source: f.cwd, target: f.cwd });
     expect(mounts).toContainEqual({ mode: "--bind", source: f.agentDir, target: f.agentDir });
     expect(mounts.some((m: { source: string }) => m.source === join(process.env.HOME!, ".pi"))).toBe(false);
-    if (rootRun) {
-      expect(mounts).not.toContainEqual({ mode: "--bind", source: f.cwd, target: f.cwd });
-      expect(mounts).toContainEqual({ mode: "--bind", source: affair, target: affair });
-      expect(mounts).toContainEqual({ mode: "--bind", source: f.input.sessionDir, target: f.input.sessionDir });
-      expect(mounts.some((m: { source: string }) => m.source === join(f.cwd, ".chrona") || m.source === join(f.cwd, "unrelated") || m.source === join(f.cwd, "b".repeat(32)))).toBe(false);
-    }
+    expect(mounts).toContainEqual({ mode: "--bind", source: f.input.sessionDir, target: f.input.sessionDir });
   });
+});
+
+const realBwrap = Bun.which("bwrap");
+test.skipIf(!realBwrap)("real bwrap: content areas appear under /content, writable only when focused, root stays read-only", async () => {
+  const f = await fixture();
+  await mkdir(f.input.sessionDir, { recursive: true });
+  const files = join(f.cwd, "content-files"), notes = join(f.cwd, "content-notes");
+  await mkdir(files); await mkdir(notes); await writeFile(join(files, "a.md"), "hi\n");
+  const config = piLaunchConfig({ ...f.options, bwrap: realBwrap! });
+  const args = piArguments(config, { ...f.input, content: [{ name: "files", dir: files, writable: false }, { name: "notes", dir: notes, writable: true }] }, "p");
+  const script = "cat /content/files/a.md; echo x > /content/notes/b && echo notes-rw; (echo y > /content/files/c) 2>/dev/null || echo files-ro; touch /chrona-root-probe 2>/dev/null || echo root-ro";
+  const proc = Bun.spawn([realBwrap!, ...args.slice(0, args.indexOf("--") + 1), "/bin/sh", "-c", script], { stdout: "pipe", stderr: "pipe" });
+  const [out, err] = [await new Response(proc.stdout).text(), await new Response(proc.stderr).text()];
+  expect({ code: await proc.exited, err }).toEqual({ code: 0, err: "" });
+  expect(out.split("\n").filter(Boolean)).toEqual(["hi", "notes-rw", "files-ro", "root-ro"]);
 });

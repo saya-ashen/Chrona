@@ -10,7 +10,7 @@ const sandbox = createScriptSandbox({ bwrapPath });
 if (!sandbox.health.available) console.warn("SKIP script sandbox integration tests: bubblewrap missing or namespaces unavailable");
 const sandboxTest = sandbox.health.available ? test : test.skip;
 test("workspace masks precede runtime and writable mounts", () => {
-  const dataDir = join(homedir(), "chrona-test-data"), cwd = join(dataDir, "affairs", "fixture");
+  const dataDir = join(homedir(), "chrona-test-data"), cwd = join(dataDir, "sessions", "fixture");
   const args = scriptWorkspaceArguments(cwd, ["/usr/bin/sh"], dataDir);
   const root = args.findIndex((arg, i) => arg === "--ro-bind" && args[i + 1] === "/");
   for (const path of [homedir(), dataDir]) {
@@ -24,7 +24,7 @@ test("workspace masks precede runtime and writable mounts", () => {
 sandboxTest("workspace can write but cannot read fake data or home secrets", async () => {
   // Use only synthetic files; never read the user's real home contents.
   const dataDir = await mkdtemp(join(tmpdir(), "chrona-hidden-data-"));
-  const cwd = join(dataDir, "affairs", "fixture"), secret = join(dataDir, "secrets", "x.json");
+  const cwd = join(dataDir, "sessions", "fixture"), secret = join(dataDir, "secrets", "x.json");
   await mkdir(cwd, { recursive: true }); await mkdir(join(dataDir, "secrets"));
   await writeFile(secret, "fake-secret", { mode: 0o600 });
   const result = await createScriptSandbox({ bwrapPath, dataDir }).run({ language: "python", cwd, input: {}, source: `import os\ntry:\n open(${JSON.stringify(secret)}).read()\n raise AssertionError('secret visible')\nexcept OSError: pass\nassert os.listdir(${JSON.stringify(homedir())}) == []\nopen('output', 'w').write('safe')\nprint('hidden')` });
@@ -134,7 +134,7 @@ sandboxTest("network namespace denies loopback connection; home is absent", asyn
   expect(await sandbox.run({ language: "python", source, input: {} })).toMatchObject({ status: "succeeded", output: "isolated\n" });
 });
 sandboxTest("cwd is writable, rest of host is read-only, network namespace shared", async () => {
-  const root = await mkdtemp(join(tmpdir(), "chrona-sandbox-")), cwd = join(root, "affair");
+  const root = await mkdtemp(join(tmpdir(), "chrona-sandbox-")), cwd = join(root, "session");
   const { mkdir, readlink } = await import("node:fs/promises");
   await mkdir(cwd); await writeFile(join(cwd, "input"), "value");
   const network = await readlink("/proc/self/ns/net");

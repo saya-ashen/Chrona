@@ -12,7 +12,8 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     await db.workspace.create({ data: { id: "w", name: "Test" } });
     const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-agent-")), now: () => new Date(), publicUrl: null, deliveries: [], chat: null };
     const service = createStewardService(ports), app = createStewardAgentRoutes(ports, service);
-    await service.forWorkspace("w").runs.enqueue({ lane: "foreground", trigger: "message", prompt: "Hi" });
+    const session = await db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
+    await service.forWorkspace("w").runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Hi" });
     const run = (await service.forWorkspace("w").runs.claimNext("foreground"))!;
     const headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
     expect((await app.request("http://localhost/catalog")).status).toBe(401);
@@ -27,8 +28,8 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("text:") } });
     const root = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
-    expect(root.status).toBe(400);
-    expect(await root.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("chrona_affair_create / chrona_focus") } });
+    expect(root.status).toBe(200);
+    expect(await root.json()).toMatchObject({ ok: true });
     await db.run.update({ where: { id: run.id }, data: { status: "finished" } });
     expect((await app.request("http://localhost/catalog", { headers })).status).toBe(401);
   } finally { await db.$disconnect(); }

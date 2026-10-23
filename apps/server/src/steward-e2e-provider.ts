@@ -29,15 +29,11 @@ export function createStewardE2eProvider(port: number): ProviderAdapter {
           await input.events.usage({ scope: "run", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0, contextTokens: null, contextWindow: null });
           await call("chrona_reply", { text: "四项演示答复已收到，未执行外部动作" });
         } else if (message.includes("规划")) {
-          const affair = await call("chrona_affair_create", { title: "十天学习规划", readme: "# 学习规划\n\n每天学习，逐步完成。\n\n- [ ] 阅读学习目标\n" });
-          const cwd = resolve(input.cwd, affair.path);
-          await writeFile(resolve(cwd, "day-1.md"), "# 第一天\n\n- [ ] 完成第一天练习\n");
-          // Root runs are not affair-bound; commit this fixture's native file write.
-          for (const args of [["add", "--", "day-1.md"], ["commit", "-m", "Create day page"]]) {
-            const process = Bun.spawn(["git", "-c", "user.name=Chrona", "-c", "user.email=chrona@local", ...args], { cwd, stdout: "ignore", stderr: "ignore" });
-            if (await process.exited !== 0) throw new Error("E2E fixture commit failed");
-          }
-          await call("chrona_ui_set", { affairId: affair.id, path: "home.ui.json", role: "entry", spec: {
+          const content = input.content?.find(area => area.name === "files" && area.writable);
+          if (!content) throw new Error("Missing writable files content area");
+          await writeFile(resolve(content.dir, "README.md"), "# 学习规划\n\n每天学习，逐步完成。\n\n- [ ] 阅读学习目标\n");
+          await writeFile(resolve(content.dir, "day-1.md"), "# 第一天\n\n- [ ] 完成第一天练习\n");
+          await call("chrona_ui_set", { module: "files", path: "home.ui.json", role: "entry", spec: {
             root: "main", elements: {
               main: { type: "Stack", props: { direction: "vertical", gap: "md" }, children: ["status", "allocation", "practice", "tasks", "done", "plan"] },
               status: { type: "Text", props: { text: "今天从第一天练习开始" }, children: [] },
@@ -48,10 +44,7 @@ export function createStewardE2eProvider(port: number): ProviderAdapter {
               plan: { type: "PageLink", props: { label: "学习规划", path: "README.md", hint: null }, children: [] },
             },
           } });
-          await call("chrona_ui_set", { affairId: affair.id, path: "card.ui.json", role: "card", spec: {
-            root: "status", elements: { status: { type: "Text", props: { text: "今天的练习已经准备好" }, children: [] } },
-          } });
-          await call("chrona_schedule", { affairId: affair.id, mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习", label: "每日学习提醒" });
+          await call("chrona_schedule", { mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习", label: "每日学习提醒" });
           await call("chrona_reply", { text: "已建好规划" });
         } else await call("chrona_reply", { text: "收到" });
       }
