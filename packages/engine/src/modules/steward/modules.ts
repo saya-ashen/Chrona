@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./approvals";
 import { requireAffair } from "./affairs";
@@ -27,13 +28,18 @@ async function checkout(context: ModuleContext, moduleId: string, hash: string |
 }
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const context = moduleContext(ports, workspaceId);
+  async function reconcile<T>(operation: Promise<T>) {
+    const result = await operation;
+    await moduleSupervisor(ports).reconcile();
+    return result;
+  }
   return {
     propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
-    buildPending: (now = ports.now()) => buildPending(context, now),
-    recoverMigrations: (now = ports.now()) => recoverMigrations(context, now),
-    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => ports.db.$transaction(tx => activateIn(context, tx, moduleId, hash, reason)),
-    onApproved: (action: ApprovedAction) => onApproved(context, action),
-    rollback: (moduleId: string, hash: string) => rollback(context, moduleId, hash),
+    buildPending: (now = ports.now()) => reconcile(buildPending(context, now)),
+    recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),
+    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile(ports.db.$transaction(tx => activateIn(context, tx, moduleId, hash, reason))),
+    onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
+    rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
     list: (affairId?: string) => list(context, affairId),
     checkout: (moduleId: string, hash: string | undefined, dir: string) => checkout(context, moduleId, hash, dir),
     /** Owner view (no affair): every module tool, grouped into toolsets. */

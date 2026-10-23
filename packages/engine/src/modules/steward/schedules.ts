@@ -1,7 +1,5 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, moduleManifestSchema, moduleOutputSchema, RUN_LIMITS } from "@chrona/contracts/steward";
+import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import type { StewardPorts } from "./ports";
 import { requireAffair } from "./affairs";
@@ -11,7 +9,7 @@ import { notificationSettings } from "./settings";
 import { enqueueNotification } from "./notify";
 import { createRuns } from "./runs";
 import { audit } from "./audit";
-import { recordModuleResult } from "./module-effects";
+import { moduleSupervisor } from "./module-supervisor";
 
 function beforeDeadline(nextAt: Date | null, until: Date | null): Date | null {
   return until && nextAt && nextAt > until ? null : nextAt;
@@ -23,28 +21,14 @@ function nextDueOccurrence(rule: Parameters<typeof nextOccurrence>[0], now: Date
 }
 
 async function runScheduledModule(ports: StewardPorts, row: Prisma.ScheduleGetPayload<object>, moduleId: string, hash: string, now: Date) {
-  let manifest: ReturnType<typeof moduleManifestSchema.parse> | undefined;
-  let output: ReturnType<typeof moduleOutputSchema.parse> | null = null, error: string | null = null, exitCode = -1;
+  let error: string | null = null, exitCode = -1;
   try {
-    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
-    if (!version) throw new Error("Module version missing");
-    manifest = moduleManifestSchema.parse(version.manifest);
-    if (!manifest.triggers.some(trigger => trigger.id === row.triggerId)) throw new Error("Module trigger missing");
-    const dataDir = join(ports.dataDir, "platform/data", moduleId);
-    await mkdir(dataDir, { recursive: true });
-    if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Module sandbox unavailable");
-    const result = await ports.sandbox.runModule({
-      codeDir: join(ports.dataDir, "platform/store", hash), dataDir, entry: manifest.entry,
-      input: { trigger: { id: row.triggerId, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) },
-      network: manifest.effects.includes("network"), timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
-    });
-    exitCode = result.exitCode ?? -1;
-    if (result.status !== "succeeded" || exitCode !== 0) throw new Error(`Module ${result.status}; exit ${exitCode}: ${result.error ?? ""}`);
-    output = moduleOutputSchema.parse(JSON.parse(result.output));
+    await moduleSupervisor(ports).deliver(moduleId, hash, { trigger: { id: row.triggerId!, kind: "schedule", firedAt: row.nextAt!.toISOString() }, now: now.toISOString(), params: {} });
+    exitCode = 0;
   } catch (cause) {
     error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
   }
-  return { manifest, output, error, exitCode };
+  return { error, exitCode };
 }
 function moduleResultSummary(exitCode: number, effectCount: number, delayMs: number, error: string | null) {
   return `Module exit ${exitCode}; effects ${effectCount}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000);
@@ -84,7 +68,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       return toSchedule(result);
     });
   }
-  async function executeModule(row: Prisma.ScheduleGetPayload<object>, now: Date, delayMs: number, context: Parameters<typeof enqueueNotification>[2]) {
+  async function executeModule(row: Prisma.ScheduleGetPayload<object>, now: Date, delayMs: number) {
     const module = row.moduleId ? await db.module.findFirst({ where: { id: row.moduleId, workspaceId } }) : null;
     const schedule = await db.schedule.findUnique({ where: { id: row.id } });
     const skip = !module ? "Module missing" : module.status !== "active" ? "Module is paused" : !module.activeHash ? "Module has no active hash" : schedule?.status === "cancelled" ? "Module schedule replaced" : null;
@@ -93,11 +77,9 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       return;
     }
     const hash = module.activeHash;
-    const { manifest, output, error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
-    await db.$transaction(async tx => {
-      const executed = await recordModuleResult(tx, ports, { workspaceId, affairId: row.affairId, moduleId: module.id, hash, triggerId: row.triggerId!, firedAt: row.nextAt! }, { manifest, output, error, exitCode }, context);
-      await tx.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, executed.length, delayMs, error) } });
-    });
+    const { error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
+    const callCount = await db.moduleCall.count({ where: { moduleId: module.id, hash, eventKey: `${row.triggerId}:${row.nextAt!.toISOString()}` } });
+    await db.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, callCount, delayMs, error) } });
   }
   async function fireDue(now = ports.now()) {
     const zone = await timezone(), chatBound = ports.chat ? await ports.chat.bound() : false;
@@ -121,7 +103,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       if (!claimed) continue;
       fired++;
       if (row.mode === "module") {
-        await executeModule(row, now, delayMs, context);
+        await executeModule(row, now, delayMs);
         continue;
       }
       await db.schedule.update({ where: { id: row.id }, data: { lastResult: `Fired; delay ${delayMs}ms`, failures: 0 } });

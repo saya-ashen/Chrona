@@ -69,6 +69,7 @@ model Module {
   affair Affair @relation(fields: [affairId], references: [id], onDelete: Cascade)
   versions ModuleVersion[]
   runs ModuleRun[]
+  calls ModuleCall[]
   schedules Schedule[]
   @@unique([affairId, name])
   @@index([workspaceId, status])
@@ -115,6 +116,22 @@ model ModuleRun {
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@index([moduleId, createdAt])
   @@index([moduleId, hash, firedAt])
+}
+
+model ModuleCall {
+  id String @id @default(uuid())
+  moduleId String
+  hash String
+  moduleRunId String?
+  eventKey String?
+  method String
+  key String
+  status String
+  error String?
+  createdAt DateTime @default(now())
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@index([moduleId, method, key, status])
+  @@index([moduleRunId])
 }
 
 model Schedule {

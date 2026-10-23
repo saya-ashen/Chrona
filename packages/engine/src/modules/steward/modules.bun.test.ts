@@ -9,6 +9,8 @@ import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./approvals";
 import { testDb } from "./test-db";
+import { testModuleSandbox } from "./module-test-process";
+import { moduleSupervisor } from "./module-supervisor";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -31,6 +33,8 @@ async function fixture() {
       return { status: fail ? "failed" : "succeeded", output: "public stdout", error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 };
     } },
   };
+  ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
+  cleanups.push(() => moduleSupervisor(ports).stop());
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const affair = await service.affairs.create({ title: "Prices" });
   const row = await db.affair.findUniqueOrThrow({ where: { id: affair.id } });

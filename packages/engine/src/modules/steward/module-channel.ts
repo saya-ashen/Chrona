@@ -6,7 +6,7 @@ type EventReply = ReturnType<typeof moduleEventReplySchema.parse>;
 type CallReply = ReturnType<typeof moduleCallReplySchema.parse>;
 const maxLine = 64 * 1024;
 
-export async function createModuleChannel(socketPath: string, { onCall }: { onCall(call: ModuleCall): Promise<CallReply> }) {
+export async function createModuleChannel(socketPath: string, { onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
   let socket: Socket | undefined, accepted = false, closed = false;
   let pending: { id: string; resolve(reply: EventReply): void; reject(error: Error): void } | undefined;
   let connected!: () => void, disconnected!: (error: Error) => void;
@@ -76,15 +76,15 @@ export async function createModuleChannel(socketPath: string, { onCall }: { onCa
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));
       const run = queue.then(() => new Promise<EventReply>((resolve, reject) => {
         let expired = false;
-        const timer = setTimeout(() => { expired = true; pending = undefined; reject(new Error("Module event timeout")); }, timeoutMs);
+        const timer = timers.setTimeout(() => { expired = true; pending = undefined; reject(new Error("Module event timeout")); }, timeoutMs);
         void ready.then(() => {
           if (expired) return;
           if (closed || !socket || socket.destroyed) throw new Error("Module channel closed");
           pending = { id: message.id,
-            resolve: reply => { clearTimeout(timer); pending = undefined; resolve(reply); },
-            reject: error => { clearTimeout(timer); pending = undefined; reject(error); } };
+            resolve: reply => { timers.clearTimeout(timer); pending = undefined; resolve(reply); },
+            reject: error => { timers.clearTimeout(timer); pending = undefined; reject(error); } };
           socket.write(JSON.stringify(message) + "\n");
-        }).catch(error => { clearTimeout(timer); pending = undefined; reject(error); });
+        }).catch(error => { timers.clearTimeout(timer); pending = undefined; reject(error); });
       }));
       queue = run.catch(() => {});
       return run;

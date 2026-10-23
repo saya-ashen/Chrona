@@ -9,21 +9,24 @@ import { createTick } from "./tick";
 import { processModuleInbound } from "./module-inbound";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
+import { testModuleSandbox } from "./module-test-process";
+import { moduleSupervisor } from "./module-supervisor";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 async function fixture() {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-module-inbound-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  let time = new Date("2026-10-21T04:00:00Z"), handled = true, fail = false;
+  let time = new Date("2026-10-21T04:00:00Z"), handled: boolean | undefined = true, fail = false;
   const source = createLocalTestSource(), calls: unknown[] = [];
   const ports: StewardPorts = { db, dataDir, now: () => time, deliveries: [], chat: null, publicUrl: null, connectors: [source.adapter],
-    sandbox: { available: true, async runModule(input) {
+    sandbox: testModuleSandbox(async input => {
       calls.push(input);
       return { status: fail ? "failed" : "succeeded", exitCode: fail ? 1 : 0, error: fail ? "failed" : null,
         output: JSON.stringify({ handled, effects: [{ type: "notify_user", key: "sorted", level: "now", title: "邮件已整理", body: "已处理" }] }) };
-    } },
+    }),
   };
+  cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
   const api = createStewardService(ports).forWorkspace(workspaceId), affair = await api.affairs.create({ title: "Mail" });
   const connector = await api.connectors.create({ kind: "local_test", label: "mail", affairId: affair.id });
@@ -38,7 +41,7 @@ async function fixture() {
   return { db, ports, api, workspaceId, module, connector, calls, push, manifest,
     run: () => processModuleInbound(ports, workspaceId),
     advance: (ms: number) => { time = new Date(time.getTime() + ms); },
-    handled: (value: boolean) => { handled = value; }, fail: () => { fail = true; } };
+    handled: (value: boolean | undefined) => { handled = value; }, fail: () => { fail = true; } };
 }
 test("inbound handled produces notification without a Provider run; false falls back to batching", async () => {
   const f = await fixture();
@@ -55,6 +58,12 @@ test("inbound handled produces notification without a Provider run; false falls 
   expect(await f.db.inboundItem.findUniqueOrThrow({ where: { id: second.id } })).toMatchObject({ status: "new", deliverAt: second.deliverAt, leaseToken: null });
   f.advance(RUN_LIMITS.inboundBatchWindowMs); await f.api.connectors.flush(f.connector.id);
   expect(await f.db.run.count()).toBe(1);
+});
+test("a reply without handled does not swallow mail", async () => {
+  const f = await fixture(); f.handled(undefined);
+  const item = await f.push(); await f.run();
+  expect(await f.db.inboundItem.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({ status: "new", leaseToken: null });
+  expect((await f.db.moduleRun.findFirstOrThrow()).output).toEqual({});
 });
 test("ignore, digest and no-match retain connector behavior; wake_now routes before flush", async () => {
   const f = await fixture(), files = await f.api.affairs.files(f.module.affairId);
@@ -126,9 +135,11 @@ test("body is UTF-8 truncated to 64 KiB without connector headers", async () => 
 });
 test("a constant module key does not swallow the next mail", async () => {
   const f = await fixture();
-  const first = await f.push("first"), second = await f.push("second");
+  const first = await f.push("first");
+  f.advance(1);
+  const second = await f.push("second");
   await f.run();
   expect(await f.db.notification.count({ where: { title: "邮件已整理" } })).toBe(2);
-  const executed = Object.fromEntries((await f.db.moduleRun.findMany()).map(run => [run.inboundItemId, run.executed]));
-  expect(executed).toEqual(Object.fromEntries([first, second].map(item => [item.id, [{ type: "notify_user", key: `inbound:${item.id}:sorted`, status: "executed" }]])));
+  const calls = await f.db.moduleCall.findMany({ orderBy: { key: "asc" } });
+  expect(calls.map(call => ({ key: call.key, status: call.status }))).toEqual([first, second].map(item => ({ key: `inbound:${item.id}:sorted`, status: "executed" })).sort((a, b) => a.key.localeCompare(b.key)));
 });

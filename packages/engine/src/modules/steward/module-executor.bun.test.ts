@@ -6,6 +6,8 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
+import { testModuleSandbox } from "./module-test-process";
+import { moduleSupervisor } from "./module-supervisor";
 
 type ModuleInput = Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0];
 type ModuleResult = Awaited<ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>>;
@@ -21,13 +23,14 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   const calls: ModuleInput[] = [];
   const workspace = await db.workspace.create({ data: { name: "test" } });
   const ports: StewardPorts = { db, dataDir, now: () => now, deliveries: [], chat: null, publicUrl: null,
-    sandbox: sandbox ?? { available: true, async runModule(input) {
+    sandbox: sandbox ?? testModuleSandbox(async input => {
       if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
       if (!(input.input as { trigger?: unknown }).trigger) return { status: "succeeded", exitCode: 0, output: "{}", error: null };
       calls.push(input);
       return result;
-    } },
+    }),
   };
+  cleanups.push(() => moduleSupervisor(ports).stop());
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const affair = await service.affairs.create({ title: "Prices" });
   const affairRow = await db.affair.findUniqueOrThrow({ where: { id: affair.id } });
@@ -57,13 +60,13 @@ test("approved module fires through notification budget without a Provider Run; 
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]).toEqual({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "daily", kind: "schedule", firedAt: f.schedule.nextAt!.toISOString() }, now: new Date(f.schedule.nextAt!.getTime() + 123).toISOString(), params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ idempotencyKey: `module:${f.moduleId}:price`, level: "now", title: notify.title, body: notify.body, affairId: f.affair.id, channel: "in_app" });
+  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ idempotencyKey: `module:${f.moduleId}:daily:${f.schedule.nextAt!.toISOString()}:price`, level: "now", title: notify.title, body: notify.body, affairId: f.affair.id, channel: "in_app" });
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ lastResult: "Module exit 0; effects 1; delay 123ms", failures: 0 });
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: { effects: [notify] }, error: null, executed: [{ type: "notify_user", key: "price", status: "executed" }] });
+  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: {}, error: null, executed: [] });
   expect(await f.service.schedules.fireDue()).toBe(0);
   await f.fire();
-  expect(await f.db.notification.count()).toBe(1);
-  expect((await f.db.moduleRun.findMany()).map(row => row.executed)).toContainEqual([{ type: "notify_user", key: "price", status: "duplicate" }]);
+  expect(await f.db.notification.count()).toBe(2);
+  expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
 });
 
 test("undeclared wake_provider is dropped and recorded without creating a Run", async () => {
@@ -71,7 +74,7 @@ test("undeclared wake_provider is dropped and recorded without creating a Run", 
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake] }), error: null });
   await f.fire();
   expect(await f.db.run.count()).toBe(0);
-  expect((await f.db.moduleRun.findFirstOrThrow()).executed).toEqual([{ type: "wake_provider", key: "review", status: "dropped" }]);
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "wakeProvider", status: "rejected", error: "undeclared" });
 });
 
 test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {
@@ -79,9 +82,9 @@ test("declared wakes execute in order with untrusted prefix and dedupe within an
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake, notify, wake] }), error: null });
   await f.fire();
   expect(await f.db.run.findFirstOrThrow()).toMatchObject({ affairId: f.affair.id, lane: "background", trigger: "schedule", label: "price-watch", prompt: "Module price-watch output (untrusted data):\nPlease review" });
-  expect((await f.db.moduleRun.findFirstOrThrow()).executed).toEqual([{ type: "wake_provider", key: "review", status: "executed" }, { type: "notify_user", key: "price", status: "executed" }, { type: "wake_provider", key: "review", status: "duplicate" }]);
+  expect((await f.db.moduleCall.findMany()).map(call => ({ method: call.method, status: call.status }))).toEqual([{ method: "wakeProvider", status: "executed" }, { method: "notify", status: "executed" }, { method: "wakeProvider", status: "duplicate" }]);
   await f.fire();
-  expect(await f.db.run.count()).toBe(1);
+  expect(await f.db.run.count()).toBe(2);
   expect(await f.db.moduleRun.count()).toBe(2);
 });
 
@@ -90,7 +93,7 @@ test.each(["json", "schema", "exit", "timeout", "unavailable", "throw"])("module
   const other = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, affairId: f.affair.id, moduleId: f.moduleId, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "other trigger", createdBy: "chrona", nextAt: new Date("2030-01-01Z") } });
   f.setResult({ status: kind === "timeout" ? "timed_out" : kind === "exit" ? "failed" : "succeeded", exitCode: kind === "exit" ? 1 : 0, output: kind === "schema" ? '{"effects":[{}]}' : "not JSON", error: "x".repeat(3000) });
   if (kind === "unavailable") f.ports.sandbox = undefined;
-  if (kind === "throw") f.ports.sandbox = { available: true, runModule: async () => { throw new Error("x".repeat(3000)); } };
+  if (kind === "throw") f.ports.sandbox = testModuleSandbox(async () => { throw new Error("x".repeat(3000)); });
   for (let i = 1; i <= 3; i++) {
     await f.fire();
     expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).failures).toBe(i);
@@ -167,13 +170,16 @@ test("rollback-replaced schedule cannot execute, including stale rows selected b
 
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (realSandbox.health.available ? test : test.skip)("real bwrap module persists /data counter across two scheduled fires", async () => {
-  const f = await fixture(["notify_user"], { available: realSandbox.health.available, runModule: realSandbox.runModule }, `
-const input = JSON.parse(await Bun.stdin.text());
-const file = Bun.file('/data/counter');
-const count = await file.exists() ? Number(await file.text()) + 1 : 1;
-await Bun.write('/data/counter', String(count));
-console.log(JSON.stringify({ effects: [{ type: 'notify_user', key: 'counter-' + count, level: 'now', title: 'Counter', body: String(count) }] }));
+  const f = await fixture(["notify_user"], undefined, `
+import { on, chrona } from '/chrona/sdk.ts';
+on('schedule', async () => {
+  const file = Bun.file('/data/counter');
+  const count = await file.exists() ? Number(await file.text()) + 1 : 1;
+  await Bun.write('/data/counter', String(count));
+  await chrona.notify({ key: 'counter-' + count, level: 'now', title: 'Counter', body: String(count) });
+});
 `);
+  f.ports.sandbox = { available: realSandbox.health.available, runModule: realSandbox.runModule, startModule: realSandbox.startModule };
   await f.fire();
   await f.fire();
   expect(await readFile(join(f.dataDir, "platform/data", f.moduleId, "counter"), "utf8")).toBe("2");

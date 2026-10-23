@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@chrona/db";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
-import { createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
+import { moduleSupervisor, createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
 import type { DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
@@ -128,6 +128,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     start() {
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
+      void moduleSupervisor(ports).start().catch(() => options.onError?.());
       void transport?.start(service, wake).catch(() => options.onError?.());
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
@@ -137,6 +138,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       stopping = true;
       if (timer) timers.clearInterval(timer);
       timer = undefined;
+      await moduleSupervisor(ports).stop();
       await running;
       await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.done; }));
       await transport?.stop();

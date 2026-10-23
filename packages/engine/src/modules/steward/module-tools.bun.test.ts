@@ -6,6 +6,8 @@ import { CHRONA_TOOLS, RUN_LIMITS, type ModuleManifest } from "@chrona/contracts
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
+import { testModuleSandbox } from "./module-test-process";
+import { moduleSupervisor } from "./module-supervisor";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -15,12 +17,13 @@ async function fixture() {
   const now = new Date("2026-10-21T04:00:00Z"), calls: unknown[] = [];
   let error: string | null = null;
   const ports: StewardPorts = { db, dataDir, now: () => now, deliveries: [], chat: null, publicUrl: null,
-    sandbox: { available: true, async runModule(input) {
+    sandbox: testModuleSandbox(async input => {
       calls.push(input);
       return { status: error ? "failed" : "succeeded", exitCode: error ? 1 : 0, error,
         output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }, { type: "wake_provider", key: "wake", prompt: "Review" }] }) };
-    } },
+    }),
   };
+  cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   const service = createStewardService(ports), api = service.forWorkspace(workspaceId);
   const affair = await api.affairs.create({ title: "Work" }), other = await api.affairs.create({ title: "Other" });
@@ -80,15 +83,15 @@ test.each([
 });
 test("success returns result, runs sandbox with scoped input and deduplicates shared effects", async () => {
   const f = await fixture(), args = { query: "hello", count: 2, unread: true, folder: "inbox" };
-  const effects = [{ type: "notify_user", key: "found", status: "executed" }, { type: "wake_provider", key: "wake", status: "executed" }];
-  expect(await f.call(args)).toEqual({ result: { found: 3 }, effects });
-  expect(await f.call(args)).toEqual({ result: { found: 3 }, effects: effects.map(effect => ({ ...effect, status: "duplicate" })) });
-  expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: Math.min(RUN_LIMITS.jobTimeoutMs, 50_000), maxOutputBytes: RUN_LIMITS.jobOutputBytes,
+  expect(await f.call(args)).toEqual({ result: { found: 3 } });
+  expect(await f.call(args)).toEqual({ result: { found: 3 } });
+  expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "executed", "duplicate", "duplicate"]);
+  expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect(await f.db.notification.count()).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(1);
   expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ prompt: expect.stringContaining("(untrusted data)") });
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null, executed: effects });
+  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null, executed: [] });
   expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ tool: "m_mail_sort_find_mail", ok: true }, { tool: "m_mail_sort_find_mail", ok: true }]);
   expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(2);
 });

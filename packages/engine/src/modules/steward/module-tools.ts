@@ -1,10 +1,8 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { z } from "zod";
-import { moduleManifestSchema, moduleOutputSchema, RUN_LIMITS } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
-import { recordModuleResult, type ModuleResult } from "./module-effects";
+import { moduleSupervisor } from "./module-supervisor";
 import { audit } from "./audit";
 
 /** The caller's affair only orders and labels; module tools run in their own module's affair. */
@@ -62,36 +60,19 @@ export function moduleToolShape(tool: Tool) {
 function validateArgs(tool: Tool, raw: unknown) {
   return parseInput(z.object(moduleToolShape(tool)).strict(), raw);
 }
-async function runTool(ports: StewardPorts, resolved: Resolved, args: unknown, now: Date): Promise<ModuleResult> {
+async function runTool(ports: StewardPorts, resolved: Resolved, args: Record<string, unknown>, now: Date) {
   const { module, manifest, tool } = resolved;
-  let exitCode = -1;
-  try {
-    const dataDir = join(ports.dataDir, "platform/data", module.id);
-    await mkdir(dataDir, { recursive: true });
-    if (!ports.sandbox?.available || !ports.sandbox.runModule) throw new Error("Module sandbox unavailable");
-    const result = await ports.sandbox.runModule({
-      codeDir: join(ports.dataDir, "platform/store", module.activeHash!), dataDir, entry: manifest.entry,
-      input: { trigger: { id: tool.name, kind: "tool", firedAt: now.toISOString(), args }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) },
-      network: manifest.effects.includes("network"), timeoutMs: Math.min(RUN_LIMITS.jobTimeoutMs, 50_000), maxOutputBytes: RUN_LIMITS.jobOutputBytes,
-    });
-    exitCode = result.exitCode ?? -1;
-    if (result.status !== "succeeded" || exitCode !== 0) throw new Error(result.error || `Module ${result.status}; exit ${exitCode}`);
-    return { manifest, output: moduleOutputSchema.parse(JSON.parse(result.output)), exitCode, error: null };
-  } catch (cause) {
-    return { manifest, output: null, exitCode, error: (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000) };
-  }
+  return moduleSupervisor(ports).deliver(module.id, module.activeHash!, { trigger: { id: tool.name, kind: "tool", firedAt: now.toISOString(), args }, now: now.toISOString(), params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) });
 }
 /** Runs a module tool for a caller (a run, or the owner when runId is null) under the module's own affair. */
 export async function callModuleTool(ports: StewardPorts, caller: Scope & { runId: string | null }, name: string, raw: unknown) {
   const resolved = (await moduleTools(ports, caller)).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");
   const args = validateArgs(resolved.tool, raw), now = ports.now(), { module } = resolved;
-  const result = await runTool(ports, resolved, args, now);
-  const context = { now, chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
-  const effects = await ports.db.$transaction(async tx => {
-    await audit(tx, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: module.id, details: { tool: name, callerRunId: caller.runId, callerAffairId: caller.affairId } });
-    return recordModuleResult(tx, ports, { workspaceId: caller.workspaceId, affairId: module.affairId, moduleId: module.id, hash: module.activeHash!, triggerId: `tool:${resolved.tool.name}`, firedAt: now }, result, context);
-  });
-  if (result.error) throw new StewardError("conflict", result.error);
-  return { result: result.output?.result, effects };
+  await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: module.id, details: { tool: name, callerRunId: caller.runId, callerAffairId: caller.affairId } });
+  try {
+    const reply = await runTool(ports, resolved, args, now);
+    if ("error" in reply) throw new Error(reply.error);
+    return { result: reply.result.result };
+  } catch (cause) { throw new StewardError("conflict", (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000)); }
 }
