@@ -74,10 +74,3 @@ test("gated local test inbox is owner protected, validated and feeds the local_t
   expect((await runtime.localTest.adapter.poll({ settings: {}, secret: null, cursor: null })).items).toEqual([{ ...item, url: null }]);
 });
 
-test.skipIf(!(await Bun.file("apps/web/dist/index.html").exists()))("unlocalized links keep their query and use the reader's language", async () => {
-  const app = await createServerApp();
-  const response = await app.request("/apps/a1?path=trending.md", { headers: { "accept-language": "zh-CN,zh;q=0.9" } });
-  expect(response.status).toBe(302);
-  expect(response.headers.get("location")).toBe("/zh/apps/a1?path=trending.md");
-});
-

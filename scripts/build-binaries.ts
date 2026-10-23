@@ -72,9 +72,6 @@ export async function buildBinary(target: BuildTargetName) {
   console.log(`  Release dir: ${releaseDir}`);
   console.log("");
 
-  log("build", "Building Web UI...");
-  await $`bun run build`.cwd(resolve(ROOT, "apps/web"));
-
   log("build", "Generating Prisma client...");
   await $`bun run db:generate`.cwd(ROOT);
 

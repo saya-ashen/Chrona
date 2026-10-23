@@ -18,6 +18,7 @@ const runtimeConfigSchema = z.object({
     url: z.string().min(1).optional(),
     migrationsDir: z.string().min(1).optional(),
   }).optional(),
+  /** Ignored: the web page is the built-in web module (v2-4e); kept so existing config files still load. */
   web: z.object({
     dist: z.string().min(1).nullable().optional(),
   }).optional(),
@@ -91,7 +92,6 @@ function configEnvDefaults(config: ChronaRuntimeConfig) {
     ["CHRONA_UNSAFE_PUBLIC_BIND", unsafePublicBindEnvValue(config.server?.unsafePublicBind)],
     ["DATABASE_URL", config.database?.url],
     ["CHRONA_MIGRATIONS_DIR", config.database?.migrationsDir],
-    ["CHRONA_WEB_DIST", config.web?.dist],
     [EXPERIMENTAL_DASHBOARD_AI_SUMMARY_ENV, unsafePublicBindEnvValue(config.experimental?.dashboardAiSummary)],
     ["API_KEY", config.security?.apiKey],
   ] as const;

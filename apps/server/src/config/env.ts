@@ -26,7 +26,6 @@ const envSchema = z.object({
   API_KEY: z.string().optional(),
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
   CHRONA_UNSAFE_CORS: z.string().optional(),
-  CHRONA_WEB_DIST: z.string().optional(),
 });
 
 type Env = z.output<typeof envSchema>;

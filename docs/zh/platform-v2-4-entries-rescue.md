@@ -1,6 +1,6 @@
 # v2-4 规格：交互入口模块化与不可变救援控制台
 
-状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）、v2-4d（内置 `qq` 模块）已实现；v2-4e（`web`）未实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
+状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）、v2-4d（内置 `qq` 模块）、v2-4e（内置 `web` 模块，简化版）已实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 目标
@@ -38,7 +38,7 @@
 ```
 
 - `keepAlive: true`：保持 QQ 长连接等外连。
-- `listen: "/api/mcp"`：模块在 `/chrona/http/s`（unix socket）上运行自己的 HTTP 服务（SDK：`chrona.serve(fetch)`）；内核认证后把 `/api/mcp` 与 `/api/mcp/*` 反向代理过去，去掉 `Authorization` 与 `Cookie`（响应去掉 `Set-Cookie`）。并发、流式响应和大响应体都由 HTTP 本身承担，不经事件通道。要求 `keepAlive`；同一路径只能有一个启用的模块；`/api/steward*`、`/api/workspaces`、`/api/health` 保留给内核。网页（`listen: "/"`）的形式留到 v2-4e 再定。
+- `listen: "/api/mcp"`：模块在 `/chrona/http/s`（unix socket）上运行自己的 HTTP 服务（SDK：`chrona.serve(fetch)`）；内核认证后把 `/api/mcp` 与 `/api/mcp/*` 反向代理过去，去掉 `Authorization` 与 `Cookie`（响应去掉 `Set-Cookie`）。并发、流式响应和大响应体都由 HTTP 本身承担，不经事件通道。要求 `keepAlive`；同一路径只能有一个启用的模块；`/api/steward*`、`/api/workspaces`、`/api/health` 保留给内核。`listen: "/"` 是网页：/api、/health、/ready 之外的所有 GET/HEAD 都转给它，不经认证（页面不含数据，浏览器带用户的密钥直接调用 /api/steward）；因为它能拿到浏览器里的密钥，声明它的模块与 `owner` 一样是入口模块（`isEntryModule`）。
 - `channel` / `secrets`：见 §6 通知投递。
 - `owner`：可调用 `owner`（SDK：`chrona.owner({ method, path, body })`）。owner API 就是 `/api/steward` 的 HTTP 映射（见 contract），由内核在进程内转发、注入 `workspaceId`；只支持 JSON，不含上传与原始下载；不与模块的其他调用排队。清单 `secrets` 列出的凭据用 `secret({ name })` 读取（v2-4d）。
 
@@ -97,7 +97,7 @@ chrona admin approve|reject <approvalId>
 
 | 模块 | 运行 | 能力 | 说明 |
 |---|---|---|---|
-| `web` | `listen: "/"` | `owner` | 现有网页。源码与锁文件在模块内；构建沙箱只读挂载 Chrona 已审查的依赖缓存，v1 不允许新增依赖 |
+| `web` | `listen: "/"` | （无） | 简化网页（2026-10-23 用户决定先做能用的简单版，原 React 网页删除）：单个 HTML + 原生 JS，无构建、无依赖。今天（审批、接下来、通知、应用、会话）、对话（切换/新建会话、发消息、附件链接）、应用（内容区文件浏览、Markdown 简单渲染、勾选框、编辑保存、二进制下载）。尚无：`*.ui.json` 生成页面渲染、面板、上传、设置与连接器管理 |
 | `qq` | `keepAlive`、`channel` | `owner`、`network`、`secrets: [qq_bot]` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
 | `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
 

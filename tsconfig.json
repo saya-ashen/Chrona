@@ -9,14 +9,9 @@
     "paths": {
       "@/generated/prisma/*": ["./packages/db/src/generated/prisma/*"],
       "@/lib/db": ["./packages/db/src/db.ts"],
-      "@/lib/logger": ["./apps/web/src/lib/logger.ts"],
-      "@/*": ["./apps/web/src/*"], "@web/*": ["./apps/web/src/*"],
-      "@server/*": ["./apps/server/src/*"], "@features/*": ["./features/*"],
-      "@shared/ui": ["./shared/ui/index.ts"],
-      "@shared/http": ["./shared/http/index.ts"],
+      "@server/*": ["./apps/server/src/*"],
       "@chrona/logging": ["./packages/logging/src/index.ts"],
       "@chrona/i18n": ["./packages/i18n/src/index.ts"],
-      "@chrona/i18n/react": ["./packages/i18n/src/client.tsx"],
       "@chrona/i18n/messages": ["./packages/i18n/src/messages.ts"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],
       "@chrona/ui-catalog": ["./packages/ui-catalog/src/index.ts"],
@@ -27,8 +22,7 @@
       "@chrona/shared": ["./packages/shared/src/index.ts"], "@chrona/shared/*": ["./packages/shared/src/*"],
       "@chrona/engine": ["./packages/engine/src/index.ts"],
       "@chrona/integrations": ["./packages/integrations/src/index.ts"],
-      "@chrona/integrations/steward": ["./packages/integrations/src/steward/index.ts"],
-      "@chrona/web/*": ["./apps/web/src/*"]
+      "@chrona/integrations/steward": ["./packages/integrations/src/steward/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts"],

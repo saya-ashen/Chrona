@@ -1,0 +1,11 @@
+{
+  "name": "web",
+  "description": "Chrona's web page: today, conversations and app content, talking to Chrona's owner API from the browser.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "listen": "/",
+  "triggers": [],
+  "effects": [],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

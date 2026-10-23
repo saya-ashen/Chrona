@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema, isEntryModule } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import type { ApprovedAction } from "./ports";
 import { consumeOnce, effectivePolicyIn } from "./grants";
@@ -84,7 +84,7 @@ export async function rollback(context: ModuleContext, moduleId: string, hash: s
   const module = await requireModule(context, context.db, moduleId);
   const version = await approvedVersion(context.db, moduleId, hash, undefined, true);
   const active = module.activeHash ? await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } }) : null;
-  if (moduleManifestSchema.parse(version.manifest).effects.includes("owner") || (active && moduleManifestSchema.parse(active.manifest).effects.includes("owner"))) {
+  if (isEntryModule(moduleManifestSchema.parse(version.manifest)) || (active && isEntryModule(moduleManifestSchema.parse(active.manifest)))) {
     if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
     const schema = moduleManifestSchema.parse(version.manifest).data.schema;
     const needsRestore = module.dataSchema !== null && schema < module.dataSchema && !await dataEmpty(join(context.platform, "data", moduleId));

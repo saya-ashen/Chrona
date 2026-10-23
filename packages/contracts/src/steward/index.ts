@@ -120,8 +120,10 @@ export const moduleManifestSchema = z.object({
    * Serves HTTP under this path (v2-4 entry modules): the module runs an HTTP server on the Unix socket `CHRONA_HTTP_SOCKET` (SDK `chrona.serve`)
    * and Chrona proxies authenticated requests to it, without `Authorization` and `Cookie`. One active module per path;
    * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
+   * `"/"` is the web page: every GET/HEAD outside /api, /health and /ready, unauthenticated (pages carry no data;
+   * the browser calls /api/steward with the user's key), so its module is an entry module like `owner` (see isEntryModule).
    */
-  listen: z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/).optional(),
+  listen: z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]).optional(),
   /** Delivers this channel's notifications (`deliver` events) and reports readiness with `channel`; requires `owner`. */
   channel: z.literal("chrona_qqbot").optional(),
   /**
@@ -164,6 +166,8 @@ export const moduleManifestSchema = z.object({
   });
 });
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
+/** Acts as the user, or serves the page holding the user's key: approved only in the rescue console, never automatic. */
+export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string }) => manifest.effects.includes("owner") || manifest.listen === "/";
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as

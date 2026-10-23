@@ -113,6 +113,7 @@ async function assertRuntimeStarts(binaryPath: string) {
   try {
     const baseUrl = `http://127.0.0.1:${port}`;
     await waitForJson(`${baseUrl}/health`, "health endpoint");
+    // The page comes from the built-in web module, which builds at first start.
     await waitForText(`${baseUrl}/`, "web index");
     const [workspace] = await waitForJson(`${baseUrl}/api/workspaces`, "workspaces endpoint") as { id?: string }[];
     if (typeof workspace?.id !== "string" || workspace.id.length === 0) {
@@ -151,7 +152,6 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
     await assertElfInterpreterFile(binaryPath, manifestTarget.linuxInterpreter);
   }
 
-  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, buildArtifacts.webDist, "index.html"), "Web index");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/schema.prisma"), "Prisma schema");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/migrations"), "Prisma migrations");
 

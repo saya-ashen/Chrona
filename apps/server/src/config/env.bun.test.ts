@@ -25,7 +25,6 @@ function resetEnv() {
   delete process.env.CHRONA_MIGRATIONS_DIR;
   delete process.env.CHRONA_UNSAFE_PUBLIC_BIND;
   delete process.env.CHRONA_UNSAFE_CORS;
-  delete process.env.CHRONA_WEB_DIST;
   delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
   delete process.env.CHRONA_EMAIL_TRIGGER_SECRET;
   resetEnvCacheForTests();
@@ -58,7 +57,6 @@ describe("server environment safety", () => {
     expect(env.PORT).toBe("3200");
     expect(env.ALLOWED_ORIGINS).toBe("http://localhost:3200");
     expect(env.DATABASE_URL).toBe("file:/tmp/chrona-config.db");
-    expect(env.CHRONA_WEB_DIST).toBe("/tmp/chrona-web");
     expect(env).not.toHaveProperty("CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY");
     expect(env.API_KEY).toBe("from-config");
   });

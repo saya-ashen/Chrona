@@ -7,23 +7,19 @@ const ROOT = resolve(import.meta.dirname, "..");
 type Command = { description: string; steps: string[][] };
 const command = (description: string, ...steps: string[][]): Command => ({ description, steps });
 const binary = (target?: string) => command("Build steward binary", ["scripts/build-binaries.ts", ...(target ? ["--target", target] : [])]);
-const types = [["x", "tsc", "--noEmit", "--pretty", "false"], ["x", "tsc", "--project", "e2e/tsconfig.json", "--noEmit", "--pretty", "false"]];
-const boundaries = ["x", "dependency-cruiser", "apps", "features/steward", "packages/contracts", "packages/db", "packages/domain", "packages/engine", "packages/integrations", "packages/cli", "packages/i18n", "packages/shared", "packages/logging", "shared/ui"];
+const types = [["x", "tsc", "--noEmit", "--pretty", "false"]];
+const boundaries = ["x", "dependency-cruiser", "apps", "packages/contracts", "packages/db", "packages/domain", "packages/engine", "packages/integrations", "packages/cli", "packages/i18n", "packages/shared", "packages/logging"];
 export const TEST_COMMANDS: Record<string, Command> = {
-  unit: command("Unit tests", ["x", "vitest", "run"]),
   bun: command("Bun tests", ["scripts/run-bun-tests.ts"]),
   api: command("API tests", ["scripts/run-api-tests.ts"]),
-  e2e: command("Steward browser loop", ["x", "playwright", "test", "--config", "playwright.steward.config.ts"]),
 };
 TEST_COMMANDS.all = command("Steward test suites", ...Object.values(TEST_COMMANDS).flatMap(c => c.steps));
 export const COMMANDS: Record<string, Partial<Record<string, Command>>> = {
   dev: {
-    all: command("API and web", ["scripts/dev.ts"]),
-    web: command("Web dev", ["run", "--cwd", "apps/web", "dev"]),
-    server: command("API dev", ["apps/server/src/index.bun.ts"]),
+    all: command("Server (the web page is the built-in web module)", ["--watch", "apps/server/src/index.bun.ts"]),
   },
   build: {
-    all: binary(), web: command("Build web", ["run", "--cwd", "apps/web", "build"]),
+    all: binary(),
     smoke: command("Release smoke", ["build/release-smoke.ts"]),
     ...Object.fromEntries(Object.keys(buildTargets).map(t => [t, binary(t)])),
   },

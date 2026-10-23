@@ -118,7 +118,6 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
   const migrationsDir = join(resourceDir, "prisma", "migrations");
   ensureEnv(resourceDir);
 
-  process.env.CHRONA_WEB_DIST ??= join(resourceDir, "apps/web/dist");
   process.env.CHRONA_MIGRATIONS_DIR ??= migrationsDir;
   process.env.DATABASE_URL ??= `file:${join(getChronaDataDir(), "chrona.db")}`;
 

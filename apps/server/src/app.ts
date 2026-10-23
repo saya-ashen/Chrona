@@ -2,15 +2,9 @@ import { Hono } from "hono";
 import { createStewardRuntime, type StewardRuntime } from "./steward-runtime";
 import { bodyLimit } from "hono/body-limit";
 
-import { getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
+import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
-import {
-  createSpaAssetMiddleware,
-  createSpaIndexMiddleware,
-  hasSpaDist,
-  isSpaAssetPath,
-} from "./static/spa";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
 import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
@@ -34,8 +28,19 @@ function resolveOrigin(origin: string | undefined, allowed: string[]) {
   return allowed.includes(origin) ? origin : null;
 }
 
-function wantsHtml(acceptHeader: string | undefined) {
-  return typeof acceptHeader === "string" && acceptHeader.includes("text/html");
+/** Forwards a request to a module's HTTP socket without the user's credentials (v2-4 `listen`). */
+async function proxy(socket: string, request: Request) {
+  const url = new URL(request.url), headers = new Headers(request.headers);
+  headers.delete("authorization");
+  headers.delete("cookie");
+  try {
+    const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: request.method, headers, body: request.body, redirect: "manual" });
+    const out = new Headers(response.headers);
+    out.delete("set-cookie");
+    return new Response(response.body, { status: response.status, headers: out });
+  } catch {
+    return Response.json({ code: "MODULE_UNAVAILABLE" }, { status: 503 });
+  }
 }
 
 function mountHealthRoutes(app: Hono, steward: StewardRuntime) {
@@ -63,7 +68,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   const app = new Hono();
   const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
   const api = createApiRouter({ steward });
-  const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 
   app.use("/api/*", async (c, next) => {
@@ -104,68 +108,16 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   // Paths no kernel route claimed go to the module declaring `listen` for them (v2-4).
   app.all("/api/:name/*", async (c) => {
     const socket = await steward.listener(`/api/${c.req.param("name")}`);
-    if (!socket) return c.json({ code: "NOT_FOUND" }, 404);
-    const url = new URL(c.req.url), headers = new Headers(c.req.raw.headers);
-    headers.delete("authorization");
-    headers.delete("cookie");
-    try {
-      const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: c.req.method, headers, body: c.req.raw.body, redirect: "manual" });
-      const out = new Headers(response.headers);
-      out.delete("set-cookie");
-      return new Response(response.body, { status: response.status, headers: out });
-    } catch {
-      return c.json({ code: "MODULE_UNAVAILABLE" }, 503);
-    }
+    return socket ? proxy(socket, c.req.raw) : c.json({ code: "NOT_FOUND" }, 404);
   });
-  if (spaAvailable) {
-    const serveSpaAsset = createSpaAssetMiddleware();
-    const serveSpaIndex = createSpaIndexMiddleware();
-
-    app.get("/", (c) => {
-      const preferredLocale = getPreferredLocale(
-        c.req.header("accept-language"),
-      );
-      return c.redirect(`/${preferredLocale}`, 302);
-    });
-
-    app.get("/*", async (c, next) => {
-      const pathname = new URL(c.req.url).pathname;
-
-      if (pathname.startsWith("/api/")) {
-        return next();
-      }
-
-      if (pathname === "/") {
-        return next();
-      }
-
-      // Real static assets emitted by the Vite build.
-      // For example: /assets/index-xxx.js, /assets/index-xxx.css, /favicon.ico.
-      if (isSpaAssetPath(pathname)) {
-        return serveSpaAsset(c, next);
-      }
-
-      const firstSegment = pathname.split("/").filter(Boolean)[0];
-
-      if (!firstSegment || !hasLocale(firstSegment)) {
-        // Links Chrona sends out (QQ, notifications) carry no locale: keep the query (e.g. ?path=) and the reader's language.
-        const locale = getPreferredLocale(c.req.header("accept-language"));
-        const query = new URL(c.req.url).search;
-        return c.redirect(`/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}${query}`, 302);
-      }
-
-      // For example: /en, /en/settings, /zh/projects/123.
-      // React Router owns these paths, so return index.html.
-      return serveSpaIndex(c, next);
-    });
-  }
+  // Everything else is the web page, served by the module declaring `listen: "/"`; pages carry no user data.
+  app.on(["GET", "HEAD"], "/*", async (c, next) => {
+    if (c.req.path.startsWith("/api/")) return next();
+    const socket = await steward.listener("/");
+    return socket ? proxy(socket, c.req.raw) : next();
+  });
 
   app.notFound((c) => {
-    if (spaAvailable && wantsHtml(c.req.header("accept"))) {
-      const locale = getPreferredLocale(c.req.header("accept-language"));
-      return c.redirect(`/${locale}`, 302);
-    }
-
     const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
     return c.json({ error: messages.notFound }, 404);
   });

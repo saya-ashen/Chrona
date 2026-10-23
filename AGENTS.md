@@ -13,7 +13,7 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
   [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`) and v2-4a–d (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp` and `qq`) and v2-6 (module dependencies); v2-4e and v2-5 are drafts.
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`) and v2-6 (module dependencies); v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
@@ -67,16 +67,16 @@ live databases, real accounts or external sends, disabling auth, approvals or se
 | `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, module sandbox and SDK |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
-| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, runtime (tick, Provider queues, QQ bot) |
-| `apps/web`, `features/steward` | SPA shell and pages (Today, Chat with sessions, Apps and app pages, Settings) |
+| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, the `listen` proxy, owner API, rescue console, runtime (tick, Provider queues) |
+| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `mcp`, `qq`, `web` (the web page: plain HTML + JS, no build) |
 | `packages/cli` | `chrona start / backup / restore / migrate-affairs / doctor / qq bind-code` |
 
-Dependency direction: `apps → features → packages/engine → packages/domain → packages/contracts`;
+Dependency direction: `apps → packages/engine → packages/domain → packages/contracts`;
 routes validate and delegate; domain has no I/O.
 
 ## Tech stack
 
-- Frontend: Vite + React 19 + React Router 7 (SPA in `apps/web`), shadcn/ui primitives in `apps/web/src/components/ui`, Tailwind.
+- Web page: the built-in `web` module (`builtin/web`: `index.html`, `app.js`, `style.css`), plain DOM against `/api/steward`; no frontend build or dependencies.
 - Backend: Hono on Bun (`apps/server`).
 - Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
 - Provider: Pi RPC with Chrona's tool extension; optional explicit web extension.
@@ -96,35 +96,14 @@ routes validate and delegate; domain has no I/O.
 
 - Heavy commands use a lot of memory: run them one at a time, memory-capped, e.g.
   `systemd-run --user --scope --quiet -p MemoryMax=8G -p MemorySwapMax=1G env NODE_OPTIONS=--max-old-space-size=6144 bunx tsc --noEmit`.
-- Targeted first: `bun test <paths>` for packages/server, `bunx vitest run features/steward apps/web` for the web.
-- Full: `bun run typecheck`, `bun run lint`, `bun run test`; `bun run test:e2e:steward` when pages or flows change.
+- Targeted first: `bun test <paths>`. Full: `bun run typecheck`, `bun run lint`, `bun run test:bun`, `bun run test:api` (all server tests); check page changes in a real browser.
 - State derivation changes need table-driven tests. UI tests assert user-visible text, roles and
   next actions (not CSS) and cover empty, loading, error, waiting and done states.
 - Never call a real model or QQ in automated tests.
 
-## Frontend UI foundation
+## Web page principles
 
-- In `apps/web/src/components/ui`, shadcn/ui primitives are the foundation for
-  basic controls. Use or generate standard shadcn primitives before creating any
-  custom button, badge, card, field, input, textarea, select, dialog, dropdown,
-  tabs, tooltip, separator, skeleton, or alert component.
-- Do NOT recreate generic primitives with custom helpers such as local
-  `buttonVariants`, generic status badge variants, generic surface cards, or
-  reusable field class constants when shadcn covers the role.
-- Chrona wrappers are allowed only when they add product/domain meaning or
-  repeated product-specific composition. Wrappers must compose shadcn primitives
-  and must not keep legacy compatibility aliases.
-- Before accepting UI foundation changes, inspect removed imports, consumer `buttonVariants`,
-  reusable field class helpers, generic status badges and generic surface cards; replace consumers
-  with official shadcn primitives first. There is currently no UI-foundation check script. Wrapper decision order: use generated
-  shadcn primitive, compose it in the feature component, then create a
-  product-named wrapper only when the wrapper carries Chrona domain meaning.
-
-
-## Frontend development principles
-
-- No business logic in React components: view models in `features/steward/model`, data in hooks.
-- User-facing strings live in `packages/i18n/src/messages/{zh,en}.json` (`steward` namespace).
+- The web page is Chinese-first plain DOM; keep it small and data-free (everything comes from `/api/steward` with the user's key).
 - Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
 - What needs the user's decision, and the primary action, must be visually obvious.
 - Copy speaks the user's language (apps, files, conversations, notifications), not internal names (runs, grants, tokens).

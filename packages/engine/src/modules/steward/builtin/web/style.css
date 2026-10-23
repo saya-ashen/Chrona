@@ -1,0 +1,30 @@
+:root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fafafa; --muted: #6b6b70; --line: #ddd; --accent: #2563eb; --card: #fff; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #161618; --muted: #9a9aa0; --line: #333; --accent: #6ea0ff; --card: #1f1f22; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.55 system-ui, "Noto Sans SC", sans-serif; color: var(--fg); background: var(--bg); }
+header { display: flex; gap: 1rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; }
+header nav { display: flex; gap: .8rem; flex: 1; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+main { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1rem; margin-bottom: 1rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+ul.plain { list-style: none; padding: 0; margin: 0; }
+ul.plain li { padding: .35rem 0; border-top: 1px solid var(--line); }
+ul.plain li:first-child { border-top: 0; }
+.muted { color: var(--muted); font-size: .9em; }
+.error { color: #d33; }
+button { font: inherit; padding: .3rem .8rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+textarea, input { font: inherit; width: 100%; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+textarea.editor { min-height: 60vh; font-family: ui-monospace, monospace; font-size: 13px; }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); padding: .5rem; border-radius: 6px; max-height: 20rem; overflow: auto; }
+.chat { display: grid; grid-template-columns: 14rem 1fr; gap: 1rem; }
+@media (max-width: 700px) { .chat { grid-template-columns: 1fr; } }
+.messages { display: flex; flex-direction: column; gap: .5rem; max-height: 65vh; overflow: auto; margin-bottom: .6rem; }
+.bubble { padding: .45rem .7rem; border-radius: 8px; max-width: 85%; white-space: pre-wrap; word-break: break-word; }
+.bubble.in { align-self: flex-end; background: var(--accent); color: #fff; }
+.bubble.out { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.markdown li.task { list-style: none; margin-left: -1.2rem; }
+.selected { font-weight: 600; }

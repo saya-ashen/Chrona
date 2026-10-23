@@ -30,7 +30,8 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   const base = { name: "web-x", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], keepAlive: true };
   expect(moduleManifestSchema.safeParse({ ...base, listen: "/api/echo" }).success).toBe(true);
   expect(moduleManifestSchema.safeParse({ ...base, keepAlive: false, listen: "/api/echo" }).success).toBe(false);
-  for (const listen of ["/api/steward", "/api/steward-agent", "/api/workspaces", "/api/health", "/api/a/b", "/"]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
+  expect(moduleManifestSchema.safeParse({ ...base, listen: "/" }).success).toBe(true);
+  for (const listen of ["/api/steward", "/api/steward-agent", "/api/workspaces", "/api/health", "/api/a/b", "/x"]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
 });
 
 (sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which calls the owner API", async () => {
@@ -66,8 +67,15 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();
   // Every built-in, including qq (unconfigured here), builds, passes its author tests and activates.
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)])).toEqual(["files", "mcp", "qq", "remind"].map(name => [name, "active", true]));
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)])).toEqual(["files", "mcp", "qq", "remind", "web"].map(name => [name, "active", true]));
   const app = await createServerApp({ steward });
+  // The web module serves the page at / (no key needed), while the API it calls stays protected.
+  const page = await app.request("/apps/a1?path=README.md");
+  expect(page.status).toBe(200);
+  expect(await page.text()).toContain('<script src="/app.js" type="module">');
+  expect((await app.request("/app.js")).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+  expect((await app.request("/api/steward/today?workspaceId=x")).status).toBe(401);
+  expect((await app.request("/", { method: "POST" })).status).toBe(404);
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
     const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });

@@ -68,12 +68,7 @@ async function smokeEntrypoint(
 			DATABASE_URL: `file:${join(tempDir, `${entrypoint.name}.db`)}`,
 			HOME: tempDir,
 			HOST: "127.0.0.1",
-			PORT:
-				entrypoint.name === "dev:web"
-					? "34103"
-					: entrypoint.name === "start"
-						? "34102"
-						: "34101",
+			PORT: entrypoint.name === "start" ? "34102" : "34101",
 		},
 		stdout: "pipe",
 		stderr: "pipe",
@@ -121,23 +116,6 @@ try {
 			name: "start",
 			command: ["bun", "run", "start"],
 			url: "http://127.0.0.1:34102/health",
-		},
-		tempDir,
-	);
-	await smokeEntrypoint(
-		{
-			name: "dev:web",
-			command: [
-				"bun",
-				"run",
-				"dev:web",
-				"--",
-				"--host",
-				"127.0.0.1",
-				"--port",
-				"34103",
-			],
-			url: "http://127.0.0.1:34103/",
 		},
 		tempDir,
 	);

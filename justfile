@@ -9,7 +9,7 @@ help:
 
 # ── Grouped Commands ──────────────────────────────────────────
 
-# Show or run dev commands: just dev [all|web|server]
+# Run the server in watch mode (the web page is the built-in web module): just dev
 dev target="":
     @if [ -z "{{target}}" ]; then bun run chrona dev; else bun run chrona dev {{target}}; fi
 
@@ -17,7 +17,7 @@ dev target="":
 server target="":
     @if [ -z "{{target}}" ]; then bun run chrona server; else bun run chrona server {{target}}; fi
 
-# Show or run build commands: just build [web|linux-x64|linux-arm64|darwin-x64|darwin-arm64|windows-x64]
+# Show or run build commands: just build [linux-x64|linux-arm64|darwin-x64|darwin-arm64|windows-x64]
 build target="":
     @if [ -z "{{target}}" ]; then bun run chrona build; else bun run chrona build {{target}}; fi
 
@@ -25,7 +25,7 @@ build target="":
 check target="" *args:
     @if [ -z "{{target}}" ]; then bun run chrona check; else bun run chrona check {{target}} -- {{args}}; fi
 
-# Show or run test commands: just test [all|unit|web|watch|api|bun|e2e|desktop|tablet|mobile|llm:record|llm:replay]
+# Show or run test commands: just test [all|api|bun]
 test target="" *args:
     @if [ -z "{{target}}" ]; then bun run chrona test; else bun run chrona test {{target}} -- {{args}}; fi
 
@@ -55,17 +55,9 @@ plugin target="":
 typecheck:
     bun run chrona check type
 
-# Vitest unit tests
-unit *args:
-    bun run chrona test unit -- {{args}}
-
 # ESLint across the monorepo
 lint:
     bun run chrona check lint
-
-# UI foundation rules
-ui:
-    bun run chrona check ui
 
 # Dependency-cruiser boundary check
 boundaries:
@@ -83,10 +75,6 @@ map *args:
 bun-test:
     bun run chrona test bun
 
-# Run Playwright E2E tests
-e2e *args:
-    bun run chrona test e2e -- {{args}}
-
 # Full DB setup: generate client + seed
 db-setup:
     bun run setup
@@ -95,30 +83,10 @@ db-setup:
 binary-build:
     bun run chrona build
 
-# ── Demo Artifacts ────────────────────────────────────────────
-
-# Remove old demo artifacts and GIFs
-clean-videos:
-    rm -rf artifacts/demo/playwright/
-    rm -f docs/assets/demo-plan.gif docs/assets/demo-assistant.gif
-
-# Run Playwright recordings
-_playwright:
-    bunx playwright test --config=playwright.record.config.ts
-
-# Convert recorded videos to GIFs
-_convert-gifs:
-    @sh scripts/demo/convert-record-gifs.sh
-
-# Run demos in debug mode
-demo-debug: clean-videos
-    bunx playwright test --config=playwright.record.config.ts --debug
-
 # ── Cleanup ──────────────────────────────────────────────────
 
 # Clean generated artifacts
 clean:
-    rm -rf artifacts/demo/playwright/
     rm -rf dist/
     rm -rf coverage/
     rm -rf .tsbuildinfo

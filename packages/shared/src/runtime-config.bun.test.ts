@@ -47,7 +47,6 @@ describe("runtime config", () => {
     expect(env.CHRONA_UNSAFE_PUBLIC_BIND).toBe("1");
     expect(env.DATABASE_URL).toBe("file:/tmp/chrona.db");
     expect(env.CHRONA_MIGRATIONS_DIR).toBe("/opt/chrona/migrations");
-    expect(env.CHRONA_WEB_DIST).toBe("/opt/chrona/web");
     expect(env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY).toBe("1");
     expect(env.API_KEY).toBe("secret");
   });

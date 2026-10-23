@@ -25,7 +25,6 @@ describe("startChronaServer", () => {
     process.env.CHRONA_CONFIG_DIR = join(directory, "config");
     process.env.CHRONA_RESOURCE_DIR = resourceDir;
     process.env.CHRONA_NO_OPEN = "1";
-    delete process.env.CHRONA_WEB_DIST;
     delete process.env.CHRONA_MIGRATIONS_DIR;
     delete process.env.DATABASE_URL;
     delete process.env.HOST;
@@ -39,7 +38,6 @@ describe("startChronaServer", () => {
         expect(process.env.PORT).toBe("4310");
         expect(process.env.DATABASE_URL).toBe(`file:${join(getChronaDataDir(), "chrona.db")}`);
         expect(process.env.CHRONA_MIGRATIONS_DIR).toBe(join(resourceDir, "prisma", "migrations"));
-        expect(process.env.CHRONA_WEB_DIST).toBe(join(resourceDir, "apps/web/dist"));
       }, { host: "0.0.0.0", port: "4310", open: false });
 
       expect(booted).toBe(true);

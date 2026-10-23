@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
-import { approvalSchema, moduleManifestSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
+import { approvalSchema, moduleManifestSchema, resolveApprovalSchema, isEntryModule } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
 import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -31,7 +31,7 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
         if (!version) throw new StewardError("not_found", "Module version not found");
         const module = await tx.module.findUniqueOrThrow({ where: { id: input.moduleId } });
         const active = module.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-        rescueOnly = moduleManifestSchema.parse(version.manifest).effects.includes("owner") || Boolean(active && moduleManifestSchema.parse(active.manifest).effects.includes("owner"));
+        rescueOnly = isEntryModule(moduleManifestSchema.parse(version.manifest)) || Boolean(active && isEntryModule(moduleManifestSchema.parse(active.manifest)));
       }
       const row = await tx.approval.create({ data: { ...input, rescueOnly, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
