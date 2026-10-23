@@ -13,7 +13,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   const dir = await mkdtemp("/tmp/cb-sdk-"), db = testDb();
   try {
     const code = join(dir, "code"); await mkdir(code);
-    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user"], data: { schema: 2, migrate: "migrate.ts" },
+    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "model"], model: { maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }, { id: "mail", inbound: { connector: "box", match: {} } }],
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
@@ -22,7 +22,9 @@ import { on, chrona } from '/chrona/sdk.ts';
 import { existsSync, readFileSync } from 'node:fs';
 on('schedule', async ev => {
   if (existsSync('/data/state') && readFileSync('/data/state', 'utf8') !== 'migrated') throw new Error('migration missing');
-  const params = { key: 'daily:' + ev.firedAt, level: 'now', title: 'Build', body: 'Only recorded' };
+  const completion = await chrona.model({ prompt: 'Never send this to a real model', maxOutputTokens: 20 });
+  if (!['Chrona test model response', 'Stub summary'].includes(completion.text)) throw new Error('unexpected model response');
+  const params = { key: 'daily:' + ev.firedAt, level: 'now', title: 'Build', body: completion.text };
   await chrona.notify(params);
   if ((await chrona.notify(params)).status !== 'duplicate') throw new Error('dedup missing');
   try { await chrona.wakeProvider({ key: 'no', prompt: 'No execution' }); throw new Error('accepted undeclared'); }
@@ -37,14 +39,22 @@ import { startModule } from '/chrona/testing.ts';
 import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
 for (const path of ['/chrona/sdk.ts', '/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
-const module = await startModule('/module/index.ts');
+const module = await startModule('/module/index.ts', { stubs: { model: () => ({ text: 'Stub summary', inputTokens: 1, outputTokens: 2 }) } });
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await module.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(module.calls.length, 3);
-  assert.equal(module.calls[2].method, 'wakeProvider');
+  assert.equal(module.calls.length, 4);
+  assert.equal(module.calls[1].params.body, 'Stub summary');
+  assert.equal(module.calls[3].method, 'wakeProvider');
 } finally { await module.stop(); }
+const defaultModule = await startModule('/module/index.ts');
+try {
+  const now = '2026-10-21T04:00:00.000Z';
+  const reply = await defaultModule.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
+  assert.equal(reply.error, undefined);
+  assert.equal(defaultModule.calls[1].params.body, 'Chrona test model response');
+} finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });
     const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], sandbox: { available: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);

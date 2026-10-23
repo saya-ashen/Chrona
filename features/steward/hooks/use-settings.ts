@@ -3,7 +3,7 @@ import type { Action, GrantMode, Settings } from "@chrona/contracts";
 import { useStewardSession } from "./use-steward-session";
 import { useStewardResource } from "./use-steward";
 import { useStewardMutation } from "./use-steward-mutation";
-import { activeGrants, parseNotificationForm, policyRows } from "../model/settings";
+import { activeGrants, parseModuleModelForm, parseNotificationForm, policyRows, type ModuleModelForm } from "../model/settings";
 import type { StewardClient } from "../model/client";
 export function useSettings() {
   const session = useStewardSession(), client = session.today.client;
@@ -27,6 +27,23 @@ export function useSettings() {
     if (preference.trim() && (await mutation.run(() => client.createPreference({ text: preference.trim() }))).ok) setPreference("");
   }
   return { ...resource, client, mutation, refresh, grants, rows: policyRows(grants, Date.now()), changeMode, preference, setPreference, addPreference };
+}
+export function useModuleModelForm(settings: Settings, client: StewardClient, refresh: () => void) {
+  const model = settings.moduleModel;
+  const [form, setForm] = useState<ModuleModelForm>({ model: model?.model ?? "", maxCallsPerEvent: String(model?.maxCallsPerEvent ?? 1), maxOutputTokens: String(model?.maxOutputTokens ?? 2000), dailyCalls: String(model?.dailyCalls ?? 100), timeoutMs: String(model?.timeoutMs ?? 60000) });
+  const [invalid, setInvalid] = useState(false), [saved, setSaved] = useState(false);
+  const mutation = useStewardMutation(refresh);
+  function change(key: keyof ModuleModelForm, value: string) { setForm(previous => ({ ...previous, [key]: value })); setSaved(false); }
+  async function save(clear = false) {
+    const moduleModel = clear ? null : parseModuleModelForm(form);
+    setInvalid(!clear && !moduleModel); setSaved(false);
+    if (clear || moduleModel) {
+      const result = await mutation.run(() => client.updateSettings({ moduleModel }));
+      setSaved(result.ok);
+      if (result.ok && clear) setForm(previous => ({ ...previous, model: "" }));
+    }
+  }
+  return { form, change, invalid, saved, save, ...mutation };
 }
 export function useNotificationForm(settings: Settings, client: StewardClient, refresh: () => void) {
   const n = settings.notifications;

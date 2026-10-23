@@ -4,7 +4,8 @@ import { moduleEventMessageSchema, moduleEventReplySchema, moduleCallSchema, mod
 
 type EventReply = ReturnType<typeof moduleEventReplySchema.parse>;
 type CallReply = ReturnType<typeof moduleCallReplySchema.parse>;
-const maxLine = 64 * 1024;
+// Model prompts allow 200k characters; account for UTF-8 and JSON escaping.
+const maxLine = 2 * 1024 * 1024;
 
 export async function createModuleChannel(socketPath: string, { onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
   let socket: Socket | undefined, accepted = false, closed = false;

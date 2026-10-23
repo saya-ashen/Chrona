@@ -11,7 +11,7 @@ import { emptyToday, chatFixture, appFixture, fileFixture } from "@features/stew
 vi.mock("../loaders", () => ({ loadAppBootData: async ({ params }: { params: { lang: string } }) => ({ locale: params.lang, dictionary: params.lang === "zh" ? zh : en, defaultWorkspace: { id: "ws-1", name: "Chrona" } }) }));
 vi.mock("@/components/access-key-gate", () => ({ AccessKeyGate: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
-const settings = { chat: { channel: "chrona_qqbot", bound: true, sentToday: 2 }, notifications: { dailyCap: 5, quietHours: null, timezone: "Asia/Shanghai", digestAt: "09:00" } };
+const settings = { moduleModel: null, chat: { channel: "chrona_qqbot", bound: true, sentToday: 2 }, notifications: { dailyCap: 5, quietHours: null, timezone: "Asia/Shanghai", digestAt: "09:00" } };
 let router: ReturnType<typeof createAppRouter>;
 function show(path: string) {
   window.history.replaceState(null, "", path);

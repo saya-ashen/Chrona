@@ -1,16 +1,18 @@
 import type { Prisma } from "@chrona/db";
-import { MODULE_METHODS, type ModuleCall, type ModuleManifest, type moduleCallReplySchema } from "@chrona/contracts/steward";
+import { MODULE_METHODS, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { enqueueNotification } from "./notify";
 import { createRuns, createRunSession } from "./runs";
+import { handleModuleModel, type CallScope } from "./module-model";
+export type { CallScope } from "./module-model";
 
 type Context = Parameters<typeof enqueueNotification>[2];
 export type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date };
-export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string };
 type Reply = ReturnType<typeof moduleCallReplySchema.parse>;
 
 /** Calls are serialized by the supervisor, including calls made outside an event. */
 export async function handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<Reply> {
+  if (call.method === "model") return handleModuleModel(ports, scope, call);
   const context = { now: ports.now(), chatBound: ports.chat ? await ports.chat.bound() : false, publicUrl: ports.publicUrl };
   const key = scope.eventKey ? `${scope.eventKey}:${call.params.key}` : call.params.key;
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: call.method, key, createdAt: context.now };

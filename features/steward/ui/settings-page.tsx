@@ -2,13 +2,13 @@ import type { ReactNode } from "react";
 import { useI18n } from "@chrona/i18n";
 import { GRANT_MODES, type GrantMode, type Settings } from "@chrona/contracts";
 import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui";
-import { useNotificationForm, useSettings } from "../hooks/use-settings";
+import { useModuleModelForm, useNotificationForm, useSettings } from "../hooks/use-settings";
 import type { StewardClient } from "../model/client";
 import { ConnectorsSection } from "./settings-connectors";
 import { MutationStatus, ResourceStatus } from "./resource-status";
 import { PageColumn, Surface, InlineForm } from "./layout";
 
-const sections = ["chat", "notifications", "permissions", "preferences", "connections", "provider", "health"] as const;
+const sections = ["chat", "notifications", "permissions", "preferences", "connections", "provider", "moduleModel", "health"] as const;
 type SettingsState = ReturnType<typeof useSettings>;
 type LoadedSettings = NonNullable<SettingsState["data"]>;
 type SectionProps = { s: SettingsState; d: LoadedSettings };
@@ -47,6 +47,36 @@ function NotificationForm({ settings, client, refresh }: { settings: Settings; c
     <MutationStatus mutation={f} />
     {f.saved && <p role="status">{c.saved}</p>}
   </form>;
+}
+
+function ModuleModelSection({ s, d }: SectionProps) {
+  const { messages } = useI18n(), c = messages.steward.settings;
+  const f = useModuleModelForm(d.settings, s.client, s.refresh);
+  const fields = [
+    { key: "model", label: c.modelId, type: "text", maxLength: 200 },
+    { key: "maxCallsPerEvent", label: c.modelEventCalls, type: "number", min: 1, max: 20 },
+    { key: "maxOutputTokens", label: c.modelOutputTokens, type: "number", min: 1, max: 32000 },
+    { key: "dailyCalls", label: c.modelDailyCalls, type: "number", min: 1, max: 10000 },
+    { key: "timeoutMs", label: c.modelTimeout, type: "number", min: 5000, max: 600000 },
+  ] as const;
+  return <SettingsSection name="moduleModel">
+    <p className="text-xs text-muted-foreground">{c.modelHint}</p>
+    <form className="grid gap-3" onSubmit={e => { e.preventDefault(); void f.save(); }}>
+      <fieldset disabled={f.pending} className="grid min-w-0 gap-3">
+        {fields.map(({ key, label, ...props }) => <div key={key} className="grid min-w-0 gap-1 min-[521px]:grid-cols-[160px_minmax(0,1fr)]">
+          <label className="self-center" htmlFor={`module-model-${key}`}>{label}</label>
+          <Input {...props} id={`module-model-${key}`} className="min-w-0" required value={f.form[key]} onChange={e => f.change(key, e.target.value)} />
+        </div>)}
+        {f.invalid && <p role="alert">{c.modelInvalid}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline">{c.modelSave}</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void f.save(true)}>{c.modelClear}</Button>
+        </div>
+      </fieldset>
+      <MutationStatus mutation={f} />
+      {f.saved && <p role="status">{c.saved}</p>}
+    </form>
+  </SettingsSection>;
 }
 
 function NotificationsSection({ s, d }: SectionProps) {
@@ -151,6 +181,7 @@ export function SettingsPage() {
             <p>{d.health.provider.sandboxed ? c.bashEnabled : c.bashDisabled}</p>
             {d.health.provider.lastError && <p role="status">{d.health.provider.lastError}</p>}
           </SettingsSection>
+          <ModuleModelSection s={s} d={d} />
           <HealthSection d={d} />
         </>}
       </div>

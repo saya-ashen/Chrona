@@ -9,7 +9,11 @@ type EventResult = { handled?: boolean; result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<Trigger["kind"], Handler>();
-const pending = new Map<string, { resolve(result: CallResult): void; reject(error: Error): void }>();
+export type ModelResult = { text: string; inputTokens: number | null; outputTokens: number | null };
+export class ModelError extends Error {
+  constructor(public readonly code: string, message: string) { super(message); this.name = "ModelError"; }
+}
+const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
 const socket = createConnection(process.env.CHRONA_SOCKET ?? "/chrona/chrona.sock");
 let stopped = false, buffer = Buffer.alloc(0), queue = Promise.resolve();
 function fail() {
@@ -32,7 +36,7 @@ socket.on("data", (chunk: Buffer) => {
   buffer = Buffer.concat([buffer, chunk]);
   let end: number;
   while ((end = buffer.indexOf(10)) !== -1) {
-    if (end > 64 * 1024) { socket.destroy(); return; }
+    if (end > 2 * 1024 * 1024) { socket.destroy(); return; }
     const text = buffer.subarray(0, end).toString("utf8");
     buffer = buffer.subarray(end + 1);
     try {
@@ -42,25 +46,26 @@ socket.on("data", (chunk: Buffer) => {
         const call = pending.get(message.id);
         if (!call) continue;
         pending.delete(message.id);
-        if (message.error) call.reject(new Error(message.error.message ?? message.error.code));
+        if (message.error) call.reject(new ModelError(message.error.code, message.error.message ?? message.error.code));
         else call.resolve(message.result);
       }
     } catch { socket.destroy(); return; }
   }
-  if (buffer.length > 64 * 1024) socket.destroy();
+  if (buffer.length > 2 * 1024 * 1024) socket.destroy();
 });
 export function on<K extends Trigger["kind"]>(kind: K, handler: (event: Extract<Trigger, { kind: K }> & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>) {
   handlers.set(kind, handler as Handler);
 }
-function call(method: string, params: unknown): Promise<CallResult> {
+function call<T = CallResult>(method: string, params: unknown): Promise<T> {
   if (stopped) return Promise.reject(new Error("Chrona disconnected"));
   const id = randomUUID();
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
+    pending.set(id, { resolve: result => resolve(result as T), reject });
     try { send({ id, method, params }); } catch (error) { pending.delete(id); reject(error); }
   });
 }
 export const chrona = {
+  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => call<ModelResult>("model", params),
   notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => call("notify", params),
   wakeProvider: (params: { key: string; prompt: string }) => call("wakeProvider", params),
 };

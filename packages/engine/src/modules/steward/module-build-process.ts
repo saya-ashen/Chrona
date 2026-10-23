@@ -16,6 +16,7 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     channel = await createModuleChannel(join(dir, "s"), { onCall: async call => {
       calls.push(call);
       if (!manifest.effects.includes(MODULE_METHODS[call.method])) return { id: call.id, error: { code: "undeclared", message: "Undeclared capability" } };
+      if (call.method === "model") return { id: call.id, result: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       const key = `${call.method}:${call.params.key}`, duplicate = seen.has(key);
       seen.add(key);
       return { id: call.id, result: { status: duplicate ? "duplicate" : "executed" } };

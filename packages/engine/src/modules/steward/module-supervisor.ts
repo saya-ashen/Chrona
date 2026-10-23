@@ -2,6 +2,7 @@ import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
+import { moduleModelSettings } from "./settings";
 import { registerBuiltins } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
 import { handleModuleCall, pauseFailedModule, type CallScope } from "./module-effects";
@@ -160,7 +161,9 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
           if (!module.builtin || !instance.manifest.dynamicSchedules || !await ports.db.schedule.findFirst({ where: { id: event.trigger.kind === "schedule" ? event.trigger.scheduleId : undefined, moduleId, mode: "module" } })) throw new Error("Dynamic schedule requires a built-in module declaring dynamicSchedules");
         } else if (event.trigger.kind === "content_edit" ? !instance.manifest.content : event.trigger.kind === "tool" ? !instance.manifest.tools.some(tool => tool.name === event.trigger.id) : !instance.manifest.triggers.some(trigger => trigger.id === event.trigger.id)) throw new Error("Module trigger missing");
         await (instance.start ??= start(instance));
-        const reply = await instance.channel!.send({ ...event, params: Object.fromEntries(Object.entries(instance.manifest.params).map(([key, param]) => [key, param.value])) }, RUN_LIMITS.jobTimeoutMs);
+        const workspace = instance.manifest.model ? await ports.db.workspace.findUniqueOrThrow({ where: { id: module.workspaceId } }) : null;
+        const timeoutMs = workspace ? moduleModelSettings(workspace.settings)?.timeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs;
+        const reply = await instance.channel!.send({ ...event, params: Object.fromEntries(Object.entries(instance.manifest.params).map(([key, param]) => [key, param.value])) }, timeoutMs);
         await instance.calls;
         if ("error" in reply) throw new Error(reply.error);
         await ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 0, output: reply.result } });

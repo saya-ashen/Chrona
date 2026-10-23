@@ -1,6 +1,12 @@
 import { expect, it } from "vitest";
 import { ACTIONS, DEFAULT_POLICY, type Grant } from "@chrona/contracts";
-import { policyRows, parseNotificationForm } from "./settings";
+import { policyRows, parseModuleModelForm, parseNotificationForm } from "./settings";
+const modelForm = { model: "fake/exact", maxCallsPerEvent: "2", maxOutputTokens: "2000", dailyCalls: "100", timeoutMs: "60000" };
+it("parses the exact module model and limits", () => expect(parseModuleModelForm(modelForm)).toEqual({ model: "fake/exact", maxCallsPerEvent: 2, maxOutputTokens: 2000, dailyCalls: 100, timeoutMs: 60000 }));
+it.each([
+  { model: " " }, { maxCallsPerEvent: "0" }, { maxCallsPerEvent: "21" }, { maxCallsPerEvent: "1.5" },
+  { maxOutputTokens: "32001" }, { dailyCalls: "10001" }, { dailyCalls: "" }, { timeoutMs: "4999" }, { timeoutMs: "600001" },
+])("rejects invalid module model form %j", patch => expect(parseModuleModelForm({ ...modelForm, ...patch })).toBeNull());
 const now = Date.parse("2026-01-01T00:00:00Z");
 const grant = (patch: Partial<Grant> = {}): Grant => ({ id: "g", action: "connect_source", mode: "auto", scope: { kind: "global" }, once: false, consumedAt: null, revokedAt: null, expiresAt: null, createdAt: "2025-01-01T00:00:00Z", ...patch });
 it.each(ACTIONS)("default and editability: %s", action => {

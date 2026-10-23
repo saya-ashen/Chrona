@@ -9,7 +9,7 @@ import { emptyToday } from "../model/fixtures";
 import { StewardSession } from "../hooks/use-steward-session";
 import { SettingsPage } from "./settings-page";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
-const settings = { notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" }, chat: { channel: "chrona_qqbot", bound: false, sentToday: 2 } };
+const settings = { moduleModel: null, notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" }, chat: { channel: "chrona_qqbot", bound: false, sentToday: 2 } };
 const source = { id: "mail", kind: "email", label: "My mail", status: "active", settings: { folders: ["INBOX"] }, hasCredentials: true, canSend: false, lastSyncAt: null, lastError: null, pendingItems: 3, coverageNote: "INBOX only" };
 let fail = false;
 function show() { render(<MemoryRouter><I18nProvider locale="en" messages={en}><StewardSession workspaceId="ws"><SettingsPage /></StewardSession></I18nProvider></MemoryRouter>); }
@@ -37,6 +37,37 @@ it("saves notifications and supports retry after failure", async () => {
   await waitFor(() => expect(screen.getAllByRole("alert").some(alert => alert.textContent?.includes("Could not connect"))).toBe(true));
   fail = false; await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("Saved")).toBeVisible();
+});
+it("loads the owner's configured module model without substituting defaults", async () => {
+  const implementation = vi.mocked(apiJson).getMockImplementation()!;
+  vi.mocked(apiJson).mockImplementation(async (url, options) => String(url).split("?")[0]!.endsWith("/settings") ? { ...settings, moduleModel: { model: "fake/owner-choice", maxCallsPerEvent: 3, maxOutputTokens: 800, dailyCalls: 12, timeoutMs: 45000 } } as never : implementation(url, options));
+  show();
+  const region = within(await screen.findByRole("region", { name: "Module model" }));
+  expect(region.getByLabelText("Exact provider/model ID")).toHaveValue("fake/owner-choice");
+  expect(region.getByLabelText("Calls per event")).toHaveValue(3);
+  expect(region.getByLabelText("Maximum output tokens")).toHaveValue(800);
+  expect(region.getByLabelText("Daily model calls")).toHaveValue(12);
+  expect(region.getByLabelText("Event timeout (ms)")).toHaveValue(45000);
+});
+it("sets and clears the exact module model through settings PATCH, with retry on failure", async () => {
+  show();
+  const region = within(await screen.findByRole("region", { name: "Module model" }));
+  expect(region.getByLabelText("Exact provider/model ID")).toHaveValue("");
+  await userEvent.type(region.getByLabelText("Exact provider/model ID"), "fake/exact-model");
+  for (const [label, value] of [["Calls per event", "2"], ["Maximum output tokens", "1500"], ["Daily model calls", "25"], ["Event timeout (ms)", "30000"]]) {
+    const input = region.getByLabelText(label!);
+    await userEvent.clear(input); await userEvent.type(input, value!);
+  }
+  fail = true;
+  await userEvent.click(region.getByRole("button", { name: "Save module model" }));
+  expect(await region.findByRole("alert")).toHaveTextContent("Could not connect");
+  fail = false;
+  await userEvent.click(region.getByRole("button", { name: "Save module model" }));
+  expect(await region.findByText("Saved")).toBeVisible();
+  expect(apiJson).toHaveBeenCalledWith("/api/steward/settings?workspaceId=ws", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ moduleModel: { model: "fake/exact-model", maxCallsPerEvent: 2, maxOutputTokens: 1500, dailyCalls: 25, timeoutMs: 30000 } }) }));
+  await userEvent.click(region.getByRole("button", { name: "Clear module model" }));
+  await waitFor(() => expect(region.getByLabelText("Exact provider/model ID")).toHaveValue(""));
+  expect(apiJson).toHaveBeenCalledWith("/api/steward/settings?workspaceId=ws", expect.objectContaining({ method: "PATCH", body: '{"moduleModel":null}' }));
 });
 it("keeps quiet-hour inputs labelled and optional in the compact notification form", async () => {
   show();

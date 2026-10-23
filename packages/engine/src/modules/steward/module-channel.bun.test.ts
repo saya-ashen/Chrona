@@ -53,7 +53,7 @@ test("channel drops oversize lines and rejects in-flight event", async () => {
     const result = f.channel.send(event, 1000);
     const rejected = result.catch(error => error as Error);
     await f.next();
-    f.socket.write("x".repeat(64 * 1024 + 1));
+    f.socket.write("x".repeat(2 * 1024 * 1024 + 1));
     expect((await rejected as Error).message).toBe("Module disconnected");
     expect(f.channel.diagnostics()).toContain("Module line overflow");
   } finally { await f.close(); }

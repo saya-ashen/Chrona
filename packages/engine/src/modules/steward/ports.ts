@@ -12,6 +12,9 @@ export type StewardPorts = {
   deliveries: DeliveryAdapter[];
   chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
   provider?: ProviderAdapter;
+  modelGateway?: {
+    complete(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
+  };
   moduleBuildResources?: { sdk: string; testing: string };
   moduleBuiltinResources?: string;
   chatTimeoutMs?: number;

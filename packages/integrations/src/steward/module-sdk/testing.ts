@@ -40,7 +40,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
         if (call.params.key !== undefined) seen.add(key);
         if (duplicate) reply = { result: { status: "duplicate" } };
         else if (call.method === "notify" || call.method === "wakeProvider") reply = { result: { status: "executed" } };
-        else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : "Chrona test model response" };
+        else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       }
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
     } else {
@@ -56,11 +56,11 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       buffer += chunk.toString();
       let end: number;
       while ((end = buffer.indexOf("\n")) >= 0) {
-        if (end > 64 * 1024) { client.destroy(); return; }
+        if (end > 2 * 1024 * 1024) { client.destroy(); return; }
         const text = buffer.slice(0, end); buffer = buffer.slice(end + 1);
         void line(text).catch(() => client.destroy());
       }
-      if (buffer.length > 64 * 1024) client.destroy();
+      if (buffer.length > 2 * 1024 * 1024) client.destroy();
     });
     client.on("error", fail); client.on("close", fail); connect();
   });

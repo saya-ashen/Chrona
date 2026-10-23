@@ -1,3 +1,4 @@
+import { moduleModelSettings } from "./settings";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -58,6 +59,16 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     intentSchema.parse(version.intent);
     const files = await stagingFiles(context, version, report);
     if (!files) return { moduleId: module.id, hash, status: "rejected", report };
+    if (manifest.model) {
+      const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
+      const limits = moduleModelSettings(workspace.settings);
+      const error = !limits ? "Module model capability unavailable: configure moduleModel in owner settings" : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
+      if (error) {
+        report.errors = [error];
+        await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+        return { moduleId: module.id, hash, status: "rejected", report };
+      }
+    }
     let passed = await runTests(context, staging, manifest, report.tests), needsMigration = false;
     if (passed) {
       const continuity = { status: "skipped" as const, reason: "no data", fromSchema: module.dataSchema, toSchema: manifest.data.schema, migrated: false };

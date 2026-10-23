@@ -6,6 +6,7 @@ import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { moduleSupervisor, createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
 import type { DeliveryAdapter, ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
+import { createPiModelGateway } from "../../../packages/integrations/src/steward/pi-model-gateway";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createInAppDelivery } from "../../../packages/integrations/src/steward/in-app-delivery";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
@@ -97,6 +98,13 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const localTest = createLocalTestSource();
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
+    modelGateway: createPiModelGateway({
+      command: process.env.CHRONA_STEWARD_PI_COMMAND,
+      agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
+      expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
+      chronaExtension: resourcePath(join("external-plugins", "pi-steward-agent", "chrona-tools.ts")),
+      agentUrl: "", workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
+    }),
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     deliveries: [createInAppDelivery(), ...(transport ? [transport.delivery] : [])],
     chat: transport ? { channel: "chrona_qqbot", bound: () => transport.bound() } : null,
