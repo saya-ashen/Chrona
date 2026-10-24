@@ -99,7 +99,7 @@ chrona admin approve|reject <approvalId>
 |---|---|---|---|
 | `web` | `listen: "/"` | （无） | 简化网页（2026-10-23 用户决定先做能用的简单版，原 React 网页删除）：单个 HTML + 原生 JS，无构建、无依赖。今天（审批、接下来、通知、应用、会话）、对话（切换/新建会话、发消息、附件链接）、应用（内容区文件浏览、Markdown 简单渲染、勾选框、编辑保存、二进制下载）。尚无：`*.ui.json` 生成页面渲染、面板、上传、设置与连接器管理 |
 | `qq` | `keepAlive`、`channel` | `owner`、`network`、`secrets: [qq_bot]` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
-| `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
+| `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；模块工具不进 `tools/list`，经固定的 `chrona_module_tools`（按关键词查找，含参数结构，始终是当前启用的模块）与 `chrona_module_call` 发现和调用，新模块无需重连即可用，也不占客户端上下文；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
 
 > 2026-10-24 起被 v2-5 §9 取代：`channel` 字段与 `deliver` 事件、`channel` 方法已删除；QQ 以工具 `qq.deliver`（仅 `notify` 可调用）投递，经 `notify.channel` 报告就绪、经 `notify.send` 补发超出回复窗口的回复。下段为历史设计。
 

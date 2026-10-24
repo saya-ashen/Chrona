@@ -37,6 +37,12 @@ const tools: { name: string; description: string; inputSchema: Args; request(arg
   { name: "chrona_modules", description: "List modules (apps Chrona runs without the Provider), their versions and recent runs.", inputSchema: schema(), request: () => ({ method: "GET", path: "/modules" }) },
   { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), request: () => ({ method: "GET", path: "/notifications" }) },
 ];
+// Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
+const moduleToolDefs = [
+  { name: "chrona_module_tools", description: "Find module tools (m_<module>_<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
+    inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }) },
+  { name: "chrona_module_call", description: "Call a module tool found with chrona_module_tools.", inputSchema: schema({ name: str("m_<module>_<tool>"), arguments: { type: "object", description: "Arguments matching the tool's input schema" } }, ["name"]) },
+];
 
 async function owner(request: Request) {
   const reply = await chrona.owner(request);
@@ -52,21 +58,26 @@ const text = (value: unknown, isError = false) => ({ content: [{ type: "text", t
 async function handle(method: string, params: Args) {
   if (method === "initialize") {
     const modules = await moduleTools();
-    // Module toolsets play the part of MCP servers inside this one; clients with tool search find their tools by these lines.
-    const instructions = `Chrona, the user's personal steward. Tools named m_<module>_<tool> come from modules (apps Chrona runs without the Provider). Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
+    // Module toolsets play the part of MCP servers inside this one; the lines tell clients what chrona_module_tools can find.
+    const instructions = `Chrona, the user's personal steward. Modules (apps Chrona runs without the Provider) offer tools named m_<module>_<tool>: find them with chrona_module_tools and call them with chrona_module_call. Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
     return { protocolVersion: typeof params.protocolVersion === "string" ? params.protocolVersion : "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "chrona", version: "1" }, instructions };
   }
   if (method === "ping") return {};
   if (method === "tools/list") return { tools: [
     ...tools.map(({ name, description, inputSchema, destructive }) => ({ name, description, inputSchema, ...(destructive ? { annotations: { destructiveHint: true } } : {}) })),
-    ...(await moduleTools()).tools,
+    ...moduleToolDefs,
   ] };
   if (method === "tools/call") {
     const name = String(params.name ?? ""), args = (params.arguments ?? {}) as Args;
     const tool = tools.find(tool => tool.name === name);
     try {
       if (tool) return text(await owner(tool.request(args)));
-      if (name.startsWith("m_")) return text(await owner({ method: "POST", path: `/modules/tools/${q(name)}`, body: args }));
+      if (name === "chrona_module_tools") {
+        const words = String(args.query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+        return text((await moduleTools()).tools.filter(tool => words.every(word => `${tool.name} ${tool.description}`.toLowerCase().includes(word))));
+      }
+      if (name === "chrona_module_call" && String(args.name ?? "").startsWith("m_")) return text(await owner({ method: "POST", path: `/modules/tools/${q(args.name)}`, body: args.arguments ?? {} }));
+      if (name === "chrona_module_call") return text(`not_found: unknown module tool ${String(args.name ?? "")}`, true);
       return text(`not_found: unknown tool ${name}`, true);
     } catch (error) { return text(error instanceof Error ? error.message : "failed", true); }
   }
