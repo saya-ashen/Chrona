@@ -58,11 +58,18 @@ async function resolveTarget(db: Db, workspaceId: string, target: string): Promi
   if (!manifest || !tool) return new CallError("not_found", `Tool ${target} not found`);
   return { module: { ...module, activeHash: module.activeHash }, tool };
 }
-/** The target decides who may reach it: its visibility, and for modules (system ones too) its `callers` list. */
-function admitted(caller: Caller, tool: Tool) {
-  const name = callerName(caller), needed = (name ? "modules" : caller.kind) as Tool["visibility"][number];
-  if (!tool.visibility.includes(needed)) return false;
-  return !name || !tool.callers || tool.callers.includes(name);
+/**
+ * The target decides who may reach it: its visibility, and for modules (system ones too) its `callers` list.
+ * A module reaches a `modules` tool it lists in `uses`; with `uses: ["*"]` it reaches the tools open to the user (v2-8 §3).
+ */
+export async function admitted(db: Db, caller: Caller, tool: Tool, target: string) {
+  const name = callerName(caller);
+  if (!name) return tool.visibility.includes(caller.kind as Tool["visibility"][number]);
+  if (tool.callers && !tool.callers.includes(name)) return false;
+  if (caller.kind !== "module") return tool.visibility.includes("modules");
+  const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
+  const uses = moduleManifestSchema.safeParse(version?.manifest).data?.uses ?? [];
+  return (uses.includes(target) && tool.visibility.includes("modules")) || (uses.includes("*") && tool.visibility.includes("owner"));
 }
 /** A system module's errors as call errors: its own refusals keep their code. */
 function systemError(error: unknown) {
@@ -104,7 +111,7 @@ function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = 
 export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
   if (resolved instanceof CallError) throw resolved;
-  if (!admitted(origin.caller, resolved.tool)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  if (!await admitted(ports.db, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   const { chain, path } = nextPath(origin);
   if (chain.includes(resolved.module.name)) throw new CallError("cycle", `${target}: ${resolved.module.name} is waiting on this call path (${chain.join(" → ")})`);
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
@@ -163,7 +170,7 @@ export async function enqueueCall(tx: Db, ports: StewardPorts, origin: CallOrigi
   if (existing) return { callId: existing.id, status: existing.status as "queued", duplicate: true };
   const resolved = await resolveTarget(tx, origin.workspaceId, target);
   if (resolved instanceof CallError) { if (origin.caller.kind !== "kernel" && origin.caller.kind !== "system" && !(lenient && (resolved.code === "unavailable" || resolved.code === "not_found"))) throw resolved; }
-  else if (!admitted(origin.caller, resolved.tool)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  else if (!await admitted(tx, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   const { path } = nextPath(origin);
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
   const args = resolved instanceof CallError ? raw : validArgs(resolved.tool, raw), now = ports.now();
@@ -198,7 +205,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
   const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
   const caller = originOf(row, callerModule);
-  if (!admitted(caller, resolved.tool)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
+  if (!await admitted(db, caller, resolved.tool, `${row.target}.${row.tool}`)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
   let args;
   try { args = validArgs(resolved.tool, row.args); }
   catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }

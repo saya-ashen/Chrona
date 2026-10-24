@@ -18,7 +18,7 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
       calls.push(call);
       // Routed calls are answered, never routed: a build must not reach another module.
       if (call.method === "call") {
-        if (!manifest.uses.includes(call.params.target)) return { id: call.id, error: { code: "undeclared", message: `${call.params.target} is not in uses` } };
+        if (!manifest.uses.includes(call.params.target) && !manifest.uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${call.params.target} is not in uses` } };
         return { id: call.id, result: call.params.mode === "async" ? { callId: randomUUID(), status: "queued" } : { output: null } };
       }
       if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };

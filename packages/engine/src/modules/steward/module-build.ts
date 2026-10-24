@@ -43,7 +43,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const libraries = [report.dependencies?.npm && "npm（bun.lock）", report.dependencies?.python && "Python（uv.lock）"].filter(Boolean).join("、") || "无";
   const exposed = manifest.tools.filter(tool => tool.visibility.some(value => value === "modules" || value === "kernel")).map(tool => `${tool.name}${tool.callers ? `（仅 ${tool.callers.join("、")}）` : ""}`);
-  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
+  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.map(target => target === "*" ? "所有对你开放的工具（*）" : target).join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
   const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null;

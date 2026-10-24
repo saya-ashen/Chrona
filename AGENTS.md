@@ -12,8 +12,9 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
 - Architecture: [`docs/zh/platform-v2.md`](docs/zh/platform-v2.md) and its parts
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
-  [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies), v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9) and v2-7 (system modules `chat` and `approvals`; conversation replies pushed to the entry module, [v2-7](docs/zh/platform-v2-7-system-modules.md)); the rest of v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
+  [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md),
+  [v2-8 calls only](docs/zh/platform-v2-8-calls-only.md) (modules interact only through routed calls; supersedes content areas, connectors and the web/MCP owner API).
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies), v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9) and v2-7 (system modules `chat` and `approvals`; conversation replies pushed to the entry module, [v2-7](docs/zh/platform-v2-7-system-modules.md)) and v2-8 step 1 (`uses: ["*"]`, system module `modules`, `chat` session tools and `chat.ask`, MCP on routed calls); the rest of v2-5 is a draft and v2-8 steps 2–4 are not implemented. The React web app was removed; the page is the built-in `web` module.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:

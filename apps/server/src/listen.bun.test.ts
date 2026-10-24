@@ -82,10 +82,10 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
     return { status: response.status, body: response.status === 200 ? await response.json() : null };
   };
   expect((await rpc("tools/list", {}, {})).status).toBe(401);
-  expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).body.result.instructions).toContain("- module_files:");
+  expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).body.result.instructions).toMatch(/Apps with tools: .*files/);
   const names = (await rpc("tools/list")).body.result.tools.map((tool: { name: string }) => tool.name);
   expect(names).toEqual(expect.arrayContaining(["chrona_today", "chrona_chat", "chrona_approval_resolve", "chrona_module_tools", "chrona_module_call"]));
-  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_tools", arguments: { query: "files" } })).body.result.content[0].text).map((tool: { name: string }) => tool.name)).toContain("m_files_list");
+  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_tools", arguments: { query: "files" } })).body.result.content[0].text).map((tool: { target: string }) => tool.target)).toContain("files.list");
   expect((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "missing" } })).body.result).toEqual({ content: [{ type: "text", text: "not_found: Content area not found" }], isError: true });
-  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "m_files_list", arguments: {} } })).body.result.content[0].text)).toHaveProperty("result");
+  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "files.list", arguments: {} } })).body.result.content[0].text)).toHaveProperty("entries");
 }, 120_000);

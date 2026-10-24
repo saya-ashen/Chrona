@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { APPROVAL_SCOPES, APPROVAL_STATUSES, attachmentSchema, DELIVERY_CHANNELS, relativePathSchema } from "@chrona/contracts/steward";
+import { APPROVAL_SCOPES, APPROVAL_STATUSES, attachmentSchema, DELIVERY_CHANNELS, moduleManifestSchema, relativePathSchema, SESSION_SOURCES, SESSION_STATUSES } from "@chrona/contracts/steward";
 import { createChat } from "./chat";
 import { createSessions } from "./sessions";
 import { contentArea } from "./content";
 import { createApprovals } from "./approvals";
 import { createModules } from "./modules";
-import { CallError, registerSystemModule, type Caller, type Json, type SystemModule, type Tool } from "./module-calls";
+import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type Tool } from "./module-calls";
 import { parseInput } from "./errors";
 
 type Properties = Tool["parameters"]["properties"];
@@ -31,6 +31,12 @@ const chat: SystemModule = {
     tool("file", "Bytes (base64) of a file attached to a reply in one of the caller's conversations.", { message: text("Reply message id"), ref: text("Attachment ref <app>/<path>") }, ["message", "ref"], { idempotent: true }),
     tool("delivered", "Record the transport id of a reply the caller delivered (for quotes).", { message: text(), "external-id": text() }, ["message", "external-id"], { idempotent: true }),
     tool("record", "Record a message the caller delivered outside a reply (e.g. a notification) into its conversation.", { key: text(), channel: { type: "string", enum: [...DELIVERY_CHANNELS] }, text: text(), "external-id": text() }, ["key", "channel", "text", "external-id"], { idempotent: true }),
+    // Request/response entries (MCP): the conversation gets no entry module, so nothing is pushed and background results are notified.
+    tool("ask", "Send the user's message by session or key (without either, a new conversation) and wait for this run's replies.", { text: text(), session: text("Session id"), key: text("Conversation key") }, ["text"]),
+    tool("sessions", "The user's conversations, most recent first.", { source: { type: "string", enum: [...SESSION_SOURCES] }, status: { type: "string", enum: [...SESSION_STATUSES] } }, [], { idempotent: true }),
+    tool("session", "One conversation.", { session: text() }, ["session"], { idempotent: true }),
+    tool("session-update", "Rename or end a conversation.", { session: text(), title: text(), status: { type: "string", enum: ["ended"] } }, ["session"], { idempotent: true }),
+    tool("messages", "A conversation's recent messages, oldest first.", { session: text(), limit: { type: "number", description: "1-200, default 50" } }, ["session"], { idempotent: true }),
   ],
   async handle({ ports, workspaceId, caller }, name, args) {
     const module = entry(caller), { db } = ports;
@@ -52,6 +58,11 @@ const chat: SystemModule = {
         return json(result.attachments[0]);
       }
       case "new-session": return json(await createSessions(ports, workspaceId).new({ key: String(args.key) }));
+      case "ask": return json(await service.handleMessage({ workspaceId, channel: "in_app", text: String(args.text), ...(args.session ? { sessionId: String(args.session) } : {}), ...(args.key ? { key: String(args.key) } : {}) }));
+      case "sessions": return json(await createSessions(ports, workspaceId).list({ ...(args.source ? { source: args.source } : {}), ...(args.status ? { status: args.status } : {}) }));
+      case "session": return json(await createSessions(ports, workspaceId).get(String(args.session)));
+      case "session-update": return json(await createSessions(ports, workspaceId).update(String(args.session), { ...(args.title !== undefined ? { title: args.title } : {}), ...(args.status !== undefined ? { status: args.status } : {}) }));
+      case "messages": return json(await createSessions(ports, workspaceId).messages(String(args.session), args.limit ?? 50));
       case "file": {
         const message = await db.message.findFirst({ where: { id: String(args.message), workspaceId, direction: "out" } });
         const ref = parseInput(z.string().max(542), args.ref), files = attachmentSchema.strip().array().catch([]).parse(message?.attachments ?? []);
@@ -92,8 +103,33 @@ const approvals: SystemModule = {
       else await ports.onApproved?.(action);
     });
     if (name === "list") return json(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"));
-    if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: args.scope ?? "once" }, module.module === "qq" ? "qq" : "entry")).approval);
+    const source = module.module === "qq" || module.module === "mcp" || module.module === "web" ? module.module : "entry";
+    if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: args.scope ?? "once" }, source)).approval);
     throw new CallError("not_found", `approvals.${name} not found`);
+  },
+};
+
+/** `modules`: what Chrona knows about the apps (versions, runs) and which tools a caller may reach; never what an app reports about itself. */
+const modules: SystemModule = {
+  name: "modules",
+  tools: [
+    tool("list", "Apps with their status, active and recent versions (with rejection reasons) and recent runs.", {}, [], { idempotent: true }),
+    tool("tools", "Module tools the caller may call (<module>.<tool>, description, input schema); query matches every word against names and descriptions.", { query: text() }, [], { idempotent: true }),
+  ],
+  async handle({ ports, workspaceId, caller }, name, args) {
+    if (caller.kind !== "module") throw new CallError("forbidden", "Only a module may call this");
+    if (name === "list") return json(await createModules(ports, workspaceId).list());
+    if (name !== "tools") throw new CallError("not_found", `modules.${name} not found`);
+    const words = String(args.query ?? "").toLowerCase().split(/\s+/).filter(Boolean), found = [];
+    for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
+      const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+      for (const candidate of moduleManifestSchema.safeParse(version?.manifest).data?.tools ?? []) {
+        const target = `${module.name}.${candidate.name}`;
+        if (!words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) || !await admitted(ports.db, caller, candidate, target)) continue;
+        found.push({ target, description: candidate.description, inputSchema: { ...candidate.parameters, additionalProperties: false } });
+      }
+    }
+    return json(found);
   },
 };
 
@@ -104,4 +140,5 @@ export function registerSystemModules() {
   registered = true;
   registerSystemModule(chat);
   registerSystemModule(approvals);
+  registerSystemModule(modules);
 }

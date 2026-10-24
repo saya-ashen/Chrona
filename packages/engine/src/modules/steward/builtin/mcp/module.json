@@ -6,6 +6,7 @@
   "listen": "/api/mcp",
   "triggers": [],
   "effects": ["owner"],
+  "uses": ["chat.ask", "chat.sessions", "chat.session", "chat.session-update", "chat.new-session", "chat.messages", "approvals.list", "approvals.resolve", "modules.list", "modules.tools", "*"],
   "data": { "schema": 1 },
   "tests": ["test.ts"]
 }

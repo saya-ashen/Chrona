@@ -6,6 +6,7 @@ import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import { callsSettled, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
 import { callModuleTool } from "./module-tools";
+import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -155,4 +156,24 @@ test("delivery outcomes: never-delivered retries, lost after sending is unknown,
   expect(await find("interrupted")).toMatchObject({ status: "unknown", error: "Delivery interrupted; outcome unknown" });
   expect(await find("interrupted-idempotent")).toMatchObject({ status: "succeeded", attempts: 2 });
   expect(seen).toEqual(["again"]);
+});
+
+test("uses \"*\" reaches the tools open to the user, never modules-only tools it does not list or past callers", async () => {
+  registerSystemModules();
+  const f = await fixture({
+    alpha: async (_event, call) => {
+      const results: Record<string, unknown> = {};
+      for (const target of ["beta.hidden", "beta.echo", "beta.private", "modules.tools"]) results[target] = await call("call", { target, args: target === "modules.tools" ? {} : { text: "x" } } as never);
+      return { result: results };
+    },
+    beta: async event => ({ result: { tool: (event.trigger as { id: string }).id } }),
+  });
+  const alpha = moduleManifestSchema.parse({ name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], uses: ["*", "modules.tools"], tools: [tool("pong")] });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } }, data: { manifest: alpha } });
+  const results = output(await f.fire()) as Record<string, { result?: { output: unknown }; error?: { code: string } }>;
+  expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
+  expect(results["beta.echo"]).toMatchObject({ error: { code: "forbidden" } });
+  expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
+  // modules.tools lists exactly what the caller may reach.
+  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target)).toEqual(["beta.hidden"]);
 });

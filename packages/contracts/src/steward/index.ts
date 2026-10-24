@@ -140,8 +140,11 @@ export const moduleManifestSchema = z.object({
   listen: z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]).optional(),
   /** Deprecated and ignored: delivery adapters are module tools called by the notification module. Kept so stored versions parse. */
   channel: z.literal("chrona_qqbot").optional(),
-  /** Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability. */
-  uses: z.array(interfaceRefSchema).max(20).default([]),
+  /**
+   * Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability.
+   * `"*"`: every tool open to the user (`owner` visibility), for entry modules that offer all apps to the user (web, MCP).
+   */
+  uses: z.array(z.union([interfaceRefSchema, z.literal("*")])).max(20).default([]),
   /**
    * System programs (v2-6), named for the host backend: nixpkgs attributes under Nix, the distribution's package names
    * otherwise. Language libraries come from lockfiles instead (package.json + bun.lock, pyproject.toml + uv.lock), which
@@ -170,7 +173,7 @@ export const moduleManifestSchema = z.object({
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   if (manifest.channel && !manifest.effects.includes("owner")) ctx.addIssue({ code: "custom", path: ["effects"], message: "channel requires the owner capability" });
-  if (manifest.secrets.length && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "secrets are only for entry modules (owner, chat.send or approvals.resolve)" });
+  if (manifest.secrets.length && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "secrets are only for entry modules (owner, chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
@@ -189,11 +192,11 @@ export const moduleManifestSchema = z.object({
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 /** Acts as the user, or serves the page holding the user's key: never activated automatically. */
 /**
- * Acts as the user (owner API; speaks for them in conversations, `chat.send`; decides approvals, `approvals.resolve`),
+ * Acts as the user (owner API; their conversations, `chat.*`; their approvals, `approvals.*`; every tool open to them, `*`),
  * or serves the page holding the user's key: every version needs the user, never activated automatically.
  */
 export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string; uses?: readonly string[] }) =>
-  manifest.effects.includes("owner") || manifest.listen === "/" || (manifest.uses ?? []).some(target => target === "chat.send" || target === "approvals.resolve");
+  manifest.effects.includes("owner") || manifest.listen === "/" || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || target.startsWith("approvals."));
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as
@@ -249,7 +252,7 @@ export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provi
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["chat", "approvals"] as const;
+export const SYSTEM_MODULES = ["chat", "approvals", "modules"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [

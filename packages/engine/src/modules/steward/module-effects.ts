@@ -17,11 +17,11 @@ const failed = (id: string, error: unknown): Reply => error instanceof CallError
   ? { id, error: { code: error.code, message: error.message.slice(0, 500) } }
   : { id, error: { code: "internal", message: "Module call failed" } };
 
-/** Routed calls: the target must be in `uses`; Chrona records the real caller and refuses waits on itself. */
+/** Routed calls: the target must be in `uses` (or reached by `*`); Chrona records the real caller and refuses waits on itself. */
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
   const { target, args, mode, key, reply, timeoutMs } = call.params, now = ports.now();
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
-  if (!scope.manifest.uses.includes(target)) {
+  if (!scope.manifest.uses.includes(target) && !scope.manifest.uses.includes("*")) {
     await ports.db.moduleCall.create({ data: { ...record, key: target, status: "rejected", error: "undeclared" } });
     return { id: call.id, error: { code: "undeclared", message: `${target} is not in the manifest's uses` } };
   }

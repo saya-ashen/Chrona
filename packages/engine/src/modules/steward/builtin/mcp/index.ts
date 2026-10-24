@@ -1,47 +1,49 @@
 // @ts-expect-error Chrona supplies the SDK at this at run time.
 import { chrona } from "chrona";
 
-// Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed.
+// Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
 type Args = Record<string, unknown>;
 type Request = { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown };
 const q = (value: unknown) => encodeURIComponent(String(value));
-const query = (args: Args, keys: string[]) => {
-  const pairs = keys.filter(key => args[key] !== undefined).map(key => `${key}=${q(args[key])}`);
-  return pairs.length ? `?${pairs.join("&")}` : "";
-};
 const str = (description?: string) => ({ type: "string", ...(description ? { description } : {}) });
 const schema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
-const tools: { name: string; description: string; inputSchema: Args; request(args: Args): Request; destructive?: boolean }[] = [
-  { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), request: () => ({ method: "GET", path: "/today" }) },
-  { name: "chrona_apps", description: "List apps, their content areas and entry pages.", inputSchema: schema(), request: () => ({ method: "GET", path: "/apps" }) },
+type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
+const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+// Today, apps, content and notifications still use the owner API until the web migration (v2-8 §11).
+const tools: McpTool[] = [
+  { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/today" }) },
+  { name: "chrona_apps", description: "List apps, their content areas and entry pages.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/apps" }) },
   { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module"] }, status: { type: "string", enum: ["active", "ended"] } }),
-    request: args => ({ method: "GET", path: `/sessions${query(args, ["source", "status"])}` }) },
-  { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), request: args => ({ method: "GET", path: `/sessions/${q(args.sessionId)}` }) },
+    run: ({ source, status }) => call("chat.sessions", { source, status }) },
+  { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: ({ sessionId }) => call("chat.session", { session: sessionId }) },
   { name: "chrona_session_update", description: "Rename or end a conversation.", inputSchema: schema({ sessionId: str(), title: str(), status: { type: "string", enum: ["ended"] } }, ["sessionId"]),
-    request: ({ sessionId, ...body }) => ({ method: "PATCH", path: `/sessions/${q(sessionId)}`, body }) },
-  { name: "chrona_session_new", description: "End the active conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), request: body => ({ method: "POST", path: "/sessions/new", body }) },
+    run: ({ sessionId, title, status }) => call("chat.session-update", { session: sessionId, title, status }) },
+  { name: "chrona_session_new", description: "End the active conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), run: ({ key }) => call("chat.new-session", { key }) },
   { name: "chrona_session_messages", description: "Read a conversation's recent messages.", inputSchema: schema({ sessionId: str(), limit: { type: "integer", minimum: 1, maximum: 200 } }, ["sessionId"]),
-    request: args => ({ method: "GET", path: `/sessions/${q(args.sessionId)}/messages${query(args, ["limit"])}` }) },
-  { name: "chrona_content_tree", description: "List an app's content files.", inputSchema: schema({ appId: str() }, ["appId"]), request: args => ({ method: "GET", path: `/apps/${q(args.appId)}/tree` }) },
+    run: ({ sessionId, limit }) => call("chat.messages", { session: sessionId, limit }) },
+  { name: "chrona_content_tree", description: "List an app's content files.", inputSchema: schema({ appId: str() }, ["appId"]), run: args => owner({ method: "GET", path: `/apps/${q(args.appId)}/tree` }) },
   { name: "chrona_content_read", description: "Read an app's content file; defaults to its README.md home page.", inputSchema: schema({ appId: str(), path: str("Defaults to README.md") }, ["appId"]),
-    request: args => ({ method: "GET", path: `/apps/${q(args.appId)}/file?path=${q(args.path ?? "README.md")}` }) },
+    run: args => owner({ method: "GET", path: `/apps/${q(args.appId)}/file?path=${q(args.path ?? "README.md")}` }) },
   { name: "chrona_content_write", description: "Save an app's content file, checking its base revision and sending content_edit.", inputSchema: schema({ appId: str(), path: str(), content: str(), baseRevision: { type: ["string", "null"] } }, ["appId", "path", "content", "baseRevision"]),
-    request: ({ appId, ...body }) => ({ method: "PUT", path: `/apps/${q(appId)}/file`, body }) },
+    run: ({ appId, ...body }) => owner({ method: "PUT", path: `/apps/${q(appId)}/file`, body }) },
   { name: "chrona_chat", description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: schema({ text: str(), sessionId: str(), key: str() }, ["text"]),
-    request: body => ({ method: "POST", path: "/chat", body: body.sessionId || body.key ? body : { ...body, key: `mcp:${crypto.randomUUID()}` } }) },
+    run: ({ text, sessionId, key }) => call("chat.ask", { text, session: sessionId, key: sessionId || key ? key : `mcp:${crypto.randomUUID()}` }) },
   { name: "chrona_approvals", description: "List approvals; defaults to open ones waiting for the user.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }),
-    request: args => ({ method: "GET", path: `/approvals?status=${q(args.status ?? "open")}` }) },
+    run: ({ status }) => call("approvals.list", { status }) },
   { name: "chrona_approval_resolve", description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", destructive: true,
     inputSchema: schema({ approvalId: str(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: ["once", "always"] } }, ["approvalId", "decision"]),
-    request: ({ approvalId, decision, scope = "once" }) => ({ method: "POST", path: `/approvals/${q(approvalId)}/resolve`, body: { decision, scope } }) },
-  { name: "chrona_modules", description: "List modules (apps Chrona runs without the Provider), their versions and recent runs.", inputSchema: schema(), request: () => ({ method: "GET", path: "/modules" }) },
-  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), request: () => ({ method: "GET", path: "/notifications" }) },
-];
-// Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
-const moduleToolDefs = [
-  { name: "chrona_module_tools", description: "Find module tools (m_<module>_<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
-    inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }) },
-  { name: "chrona_module_call", description: "Call a module tool found with chrona_module_tools.", inputSchema: schema({ name: str("m_<module>_<tool>"), arguments: { type: "object", description: "Arguments matching the tool's input schema" } }, ["name"]) },
+    run: ({ approvalId, decision, scope = "once" }) => call("approvals.resolve", { approval: approvalId, decision, scope }) },
+  { name: "chrona_modules", description: "List modules (apps Chrona runs without the Provider), their versions and recent runs.", inputSchema: schema(), run: () => call("modules.list") },
+  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/notifications" }) },
+  // Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
+  { name: "chrona_module_tools", description: "Find module tools (<module>.<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
+    inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }), run: ({ query }) => call("modules.tools", { query }) },
+  { name: "chrona_module_call", description: "Call a module tool found with chrona_module_tools.", inputSchema: schema({ name: str("<module>.<tool>"), arguments: { type: "object", description: "Arguments matching the tool's input schema" } }, ["name"]),
+    run: ({ name, arguments: args }) => {
+      // Conversations, approvals and app records have their own tools above (approval resolution is marked destructive there).
+      if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(String(name)) || /^(chat|approvals|modules)\./.test(String(name))) throw new Error(`not_found: unknown module tool ${String(name)}`);
+      return chrona.call(String(name), (args ?? {}) as Args);
+    } },
 ];
 
 async function owner(request: Request) {
@@ -50,36 +52,29 @@ async function owner(request: Request) {
   if (reply.status >= 400) throw new Error(failure?.code ? `${failure.code}${failure.message ? `: ${failure.message}` : ""}` : `failed (${reply.status})`);
   return reply.body;
 }
-async function moduleTools() {
-  return await owner({ method: "GET", path: "/modules/tools" }) as { tools: { name: string; description: string; inputSchema: Args }[]; toolsets: { name: string; description: string }[] };
-}
 const text = (value: unknown, isError = false) => ({ content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 1) }], ...(isError ? { isError } : {}) });
 
 async function handle(method: string, params: Args) {
   if (method === "initialize") {
-    const modules = await moduleTools();
-    // Module toolsets play the part of MCP servers inside this one; the lines tell clients what chrona_module_tools can find.
-    const instructions = `Chrona, the user's personal steward. Modules (apps Chrona runs without the Provider) offer tools named m_<module>_<tool>: find them with chrona_module_tools and call them with chrona_module_call. Module toolsets:\n${modules.toolsets.map(set => `- ${set.name}: ${set.description}`).join("\n") || "(none)"}`;
+    const apps = [...new Set((await call("modules.tools") as { target: string }[]).map(tool => tool.target.split(".")[0]))];
+    // The app list tells clients what chrona_module_tools can find.
+    const instructions = `Chrona, the user's personal steward. Modules (apps Chrona runs without the Provider) offer tools named <module>.<tool>: find them with chrona_module_tools and call them with chrona_module_call. Apps with tools: ${apps.join(", ") || "none yet"}.`;
     return { protocolVersion: typeof params.protocolVersion === "string" ? params.protocolVersion : "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "chrona", version: "1" }, instructions };
   }
   if (method === "ping") return {};
   if (method === "tools/list") return { tools: [
     ...tools.map(({ name, description, inputSchema, destructive }) => ({ name, description, inputSchema, ...(destructive ? { annotations: { destructiveHint: true } } : {}) })),
-    ...moduleToolDefs,
   ] };
   if (method === "tools/call") {
     const name = String(params.name ?? ""), args = (params.arguments ?? {}) as Args;
     const tool = tools.find(tool => tool.name === name);
+    if (!tool) return text(`not_found: unknown tool ${name}`, true);
     try {
-      if (tool) return text(await owner(tool.request(args)));
-      if (name === "chrona_module_tools") {
-        const words = String(args.query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
-        return text((await moduleTools()).tools.filter(tool => words.every(word => `${tool.name} ${tool.description}`.toLowerCase().includes(word))));
-      }
-      if (name === "chrona_module_call" && String(args.name ?? "").startsWith("m_")) return text(await owner({ method: "POST", path: `/modules/tools/${q(args.name)}`, body: args.arguments ?? {} }));
-      if (name === "chrona_module_call") return text(`not_found: unknown module tool ${String(args.name ?? "")}`, true);
-      return text(`not_found: unknown tool ${name}`, true);
-    } catch (error) { return text(error instanceof Error ? error.message : "failed", true); }
+      return text(await tool.run(args));
+    } catch (error) {
+      const { code, message } = error as { code?: string; message?: string };
+      return text(code ? `${code}: ${message ?? ""}` : message ?? "failed", true);
+    }
   }
   throw Object.assign(new Error(`Method not found: ${method}`), { code: -32601 });
 }

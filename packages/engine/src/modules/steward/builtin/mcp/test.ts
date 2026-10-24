@@ -2,14 +2,18 @@ import { strict as assert } from "node:assert";
 // @ts-expect-error Chrona supplies the test kernel at this at run time.
 import { startModule } from "chrona/testing";
 
-const owner: { method: string; path: string; body?: unknown }[] = [];
-const moduleTools: { name: string; description: string; inputSchema: Record<string, unknown> }[] = [{ name: "m_files_list", description: "[module files] List", inputSchema: { type: "object", properties: {}, required: [] } }];
-const module = await startModule("index.ts", { stubs: { owner: (params: { method: string; path: string; body?: unknown }) => {
-  owner.push(params);
-  if (params.path === "/modules/tools") return { status: 200, body: { tools: [...moduleTools], toolsets: [{ name: "module_files", description: "Files", tools: ["m_files_list"] }] } };
-  if (params.path.startsWith("/approvals/")) return { status: 403, body: { code: "forbidden", message: "rescue only" } };
-  return { status: 200, body: { ok: params.path } };
-} } });
+type Args = Record<string, unknown>;
+const owner: { method: string; path: string; body?: unknown }[] = [], calls: [string, Args][] = [];
+const moduleTools: { target: string; description: string; inputSchema: Args }[] = [{ target: "files.list", description: "List a document directory.", inputSchema: { type: "object", properties: {}, required: [] } }];
+const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: target })) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
+const module = await startModule("index.ts", { stubs: {
+  owner: (params: { method: string; path: string; body?: unknown }) => { owner.push(params); return { status: 200, body: { ok: params.path } }; },
+  ...Object.fromEntries([
+    routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
+    routed("chat.ask"), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
+    routed("planning.get", args => ({ plan: args.id })),
+  ]),
+} });
 async function rpc(method: string, params: unknown = {}, id: number | null = 1) {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -18,29 +22,33 @@ async function rpc(method: string, params: unknown = {}, id: number | null = 1) 
     } catch (error) { if (attempt > 50) throw error; await new Promise(resolve => setTimeout(resolve, 100)); }
   }
 }
+const tool = async (name: string, args: Args = {}) => (await rpc("tools/call", { name, arguments: args })).body.result;
+const json = async (name: string, args: Args = {}) => JSON.parse((await tool(name, args)).content[0].text);
 try {
   const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } });
   assert.equal(init.body.result.protocolVersion, "2025-06-18");
-  assert.match(init.body.result.instructions, /module_files: Files/);
+  assert.match(init.body.result.instructions, /Apps with tools: files\./);
   assert.equal((await rpc("notifications/initialized", {}, null)).status, 202);
-  const names = (await rpc("tools/list")).body.result.tools.map((tool: { name: string }) => tool.name);
-  assert.ok(names.includes("chrona_chat") && names.includes("chrona_module_tools") && names.includes("chrona_module_call"));
-  assert.ok(!names.some((name: string) => name.startsWith("m_")));
-  const found = async (query?: string) => JSON.parse((await rpc("tools/call", { name: "chrona_module_tools", arguments: query === undefined ? {} : { query } })).body.result.content[0].text).map((tool: { name: string }) => tool.name);
-  assert.deepEqual(await found(), ["m_files_list"]);
+  const names = (await rpc("tools/list")).body.result.tools.map((entry: { name: string }) => entry.name);
+  assert.ok(["chrona_chat", "chrona_module_tools", "chrona_module_call"].every(name => names.includes(name)));
+  // Conversations, approvals and app records are routed calls with the system modules' argument names.
+  calls.length = 0;
+  await tool("chrona_chat", { text: "hi" });
+  assert.equal(calls[0]![0], "chat.ask"); assert.match(String(calls[0]![1].key), /^mcp:/); assert.equal(calls[0]![1].session, undefined);
+  await tool("chrona_session_messages", { sessionId: "s1", limit: 5 });
+  assert.deepEqual(calls.at(-1), ["chat.messages", { session: "s1", limit: 5 }]);
+  await tool("chrona_approval_resolve", { approvalId: "a1", decision: "approve" });
+  assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
   // A module activated after the client listed its tools is found and callable at once.
-  moduleTools.push({ name: "m_planning_get", description: "[module planning] Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } });
-  assert.deepEqual(await found("PLANNING plan"), ["m_planning_get"]);
-  assert.deepEqual(await found("planning list"), []);
+  moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } });
+  assert.deepEqual((await json("chrona_module_tools", { query: "planning" })).map((entry: { target: string }) => entry.target), ["planning.get"]);
+  assert.deepEqual(await json("chrona_module_call", { name: "planning.get", arguments: { id: "x" } }), { plan: "x" });
+  assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: {} })).isError, true);
+  assert.equal((await tool("chrona_module_call", { name: "m_files_list" })).isError, true);
+  // Content still goes through the owner API until the web migration.
   owner.length = 0;
-  assert.deepEqual((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "a b" } })).body.result.content[0].text, JSON.stringify({ ok: "/apps/a%20b/file?path=README.md" }, null, 1));
-  await rpc("tools/call", { name: "chrona_chat", arguments: { text: "hi" } });
-  assert.match(String((owner.at(-1)!.body as { key: string }).key), /^mcp:/);
-  await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "m_planning_get", arguments: { id: "x" } } });
-  assert.deepEqual(owner.at(-1), { method: "POST", path: "/modules/tools/m_planning_get", body: { id: "x" } });
-  assert.equal((await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "chrona_today" } })).body.result.isError, true);
-  assert.equal((await rpc("tools/call", { name: "m_files_list", arguments: {} })).body.result.isError, true);
-  const denied = (await rpc("tools/call", { name: "chrona_approval_resolve", arguments: { approvalId: "x", decision: "approve" } })).body.result;
-  assert.equal(denied.isError, true); assert.equal(denied.content[0].text, "forbidden: rescue only");
+  await tool("chrona_content_read", { appId: "a b" });
+  assert.deepEqual(owner, [{ method: "GET", path: "/apps/a%20b/file?path=README.md" }]);
+  assert.equal((await tool("nope")).isError, true);
   assert.equal((await rpc("nope")).body.error.code, -32601);
 } finally { await module.stop(); }

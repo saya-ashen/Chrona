@@ -12,7 +12,7 @@ type Reply = { id: string; result?: { handled?: boolean; result?: unknown }; err
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`) to a
- * target in `uses` answer from `stubs["<module>.<tool>"]` (sync: its value is the output) or with a queued call.
+ * target in `uses` (or any target, with `*`) answer from `stubs["<module>.<tool>"]` (sync: its value is the output) or with a queued call.
  */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: string[] };
@@ -40,7 +40,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       let reply: unknown;
       if (call.method === "call") {
         const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
-        if (!(manifest.uses ?? []).includes(target)) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
+        if (!(manifest.uses ?? []).includes(target) && !(manifest.uses ?? []).includes("*")) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
         // The request id doubles as the call id, so a test can answer it with a call_result event.
         else if (call.params.mode === "async") reply = { result: { callId: call.id, status: "queued" } };
         else reply = { result: { output: stubs[target] ? await stubs[target]!(args) ?? null : null } };
