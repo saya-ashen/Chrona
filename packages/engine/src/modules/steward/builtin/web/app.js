@@ -1,4 +1,5 @@
-// Chrona's simple web page: plain DOM, no build step. Everything goes through /api/steward with the user's key.
+// Chrona's simple web page: plain DOM, no build step. Data comes from this module's /api/web (routed calls, v2-8);
+// app content pages still read /api/steward until content areas go (v2-8 step 3). Both carry the user's key.
 const KEY = "chrona.accessKey"; // the same key the previous web app stored
 const main = document.getElementById("main");
 let workspaceId = null;
@@ -14,17 +15,44 @@ const h = (tag, attrs = {}, ...children) => {
 };
 const when = iso => new Date(iso).toLocaleString();
 class Unauthorized extends Error {}
+const auth = () => { const key = localStorage.getItem(KEY); return key ? { authorization: `Bearer ${key}` } : {}; };
 
-async function api(path, { method = "GET", body, raw = false } = {}) {
-  const key = localStorage.getItem(KEY);
-  const url = `/api/steward${path}${path.includes("?") ? "&" : "?"}workspaceId=${encodeURIComponent(workspaceId)}`;
-  const response = await fetch(url, { method, headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+async function request(url, { method = "GET", body, raw = false } = {}) {
+  const response = await fetch(url, { method, headers: { ...auth(), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
   if (response.status === 401) throw new Unauthorized();
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || error.code || `请求失败（${response.status}）`);
   }
   return raw ? response.blob() : response.json();
+}
+const web = (path, options) => request(`/api/web${path}`, options);
+// App content (until v2-8 step 3 removes content areas).
+const steward = (path, options) => request(`/api/steward${path}${path.includes("?") ? "&" : "?"}workspaceId=${encodeURIComponent(workspaceId)}`, options);
+
+// Replies to web conversations, pushed over SSE. fetch (not EventSource) so the request carries the key.
+const replyListeners = new Set();
+async function listen() {
+  for (;;) {
+    try {
+      const response = await fetch("/api/web/events", { headers: { ...auth(), accept: "text/event-stream" } });
+      if (response.status === 401) return;
+      const reader = response.body.getReader(), decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop();
+        for (const block of blocks) {
+          const data = block.split("\n").filter(line => line.startsWith("data: ")).map(line => line.slice(6)).join("\n");
+          if (data) { const event = JSON.parse(data); for (const listener of replyListeners) listener(event); }
+        }
+      }
+    } catch { /* reconnect below */ }
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
 }
 
 function login(message) {
@@ -38,7 +66,7 @@ function login(message) {
 // ------------------------------------------------------------------ today --
 function approvalItem(approval, after) {
   const decide = (decision, scope = "once") => async () => {
-    try { await api(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } }); after(); }
+    try { await web(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } }); after(); }
     catch (error) { alert(error.message); }
   };
   return h("li", {},
@@ -49,7 +77,7 @@ function approvalItem(approval, after) {
       approval.moduleId && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
 }
 async function today() {
-  const view = await api("/today");
+  const view = await web("/today");
   main.replaceChildren(
     view.health && !view.health.provider.available ? h("section", {}, h("p", { class: "error" }, `Provider 不可用：${view.health.provider.lastError ?? view.health.provider.name}`)) : "",
     h("section", {}, h("h2", {}, `待你决定（${view.approvals.length}）`),
@@ -68,21 +96,37 @@ async function today() {
 // ------------------------------------------------------------------- chat --
 async function attachmentLink(file) {
   const [name, ...rest] = (file.ref ?? "").split("/");
-  const apps = (await api("/apps")).items, app = apps.find(a => a.name === name);
+  const app = file.appId ? { id: file.appId } : (await steward("/apps")).items.find(a => a.name === name);
   if (!app || !rest.length) return h("span", { class: "muted" }, file.name);
   return h("a", { href: `/apps/${app.id}?path=${encodeURIComponent(rest.join("/"))}` }, file.name);
 }
+async function bubble(message) {
+  const node = h("div", { class: `bubble ${message.direction}` }, message.text);
+  for (const file of message.attachments ?? []) node.append(h("div", {}, await attachmentLink(file)));
+  return node;
+}
 async function chat(sessionId) {
-  const sessions = (await api("/sessions?source=web&status=active")).items;
-  const current = sessionId ?? sessions[0]?.id ?? null;
-  const messages = current ? (await api(`/sessions/${current}/messages?limit=100`)).items : [];
-  const list = h("div", { class: "messages" });
-  for (const message of messages) {
-    const bubble = h("div", { class: `bubble ${message.direction}` }, message.text);
-    for (const file of message.attachments) bubble.append(h("div", {}, await attachmentLink(file)));
-    list.append(bubble);
-  }
-  const status = h("p", { class: "muted" });
+  const sessions = await web("/sessions");
+  const current = sessionId ?? (location.pathname === "/chat/new" ? null : sessions[0]?.id ?? null);
+  const list = h("div", { class: "messages" }), status = h("p", { class: "muted" }), shown = new Set(), early = [];
+  const show = async message => {
+    if (shown.has(message.id)) return;
+    shown.add(message.id);
+    list.append(await bubble(message));
+    list.scrollTop = list.scrollHeight;
+  };
+  // Listen before loading, so a reply pushed meanwhile is neither lost nor shown twice.
+  let loaded = false;
+  replyListeners.clear();
+  replyListeners.add(async event => {
+    if (event.type !== "reply" || event.session !== current) return;
+    const message = { id: event.message, direction: "out", text: event.text, attachments: JSON.parse(event.attachments ?? "[]") };
+    status.textContent = "";
+    if (loaded) await show(message); else early.push(message);
+  });
+  for (const message of current ? await web(`/sessions/${current}/messages`) : []) await show(message);
+  loaded = true;
+  for (const message of early) await show(message);
   const form = h("form", { onsubmit: async event => {
     event.preventDefault();
     const text = event.target.text.value.trim();
@@ -90,10 +134,11 @@ async function chat(sessionId) {
     event.target.text.value = ""; status.textContent = "Chrona 正在处理……";
     list.append(h("div", { class: "bubble in" }, text));
     try {
-      const reply = await api("/chat", { method: "POST", body: current ? { text, sessionId: current } : { text, key: `web:${crypto.randomUUID()}` } });
-      go(`/sessions/${reply.sessionId}`, true);
+      const sent = await web("/chat", { method: "POST", body: current ? { text, session: current } : { text } });
+      // A new conversation: open it; its replies arrive on the reopened page.
+      if (!current) go(`/sessions/${sent.sessionId}`, true);
     } catch (error) { status.textContent = error.message; }
-  } }, h("textarea", { name: "text", rows: 3, placeholder: "说点什么……（Ctrl+Enter 发送）", onkeydown: event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.target.form.requestSubmit(); } }),
+  } }, h("textarea", { name: "text", rows: 3, placeholder: current ? "说点什么……（Ctrl+Enter 发送）" : "新会话：说点什么……", onkeydown: event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.target.form.requestSubmit(); } }),
     h("div", { class: "row" }, h("button", { class: "primary" }, "发送"), status));
   main.replaceChildren(h("div", { class: "chat" },
     h("section", {}, h("h2", {}, "会话"),
@@ -102,6 +147,7 @@ async function chat(sessionId) {
     h("section", {}, list, form)));
   list.scrollTop = list.scrollHeight;
 }
+
 // ------------------------------------------------------------------- apps --
 function inline(text) {
   // Escaped first; then only links, bold and code.
@@ -131,54 +177,93 @@ function markdown(file, onToggle) {
   return root;
 }
 async function apps() {
-  const items = (await api("/apps")).items;
+  const items = await web("/modules");
   main.replaceChildren(h("section", {}, h("h2", {}, "应用"),
-    h("ul", { class: "plain" }, items.map(app => h("li", {}, app.content ? h("a", { href: `/apps/${app.id}` }, app.name) : app.name, " ",
+    h("ul", { class: "plain" }, items.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ",
       h("span", { class: "muted" }, `${app.status === "active" ? "" : "已暂停 · "}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))));
 }
+// The generic app page: what Chrona recorded (versions, runs) and the tools the app offers the user.
 async function app(appId, path) {
-  const meta = (await api("/apps")).items.find(a => a.id === appId);
+  const meta = (await web("/modules")).find(a => a.id === appId);
   if (!meta) throw new Error("没有这个应用");
-  const tree = meta.content ? (await api(`/apps/${appId}/tree`)).items : [];
+  const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
+  const content = (await steward("/apps")).items.find(a => a.id === appId);
+  const files = h("section", {});
+  main.replaceChildren(
+    h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `${meta.status === "active" ? "运行中" : "已暂停"}${meta.description ? ` · ${meta.description}` : ""}`)),
+    tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : "",
+    h("section", {}, h("h2", {}, "最近运行"),
+      meta.runs.length ? h("ul", { class: "plain" }, meta.runs.map(run => h("li", {}, when(run.createdAt), " · ", run.triggerId, " · ",
+        run.error ? h("span", { class: "error" }, run.error) : run.exitCode === 0 ? "成功" : `退出码 ${run.exitCode}`))) : h("p", { class: "muted" }, "还没有运行记录。")),
+    h("section", {}, h("h2", {}, "版本"),
+      h("ul", { class: "plain" }, meta.versions.slice(0, 5).map(version => h("li", {}, when(version.createdAt), " · ", version.hash.slice(0, 8), " · ", version.hash === meta.activeHash ? "当前" : version.status,
+        version.errors ? h("div", { class: "error" }, version.errors.join("；")) : "")))),
+    content?.content ? files : "");
+  if (content?.content) await contentFiles(content, path, files);
+}
+function toolForm(tool) {
+  const properties = Object.entries(tool.inputSchema.properties ?? {}), required = tool.inputSchema.required ?? [];
+  const output = h("pre", { hidden: true });
+  const field = ([name, schema]) => h("label", {}, `${name}${required.includes(name) ? " *" : ""} `,
+    schema.enum ? h("select", { name }, (required.includes(name) ? [] : [h("option", { value: "" }, "")]).concat(schema.enum.map(value => h("option", { value }, value))))
+      : h("input", { name, type: schema.type === "boolean" ? "checkbox" : schema.type === "number" ? "number" : "text", required: schema.type !== "boolean" && required.includes(name), style: schema.type === "boolean" ? "width:auto" : false, title: schema.description ?? false }));
+  return h("form", { onsubmit: async event => {
+    event.preventDefault();
+    // A tool that is not idempotent may change things: ask first.
+    if (!tool.idempotent && !confirm(`执行 ${tool.target}？`)) return;
+    const args = {};
+    for (const [name, schema] of properties) {
+      const input = event.target.elements[name];
+      if (schema.type === "boolean") args[name] = input.checked;
+      else if (input.value !== "") args[name] = schema.type === "number" ? Number(input.value) : input.value;
+    }
+    output.hidden = false; output.textContent = "执行中……";
+    try { output.textContent = JSON.stringify(await web("/call", { method: "POST", body: { target: tool.target, args } }), null, 2); }
+    catch (error) { output.textContent = error.message; }
+  } }, h("div", {}, h("strong", {}, tool.target.split(".")[1]), " ", h("span", { class: "muted" }, tool.description)),
+    ...properties.map(field), h("div", { class: "row" }, h("button", { class: "primary" }, "执行")), output);
+}
+async function contentFiles(meta, path, view) {
+  const tree = (await steward(`/apps/${meta.id}/tree`)).items;
   const current = path ?? meta.entry ?? tree.find(node => node.kind === "file")?.path ?? null;
-  const view = h("section", {});
-  main.replaceChildren(h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, meta.description ?? ""),
+  const shown = h("div", {});
+  view.replaceChildren(h("h2", {}, "内容"),
     h("details", { open: !current }, h("summary", {}, `文件（${tree.filter(n => n.kind === "file").length}）`),
       h("ul", { class: "plain" }, tree.filter(n => n.kind === "file").map(node => h("li", { class: node.path === current ? "selected" : "" },
-        h("a", { href: `/apps/${appId}?path=${encodeURIComponent(node.path)}` }, node.path), " ", h("span", { class: "muted" }, when(node.updatedAt))))))), view);
-  if (current) await showFile(appId, current, view);
+        h("a", { href: `/apps/${meta.id}?path=${encodeURIComponent(node.path)}` }, node.path), " ", h("span", { class: "muted" }, when(node.updatedAt)))))), shown);
+  if (current) await showFile(meta.id, current, shown);
 }
 async function showFile(appId, path, view) {
   let file;
-  try { file = await api(`/apps/${appId}/file?path=${encodeURIComponent(path)}`); }
+  try { file = await steward(`/apps/${appId}/file?path=${encodeURIComponent(path)}`); }
   catch {
     // Binary files have no text view: offer the bytes through an authenticated download.
-    const blob = await api(`/apps/${appId}/raw?path=${encodeURIComponent(path)}`, { raw: true });
+    const blob = await steward(`/apps/${appId}/raw?path=${encodeURIComponent(path)}`, { raw: true });
     const url = URL.createObjectURL(blob);
-    view.replaceChildren(h("h2", {}, path), blob.type.startsWith("image/") ? h("img", { src: url, alt: path, style: "max-width:100%" }) : "", h("p", {}, h("a", { href: url, download: path.split("/").pop() }, "下载")));
+    view.replaceChildren(h("h3", {}, path), blob.type.startsWith("image/") ? h("img", { src: url, alt: path, style: "max-width:100%" }) : "", h("p", {}, h("a", { href: url, download: path.split("/").pop() }, "下载")));
     return;
   }
   const reload = () => showFile(appId, path, view);
   const editor = h("textarea", { class: "editor" }, file.content), status = h("span", { class: "muted" });
   const save = async () => {
-    try { await api(`/apps/${appId}/file`, { method: "PUT", body: { path, content: editor.value, baseRevision: file.revision } }); status.textContent = "已保存"; await reload(); }
+    try { await steward(`/apps/${appId}/file`, { method: "PUT", body: { path, content: editor.value, baseRevision: file.revision } }); status.textContent = "已保存"; await reload(); }
     catch (error) { status.textContent = error.message; }
   };
   const toggle = async (line, checked) => {
-    try { await api(`/apps/${appId}/checkbox`, { method: "POST", body: { path, line, checked, baseRevision: file.revision } }); await reload(); }
+    try { await steward(`/apps/${appId}/checkbox`, { method: "POST", body: { path, line, checked, baseRevision: file.revision } }); await reload(); }
     catch (error) { alert(error.message); await reload(); }
   };
   const rendered = /\.md$/i.test(path) ? markdown(file, toggle) : h("pre", {}, /\.json$/i.test(path) ? (() => { try { return JSON.stringify(JSON.parse(file.content), null, 2); } catch { return file.content; } })() : file.content);
-  view.replaceChildren(h("div", { class: "row" }, h("h2", { style: "flex:1" }, path), h("span", { class: "muted" }, when(file.updatedAt))), rendered,
+  view.replaceChildren(h("div", { class: "row" }, h("h3", { style: "flex:1" }, path), h("span", { class: "muted" }, when(file.updatedAt))), rendered,
     h("details", {}, h("summary", {}, "编辑"), editor, h("div", { class: "row" }, h("button", { class: "primary", onclick: save }, "保存"), status)));
 }
 
 // ----------------------------------------------------------------- router --
 async function route() {
   const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
+  replyListeners.clear();
   try {
-    if (parts[0] === "chat" && parts[1] === "new") await newChatPage();
-    else if (parts[0] === "chat") await chat(null);
+    if (parts[0] === "chat") await chat(null);
     else if (parts[0] === "sessions" && parts[1]) await chat(parts[1]);
     else if (parts[0] === "apps" && parts[1]) await app(parts[1], url.searchParams.get("path"));
     else if (parts[0] === "apps") await apps();
@@ -187,21 +272,6 @@ async function route() {
     if (error instanceof Unauthorized) login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);
     else main.replaceChildren(h("section", {}, h("p", { class: "error" }, error.message)));
   }
-}
-// A new conversation starts on the first message: show an empty chat whose form creates the session.
-async function newChatPage() {
-  const sessions = (await api("/sessions?source=web&status=active")).items;
-  const status = h("p", { class: "muted" }), list = h("div", { class: "messages" });
-  main.replaceChildren(h("div", { class: "chat" },
-    h("section", {}, h("h2", {}, "会话"), h("ul", { class: "plain" }, sessions.map(s => h("li", {}, h("a", { href: `/sessions/${s.id}` }, s.title ?? when(s.createdAt)))))),
-    h("section", {}, list, h("form", { onsubmit: async event => {
-      event.preventDefault();
-      const text = event.target.text.value.trim();
-      if (!text) return;
-      list.append(h("div", { class: "bubble in" }, text)); status.textContent = "Chrona 正在处理……";
-      try { go(`/sessions/${(await api("/chat", { method: "POST", body: { text, key: `web:${crypto.randomUUID()}` } })).sessionId}`, true); }
-      catch (error) { status.textContent = error.message; }
-    } }, h("textarea", { name: "text", rows: 3, placeholder: "新会话：说点什么……" }), h("div", { class: "row" }, h("button", { class: "primary" }, "发送"), status)))));
 }
 function go(path, replace = false) {
   history[replace ? "replaceState" : "pushState"](null, "", path);
@@ -215,13 +285,15 @@ document.addEventListener("click", event => {
 addEventListener("popstate", () => void route());
 document.getElementById("logout").addEventListener("click", () => { localStorage.removeItem(KEY); login(); });
 
+let listening = false;
 async function start() {
   const key = localStorage.getItem(KEY);
   document.getElementById("logout").hidden = !key;
-  const response = await fetch("/api/workspaces", { headers: key ? { authorization: `Bearer ${key}` } : {} });
+  const response = await fetch("/api/workspaces", { headers: auth() });
   if (response.status === 401) { login(key ? "密钥不正确，请重新输入。" : undefined); return; }
   workspaceId = (await response.json())[0]?.id ?? null;
   if (!workspaceId) { main.replaceChildren(h("p", { class: "error" }, "没有工作区。")); return; }
+  if (!listening) { listening = true; void listen(); }
   await route();
 }
 void start();

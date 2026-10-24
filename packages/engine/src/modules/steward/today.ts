@@ -3,6 +3,8 @@ import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
 import { toApproval, toSession } from "./store";
+import { createApps } from "./apps";
+import { createNotificationsView } from "./notify-user";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 /** `notifications` is answered by the notify module; when it cannot answer the view shows none. */
 export type HealthPorts = { provider(): Promise<Health["provider"]>; moduleSandbox(): boolean;
@@ -36,4 +38,17 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
       upcoming: schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.payload !== null ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() })), health: status };
   }
   return { get, health };
+}
+
+/** The workspace's today view as Chrona sees it: the owner API's /today and the system tool chat.today. */
+export function workspaceToday(ports: StewardPorts, workspaceId: string) {
+  return createToday({ db: ports.db, workspaceId, now: ports.now }, {
+    async provider() {
+      if (!ports.provider) return { name: "unconfigured", available: false, sandboxed: false, lastError: null };
+      try { const h = await ports.provider.health(); return { name: ports.provider.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
+      catch { return { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
+    },
+    moduleSandbox: () => ports.sandbox?.isolated ?? false,
+    notifications: createNotificationsView(ports, workspaceId),
+  }, createApps(ports, workspaceId).list);
 }

@@ -1,5 +1,5 @@
 import { Prisma } from "@chrona/db/generated/prisma/client";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
 import { notificationSettings } from "./settings";
@@ -14,7 +14,8 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
   const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
   if (manifest.listen) for (const other of await tx.module.findMany({ where: { id: { not: moduleId }, status: "active", activeHash: { not: null } } })) {
     const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: other.id, hash: other.activeHash! } } });
-    if (active && moduleManifestSchema.parse(active.manifest).listen === manifest.listen) throw new StewardError("conflict", `${manifest.listen} is served by module ${other.name}`);
+    const taken = active ? listenPaths(moduleManifestSchema.parse(active.manifest)).find(path => listenPaths(manifest).includes(path)) : undefined;
+    if (taken) throw new StewardError("conflict", `${taken} is served by module ${other.name}`);
   }
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active", payload: { equals: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });

@@ -119,6 +119,9 @@ const moduleToolSchema = z.object({
 }).strict();
 /** `<module>.<tool>`: a module tool other modules call through Chrona. */
 export const interfaceRefSchema = z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/);
+const listenPath = z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]);
+/** The HTTP paths a module serves (`listen` is one path or several). */
+export const listenPaths = (manifest: { listen?: string | readonly string[] }): string[] => manifest.listen === undefined ? [] : typeof manifest.listen === "string" ? [manifest.listen] : [...manifest.listen];
 export const moduleManifestSchema = z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
@@ -136,8 +139,9 @@ export const moduleManifestSchema = z.object({
    * kernel paths (`/api/steward*`, `/api/workspaces`, `/api/health`) are reserved. Requires keepAlive.
    * `"/"` is the web page: every GET/HEAD outside /api, /health and /ready, unauthenticated (pages carry no data;
    * the browser calls /api/steward with the user's key), so its module is an entry module like `owner` (see isEntryModule).
+   * Several paths as an array (v2-8: the web page at "/" and its data API under /api/web).
    */
-  listen: z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]).optional(),
+  listen: z.union([listenPath, z.array(listenPath).min(1).max(4)]).optional(),
   /** Deprecated and ignored: delivery adapters are module tools called by the notification module. Kept so stored versions parse. */
   channel: z.literal("chrona_qqbot").optional(),
   /**
@@ -178,7 +182,8 @@ export const moduleManifestSchema = z.object({
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
-  if (manifest.listen && RESERVED_LISTEN_PATHS.some(path => manifest.listen === path || manifest.listen!.startsWith(`${path}-`))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
+  if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
+  if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length) ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
   if (manifest.effects.includes("model") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the model effect is declared" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
@@ -195,8 +200,8 @@ export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
  * Acts as the user (owner API; their conversations, `chat.*`; their approvals, `approvals.*`; every tool open to them, `*`),
  * or serves the page holding the user's key: every version needs the user, never activated automatically.
  */
-export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string; uses?: readonly string[] }) =>
-  manifest.effects.includes("owner") || manifest.listen === "/" || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || target.startsWith("approvals."));
+export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string | readonly string[]; uses?: readonly string[] }) =>
+  manifest.effects.includes("owner") || listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || target.startsWith("approvals."));
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as

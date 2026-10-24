@@ -10,6 +10,7 @@ import { handleModuleCall } from "./module-effects";
 import { testDb } from "./test-db";
 import { qqEntry } from "./test-entry";
 import { notices } from "./test-notices";
+import { readFileSync } from "node:fs";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -119,4 +120,20 @@ test("chat.file and chat.delivered only reach replies in the caller's own conver
   const foreign = await f.db.message.create({ data: { workspaceId: f.w, sessionId: web.id, direction: "out", channel: "in_app", text: "web reply", attachments: [{ name: "a.png", ref: "files/a.png", mime: "image/png", size: 1 }] } });
   await expect(f.qq.call("chat.file", { message: foreign.id, ref: "files/a.png" })).rejects.toMatchObject({ code: "not_found" });
   await expect(f.qq.call("chat.delivered", { message: foreign.id, "external-id": "qq:out:x" })).rejects.toMatchObject({ code: "not_found" });
+});
+
+test("the web page is an entry like qq: its conversations push replies to web.reply, and it cannot speak in qq's", async () => {
+  const f = await fixture();
+  const manifest = moduleManifestSchema.parse(JSON.parse(readFileSync(join(import.meta.dirname, "builtin/web/module.json"), "utf8")));
+  const web = await f.db.module.create({ data: { workspaceId: f.w, name: "web", activeHash: "web-test", builtin: true } });
+  await f.db.moduleVersion.create({ data: { moduleId: web.id, hash: "web-test", manifest, source: "builtin", intent: {}, report: {}, status: "approved" } });
+  const call = (target: string, args: Record<string, unknown>) => handleModuleCall(f.ports, { workspaceId: f.w, moduleId: web.id, hash: "web-test", manifest }, { id: "w", method: "call", params: { target, args: args as never, mode: "sync", reply: false } });
+  f.behaviors.push({ reply: "QQ 回答" }, { reply: "网页回答" });
+  await send(f, "QQ 提问", "qq:in:1");
+  await f.settle();
+  expect(await call("chat.send", { key: "qq:dm", text: "插话", channel: "in_app" })).toMatchObject({ error: { code: "forbidden" } });
+  expect(await call("chat.send", { key: "web:w1", text: "网页提问", channel: "in_app" })).toHaveProperty("result");
+  await f.settle();
+  const pushed = await f.db.moduleInvocation.findMany({ where: { workspaceId: f.w, tool: "reply" }, orderBy: { createdAt: "asc" } });
+  expect(pushed.map(row => [row.target, (row.args as { text: string }).text])).toEqual([["qq", "QQ 回答"], ["web", "网页回答"]]);
 });

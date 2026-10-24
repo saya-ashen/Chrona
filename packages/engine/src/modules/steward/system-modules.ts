@@ -5,6 +5,7 @@ import { createSessions } from "./sessions";
 import { contentArea } from "./content";
 import { createApprovals } from "./approvals";
 import { createModules } from "./modules";
+import { workspaceToday } from "./today";
 import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type Tool } from "./module-calls";
 import { parseInput } from "./errors";
 
@@ -36,6 +37,7 @@ const chat: SystemModule = {
     tool("sessions", "The user's conversations, most recent first.", { source: { type: "string", enum: [...SESSION_SOURCES] }, status: { type: "string", enum: [...SESSION_STATUSES] } }, [], { idempotent: true }),
     tool("session", "One conversation.", { session: text() }, ["session"], { idempotent: true }),
     tool("session-update", "Rename or end a conversation.", { session: text(), title: text(), status: { type: "string", enum: ["ended"] } }, ["session"], { idempotent: true }),
+    tool("today", "The user's overview: approvals waiting, the next 7 days of schedules, recent notifications, apps, recent conversations and health.", {}, [], { idempotent: true }),
     tool("messages", "A conversation's recent messages, oldest first.", { session: text(), limit: { type: "number", description: "1-200, default 50" } }, ["session"], { idempotent: true }),
   ],
   async handle({ ports, workspaceId, caller }, name, args) {
@@ -45,6 +47,9 @@ const chat: SystemModule = {
     const own = async (sessionId: string) => (await db.session.findFirst({ where: { id: sessionId, workspaceId } }))?.entryModuleId === module.moduleId;
     switch (name) {
       case "send": {
+        // Another entry's conversation is not this module's to speak in (or to take its replies).
+        const session = await db.session.findFirst({ where: { workspaceId, key: String(args.key), status: "active" } });
+        if (session?.entryModuleId && session.entryModuleId !== module.moduleId) throw new CallError("forbidden", "Conversation belongs to another entry");
         let raw: unknown = [];
         try { if (args.attachments !== undefined) raw = JSON.parse(String(args.attachments)); } catch { throw new CallError("invalid", "attachments must be a JSON array"); }
         const attachments = parseInput(z.array(attachmentSchema.extend({ base64: z.string().optional() })).max(10), raw);
@@ -59,6 +64,7 @@ const chat: SystemModule = {
       }
       case "new-session": return json(await createSessions(ports, workspaceId).new({ key: String(args.key) }));
       case "ask": return json(await service.handleMessage({ workspaceId, channel: "in_app", text: String(args.text), ...(args.session ? { sessionId: String(args.session) } : {}), ...(args.key ? { key: String(args.key) } : {}) }));
+      case "today": return json(await workspaceToday(ports, workspaceId).get());
       case "sessions": return json(await createSessions(ports, workspaceId).list({ ...(args.source ? { source: args.source } : {}), ...(args.status ? { status: args.status } : {}) }));
       case "session": return json(await createSessions(ports, workspaceId).get(String(args.session)));
       case "session-update": return json(await createSessions(ports, workspaceId).update(String(args.session), { ...(args.title !== undefined ? { title: args.title } : {}), ...(args.status !== undefined ? { status: args.status } : {}) }));
@@ -126,7 +132,7 @@ const modules: SystemModule = {
       for (const candidate of moduleManifestSchema.safeParse(version?.manifest).data?.tools ?? []) {
         const target = `${module.name}.${candidate.name}`;
         if (!words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) || !await admitted(ports.db, caller, candidate, target)) continue;
-        found.push({ target, description: candidate.description, inputSchema: { ...candidate.parameters, additionalProperties: false } });
+        found.push({ target, description: candidate.description, inputSchema: { ...candidate.parameters, additionalProperties: false }, idempotent: candidate.idempotent });
       }
     }
     return json(found);

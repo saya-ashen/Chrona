@@ -1,6 +1,6 @@
 import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
+import { listenPaths, moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { moduleModelSettings } from "./settings";
 import { registerBuiltins } from "./module-builtin";
@@ -205,7 +205,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
   async function listener(path: string) {
     for (const module of await ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })) {
       const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-      if (moduleManifestSchema.safeParse(version?.manifest).data?.listen !== path) continue;
+      if (!listenPaths(moduleManifestSchema.safeParse(version?.manifest).data ?? {}).includes(path)) continue;
       await ensureActive(module.id);
       const instance = instances.get(keyOf(module.id, module.activeHash!));
       await instance?.start?.catch(() => {});

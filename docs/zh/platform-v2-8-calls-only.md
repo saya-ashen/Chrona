@@ -1,6 +1,6 @@
 # v2-8 规格：模块之间只经路由调用
 
-状态：用户已确认（2026-10-24）。§11 第 1 步已实现（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）；第 2–4 步未实现。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
+状态：用户已确认（2026-10-24）。§11 第 1 步（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）与第 2 步（`listen` 多路径、web 改为路由调用、`chat.today`、回复推送）已实现；第 3、4 步未实现。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
 
 ## 1. 目标
 
@@ -52,9 +52,13 @@
 - `chat.sessions`（列表，可按来源、状态过滤）、`chat.session`（读取）、`chat.session-update`（改名、结束）、`chat.messages`（最近消息）。取代 `GET/PATCH /sessions*`、`GET /sessions/:id/messages`。
 - `chat.ask`（同步）：发出用户消息并等这次运行的回复（语义同 `POST /chat`，等待上限相同）。给一问一答的入口（MCP）用：会话**不记入口模块**，回复不推送，后台结果照旧发通知。需要推送的入口（qq、web）用 `chat.send`。
 
-### 4.3 内置模块工具可见性调整
+### 4.3 今天
 
-web 的“今天”页需要的数据改由各自的模块提供：`notify.list`、`notify.status`、`notify.feedback`、`notify.retry` 增加 `owner` 可见性；`remind` 增加 `upcoming`（未来 7 天的日程）；审批用 `approvals.list` / `approvals.resolve`。owner API 的 `/today` 不再给模块使用。
+`chat.today`（`visibility: ["modules"]`）：内核汇总的总览，与 owner API `/today` 同一份数据（待决定的审批、未来 7 天的日程、最近通知、应用、最近会话、健康状态）。这些都是内核掌握的事实（通知经 `notify` 模块取得），所以作为一个系统接口提供，不拆给各模块；`notify`、`remind` 的工具可见性不变。
+
+### 4.4 会话归属
+
+`chat.send` 拒绝在**另一个入口模块**的会话里发言（`forbidden`），与 `chat.record`、`chat.file` 相同：否则一个入口（如 web）用另一个入口的 key（`qq:dm`）发消息，就会把该会话的入口和回复推送改到自己名下。没有入口的旧会话可以被第一个发言的入口认领。
 
 ## 5. 入口模块的 HTTP
 
@@ -64,11 +68,12 @@ web 的“今天”页需要的数据改由各自的模块提供：`notify.list`
 
 ## 6. web 模块
 
-- 服务端：`/api/web/*` 把页面操作翻译成路由调用；`uses`：`chat.*`、`approvals.*`、`modules.*`、`*`。
+- 服务端：`/api/web/*` 把页面操作翻译成路由调用；`uses`：`chat.send`、`chat.session`、`chat.sessions`、`chat.messages`、`chat.today`、`approvals.resolve`、`modules.list`、`modules.tools`、`*`。`/api/web/call` 调用模块工具，不接受系统模块（它们有专门的路由）。
 - **通用页面**：对没有专门页面的模块，列出它的运行记录（来自 `modules.list`）和对用户开放的工具（来自 `modules.tools`），按参数结构生成表单与按钮；会改变状态的工具点击后先确认。新模块一启用就能在网页上用。
 - **专门页面**：模块需要更好的展示时，由 AI 修改 web 模块（构建、测试、用户批准启用，与其他模块相同）。web 代码中按模块名组织专门页面；对应模块不存在或工具调用失败时退回通用页面。
-- 对话：`chat.send` 发消息；web 提供 `reply` 工具接收回复推送（v2-7 §4），经 SSE（`GET /api/web/events`）推给浏览器，取代轮询。网页会话因此有入口模块，后台结果推回网页对话，不再另发通知。
-- 今天：由 `approvals.list`、`notify.list`、`remind.upcoming`、`modules.list`、`chat.sessions` 组成。
+- 对话：`chat.send` 发消息；web 提供 `reply` 工具（`callers: ["chat"]`）接收回复推送（v2-7 §4），经 SSE（`GET /api/web/events`，浏览器用 `fetch` 读以便带上密钥，每 5 秒心跳）推给打开的页面，取代等待 `/chat` 返回。没有页面打开时回复不丢：页面打开时读会话。网页会话因此有入口模块，后台结果推回网页对话，不再另发通知。
+- 今天：`chat.today`。
+- 第 2 步后：应用内容页（内容区的文件树、读写、勾选、附件链接）仍由浏览器直接请求 owner API `/api/steward/apps/*`，第 3 步删除内容区时移走。
 
 ## 7. MCP 模块
 

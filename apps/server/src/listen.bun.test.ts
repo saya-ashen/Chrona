@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "@chrona/engine";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
@@ -32,6 +32,11 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   expect(moduleManifestSchema.safeParse({ ...base, keepAlive: false, listen: "/api/echo" }).success).toBe(false);
   expect(moduleManifestSchema.safeParse({ ...base, listen: "/" }).success).toBe(true);
   for (const listen of ["/api/steward", "/api/steward-agent", "/api/workspaces", "/api/health", "/api/a/b", "/x"]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
+  // Several paths (v2-8): each checked; serving "/" makes it an entry module.
+  expect(moduleManifestSchema.safeParse({ ...base, listen: ["/", "/api/web"] }).success).toBe(true);
+  for (const listen of [["/", "/api/steward"], ["/api/web", "/api/web"], []]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
+  expect(isEntryModule({ effects: [], listen: ["/api/x", "/"] })).toBe(true);
+  expect(isEntryModule({ effects: [], listen: ["/api/x"] })).toBe(false);
 });
 
 (sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which calls the owner API", async () => {
@@ -76,6 +81,15 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect((await app.request("/app.js")).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   expect((await app.request("/api/steward/today?workspaceId=x")).status).toBe(401);
   expect((await app.request("/", { method: "POST" })).status).toBe(404);
+  // The page's data API is the web module's own, behind the user's key, answered by routed calls (v2-8).
+  expect((await app.request("/api/web/today")).status).toBe(401);
+  const view = await app.request("/api/web/today", { headers: { authorization: "Bearer listen-test" } });
+  expect(view.status).toBe(200);
+  expect(await view.json()).toMatchObject({ approvals: [], apps: expect.arrayContaining([expect.objectContaining({ name: "files" })]) });
+  const apps = await (await app.request("/api/web/modules", { headers: { authorization: "Bearer listen-test" } })).json() as { name: string; versions: unknown[] }[];
+  expect(apps.find(row => row.name === "web")?.versions.length).toBeGreaterThan(0);
+  expect(await db.moduleInvocation.findMany({ where: { target: { in: ["chat", "modules"] } }, select: { target: true, tool: true, status: true }, orderBy: { createdAt: "asc" } }))
+    .toEqual([{ target: "chat", tool: "today", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]);
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
     const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });

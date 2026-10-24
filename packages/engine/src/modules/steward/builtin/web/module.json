@@ -1,11 +1,16 @@
 {
   "name": "web",
-  "description": "Chrona's web page: today, conversations and app content, talking to Chrona's owner API from the browser.",
+  "description": "Chrona's web page: today, conversations and apps; its data API at /api/web makes routed calls for the user.",
   "entry": "index.ts",
   "keepAlive": true,
-  "listen": "/",
+  "listen": ["/", "/api/web"],
   "triggers": [],
   "effects": [],
+  "uses": ["chat.send", "chat.session", "chat.sessions", "chat.messages", "chat.today", "approvals.resolve", "modules.list", "modules.tools", "*"],
+  "tools": [
+    { "name": "reply", "description": "A reply in one of this page's conversations, pushed by Chrona.", "visibility": ["modules"], "callers": ["chat"],
+      "parameters": { "type": "object", "properties": { "session": { "type": "string" }, "message": { "type": "string" }, "text": { "type": "string" }, "workspace": { "type": "string" }, "attachments": { "type": "string" }, "in-reply-to": { "type": "string" } }, "required": ["session", "message", "text"] } }
+  ],
   "data": { "schema": 1 },
   "tests": ["test.ts"]
 }

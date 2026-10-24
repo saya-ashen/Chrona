@@ -1,4 +1,6 @@
 import { join } from "node:path";
+import { z } from "zod";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
@@ -14,9 +16,14 @@ import { recoverMigrations } from "./module-migration";
 import { readModuleFiles } from "./module-preview";
 import { callModuleTool, moduleToolsets, moduleToolCatalog } from "./module-tools";
 
+/** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
 async function list(context: ModuleContext) {
   const { db, workspaceId } = context;
-  return db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
+  const rows = await db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true, manifest: true, report: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
+  return rows.map(({ versions, ...row }) => ({
+    ...row, description: moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data?.description ?? null,
+    versions: versions.map(({ manifest: _manifest, report, ...version }) => ({ ...version, errors: z.object({ errors: z.array(z.string()) }).safeParse(report).data?.errors ?? null })),
+  }));
 }
 async function checkout(context: ModuleContext, moduleId: string, hash: string | undefined, dir: string, root: string) {
   const { db, store } = context;
