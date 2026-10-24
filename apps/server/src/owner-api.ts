@@ -5,13 +5,14 @@ import { readEnv } from "./config/env";
 /** The owner API for entry modules: one request of the /api/steward map, in process, as the user. */
 export function ownerApi(ports: StewardPorts, service: StewardService, wake: () => void): NonNullable<StewardPorts["owner"]> {
   let routes: ReturnType<typeof createStewardRoutes> | undefined;
-  return async (workspaceId, { method, path, body }) => {
+  return async (workspaceId, { method, path, body }, via) => {
     routes ??= createStewardRoutes(ports, service, wake);
     const url = new URL(path, "http://owner");
     url.searchParams.set("workspaceId", workspaceId);
     const key = readEnv().API_KEY, headers = new Headers(key ? { authorization: `Bearer ${key}` } : {});
     if (body !== undefined) headers.set("content-type", "application/json");
-    const response = await routes.request(url.pathname + url.search, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    // The entry module travels in the in-process env, which no network request can set: it labels the record only.
+    const response = await routes.request(url.pathname + url.search, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }, { ownerModule: via?.module });
     const contentType = response.headers.get("content-type") ?? "";
     // Downloads (e.g. /apps/:id/raw) come back as base64; the module channel caps lines at 32 MiB.
     if (!contentType.includes("json") && response.ok && response.status !== 204) {

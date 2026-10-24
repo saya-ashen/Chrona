@@ -39,7 +39,8 @@ function fileLink(origin: string, appId: string, path: string, workspaceId: stri
 }
 const isReplyImage = (file: Attachment | undefined) => Boolean(file?.ref && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024);
 
-export function createRelay({ owner, publicUrl, download, pollMs = 2000 }: { owner: Owner; publicUrl: string | null; download: Download; pollMs?: number }) {
+/** `notify`: an async call to notify.send (the notify module applies the budget and picks the channel). */
+export function createRelay({ owner, notify, publicUrl, download, pollMs = 2000 }: { owner: Owner; notify: (args: Record<string, unknown>) => Promise<unknown>; publicUrl: string | null; download: Download; pollMs?: number }) {
   // Reply bodies by message id, for image uploads; and replies already relayed (a run's late replies are polled).
   const sent = new Map<string, Message>(), claimed = new Set<string>();
   const apps = async () => (await call<{ items: { id: string; name: string }[] }>(owner, { method: "GET", path: "/apps" })).items;
@@ -100,7 +101,7 @@ export function createRelay({ owner, publicUrl, download, pollMs = 2000 }: { own
     },
     setExternalId: (messageId: string, externalId: string) => call(owner, { method: "PATCH", path: `/messages/${encodeURIComponent(messageId)}`, body: { externalId } }),
     /** The normal budget may fold this into a digest; never bypass quiet hours/caps. Pinned to its sender. */
-    enqueueFinal: (key: string, text: string, recipient: string, sessionId?: string | null) => call(owner, { method: "POST", path: "/notifications", body: { title: "Chrona", body: text, dedupeKey: `response:qq-final:${key}`, recipient, ...(sessionId ? { sessionId } : {}) } }),
+    enqueueFinal: (key: string, text: string, recipient: string, sessionId?: string | null) => notify({ key: `response:qq-final:${key}`, level: "now", title: "Chrona", body: text.slice(0, 4000), recipient, responds: true, ...(sessionId ? { session: sessionId } : {}) }),
     /** A notification QQ accepted joins the QQ session, so quoting it works. */
     recordDelivered: (text: string, externalId: string) => call(owner, { method: "POST", path: "/messages", body: { key: "qq:dm", channel: "chrona_qqbot", text: text.slice(0, 8000), externalId } }),
   };

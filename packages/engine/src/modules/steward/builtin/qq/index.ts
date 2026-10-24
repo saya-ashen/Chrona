@@ -6,27 +6,39 @@ import { ackQqInteraction, createQqGateway, createQqTokenSource, downloadQqAttac
 import { createRelay } from "./relay";
 
 const log: QqLog = (event, fields = {}) => console.error(JSON.stringify({ component: "qq-bot", event, ...fields }));
-// Registered before any await: deliver events can arrive while the module is still starting.
+// Registered before any await: deliver calls can arrive while the module is still starting.
 let deliver = async (_message: DeliveryMessage): Promise<DeliveryOutcome> => ({ outcome: "rejected", retryable: true, error: "QQ bot is starting" });
-on("deliver", async (event: { message: DeliveryMessage }) => ({ result: await deliver(event.message) }));
+on("tool", async (event: { id: string; args: Record<string, string | boolean | undefined> }) => {
+  if (event.id !== "deliver") throw new Error(`Unknown tool ${event.id}`);
+  const { key, title, body, link, recipient, approval, scoped } = event.args;
+  return { result: await deliver({ idempotencyKey: String(key), title: String(title), body: String(body), link: typeof link === "string" ? link : null, recipient: typeof recipient === "string" ? recipient : null,
+    ...(typeof approval === "string" ? { approval: { id: approval, scoped: scoped === true } } : {}) }) };
+});
+// Readiness goes to the notify module, which picks the channel; the time orders reports that arrive late.
+async function reportReady(ready: boolean) {
+  const at = new Date().toISOString();
+  try { await chrona.call("notify.channel", { channel: "chrona_qqbot", ready, at }, { mode: "async", key: `ready:${at}:${ready}` }); return true; }
+  catch { log("qq.channel_report_failed"); return false; }
+}
 const credentials = async () => (await chrona.secret({ name: "qq_bot" })).value as { appId?: string; clientSecret?: string };
 const appId = await credentials().then(value => /^\d{5,20}$/.test(value.appId ?? "") && value.clientSecret ? value.appId! : null, () => null);
 
 if (!appId) {
   // Not configured: stay up so Chrona keeps routing notifications to the web.
   log("qq.unconfigured");
-  await chrona.channel({ ready: false });
+  await reportReady(false);
   deliver = async () => ({ outcome: "rejected", retryable: false, error: "QQ bot is not configured" });
 } else {
   const tokens = createQqTokenSource({ appId, readSecret: async () => (await credentials()).clientSecret!, log });
   const state = createQqBotState(chrona.paths.data, appId);
-  const relay = createRelay({ owner: chrona.owner, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, download: downloadQqAttachment });
+  const relay = createRelay({ owner: chrona.owner, notify: args => chrona.call("notify.send", args, { mode: "async", key: `final:${String(args.key)}` }), publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, download: downloadQqAttachment });
   let recipients = new Set<string>(), ready: boolean | null = null;
   const delivery = createChronaQqDelivery({ tokens, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, allowedRecipients: () => recipients });
   async function refreshBinding() {
     const binding = await state.binding();
     recipients = new Set(binding ? [`${DEDICATED_PLATFORM}:${binding.openid}`] : []);
-    if (ready !== Boolean(binding)) { ready = Boolean(binding); await chrona.channel({ ready }); }
+    // A failed report is repeated on the next status refresh.
+    if (ready !== Boolean(binding) && await reportReady(Boolean(binding))) ready = Boolean(binding);
     return binding;
   }
   async function writeStatus() {
@@ -58,8 +70,6 @@ if (!appId) {
     })(); },
   });
   deliver = async message => {
-    // Conversation replies go out passively from the chat flow above; only outbox notifications are sent actively.
-    if (message.idempotencyKey.startsWith("reply:")) return { outcome: "accepted", receiptRef: null };
     const binding = await refreshBinding();
     const result = await delivery.send(message);
     if (binding && result.outcome === "accepted" && result.receiptRef) {

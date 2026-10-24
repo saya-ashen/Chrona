@@ -3,10 +3,10 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger, type SessionSource } from "@chrona/contracts/steward";
-import { localDayKey } from "@chrona/domain/steward/notify-budget";
+import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
-import { enqueueNotification } from "./notify";
+import { notifyUser } from "./notify-user";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
@@ -87,7 +87,6 @@ class RunService {
     if (!run) throw new StewardError("not_found", "Run not found");
     if (run.status !== "running") return;
     const expired = !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now));
-    const chatBound = ports.chat ? await ports.chat.bound() : false;
     const finalized = await db.$transaction(async tx => {
       const cancelled = !!await tx.audit.findUnique({ where: { id: providerCancelKey(runId) } });
       const status = cancelled ? "cancelled" : expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
@@ -95,8 +94,8 @@ class RunService {
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return false;
       if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
       if (run.lane !== "build") {
-        if (status === "finished") await this.deliverResult(tx, run, now, chatBound);
-        await this.followUp(tx, run, status, now, chatBound);
+        if (status === "finished") await this.deliverResult(tx, run, now);
+        await this.followUp(tx, run, status, now);
       }
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
       return true;
@@ -106,7 +105,7 @@ class RunService {
     await settleBuildAttempt(ports, workspaceId, runId);
     await ports.onRunFinished?.(workspaceId, runId);
   }
-  private async deliverResult(tx: Prisma.TransactionClient, run: RunRow, now: Date, chatBound: boolean) {
+  private async deliverResult(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
     const session = run.session;
     if (!session || !["wake", "module"].includes(session.source)) return;
     const receipts = await tx.audit.findMany({ where: { workspaceId: this.workspaceId, kind: "run_reply", subjectId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
@@ -124,16 +123,17 @@ class RunService {
       for (const reply of ordered) await tx.message.create({ data: { workspaceId: this.workspaceId, sessionId: origin.id, channel: latest?.channel ?? "in_app", direction: "out", text: reply.text, attachments: reply.attachments as Prisma.InputJsonValue, at: now } });
       await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
     }
-    const notification = await enqueueNotification(tx, { workspaceId: this.workspaceId, level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n").slice(0, 4000), dedupeKey: `session-result:${run.id}` }, { now, chatBound, publicUrl: this.ports.publicUrl });
-    await tx.notification.update({ where: { id: notification.id }, data: { sessionId: session.originSessionId ?? session.id, moduleId: session.moduleId } });
+    const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
+    await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,
+      session: session.originSessionId ?? session.id, ...(module ? { module: module.id, app: module.name } : {}) });
   }
-  private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, chatBound: boolean) {
+  private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date) {
     const { workspaceId, ports } = this;
     if (["failed", "timed_out", "provider_unavailable"].includes(status)) {
       const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
-      if (failures === RUN_LIMITS.maxFailures) await enqueueNotification(tx, { workspaceId, level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", dedupeKey: `run-failed:${run.id}` }, { now, chatBound, publicUrl: ports.publicUrl });
+      if (failures === RUN_LIMITS.maxFailures) await notifyUser(tx, ports, workspaceId, { level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", key: `run-failed:${run.id}` });
       const retry = await tx.run.create({ data: { workspaceId, sessionId: run.sessionId, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
       const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });

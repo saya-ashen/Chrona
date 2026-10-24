@@ -7,6 +7,7 @@ import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
+import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -14,13 +15,13 @@ async function fixture(scope: "once" | "always" = "always", network = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-auto-test-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test", settings: { notifications: DEFAULT_NOTIFICATION_SETTINGS } } });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "prices");
   await mkdir(dir, { recursive: true });
-  const manifest: ModuleManifest = { dynamicSchedules: false, content: false, secrets: [], packages: [], name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
+  const manifest: ModuleManifest = { dynamicSchedules: false, content: false, secrets: [], packages: [], uses: [], name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, data: { schema: 1 } };
   let revision = 0;
   const propose = async () => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
@@ -54,8 +55,8 @@ test.each(["no data", "live data", "empty schema upgrade", "changed triggers", "
   expect(await f.db.module.findUniqueOrThrow({ where: { id: version.moduleId } })).toMatchObject({ activeHash: version.hash, status: "active" });
   expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "activate", seq: 2 });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_auto_activated" } })).toMatchObject({ details: { versionId: version.id, hash: version.hash, grantId: f.grantId } });
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "digest", title: "模块 prices 已自动更新" });
-  const notification = await f.db.notification.findFirstOrThrow();
+  expect(await notice(f.db)).toMatchObject({ level: "digest", title: "模块 prices 已自动更新" });
+  const notification = await notice(f.db);
   expect(notification.body).toContain("Refactor prices"); expect(notification.body).toContain("Rules");
   expect(notification.body).toContain(`版本 hash: ${version.hash}`); expect(notification.body).toContain("可在模块历史中回滚");
 });
@@ -68,7 +69,7 @@ async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
   expect(await f.db.generation.count()).toBe(1);
   expect(await f.db.approval.count({ where: { status: "approved" } })).toBe(1);
   expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(0);
-  expect(await f.db.notification.count()).toBe(0);
+  expect((await notices(f.db)).length).toBe(0);
   return version;
 }
 
@@ -113,7 +114,7 @@ test.each(["tests", "smoke"])("failed %s rejects the update despite a module gra
   expect(version.status).toBe("rejected");
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash });
   expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(0);
-  expect(await f.db.notification.count()).toBe(0);
+  expect((await notices(f.db)).length).toBe(0);
 });
 
 test.each(["auto", "notify_after"] as const)("explicit %s policy uses its non-once grant", async mode => {

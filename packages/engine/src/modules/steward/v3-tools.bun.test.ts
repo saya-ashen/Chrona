@@ -11,7 +11,7 @@ let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, ses
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   sessionId = (await db.session.create({ data: { workspaceId, key: "web:tools", source: "web" } })).id;
-  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-tools-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chat: null, deliveries: [] };
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-tools-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null };
 });
 afterEach(async () => { await db.$disconnect(); });
 async function capability() {

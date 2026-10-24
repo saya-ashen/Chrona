@@ -1,6 +1,6 @@
 # v2-1 规格：模块运行模型——常驻、事件驱动，去掉回放
 
-状态：草案，未实现（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；是 v2-2 至 v2-5 的前提。
+状态：已实现（2026-10-23）；跨模块调用与通知模块见 [v2-5 §9](platform-v2-5-extensions.md)。总纲见 [platform-v2](platform-v2.md)；是 v2-2 至 v2-5 的前提。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 决定
@@ -74,7 +74,7 @@ on("schedule", async ev => {
 
 | 能力 | 方法 | 说明 |
 |---|---|---|
-| `notify_user` | `notify` | 经通知预算；`key` 为幂等键 |
+| `notify_user` | `notify` | 兼容别名：转为对 `notify.send` 的异步调用（v2-5 §9）；`key` 为幂等键 |
 | `wake_provider` | `wakeProvider` | 唤起 Provider，内容按 untrusted data 注入（v2-2 之前唤起模块所属事务；之后在全新会话中运行，见 v2-2 §2.4） |
 | `model` | `model` | v2-3 |
 | `owner` | `owner.*` | v2-4 |

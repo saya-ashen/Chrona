@@ -8,6 +8,7 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -16,7 +17,7 @@ async function fixture() {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const now = new Date("2026-10-21T04:00:00Z"), calls: unknown[] = [];
   let error: string | null = null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null,
     sandbox: testModuleSandbox(async input => {
       calls.push(input);
       return { status: error ? "failed" : "succeeded", exitCode: error ? 1 : 0, error,
@@ -28,7 +29,7 @@ async function fixture() {
   const service = createStewardService(ports), api = service.forWorkspace(workspaceId);
   const session = await db.session.create({ data: { workspaceId, source: "web", key: "web:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
-  const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
+  const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "wake_provider", "network"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
@@ -49,7 +50,7 @@ test("unfocused sessions find deferred module tools", async () => {
   await f.db.session.update({ where: { id: f.session.id }, data: { focus: [] } });
   expect((await f.service.tools.catalog(f.run.token)).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail" } });
   expect(await f.call()).toMatchObject({ result: { found: 3 } });
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ moduleId: f.module.id });
+  expect(await notice(f.db)).toMatchObject({ moduleId: f.module.id });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "chrona", subjectId: f.module.id, details: { tool: "m_mail_sort_find_mail", callerRunId: f.run.id, callerSessionId: f.session.id } });
 });
 test("module names are unique within the workspace", async () => {
@@ -80,8 +81,8 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "executed", "duplicate", "duplicate"]);
   expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
-    input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
-  expect(await f.db.notification.count()).toBe(1);
+    input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
+  expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(1);
   expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ prompt: expect.stringContaining("(untrusted data)") });
   expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null });
@@ -95,7 +96,7 @@ test("module failure returns truncated public stderr and shares the consecutive 
   for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "conflict", message: "x".repeat(2000) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   expect(await f.db.moduleRun.count()).toBe(3);
-  expect(await f.db.notification.count({ where: { title: "模块连续失败，已暂停" } })).toBe(1);
+  expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
   expect((await f.service.tools.catalog(f.run.token)).some(tool => tool.name.startsWith("m_"))).toBe(false);
   expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ ok: false }, { ok: false }, { ok: false }]);

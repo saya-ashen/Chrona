@@ -7,7 +7,7 @@ import { audit } from "./audit";
 import { activateApprovedIn } from "./module-activation";
 import { dataEmpty } from "./module-data";
 import { intentSchema, requireModule, type BuildReport, type ModuleContext, type ModuleVersion } from "./module-context";
-import { createNotifications } from "./notify";
+import { notifyUser } from "./notify-user";
 
 type ReviewCard = { moduleId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
 function checksPassed(report: BuildReport) {
@@ -22,9 +22,18 @@ async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, ve
   if (!context.ports.sandbox?.isolated || isEntryModule(manifest)) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
-  const effects = moduleManifestSchema.parse(active.manifest).effects;
-  if (isEntryModule(moduleManifestSchema.parse(active.manifest))) return false;
+  const current = moduleManifestSchema.parse(active.manifest), effects = current.effects;
+  if (isEntryModule(current)) return false;
   if (!manifest.effects.every(effect => effects.includes(effect))) return false;
+  // Calling another module, or being callable by more parties, is a capability too.
+  if (!manifest.uses.every(target => current.uses.includes(target))) return false;
+  if (!manifest.tools.every(tool => {
+    const previous = current.tools.find(candidate => candidate.name === tool.name);
+    const wider = (visibility: string[]) => visibility.some(value => value !== "provider" && value !== "owner");
+    if (!previous) return !wider(tool.visibility);
+    const callers = !tool.visibility.includes("modules") || previous.callers === undefined || (tool.callers?.every(name => previous.callers!.includes(name)) ?? false);
+    return tool.visibility.every(value => previous.visibility.includes(value)) && callers;
+  })) return false;
   // New or changed dependencies count as new capabilities (v2-6 §4).
   if (!manifest.packages.every(name => moduleManifestSchema.parse(active.manifest).packages.includes(name))) return false;
   for (const lockfile of ["package.json", "bun.lock", "pyproject.toml", "uv.lock"]) {
@@ -58,6 +67,6 @@ export async function tryAutoActivate(context: ModuleContext, version: ModuleVer
   catch { return null; }
   if (!approval) return null;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await createNotifications(context.ports, context.workspaceId).enqueue({ moduleId: card.moduleId, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n完整意图与代码差异见审批预览；版本 hash: ${version.hash}\n可在模块历史中回滚`, dedupeKey: `module-auto-activated:${version.id}` });
+  await notifyUser(context.db, context.ports, context.workspaceId, { module: card.moduleId, app: manifest.name, level: "digest", title: `模块 ${manifest.name} 已自动更新`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n完整意图与代码差异见审批预览；版本 hash: ${version.hash}\n可在模块历史中回滚`, key: `module-auto-activated:${version.id}` });
   return approval;
 }

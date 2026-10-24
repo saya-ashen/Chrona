@@ -9,8 +9,8 @@ try {
     const reply = await module.send({ trigger: { kind: "schedule", id: scheduleId, scheduleId, firedAt: now, payload: { text } }, now, params: {} });
     assert.equal(reply.error, undefined);
     const call = module.calls.at(-1);
-    assert.equal(call.method, "notify");
-    assert.deepEqual(call.params, { key: `${scheduleId}:${now}`, level: "now", title: "提醒", body: text });
+    assert.equal(call.method, "call");
+    assert.deepEqual(call.params, { target: "notify.send", args: { key: `${scheduleId}:${now}`, level: "now", title: "提醒", body: text }, mode: "async", key: `${scheduleId}:${now}` });
   }
   assert.equal(module.calls.length, 2);
 } finally { await module.stop(); }

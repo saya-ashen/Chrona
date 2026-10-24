@@ -15,7 +15,7 @@ let answers: ProviderAnswer[], capability: string;
 beforeEach(async () => {
   previous = process.env.API_KEY; process.env.API_KEY = "provider-owner-fixture"; resetEnvCacheForTests();
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = []; capability = "";
-  ports = { db, now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), deliveries: [], chat: null, publicUrl: null,
+  ports = { db, now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
       const controller = new AbortController(); capability = input.token;
       const done = (async () => {

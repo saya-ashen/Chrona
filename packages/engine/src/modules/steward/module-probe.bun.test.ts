@@ -5,7 +5,7 @@ import { keyProbePreview, probeKeys, smokeRun } from "./module-probe";
 import { testModuleProcess } from "./module-test-process";
 
 const schedule = { id: "daily", schedule: { kind: "daily" as const, time: "09:00" } };
-const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ dynamicSchedules: false, content: false, secrets: [], packages: [], name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
+const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ dynamicSchedules: false, content: false, secrets: [], packages: [], uses: [], name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: ["notify_user"], tests: ["test.ts"], params: {}, data: { schema: 1 } });
 function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[] = []) {
   const peer = testModuleProcess(async (event, call) => {
     inputs.push(event);
@@ -39,7 +39,7 @@ test("review card keeps the key-probe shape", () => {
 });
 test.each([false, true])("smoke sends every trigger and tool; failure=%s", async failed => {
   const inputs: unknown[] = [], m = manifest([schedule, { ...schedule, id: "second" }, { id: "mail", inbound: { connector: "c", match: {} } }]);
-  m.tools = [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {}, required: [] } }];
+  m.tools = [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {}, required: [] }, visibility: ["provider", "owner"], idempotent: false }];
   const errors = await smokeRun(context(() => failed ? null : [], inputs), "/staging", m);
   expect(errors).toHaveLength(failed ? 4 : 0);
   expect(inputs).toMatchObject([

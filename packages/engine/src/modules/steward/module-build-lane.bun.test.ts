@@ -12,6 +12,7 @@ import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
 import { proposeFromBuild } from "./module-build-lane";
+import { notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -25,7 +26,7 @@ async function fixture() {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
   let fail = false, build: Build = async () => {};
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-21T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null,
     moduleSdk: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk", import.meta.url)),
     sandbox: { available: true, isolated: true, async runModule() { return { status: fail ? "failed" : "succeeded", output: '{"effects":[]}', error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 }; } },
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
@@ -117,7 +118,7 @@ test("failed, invalid or empty attempts retry with the public report, then give 
   expect(attempt).toBe(RUN_LIMITS.maxBuildAttempts);
   expect(await f.db.run.count({ where: { lane: "build" } })).toBe(RUN_LIMITS.maxBuildAttempts);
   expect(await f.db.run.count({ where: { lane: { not: "build" }, status: "queued" } })).toBe(0);
-  expect(await f.db.notification.count({ where: { title: "模块 mail-sort 自动构建未成功" } })).toBe(1);
+  expect((await notices(f.db, { title: "模块 mail-sort 自动构建未成功" })).length).toBe(1);
   expect(await f.db.audit.count({ where: { kind: "module_build_settled" } })).toBe(RUN_LIMITS.maxBuildAttempts);
 });
 

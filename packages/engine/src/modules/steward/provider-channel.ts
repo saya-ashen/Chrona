@@ -5,7 +5,8 @@ import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
 import { liveRuns } from "./runs";
 import { cancelProviderRun } from "./provider-cancel";
-import { enqueueNotification } from "./notify";
+import { notifyUser, withdrawNotice } from "./notify-user";
+import { drainCalls } from "./module-calls";
 import { providerAnswerKey, providerCancelKey, providerJournal, providerReceipt, providerRuns } from "./provider-journal";
 
 type Pending = { runId: string; workspaceId: string; db: StewardPorts["db"]; request: ProviderInteraction; claimed: boolean; closed: boolean; settle(value: ProviderAnswer, status: ProviderInteraction["status"]): Promise<void> };
@@ -14,15 +15,6 @@ function assertPending(entry: Pending | undefined, workspaceId: string, db: Stew
   if (!entry || entry.workspaceId !== workspaceId || entry.db !== db || entry.closed || entry.claimed || Date.parse(entry.request.expiresAt) <= now.getTime()) throw new StewardError("conflict", "Provider interaction is no longer active");
 }
 const alreadyClosed = (entry: Pending) => entry.closed;
-async function chatAvailable(chat: StewardPorts["chat"]): Promise<boolean> {
-  if (!chat) return false;
-  let expired!: (value: boolean) => void;
-  const fallback = new Promise<boolean>(resolve => { expired = resolve; });
-  const timer = setTimeout(() => expired(false), 200);
-  try { return await Promise.race([chat.bound(), fallback]); }
-  catch { return false; } // An optional QQ failure must not hide a Web question.
-  finally { clearTimeout(timer); }
-}
 type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; deadlineAt: Date; token?: string };
 
 /** Technical event journal only: no raw RPC, answer body, new permission grant or replayable authorization. */
@@ -46,7 +38,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
       entry.closed = true; clearTimeout(timer); signal.removeEventListener("abort", abort);
       try {
         await providerReceipt(db, run.workspaceId, request.id, status, now());
-        if (owned.size === 1) await db.notification.updateMany({ where: { workspaceId: run.workspaceId, idempotencyKey: `provider-input:${run.id}`, status: { in: ["queued", "folded"] } }, data: { status: "suppressed" } });
+        if (owned.size === 1) { await withdrawNotice(db, ports, run.workspaceId, `provider-input:${run.id}`); void drainCalls(ports, run.workspaceId).catch(() => {}); }
       } catch (error) { resolve({ decision: "cancel" }); throw error; }
       finally { pending.delete(request.id); owned.delete(request.id); }
       resolve(signal.aborted || closed || now() >= expires ? { decision: "cancel" } : value);
@@ -56,15 +48,15 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity) {
     pending.set(request.id, entry); owned.add(request.id);
     signal.addEventListener("abort", abort, { once: true });
     try {
-      const chatBound = await chatAvailable(ports.chat);
       await db.$transaction(async tx => {
         const { method, title, message, options, timeoutMs } = safe;
         const stored = { ...request, question: { method, title, message, options, timeoutMs } };
         await tx.audit.create({ data: { id: `provider-request:${request.id}`, workspaceId: run.workspaceId, actorKey: "chrona", subjectId: run.id, kind: "provider_question", details: stored } });
-        if (!signal.aborted && !closed && !entry.closed) await enqueueNotification(tx, { workspaceId: run.workspaceId, level: "now", title: safe.title, body: safe.message || safe.title, dedupeKey: `provider-input:${run.id}` }, { now: at, chatBound, publicUrl: ports.publicUrl });
+        if (!signal.aborted && !closed && !entry.closed) await notifyUser(tx, ports, run.workspaceId, { level: "now", title: safe.title, body: safe.message || safe.title, key: `provider-input:${run.id}` });
       });
       if (signal.aborted || closed) abort();
-      if (entry.closed && !owned.size) await db.notification.updateMany({ where: { workspaceId: run.workspaceId, idempotencyKey: `provider-input:${run.id}`, status: { in: ["queued", "folded"] } }, data: { status: "suppressed" } });
+      void drainCalls(ports, run.workspaceId).catch(() => {});
+      if (entry.closed && !owned.size) await withdrawNotice(db, ports, run.workspaceId, `provider-input:${run.id}`);
       return await answer;
     } catch (error) { await entry.settle({ decision: "cancel" }, "interrupted"); throw error; }
   }

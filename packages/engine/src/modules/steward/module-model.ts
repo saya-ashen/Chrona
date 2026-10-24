@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { ModuleCall, ModuleManifest } from "@chrona/contracts/steward";
-import { localDayKey } from "@chrona/domain/steward/notify-budget";
+import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
-export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string };
+/** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
+export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
 import { moduleModelSettings, notificationSettings } from "./settings";
 import { audit } from "./audit";
 

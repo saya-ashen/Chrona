@@ -50,11 +50,11 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     checkout: (moduleId: string, hash: string | undefined, dir: string, root: string) => checkout(context, moduleId, hash, dir, root),
     /** Owner view: every workspace module tool, grouped into toolsets. */
     tools: async () => {
-      const scope = { workspaceId };
-      const catalog = await moduleToolCatalog(ports, scope);
+      const catalog = await moduleToolCatalog(ports, { workspaceId, audience: "owner" });
       const tools = catalog.map(({ name, inputSchema: { description, ...inputSchema } }) => ({ name, description, inputSchema }));
       return { tools, toolsets: moduleToolsets(catalog) };
     },
-    callTool: (name: string, args: unknown) => callModuleTool(ports, { workspaceId, runId: null }, name, args),
+    /** `via`: the entry module that relayed the owner's request (recorded, grants nothing). */
+    callTool: (name: string, args: unknown, via: string | null = null) => callModuleTool(ports, { workspaceId, runId: null, via }, name, args),
   };
 }

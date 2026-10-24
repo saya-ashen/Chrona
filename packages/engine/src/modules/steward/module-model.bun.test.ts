@@ -10,6 +10,7 @@ import { createModuleSupervisor } from "./module-supervisor";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -24,7 +25,7 @@ async function fixture() {
   const now = new Date("2026-10-21T04:00:00Z");
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
   let calls = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null, modelGateway: { async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, modelGateway: { async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
   const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
   const call = (maxOutputTokens = 20) => handleModuleCall(ports, scope, { id: "model-call", method: "model", params: { prompt, maxOutputTokens } });
   return { db, dataDir, workspace, module, manifest, ports, scope, call, calls: () => calls };
@@ -32,7 +33,7 @@ async function fixture() {
 
 test("settings moduleModel defaults null, persists owner updates and disabling", async () => {
   const f = await fixture();
-  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, null);
+  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { status: async () => null, forward: async () => null });
   expect((await settings.get()).moduleModel).toEqual(limits);
   expect((await settings.update({ moduleModel: null })).moduleModel).toBeNull();
   expect((await settings.update({ moduleModel: limits })).moduleModel).toEqual(limits);
@@ -96,7 +97,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   f.ports.sandbox = { available: true, isolated: true, startModule: sandbox.startModule };
   const supervisor = createModuleSupervisor(f.ports); cleanups.push(() => supervisor.stop());
   await supervisor.deliver(f.module.id, "v1", { trigger: { kind: "schedule", id: "daily", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: {} });
-  expect(await f.db.notification.findFirst()).toMatchObject({ body: text });
+  expect((await notices(f.db))[0]).toMatchObject({ body: text });
   const calls = await f.db.moduleCall.findMany({ orderBy: { createdAt: "asc" } });
   expect(calls).toHaveLength(2);
   expect(calls).toEqual(expect.arrayContaining([

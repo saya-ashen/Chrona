@@ -9,6 +9,7 @@ import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
+import { notices } from "./test-notices";
 
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-builtin-");
@@ -20,7 +21,7 @@ async function fixture(real = false) {
     if (input.entry === "test.ts") tests++;
     return { status: "succeeded", exitCode: 0, output: '{"effects":[],"result":"ok"}', error: null };
   });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-22T00:00:00Z"), deliveries: [], chat: null, publicUrl: null, moduleBuiltinResources: root,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-22T00:00:00Z"), publicUrl: null, moduleBuiltinResources: root,
     sandbox: real ? { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } : sandbox as StewardPorts["sandbox"] };
   async function write(revision: number) {
     await writeFile(join(code, "module.json"), JSON.stringify({ name: "sample", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] }));
@@ -80,8 +81,8 @@ test.each([false, true])("built-in upgrade preserves user version: %s", async us
     if (user) {
       expect(after.activeHash).toBe(before.activeHash);
       expect(await f.db.moduleVersion.findFirst({ where: { source: "builtin", hash: { not: first.activeHash! } } })).toMatchObject({ status: "pending_review" });
-      expect(await f.db.notification.findFirst()).toMatchObject({ level: "web" });
-      await f.start(); expect(await f.db.notification.count()).toBe(1);
+      expect((await notices(f.db))[0]).toMatchObject({ level: "web" });
+      await f.start(); expect((await notices(f.db)).length).toBe(1);
     } else {
       expect(after.activeHash).not.toBe(before.activeHash);
       expect(await f.db.approval.count()).toBe(0);

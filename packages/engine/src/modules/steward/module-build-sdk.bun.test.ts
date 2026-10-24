@@ -7,6 +7,7 @@ import { smokeRun, probeKeys } from "./module-probe";
 import { checkContinuity, runTests } from "./module-continuity";
 import { moduleContext, type ContinuityReport, type TestReport } from "./module-context";
 import { testDb } from "./test-db";
+import { notices } from "./test-notices";
 
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (sandbox.health.available ? test : test.skip)("SDK author helper, smoke, key probe and migrated continuity use fake kernels", async () => {
@@ -57,7 +58,7 @@ try {
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });
-    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], sandbox: { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);
+    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, sandbox: { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);
     const tests: TestReport = [];
     expect(await runTests(context, code, manifest, tests)).toBe(true);
     expect(tests).toMatchObject([{ exitCode: 0 }]);
@@ -74,7 +75,7 @@ try {
     expect(continuity).toMatchObject({ status: "passed", migrated: true });
     expect(continuity.effects).toHaveLength(4);
     expect(await readFile(join(live, "state"), "utf8")).toBe("original");
-    expect(await db.notification.count()).toBe(0);
+    expect((await notices(db)).length).toBe(0);
     expect(await db.run.count()).toBe(0);
   } finally { await db.$disconnect(); await rm(dir, { recursive: true, force: true }); }
 });

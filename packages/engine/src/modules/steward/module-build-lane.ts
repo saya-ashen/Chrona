@@ -4,10 +4,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { chronaToolInputSchemas, moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
-import { localDayKey } from "@chrona/domain/steward/notify-budget";
+import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
-import { createNotifications } from "./notify";
+import { notifyUser } from "./notify-user";
 import { StewardError } from "./errors";
 import { intentSchema, moduleContext } from "./module-context";
 import { readModuleFiles } from "./module-preview";
@@ -135,7 +135,7 @@ export async function settleBuildAttempt(ports: StewardPorts, workspaceId: strin
     return true;
   });
   await rm(run.cwd, { recursive: true, force: true });
-  if (gaveUp) await createNotifications(ports, workspaceId).enqueue({ level: "digest", title: `模块 ${request.name} 自动构建未成功`, body: `已尝试 ${attempt} 次，未生成可审查的版本。`, dedupeKey: `module-build-gave-up:${request.id}` });
+  if (gaveUp) await notifyUser(ports.db, ports, workspaceId, { level: "digest", title: `模块 ${request.name} 自动构建未成功`, body: `已尝试 ${attempt} 次，未生成可审查的版本。`, key: `module-build-gave-up:${request.id}` });
 }
 /** Build version finished testing: settle the attempt that submitted it. */
 export async function settleBuildVersion(ports: StewardPorts, workspaceId: string, versionId: string) {

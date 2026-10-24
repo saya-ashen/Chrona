@@ -8,6 +8,7 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { notice, notices } from "./test-notices";
 
 type ModuleInput = Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0];
 type ModuleResult = Awaited<ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>>;
@@ -22,7 +23,7 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   let result: ModuleResult = { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [notify] }), error: null };
   const calls: ModuleInput[] = [];
   const workspace = await db.workspace.create({ data: { name: "test" } });
-  const ports: StewardPorts = { db, dataDir, now: () => now, deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null,
     sandbox: sandbox ?? testModuleSandbox(async input => {
       if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
       if (!(input.input as { trigger?: unknown }).trigger) return { status: "succeeded", exitCode: 0, output: "{}", error: null };
@@ -59,12 +60,12 @@ test("approved module fires through notification budget without a Provider Run; 
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]).toEqual({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "daily", kind: "schedule", firedAt: f.schedule.nextAt!.toISOString() }, now: new Date(f.schedule.nextAt!.getTime() + 123).toISOString(), params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ idempotencyKey: `module:${f.moduleId}:daily:${f.schedule.nextAt!.toISOString()}:price`, level: "now", title: notify.title, body: notify.body, moduleId: f.moduleId, channel: "in_app" });
+  expect(await notice(f.db)).toMatchObject({ idempotencyKey: `module:${f.moduleId}:daily:${f.schedule.nextAt!.toISOString()}:price`, level: "now", title: notify.title, body: notify.body, moduleId: f.moduleId });
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ lastResult: "Module exit 0; effects 1; delay 123ms", failures: 0 });
   expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: {}, error: null });
   expect(await f.service.schedules.fireDue()).toBe(0);
   await f.fire();
-  expect(await f.db.notification.count()).toBe(2);
+  expect((await notices(f.db)).length).toBe(2);
   expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
 });
 
@@ -104,7 +105,7 @@ test.each(["json", "schema", "exit", "timeout", "unavailable", "throw"])("module
   }
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("paused");
   for (const id of [f.schedule.id, other.id]) expect((await f.db.schedule.findUniqueOrThrow({ where: { id } })).status).toBe("paused");
-  const notification = await f.db.notification.findFirstOrThrow();
+  const notification = await notice(f.db);
   expect(notification).toMatchObject({ title: "模块连续失败，已暂停", level: "now", idempotencyKey: `module:${f.moduleId}:paused:${records[2]!.firedAt.toISOString()}` });
   expect(await f.db.run.count()).toBe(0);
 });
@@ -183,6 +184,6 @@ on('schedule', async () => {
   await f.fire();
   expect(await readFile(join(f.dataDir, "platform/data", f.moduleId, "counter"), "utf8")).toBe("2");
   expect(await f.db.moduleRun.count({ where: { error: null } })).toBe(2);
-  expect((await f.db.notification.findMany()).map(row => row.body).sort()).toEqual(["1", "2"]);
+  expect((await notices(f.db)).map(row => row.body).sort()).toEqual(["1", "2"]);
   expect(await f.db.run.count()).toBe(0);
 });

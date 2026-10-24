@@ -77,16 +77,19 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
       const message = moduleEventMessageSchema.parse({ id: randomUUID(), event });
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));
       const run = queue.then(() => new Promise<EventReply>((resolve, reject) => {
-        let expired = false;
-        const timer = timers.setTimeout(() => { expired = true; pending = undefined; reject(new Error("Module event timeout")); }, timeoutMs);
+        // `written` tells callers whether the module may have seen the event (and acted on it).
+        let expired = false, written = false;
+        const fail = (error: Error) => reject(Object.assign(error, { written }));
+        const timer = timers.setTimeout(() => { expired = true; pending = undefined; fail(new Error("Module event timeout")); }, timeoutMs);
         void ready.then(() => {
           if (expired) return;
           if (closed || !socket || socket.destroyed) throw new Error("Module channel closed");
           pending = { id: message.id,
             resolve: reply => { timers.clearTimeout(timer); pending = undefined; resolve(reply); },
-            reject: error => { timers.clearTimeout(timer); pending = undefined; reject(error); } };
+            reject: error => { timers.clearTimeout(timer); pending = undefined; fail(error); } };
+          written = true;
           socket.write(JSON.stringify(message) + "\n");
-        }).catch(error => { timers.clearTimeout(timer); pending = undefined; reject(error); });
+        }).catch(error => { timers.clearTimeout(timer); pending = undefined; fail(error); });
       }));
       queue = run.catch(() => {});
       return run;

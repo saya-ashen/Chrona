@@ -27,6 +27,7 @@ model Workspace {
   notifications Notification[]
   connectors Connector[]
   inboundItems InboundItem[]
+  invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
 }
@@ -136,6 +137,41 @@ model ModuleCall {
   module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   @@index([moduleId, method, key, status])
   @@index([moduleRunId])
+}
+
+/// A call routed by Chrona to a module tool. Async calls are stored here until delivered; sync calls are only recorded.
+/// `caller` is Chrona's record of who called (`module:<id>`, `kernel`, `provider:<runId>`, `owner`), never caller-supplied.
+model ModuleInvocation {
+  id String @id @default(uuid())
+  workspaceId String
+  caller String
+  callerModuleId String?
+  callerHash String?
+  target String
+  tool String
+  args Json
+  key String
+  /// Module names on the call path, the caller last.
+  chain Json @default(dbgenerated("'[]'"))
+  mode String
+  /// The target tool declared itself safe to run twice when the call was made.
+  idempotent Boolean @default(false)
+  status String @default("queued")
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  leaseToken String?
+  leaseUntil DateTime?
+  output Json?
+  error String?
+  reply Boolean @default(false)
+  replyAttempts Int @default(0)
+  repliedAt DateTime?
+  createdAt DateTime @default(now())
+  finishedAt DateTime?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, caller, target, tool, key])
+  @@index([workspaceId, status, nextAttemptAt])
+  @@index([workspaceId, reply, repliedAt])
 }
 
 model Schedule {

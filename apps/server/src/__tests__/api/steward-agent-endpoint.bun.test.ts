@@ -10,7 +10,7 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
   const db = testDb();
   try {
     await db.workspace.create({ data: { id: "w", name: "Test" } });
-    const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-agent-")), now: () => new Date(), publicUrl: null, deliveries: [], chat: null };
+    const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-agent-")), now: () => new Date(), publicUrl: null };
     const service = createStewardService(ports), app = createStewardAgentRoutes(ports, service);
     const session = await db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
     await service.forWorkspace("w").runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Hi" });

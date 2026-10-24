@@ -7,13 +7,14 @@ import { testDb } from "@chrona/engine/test-support";
 import { createStewardService, moduleSupervisor, type StewardPorts } from "@chrona/engine";
 import { createStewardRoutes } from "../../routes/steward.routes";
 import { createScriptSandbox } from "../../../../../packages/integrations/src/steward/script-sandbox";
+import { notice } from "../../../../../packages/engine/src/modules/steward/test-notices";
 let db: ReturnType<typeof testDb>, app: ReturnType<typeof createStewardRoutes>, service: ReturnType<typeof createStewardService>, dataDir: string;
 let savedKey: string | undefined;
 beforeEach(async () => {
   savedKey = process.env.API_KEY; process.env.API_KEY = "test-owner";
   db = testDb(); await db.workspace.create({ data: { id: "w", name: "Test" } });
   dataDir = mkdtempSync(join(tmpdir(), "chrona-content-routes-"));
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, deliveries: [], chat: null };
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
   service = createStewardService(ports); app = createStewardRoutes(ports, service);
 });
 afterEach(async () => { await db.$disconnect(); if (savedKey === undefined) delete process.env.API_KEY; else process.env.API_KEY = savedKey; });
@@ -90,8 +91,7 @@ test("schedule and approval lifecycle", async () => {
 const reminderSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (reminderSandbox.health.available ? test : test.skip)("POST /schedules reminder fires through the built-in module without a Provider run", async () => {
   const now = new Date("2026-10-22T12:00:00Z");
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null,
-    moduleBuiltinResources: join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"),
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null,     moduleBuiltinResources: join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"),
     sandbox: { available: true, isolated: true, runModule: reminderSandbox.runModule, startModule: reminderSandbox.startModule } };
   service = createStewardService(ports); app = createStewardRoutes(ports, service);
   try {
@@ -102,7 +102,7 @@ const reminderSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? u
     expect(await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toMatchObject({ mode: "module", payload: { text: "Remember from HTTP" } });
     expect((await service.forWorkspace("w").today()).upcoming).toContainEqual(expect.objectContaining({ scheduleId: schedule.id, label: "Remember from HTTP" }));
     expect(await service.forWorkspace("w").schedules.fireDue()).toBe(1);
-    expect(await db.notification.findFirstOrThrow()).toMatchObject({ title: "提醒", body: "Remember from HTTP", moduleId: expect.any(String) });
+    expect(await notice(db)).toMatchObject({ title: "提醒", body: "Remember from HTTP", moduleId: expect.any(String) });
     expect(await db.moduleRun.findFirstOrThrow()).toMatchObject({ exitCode: 0 });
     expect(await db.run.count()).toBe(0);
     expect(await service.forWorkspace("w").schedules.fireDue()).toBe(0);

@@ -13,14 +13,15 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
   [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`) and v2-6 (module dependencies); v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies) and v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9); the rest of v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
 
 - There are no affairs. Chrona's features are **modules (apps)**: `module.json` + entry + tests,
   long-running sandboxed SDK processes that receive events (schedule, inbound, tool, content_edit)
-  and call kernel methods only for declared capabilities. A module may own a **content area**
+  and call kernel methods only for declared capabilities, and other modules' tools only through Chrona
+  (`uses` + `chrona.call`; the callee's `visibility`/`callers` decide who may call; Chrona records the real caller). A module may own a **content area**
   (`<dataDir>/platform/content/<moduleId>/`: Markdown, panels, `*.ui.json`, uploads — content, never executed)
   that the web renders as its pages. Built-in modules (e.g. `files`) ship with Chrona and activate without approval.
 - Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); `wake` and module wakes run in
@@ -30,7 +31,8 @@ Rules that follow from the goals:
 - Providers own file, shell, web and session tools; each run sees all content areas read-only under `content/` in
   its cwd and the session's focused apps writable. bwrap isolation is optional hardening, never a prerequisite:
   without it modules and the Provider run as the Chrona user, and every module version needs approval. Chrona supplies scheduling, events, sessions, connectors/credentials,
-  approvals, budgets and delivery. No duplicate Chrona web/shell tools for Providers.
+  approvals, run budgets and routed calls; notification budget and delivery are the built-in `notify` module. The kernel holds no
+  notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module submitted via `chrona_propose`, built and checked in the Chrona sandbox
   (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated through an `activate_module`
   approval bound to its content hash (or automatically, if the user allowed it for that module and the update adds no
@@ -40,8 +42,9 @@ Rules that follow from the goals:
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
   auto · notify_after · preapproved · ask · never; grants are global, per module or per connector.
   External text can never grant anything.
-- Notifications go through the budget (`notify-budget.ts`): now / digest / web, daily cap,
-  quiet hours. Do not add notification paths that bypass it.
+- Notifications go through the `notify` module (`builtin/notify`, budget in `budget.ts`): now / digest / web, daily cap,
+  quiet hours. Channel adapters (e.g. `qq.deliver`) are tools only `notify` may call (`callers`). Do not add notification
+  paths that bypass it; `chrona.notify` is a deprecated compatibility alias for `notify.send`, not a second path.
 - Never pretend: unfinished work is reported as unfinished; unverified sources are marked.
 - No backward compatibility with removed systems: affairs, task/goal/plan systems, AffairResult,
   Ask/suggestions, care/cadence, FollowUp, concierge/assessor roles, management MCP, Hermes, the `job`
@@ -50,9 +53,9 @@ Rules that follow from the goals:
 The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owned: propose
 changes, do not edit it in delegated work.
 
-The owner MCP (`apps/server/src/routes/steward-mcp.ts`, `/api/mcp`, API_KEY) lets the user's own agents (Pi, Claude Code)
+The owner MCP (built-in `mcp` module, `/api/mcp`, API_KEY) lets the user's own agents (Pi, Claude Code)
 do what the web UI does: chat in sessions, read and edit app content, list/resolve approvals, list modules and
-notifications, and call module tools. It never exposes Provider tools or run capabilities.
+notifications, and call owner-visible module tools. It never exposes Provider tools, run capabilities or module-only interfaces.
 
 Never pre-approved: deleting or migrating real user data (including `chrona migrate-affairs --apply`), deploy/push,
 live databases, real accounts or external sends, disabling auth, approvals or secret redaction.
@@ -63,12 +66,12 @@ live databases, real accounts or external sends, disabling auth, approvals or se
 | --- | --- |
 | `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
 | `packages/domain/src/steward` | Pure policy, budgets, schedule rules, inbound rules, Markdown and refs |
-| `packages/engine/src/modules/steward` | Sessions, content areas, schedules, modules (gateway, build, supervisor, built-ins), approvals, connectors, queues, runs, tools and tick |
-| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, QQ/delivery, module sandbox and SDK |
+| `packages/engine/src/modules/steward` | Sessions, content areas, schedules, modules (build, supervisor, routed calls in `module-calls.ts`, built-ins), approvals, connectors, queues, runs, tools and tick |
+| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, module sandbox and SDK |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
 | `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, the `listen` proxy, owner API, rescue console, runtime (tick, Provider queues) |
-| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `mcp`, `qq`, `web` (the web page: plain HTML + JS, no build) |
+| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `notify`, `mcp`, `qq`, `web` (the web page: plain HTML + JS, no build) |
 | `packages/cli` | `chrona start / backup / restore / migrate-affairs / doctor / qq bind-code` |
 
 Dependency direction: `apps → packages/engine → packages/domain → packages/contracts`;

@@ -26,7 +26,7 @@ async function fixture(real = false) {
     throw new Error("Unexpected event");
   });
   const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined }) : null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, chat: null, deliveries: [], connectors: [local.adapter], moduleBuiltinResources: resources,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, connectors: [local.adapter], moduleBuiltinResources: resources,
     // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
     sandbox: { available: true, isolated: true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   const api = createStewardService(ports).forWorkspace(workspaceId);

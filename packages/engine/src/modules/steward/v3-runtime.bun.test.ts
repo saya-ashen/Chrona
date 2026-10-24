@@ -10,7 +10,7 @@ let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, ses
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "runtime" } })).id;
   sessionId = (await db.session.create({ data: { workspaceId, key: "web:first", source: "web" } })).id;
-  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-runtime-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chat: null, deliveries: [] };
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-runtime-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null };
 });
 afterEach(async () => { await db.$disconnect(); });
 test("run cwd and context belong to the session", async () => {

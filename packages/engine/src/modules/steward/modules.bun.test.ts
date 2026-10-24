@@ -11,6 +11,7 @@ import type { ApprovedAction } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -22,7 +23,7 @@ async function fixture() {
   const calls: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0][] = [];
   const forwarded: ApprovedAction[] = [];
   let fail = false;
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), publicUrl: null,
     onApproved: async action => { forwarded.push(action); },
     sandbox: { available: true, isolated: true, async runModule(input) {
       if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
@@ -190,11 +191,11 @@ test.each(["no snapshot", "migrating", "missing snapshot", "changed snapshot", "
         expect(await f.db.schedule.findMany()).toEqual(restoredSchedules);
         expect(await f.db.generation.count()).toBe(restoredGenerations);
         expect(await f.db.moduleVersion.findFirstOrThrow({ where: { hash: f.second.hash } })).toMatchObject({ status: "approved" });
-        expect(await f.db.notification.count()).toBe(0);
+        expect((await notices(f.db)).length).toBe(0);
         expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
         return;
       }
-      expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "now", title: "模块 price-watch 回滚未完成：数据恢复失败" });
+      expect(await notice(f.db)).toMatchObject({ level: "now", title: "模块 price-watch 回滚未完成：数据恢复失败" });
     } else await expect(f.approve(result.approvalId)).rejects.toThrow();
   }
   expect(await f.db.module.findFirstOrThrow()).toEqual(before);
@@ -295,7 +296,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
   expect(JSON.stringify(version.report)).not.toContain("private host diagnostic");
   if (["failed", "timeout", "output"].includes(kind)) expect(version.report).toMatchObject({ migration: { stdout: expect.stringContaining(""), stderr: "public migration stderr" } });
   expect(await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).toMatchObject({ status: "approved" });
-  expect(await f.db.notification.findFirstOrThrow()).toMatchObject({ level: "now", title: "模块 price-watch 新版本未启用：数据迁移失败", idempotencyKey: `module-migration-failed:${version.id}` });
+  expect(await notice(f.db)).toMatchObject({ level: "now", title: "模块 price-watch 新版本未启用：数据迁移失败", idempotencyKey: `module-migration-failed:${version.id}` });
   await expect(stat(join(f.dataDir, "platform/data-next", f.first.moduleId!))).rejects.toMatchObject({ code: "ENOENT" });
   f.ports.sandbox!.available = true;
   let oldRan = false;
@@ -369,7 +370,7 @@ test("same-schema continuity runs on a disposable copy, previews effects and nev
   expect(preview).toContain("按当前数据新版本会产生的 effects");
   expect(preview).toContain("Would notify");
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.notification.count()).toBe(0);
+  expect((await notices(f.db)).length).toBe(0);
   expect(await f.db.moduleRun.count()).toBe(1);
 });
 
@@ -499,7 +500,7 @@ test("test, continuity and schema failures share the same streak and budgeted di
     expect((await f.propose()).status).toBe("rejected");
   }
   expect(await f.db.run.count()).toBe(2);
-  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  expect((await notices(f.db, { level: "digest" })).length).toBe(1);
 });
 
 test("large effects preview is explicitly truncated without hiding schema, intent or hash", async () => {
@@ -606,7 +607,7 @@ test("three consecutive rejected versions stop waking and enqueue only one budge
     await f.write(i);
     await f.propose();
     expect(await f.db.run.count()).toBe(Math.min(i, 2));
-    expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(i >= 3 ? 1 : 0);
+    expect((await notices(f.db, { level: "digest" })).length).toBe(i >= 3 ? 1 : 0);
   }
 });
 
@@ -616,13 +617,13 @@ test("a successful build resets the failure streak even when the clock has not a
   f.fail();
   for (let i = 2; i <= 4; i++) { await f.write(i); await f.propose(); }
   expect(await f.db.run.count()).toBe(2);
-  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  expect((await notices(f.db, { level: "digest" })).length).toBe(1);
   f.fail(false);
   await f.write(5); await f.propose();
   f.fail();
   for (let i = 6; i <= 8; i++) { await f.write(i); await f.propose(); }
   expect(await f.db.run.count()).toBe(4);
-  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(2);
+  expect((await notices(f.db, { level: "digest" })).length).toBe(2);
 });
 
 test("queued failures sharing a timestamp still stop at two wakes and one digest", async () => {
@@ -630,10 +631,10 @@ test("queued failures sharing a timestamp still stop at two wakes and one digest
   for (let i = 1; i <= 4; i++) { await f.write(i); await f.submit(); }
   await f.service.modules.buildPending();
   expect(await f.db.run.count()).toBe(2);
-  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  expect((await notices(f.db, { level: "digest" })).length).toBe(1);
   await f.service.modules.buildPending();
   expect(await f.db.run.count()).toBe(2);
-  expect(await f.db.notification.count({ where: { level: "digest" } })).toBe(1);
+  expect((await notices(f.db, { level: "digest" })).length).toBe(1);
 });
 
 test("user proposals do not wake a provider and rejected hashes can be resubmitted", async () => {

@@ -101,6 +101,8 @@ chrona admin approve|reject <approvalId>
 | `qq` | `keepAlive`、`channel` | `owner`、`network`、`secrets: [qq_bot]` | 现有 QQ 机器人：主人绑定、消息与 `qq:dm` 会话互转、`/new`、审批按钮、通知投递；绑定数据在模块数据目录 |
 | `mcp` | `listen: "/api/mcp"` | `owner` | owner MCP，按 owner API 映射为 MCP 工具；无状态 JSON-RPC，手写，不用 MCP SDK。多工作区时以模块所在工作区为准（不再接受 `?workspaceId=`） |
 
+> 2026-10-24 起被 v2-5 §9 取代：`channel` 字段与 `deliver` 事件、`channel` 方法已删除；QQ 以工具 `qq.deliver`（仅 `notify` 可调用）投递，经 `notify.channel` 报告就绪、经 `notify.send` 补发超出回复窗口的回复。下段为历史设计。
+
 通知投递（v2-4d 实现）：清单声明 `channel: "chrona_qqbot"` 的入口模块是该通道的投递者。内核发件箱照旧决定发不发、何时发、重试（预算、安静时段、去重、租约都不变），每条通知以 `deliver` 事件交给模块，模块回 DeliveryOutcome；模块用 `channel({ ready })` 报告能否投递（QQ：是否已绑定主人），未就绪时通知只进网页。凭据经清单 `secrets` 与 `secret` 方法按需读取，二者都要求 `owner`。QQ 模块用 owner API 的 `/chat`（带 `channel`、`externalId`、`quotedExternalId`、附件）、`/chat/attachments`、`/chat/runs/:id`、`/messages`、`/notifications` 完成对话、附件、后续回复、引用与超出回复窗口的补发。绑定码仍由 `chrona qq bind-code` 生成，写入模块数据目录。
 
 ## 7. 分阶段

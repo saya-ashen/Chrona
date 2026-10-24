@@ -17,7 +17,7 @@ test("every contract HTTP route returns a successful, schema-valid response", as
   try {
     await db.workspace.create({ data: { id: "w", name: "HTTP walk" } });
     const ports: StewardPorts = {
-      db, dataDir: mkdtempSync(join(tmpdir(), "chrona-http-map-")), now: () => new Date(), publicUrl: null, deliveries: [], chat: null, chatTimeoutMs: 3000,
+      db, dataDir: mkdtempSync(join(tmpdir(), "chrona-http-map-")), now: () => new Date(), publicUrl: null, chatTimeoutMs: 3000,
       connectors: [{ kind: "email", coverageNote: "Offline fixture", test: async () => ({ ok: true }), poll: async () => ({ items: [], cursor: null }) }],
       provider: { name: "offline", health: async () => ({ available: true, sandboxed: false, error: null }), start(input) {
         const stopped = new Promise<void>(resolve => { stop = resolve; });
@@ -102,11 +102,12 @@ test("every contract HTTP route returns a successful, schema-valid response", as
     await walk("/preferences", list(s.preferenceSchema));
     const preference = await walk("/preferences", s.preferenceSchema, "POST", { text: "Fixture preference" });
     const deleted = await request(`/preferences/${preference.id}`, "DELETE"); expect(deleted.status).toBe(204); expect(await deleted.text()).toBe("");
-    const notification = await api.notifications.enqueue({ level: "digest", title: "Fixture", body: "Update", dedupeKey: "walk" });
-    await walk("/notifications", list(s.notificationSchema));
-    await walk(`/notifications/${notification.id}/feedback`, s.notificationSchema, "POST", { feedback: "useful" });
-    await db.notification.update({ where: { id: notification.id }, data: { status: "failed" } });
-    await walk(`/notifications/${notification.id}/retry`, s.notificationSchema, "POST");
+    // Notifications are answered by the notify module; without a module sandbox here it cannot run, so the
+    // owner routes queue (POST) and degrade (GET: none; feedback/retry: 409). builtin-notify tests run it for real.
+    await walk("/notifications", z.object({ callId: z.string(), status: z.literal("queued") }).strict(), "POST", { title: "Fixture", body: "Update", dedupeKey: "walk" });
+    expect(await walk("/notifications", list(s.notificationSchema))).toEqual({ items: [] });
+    expect((await request("/notifications/missing/feedback", "POST", { feedback: "useful" })).status).toBe(409);
+    expect((await request("/notifications/missing/retry", "POST")).status).toBe(409);
     await walk("/connectors", list(s.connectorSchema));
     const connector = await walk("/connectors", s.connectorSchema, "POST", { kind: "email", label: "Offline" });
     await walk(`/connectors/${connector.id}`, s.connectorSchema, "PATCH", { label: "Renamed offline" });

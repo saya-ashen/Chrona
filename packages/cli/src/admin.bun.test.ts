@@ -20,7 +20,7 @@ async function fixture() {
   const module = await db.module.create({ data: { workspaceId: "ws_default", name: "entry", status: "active", activeHash: "a".repeat(64), dataSchema: 1 } });
   const manifest = { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: ["owner"], tests: ["test.ts"] };
   for (const hash of ["a", "b"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash: hash.repeat(64), manifest, intent: {}, report: {}, source: hash === "a" ? "builtin" : "user", status: "approved" } });
-  const ports = { db, dataDir, now: () => new Date(), deliveries: [], publicUrl: null, chat: null };
+  const ports = { db, dataDir, now: () => new Date(), publicUrl: null };
   const api = createStewardService(ports).forWorkspace("ws_default");
   return { db, module, api, options: { dataDir, databaseUrl } };
 }

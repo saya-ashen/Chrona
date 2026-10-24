@@ -10,12 +10,13 @@ import { testDb } from "./test-db";
 import { liveRuns } from "./runs";
 import type { StewardPorts } from "./ports";
 import type { ProviderQuestion } from "@chrona/contracts/steward";
+import { notice, notices } from "./test-notices";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, time: Date;
 let service: ReturnType<typeof createStewardService>, api: ReturnType<typeof service.forWorkspace>;
 const channels: ReturnType<typeof createProviderChannel>[] = [];
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-17T04:00:00Z"); workspaceId = (await db.workspace.create({ data: { name: "provider" } })).id;
-  ports = { db, now: () => time, dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-channel-")), deliveries: [], chat: null, publicUrl: null };
+  ports = { db, now: () => time, dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-channel-")), publicUrl: null };
   service = createStewardService(ports); api = service.forWorkspace(workspaceId);
 });
 afterEach(async () => { await Promise.all(channels.splice(0).map(channel => channel.close())); liveRuns.clear(); await db.$disconnect(); });
@@ -67,7 +68,8 @@ test("expiry rejects late approval and returns cancellation; queued notice is su
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
   expect(await result).toEqual({ decision: "cancel" });
   expect((await api.provider.list())[0]!.interactions[0]!.status).toBe("expired");
-  expect((await db.notification.findFirstOrThrow()).status).toBe("suppressed");
+  // The notify module drops the queued notice: Chrona withdraws it by key.
+  expect(await db.moduleInvocation.count({ where: { target: "notify", tool: "withdraw", key: `withdraw:provider-input:${f.run.id}` } })).toBe(1);
 });
 test("restart/no live process cannot reuse pending requests", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
@@ -88,12 +90,13 @@ test("owner cancel blocks tools immediately, retains input and never retries the
   await expect(api.runs.authenticate(f.run.token)).rejects.toMatchObject({ code: "forbidden" });
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
 });
-test("progress is safe, deduplicated and bounded; request notices use the existing budget", async () => {
+test("progress is safe, deduplicated and bounded; request notices go through notify.send", async () => {
   const f = await fixture(); await api.settings.update({ notifications: { dailyCap: 0 } });
   for (let i = 0; i < 350; i++) await f.channel.events.progress({ phase: i % 2 ? "reading" : "writing", tool: null });
   expect(await db.audit.count({ where: { kind: "provider_event" } })).toBe(300);
   const result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  expect((await db.notification.findFirstOrThrow()).status).toBe("folded");
+  // The budget (folded under dailyCap 0) is the notify module's; Chrona queues a normal, non-responding notice.
+  expect(await notice(db)).toMatchObject({ level: "now", idempotencyKey: `provider-input:${f.run.id}` });
   await api.provider.answer(request.id, { decision: "cancel" }); expect(await result).toEqual({ decision: "cancel" });
 });
 test("telemetry cannot crowd a live question or the latest usage out of the projection", async () => {
@@ -108,20 +111,7 @@ test("sensitive request context fails closed before publication", async () => {
   const f = await fixture();
   await expect(f.channel.events.question({ ...question(), message: `password=bad ${f.run.token}` }, f.controller.signal)).rejects.toMatchObject({ code: "invalid" });
   expect(await db.audit.count({ where: { kind: "provider_question" } })).toBe(0);
-  expect(await db.notification.count()).toBe(0);
-});
-test("cancellation during finalization wins over a previously computed failure/retry", async () => {
-  const f = await fixture();
-  let reached!: () => void, release!: (value: boolean) => void;
-  const reachedLookup = new Promise<void>(resolve => { reached = resolve; });
-  const blocked = new Promise<boolean>(resolve => { release = resolve; });
-  ports.chat = { channel: "chrona_qqbot", bound: async () => { reached(); return blocked; } };
-  const finishing = api.runs.finish(f.run.id, { outcome: "failed", sessionId: null, error: "Synthetic failure" });
-  await reachedLookup;
-  await db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: f.run.id, details: {} } });
-  release(false); await finishing;
-  expect((await db.run.findUniqueOrThrow({ where: { id: f.run.id } })).status).toBe("cancelled");
-  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
+  expect((await notices(db)).length).toBe(0);
 });
 test("a pending launch publishes cancellation before it can start work", async () => {
   const gate = providerStartGate(), injection = gate.handle.inject("Persisted input").then(() => false, () => true);
@@ -147,13 +137,6 @@ test("a failed reply receipt never releases a positive answer", async () => {
     expect(await result).toEqual({ decision: "cancel" });
     expect(await db.audit.count({ where: { kind: "provider_answer" } })).toBe(0);
   } finally { await db.$executeRawUnsafe("DROP TRIGGER fail_provider_receipt"); }
-});
-test("QQ state failure still permits a budgeted Web question", async () => {
-  const f = await fixture(); ports.chat = { channel: "chrona_qqbot", bound: async () => { throw new Error("Synthetic offline"); } };
-  const result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  expect((await db.notification.findFirstOrThrow()).channel).toBe("in_app");
-  await api.provider.answer(request.id, { decision: "submit", value: false });
-  expect(await result).toEqual({ decision: "submit", value: false });
 });
 test("a durable queued cancel is never claimed after restart", async () => {
   const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "web" } });

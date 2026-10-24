@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { createRuns, createRunSession } from "./runs";
-import { createNotifications } from "./notify";
+import { notifyUser } from "./notify-user";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
 import { tryAutoActivate } from "./module-auto";
@@ -42,7 +42,8 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const libraries = [report.dependencies?.npm && "npm（bun.lock）", report.dependencies?.python && "Python（uv.lock）"].filter(Boolean).join("、") || "无";
-  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
+  const exposed = manifest.tools.filter(tool => tool.visibility.some(value => value === "modules" || value === "kernel")).map(tool => `${tool.name}${tool.callers ? `（仅 ${tool.callers.join("、")}）` : ""}`);
+  const prefix = `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
   const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null;
@@ -116,7 +117,7 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
         return true;
       });
       if (activated) return { moduleId: module.id, hash, status: "approved", report };
-      await createNotifications(context.ports, workspaceId).enqueue({ moduleId: module.id, level: "web", title: `内置模块 ${module.name} 有新版本`, body: "已保留当前版本；新内置版本可在模块历史中审查启用。", dedupeKey: `builtin:${module.id}:${hash}` });
+      await notifyUser(context.db, context.ports, workspaceId, { module: module.id, app: module.name, level: "web", title: `内置模块 ${module.name} 有新版本`, body: "已保留当前版本；新内置版本可在模块历史中审查启用。", key: `builtin:${module.id}:${hash}` });
       // Candidates use the same review/activation gateway as user proposals.
     }
     return await requestReview(context, { version, module, report, files, needsMigration });
@@ -141,7 +142,7 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
   for (const row of versions) { if (row.status !== "rejected") break; failures++; }
   if (failures >= 3) {
     // Key streak by preceding successful build; failures may share timestamps.
-    await createNotifications(ports, workspaceId).enqueue({ moduleId: module.id, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", dedupeKey: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
+    await notifyUser(db, ports, workspaceId, { module: module.id, app: module.name, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", key: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
   } else {
     // Keep continuity diagnostics visible even when successful tests printed a lot.
     const summary = result.report.continuity ? { continuity: result.report.continuity } : result.report;

@@ -10,7 +10,7 @@ beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
   workspaceId = (await db.workspace.create({ data: { name: "recovery" } })).id;
   sessionId = (await db.session.create({ data: { workspaceId, key: "web:test", source: "web" } })).id;
-  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-recovery-")), now: () => time, publicUrl: null, chat: null, deliveries: [] };
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-recovery-")), now: () => time, publicUrl: null };
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 test("failure retry retains session, prompt and cwd and preserves input linkage", async () => {

@@ -27,7 +27,7 @@ test("connector files, dedupe, all rules, batch first-arrival window, isolation 
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-inbound-"));
   let time = new Date("2026-10-15T04:00:00Z");
   const local = createLocalTestSource();
-  const ports = { db, dataDir, now: () => time, publicUrl: null, chat: null, deliveries: [], connectors: [local.adapter] };
+  const ports = { db, dataDir, now: () => time, publicUrl: null, connectors: [local.adapter] };
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
     const api = createStewardService(ports).forWorkspace(workspaceId);

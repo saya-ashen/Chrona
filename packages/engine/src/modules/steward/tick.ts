@@ -7,11 +7,12 @@ import { registerBuiltins } from "./module-builtin";
 import { processModuleInbound } from "./module-inbound";
 import { createConnectors } from "./connectors";
 import { createRuns, liveRuns } from "./runs";
-import { createNotifications } from "./notify";
 import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
 import { chatImages } from "./chat";
+import { announceApprovals, moveLegacyNotifications } from "./notify-user";
+import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
@@ -31,7 +32,7 @@ export function createTick(ports: StewardPorts) {
     const failures: { workspaceId: string; stage: string }[] = [...buildFailures].map(workspaceId => ({ workspaceId, stage: "modules" }));
     buildFailures.clear();
     for (const workspace of await ports.db.workspace.findMany()) {
-      const workspaceId = workspace.id, runs = createRuns(ports, workspaceId), notifications = createNotifications(ports, workspaceId);
+      const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
         if (run.lane === "build") return { prompt: await prepareBuildRun(ports, workspaceId, run), inbound: null, extraTools: [], searchTools: false, sessionId: null, hostPaths: [], content: [] };
         const messages = run.sessionId ? (await ports.db.message.findMany({ where: { workspaceId, sessionId: run.sessionId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 20 })).reverse() : [];
@@ -108,12 +109,16 @@ export function createTick(ports: StewardPorts) {
       }
       for (const [stage, action] of [
         ["builtins", () => registerBuiltins(ports, workspaceId)],
+        // Before anything new is announced, so the notify module sees what was already sent.
+        ["legacy-notifications", () => moveLegacyNotifications(ports, workspaceId)],
         ["connectors", () => createConnectors(ports, workspaceId).tick()],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
         ["module-inbound", () => processModuleInbound(ports, workspaceId, now)],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", () => runs.expireLeases(now)],
-        ["approvals", () => notifications.announceApprovals(now)], ["deliver", () => notifications.deliverDue(now)], ["digest", () => notifications.sendDigestIfDue(now)],
+        ["approvals", () => announceApprovals(ports, workspaceId)],
+        // Routed async calls (notifications among them) are delivered beside the tick.
+        ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
       ] as const) {
         try { await action(); } catch { failures.push({ workspaceId, stage }); }
       }
@@ -122,5 +127,5 @@ export function createTick(ports: StewardPorts) {
     }
     return { failures };
   }
-  return Object.assign(tick, { settled: () => Promise.all(builds.values()).then(() => undefined) });
+  return Object.assign(tick, { settled: () => Promise.all([...builds.values(), callsSettled(ports)]).then(() => undefined) });
 }

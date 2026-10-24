@@ -9,7 +9,7 @@ test("HTTP chat drives a fake provider and returns only chrona_reply messages", 
   const db = testDb(), saved = process.env.API_KEY; process.env.API_KEY = "test-owner";
   try {
     await db.workspace.create({ data: { id: "w", name: "Test" } });
-    const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-chat-")), now: () => new Date(), publicUrl: null, deliveries: [], chat: null, chatTimeoutMs: 2000,
+    const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-chat-")), now: () => new Date(), publicUrl: null, chatTimeoutMs: 2000,
       provider: { name: "fake", health: async () => ({ available: true, sandboxed: false, error: null }), start(input) {
         return { inject: async () => {}, abort: async () => {}, done: (async () => {
           await service.tools.call(input.token, "chrona_reply", { text: "Hello from Chrona" });

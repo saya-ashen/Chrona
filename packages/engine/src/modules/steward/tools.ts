@@ -14,7 +14,8 @@ import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { proposeFromBuild, requestBuild } from "./module-build-lane";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
-import { createNotifications } from "./notify";
+import { notifyUser } from "./notify-user";
+import { drainCalls } from "./module-calls";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -84,7 +85,7 @@ async function contentFile(ctx: ToolContext, ref: string) {
   return { name: parts.at(-1)!, path, size: info.size };
 }
 async function reply(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, ports, now, session } = ctx;
+  const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;
   if (!session || !run.sessionId) throw new StewardError("invalid", "Reply requires a session");
   const target = session.originSessionId ?? session.id;
   const conversation = await db.message.findFirst({ where: { workspaceId, sessionId: target }, orderBy: [{ at: "desc" }, { id: "desc" }] });
@@ -95,18 +96,17 @@ async function reply(ctx: ToolContext, raw: unknown) {
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
     return message;
   });
-  // Background results are posted and budget-notified exactly once at finalization.
-  if (session.source === "wake" || session.source === "module") return { messageId: message.id };
-  const adapter = ports.deliveries.find(d => d.channel === conversation?.channel);
-  const delivery = adapter ? await adapter.send({ idempotencyKey: `reply:${message.id}`, title: "", body: input.text, link: null, recipient: null, files: files.map(({ name, path }) => ({ name, path })) }) : { outcome: "rejected", retryable: true, error: "Delivery unavailable" };
-  return { messageId: message.id, delivery };
+  // The conversation's entry (web page, QQ module) relays replies; background results are notified once at finalization.
+  return { messageId: message.id };
 }
 async function notify(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_notify, raw);
   const pending = await gate(ctx, "notify_user", {}, { tool: ctx.tool, ...input });
   if (pending) return pending;
   if (input.file) await contentFile(ctx, input.file);
-  return createNotifications(ctx.ports, ctx.workspaceId).enqueue({ level: input.level, title: input.title, body: input.body, dedupeKey: `tool:${ctx.run.id}:${ctx.index}` });
+  const queued = await notifyUser(ctx.db, ctx.ports, ctx.workspaceId, { level: input.level, title: input.title, body: input.body, key: `tool:${ctx.run.id}:${ctx.index}` });
+  void drainCalls(ctx.ports, ctx.workspaceId).catch(() => {});
+  return { status: "queued", callId: queued.callId };
 }
 async function schedule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_schedule, raw);

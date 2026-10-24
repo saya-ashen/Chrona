@@ -13,6 +13,7 @@ import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { filesContent } from "./content";
 import { testFilesContent } from "./test-content";
+import { notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -21,7 +22,7 @@ async function fixture() {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   let time = new Date("2026-10-21T04:00:00Z"), handled: boolean | undefined = true, fail = false;
   const source = createLocalTestSource(), calls: unknown[] = [];
-  const ports: StewardPorts = { db, dataDir, now: () => time, deliveries: [], chat: null, publicUrl: null, connectors: [source.adapter],
+  const ports: StewardPorts = { db, dataDir, now: () => time, publicUrl: null, connectors: [source.adapter],
     sandbox: testModuleSandbox(async input => {
       calls.push(input);
       return { status: fail ? "failed" : "succeeded", exitCode: fail ? 1 : 0, error: fail ? "failed" : null,
@@ -53,7 +54,7 @@ test("inbound handled produces notification without a Provider run; false falls 
   const tick = createTick(f.ports);
   expect((await tick()).failures).toEqual([]); await tick.settled();
   expect(await f.db.inboundItem.findUniqueOrThrow({ where: { id: first.id } })).toMatchObject({ status: "delivered", action: "module", ruleNote: "模块 mail-sort 已处理", leaseToken: null });
-  expect(await f.db.notification.count()).toBe(1);
+  expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ inboundItemId: first.id, triggerId: "mail", firedAt: first.receivedAt });
   expect(f.calls[0]).toMatchObject({ network: false, input: { trigger: { kind: "inbound", firedAt: first.receivedAt.toISOString(), item: { body: "mail body", externalId: "first" } }, params: {} } });
@@ -85,7 +86,7 @@ test("failures fall back and three failures pause once across module runs", asyn
     f.advance(1);
   }
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "paused" });
-  expect(await f.db.notification.count({ where: { title: "模块连续失败，已暂停" } })).toBe(1);
+  expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
   expect((await f.push("paused")).status).toBe("new");
 });
 test("concurrent ticks execute once and expired lease is reclaimed", async () => {
@@ -142,7 +143,7 @@ test("a constant module key does not swallow the next mail", async () => {
   f.advance(1);
   const second = await f.push("second");
   await f.run();
-  expect(await f.db.notification.count({ where: { title: "邮件已整理" } })).toBe(2);
+  expect((await notices(f.db, { title: "邮件已整理" })).length).toBe(2);
   const calls = await f.db.moduleCall.findMany({ orderBy: { key: "asc" } });
   expect(calls.map(call => ({ key: call.key, status: call.status }))).toEqual([first, second].map(item => ({ key: `inbound:${item.id}:sorted`, status: "executed" })).sort((a, b) => a.key.localeCompare(b.key)));
 });

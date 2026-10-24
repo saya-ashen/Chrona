@@ -1,0 +1,42 @@
+{
+  "name": "notify",
+  "description": "Tells the user things: budget (daily cap, quiet hours, digest), channel and recipient choice, delivery through channel modules such as qq.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "triggers": [],
+  "effects": [],
+  "uses": ["qq.deliver"],
+  "tools": [
+    { "name": "send", "description": "Queue a notification for the user. The budget decides now, digest or web; a repeated key is dropped.", "visibility": ["modules", "kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["key", "level", "title", "body"], "properties": {
+        "key": { "type": "string", "description": "Idempotency key, derived from what is being reported" },
+        "level": { "type": "string", "enum": ["now", "digest", "web"] },
+        "title": { "type": "string" }, "body": { "type": "string" },
+        "module": { "type": "string", "description": "Chrona only: the app (module id) this is about" },
+        "app": { "type": "string", "description": "Chrona only: the app's name" },
+        "session": { "type": "string", "description": "Conversation to link to" },
+        "approval": { "type": "string", "description": "Chrona only: open approval this asks about" },
+        "scoped": { "type": "boolean" }, "urgent": { "type": "boolean" },
+        "responds": { "type": "boolean", "description": "Answers something the user asked: no cap or quiet hours" },
+        "recipient": { "type": "string", "description": "Channel recipient to pin the message to" } } } },
+    { "name": "withdraw", "description": "Drop a queued notification that is no longer relevant.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["key"], "properties": { "key": { "type": "string" } } } },
+    { "name": "channel", "description": "A channel module reports whether it can deliver now.", "visibility": ["modules"], "callers": ["qq"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["channel", "ready", "at"], "properties": { "channel": { "type": "string", "enum": ["chrona_qqbot"] }, "ready": { "type": "boolean" }, "at": { "type": "string" } } } },
+    { "name": "list", "description": "Recent notifications, newest first.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "properties": { "limit": { "type": "number" } } } },
+    { "name": "status", "description": "Channel readiness and queue counts.", "visibility": ["kernel"], "idempotent": true, "parameters": { "type": "object" } },
+    { "name": "feedback", "description": "The user's feedback on a notification.", "visibility": ["kernel"],
+      "parameters": { "type": "object", "required": ["id", "feedback"], "properties": { "id": { "type": "string" }, "feedback": { "type": "string", "enum": ["useful", "not_useful"] } } } },
+    { "name": "retry", "description": "Queue a failed notification again.", "visibility": ["kernel"],
+      "parameters": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } } } },
+    { "name": "configure", "description": "The user's notification settings.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["daily-cap", "timezone", "digest-at", "at"], "properties": {
+        "daily-cap": { "type": "number" }, "quiet-start": { "type": "string" }, "quiet-end": { "type": "string" },
+        "timezone": { "type": "string" }, "digest-at": { "type": "string" }, "at": { "type": "string" } } } },
+    { "name": "import", "description": "Chrona only: notifications recorded before this module existed (JSON array).", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["rows"], "properties": { "rows": { "type": "string" } } } }
+  ],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { MODULE_METHODS, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
@@ -15,10 +16,15 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     await chmod(dir, 0o700);
     channel = await createModuleChannel(join(dir, "s"), { onCall: async call => {
       calls.push(call);
+      // Routed calls are answered, never routed: a build must not reach another module.
+      if (call.method === "call") {
+        if (!manifest.uses.includes(call.params.target)) return { id: call.id, error: { code: "undeclared", message: `${call.params.target} is not in uses` } };
+        return { id: call.id, result: call.params.mode === "async" ? { callId: randomUUID(), status: "queued" } : { output: null } };
+      }
+      if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
       if (!manifest.effects.includes(MODULE_METHODS[call.method])) return { id: call.id, error: { code: "undeclared", message: "Undeclared capability" } };
       if (call.method === "model") return { id: call.id, result: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       if (call.method === "owner") return { id: call.id, result: { status: 503, body: { error: "Owner API unavailable during build" } } };
-      if (call.method === "channel") return { id: call.id, result: { status: "executed" } };
       if (call.method === "secret") return { id: call.id, error: { code: "unconfigured", message: "No secrets during build" } };
       const key = `${call.method}:${call.params.key}`, duplicate = seen.has(key);
       seen.add(key);

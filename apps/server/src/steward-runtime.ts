@@ -7,12 +7,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@chrona/db";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
-import { moduleChannel, moduleSupervisor, createStewardService, type StewardPorts } from "@chrona/engine";
+import { moduleSupervisor, createStewardService, type StewardPorts } from "@chrona/engine";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createPiModelGateway } from "../../../packages/integrations/src/steward/pi-model-gateway";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
-import { createInAppDelivery } from "../../../packages/integrations/src/steward/in-app-delivery";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { createModulePackages } from "../../../packages/integrations/src/steward/module-packages";
 import { createEmailConnector } from "../../../packages/integrations/src/steward/email";
@@ -91,16 +90,12 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       agentUrl: "", workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
     }),
     connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
-    // QQ is the built-in qq module's channel: bound once it reports an owner binding.
-    deliveries: [createInAppDelivery(), { channel: "chrona_qqbot", send: message => qq.delivery.send(message) }],
-    chat: { channel: "chrona_qqbot", bound: () => qq.bound() },
     secrets: configuredSecret, packages: createModulePackages(),
     sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
-  const qq = moduleChannel(ports, "chrona_qqbot");
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;

@@ -17,7 +17,7 @@ const htmlPath = join(import.meta.dirname, "static/rescue.html");
 async function fixture() {
   const db = testDb(); dbs.push(db);
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
-  const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-rescue-test-")), now: () => new Date(), deliveries: [], publicUrl: null, chat: null, chatTimeoutMs: 2000 };
+  const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-rescue-test-")), now: () => new Date(), publicUrl: null, chatTimeoutMs: 2000 };
   const service = createStewardService(ports);
   const app = createRescueApp(ports, service, "test-rescue-key", readFileSync(htmlPath, "utf8"));
   const request = (path: string, data?: unknown, key = "test-rescue-key") => app.request(path, { headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(data ? { method: "POST", body: JSON.stringify(data) } : {}) });
@@ -83,7 +83,7 @@ test("HTTP and QQ resolve policy approvals like any other", async () => {
     const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
     // The qq module resolves through the owner API, as an entry.
     const owner = ownerApi(f.ports, f.service, () => {});
-    const relay = createRelay({ owner: request => owner("ws_default", request), publicUrl: null, download: async () => { throw new Error("unused"); } });
+    const relay = createRelay({ owner: request => owner("ws_default", request), notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
     expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
     expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
   } finally {

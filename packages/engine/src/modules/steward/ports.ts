@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@chrona/db";
-import type { ConnectorAdapter, DeliveryAdapter, ProviderAdapter, moduleCallReplySchema } from "@chrona/contracts/steward";
+import type { ConnectorAdapter, ProviderAdapter, moduleCallReplySchema } from "@chrona/contracts/steward";
 type OwnerReply = Extract<Extract<ReturnType<typeof moduleCallReplySchema.parse>, { result: unknown }>["result"], { body: unknown }>;
 /** Only trusted owner routes may resolve. The caller executes the returned payload,
  * rechecking policy and atomically consuming a once grant with its action claim. */
@@ -10,8 +10,6 @@ export type OnApproved = (action: ApprovedAction) => Promise<void>;
 
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
-  deliveries: DeliveryAdapter[];
-  chat: { channel: "chrona_qqbot"; bound(): Promise<boolean> } | null;
   provider?: ProviderAdapter;
   modelGateway?: {
     complete(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
@@ -23,8 +21,8 @@ export type StewardPorts = {
     backend: "nix" | "system";
     install(input: { dir: string; packages: string[]; gcroot: string }): Promise<{ errors: string[]; installed: { npm: boolean; python: boolean; packages: Record<string, string[]> } }>;
   };
-  /** Owner API for entry modules (v2-4): one request of the HTTP map, as the user. */
-  owner?(workspaceId: string, request: { method: string; path: string; body?: unknown }): Promise<OwnerReply>;
+  /** Owner API for entry modules (v2-4): one request of the HTTP map, as the user; `via` names the entry module for the record. */
+  owner?(workspaceId: string, request: { method: string; path: string; body?: unknown }, via?: { module: string }): Promise<OwnerReply>;
   /** The `chrona` SDK package directory (sdk.ts, testing.ts) given to module builds. */
   moduleSdk?: string;
   moduleBuiltinResources?: string;

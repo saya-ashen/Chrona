@@ -1,6 +1,6 @@
 # v2-5 规格：扩展面——对外动作审批、跨模块调用、事件源、本机环境
 
-状态：草案，未实现（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md) 至 [v2-4](platform-v2-4-entries-rescue.md)。
+状态：§3 跨模块调用已在 `platform-v2` 分支实现（2026-10-24，与本文的差异见 §9）；其余仍为草案（2026-10-22）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md) 至 [v2-4](platform-v2-4-entries-rescue.md)。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
 ## 1. 目标
@@ -24,6 +24,8 @@
 - 模块经 `network` 直接发出的请求无法由内核逐次拦截。因此声明 `network` 的模块，所有对外写行为都应通过声明了 `action` 的工具暴露；这一点写入构建通道提示词，并作为审查卡片的检查项。根本限制要靠 P5 的按主机放行网络。
 
 ## 3. 跨模块调用
+
+> 已实现，实现与本节不同之处以 §9 为准（字段名 `uses`、可见性、异步调用、通知模块化）。
 
 ### 3.1 声明与调用
 
@@ -123,3 +125,26 @@ systemd、桌面通知、Docker socket 等需要绑定特定 socket 或设备，
 - 条目目前按邮件建模（from、subject、body）；设备状态、价格等来源是否需要更一般的条目结构。
 - 本机环境固定拒绝列表的完整内容。
 - 跨模块调用中被调用方需要 `ask` 审批时，调用方如何在批准后继续（v1：收到 `pending_approval`，下次事件重试）。
+
+## 9. 实现说明：跨模块调用与通知模块（2026-10-24）
+
+### 9.1 接口与权限
+- 模块工具就是接口。每个工具声明 `visibility`（`provider`、`owner`、`modules`、`kernel`，默认 `provider`+`owner`，与此前行为相同）、可选的 `callers`（`modules` 可见时只允许这些模块调用）和 `idempotent`（默认 false）。
+- 调用方在清单 `uses: ["<module>.<tool>"]` 中声明（本文原名 `calls`），随版本审批；审批卡显示“调用其他模块 / 供其他模块调用”。新增 `uses` 或接口可见范围变宽视为新能力，不自动启用。
+- 被调用方决定谁能调用：内核在路由时检查可见性和 `callers`。owner API（含 MCP）只能到达 `owner` 可见的工具，入口模块名作为 `via` 记录在审计里，不授予任何权限；Provider 只能到达 `provider` 可见的工具。
+
+### 9.2 调用
+- `chrona.call(target, args, { mode, key, reply, timeoutMs })`，经模块自己的 socket 进入内核，由 supervisor 投递为目标的 `tool` 事件。事件带内核记录的 `caller`（`module`/`provider`/`owner`/`kernel`）和 `call`（id、key、attempt、chain）。
+- 同步（默认）：等待结果。目标已在本调用路径上等待时立即返回 `cycle`（目标的事件串行，永远无法应答）；路径长度上限 6。送达后超时或崩溃 → `unknown`，不重试；未送达 → `unavailable`；目标抛错 → `failed`。
+- 异步：需要调用方的幂等 `key`，在调用方事务内写入 `ModuleInvocation`（同一调用方、目标、key 只有一条）。内核在 tick 旁投递：未送达（目标未安装、暂停、启动失败）退避重试，最多 6 次；送达后无应答、或 Chrona 中途重启导致租约过期 → 仅 `idempotent` 目标重新投递，否则标为 `unknown`。不承诺对外副作用恰好一次。`reply: true` 时把 `call_result` 事件回送调用方；也可 `chrona.callStatus(callId)` 查询。
+- 异步调用不形成等待，A→B→A 可以通过异步完成；需要同步回调的设计应改为异步。
+
+### 9.3 通知模块
+- 内核不再含通知业务。内置 `notify` 模块负责预算（日上限、静默时段、负反馈降级、回复不计入）、摘要、出口与接收人选择（发送时判断聊天出口是否就绪，否则留在网页），并通过 `qq.deliver`（`callers: ["notify"]`）异步投递；结果未知记为 `uncertain`，从不自动重发。
+- Chrona 自己要告诉用户的事（运行结果、审批、模块失败等）就是一次对 `notify.send` 的异步路由调用；Today、健康、设置和 `/notifications` 路由向 `notify` 同步查询，`notify` 不可用时显示为空。
+- `chrona.notify(...)` 是兼容别名（`notify_user` 能力 → 对 `notify.send` 的异步调用），只为此前写成的模块保留；新模块用 `uses: ["notify.send"]`。没有活动版本调用它后删除。
+- 旧 `Notification` 表不删除：新版本第一次 tick 时把各工作区的旧行与通知设置一次性复制给 `notify`（与标记同一事务）；持有发送租约的 queued 行导入为 `uncertain`。
+
+### 9.4 未做
+- §3.3 接口兼容检查（被调用工具删除或不兼容修改时列出调用方并阻止自动启用）尚未实现。
+- §2 对外动作审批、§4 事件源、§5 本机环境未实现。

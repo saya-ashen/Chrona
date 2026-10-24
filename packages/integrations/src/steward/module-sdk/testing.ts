@@ -10,9 +10,12 @@ type Event = { trigger: Trigger; now: string; params: Record<string, string | nu
 type Reply = { id: string; result?: { handled?: boolean; result?: unknown }; error?: string };
 /** The directories the module under test sees (same variables as `chrona.paths`). */
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
-/** Fake kernel for author tests. No call ever executes a real external effect. */
+/**
+ * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`) to a
+ * target in `uses` answer from `stubs["<module>.<tool>"]` (sync: its value is the output) or with a queued call.
+ */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
-  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[] };
+  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
   const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>();
@@ -33,15 +36,22 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", channel: "owner", secret: "owner" } as Record<string, string>)[call.method];
+      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", secret: "owner" } as Record<string, string>)[call.method];
       let reply: unknown;
-      if (!capability || !manifest.effects.includes(capability)) reply = { error: { code: "undeclared", message: "Undeclared capability" } };
+      if (call.method === "call") {
+        const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
+        if (!(manifest.uses ?? []).includes(target)) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
+        // The request id doubles as the call id, so a test can answer it with a call_result event.
+        else if (call.params.mode === "async") reply = { result: { callId: call.id, status: "queued" } };
+        else reply = { result: { output: stubs[target] ? await stubs[target]!(args) ?? null : null } };
+      } else if (call.method === "callStatus") reply = { result: { callId: String(call.params.callId), status: "queued" } };
+      else if (!capability || !manifest.effects.includes(capability)) reply = { error: { code: "undeclared", message: "Undeclared capability" } };
       else {
         const key = `${eventKey}:${call.method}:${String(call.params.key)}`;
         const duplicate = call.params.key !== undefined && seen.has(key);
         if (call.params.key !== undefined) seen.add(key);
         if (duplicate) reply = { result: { status: "duplicate" } };
-        else if (call.method === "notify" || call.method === "wakeProvider" || (call.method === "channel" && !stubs.channel)) reply = { result: { status: "executed" } };
+        else if (call.method === "notify" || call.method === "wakeProvider") reply = { result: { status: "executed" } };
         else if (call.method === "secret" && !stubs.secret) reply = { error: { code: "unconfigured", message: "No secrets in tests" } };
         else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : call.method === "owner" ? { status: 200, body: null } : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       }

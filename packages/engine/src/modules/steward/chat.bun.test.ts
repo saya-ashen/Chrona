@@ -9,7 +9,7 @@ import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, chat: ReturnType<typeof createChat>;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "chat" } })).id;
-  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-chat-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chat: null, deliveries: [], chatTimeoutMs: 1 };
+  ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-chat-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chatTimeoutMs: 1 };
   chat = createChat(ports, async () => {});
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });

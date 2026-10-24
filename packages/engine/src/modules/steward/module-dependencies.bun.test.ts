@@ -16,7 +16,7 @@ const intent = { changes: ["Format with a library"], preserves: [] };
 test("lockfile libraries install at build time, never come from the submission, and changed locks need approval", async () => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-deps-");
   const sandbox = createScriptSandbox({ dataDir });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T04:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T04:00:00Z"), publicUrl: null,
     sandbox: { ...sandbox.health, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule }, packages: createModulePackages({ backend: "system" }) };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "deps" } });

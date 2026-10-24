@@ -3,7 +3,8 @@
   "entry": "index.ts",
   "triggers": [],
   "dynamicSchedules": true,
-  "effects": ["notify_user"],
+  "effects": [],
+  "uses": ["notify.send"],
   "params": {},
   "data": { "schema": 1 },
   "tests": ["test.ts"]

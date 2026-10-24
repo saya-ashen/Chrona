@@ -6,7 +6,7 @@ import { createStewardService, StewardError, type StewardPorts, type StewardServ
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 
 export type StewardRoutePorts = StewardPorts;
-type StewardVariables = { Variables: { steward: ReturnType<StewardService["forWorkspace"]> } };
+type StewardVariables = { Variables: { steward: ReturnType<StewardService["forWorkspace"]> }; Bindings: { ownerModule?: string } | undefined };
 function providerRoutes(router: Hono<StewardVariables>) {
   router.get("/provider/runs", async c => c.json({ items: (await c.get("steward").provider.list(z.string().min(1).max(128).optional().parse(c.req.query("sessionId")))).map(item => s.providerRunViewSchema.parse(item)) }));
   router.post("/provider/interactions/:id/answer", async c => c.json(await c.get("steward").provider.answer(c.req.param("id"), s.providerAnswerSchema.parse(await c.req.json()))));
@@ -88,8 +88,8 @@ export function createStewardRoutes(ports: StewardPorts, service: StewardService
   router.delete("/preferences/:id", async c => { await c.get("steward").preferences.delete(c.req.param("id")); return c.body(null, 204); });
   router.get("/modules", async c => c.json({ items: await c.get("steward").modules.list() }));
   router.get("/modules/tools", async c => c.json(s.moduleToolListSchema.parse(await c.get("steward").modules.tools())));
-  router.post("/modules/tools/:name", async c => c.json(await c.get("steward").modules.callTool(c.req.param("name"), await c.req.json())));
-  router.post("/notifications", async c => c.json(s.notificationSchema.parse(await c.get("steward").notifications.enqueue({ level: "now", ...s.createNotificationSchema.parse(await c.req.json()) }))));
+  router.post("/modules/tools/:name", async c => c.json(await c.get("steward").modules.callTool(c.req.param("name"), await c.req.json(), c.env?.ownerModule ?? null)));
+  router.post("/notifications", async c => c.json(await c.get("steward").notifications.enqueue({ level: "now", ...s.createNotificationSchema.parse(await c.req.json()) })));
   router.get("/notifications", async c => c.json({ items: await c.get("steward").notifications.list() }));
   router.post("/notifications/:id/feedback", async c => c.json(await c.get("steward").notifications.recordFeedback(c.req.param("id"), z.object({ feedback: z.enum(["useful", "not_useful"]) }).strict().parse(await c.req.json()).feedback)));
   router.post("/notifications/:id/retry", async c => c.json(await c.get("steward").notifications.retry(c.req.param("id"))));

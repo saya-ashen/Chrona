@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isDigestDue, localDayKey, routeNotification } from "./notify-budget";
+import { composeDigest, isDigestDue, localDayKey, routeNotification } from "./builtin/notify/budget";
 const base = { sentToday: 0, dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, timezone: "UTC", now: new Date("2026-01-01T12:00:00Z"), urgent: false };
 test.each([
   ["normal", "now", {}, "send"], ["web", "web", {}, "web"], ["digest", "digest", { urgent: true }, "fold"],
@@ -22,4 +22,14 @@ test.each([
   ["08:59", null, false], ["09:00", null, true], ["23:59", "2025-12-31", true], ["12:00", "2026-01-01", false],
 ] as const)("digest %s %s", (time, lastDigestDay, due) => {
   expect(isDigestDue({ digestAt: "09:00", timezone: "UTC", now: new Date(`2026-01-01T${time}:00Z`), lastDigestDay })).toBe(due);
+});
+test.each([0, 1, 10, 11, 15])("digest count %s", (count) => {
+  const result = composeDigest(Array.from({ length: count }, (_, i) => ({ moduleTitle: i % 2 ? "读书" : null, title: `变化${i}`, body: "请查看应用" })), { dayLabel: "今天" });
+  if (!count) { expect(result).toBeNull(); return; }
+  expect(result?.title).toBe("今天日报");
+  expect(result?.body.match(/^- /gm)?.length).toBe(Math.min(count, 10));
+  expect(result?.body.includes(`另有 ${count - 10} 条`)).toBe(count > 10);
+});
+test.each(["读书", null])("groups %s", (moduleTitle) => {
+  expect(composeDigest([{ moduleTitle, title: "甲", body: "一" }, { moduleTitle, title: "乙", body: "二" }], { dayLabel: "今天" })?.body).toBe(`${moduleTitle ?? "其他动态"}\n- 甲：一\n- 乙：二`);
 });

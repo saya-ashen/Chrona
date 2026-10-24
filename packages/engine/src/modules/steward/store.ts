@@ -11,7 +11,6 @@ export const toRun = (row: db.Run) => project(c.runSchema, row);
 export const toApproval = (row: db.Approval) => project(c.approvalSchema, row);
 export const toGrant = (row: db.Grant) => project(c.grantSchema, row);
 export const toPreference = (row: db.Preference) => project(c.preferenceSchema, row);
-export const toNotification = (row: db.Notification) => project(c.notificationSchema, row);
 export function toMessage(row: db.Message): c.Message {
   const attachments = c.attachmentSchema.strip().array().parse(row.attachments);
   return c.messageSchema.parse({ id: row.id, direction: row.direction, channel: row.channel, text: row.text, attachments, sessionId: row.sessionId, quotedMessageId: row.quotedMessageId, at: row.at.toISOString() });

@@ -11,5 +11,6 @@ export { StewardError } from "./errors";
 export type { StewardErrorCode } from "./errors";
 export { createContent, contentArea, filesContent } from "./content";
 export { consumeOnce, effectivePolicyIn } from "./grants";
-export { createNotifications, enqueueNotification } from "./notify";
-export type { NotificationInput, NotificationContext } from "./notify";
+export { notifyUser, createNotificationsView } from "./notify-user";
+export type { UserNotice } from "./notify-user";
+export { callSync, enqueueCall, callStatus, runDueCalls, drainCalls, callsSettled, CallError } from "./module-calls";

@@ -101,10 +101,22 @@ const toolParameterSchema = z.union([
   z.object({ type: z.enum(["string", "number", "boolean"]), description: z.string().max(300).optional() }).strict(),
   z.object({ type: z.literal("string"), enum: z.array(z.string().max(100)).min(1).max(20), description: z.string().max(300).optional() }).strict(),
 ]);
+/**
+ * Who may call a module tool (an interface): `provider` (m_* tools of runs), `owner` (the owner API and MCP),
+ * `modules` (other modules declaring it in `uses`, routed by Chrona) and `kernel` (Chrona itself).
+ */
+export const TOOL_VISIBILITY = ["provider", "owner", "modules", "kernel"] as const;
 const moduleToolSchema = z.object({
   name: slug, description: z.string().min(1).max(500),
   parameters: z.object({ type: z.literal("object"), properties: z.record(slug, toolParameterSchema).default({}), required: z.array(slug).default([]) }).strict(),
+  visibility: z.array(z.enum(TOOL_VISIBILITY)).min(1).max(TOOL_VISIBILITY.length).default(["provider", "owner"]),
+  /** With `modules` visibility: only these modules may call it (e.g. a delivery adapter only for the notification module). */
+  callers: z.array(slug).min(1).max(20).optional(),
+  /** Safe to run twice: Chrona redelivers an asynchronous call whose outcome is unknown only when this is true. */
+  idempotent: z.boolean().default(false),
 }).strict();
+/** `<module>.<tool>`: a module tool other modules call through Chrona. */
+export const interfaceRefSchema = z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/);
 export const moduleManifestSchema = z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
@@ -124,8 +136,10 @@ export const moduleManifestSchema = z.object({
    * the browser calls /api/steward with the user's key), so its module is an entry module like `owner` (see isEntryModule).
    */
   listen: z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]).optional(),
-  /** Delivers this channel's notifications (`deliver` events) and reports readiness with `channel`; requires `owner`. */
+  /** Deprecated and ignored: delivery adapters are module tools called by the notification module. Kept so stored versions parse. */
   channel: z.literal("chrona_qqbot").optional(),
+  /** Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability. */
+  uses: z.array(interfaceRefSchema).max(20).default([]),
   /**
    * System programs (v2-6), named for the host backend: nixpkgs attributes under Nix, the distribution's package names
    * otherwise. Language libraries come from lockfiles instead (package.json + bun.lock, pyproject.toml + uv.lock), which
@@ -155,6 +169,7 @@ export const moduleManifestSchema = z.object({
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   if ((manifest.channel || manifest.secrets.length) && !manifest.effects.includes("owner")) ctx.addIssue({ code: "custom", path: ["effects"], message: "channel and secrets require the owner capability" });
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
+  if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (manifest.listen && RESERVED_LISTEN_PATHS.some(path => manifest.listen === path || manifest.listen!.startsWith(`${path}-`))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (manifest.effects.includes("model") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the model effect is declared" });
@@ -162,6 +177,8 @@ export const moduleManifestSchema = z.object({
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
     names.add(tool.name);
+    if (new Set(tool.visibility).size !== tool.visibility.length) ctx.addIssue({ code: "custom", path: ["tools", index, "visibility"], message: "Visibility must be unique" });
+    if (tool.callers && !tool.visibility.includes("modules")) ctx.addIssue({ code: "custom", path: ["tools", index, "callers"], message: "callers require modules visibility" });
     for (const key of tool.parameters.required) if (!(key in tool.parameters.properties)) ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
   });
 });
@@ -177,20 +194,33 @@ export type ModuleTool = z.infer<typeof moduleToolSchema>;
  * Events of one module are delivered one at a time; calls made meanwhile belong to that event.
  */
 const channelId = z.string().min(1).max(64);
-const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB");
+const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 262_144, "result must serialize to at most 256 KiB");
+/** Statuses of a routed call: sync calls finish in place; async ones are stored and delivered by Chrona. */
+export const CALL_STATUSES = ["queued", "running", "succeeded", "failed", "unknown"] as const;
+/** Who made a call, as Chrona recorded it (never supplied by the caller). `via` names the entry module behind an owner call. */
+export const callerSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("module"), module: slug, moduleId: z.string().max(128), hash: z.string().max(64) }).strict(),
+  z.object({ kind: z.literal("provider"), runId: z.string().max(128) }).strict(),
+  z.object({ kind: z.literal("owner"), via: slug.nullable() }).strict(),
+  z.object({ kind: z.literal("kernel") }).strict(),
+]);
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
     /** `scheduleId` and `payload` are set for dynamic schedules (e.g. reminders created through `chrona_schedule`). */
     z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso, scheduleId: z.string().max(128).optional(), payload: z.record(z.string(), z.unknown()).optional() }).strict(),
     z.object({ kind: z.literal("inbound"), id: slug, firedAt: iso, item: z.object({ externalId: z.string(), from: z.string(), subject: z.string(), receivedAt: iso, body: z.string() }).strict() }).strict(),
-    z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()) }).strict(),
+    /**
+     * A tool call. `caller` is who called it; `call` is set for routed calls: `key` is the caller's idempotency key
+     * (async calls only), `attempt` counts deliveries of the same call, `chain` lists the modules on the call path.
+     */
+    z.object({ kind: z.literal("tool"), id: slug, firedAt: iso, args: z.record(z.string(), z.unknown()),
+      caller: callerSchema.optional(),
+      call: z.object({ id: z.string().max(128), key: z.string().max(500).nullable(), attempt: z.number().int().min(1), chain: z.array(slug).max(16) }).strict().optional() }).strict(),
     /** The user or the Provider changed files in this module's content area (`id` is always "content"). */
     z.object({ kind: z.literal("content_edit"), id: z.literal("content"), firedAt: iso, paths: z.array(relativePathSchema).min(1).max(200), by: z.enum(["user", "provider"]) }).strict(),
-    /** One outbox notification for the module's `channel`; `result` must be a DeliveryOutcome. Budget, quiet hours and retries stay with Chrona. */
-    z.object({ kind: z.literal("deliver"), id: z.literal("deliver"), firedAt: iso, message: z.object({
-      idempotencyKey: z.string().max(500), title: z.string().max(200), body: z.string().max(4000), link: z.string().max(2000).nullable(), recipient: z.string().max(200).nullable(),
-      approval: z.object({ id: z.string().max(128), scoped: z.boolean() }).strict().optional(),
-    }).strict() }).strict(),
+    /** The result of an async call this module made with `reply: true` (`id` is always "call"). */
+    z.object({ kind: z.literal("call_result"), id: z.literal("call"), firedAt: iso, callId: z.string().max(128), target: interfaceRefSchema, key: z.string().max(500),
+      status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
   ]),
   now: iso,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
@@ -199,8 +229,16 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 /** `handled: false` hands an inbound item back to the Provider; `result` answers a tool call. */
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
-/** Kernel methods and the capability each needs. */
-export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", channel: "owner", secret: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+/**
+ * Kernel methods and the capability each needs. `call` and `callStatus` need no effect: each target must be listed
+ * in the manifest's `uses`. `notify` is a deprecated compatibility alias (an async call to `notify.send`) for module
+ * versions written before routing; new versions use `uses: ["notify.send"]`. Remove it once no active version calls it.
+ */
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", secret: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+/** The interface `chrona.notify` and Chrona's own notifications go to. */
+export const NOTIFY_INTERFACE = "notify.send";
+/** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
+export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   z.object({ id: channelId, method: z.literal("notify"), params: z.object({ key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict() }).strict(),
   z.object({ id: channelId, method: z.literal("wakeProvider"), params: z.object({ key: z.string().min(1).max(200), prompt: text.max(4000) }).strict() }).strict(),
@@ -215,12 +253,24 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
     path: z.string().max(2000).regex(/^\/[A-Za-z0-9_\-./?=&%:~+,]*$/).refine(path => !path.split("?")[0]!.split("/").includes(".."), "No .. segments"),
     body: z.json().optional(),
   }).strict() }).strict(),
-  /** Channel modules: whether notifications can be delivered now (e.g. QQ owner bound); unready routes them to the web. */
-  z.object({ id: channelId, method: z.literal("channel"), params: z.object({ ready: z.boolean() }).strict() }).strict(),
   /** A credential the manifest lists in `secrets`; never logged or stored by Chrona's module records. */
   z.object({ id: channelId, method: z.literal("secret"), params: z.object({ name: z.string().max(41) }).strict() }).strict(),
+  /**
+   * A routed call to another module's tool (`target` must be in `uses`). `sync` waits for the result (bounded by
+   * `timeoutMs`); a timeout or crash after delivery is `unknown`, never retried. `async` stores the call under the
+   * caller's idempotency `key` (a repeat returns the same call) and returns at once; Chrona delivers it, retrying only
+   * deliveries that never reached the target, or `idempotent` targets. `reply` sends a `call_result` event back.
+   */
+  z.object({ id: channelId, method: z.literal("call"), params: z.object({
+    target: interfaceRefSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
+    key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(),
+  }).strict().refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
+  /** State of an async call this module made. */
+  z.object({ id: channelId, method: z.literal("callStatus"), params: z.object({ callId: z.string().min(1).max(128) }).strict() }).strict(),
 ]);
-export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal", "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
+export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal", "unconfigured", "budget_exceeded", "provider_error", "timeout",
+  /** Routed calls: refused by the target's visibility/callers, unknown target, would wait on itself, outcome unknown, the target failed or never got it. */
+  "forbidden", "not_found", "cycle", "unknown", "failed", "unavailable"] as const;
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   z.object({ status: z.enum(["executed", "duplicate"]) }).strict(),
   /** `model` replies: the completion is untrusted data. */
@@ -229,6 +279,10 @@ export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   z.object({ status: z.number().int().min(100).max(599), body: z.json() }).strict(),
   /** `secret` replies. */
   z.object({ value: z.record(z.string(), z.string()) }).strict(),
+  /** Sync `call` replies: the target's result. */
+  z.object({ output: z.json() }).strict(),
+  /** Async `call` and `callStatus` replies. */
+  z.object({ callId: z.string().max(128), status: z.enum(CALL_STATUSES), duplicate: z.boolean().optional(), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
 ]) }).strict()
   .or(z.object({ id: channelId, error: z.object({ code: z.enum(MODULE_CALL_ERRORS), message: z.string().max(500) }).strict() }).strict());
 export type ModuleEvent = z.infer<typeof moduleEventSchema>;
@@ -451,7 +505,8 @@ export const updateConnectorSchema = createConnectorSchema.partial().extend({ st
  *   GET  /schedules | POST (CreateSchedule, wake origin = ?sessionId) ; PATCH /schedules/:id (UpdateSchedule)
  *   GET  /approvals?status= ; POST /approvals/:id/resolve (ResolveApproval) -> Approval
  *   GET  /settings | PATCH ; GET /grants | POST ; POST /grants/:id/revoke ; GET /preferences | POST | DELETE /preferences/:id
- *   GET  /notifications | POST (CreateNotification, level now) ; POST /notifications/:id/feedback ; POST /notifications/:id/retry
+ *   GET  /notifications | POST (CreateNotification, level now) -> {callId, status} (queued for the `notify` module) ;
+ *   POST /notifications/:id/feedback ; POST /notifications/:id/retry   (all answered by the `notify` module)
  *   GET  /connectors | POST ; PATCH /connectors/:id ; POST /connectors/:id/test ; POST /connectors/:id/sync ; GET /connectors/:id/items
  *   GET  /modules                                 -> {items: object[]} (modules, versions and recent runs; engine-shaped)
  *   GET  /modules/tools                           -> ModuleToolList ; POST /modules/tools/:name (arguments) -> {result}
@@ -488,7 +543,7 @@ export const chronaToolInputSchemas = {
     dir: relativePathSchema.optional().describe("Module directory relative to the session directory"),
     request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
-  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required}}. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects notify_user|wake_provider|network|model; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); call chrona.notify({key,level,title,body}) / wakeProvider({key,prompt}) / model({system?,prompt,maxOutputTokens})→{text} only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
+  }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}|{id,inbound:{connector,match?:{from?,subject?}}}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects wake_provider|network|model; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"inbound"|"tool", async ev => ...) where ev {id,kind,firedAt,item?,args?,now,params}; return {handled?:true,result?} (inbound stays with the Provider unless handled:true; result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) / model({system?,prompt,maxOutputTokens})→{text} only for declared effects; keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   chrona_modules: z.object({}).strict().describe("List modules (apps), versions, approval status and recent runs."),
   chrona_module_checkout: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema }).strict().describe("Copy module files into an empty directory of the session directory for editing; hash defaults to the active version."),
   chrona_module_rollback: z.object({ moduleId: id, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().describe('Roll back to a previously approved module hash. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval. Accepts no force/restore flag.'),
@@ -525,11 +580,6 @@ export type ConnectorAdapter = {
   poll(input: { settings: Record<string, unknown>; secret: Record<string, string> | null; cursor: string | null }): Promise<{ items: SourceItem[]; cursor: string | null }>;
   send?(input: { settings: Record<string, unknown>; secret: Record<string, string> | null; to: string[]; subject: string; body: string; inReplyTo?: string }): Promise<{ ok: true; messageId: string | null } | { ok: false; retryable: boolean; error: string }>;
 };
-export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; files?: { name: string; path: string }[];
-  /** An open approval this message asks about; chat channels may offer approve/deny buttons (scoped: an "always" scope is available). */
-  approval?: { id: string; scoped: boolean } };
-export type DeliveryOutcome = { outcome: "accepted"; receiptRef: string | null } | { outcome: "rejected"; retryable: boolean; error: string } | { outcome: "uncertain"; error: string };
-export type DeliveryAdapter = { channel: DeliveryChannel; send(message: DeliveryMessage): Promise<DeliveryOutcome> };
 
 /** Provider adapter (Pi first). Chrona owns when and where a run happens; the Provider owns how it works. */
 export type ProviderRunInput = {

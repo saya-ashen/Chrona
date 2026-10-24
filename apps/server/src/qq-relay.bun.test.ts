@@ -14,14 +14,13 @@ async function fixture(reply: (input: ProviderRunInput, service: ReturnType<type
   const now = () => new Date("2026-10-15T04:00:00Z");
   await db.workspace.create({ data: { id: "w", name: "test" } });
   const prompts: ProviderRunInput[] = [];
-  const ports: StewardPorts = { db, dataDir, now, publicUrl: "https://chrona.example", deliveries: [], chat: null,
-    provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
+  const ports: StewardPorts = { db, dataDir, now, publicUrl: "https://chrona.example",     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
       prompts.push(input);
       return { inject: async () => {}, abort: async () => {}, done: (async () => { await reply(input, service); return { outcome: "finished" as const, sessionId: null, error: null }; })() };
     } } };
   const service = createStewardService(ports);
   ports.owner = ownerApi(ports, service, () => {});
-  const relay = createRelay({ owner: request => ports.owner!("w", request), publicUrl: ports.publicUrl,
+  const relay = createRelay({ owner: request => ports.owner!("w", request), notify: async () => ({}), publicUrl: ports.publicUrl,
     download: a => downloadQqAttachment(a, async (_url, init) => { expect(init?.redirect).toBe("error"); return new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), { headers: { "content-type": a.mime } }); }), pollMs: 5 });
   return { db, dataDir, now, prompts, service, relay };
 }

@@ -1,11 +1,17 @@
 {
   "name": "qq",
-  "description": "Chrona's private QQ bot: owner binding, chat in the qq:dm session, approval buttons and notification delivery.",
+  "description": "Chrona's private QQ bot: owner binding, chat in the qq:dm session, approval buttons and the QQ channel for the notify module.",
   "entry": "index.ts",
   "keepAlive": true,
-  "channel": "chrona_qqbot",
   "secrets": ["qq_bot"],
   "triggers": [],
+  "uses": ["notify.channel", "notify.send"],
+  "tools": [
+    { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"], "callers": ["notify"],
+      "parameters": { "type": "object", "required": ["key", "title", "body"], "properties": {
+        "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "link": { "type": "string" },
+        "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } }
+  ],
   "effects": ["owner", "network"],
   "data": { "schema": 1 },
   "tests": ["test.ts"]

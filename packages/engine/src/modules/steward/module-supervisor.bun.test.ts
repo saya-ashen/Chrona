@@ -6,6 +6,7 @@ import { createModuleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -25,7 +26,7 @@ async function fixture({ keepAlive = false, effects = ["notify_user", "wake_prov
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, deliveries: [], chat: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   const supervisor = createModuleSupervisor(ports, { timers: fakeClock.timers });
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   return { db, module, manifest, ports, supervisor, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
@@ -64,7 +65,7 @@ test("keepAlive starts at runtime start, restarts with backoff and pauses after 
     if (i < 2) await until(() => f.processes.length === i + 2);
   }
   await until(async () => (await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status === "paused");
-  expect(await f.db.notification.count({ where: { title: "模块连续失败，已暂停" } })).toBe(1);
+  expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
   f.advance(60_000); await Bun.sleep(20); expect(f.processes).toHaveLength(3);
 });
 test("event errors pause after three failures and retain one ModuleRun per event", async () => {
@@ -105,6 +106,6 @@ test("duplicate keys return duplicate and a different event does not swallow the
   expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "executed" } } } });
   expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "duplicate" } } } });
   await f.supervisor.deliver(f.module.id, "v1", { ...event, trigger: { ...event.trigger, firedAt: "2026-10-22T00:00:00Z" } });
-  expect(await f.db.notification.count()).toBe(2);
+  expect((await notices(f.db)).length).toBe(2);
   expect(await f.db.moduleCall.count()).toBe(3);
 });

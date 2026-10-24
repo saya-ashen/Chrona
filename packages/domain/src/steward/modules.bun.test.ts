@@ -63,12 +63,12 @@ describe("module channel contract", () => {
     expect(moduleCallSchema.safeParse({ id: "1", method: "notify", params: { ...notify, level: "digest" } }).success).toBe(true);
     expect(moduleCallSchema.safeParse({ id: "1", method: "wakeProvider", params: wake }).success).toBe(true);
   });
-  test("event replies default result and cap it at 16 KiB serialized", () => {
-    const result = "x".repeat(16 * 1024 - 2);
+  test("event replies default result and cap it at 256 KiB serialized", () => {
+    const result = "x".repeat(256 * 1024 - 2);
     expect(moduleEventReplySchema.parse({ id: "1" })).toEqual({ id: "1", result: {} });
     expect(moduleEventReplySchema.parse({ id: "1", result: { handled: true, result } })).toEqual({ id: "1", result: { handled: true, result } });
     expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: `${result}x` } }).success).toBe(false);
-    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: "界".repeat(6000) } }).success).toBe(false);
+    expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: "界".repeat(90_000) } }).success).toBe(false);
   });
   test.each([
     { method: "notify", params: { ...notify, level: "web" } }, { method: "notify", params: { ...notify, key: "" } },

@@ -11,6 +11,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { createStewardService } from "./service";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { notice } from "./test-notices";
 
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 const now = new Date("2026-10-22T12:00:00Z");
@@ -29,14 +30,14 @@ async function fixture(migrated = false) {
       sqlite.run('INSERT INTO "Workspace" (id, name, updatedAt) VALUES (?, ?, CURRENT_TIMESTAMP)', ["w", "Migration"]);
       sqlite.run('INSERT INTO "Schedule" (id, workspaceId, mode, rule, text, label, createdBy, nextAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', ["00000000-0000-0000-0000-000000000001", "w", "remind", JSON.stringify({ kind: "at", at: now.toISOString() }), "Migrated reminder", "Old label", "user", now.toISOString().replace("Z", "+00:00")]);
     } finally { sqlite.close(); }
-    await cp(join(source, "0011_schedule_payload"), join(migrationsDir, "0011_schedule_payload"), { recursive: true });
+    for (const name of (await readdir(source)).filter(name => /^\d/.test(name) && name >= "0011")) await cp(join(source, name), join(migrationsDir, name), { recursive: true });
     ensureSqliteDatabase({ databaseUrl, migrationsDir });
     db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   } else {
     db = testDb();
     await db.workspace.create({ data: { id: "w", name: "Reminders" } });
   }
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, deliveries: [], chat: null, moduleBuiltinResources: resources,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
     sandbox: { ...sandbox.health, runModule: sandbox.runModule, startModule: sandbox.startModule } };
   const service = createStewardService(ports), api = service.forWorkspace("w");
   return { db, ports, service, api, async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
@@ -82,8 +83,8 @@ sandboxTest("chrona_schedule reminder runs built-in author tests, not a Provider
     await f.api.modules.activate(module.id, module.activeHash!, "rollback");
     expect(await f.api.schedules.fireDue()).toBe(1);
     expect(await f.api.schedules.fireDue()).toBe(0);
-    expect(await f.db.notification.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ title: "提醒", body: "喝水" });
-    expect(await f.db.moduleCall.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ method: "notify", status: "executed" });
+    expect(await notice(f.db, { moduleId: module.id })).toMatchObject({ title: "提醒", body: "喝水" });
+    expect(await f.db.moduleCall.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ method: "call", status: "executed" });
     expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ exitCode: 0 });
     expect(await f.db.run.count()).toBe(1);
   } finally { await f.close(); }
@@ -98,7 +99,7 @@ sandboxTest("0011 migrates an old remind row; registration attaches it idempoten
     const module = await f.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: "w", name: "remind" } } });
     expect(await f.db.schedule.findFirstOrThrow()).toMatchObject({ moduleId: module.id, status: "active" });
     expect(await f.api.schedules.fireDue()).toBe(1);
-    expect(await f.db.notification.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ title: "提醒", body: "Migrated reminder" });
+    expect(await notice(f.db, { moduleId: module.id })).toMatchObject({ title: "提醒", body: "Migrated reminder" });
     expect(await f.db.run.count()).toBe(0);
   } finally { await f.close(); }
 }, 30_000);

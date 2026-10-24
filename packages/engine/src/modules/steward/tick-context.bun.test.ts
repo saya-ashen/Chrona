@@ -14,7 +14,7 @@ test("run context lists current modules, their recent errors and the entry the m
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-tick-context-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const starts: ProviderRunInput[] = [];
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T14:00:00Z"), deliveries: [], chat: null, publicUrl: null,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T14:00:00Z"), publicUrl: null,
     provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
       starts.push(input);
       return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) };
