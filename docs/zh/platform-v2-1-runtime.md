@@ -27,7 +27,7 @@
   "keepAlive": false,
   "content": false,
   "effects": ["network", "model", "notify_user"],
-  "model": { "maxCalls": 3, "maxOutputTokens": 2000 },
+  "model": { "tier": "fast", "maxCalls": 3, "maxOutputTokens": 2000 },
   "params": {},
   "data": { "schema": 1 },
   "tests": ["test.ts"]

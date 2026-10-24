@@ -14,14 +14,14 @@ import { notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-const limits = { model: "fake/exact", maxCallsPerEvent: 2, maxOutputTokens: 20, dailyCalls: 10, timeoutMs: 5000 };
+const limits = { models: { fast: "fake/fast", strong: "fake/exact" }, maxCallsPerEvent: 2, maxOutputTokens: 20, dailyCalls: 10, timeoutMs: 5000 };
 const prompt = "PRIVATE_PROMPT", text = "PRIVATE_COMPLETION";
 async function fixture() {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-model-engine-");
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "model", settings: { moduleModel: limits } } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "model-test", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: ["model", "notify_user"], model: { maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: ["model", "notify_user"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   const now = new Date("2026-10-21T04:00:00Z");
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
   let calls = 0;
@@ -40,11 +40,12 @@ test("settings moduleModel defaults null, persists owner updates and disabling",
   await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: {} } });
   expect((await settings.get()).moduleModel).toBeNull();
 });
-for (const kind of ["undeclared", "unconfigured", "event", "daily", "tokens", "setting-tokens", "setting-calls", "no-event"] as const) test(`handler enforces ${kind}`, async () => {
+for (const kind of ["undeclared", "unconfigured", "tier", "event", "daily", "tokens", "setting-tokens", "setting-calls", "no-event"] as const) test(`handler enforces ${kind}`, async () => {
   const f = await fixture();
   let cap = 20;
   if (kind === "undeclared") f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, effects: ["notify_user"], model: undefined });
   if (kind === "unconfigured") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: {} } });
+  if (kind === "tier") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, models: { fast: "fake/fast" } } } } });
   if (kind === "event") { await f.call(); await f.call(); }
   if (kind === "daily") { await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, dailyCalls: 1 } } } }); await f.call(); }
   if (kind === "tokens") cap = 21;
@@ -52,7 +53,7 @@ for (const kind of ["undeclared", "unconfigured", "event", "daily", "tokens", "s
   if (kind === "setting-calls") { await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, maxCallsPerEvent: 1 } } } }); await f.call(); }
   if (kind === "no-event") delete f.scope.moduleRunId;
   const before = f.calls();
-  expect(await f.call(cap)).toMatchObject({ error: { code: ["undeclared", "unconfigured"].includes(kind) ? kind : "budget_exceeded" } });
+  expect(await f.call(cap)).toMatchObject({ error: { code: kind === "tier" ? "unconfigured" : ["undeclared", "unconfigured"].includes(kind) ? kind : "budget_exceeded" } });
   expect(f.calls()).toBe(before);
   expect(await f.db.moduleCall.count({ where: { status: "rejected", method: "model" } })).toBe(1);
 });
@@ -76,17 +77,17 @@ test("success caps output and audits only model and token counts", async () => {
   const f = await fixture();
   expect(await f.call(1)).toMatchObject({ result: { text: text.slice(0, 4), inputTokens: 3, outputTokens: 4 } });
   const audits = await f.db.audit.findMany();
-  expect(audits[0]?.details).toMatchObject({ model: limits.model, inputTokens: 3, outputTokens: 4, error: null });
+  expect(audits[0]?.details).toMatchObject({ model: limits.models.strong, inputTokens: 3, outputTokens: 4, error: null });
   expect(JSON.stringify(audits)).not.toContain(prompt); expect(JSON.stringify(audits)).not.toContain(text);
 });
-for (const setting of [null, { ...limits, maxCallsPerEvent: 1 }, { ...limits, maxOutputTokens: 10 }]) test(`build rejects unavailable or excessive model limits ${JSON.stringify(setting)}`, async () => {
+for (const setting of [null, { ...limits, models: { fast: "fake/fast" } }, { ...limits, maxCallsPerEvent: 1 }, { ...limits, maxOutputTokens: 10 }]) test(`build rejects unavailable or excessive model limits ${JSON.stringify(setting)}`, async () => {
   const f = await fixture();
   await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: setting } } });
   const version = await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "build", manifest: f.manifest, intent: { changes: ["model"] }, source: "user", report: {}, status: "building" } });
   const staging = join(f.dataDir, "platform/staging", version.id); await mkdir(staging, { recursive: true }); await writeFile(join(staging, "index.ts"), "");
   await buildPending(moduleContext(f.ports, f.workspace.id));
   const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
-  expect(row.status).toBe("rejected"); expect(JSON.stringify(row.report)).toContain(setting ? "limits exceed" : "configure moduleModel"); expect(f.calls()).toBe(0);
+  expect(row.status).toBe("rejected"); expect(JSON.stringify(row.report)).toContain(!setting ? "configure moduleModel" : "strong" in setting.models ? "limits exceed" : 'tier \\"strong\\" is not configured'); expect(f.calls()).toBe(0);
 });
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (sandbox.health.available ? test : test.skip)("sandbox schedule calls SDK model then notify; model audit excludes content", async () => {
@@ -108,7 +109,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   expect(f.calls()).toBe(1);
   expect(await f.db.run.count()).toBe(0);
   const audits = await f.db.audit.findMany();
-  expect(audits.find(audit => audit.kind === "module_model_call")?.details).toMatchObject({ callId: calls.find(call => call.method === "model")!.id, model: limits.model, inputTokens: 3, outputTokens: 4, error: null });
+  expect(audits.find(audit => audit.kind === "module_model_call")?.details).toMatchObject({ callId: calls.find(call => call.method === "model")!.id, model: limits.models.strong, inputTokens: 3, outputTokens: 4, error: null });
   const logs = JSON.stringify(audits);
   expect(logs).not.toContain(prompt); expect(logs).not.toContain(text);
 });

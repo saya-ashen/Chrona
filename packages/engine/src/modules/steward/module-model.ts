@@ -17,7 +17,7 @@ export async function handleModuleModel(ports: StewardPorts, scope: CallScope, c
     const settings = moduleModelSettings(workspace.settings);
     let error: ModelError | null = null;
     if (!scope.manifest.effects.includes("model") || !scope.manifest.model) error = "undeclared";
-    else if (!settings || !ports.modelGateway) error = "unconfigured";
+    else if (!settings || !Object.hasOwn(settings.models, scope.manifest.model.tier) || !ports.modelGateway) error = "unconfigured";
     else {
       const eventCalls = scope.moduleRunId ? await tx.moduleCall.count({ where: { moduleRunId: scope.moduleRunId, method: "model" } }) : Infinity;
       const timezone = notificationSettings(workspace.settings).timezone, day = localDayKey(now, timezone);
@@ -25,15 +25,16 @@ export async function handleModuleModel(ports: StewardPorts, scope: CallScope, c
       const daily = recent.filter(row => localDayKey(row.createdAt, timezone) === day).length;
       if (eventCalls >= Math.min(scope.manifest.model!.maxCalls, settings.maxCallsPerEvent) || daily >= settings.dailyCalls || call.params.maxOutputTokens > Math.min(scope.manifest.model!.maxOutputTokens, settings.maxOutputTokens)) error = "budget_exceeded";
     }
+    const model = settings && scope.manifest.model ? settings.models[scope.manifest.model.tier] ?? null : null;
     const record = await tx.moduleCall.create({ data: { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "model", key: randomUUID(), status: error ? "rejected" : "pending", error, createdAt: now } });
-    if (error) await audit(tx, { workspaceId: scope.workspaceId, kind: "module_model_call", actor: "module", subjectId: scope.moduleId, details: { callId: record.id, model: settings?.model ?? null, inputTokens: null, outputTokens: null, error } });
-    return { id: record.id, settings, error };
+    if (error) await audit(tx, { workspaceId: scope.workspaceId, kind: "module_model_call", actor: "module", subjectId: scope.moduleId, details: { callId: record.id, model, inputTokens: null, outputTokens: null, error } });
+    return { id: record.id, settings, model, error };
   });
   if (reservation.error) return { id: call.id, error: { code: reservation.error, message: `Module model call: ${reservation.error}` } };
-  const settings = reservation.settings!;
+  const settings = reservation.settings!, model = reservation.model!;
   let result: { text: string; inputTokens: number | null; outputTokens: number | null } | undefined, error: ModelError | null = null;
   try {
-    result = await ports.modelGateway!.complete({ ...call.params, model: settings.model, timeoutMs: settings.timeoutMs });
+    result = await ports.modelGateway!.complete({ ...call.params, model, timeoutMs: settings.timeoutMs });
     // shortcut: approximate the output token cap with four characters per token.
     result = { ...result, text: result.text.slice(0, call.params.maxOutputTokens * 4) };
   } catch (cause) {
@@ -41,7 +42,7 @@ export async function handleModuleModel(ports: StewardPorts, scope: CallScope, c
   }
   await ports.db.$transaction(async tx => {
     await tx.moduleCall.update({ where: { id: reservation.id }, data: { status: error ? "failed" : "executed", error } });
-    await audit(tx, { workspaceId: scope.workspaceId, kind: "module_model_call", actor: "module", subjectId: scope.moduleId, details: { callId: reservation.id, model: settings.model, inputTokens: result?.inputTokens ?? null, outputTokens: result?.outputTokens ?? null, error } });
+    await audit(tx, { workspaceId: scope.workspaceId, kind: "module_model_call", actor: "module", subjectId: scope.moduleId, details: { callId: reservation.id, model, inputTokens: result?.inputTokens ?? null, outputTokens: result?.outputTokens ?? null, error } });
   });
   return error ? { id: call.id, error: { code: error, message: `Module model call: ${error}` } } : { id: call.id, result: result! };
 }

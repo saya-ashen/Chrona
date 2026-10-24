@@ -72,13 +72,13 @@
 ```json
 {
   "effects": ["network", "model", "notify_user"],
-  "model": { "maxCalls": 3, "maxOutputTokens": 2000 }
+  "model": { "tier": "fast", "maxCalls": 3, "maxOutputTokens": 2000 }
 }
 ```
 
 - `effects` 含 `model` 时必须有 `model` 字段；两者缺一 build 失败。
-- **L1**（设置，仅用户可改）：`moduleModel = { provider, model, maxCallsPerEvent, maxOutputTokens, dailyCalls, timeoutMs }`（`timeoutMs` 为声明 `model` 的模块的事件超时，v2-1 §2.3）。确切的 provider/model 由用户指定；未配置时 `model` 能力不可用（build 失败并说明原因）。**不自动回退到其他模型。**
-- 清单的 `maxCalls` / `maxOutputTokens` 不得超过 L1 上限，否则 build 失败。
+- **L1**（设置，仅用户可改）：`moduleModel = { models: { <档位>: "<provider/model>" }, maxCallsPerEvent, maxOutputTokens, dailyCalls, timeoutMs }`（`timeoutMs` 为声明 `model` 的模块的事件超时，v2-1 §2.3）。档位名（如 `fast`、`strong`）对应的确切 provider/model 由用户指定，额度各档共用；未配置时 `model` 能力不可用（build 失败并说明原因）。**不自动回退到其他模型或档位。**
+- 清单的 `model.tier` 按任务难度选一个已配置的档位（构建提示会列出档位）；档位未配置、或 `maxCalls` / `maxOutputTokens` 超过 L1 上限，build 失败。运行时档位被删除则调用返回 `unconfigured`。用户换某档的模型不需要重建模块。
 - 新增 `model` 属于新增 effects，按现行规则必须经审查启用，不会自动启用。
 
 ### 4.2 调用

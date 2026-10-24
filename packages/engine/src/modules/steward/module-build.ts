@@ -71,7 +71,9 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     if (manifest.model) {
       const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
       const limits = moduleModelSettings(workspace.settings);
-      const error = !limits ? "Module model capability unavailable: configure moduleModel in owner settings" : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
+      const error = !limits ? "Module model capability unavailable: configure moduleModel in owner settings"
+        : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
+        : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
       if (error) {
         report.errors = [error];
         await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
