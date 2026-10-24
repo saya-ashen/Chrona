@@ -16,8 +16,10 @@ import { createTick } from "./tick";
 import { createChat } from "./chat";
 import { createConnectors } from "./connectors";
 import { createProviderControl } from "./provider-channel";
+import { registerSystemModules } from "./system-modules";
 /** Authenticated owner boundary. */
 export function createStewardService(inputPorts: StewardPorts) {
+  registerSystemModules();
   const ports: StewardPorts = Object.create(inputPorts);
   const tick = createTick(ports);
   const chat = createChat(ports, () => ports.onQueued ? ports.onQueued() : tick());

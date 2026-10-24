@@ -13,7 +13,7 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
   [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies) and v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9); the rest of v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies), v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9) and v2-7 (system modules `chat` and `approvals`; conversation replies pushed to the entry module, [v2-7](docs/zh/platform-v2-7-system-modules.md)); the rest of v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
@@ -24,7 +24,8 @@ Rules that follow from the goals:
   (`uses` + `chrona.call`; the callee's `visibility`/`callers` decide who may call; Chrona records the real caller). A module may own a **content area**
   (`<dataDir>/platform/content/<moduleId>/`: Markdown, panels, `*.ui.json`, uploads — content, never executed)
   that the web renders as its pages. Built-in modules (e.g. `files`) ship with Chrona and activate without approval.
-- Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); `wake` and module wakes run in
+- Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); entry modules reach them through the in-process system
+  module `chat` (`chat.send`), and replies are pushed to the session's entry module (`<entry>.reply`), never polled; `wake` and module wakes run in
   fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.

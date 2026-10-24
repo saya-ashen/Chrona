@@ -9,6 +9,8 @@ import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toMessage } from "./store";
+import { pushReply } from "./chat-replies";
+import { drainCalls } from "./module-calls";
 
 const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
 const inputSchema = z.object({
@@ -36,7 +38,7 @@ async function serial<T>(key: string, action: () => Promise<T>): Promise<T> {
 }
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   const chat = new ChatService(ports, wake);
-  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
+  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), accept: chat.accept.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
     runReplies: chat.runReplies.bind(chat), recordMessage: chat.recordMessage.bind(chat), setExternalId: chat.setExternalId.bind(chat) };
 }
 class ChatService {
@@ -55,7 +57,11 @@ class ChatService {
         const inbound = caller.subjectId ? await db.message.findUnique({ where: { id: caller.subjectId } }) : null;
         const session = inbound ? await db.session.findUnique({ where: { id: inbound.sessionId } }) : null;
         const failureText = session?.key === "rescue" ? "Provider unavailable. Use chrona admin on the host to repair Chrona; approvals remain available here." : unavailable;
-        if (inbound && !(await this.replies(inbound, saved.data.before)).length) await db.message.create({ data: { workspaceId, sessionId: inbound.sessionId, channel: inbound.channel, direction: "out", text: failureText, quotedMessageId: inbound.id, at: new Date(Math.max(this.ports.now().getTime(), inbound.at.getTime())) } });
+        if (inbound && !(await this.replies(inbound, saved.data.before)).length) {
+          const failure = await db.message.create({ data: { workspaceId, sessionId: inbound.sessionId, channel: inbound.channel, direction: "out", text: failureText, quotedMessageId: inbound.id, at: new Date(Math.max(this.ports.now().getTime(), inbound.at.getTime())) } });
+          await pushReply(db, this.ports, failure, runId);
+          void drainCalls(this.ports, workspaceId).catch(() => {});
+        }
       }
     }
     await audit(db, { workspaceId, actor: "chrona", kind: "chat_run_finished", subjectId: runId, details: {} });
@@ -70,7 +76,13 @@ class ChatService {
     void this.wake().catch(() => {});
     return { ok: true };
   }
-  private async prepare(raw: ChatInput) {
+  /** An entry module's message: recorded and run without waiting; replies are pushed to `entryModuleId` (chat-replies). */
+  async accept(raw: ChatInput, entryModuleId: string) {
+    const prepared = await this.prepare(raw, entryModuleId);
+    void this.wake().catch(() => {});
+    return { sessionId: prepared.inbound.sessionId, messageId: prepared.inbound.id, runId: prepared.runId };
+  }
+  private async prepare(raw: ChatInput, entryModuleId?: string) {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments), { ports } = this, { db } = ports;
     return serial(input.workspaceId, async () => {
       const existing = input.externalId ? await db.message.findUnique({ where: { workspaceId_externalId: { workspaceId: input.workspaceId, externalId: input.externalId } } }) : null;
@@ -90,6 +102,7 @@ class ChatService {
         const source = SESSION_SOURCES.find(source => source === prefix) ?? "web";
         return row ?? tx.session.create({ data: { workspaceId: input.workspaceId, key, source, createdAt: ports.now(), lastActivityAt: ports.now() } });
       });
+      if (entryModuleId && session.entryModuleId !== entryModuleId) await db.session.update({ where: { id: session.id }, data: { entryModuleId } });
       const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } })
         // A transport quote of something Chrona never recorded (or from an older session) is just ignored.
         : input.quotedExternalId ? await db.message.findFirst({ where: { externalId: input.quotedExternalId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } }) : null;

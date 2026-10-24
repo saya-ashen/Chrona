@@ -6,8 +6,7 @@ import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { createStewardRoutes } from "./routes/steward.routes";
-import { createRelay } from "@chrona/engine/test-support";
-import { ownerApi } from "./owner-api";
+import { createRelay, qqEntry } from "@chrona/engine/test-support";
 import { resetEnvCacheForTests } from "./config/env";
 import { buildArtifacts } from "../../../build/manifest";
 
@@ -81,9 +80,9 @@ test("HTTP and QQ resolve policy approvals like any other", async () => {
     const response = await http.request(`/approvals/${viaHttp.id}/resolve?workspaceId=ws_default`, { method: "POST", headers, body: JSON.stringify({ decision: "approve" }) });
     expect(response.status).toBe(200);
     const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
-    // The qq module resolves through the owner API, as an entry.
-    const owner = ownerApi(f.ports, f.service, () => {});
-    const relay = createRelay({ owner: request => owner("ws_default", request), notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
+    // The qq module resolves through the approvals system module, as an entry (no owner API).
+    const qq = await qqEntry(f.ports, "ws_default");
+    const relay = createRelay({ call: qq.call, notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
     expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
     expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
   } finally {

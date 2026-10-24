@@ -15,7 +15,7 @@ export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data:
  * target in `uses` answer from `stubs["<module>.<tool>"]` (sync: its value is the output) or with a queued call.
  */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
-  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[] };
+  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: string[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
   const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>();
@@ -36,7 +36,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", secret: "owner" } as Record<string, string>)[call.method];
+      const capability = ({ notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as Record<string, string>)[call.method];
       let reply: unknown;
       if (call.method === "call") {
         const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
@@ -45,6 +45,8 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
         else if (call.params.mode === "async") reply = { result: { callId: call.id, status: "queued" } };
         else reply = { result: { output: stubs[target] ? await stubs[target]!(args) ?? null : null } };
       } else if (call.method === "callStatus") reply = { result: { callId: String(call.params.callId), status: "queued" } };
+      // Secrets: only modules listing them (entry modules); never real values in tests.
+      else if (call.method === "secret") reply = (manifest.secrets ?? []).includes(String(call.params.name)) && stubs.secret ? { result: await stubs.secret(call.params) } : { error: { code: (manifest.secrets ?? []).includes(String(call.params.name)) ? "unconfigured" : "undeclared", message: "No secrets in tests" } };
       else if (!capability || !manifest.effects.includes(capability)) reply = { error: { code: "undeclared", message: "Undeclared capability" } };
       else {
         const key = `${eventKey}:${call.method}:${String(call.params.key)}`;
@@ -52,7 +54,6 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
         if (call.params.key !== undefined) seen.add(key);
         if (duplicate) reply = { result: { status: "duplicate" } };
         else if (call.method === "notify" || call.method === "wakeProvider") reply = { result: { status: "executed" } };
-        else if (call.method === "secret" && !stubs.secret) reply = { error: { code: "unconfigured", message: "No secrets in tests" } };
         else reply = { result: stubs[call.method] ? await stubs[call.method]!(call.params) : call.method === "owner" ? { status: 200, body: null } : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
       }
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");

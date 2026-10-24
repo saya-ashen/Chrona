@@ -167,7 +167,9 @@ export const moduleManifestSchema = z.object({
   });
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
-  if ((manifest.channel || manifest.secrets.length) && !manifest.effects.includes("owner")) ctx.addIssue({ code: "custom", path: ["effects"], message: "channel and secrets require the owner capability" });
+  if (manifest.channel && !manifest.effects.includes("owner")) ctx.addIssue({ code: "custom", path: ["effects"], message: "channel requires the owner capability" });
+  if (manifest.secrets.length && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "secrets are only for entry modules (owner, chat.send or approvals.resolve)" });
+  if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
@@ -184,7 +186,12 @@ export const moduleManifestSchema = z.object({
 });
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 /** Acts as the user, or serves the page holding the user's key: never activated automatically. */
-export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string }) => manifest.effects.includes("owner") || manifest.listen === "/";
+/**
+ * Acts as the user (owner API; speaks for them in conversations, `chat.send`; decides approvals, `approvals.resolve`),
+ * or serves the page holding the user's key: every version needs the user, never activated automatically.
+ */
+export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string; uses?: readonly string[] }) =>
+  manifest.effects.includes("owner") || manifest.listen === "/" || (manifest.uses ?? []).some(target => target === "chat.send" || target === "approvals.resolve");
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as
@@ -203,6 +210,8 @@ export const callerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("provider"), runId: z.string().max(128) }).strict(),
   z.object({ kind: z.literal("owner"), via: slug.nullable() }).strict(),
   z.object({ kind: z.literal("kernel") }).strict(),
+  /** A system module (in-process, part of Chrona, e.g. `chat` pushing a reply). */
+  z.object({ kind: z.literal("system"), module: slug }).strict(),
 ]);
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
@@ -230,13 +239,15 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /**
- * Kernel methods and the capability each needs. `call` and `callStatus` need no effect: each target must be listed
+ * Kernel methods and the capability each needs. `secret` needs an entry module listing the secret. `call` and `callStatus` need no effect: each target must be listed
  * in the manifest's `uses`. `notify` is a deprecated compatibility alias (an async call to `notify.send`) for module
  * versions written before routing; new versions use `uses: ["notify.send"]`. Remove it once no active version calls it.
  */
-export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner", secret: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
+export const MODULE_METHODS = { notify: "notify_user", wakeProvider: "wake_provider", model: "model", owner: "owner" } as const satisfies Record<string, (typeof MODULE_EFFECTS)[number]>;
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
+/** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
+export const SYSTEM_MODULES = ["chat", "approvals"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [

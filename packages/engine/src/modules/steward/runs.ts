@@ -7,6 +7,7 @@ import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
 import { notifyUser } from "./notify-user";
+import { pushReply } from "./chat-replies";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
@@ -120,8 +121,13 @@ class RunService {
       const origin = await tx.session.findFirst({ where: { id: session.originSessionId, workspaceId: this.workspaceId } });
       if (!origin) throw new StewardError("not_found", "Origin session not found");
       const latest = await tx.message.findFirst({ where: { sessionId: origin.id }, orderBy: [{ at: "desc" }, { id: "desc" }] });
-      for (const reply of ordered) await tx.message.create({ data: { workspaceId: this.workspaceId, sessionId: origin.id, channel: latest?.channel ?? "in_app", direction: "out", text: reply.text, attachments: reply.attachments as Prisma.InputJsonValue, at: now } });
+      for (const reply of ordered) {
+        const copy = await tx.message.create({ data: { workspaceId: this.workspaceId, sessionId: origin.id, channel: latest?.channel ?? "in_app", direction: "out", text: reply.text, attachments: reply.attachments as Prisma.InputJsonValue, at: now } });
+        await pushReply(tx, this.ports, copy, null);
+      }
       await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
+      // Pushed into the original conversation (e.g. QQ): the result needs no separate notice there.
+      if (origin.entryModuleId) return;
     }
     const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
     await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,

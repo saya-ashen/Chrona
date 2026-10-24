@@ -16,6 +16,7 @@ import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { notifyUser } from "./notify-user";
 import { drainCalls } from "./module-calls";
+import { pushReply } from "./chat-replies";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -94,9 +95,11 @@ async function reply(ctx: ToolContext, raw: unknown) {
   const message = await db.$transaction(async tx => {
     const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation?.channel ?? "in_app", sessionId: session.id, text: input.text, attachments, at: now() } });
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
+    // Background results reach their origin conversation at finalization; conversation replies go to its entry now.
+    if (session.source !== "wake" && session.source !== "module") await pushReply(tx, ctx.ports, message, run.id);
     return message;
   });
-  // The conversation's entry (web page, QQ module) relays replies; background results are notified once at finalization.
+  void drainCalls(ctx.ports, workspaceId).catch(() => {});
   return { messageId: message.id };
 }
 async function notify(ctx: ToolContext, raw: unknown) {

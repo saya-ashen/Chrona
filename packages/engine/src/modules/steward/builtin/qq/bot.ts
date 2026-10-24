@@ -74,10 +74,11 @@ export function createQqBotState(dir: string, appId: string) {
   };
 }
 export type QqBotState = ReturnType<typeof createQqBotState>;
-type QqReplyItem = { reply: string; messageId: string; sessionId: string | null };
-/** later: replies the same run sends after the first batch was returned (it keeps working after its first reply). */
-export type QqChatResult = { reply: string; sessionId?: string | null; messageId?: string; workspaceId?: string; replies?: QqReplyItem[]; later?: AsyncIterable<QqReplyItem> };
-export type QqChatPort = { handleMessage(input: { workspaceId: string; key: "qq:dm"; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<QqChatResult> };
+/** One reply Chrona pushed (`qq.reply`): `inReplyTo` is the QQ message id it answers, when known. */
+export type QqReplyItem = { messageId: string; sessionId: string | null; text: string; workspace: string; inReplyTo: string | null;
+  attachments: { name: string; ref: string | null; mime: string; size: number; appId?: string | null }[] };
+/** Sends the owner's message to Chrona (`chat.send`); returns at once. `reply` is an immediate answer (e.g. `/new`). */
+export type QqChatPort = { send(input: { workspaceId: string; key: "qq:dm"; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<{ reply?: string }> };
 const HELP_WORDS = new Set(["help", "帮助", "?", "？", "用法", "菜单"]);
 const UNBOUND = "【Chrona】这是 Chrona 的私人管家机器人，尚未绑定主人。主人请在 Chrona 管理端取得一次性绑定码后发送：绑定 <绑定码>。未绑定前不处理任何其他内容。";
 const NOT_OWNER = "【Chrona】这是私人机器人，你没有使用权限。本条未做任何处理。";
@@ -103,16 +104,16 @@ export function approvalButtons(id: string, scoped: boolean) {
 const approvalHint = (id: string, scoped: boolean) => `回复「批准 ${id.slice(0, 8)}」${scoped ? `（加「始终」则始终允许）` : ""}或「拒绝 ${id.slice(0, 8)}」。`;
 
 /** Reservations count even failed/uncertain sends; sequence numbers must never be reused. */
-export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>, now = Date.now) {
+export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, item?: QqReplyItem) => Promise<unknown>, now = Date.now) {
   const windows = new Map<string, { until: number; count: number }>();
-  return async (message: QqC2cMessage, text: string, result?: QqChatResult): Promise<boolean> => {
+  return async (message: QqC2cMessage, text: string, item?: QqReplyItem): Promise<boolean> => {
     const at = now(), key = `${message.openid}:${message.id}`;
     const timestamp = Date.parse(message.timestamp);
     const window = windows.get(key) ?? { until: (Number.isFinite(timestamp) ? timestamp : at) + 3600_000, count: 0 };
     windows.set(key, window);
     for (const [id, value] of windows) if (value.until < at && id !== key) windows.delete(id);
     if (at >= window.until || window.count >= 4) return false;
-    await reply(message.openid, message.id, text, ++window.count, result);
+    await reply(message.openid, message.id, text, ++window.count, item);
     return true;
   };
 }
@@ -122,14 +123,18 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
   state: QqBotState; chat: QqChatPort;
   /** Owner-only; returns the line to send back. */
   resolveApproval?: (binding: QqBinding, decision: ApprovalDecision) => Promise<string>;
-  reply: (openid: string, messageId: string, text: string, sequence: number, result?: QqChatResult) => Promise<unknown>;
+  reply: (openid: string, messageId: string, text: string, sequence: number, item?: QqReplyItem) => Promise<unknown>;
   enqueueFinal: (binding: QqBinding, messageId: string, text: string, sessionId?: string | null) => Promise<void>;
   onBound?: (binding: QqBinding) => Promise<void>; log?: QqLog; now?: () => Date;
   timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 }) {
   let seen: Map<string, number> | null = null, queue = Promise.resolve();
   const strangerReplies = new Map<string, number>();
+  // Owner messages still waiting for their first reply (or within their passive window), by QQ message id.
+  const asked = new Map<string, { message: QqC2cMessage; binding: QqBinding; timer: ReturnType<typeof setTimeout>; answered: boolean }>();
   const passive = createQqPassiveReplies(reply, () => now().getTime());
+  // An interrupted send may already have reached QQ. Only local quota/window exhaustion falls back to the outbox.
+  const passiveSend = (message: QqC2cMessage, text: string, item?: QqReplyItem) => passive(message, text, item).catch(() => { log("qq.reply_failed"); return true; });
   async function recordUnseenMessage(message: QqC2cMessage) {
     seen ??= new Map((await state.loadSeen()).map(row => [row.id, row.at]));
     if (seen.has(message.id)) return null;
@@ -143,9 +148,7 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     if (!OPENID.test(message.openid)) return;
     const at = await recordUnseenMessage(message);
     if (at === null) return;
-    // An interrupted send may already have reached QQ. Only local quota/window
-    // exhaustion falls back to the outbox; unknown outcomes are not resent.
-    const send = (text: string, result?: QqChatResult) => passive(message, text, result).catch(() => { log("qq.reply_failed"); return true; });
+    const send = (text: string) => passiveSend(message, text);
     const text = message.content.trim();
     const bind = /^(?:绑定|bind)\s+([A-Za-z0-9]{4,16})$/i.exec(text);
     if (bind?.[1]) {
@@ -172,24 +175,32 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     if (decision) await send(await resolveApproval!(binding, decision).catch(() => "【Chrona】审批未处理，请在网页上操作。"));
     return Boolean(decision);
   }
-  async function handleOwnerMessage(message: QqC2cMessage, binding: QqBinding, send: (text: string, result?: QqChatResult) => Promise<boolean>) {
+  async function handleOwnerMessage(message: QqC2cMessage, binding: QqBinding, send: (text: string) => Promise<boolean>) {
+    for (const [id, entry] of asked) if (now().getTime() - Date.parse(entry.message.timestamp) > 3600_000) { timers.clearTimeout(entry.timer); asked.delete(id); }
     // Most answers arrive in well under half a minute: only a genuinely slow one gets a holding line,
     // so a quick question is answered in one message (QQ passive replies stay valid for an hour).
-    let ack: Promise<boolean> | undefined;
-    const timer = timers.setTimeout(() => { ack = send(SLOW_ACK); }, SLOW_ACK_MS);
-    let result: QqChatResult;
-    try { result = await chat.handleMessage({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, key: "qq:dm", text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
+    const entry = { message, binding, answered: false, timer: timers.setTimeout(() => { if (!entry.answered) void send(SLOW_ACK); }, SLOW_ACK_MS) };
+    asked.set(message.id, entry);
+    let result: { reply?: string };
+    try { result = await chat.send({ workspaceId: binding.workspaceId, channel: DEDICATED_CHANNEL, key: "qq:dm", text: message.content, externalId: message.id, ...(message.quotedId ? { quotedExternalId: message.quotedId } : {}), ...(message.attachments?.length ? { attachments: message.attachments } : {}) }); }
     catch (error) { log("qq.chat_failed", { error: String(error).slice(0, 500) }); result = { reply: "【Chrona】处理未完成，请稍后重试或在网页查看。" }; }
-    finally { timers.clearTimeout(timer); }
-    await ack;
-    const deliver = async (item: Pick<QqReplyItem, "reply"> & Partial<QqReplyItem>) => {
-      if (!await send(item.reply, { ...item, workspaceId: result.workspaceId })) await enqueueFinal(binding, `${message.id}:${item.messageId ?? ""}`, item.reply, item.sessionId);
-    };
-    for (const item of result.replies?.length ? result.replies : [result]) await deliver(item);
-    // Not awaited: the next owner message must not wait for this run to finish.
-    if (result.later) void (async () => { for await (const item of result.later!) await deliver(item); })().catch(() => log("qq.late_reply_failed"));
+    if (result.reply) { entry.answered = true; timers.clearTimeout(entry.timer); await send(result.reply); }
   }
-  return { onMessage(message: QqC2cMessage) { queue = queue.then(() => handle(message)).catch(() => log("qq.handler_failed")); return queue; }, drain: () => queue };
+  /**
+   * A reply Chrona pushed. It answers its own message passively while that window lasts; otherwise (window used up,
+   * unknown message after a restart, or a background result) it goes out through notify.send to the bound owner.
+   */
+  async function deliverReply(item: QqReplyItem): Promise<"passive" | "outbox" | "unbound"> {
+    const binding = await state.binding();
+    if (!binding) return "unbound";
+    const entry = item.inReplyTo ? asked.get(item.inReplyTo) : undefined;
+    if (entry) { entry.answered = true; timers.clearTimeout(entry.timer); }
+    if (entry && entry.binding.openid === binding.openid && await passiveSend(entry.message, item.text, item)) return "passive";
+    await enqueueFinal(binding, `${item.inReplyTo ?? "push"}:${item.messageId}`, item.text, item.sessionId);
+    return "outbox";
+  }
+  return { onMessage(message: QqC2cMessage) { queue = queue.then(() => handle(message)).catch(() => log("qq.handler_failed")); return queue; },
+    deliverReply: (item: QqReplyItem) => { const next = queue.then(() => deliverReply(item)); queue = next.then(() => {}, () => {}); return next; }, drain: () => queue };
 }
 
 /** A bot without markdown/button permission is refused before delivery: the text fallback still works. */

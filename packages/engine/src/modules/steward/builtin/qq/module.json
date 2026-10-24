@@ -1,18 +1,22 @@
 {
   "name": "qq",
-  "description": "Chrona's private QQ bot: owner binding, chat in the qq:dm session, approval buttons and the QQ channel for the notify module.",
+  "description": "Chrona's private QQ bot: owner binding, the qq:dm conversation (through chat), approval buttons, and the QQ channel for the notify module.",
   "entry": "index.ts",
   "keepAlive": true,
   "secrets": ["qq_bot"],
   "triggers": [],
-  "uses": ["notify.channel", "notify.send"],
+  "uses": ["chat.send", "chat.attach", "chat.new-session", "chat.file", "chat.delivered", "chat.record", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],
   "tools": [
     { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"], "callers": ["notify"],
       "parameters": { "type": "object", "required": ["key", "title", "body"], "properties": {
         "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "link": { "type": "string" },
-        "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } }
+        "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } },
+    { "name": "reply", "description": "A reply in the qq:dm conversation: a passive reply to the message it answers while that window lasts, otherwise through notify.send.", "visibility": ["modules"], "callers": ["chat"],
+      "parameters": { "type": "object", "required": ["session", "message", "text", "workspace"], "properties": {
+        "session": { "type": "string" }, "message": { "type": "string" }, "text": { "type": "string" }, "workspace": { "type": "string" },
+        "attachments": { "type": "string", "description": "JSON array of the reply's files, with appId" }, "in-reply-to": { "type": "string" } } } }
   ],
-  "effects": ["owner", "network"],
+  "effects": ["network"],
   "data": { "schema": 1 },
   "tests": ["test.ts"]
 }

@@ -43,6 +43,8 @@ model Session {
   moduleId String?
   originSessionId String?
   providerSessionId String?
+  /// The entry module (e.g. qq) that brings this conversation's messages and receives its replies.
+  entryModuleId String?
   /// Module names whose content areas runs in this session may write.
   focus Json @default(dbgenerated("'[\"files\"]'"))
   lastActivityAt DateTime @default(now())

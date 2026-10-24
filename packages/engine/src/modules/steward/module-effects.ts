@@ -1,5 +1,5 @@
 import type { Prisma } from "@chrona/db";
-import { MODULE_METHODS, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
+import { isEntryModule, MODULE_METHODS, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { createRuns, createRunSession } from "./runs";
 import { handleModuleModel, type CallScope } from "./module-model";
@@ -57,7 +57,7 @@ export async function handleModuleCall(ports: StewardPorts, scope: CallScope, ca
     catch { return { id: call.id, error: { code: "internal", message: "Owner API call failed" } }; }
   }
   if (call.method === "secret") {
-    if (!scope.manifest.effects.includes("owner") || !scope.manifest.secrets.includes(call.params.name)) return { id: call.id, error: { code: "undeclared", message: "Secret not declared" } };
+    if (!isEntryModule(scope.manifest) || !scope.manifest.secrets.includes(call.params.name)) return { id: call.id, error: { code: "undeclared", message: "Secret not declared" } };
     const value = await ports.secrets?.(call.params.name).catch(() => null);
     return value ? { id: call.id, result: { value } } : { id: call.id, error: { code: "unconfigured", message: "Secret not configured" } };
   }
