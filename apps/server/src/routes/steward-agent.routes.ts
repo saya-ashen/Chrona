@@ -1,10 +1,9 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { createStewardService, StewardError, type StewardService } from "@chrona/engine";
-import type { StewardRoutePorts } from "./steward.routes";
+import { createStewardService, StewardError, type StewardPorts, type StewardService } from "@chrona/engine";
 
 const failure = (code: string, message = code) => ({ ok: false as const, error: { code, message } });
-export function createStewardAgentRoutes(ports: StewardRoutePorts, service: StewardService = createStewardService(ports)) {
+export function createStewardAgentRoutes(ports: StewardPorts, service: StewardService = createStewardService(ports)) {
   const endpoint = service.tools;
   const router = new Hono<{ Variables: { token: string; catalog: Awaited<ReturnType<typeof endpoint.catalog>> } }>();
   router.use("*", async (c, next) => {

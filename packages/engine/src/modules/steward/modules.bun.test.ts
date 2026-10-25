@@ -59,14 +59,12 @@ async function fixture() {
   return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
 
-test.each([true, false])("activation schedules only schedule triggers (inbound only: %s)", async only => {
-  const f = await fixture(), path = join(f.dir, "module.json"), manifest = JSON.parse(await readFile(path, "utf8"));
-  const inbound = { id: "mail", inbound: { connector: "mailbox", match: {} } };
-  await writeFile(path, JSON.stringify({ ...manifest, triggers: only ? [inbound] : [inbound, ...manifest.triggers] }));
+test("activation schedules the module's schedule triggers", async () => {
+  const f = await fixture(), manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
   const result = await f.propose();
   await f.approve(result.approvalId!);
   const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
-  expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual(only ? [] : [{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);
+  expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual([{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "active", activeHash: result.hash });
 });
 
@@ -361,7 +359,9 @@ test("same-schema continuity runs on a disposable copy, previews effects and nev
   };
   const result = await f.propose();
   expect(result.status).toBe("pending_review");
-  expect(result.report).toMatchObject({ continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false, effects } });
+  // Previews show the keys as sent: scoped to the event (daily:<firedAt>:<key>), as the SDK does.
+  const scope = `daily:${f.ports.now().toISOString()}:`;
+  expect(result.report).toMatchObject({ continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false, effects: effects.map(effect => ({ ...effect, key: scope + effect.key })) } });
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
   const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
@@ -509,7 +509,7 @@ test("large effects preview is explicitly truncated without hiding schema, inten
   f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
   const result = await f.propose();
   expect(result.status).toBe("pending_review");
-  expect(result.report).toMatchObject({ continuity: { effects } });
+  expect(result.report).toMatchObject({ continuity: { effects: effects.map(effect => ({ ...effect, key: `daily:${f.ports.now().toISOString()}:${effect.key}` })) } });
   const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
   expect(preview.length).toBeLessThanOrEqual(20_000);
   expect(preview).toContain("…effects 过长，已截断");

@@ -91,13 +91,6 @@ export function createFiles(content: string, data: string) {
     }
   }
   return {
-    async contentEdit(paths: string[], at: string) {
-      for (const value of paths) {
-        const path = relative(value);
-        try { for (const file of await tree(path)) await record(file, at); }
-        catch (error) { if (!missing(error)) throw error; await record(path, at); }
-      }
-    },
     async tool(id: string, args: Record<string, unknown>, at: string): Promise<unknown> {
       try {
         if (id === "list") {

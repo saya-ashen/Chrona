@@ -8,9 +8,11 @@ import { createSchedules } from "./schedules";
 import { callSync, kernelOrigin } from "./module-calls";
 import { handleModuleCall } from "./module-effects";
 import { testDb } from "./test-db";
-import { qqEntry } from "./test-entry";
+import { builtinEntry, qqEntry } from "./test-entry";
 import { notices } from "./test-notices";
 import { readFileSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { migrateConversationFiles } from "./chat";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -136,4 +138,45 @@ test("the web page is an entry like qq: its conversations push replies to web.re
   await f.settle();
   const pushed = await f.db.moduleInvocation.findMany({ where: { workspaceId: f.w, tool: "reply" }, orderBy: { createdAt: "asc" } });
   expect(pushed.map(row => [row.target, (row.args as { text: string }).text])).toEqual([["qq", "QQ 回答"], ["web", "网页回答"]]);
+});
+
+test("v2-8 migration copies content-area attachments into chat's store and gives web conversations the web entry, once", async () => {
+  const f = await fixture();
+  const files = await f.db.module.create({ data: { workspaceId: f.w, name: "files", builtin: true } });
+  const web = await f.db.module.create({ data: { workspaceId: f.w, name: "web", builtin: true } });
+  await mkdir(join(f.ports.dataDir, "platform/content", files.id, "uploads"), { recursive: true });
+  await writeFile(join(f.ports.dataDir, "platform/content", files.id, "uploads/a.png"), "png");
+  const session = await f.db.session.create({ data: { workspaceId: f.w, key: "web:old", source: "web" } });
+  const message = await f.db.message.create({ data: { workspaceId: f.w, sessionId: session.id, direction: "in", channel: "in_app", text: "old", attachments: [
+    { name: "a.png", ref: "files/uploads/a.png", mime: "image/png", size: 3 }, { name: "gone.txt", ref: "files/gone.txt", mime: "text/plain", size: 1 }] } });
+  expect(await migrateConversationFiles(f.ports, f.w)).toBe(2);
+  const [moved, gone] = (await f.db.message.findUniqueOrThrow({ where: { id: message.id } })).attachments as { ref: string | null }[];
+  expect(moved!.ref).toMatch(/^chat\/[0-9a-f-]{36}-a\.png$/);
+  expect(await readFile(join(f.ports.dataDir, "platform/data", moved!.ref!), "utf8")).toBe("png");
+  expect(gone!.ref).toBeNull();
+  expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ entryModuleId: web.id });
+  expect(await migrateConversationFiles(f.ports, f.w)).toBe(0);
+});
+
+test("settings, grants, preferences and schedules are system interfaces for entry modules (v2-9)", async () => {
+  const f = await fixture();
+  const web = await builtinEntry(f.ports, f.w, "web");
+  const before = await web.call("settings.get", {}) as { notifications: { dailyCap: number } };
+  await web.call("settings.update", { settings: JSON.stringify({ notifications: { dailyCap: before.notifications.dailyCap + 1 } }) });
+  expect(await web.call("settings.get", {})).toMatchObject({ notifications: { dailyCap: before.notifications.dailyCap + 1 } });
+  await expect(web.call("settings.update", { settings: "{" })).rejects.toMatchObject({ code: "invalid" });
+  const grant = await f.api.grants.create({ action: "schedule", mode: "auto", scope: { kind: "global" } });
+  expect(await web.call("settings.grants", {})).toMatchObject([{ id: grant.id }]);
+  await web.call("settings.revoke-grant", { grant: grant.id });
+  expect((await f.db.grant.findUniqueOrThrow({ where: { id: grant.id } })).revokedAt).not.toBeNull();
+  const preference = await f.api.preferences.add({ text: "简短回答" });
+  expect(await web.call("settings.preferences", {})).toMatchObject([{ id: preference.id }]);
+  await web.call("settings.forget", { preference: preference.id });
+  expect(await f.db.preference.count()).toBe(0);
+  const origin = await f.db.session.create({ data: { workspaceId: f.w, key: "web:s", source: "web" } });
+  const schedule = await createSchedules(f.ports, f.w).create(origin.id, { mode: "wake", rule: { kind: "daily", time: "09:00" }, text: "check", label: "Check" });
+  expect(await web.call("schedules.list", {})).toMatchObject([{ id: schedule.id, status: "active" }]);
+  expect(await web.call("schedules.update", { schedule: schedule.id, status: "paused" })).toMatchObject({ status: "paused" });
+  // QQ does not list them, so it cannot change settings.
+  await expect(f.qq.call("settings.update", { settings: "{}" })).rejects.toMatchObject({ code: "undeclared" });
 });

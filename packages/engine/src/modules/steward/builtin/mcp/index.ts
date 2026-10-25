@@ -3,16 +3,12 @@ import { chrona } from "chrona";
 
 // Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
 type Args = Record<string, unknown>;
-type Request = { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown };
-const q = (value: unknown) => encodeURIComponent(String(value));
 const str = (description?: string) => ({ type: "string", ...(description ? { description } : {}) });
 const schema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
-// Today, apps, content and notifications still use the owner API until the web migration (v2-8 §11).
 const tools: McpTool[] = [
-  { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/today" }) },
-  { name: "chrona_apps", description: "List apps, their content areas and entry pages.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/apps" }) },
+  { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), run: () => call("chat.today") },
   { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module"] }, status: { type: "string", enum: ["active", "ended"] } }),
     run: ({ source, status }) => call("chat.sessions", { source, status }) },
   { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: ({ sessionId }) => call("chat.session", { session: sessionId }) },
@@ -21,11 +17,6 @@ const tools: McpTool[] = [
   { name: "chrona_session_new", description: "End the active conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), run: ({ key }) => call("chat.new-session", { key }) },
   { name: "chrona_session_messages", description: "Read a conversation's recent messages.", inputSchema: schema({ sessionId: str(), limit: { type: "integer", minimum: 1, maximum: 200 } }, ["sessionId"]),
     run: ({ sessionId, limit }) => call("chat.messages", { session: sessionId, limit }) },
-  { name: "chrona_content_tree", description: "List an app's content files.", inputSchema: schema({ appId: str() }, ["appId"]), run: args => owner({ method: "GET", path: `/apps/${q(args.appId)}/tree` }) },
-  { name: "chrona_content_read", description: "Read an app's content file; defaults to its README.md home page.", inputSchema: schema({ appId: str(), path: str("Defaults to README.md") }, ["appId"]),
-    run: args => owner({ method: "GET", path: `/apps/${q(args.appId)}/file?path=${q(args.path ?? "README.md")}` }) },
-  { name: "chrona_content_write", description: "Save an app's content file, checking its base revision and sending content_edit.", inputSchema: schema({ appId: str(), path: str(), content: str(), baseRevision: { type: ["string", "null"] } }, ["appId", "path", "content", "baseRevision"]),
-    run: ({ appId, ...body }) => owner({ method: "PUT", path: `/apps/${q(appId)}/file`, body }) },
   { name: "chrona_chat", description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: schema({ text: str(), sessionId: str(), key: str() }, ["text"]),
     run: ({ text, sessionId, key }) => call("chat.ask", { text, session: sessionId, key: sessionId || key ? key : `mcp:${crypto.randomUUID()}` }) },
   { name: "chrona_approvals", description: "List approvals; defaults to open ones waiting for the user.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }),
@@ -33,8 +24,13 @@ const tools: McpTool[] = [
   { name: "chrona_approval_resolve", description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", destructive: true,
     inputSchema: schema({ approvalId: str(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: ["once", "always"] } }, ["approvalId", "decision"]),
     run: ({ approvalId, decision, scope = "once" }) => call("approvals.resolve", { approval: approvalId, decision, scope }) },
+  { name: "chrona_runs", description: "Chrona's recent work (runs) with progress and any question waiting for the user.", inputSchema: schema({ sessionId: str() }), run: ({ sessionId }) => call("chat.runs", { session: sessionId }) },
+  { name: "chrona_run_answer", description: "Answer a question a running Chrona run asked the user. Only send what the user decided.", destructive: true,
+    inputSchema: schema({ interactionId: str(), decision: { type: "string", enum: ["submit", "cancel"] }, value: { type: ["boolean", "integer", "string"], description: "confirm: true/false; select: option index; input/editor: text" } }, ["interactionId", "decision"]),
+    run: ({ interactionId, decision, value }) => call("chat.answer", { interaction: interactionId, answer: JSON.stringify(decision === "cancel" ? { decision } : { decision, value }) }) },
+  { name: "chrona_run_cancel", description: "Stop a running Chrona run (work already done is kept).", inputSchema: schema({ runId: str() }, ["runId"]), run: ({ runId }) => call("chat.cancel", { run: runId }) },
   { name: "chrona_modules", description: "List modules (apps Chrona runs without the Provider), their versions and recent runs.", inputSchema: schema(), run: () => call("modules.list") },
-  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: () => owner({ method: "GET", path: "/notifications" }) },
+  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: async () => (await call("chat.today") as { updates: unknown }).updates },
   // Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
   { name: "chrona_module_tools", description: "Find module tools (<module>.<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
     inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }), run: ({ query }) => call("modules.tools", { query }) },
@@ -46,12 +42,6 @@ const tools: McpTool[] = [
     } },
 ];
 
-async function owner(request: Request) {
-  const reply = await chrona.owner(request);
-  const failure = reply.body as { code?: string; message?: string } | null;
-  if (reply.status >= 400) throw new Error(failure?.code ? `${failure.code}${failure.message ? `: ${failure.message}` : ""}` : `failed (${reply.status})`);
-  return reply.body;
-}
 const text = (value: unknown, isError = false) => ({ content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 1) }], ...(isError ? { isError } : {}) });
 
 async function handle(method: string, params: Args) {

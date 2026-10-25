@@ -50,7 +50,7 @@ sandboxTest("long-running SDK module exchanges events and calls, stays isolated,
   const calls: unknown[] = [];
   const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => {
     calls.push(call);
-    return call.method === "wakeProvider" ? { id: call.id, error: { code: "undeclared", message: "Not allowed" } } : { id: call.id, result: { status: "executed" } };
+    return call.method === "call" && call.params.target === "ai.wake" ? { id: call.id, error: { code: "undeclared", message: "Not allowed" } } : { id: call.id, result: { callId: "c1", status: "queued" } };
   } });
   // An actual host listener distinguishes isolated loopback from an unused port.
   const listener = createServer(socket => socket.destroy());
@@ -86,7 +86,8 @@ on("tool", () => { throw new Error("handler failed"); });`);
     await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
     const now = "2026-10-22T09:00:00.000Z";
     expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "executed" } });
-    expect(calls).toMatchObject([{ method: "notify", params: { key: "daily", body: "hello" } }, { method: "wakeProvider" }]);
+    // The SDK shorthands are routed calls (v2-10).
+    expect(calls).toMatchObject([{ method: "call", params: { target: "notify.send", mode: "async", key: `daily:${now}:daily`, args: { key: `daily:${now}:daily`, body: "hello" } } }, { method: "call", params: { target: "ai.wake" } }]);
     expect(await channel.send({ trigger: { kind: "tool", id: "test", firedAt: now, args: {} }, now, params: {} }, 2000)).toMatchObject({ error: "handler failed" });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
     expect(handle.pid).toBeGreaterThan(0);
@@ -106,7 +107,7 @@ test("without bubblewrap the same SDK module runs as a plain process and kill en
   await mkdir(dataDir); await mkdir(codeDir, { recursive: true });
   const plain = createScriptSandbox({ dataDir: root });
   expect(plain.health).toEqual({ available: true, isolated: false });
-  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => ({ id: call.id, result: { status: "executed" } }) });
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => ({ id: call.id, result: { callId: "c1", status: "queued" } }) });
   let handle: ReturnType<typeof plain.startModule> | undefined;
   try {
     await writeFile(join(codeDir, "index.ts"), `import { on, chrona } from "chrona";

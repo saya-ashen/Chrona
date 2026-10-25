@@ -3,7 +3,6 @@ import { NOTIFY_INTERFACE, notificationSchema, type NotificationSettings } from 
 import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { callSync, enqueueCall, kernelOrigin } from "./module-calls";
-import { StewardError } from "./errors";
 import { audit } from "./audit";
 
 /** What Chrona tells the user. Budget, channel and recipient are decided by the module behind `notify.send`. */
@@ -45,25 +44,11 @@ async function ask(ports: StewardPorts, workspaceId: string, tool: string, args:
   catch { return null; }
 }
 const statusSchema = z.object({ chat: z.object({ channel: z.enum(["in_app", "chrona_qqbot"]), bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
-const answerSchema = z.object({ notification: notificationSchema }).or(z.object({ error: z.string(), message: z.string().optional() }));
 /** The owner's view of notifications, answered by the notify module. */
 export function createNotificationsView(ports: StewardPorts, workspaceId: string) {
-  async function mutate(tool: "feedback" | "retry", args: Record<string, unknown>) {
-    const parsed = answerSchema.safeParse(await ask(ports, workspaceId, tool, args));
-    if (!parsed.success) throw new StewardError("conflict", "Notifications are unavailable");
-    if ("error" in parsed.data) throw new StewardError(parsed.data.error === "not_found" ? "not_found" : "conflict", parsed.data.message ?? parsed.data.error);
-    return parsed.data.notification;
-  }
   return {
     list: async (limit = 50) => z.object({ items: notificationSchema.array() }).safeParse(await ask(ports, workspaceId, "list", { limit })).data?.items ?? [],
     status: async () => statusSchema.safeParse(await ask(ports, workspaceId, "status")).data ?? null,
-    /** Owner API: a message for the user (entry modules), through the normal budget. */
-    enqueue: async (input: { title: string; body: string; dedupeKey: string; sessionId?: string; recipient?: string; level: "now" }) => {
-      const queued = await notifyUser(ports.db, ports, workspaceId, { level: input.level, title: input.title, body: input.body, key: input.dedupeKey, ...(input.sessionId ? { session: input.sessionId } : {}), ...(input.recipient ? { recipient: input.recipient } : {}) });
-      return { callId: queued.callId, status: queued.status };
-    },
-    recordFeedback: (id: string, feedback: "useful" | "not_useful") => mutate("feedback", { id, feedback }),
-    retry: (id: string) => mutate("retry", { id }),
   };
 }
 

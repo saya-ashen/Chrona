@@ -21,7 +21,7 @@ test("run context lists current modules, their recent errors and the entry the m
     } } };
   const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
   for (const [name, manifest] of [
-    ["chat-entry", { name: "chat-entry", description: "Chat transport", entry: "index.ts", keepAlive: true, triggers: [], effects: ["owner"], channel: "chrona_qqbot", tests: ["test.ts"] }],
+    ["chat-entry", { name: "chat-entry", description: "Chat transport", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], channel: "chrona_qqbot", tests: ["test.ts"] }],
     ["reports", { name: "reports", description: "Daily report", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], effects: ["notify_user"], tests: ["test.ts"] }],
   ] as const) {
     const module = await db.module.create({ data: { workspaceId, name, activeHash: name.padEnd(64, "0"), status: name === "reports" ? "paused" : "active" } });

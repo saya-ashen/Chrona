@@ -1,7 +1,7 @@
 import { DEFAULT_POLICY, type Action, type Grant, type GrantMode, type PolicyDecision } from "@chrona/contracts/steward";
 
 export const MODE_STRICTNESS = { auto: 0, notify_after: 1, preapproved: 2, ask: 3, never: 4 } as const satisfies Record<GrantMode, number>;
-type Target = { moduleId?: string; connectorId?: string };
+type Target = { moduleId?: string };
 const labels: Record<Action, string> = {
   change_policy: "修改权限与设置", read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
   activate_module: "启用模块", send_external_message: "对外发消息", modify_external: "修改外部系统", purchase: "购买",
@@ -13,7 +13,6 @@ function specificity(grant: Grant, target: Target): number {
   switch (scope.kind) {
     case "global": return 0;
     case "module": return scope.moduleId === target.moduleId ? 1 : -1;
-    case "connector": return scope.connectorId === target.connectorId ? 1 : -1;
   }
 }
 function isUsableGrant(grant: Grant, action: Action, now: Date): boolean {

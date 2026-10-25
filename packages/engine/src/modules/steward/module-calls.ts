@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
@@ -10,8 +10,11 @@ import { StewardError } from "./errors";
 export type Caller = z.infer<typeof callerSchema>;
 /** A JSON value as the contract carries it. */
 export type Json = z.output<ReturnType<typeof z.json>>;
-/** Who is calling, as Chrona knows it. `chain` holds the modules waiting on this call path (sync), `path` every module on it. */
-export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[] };
+/**
+ * Who is calling, as Chrona knows it. `chain` holds the modules waiting on this call path (sync), `path` every module on it.
+ * `run`: the module event being handled, for system modules that budget per event (ai.complete).
+ */
+export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string } };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 export type Tool = ModuleManifest["tools"][number];
 export type CallErrorCode = "forbidden" | "not_found" | "cycle" | "invalid" | "unknown" | "failed" | "unavailable";
@@ -23,7 +26,8 @@ export class CallError extends Error {
  * calls (visibility, callers, uses, recorded caller, async queue); its code is Chrona's, so it is never proposed,
  * built, sandboxed or paused, and its name is reserved.
  */
-export type SystemModule = { name: string; tools: Tool[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller }, tool: string, args: Record<string, unknown>): Promise<Json> };
+/** `unrecorded`: tools called only synchronously whose arguments and results are never stored (credentials, model prompts and completions). */
+export type SystemModule = { name: string; tools: Tool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"] }, tool: string, args: Record<string, unknown>): Promise<Json> };
 const systemModules = new Map<string, SystemModule>();
 export function registerSystemModule(module: SystemModule) { systemModules.set(module.name, module); }
 type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: Tool; system?: SystemModule };
@@ -68,7 +72,7 @@ export async function admitted(db: Db, caller: Caller, tool: Tool, target: strin
   if (tool.callers && !tool.callers.includes(name)) return false;
   if (caller.kind !== "module") return tool.visibility.includes("modules");
   const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
-  const uses = moduleManifestSchema.safeParse(version?.manifest).data?.uses ?? [];
+  const manifest = moduleManifestSchema.safeParse(version?.manifest).data, uses = manifest ? grantedUses(manifest) : [];
   return (uses.includes(target) && tool.visibility.includes("modules")) || (uses.includes("*") && tool.visibility.includes("owner"));
 }
 /** A system module's errors as call errors: its own refusals keep their code. */
@@ -115,15 +119,15 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, target: 
   const { chain, path } = nextPath(origin);
   if (chain.includes(resolved.module.name)) throw new CallError("cycle", `${target}: ${resolved.module.name} is waiting on this call path (${chain.join(" → ")})`);
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
-  const args = validArgs(resolved.tool, raw), now = ports.now();
+  const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = resolved.system?.unrecorded?.includes(resolved.tool.name) ?? false;
   const row = await ports.db.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), callerModuleId: origin.caller.kind === "module" ? origin.caller.moduleId : null, callerHash: origin.caller.kind === "module" ? origin.caller.hash : null,
-    target: resolved.module.name, tool: resolved.tool.name, args: args as Prisma.InputJsonValue, key: randomUUID(), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } });
+    target: resolved.module.name, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: randomUUID(), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } });
   const finish = (data: Prisma.ModuleInvocationUpdateInput) => ports.db.moduleInvocation.update({ where: { id: row.id }, data: { ...data, finishedAt: ports.now() } });
   if (resolved.system) {
     // In-process: no event queue to wait on, so no deadlock to guard against.
     try {
-      const output = await resolved.system.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller }, resolved.tool.name, args);
-      await finish({ status: "succeeded", output: output as Prisma.InputJsonValue });
+      const output = await resolved.system.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run }, resolved.tool.name, args);
+      await finish({ status: "succeeded", output: (quiet ? {} : output) as Prisma.InputJsonValue });
       return { callId: row.id, output };
     } catch (error) {
       const failure = systemError(error);
@@ -171,6 +175,7 @@ export async function enqueueCall(tx: Db, ports: StewardPorts, origin: CallOrigi
   const resolved = await resolveTarget(tx, origin.workspaceId, target);
   if (resolved instanceof CallError) { if (origin.caller.kind !== "kernel" && origin.caller.kind !== "system" && !(lenient && (resolved.code === "unavailable" || resolved.code === "not_found"))) throw resolved; }
   else if (!await admitted(tx, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
   const { path } = nextPath(origin);
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
   const args = resolved instanceof CallError ? raw : validArgs(resolved.tool, raw), now = ports.now();

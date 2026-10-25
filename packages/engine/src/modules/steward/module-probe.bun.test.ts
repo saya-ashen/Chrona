@@ -11,13 +11,13 @@ function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[]
     inputs.push(event);
     const keys = keyFor(event.trigger.firedAt);
     if (!keys) throw new Error("boom");
-    for (const key of keys) await call("notify", { key, level: "now", title: "t", body: "b" });
+    for (const key of keys) await call("call", { target: "notify.send", args: { key, level: "now", title: "t", body: "b" }, mode: "async", key } as never);
     return {};
   });
   return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, isolated: true, startModule: peer.startModule } } } as unknown as ModuleContext;
 }
 test.each<[string, (at: string) => string[] | null, KeyProbe]>([
-  ["constant key", () => ["sent"], { status: "repeated", keys: ["notify_user:sent"] }],
+  ["constant key", () => ["sent"], { status: "repeated", keys: ["call:notify.send:sent"] }],
   ["date key", at => [`sent:${at.slice(0, 10)}`], { status: "passed" }],
   ["no effects", () => [], { status: "skipped", reason: "no effects on both fires" }],
   ["entry failure", () => null, { status: "skipped", reason: "entry failed or invalid output" }],
@@ -38,12 +38,12 @@ test("review card keeps the key-probe shape", () => {
   expect(keyProbePreview(undefined)).toBe("");
 });
 test.each([false, true])("smoke sends every trigger and tool; failure=%s", async failed => {
-  const inputs: unknown[] = [], m = manifest([schedule, { ...schedule, id: "second" }, { id: "mail", inbound: { connector: "c", match: {} } }]);
+  const inputs: unknown[] = [], m = manifest([schedule, { ...schedule, id: "second" }]);
   m.tools = [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {}, required: [] }, visibility: ["provider", "owner"], idempotent: false }];
   const errors = await smokeRun(context(() => failed ? null : [], inputs), "/staging", m);
-  expect(errors).toHaveLength(failed ? 4 : 0);
+  expect(errors).toHaveLength(failed ? 3 : 0);
   expect(inputs).toMatchObject([
     { trigger: { kind: "schedule", id: "daily" } }, { trigger: { kind: "schedule", id: "second" } },
-    { trigger: { kind: "inbound", id: "mail" } }, { trigger: { kind: "tool", id: "lookup", args: {} } },
+    { trigger: { kind: "tool", id: "lookup", args: {} } },
   ]);
 });

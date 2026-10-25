@@ -23,7 +23,7 @@ function lines(socket: Socket) {
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "chrona-channel-"));
   const calls: unknown[] = [];
-  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { calls.push(call); return { id: call.id, result: { status: "executed" } }; } });
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status: "queued" } }; } });
   const socket = createConnection(join(root, "channel.sock"));
   const next = lines(socket);
   await channel.ready;
@@ -34,13 +34,13 @@ test("channel drops malformed lines, validates calls and event replies, then rec
   try {
     f.socket.write('not-json\n{"id":"bad","method":"unknown","params":{}}\n');
     expect(await f.next()).toMatchObject({ id: "bad", error: { code: "invalid" } });
-    f.socket.write(JSON.stringify({ id: "bad-params", method: "notify", params: {} }) + "\n");
+    f.socket.write(JSON.stringify({ id: "bad-params", method: "call", params: { target: "notify.send", mode: "async" } }) + "\n");
     expect(await f.next()).toMatchObject({ id: "bad-params", error: { code: "invalid" } });
     const result = f.channel.send(event, 1000);
     const message = await f.next() as { id: string };
     f.socket.write(JSON.stringify({ id: message.id, result: { unexpected: true } }) + "\n");
-    f.socket.write(JSON.stringify({ id: "call", method: "wakeProvider", params: { key: "key", prompt: "hello" } }) + "\n");
-    expect(await f.next()).toEqual({ id: "call", result: { status: "executed" } });
+    f.socket.write(JSON.stringify({ id: "call", method: "call", params: { target: "ai.wake", args: { prompt: "hello" }, mode: "async", key: "key" } }) + "\n");
+    expect(await f.next()).toEqual({ id: "call", result: { callId: "c1", status: "queued" } });
     f.socket.write(JSON.stringify({ id: message.id, result: { handled: true, result: 42 } }) + "\n");
     expect(await result).toEqual({ id: message.id, result: { handled: true, result: 42 } });
     expect(f.calls).toHaveLength(1);

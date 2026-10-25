@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { compileUiSpec, checkUiSpec, uiGuide } from "@chrona/ui-catalog";
-import { contentArea } from "./content";
-import { realpath, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
@@ -17,6 +15,7 @@ import { createApprovals } from "./approvals";
 import { notifyUser } from "./notify-user";
 import { drainCalls } from "./module-calls";
 import { pushReply } from "./chat-replies";
+import { readChatFile, storeChatFile } from "./chat";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -29,7 +28,7 @@ function toolContext(ports: StewardPorts, claim: Claim, tool: ToolName) {
     schedules: createSchedules(ports, workspaceId), preferences: createPreferences(ctx), approvals: createApprovals(ctx) };
 }
 type ToolContext = ReturnType<typeof toolContext>;
-async function gate(ctx: ToolContext, action: Action, target: { connectorId?: string }, payload: Prisma.InputJsonValue) {
+async function gate(ctx: ToolContext, action: Action, target: { moduleId?: string }, payload: Prisma.InputJsonValue) {
   const { db, workspaceId, now, tool } = ctx;
   return db.$transaction(async tx => {
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
@@ -42,21 +41,6 @@ async function gate(ctx: ToolContext, action: Action, target: { connectorId?: st
     if (decision.grantId) await consumeOnce(tx, workspaceId, decision.grantId, now());
     return null;
   });
-}
-/** Content task supplies mounts using this persisted selection; focus changes apply next run. */
-export async function sessionContentFocus(db: StewardPorts["db"], workspaceId: string, sessionId: string) {
-  const session = await db.session.findFirst({ where: { id: sessionId, workspaceId } });
-  if (!session) throw new StewardError("not_found", "Session not found");
-  return z.array(z.string()).parse(session.focus);
-}
-async function focus(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_focus, raw);
-  if (!ctx.run.sessionId) throw new StewardError("invalid", "Focus requires a session");
-  const names = [...new Set(input.modules)];
-  const modules = await ctx.db.module.findMany({ where: { workspaceId: ctx.workspaceId, name: { in: names }, status: "active" } });
-  if (names.some(name => ["web", "qq", "mcp"].includes(name) || !modules.some(module => module.name === name))) throw new StewardError("invalid", "Focus requires active non-entry module names");
-  await ctx.db.session.update({ where: { id: ctx.run.sessionId }, data: { focus: names } });
-  return { modules: names };
 }
 /** shortcut: LIKE scans message text with at most 200 hits, upgrade to FTS5 when search volume or history requires indexed ranking. */
 export async function searchSessions(db: StewardPorts["db"], workspaceId: string, query: string, limit = 3) {
@@ -72,26 +56,32 @@ export async function searchSessions(db: StewardPorts["db"], workspaceId: string
     }) }] : [];
   });
 }
-/** Resolve only content references, never host paths; mounts/edits are owned by the content layer. */
-async function contentFile(ctx: ToolContext, ref: string) {
-  const [name, ...parts] = ref.split("/");
-  const module = await ctx.db.module.findFirst({ where: { workspaceId: ctx.workspaceId, name, status: "active" } });
-  if (!module) throw new StewardError("not_found", "Content module not found");
-  const root = await realpath(join(ctx.ports.dataDir, "platform", "content", module.id));
-  const path = await realpath(join(root, ...parts));
-  const rel = relative(root, path);
-  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new StewardError("forbidden", "Content path escapes its module");
-  const info = await stat(path);
-  if (!info.isFile()) throw new StewardError("invalid", "Content reference is not a file");
-  return { name: parts.at(-1)!, path, size: info.size };
+/**
+ * A file to attach, kept by chat: an attachment the run received (content/chat/<file>) or a file the run wrote in its
+ * working directory, copied in. Never a host path outside the run's directory.
+ */
+async function replyFile(ctx: ToolContext, path: string) {
+  if (path.startsWith("content/chat/")) {
+    const ref = `chat/${path.slice("content/chat/".length)}`, file = await readChatFile(ctx.ports, ref);
+    if (!file) throw new StewardError("not_found", `No received attachment ${path}`);
+    return { name: path.split("/").pop()!.replace(/^[0-9a-f-]{36}-/, ""), ref, size: file.bytes.byteLength };
+  }
+  const root = await realpath(ctx.run.cwd);
+  const full = await realpath(join(root, path)).catch(() => { throw new StewardError("not_found", `No file ${path} in the working directory`); });
+  const rel = relative(root, full);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new StewardError("forbidden", "Attachments must be files in the working directory");
+  const info = await stat(full);
+  if (!info.isFile()) throw new StewardError("invalid", `${path} is not a file`);
+  if (info.size > 20 * 1024 * 1024) throw new StewardError("invalid", `${path} is larger than 20 MiB`);
+  return storeChatFile(ctx.ports, path.split("/").pop()!, await readFile(full));
 }
 async function reply(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;
   if (!session || !run.sessionId) throw new StewardError("invalid", "Reply requires a session");
   const target = session.originSessionId ?? session.id;
   const conversation = await db.message.findFirst({ where: { workspaceId, sessionId: target }, orderBy: [{ at: "desc" }, { id: "desc" }] });
-  const files = await Promise.all(input.files.map(ref => contentFile(ctx, ref)));
-  const attachments = files.map((file, index) => ({ name: file.name, ref: input.files[index], mime: "application/octet-stream", size: file.size }));
+  const files = await Promise.all(input.files.map(path => replyFile(ctx, path)));
+  const attachments = files.map(file => ({ name: file.name, ref: file.ref, mime: "application/octet-stream", size: file.size }));
   const message = await db.$transaction(async tx => {
     const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation?.channel ?? "in_app", sessionId: session.id, text: input.text, attachments, at: now() } });
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
@@ -106,7 +96,6 @@ async function notify(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_notify, raw);
   const pending = await gate(ctx, "notify_user", {}, { tool: ctx.tool, ...input });
   if (pending) return pending;
-  if (input.file) await contentFile(ctx, input.file);
   const queued = await notifyUser(ctx.db, ctx.ports, ctx.workspaceId, { level: input.level, title: input.title, body: input.body, key: `tool:${ctx.run.id}:${ctx.index}` });
   void drainCalls(ctx.ports, ctx.workspaceId).catch(() => {});
   return { status: "queued", callId: queued.callId };
@@ -168,53 +157,12 @@ async function requestPathAccess(ctx: ToolContext, raw: unknown) {
   if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
   return ctx.approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，后续运行可以读写：\n${path}`, payload: { tool: ctx.tool, kind: "host_path", path, sessionId: ctx.run.sessionId } });
 }
-async function sendEmail(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_send_email, raw);
-  const connector = await ctx.db.connector.findFirst({ where: { workspaceId: ctx.workspaceId, id: input.connectorId } });
-  if (!connector || connector.kind !== "email" || !connector.canSend || connector.status !== "active") throw new StewardError("forbidden", "Email connector cannot send");
-  const decision = await effectivePolicyIn(ctx.db, ctx.workspaceId, "send_external_message", { connectorId: input.connectorId }, ctx.now());
-  if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
-  return ctx.approvals.create({ action: "send_external_message", title: input.subject, detail: `Email to ${input.to.join(", ")}`, preview: input.body.slice(0, 20000), payload: { tool: ctx.tool, ...input } });
-}
-async function inbound(ctx: ToolContext, raw: unknown) {
-  const { limit, ...where } = parseInput(schemas.chrona_inbound, raw);
-  const connectors = where.connectorId ? [{ id: where.connectorId }] : await ctx.db.connector.findMany({ where: { workspaceId: ctx.workspaceId }, select: { id: true } });
-  for (const connector of connectors) {
-    const pending = await gate(ctx, "read_source", { connectorId: connector.id }, { tool: ctx.tool, ...where, limit });
-    if (pending) return pending;
-  }
-  return ctx.db.inboundItem.findMany({ where: { workspaceId: ctx.workspaceId, ...where }, take: limit, orderBy: { receivedAt: "desc" }, select: { id: true, connectorId: true, from: true, subject: true, receivedAt: true, path: true, status: true, ruleNote: true } });
-}
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {
-  chrona_ui_guide: async (ctx, raw) => {
-    parseInput(schemas.chrona_ui_guide, raw);
-    const preferences = await ctx.db.preference.findMany({ where: { workspaceId: ctx.workspaceId, topic: "ui" } });
-    const rows = await ctx.db.audit.findMany({ where: { workspaceId: ctx.workspaceId, kind: "ui_event", createdAt: { gte: new Date(ctx.now().getTime() - 14 * 86400000) } } });
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      const input = row.details as { kind?: string; path?: string; name?: string } | null;
-      if (!input || !["open", "action"].includes(input.kind ?? "")) continue;
-      const key = input.kind === "open" ? `Page opened: ${input.path}` : `Action used: ${input.name ?? "unnamed"}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return { guide: uiGuide(preferences.map(row => row.text), [...counts].slice(0, 10).map(([key, count]) => `${key}: ${count}`)) };
-  },
-  chrona_ui_set: async (ctx, raw) => {
-    const input = parseInput(schemas.chrona_ui_set, raw);
-    if (!ctx.session || !Array.isArray(ctx.session.focus) || !ctx.session.focus.includes(input.module) || ["web", "qq", "mcp"].includes(input.module)) throw new StewardError("forbidden", "Module must be focused");
-    const module = await ctx.db.module.findUnique({ where: { workspaceId_name: { workspaceId: ctx.workspaceId, name: input.module } } });
-    if (!module) throw new StewardError("not_found", "Module not found");
-    const spec = compileUiSpec(input.spec), check = checkUiSpec(spec);
-    if (!check.ok) throw new StewardError("invalid", check.issues.join("; "));
-    const files = await contentArea(ctx.ports, ctx.workspaceId, module.id);
-    await files.intake([{ path: input.path, bytes: Buffer.from(JSON.stringify(spec)) }, ...(input.role === "entry" ? [{ path: ".chrona/entry", bytes: Buffer.from(input.path + "\n") }] : [])]);
-    return { path: input.path };
-  },
   chrona_propose: proposeModule, chrona_modules: listModules, chrona_module_checkout: checkoutModule, chrona_module_rollback: rollbackModule,
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
-  chrona_schedule_cancel: cancelSchedule, chrona_focus: focus,
+  chrona_schedule_cancel: cancelSchedule,
   chrona_session_search: async (ctx, raw) => { const input = parseInput(schemas.chrona_session_search, raw); return searchSessions(ctx.db, ctx.workspaceId, input.query, input.limit); },
-  chrona_request_approval: requestApproval, chrona_request_path_access: requestPathAccess, chrona_send_email: sendEmail, chrona_inbound: inbound,
+  chrona_request_approval: requestApproval, chrona_request_path_access: requestPathAccess,
   chrona_remember: async (ctx, raw) => ctx.preferences.add(parseInput(schemas.chrona_remember, raw), "learned"),
   chrona_forget: async (ctx, raw) => ctx.preferences.delete(parseInput(schemas.chrona_forget, raw).preferenceId),
   chrona_preferences: async (ctx, raw) => { parseInput(schemas.chrona_preferences, raw); return ctx.preferences.list(); },

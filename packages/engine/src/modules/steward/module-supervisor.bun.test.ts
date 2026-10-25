@@ -92,19 +92,21 @@ test("events are serial and calls carry event-scoped dedupe; undeclared calls re
   let active = 0, maximum = 0;
   const f = await fixture({ effects: [], handler: async (_event, call) => {
     maximum = Math.max(maximum, ++active);
-    const reply = await call("notify", { key: "key", level: "now", title: "Title", body: "Body" });
+    const reply = await call("call", { target: "notify.send", args: { key: "key", level: "now", title: "Title", body: "Body" }, mode: "async", key: "key" } as never);
     await Bun.sleep(5); active--; return { result: reply };
   } });
   const replies = await Promise.all([f.deliver(), f.deliver()]);
   expect(maximum).toBe(1); expect(f.processes).toHaveLength(1);
   expect(replies[0]).toMatchObject({ result: { result: { error: { code: "undeclared" } } } });
   expect(await f.db.moduleCall.findMany()).toHaveLength(2);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "notify", status: "rejected", error: "undeclared", moduleRunId: expect.any(String) });
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "rejected", error: "undeclared", moduleRunId: expect.any(String) });
 });
 test("duplicate keys return duplicate and a different event does not swallow the next notification", async () => {
-  const f = await fixture({ handler: async (_event, call) => ({ result: await call("notify", { key: "key", level: "now", title: "Title", body: "Body" }) }) });
-  expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "executed" } } } });
-  expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "duplicate" } } } });
+  // The deprecated notify_user effect stands for notify.send (grantedUses), so this older manifest still may call it.
+  // Keys scoped to the event, as the SDK shorthands send them.
+  const f = await fixture({ handler: async (event, call) => ({ result: await call("call", { target: "notify.send", args: { key: `${event.trigger.firedAt}:key`, level: "now", title: "Title", body: "Body" }, mode: "async", key: `${event.trigger.firedAt}:key` } as never) }) });
+  expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
+  expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: true } } } });
   await f.supervisor.deliver(f.module.id, "v1", { ...event, trigger: { ...event.trigger, firedAt: "2026-10-22T00:00:00Z" } });
   expect((await notices(f.db)).length).toBe(2);
   expect(await f.db.moduleCall.count()).toBe(3);

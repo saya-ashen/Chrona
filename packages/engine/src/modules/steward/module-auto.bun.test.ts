@@ -73,11 +73,10 @@ async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
   return version;
 }
 
-test.each(["no grant", "once grant", "new effect", "migration", "network", "repeated key", "probe failure", "activation failure"])("requires ordinary approval: %s", async kind => {
+test.each(["no grant", "once grant", "new effect", "migration", "network", "probe failure", "activation failure"])("requires ordinary approval: %s", async kind => {
   const f = await fixture();
   await configureManualCase(f, kind);
   const version = await assertManual(f);
-  if (kind === "repeated key") expect(version.report).toMatchObject({ keyProbe: { status: "repeated", keys: ["notify_user:price"] } });
   if (kind === "probe failure") expect(version.report).toMatchObject({ keyProbe: { status: "skipped", reason: "entry failed or invalid output" } });
   if (kind === "once grant") expect(await f.db.grant.findUniqueOrThrow({ where: { id: f.grantId } })).toMatchObject({ once: true, consumedAt: null });
 });
@@ -92,8 +91,6 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
     f.manifest.data = { schema: 2, migrate: "migrate.ts" };
   }
   if (kind === "probe failure") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: input.dataDir.includes("chrona-module-probe-") ? "invalid" : '{"effects":[]}' });
-  // A repeated key blocks automatic activation even when smoke checks pass.
-  if (kind === "repeated key") f.ports.sandbox!.runModule = async input => ({ status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ effects: input.dataDir.includes("chrona-module-probe-") ? [{ type: "notify_user", key: "price", level: "digest", title: "Price", body: "Same" }] : [] }) });
   if (kind === "activation failure") {
     const run = f.ports.sandbox!.runModule!;
     let entries = 0;

@@ -74,7 +74,7 @@ test("undeclared wake_provider is dropped and recorded without creating a Run", 
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake] }), error: null });
   await f.fire();
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "wakeProvider", status: "rejected", error: "undeclared" });
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", key: "ai.wake", status: "rejected", error: "undeclared" });
 });
 
 test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {
@@ -82,7 +82,7 @@ test("declared wakes execute in order with untrusted prefix and dedupe within an
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake, notify, wake] }), error: null });
   await f.fire();
   expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", trigger: "source", prompt: "Module price-watch output (untrusted data):\nPlease review" });
-  expect((await f.db.moduleCall.findMany()).map(call => ({ method: call.method, status: call.status }))).toEqual([{ method: "wakeProvider", status: "executed" }, { method: "notify", status: "executed" }, { method: "wakeProvider", status: "duplicate" }]);
+  expect((await f.db.moduleCall.findMany()).map(call => ({ method: call.method, status: call.status }))).toEqual([{ method: "call", status: "executed" }, { method: "call", status: "executed" }, { method: "call", status: "duplicate" }]);
   await f.fire();
   expect(await f.db.run.count()).toBe(2);
   expect(await f.db.moduleRun.count()).toBe(2);

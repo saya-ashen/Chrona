@@ -39,25 +39,24 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   expect(isEntryModule({ effects: [], listen: ["/api/x"] })).toBe(false);
 });
 
-(sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which calls the owner API", async () => {
+(sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which makes routed calls", async () => {
   const { workspaceId } = await seedWorkspace("Listen");
-  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: ["owner"], keepAlive: true, listen: "/api/echo" });
+  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], uses: ["chat.today"], keepAlive: true, listen: "/api/echo" });
   const module = await db.module.create({ data: { workspaceId, name: "echo", activeHash: "v1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/v1");
   await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
-  const today = await chrona.owner({ method: "GET", path: "/today" });
-  const denied = await chrona.owner({ method: "GET", path: "/today?workspaceId=other" });
-  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), today: today.status, overridden: denied.status, apps: Array.isArray((today.body as { apps?: unknown }).apps) });
+  const today = await chrona.call("chat.today") as { apps?: unknown };
+  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), apps: Array.isArray(today.apps) });
 });`);
   const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
   stop = () => steward.stop();
   const app = await createServerApp({ steward });
   expect((await app.request("/api/echo/x")).status).toBe(401);
   const response = await app.request("/api/echo/x?y=1", { method: "POST", headers: { authorization: "Bearer listen-test", cookie: "s=1" }, body: "hi" });
-  expect(await response.json()).toEqual({ path: "/api/echo/x", query: "?y=1", auth: null, cookie: null, body: "hi", today: 200, overridden: 200, apps: true });
+  expect(await response.json()).toEqual({ path: "/api/echo/x", query: "?y=1", auth: null, cookie: null, body: "hi", apps: true });
   expect((await (await app.request("/api/echo", { headers: { authorization: "Bearer listen-test" } })).json()).path).toBe("/api/echo");
   expect((await app.request("/api/nothing/x", { headers: { authorization: "Bearer listen-test" } })).status).toBe(404);
 }, 30_000);
@@ -79,7 +78,6 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect(page.status).toBe(200);
   expect(await page.text()).toContain('<script src="/app.js" type="module">');
   expect((await app.request("/app.js")).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
-  expect((await app.request("/api/steward/today?workspaceId=x")).status).toBe(401);
   expect((await app.request("/", { method: "POST" })).status).toBe(404);
   // The page's data API is the web module's own, behind the user's key, answered by routed calls (v2-8).
   expect((await app.request("/api/web/today")).status).toBe(401);
@@ -100,6 +98,6 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   const names = (await rpc("tools/list")).body.result.tools.map((tool: { name: string }) => tool.name);
   expect(names).toEqual(expect.arrayContaining(["chrona_today", "chrona_chat", "chrona_approval_resolve", "chrona_module_tools", "chrona_module_call"]));
   expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_tools", arguments: { query: "files" } })).body.result.content[0].text).map((tool: { target: string }) => tool.target)).toContain("files.list");
-  expect((await rpc("tools/call", { name: "chrona_content_read", arguments: { appId: "missing" } })).body.result).toEqual({ content: [{ type: "text", text: "not_found: Content area not found" }], isError: true });
+  expect((await rpc("tools/call", { name: "chrona_today", arguments: {} })).body.result.content[0].text).toContain("approvals");
   expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "files.list", arguments: {} } })).body.result.content[0].text)).toHaveProperty("entries");
 }, 120_000);

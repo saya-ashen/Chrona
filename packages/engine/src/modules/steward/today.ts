@@ -12,17 +12,16 @@ export type HealthPorts = { provider(): Promise<Health["provider"]>; moduleSandb
 export function createToday({ db, workspaceId, now }: RecordContext, ports: HealthPorts, apps: () => Promise<TodayView["apps"]> = async () => []) {
   async function health(): Promise<Health> {
     const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
-    const [provider, runs, dueSchedules, failingConnectors, notifications, state] = await Promise.all([
+    const [provider, runs, dueSchedules, notifications, state] = await Promise.all([
       ports.provider(), db.run.findMany({ where: { workspaceId, OR: [{ status: { in: ["queued", "running"] } }, { createdAt: { gte: new Date(at.getTime() - 48 * 3600000) } }] } }),
       db.schedule.count({ where: { workspaceId, status: "active", nextAt: { lte: at } } }),
-      db.connector.count({ where: { workspaceId, status: { in: ["failing", "needs_authorization"] } } }),
       ports.notifications.status(),
       db.stewardState.findUnique({ where: { workspaceId } }),
     ]);
     const day = localDayKey(at, settings.timezone);
     return { provider, moduleSandbox: ports.moduleSandbox(), queuedRuns: runs.filter(r => r.status === "queued").length, runningRuns: runs.filter(r => r.status === "running").length,
       failedRunsToday: runs.filter(r => ["failed", "timed_out", "provider_unavailable"].includes(r.status) && localDayKey(r.endedAt ?? r.createdAt, settings.timezone) === day).length,
-      dueSchedules, failingConnectors, queuedNotifications: notifications?.queued ?? 0, failedNotifications: notifications?.failed ?? 0, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
+      dueSchedules, queuedNotifications: notifications?.queued ?? 0, failedNotifications: notifications?.failed ?? 0, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
   }
   async function get(): Promise<TodayView> {
     const at = now(), week = 7 * 86400000;

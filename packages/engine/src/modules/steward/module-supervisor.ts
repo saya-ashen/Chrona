@@ -18,7 +18,7 @@ type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["star
 type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 type Instance = {
   moduleId: string; hash: string; manifest: ModuleManifest; scope: CallScope;
-  queue: Promise<unknown>; calls: Promise<unknown>; start?: Promise<void>;
+  queue: Promise<unknown>; start?: Promise<void>;
   process?: Process; channel?: Awaited<ReturnType<typeof createModuleChannel>>;
   dir?: string; idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean;
 };
@@ -44,7 +44,6 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     instance.process?.kill();
     await instance.channel?.close();
     await instance.process?.exited.catch(() => {});
-    await instance.calls.catch(() => {});
     if (instance.dir) await rm(instance.dir, { recursive: true, force: true });
     if (instances.get(keyOf(instance.moduleId, instance.hash)) === instance) instances.delete(keyOf(instance.moduleId, instance.hash));
   }
@@ -77,14 +76,8 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       await chmod(instance.dir, 0o700);
       const dataDir = join(ports.dataDir, "platform/data", instance.moduleId);
       await mkdir(dataDir, { recursive: true });
-      instance.channel = await createModuleChannel(join(instance.dir, "s"), { timers, onCall: call => {
-        const scope = { ...instance.scope };
-        // A chat request or a routed call waits for another party; it must not hold back the module's other calls.
-        if (call.method === "owner" || call.method === "call" || call.method === "callStatus") return handleModuleCall(ports, scope, call);
-        const result = instance.calls.then(() => handleModuleCall(ports, scope, call));
-        instance.calls = result.catch(() => {});
-        return result;
-      } });
+      // Only routed calls cross the channel (v2-10); each waits for its own target, never for the module's other calls.
+      instance.channel = await createModuleChannel(join(instance.dir, "s"), { timers, onCall: call => handleModuleCall(ports, { ...instance.scope }, call) });
       if (stopped || instance.closing) throw new Error("Module supervisor stopped");
       const contentDir = instance.manifest.content ? join(ports.dataDir, "platform/content", instance.moduleId) : undefined;
       if (contentDir) await mkdir(contentDir, { recursive: true });
@@ -124,7 +117,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
       instance = instances.get(key);
       if (!instance) {
         const manifest = moduleManifestSchema.parse(version.manifest);
-        instance = { moduleId, hash, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, manifest }, queue: Promise.resolve(), calls: Promise.resolve(), retiring: false, closing: false, busy: false };
+        instance = { moduleId, hash, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, manifest }, queue: Promise.resolve(), retiring: false, closing: false, busy: false };
         instances.set(key, instance);
       }
     }
@@ -153,7 +146,7 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
    * Delivers one event; the module's events are serial. `chain`/`path` are the routed call path the event belongs to
    * (calls the module makes meanwhile extend it). Failures carry a `stage` (see DeliveryStage).
    */
-  async function deliver(moduleId: string, hash: string, event: ModuleEvent, { inboundItemId, chain = [], path = [], timeoutMs: requested }: { inboundItemId?: string; chain?: string[]; path?: string[]; timeoutMs?: number } = {}): Promise<Reply> {
+  async function deliver(moduleId: string, hash: string, event: ModuleEvent, { chain = [], path = [], timeoutMs: requested }: { chain?: string[]; path?: string[]; timeoutMs?: number } = {}): Promise<Reply> {
     let instance: Instance;
     try { instance = await get(moduleId, hash); }
     catch (error) {
@@ -165,17 +158,17 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
     const result = instance.queue.then(async () => {
       const module = await ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
       if (stopped || module.status !== "active") throw staged(new Error("Module is not active"), "unavailable");
-      const run = await ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), inboundItemId, firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: ports.now() } });
+      const run = await ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: ports.now() } });
       instance.busy = true;
       instance.scope.moduleRunId = run.id;
-      instance.scope.eventKey = inboundItemId ? `inbound:${inboundItemId}` : `${event.trigger.id}:${event.trigger.firedAt}`;
+      instance.scope.eventKey = `${event.trigger.id}:${event.trigger.firedAt}`;
       instance.scope.chain = chain; instance.scope.path = path;
       try {
         const { trigger } = event, { manifest } = instance;
         const dynamic = trigger.kind === "schedule" && trigger.scheduleId !== undefined && trigger.payload !== undefined;
         if (dynamic) {
           if (!module.builtin || !manifest.dynamicSchedules || !await ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires a built-in module declaring dynamicSchedules"), "unavailable");
-        } else if (trigger.kind === "content_edit" ? !manifest.content : trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+        } else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
         try { await (instance.start ??= start(instance)); }
         catch (error) { throw staged(error, "unavailable"); }
         const workspace = manifest.model ? await ports.db.workspace.findUniqueOrThrow({ where: { id: module.workspaceId } }) : null;
@@ -183,7 +176,6 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
         let reply: Reply;
         try { reply = await instance.channel!.send({ ...event, params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) }, timeoutMs); }
         catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
-        await instance.calls;
         if ("error" in reply) throw staged(new Error(reply.error), "handler");
         await ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 0, output: reply.result } });
         failures.set(moduleId, 0);

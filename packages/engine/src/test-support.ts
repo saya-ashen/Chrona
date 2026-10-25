@@ -7,4 +7,4 @@ export { createRelay, qqReplyText } from "./modules/steward/builtin/qq/relay";
 export { callSync, callsSettled, runDueCalls } from "./modules/steward/module-calls";
 export { notices } from "./modules/steward/test-notices";
 export { handleModuleCall } from "./modules/steward/module-effects";
-export { qqEntry } from "./modules/steward/test-entry";
+export { builtinEntry, qqEntry } from "./modules/steward/test-entry";

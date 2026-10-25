@@ -1,7 +1,6 @@
 import { startRescueListener } from "./rescue";
 import { migrateQqState } from "./qq-state-migration";
 import { readProtectedSecret } from "../../../packages/integrations/src/steward/protected-secret";
-import { ownerApi } from "./owner-api";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,9 +13,6 @@ import { createPiModelGateway } from "../../../packages/integrations/src/steward
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { createModulePackages } from "../../../packages/integrations/src/steward/module-packages";
-import { createEmailConnector } from "../../../packages/integrations/src/steward/email";
-import { createLocalTestSource } from "../../../packages/integrations/src/steward/local-test-source";
-import { createChinoServiceHealthSource } from "../../../packages/integrations/src/steward/chino-health-source";
 
 function publicOrigin(): string | null {
   try {
@@ -79,7 +75,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     runModule: input => scriptSandbox.runModule(input),
     startModule: input => scriptSandbox.startModule(input),
   };
-  const localTest = createLocalTestSource();
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     modelGateway: createPiModelGateway({
@@ -89,7 +84,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       chronaExtension: resourcePath(join("external-plugins", "pi-steward-agent", "chrona-tools.ts")),
       agentUrl: "", workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
     }),
-    connectors: [createEmailConnector(), localTest.adapter,createChinoServiceHealthSource({ url: process.env.CHRONA_CHINO_DASHBOARD_URL })],
     secrets: configuredSecret, packages: createModulePackages(),
     sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
@@ -114,9 +108,8 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return running;
   }
   function wake() { void tickOnce(); }
-  ports.owner = ownerApi(ports, service, wake);
   return {
-    ports, service, tickOnce, wake, localTest,
+    ports, service, tickOnce, wake,
     /** HTTP socket of the module declaring `listen: path`, or null. */
     listener: (path: string) => moduleSupervisor(ports).listener(path),
     async health() {

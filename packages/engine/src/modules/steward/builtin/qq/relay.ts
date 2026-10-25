@@ -3,29 +3,13 @@ import type { QqAttachment } from "./official";
 
 /** Everything the QQ module asks of Chrona, as routed calls (`chrona.call`): `chat.*`, `approvals.*`, `notify.send`. */
 export type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
-type Attachment = { name: string; ref: string | null; mime: string; size: number; appId?: string | null };
+type Attachment = { name: string; ref: string | null; mime: string; size: number };
 type Download = (attachment: QqAttachment) => Promise<{ name: string; mime: string; bytes: Uint8Array }>;
 
-/** Pages open in the web reader; other files download through the authenticated raw route. Never expose a local path. */
-export function qqReplyText(message: { text: string; attachments: Attachment[] }, publicUrl: string | null, workspaceId: string) {
-  return [message.text, ...message.attachments.map(file => {
-    const parts = file.ref?.split("/").slice(1) ?? [];
-    return file.appId && parts.length && publicUrl
-      ? `${linkLabel(file.name)}：${fileLink(publicUrl.replace(/\/$/, ""), file.appId, parts.join("/"), workspaceId)}`
-      : `${file.name}（请在 Chrona 网页查看附件）`;
-  })].join("\n\n");
-}
-/** People see page names, not file names: composed pages are "the page", Markdown pages drop their extension. */
-function linkLabel(name: string) {
-  if (/\.ui\.json$/i.test(name)) return "打开页面";
-  if (/^readme\.md$/i.test(name)) return "总览";
-  return name.replace(/\.md$/i, "");
-}
-function fileLink(origin: string, appId: string, path: string, workspaceId: string) {
-  const app = encodeURIComponent(appId);
-  return /\.(md|ui\.json)$/i.test(path)
-    ? `${origin}/apps/${app}?${new URLSearchParams({ path })}`
-    : `${origin}/api/steward/apps/${app}/raw?${new URLSearchParams({ workspaceId, path })}`;
+/** Files stay with the conversation: the link opens it on the web page, which downloads them with the user's key. Never expose a local path. */
+export function qqReplyText(message: { text: string; attachments: Attachment[] }, publicUrl: string | null, sessionId: string | null) {
+  const link = publicUrl && sessionId ? `${publicUrl.replace(/\/$/, "")}/sessions/${encodeURIComponent(sessionId)}` : null;
+  return [message.text, ...message.attachments.map(file => link && file.ref ? `${file.name}：${link}` : `${file.name}（请在 Chrona 网页查看附件）`)].join("\n\n");
 }
 const isReplyImage = (file: Attachment | undefined) => Boolean(file?.ref && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024);
 
@@ -50,7 +34,7 @@ export function createRelay({ call, notify, publicUrl, download }: { call: Call;
   return {
     send,
     /** The text QQ shows for a pushed reply: the reply plus links to its files. */
-    replyText: (item: Pick<QqReplyItem, "text" | "attachments" | "workspace">) => qqReplyText(item, publicUrl, item.workspace),
+    replyText: (item: Pick<QqReplyItem, "text" | "attachments" | "sessionId">) => qqReplyText(item, publicUrl, item.sessionId),
     /** The bound owner's decision on one open approval, addressed by an id prefix. */
     async resolveApproval(_binding: QqBinding, decision: ApprovalDecision) {
       const open = await call("approvals.list", { status: "open" }) as { id: string; title: string }[];

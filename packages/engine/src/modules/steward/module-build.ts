@@ -2,7 +2,7 @@ import { moduleModelSettings } from "./settings";
 import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { isEntryModule, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { createRuns, createRunSession } from "./runs";
 import { notifyUser } from "./notify-user";
@@ -53,7 +53,10 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
-  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`, detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  // A built-in release waits for review only when the active version is someone's modification: say it replaces that.
+  const replacing = version.source === "builtin" && active && active.source !== "builtin" ? `Chrona 内置新版本：批准后替换当前由${active.source === "user" ? "你" : " AI "}修改的版本 ${active.hash.slice(0, 8)}，那些修改不会带过来。` : "";
+  const card = { moduleId: module.id, action: "activate_module" as const, title: replacing ? `启用模块 ${manifest.name} 的内置新版本（替换当前修改版）` : `启用模块 ${manifest.name}`,
+    detail: replacing + (context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络"), payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
   if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
   const approval = await createApprovals(context).create(card);
@@ -68,6 +71,13 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     intentSchema.parse(version.intent);
     const files = await stagingFiles(context, version, report);
     if (!files) return { moduleId: module.id, hash, status: "rejected", report };
+    // v2-8: apps offer tools and the web module shows them; only entry modules (web, MCP) serve HTTP. Checked at build,
+    // not in the manifest schema, so an active version that still serves a page keeps working until it is rebuilt.
+    if (listenPaths(manifest).length && !isEntryModule(manifest)) {
+      report.errors = ["listen is only for entry modules (web, MCP): expose tools instead; the web module shows them"];
+      await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+      return { moduleId: module.id, hash, status: "rejected", report };
+    }
     if (manifest.model) {
       const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
       const limits = moduleModelSettings(workspace.settings);

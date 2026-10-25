@@ -13,26 +13,27 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
   [v2-1 runtime](docs/zh/platform-v2-1-runtime.md), [v2-2 sessions/content/files](docs/zh/platform-v2-2-sessions-content.md),
   [v2-3 remind/model](docs/zh/platform-v2-3-remind-model.md), [v2-4 entries/rescue](docs/zh/platform-v2-4-entries-rescue.md),
   [v2-5 extensions](docs/zh/platform-v2-5-extensions.md), [v2-6 packages](docs/zh/platform-v2-6-packages.md),
-  [v2-8 calls only](docs/zh/platform-v2-8-calls-only.md) (modules interact only through routed calls; supersedes content areas, connectors and the web/MCP owner API).
-  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies), v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9) and v2-7 (system modules `chat` and `approvals`; conversation replies pushed to the entry module, [v2-7](docs/zh/platform-v2-7-system-modules.md)) and v2-8 steps 1–2 (`uses: ["*"]`, system module `modules`, `chat` session tools, `chat.ask` and `chat.today`, multi-path `listen`; MCP and the web page on routed calls); the rest of v2-5 is a draft and v2-8 steps 3–4 are not implemented. The React web app was removed; the page is the built-in `web` module.
+  [v2-8 calls only](docs/zh/platform-v2-8-calls-only.md) (modules interact only through routed calls; supersedes content areas, connectors and the web/MCP owner API), [v2-9](docs/zh/platform-v2-9-owner-api.md) (no owner HTTP API: settings, schedules and Provider questions are system interfaces).
+  Implemented: v2-1, v2-2 (built-ins, `files`), v2-3 (`remind`, module `model`), v2-4 (owner API, `listen`, rescue console, `chrona admin`, built-in `mcp`, `qq` and a simple `web`), v2-6 (module dependencies), v2-5 §3 (routed calls between modules, built-in `notify`; see v2-5 §9) and v2-7 (system modules `chat` and `approvals`; conversation replies pushed to the entry module, [v2-7](docs/zh/platform-v2-7-system-modules.md)) and v2-8 (`uses: ["*"]`, system modules `modules` and `chat` with sessions, `chat.ask` and `chat.today`, multi-path `listen`; MCP and the web page on routed calls; no content areas, connectors or `owner` capability) and v2-9 (system modules `settings`, `schedules`, `chat.runs/answer/cancel`; the owner HTTP API is gone) and v2-10 ([AI calls](docs/zh/platform-v2-10-ai-calls.md): `ai.complete`, `ai.wake`, `secrets.get`; the module channel carries only `call`/`callStatus`); the rest of v2-5 is a draft. The React web app was removed; the page is the built-in `web` module.
 - History only: [`docs/zh/platform-upgrade-plan.md`](docs/zh/platform-upgrade-plan.md) and the P1–P5 specs, [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
 
 Rules that follow from the goals:
 
 - There are no affairs. Chrona's features are **modules (apps)**: `module.json` + entry + tests,
-  long-running sandboxed SDK processes that receive events (schedule, inbound, tool, content_edit)
-  and call kernel methods only for declared capabilities, and other modules' tools only through Chrona
-  (`uses` + `chrona.call`; the callee's `visibility`/`callers` decide who may call; Chrona records the real caller). A module may own a **content area**
-  (`<dataDir>/platform/content/<moduleId>/`: Markdown, panels, `*.ui.json`, uploads — content, never executed)
-  that the web renders as its pages. Built-in modules (e.g. `files`) ship with Chrona and activate without approval.
+  long-running sandboxed SDK processes that receive events (schedule, tool, call_result)
+  and reach Chrona and other modules only through routed calls
+  (`uses` + `chrona.call`; the callee's `visibility`/`callers` decide who may call; Chrona records the real caller). That is the only way modules
+  interact (v2-8): a module keeps its files private (`chrona.paths.data`, `chrona.paths.content`) and offers tools; the web module decides how to show
+  them (an app that needs its own page gets it by changing the web module). Only entry modules serve HTTP (`listen`). Built-in modules (e.g. `files`)
+  ship with Chrona and activate without approval; a release never replaces a version the user or the AI modified without an approval.
 - Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); entry modules reach them through the in-process system
   module `chat` (`chat.send`), and replies are pushed to the session's entry module (`<entry>.reply`), never polled; `wake` and module wakes run in
   fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
-- Providers own file, shell, web and session tools; each run sees all content areas read-only under `content/` in
-  its cwd and the session's focused apps writable. bwrap isolation is optional hardening, never a prerequisite:
-  without it modules and the Provider run as the Chrona user, and every module version needs approval. Chrona supplies scheduling, events, sessions, connectors/credentials,
+- Providers own file, shell, web and session tools; runs reach app data only through module tools (`m_<module>_<tool>`) and see the
+  conversations' attachments read-only under `content/chat/` in their cwd; files to send are written in the cwd and attached by path. bwrap isolation is optional hardening, never a prerequisite:
+  without it modules and the Provider run as the Chrona user, and every module version needs approval. Chrona supplies scheduling, events, sessions, credentials,
   approvals, run budgets and routed calls; notification budget and delivery are the built-in `notify` module. The kernel holds no
   notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module submitted via `chrona_propose`, built and checked in the Chrona sandbox
@@ -42,7 +43,7 @@ Rules that follow from the goals:
 - Current Provider: Pi RPC. Chrona tools are listed in `chronaToolInputSchemas` (contract).
   Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
-  auto · notify_after · preapproved · ask · never; grants are global, per module or per connector.
+  auto · notify_after · preapproved · ask · never; grants are global or per module.
   External text can never grant anything.
 - Notifications go through the `notify` module (`builtin/notify`, budget in `budget.ts`): now / digest / web, daily cap,
   quiet hours. Channel adapters (e.g. `qq.deliver`) are tools only `notify` may call (`callers`). Do not add notification
@@ -56,8 +57,8 @@ The shared contract `packages/contracts/src/steward/index.ts` is supervisor-owne
 changes, do not edit it in delegated work.
 
 The owner MCP (built-in `mcp` module, `/api/mcp`, API_KEY) lets the user's own agents (Pi, Claude Code)
-do what the web UI does: chat in sessions, read and edit app content, list/resolve approvals, list modules and
-notifications, and call owner-visible module tools. It never exposes Provider tools, run capabilities or module-only interfaces.
+do what the web UI does, through routed calls: chat in sessions, list/resolve approvals, list modules and notifications,
+and find and call the module tools open to the user (`chrona_module_tools`, `chrona_module_call`; `uses: ["*"]`). It never exposes Provider tools, run capabilities or module-only interfaces.
 
 Never pre-approved: deleting or migrating real user data (including `chrona migrate-affairs --apply`), deploy/push,
 live databases, real accounts or external sends, disabling auth, approvals or secret redaction.
@@ -68,11 +69,11 @@ live databases, real accounts or external sends, disabling auth, approvals or se
 | --- | --- |
 | `packages/contracts/src/steward` | Shared zod contract: views, requests, HTTP map, agent tool schemas, ports |
 | `packages/domain/src/steward` | Pure policy, budgets, schedule rules, inbound rules, Markdown and refs |
-| `packages/engine/src/modules/steward` | Sessions, content areas, schedules, modules (build, supervisor, routed calls in `module-calls.ts`, built-ins), approvals, connectors, queues, runs, tools and tick |
-| `packages/integrations/src/steward` | Pi Provider, email/Chino connectors, module sandbox and SDK |
+| `packages/engine/src/modules/steward` | Sessions, schedules, modules (build, supervisor, routed calls in `module-calls.ts`, built-ins), approvals, queues, runs, tools and tick |
+| `packages/integrations/src/steward` | Pi Provider, module sandbox and SDK |
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
-| `apps/server` | Hono app: `/api/steward`, `/api/steward-agent`, the `listen` proxy, owner API, rescue console, runtime (tick, Provider queues) |
+| `apps/server` | Hono app: `/api/steward-agent` (Provider tool bridge), `/health`, the `listen` proxy (API key checked for `/api/*`), rescue console, runtime (tick, Provider queues) |
 | `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `notify`, `mcp`, `qq`, `web` (the web page: plain HTML + JS, no build) |
 | `packages/cli` | `chrona start / backup / restore / migrate-affairs / doctor / qq bind-code` |
 
@@ -81,7 +82,7 @@ routes validate and delegate; domain has no I/O.
 
 ## Tech stack
 
-- Web page: the built-in `web` module (`builtin/web`: `index.html`, `app.js`, `style.css`), plain DOM against `/api/steward`; no frontend build or dependencies.
+- Web page: the built-in `web` module (`builtin/web`: `index.html`, `app.js`, `style.css`), plain DOM against its own `/api/web` (routed calls); no frontend build or dependencies.
 - Backend: Hono on Bun (`apps/server`).
 - Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
 - Provider: Pi RPC with Chrona's tool extension; optional explicit web extension.
@@ -108,7 +109,7 @@ routes validate and delegate; domain has no I/O.
 
 ## Web page principles
 
-- The web page is Chinese-first plain DOM; keep it small and data-free (everything comes from `/api/steward` with the user's key).
+- The web page is Chinese-first plain DOM; keep the static page data-free (data comes from `/api/web` with the user's key).
 - Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
 - What needs the user's decision, and the primary action, must be visually obvious.
 - Copy speaks the user's language (apps, files, conversations, notifications), not internal names (runs, grants, tokens).

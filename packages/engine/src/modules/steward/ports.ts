@@ -1,6 +1,5 @@
 import type { Prisma, PrismaClient } from "@chrona/db";
-import type { ConnectorAdapter, ProviderAdapter, moduleCallReplySchema } from "@chrona/contracts/steward";
-type OwnerReply = Extract<Extract<ReturnType<typeof moduleCallReplySchema.parse>, { result: unknown }>["result"], { body: unknown }>;
+import type { ProviderAdapter } from "@chrona/contracts/steward";
 /** Only trusted owner routes may resolve. The caller executes the returned payload,
  * rechecking policy and atomically consuming a once grant with its action claim. */
 export type ApprovedAction = { workspaceId: string; approvalId: string; grantId: string; payload: Prisma.JsonValue };
@@ -21,8 +20,6 @@ export type StewardPorts = {
     backend: "nix" | "system";
     install(input: { dir: string; packages: string[]; gcroot: string }): Promise<{ errors: string[]; installed: { npm: boolean; python: boolean; packages: Record<string, string[]> } }>;
   };
-  /** Owner API for entry modules (v2-4): one request of the HTTP map, as the user; `via` names the entry module for the record. */
-  owner?(workspaceId: string, request: { method: string; path: string; body?: unknown }, via?: { module: string }): Promise<OwnerReply>;
   /** The `chrona` SDK package directory (sdk.ts, testing.ts) given to module builds. */
   moduleSdk?: string;
   moduleBuiltinResources?: string;
@@ -30,7 +27,6 @@ export type StewardPorts = {
   onQueued?: () => Promise<unknown>;
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
-  connectors?: ConnectorAdapter[];
   sandbox?: {
     /** Modules can run (an interpreter exists). */
     available: boolean;

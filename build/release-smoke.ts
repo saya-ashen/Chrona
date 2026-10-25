@@ -115,11 +115,8 @@ async function assertRuntimeStarts(binaryPath: string) {
     await waitForJson(`${baseUrl}/health`, "health endpoint");
     // The page comes from the built-in web module, which builds at first start.
     await waitForText(`${baseUrl}/`, "web index");
-    const [workspace] = await waitForJson(`${baseUrl}/api/workspaces`, "workspaces endpoint") as { id?: string }[];
-    if (typeof workspace?.id !== "string" || workspace.id.length === 0) {
-      throw new Error("Workspaces response missing the default workspace");
-    }
-    await waitForJson(`${baseUrl}/api/steward/today?workspaceId=${encodeURIComponent(workspace.id)}`, "steward today endpoint");
+    // The page's data API (web module, routed calls): today's overview of the default workspace.
+    await waitForJson(`${baseUrl}/api/web/today`, "web today endpoint");
     await assertExists(join(dataDir, "chrona.db"), "Runtime SQLite database");
   } catch (error) {
     proc.kill();

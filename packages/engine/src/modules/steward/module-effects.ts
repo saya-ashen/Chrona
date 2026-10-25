@@ -1,8 +1,7 @@
 import type { Prisma } from "@chrona/db";
-import { isEntryModule, MODULE_METHODS, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
+import { grantedUses, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { createRuns, createRunSession } from "./runs";
-import { handleModuleModel, type CallScope } from "./module-model";
+import type { CallScope } from "./module-model";
 import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
 import { notifyUser } from "./notify-user";
 export type { CallScope } from "./module-model";
@@ -11,17 +10,22 @@ export type ModuleExecution = { workspaceId: string; moduleId: string; hash: str
 type Reply = ReturnType<typeof moduleCallReplySchema.parse>;
 
 function originOf(scope: CallScope): CallOrigin {
-  return { workspaceId: scope.workspaceId, caller: { kind: "module", module: scope.manifest.name, moduleId: scope.moduleId, hash: scope.hash }, chain: scope.chain ?? [], path: scope.path ?? [] };
+  return { workspaceId: scope.workspaceId, caller: { kind: "module", module: scope.manifest.name, moduleId: scope.moduleId, hash: scope.hash }, chain: scope.chain ?? [], path: scope.path ?? [],
+    run: { ...(scope.moduleRunId ? { moduleRunId: scope.moduleRunId } : {}), ...(scope.eventKey ? { eventKey: scope.eventKey } : {}) } };
 }
 const failed = (id: string, error: unknown): Reply => error instanceof CallError
   ? { id, error: { code: error.code, message: error.message.slice(0, 500) } }
   : { id, error: { code: "internal", message: "Module call failed" } };
 
-/** Routed calls: the target must be in `uses` (or reached by `*`); Chrona records the real caller and refuses waits on itself. */
+/**
+ * Routed calls: the target must be granted (`uses`, deprecated declarations, or `*`); Chrona records the real caller and
+ * refuses waits on itself.
+ */
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
   const { target, args, mode, key, reply, timeoutMs } = call.params, now = ports.now();
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
-  if (!scope.manifest.uses.includes(target) && !scope.manifest.uses.includes("*")) {
+  const uses = grantedUses(scope.manifest);
+  if (!uses.includes(target) && !uses.includes("*")) {
     await ports.db.moduleCall.create({ data: { ...record, key: target, status: "rejected", error: "undeclared" } });
     return { id: call.id, error: { code: "undeclared", message: `${target} is not in the manifest's uses` } };
   }
@@ -32,7 +36,8 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
       return { id: call.id, result: { output: result.output } };
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
-    const queued = await enqueueCall(ports.db, ports, originOf(scope), target, args, { key: key!, reply });
+    // A notification is stored even while the built-in notify module is not running (e.g. rebuilding); it is delivered later.
+    const queued = await enqueueCall(ports.db, ports, originOf(scope), target, args, { key: key!, reply, lenient: target === NOTIFY_INTERFACE });
     await ports.db.moduleCall.create({ data: { ...record, key: queued.callId, status: queued.duplicate ? "duplicate" : "executed" } });
     if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
     return { id: call.id, result: queued };
@@ -42,56 +47,11 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
   }
 }
 
-/** Effect calls are serialized by the supervisor, including calls made outside an event; owner and routed calls are not. */
+/** The module channel carries only routed calls (v2-10): every capability is an interface in `uses` (see grantedUses). */
 export async function handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<Reply> {
-  if (call.method === "model") return handleModuleModel(ports, scope, call);
   if (call.method === "call") return routedCall(ports, scope, call);
-  if (call.method === "callStatus") {
-    try { return { id: call.id, result: await callStatus(ports, originOf(scope), call.params.callId) as Extract<Reply, { result: unknown }>["result"] }; }
-    catch (error) { return failed(call.id, error); }
-  }
-  if (call.method === "owner") {
-    if (!scope.manifest.effects.includes("owner")) return { id: call.id, error: { code: "undeclared", message: "Module capability not declared" } };
-    if (!ports.owner) return { id: call.id, error: { code: "unconfigured", message: "Owner API unavailable" } };
-    try { return { id: call.id, result: await ports.owner(scope.workspaceId, call.params, { module: scope.manifest.name }) }; }
-    catch { return { id: call.id, error: { code: "internal", message: "Owner API call failed" } }; }
-  }
-  if (call.method === "secret") {
-    if (!isEntryModule(scope.manifest) || !scope.manifest.secrets.includes(call.params.name)) return { id: call.id, error: { code: "undeclared", message: "Secret not declared" } };
-    const value = await ports.secrets?.(call.params.name).catch(() => null);
-    return value ? { id: call.id, result: { value } } : { id: call.id, error: { code: "unconfigured", message: "Secret not configured" } };
-  }
-  const now = ports.now();
-  const key = scope.eventKey ? `${scope.eventKey}:${call.params.key}` : call.params.key;
-  const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: call.method, key, createdAt: now };
-  try {
-    const result = await ports.db.$transaction(async tx => {
-      if (!scope.manifest.effects.includes(MODULE_METHODS[call.method])) {
-        await tx.moduleCall.create({ data: { ...record, status: "rejected", error: "undeclared" } });
-        return { id: call.id, error: { code: "undeclared" as const, message: "Module capability not declared" } };
-      }
-      const previous = await tx.moduleCall.findFirst({ where: { moduleId: scope.moduleId, method: call.method, key, status: "executed" } });
-      let status: "executed" | "duplicate" = previous ? "duplicate" : "executed";
-      if (!previous) {
-        const { workspaceId, moduleId } = scope;
-        if (call.method === "notify") {
-          // `chrona.notify` is shorthand for an async call to notify.send; `notify_user` is the permission for it.
-          const queued = await enqueueCall(tx, ports, originOf(scope), NOTIFY_INTERFACE, { key, level: call.params.level, title: call.params.title, body: call.params.body }, { key, lenient: true });
-          if (queued.duplicate) status = "duplicate";
-        } else {
-          const session = await createRunSession(tx, workspaceId, "module", now, { moduleId });
-          await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", label: scope.manifest.name, prompt: `Module ${scope.manifest.name} output (untrusted data):\n${call.params.prompt}` }, tx);
-        }
-      }
-      await tx.moduleCall.create({ data: { ...record, status } });
-      return { id: call.id, result: { status } };
-    });
-    if (call.method === "notify" && "result" in result && result.result?.status === "executed") void drainCalls(ports, scope.workspaceId).catch(() => {});
-    return result;
-  } catch (error) {
-    await ports.db.moduleCall.create({ data: { ...record, status: "failed", error: error instanceof CallError ? error.code : "internal" } });
-    return failed(call.id, error);
-  }
+  try { return { id: call.id, result: await callStatus(ports, originOf(scope), call.params.callId) as Extract<Reply, { result: unknown }>["result"] }; }
+  catch (error) { return failed(call.id, error); }
 }
 
 export async function pauseFailedModule(tx: Prisma.TransactionClient, ports: StewardPorts, execution: ModuleExecution, runId: string) {

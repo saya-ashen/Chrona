@@ -13,7 +13,7 @@ async function fixture() {
 test.each(["entry", "web", "mcp", "qq", "rescue", "cli"] as const)("entry-module and policy approvals resolve from any source: %s", async source => {
   const { db, workspace, approvals } = await fixture();
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "entry" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a".repeat(64), manifest: { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: ["owner"], tests: ["test.ts"] }, intent: {}, source: "user", report: {}, status: "pending_review" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a".repeat(64), manifest: { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] }, intent: {}, source: "user", report: {}, status: "pending_review" } });
   const entry = await approvals.create({ action: "activate_module", moduleId: module.id, title: "Enable", detail: "Review", preview: "diff", payload: { kind: "activate_module", moduleId: module.id, hash: "a".repeat(64) } });
   const policy = await approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "settings diff", payload: { kind: "change_policy" } });
   expect((await approvals.resolve(entry.id, { decision: "deny" }, source)).approval.status).toBe("denied");

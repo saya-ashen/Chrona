@@ -25,8 +25,6 @@ model Workspace {
   grants Grant[]
   preferences Preference[]
   notifications Notification[]
-  connectors Connector[]
-  inboundItems InboundItem[]
   invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
@@ -114,7 +112,6 @@ model ModuleRun {
   moduleId String
   hash String
   triggerId String
-  inboundItemId String?
   firedAt DateTime
   exitCode Int
   output Json?
@@ -333,53 +330,6 @@ model Notification {
   @@index([workspaceId, channel, sentAt])
   @@index([sessionId, createdAt])
   @@index([approvalId])
-}
-
-model Connector {
-  id String @id @default(uuid())
-  workspaceId String
-  kind String
-  label String
-  status String @default("active")
-  settings Json @default(dbgenerated("'{}'"))
-  cursor String?
-  secretRef String?
-  canSend Boolean @default(false)
-  failures Int @default(0)
-  nextSyncAt DateTime?
-  lastSyncAt DateTime?
-  lastError String?
-  coverageNote String @default("")
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  items InboundItem[]
-  @@index([workspaceId, status, nextSyncAt])
-}
-
-model InboundItem {
-  id String @id @default(uuid())
-  workspaceId String
-  connectorId String
-  externalId String
-  from String
-  subject String
-  receivedAt DateTime
-  path String?
-  status String @default("new")
-  ruleNote String?
-  action String @default("batch")
-  batchId String?
-  deliverAt DateTime?
-  deliveredAt DateTime?
-  attempts Int @default(0)
-  leaseUntil DateTime?
-  leaseToken String?
-  lastError String?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  connector Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
-  @@unique([connectorId, externalId])
-  @@index([workspaceId, status, deliverAt])
-  @@index([connectorId, status, receivedAt])
-  @@index([workspaceId, batchId])
 }
 
 model Audit {

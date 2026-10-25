@@ -15,9 +15,7 @@ try {
   assert.deepEqual(await tool("write", { path: "notes/report.txt", content: "first" }), { ok: true });
   assert.equal((await tool("read", { path: "notes/report.txt" })).content, "first");
   const first = (await tool("history", { path: "notes/report.txt" })).versions[0].version;
-  await writeFile(`${paths.content}/notes/report.txt`, "external");
-  const edit = await module.send({ trigger: { kind: "content_edit", id: "content", firedAt: now, paths: ["notes/report.txt"], by: "provider" }, now, params: {} });
-  assert.equal(edit.error, undefined);
+  assert.deepEqual(await tool("write", { path: "notes/report.txt", content: "second" }), { ok: true });
   assert.equal((await tool("history", { path: "notes/report.txt" })).versions.length, 2);
   assert.deepEqual(await tool("restore", { path: "notes/report.txt", version: first }), { ok: true });
   assert.equal((await tool("read", { path: "notes/report.txt" })).content, "first");

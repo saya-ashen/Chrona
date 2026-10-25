@@ -3,7 +3,7 @@ import { createServerApp as createApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 const createServerApp = () => createApp({ steward: createStewardRuntime(db, { provider: null }) });
 import { resetEnvCacheForTests } from "./config/env";
-import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
+import { db, resetTestDb } from "./__tests__/bun-test-helpers";
 
 const keys = ["API_KEY", "ALLOWED_ORIGINS", "CHRONA_E2E_TEST_ROUTES", "CHRONA_STEWARD_AGENT"] as const;
 let saved: Record<string, string | undefined>;
@@ -28,20 +28,16 @@ test("health and database readiness do not require an execution engine", async (
   expect(await (await app.request("/ready")).json()).toEqual({ status: "ready" });
 });
 
-test("workspace discovery is owner protected and returns only id and name", async () => {
-  const { workspaceId } = await seedWorkspace("Steward");
+test("the owner HTTP API and workspace discovery are gone (v2-9): modules serve the user", async () => {
   const app = await createServerApp();
-  expect((await app.request("/api/workspaces")).status).toBe(401);
-  const response = await app.request("/api/workspaces", { headers: owner });
-  expect(response.status).toBe(200);
-  expect(await response.json()).toEqual([{ id: workspaceId, name: "Steward" }]);
+  for (const path of ["/api/workspaces", "/api/steward/today?workspaceId=x", "/api/steward/settings?workspaceId=x"]) expect((await app.request(path, { headers: owner })).status).toBe(404);
 });
 
-test("origin policy and body limit apply to steward routes", async () => {
+test("origin policy and body limit apply to /api routes", async () => {
   const app = await createServerApp();
-  expect((await app.request("/api/steward/works", { method: "OPTIONS", headers: { origin: "https://untrusted.example" } })).status).toBe(403);
-  expect((await app.request("/api/steward/works", { method: "OPTIONS", headers: { origin: "https://trusted.example" } })).status).toBe(204);
-  expect((await app.request("/api/steward/works", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
+  expect((await app.request("/api/web/today", { method: "OPTIONS", headers: { origin: "https://untrusted.example" } })).status).toBe(403);
+  expect((await app.request("/api/web/today", { method: "OPTIONS", headers: { origin: "https://trusted.example" } })).status).toBe(204);
+  expect((await app.request("/api/web/chat", { method: "POST", headers: owner, body: "x".repeat(21 * 1024 * 1024 + 1) })).status).toBe(413);
 });
 
 test("only exact capability endpoints bypass owner auth, retaining their own proxy guard", async () => {
@@ -60,17 +56,5 @@ test("legacy routes and the disabled test seam are absent", async () => {
     expect((await app.request(`/api/${path}`, { headers: owner })).status).toBe(404);
   }
   expect((await app.request("/api/steward-e2e/local-test-items", { method: "POST", headers: owner, body: "{}" })).status).toBe(404);
-});
-
-test("gated local test inbox is owner protected, validated and feeds the local_test connector", async () => {
-  process.env.CHRONA_E2E_TEST_ROUTES = "1";
-  const runtime = createStewardRuntime(db, { provider: null });
-  const app = await createApp({ steward: runtime });
-  const post = (body: unknown, headers: Record<string, string> = owner) => app.request("/api/steward-e2e/local-test-items", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) });
-  const item = { externalId: "m1", from: "a@shop.example", subject: "Order", body: "shipped", receivedAt: "2026-10-21T08:00:00.000Z" };
-  expect((await post({ items: [item] }, {})).status).toBe(401);
-  expect((await post({ items: [{ ...item, extra: 1 }] })).status).toBe(400);
-  expect(await (await post({ items: [item] })).json()).toEqual({ queued: 1 });
-  expect((await runtime.localTest.adapter.poll({ settings: {}, secret: null, cursor: null })).items).toEqual([{ ...item, url: null }]);
 });
 

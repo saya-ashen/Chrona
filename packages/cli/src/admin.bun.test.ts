@@ -18,7 +18,7 @@ async function fixture() {
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) }); dbs.push(db);
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
   const module = await db.module.create({ data: { workspaceId: "ws_default", name: "entry", status: "active", activeHash: "a".repeat(64), dataSchema: 1 } });
-  const manifest = { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: ["owner"], tests: ["test.ts"] };
+  const manifest = { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] };
   for (const hash of ["a", "b"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash: hash.repeat(64), manifest, intent: {}, report: {}, source: hash === "a" ? "builtin" : "user", status: "approved" } });
   const ports = { db, dataDir, now: () => new Date(), publicUrl: null };
   const api = createStewardService(ports).forWorkspace("ws_default");

@@ -4,11 +4,10 @@ import { randomUUID } from "node:crypto";
 /** Who called a tool, as Chrona recorded it. */
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
 export type Trigger = { kind: "schedule"; id: string; firedAt: string }
-  | { kind: "inbound"; id: string; firedAt: string; item: { externalId: string; from: string; subject: string; receivedAt: string; body: string } }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
   | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
-type EventResult = { handled?: boolean; result?: unknown };
+type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number };
@@ -29,15 +28,21 @@ function fail() {
 socket.on("error", fail);
 socket.on("close", fail);
 function send(message: unknown) { socket.write(JSON.stringify(message) + "\n"); }
+// Events run one at a time; the shorthands below scope their keys to the event being handled, so a redelivered event
+// repeats them and another event does not (routed calls keep the caller's key as given).
+let current: string | null = null;
+const scoped = (key: string) => (current ? `${current}:${key}` : key);
 async function event(message: { id: string; event: { trigger: Trigger; now: string; params: Record<string, string | number | boolean> } }) {
   try {
     const handler = handlers.get(message.event.trigger.kind);
     // Results of async calls are optional to handle: callStatus reads them too.
     if (!handler && message.event.trigger.kind === "call_result") { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
+    current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000) }); }
+  finally { current = null; }
 }
 // Lines may carry attachments (up to 32 MiB); collect chunks instead of re-copying the buffer.
 const MAX_LINE = 32 * 1024 * 1024;
@@ -74,7 +79,6 @@ function call<T = CallResult>(method: string, params: unknown): Promise<T> {
     try { send({ id, method, params }); } catch (error) { pending.delete(id); reject(error); }
   });
 }
-export type OwnerResult = { status: number; body: unknown };
 /** Where this module's directories are; set by Chrona with or without a sandbox. */
 export const paths = {
   module: process.env.CHRONA_MODULE ?? process.cwd(),
@@ -84,8 +88,6 @@ export const paths = {
 };
 export const chrona = {
   paths,
-  /** Owner API (`owner` capability): one request of Chrona's /api/steward HTTP map, as the user. */
-  owner: (params: { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path: string; body?: unknown }) => call<OwnerResult>("owner", params),
   /**
    * Calls another module's tool through Chrona (`target` = "<module>.<tool>", listed in the manifest's `uses`).
    * sync (default): resolves to the tool's result; a timeout or crash after delivery rejects with code "unknown".
@@ -97,15 +99,21 @@ export const chrona = {
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result) as T),
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
-  /** A credential listed in the manifest's `secrets` (`owner`). Never log or store it. */
-  secret: (params: { name: string }) => call<{ value: Record<string, string> }>("secret", params),
+  /** A credential listed in the manifest's `secrets` (entry modules): a routed call to `secrets.get`. Never log or store it. */
+  secret: (params: { name: string }) => chrona.call<{ value: Record<string, string> }>("secrets.get", params),
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
   serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
-  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => call<ModelResult>("model", params),
   /**
-   * Deprecated compatibility shorthand for modules written before routing: Chrona turns it into an async call to
-   * notify.send (`notify_user` capability). New modules declare `uses: ["notify.send"]` and use `call`.
+   * One completion: a routed call to `ai.complete` (uses ["ai.complete"] and the manifest's `model` tier and limits).
+   * Rejects with ModelError code unconfigured, budget_exceeded, provider_error, timeout or undeclared.
    */
-  notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => call("notify", params),
-  wakeProvider: (params: { key: string; prompt: string }) => call("wakeProvider", params),
+  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => chrona.call<ModelResult>("ai.complete", params).catch((error: ModelError) => {
+    throw new ModelError(/^(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(error.message)?.[1] ?? error.code, error.message);
+  }),
+  /** Shorthand for an async call to `notify.send` (uses ["notify.send"]); `key` is the idempotency key. */
+  notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => chrona.call<CallState>("notify.send", { ...params, key: scoped(params.key) }, { mode: "async", key: scoped(params.key) })
+    .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
+  /** Shorthand for an async call to `ai.wake` (uses ["ai.wake"]): the Provider runs with `prompt` as untrusted data. */
+  wakeProvider: (params: { key: string; prompt: string }) => chrona.call<CallState>("ai.wake", { prompt: params.prompt }, { mode: "async", key: scoped(params.key) })
+    .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
 };

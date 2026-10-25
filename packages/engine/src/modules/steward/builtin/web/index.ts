@@ -52,12 +52,25 @@ async function api(request: Request, path: string[]) {
     return call("chat.send", { key, text: body.text, channel: "in_app" });
   }
   if (request.method === "POST" && path[0] === "approvals" && path[2] === "resolve" && path.length === 3) return call("approvals.resolve", { approval: path[1], decision: body.decision, scope: body.scope });
+  // Settings page (v2-9): settings, grant rules, preferences and schedules in one read.
+  if (route === "GET /settings") {
+    const [settings, grants, preferences, schedules] = await Promise.all([call("settings.get"), call("settings.grants"), call("settings.preferences"), call("schedules.list")]);
+    return { settings, grants, preferences, schedules };
+  }
+  if (route === "POST /settings") return call("settings.update", { settings: JSON.stringify(body) });
+  if (request.method === "POST" && path[0] === "grants" && path[2] === "revoke" && path.length === 3) return call("settings.revoke-grant", { grant: path[1] });
+  if (request.method === "POST" && path[0] === "preferences" && path[2] === "forget" && path.length === 3) return call("settings.forget", { preference: path[1] });
+  if (request.method === "POST" && path[0] === "schedules" && path.length === 2) return call("schedules.update", { schedule: path[1], status: body.status });
+  // Provider runs: questions waiting for the user, and stopping a run.
+  if (route === "GET /runs") return call("chat.runs");
+  if (request.method === "POST" && path[0] === "interactions" && path[2] === "answer" && path.length === 3) return call("chat.answer", { interaction: path[1], answer: JSON.stringify(body) });
+  if (request.method === "POST" && path[0] === "runs" && path[2] === "cancel" && path.length === 3) return call("chat.cancel", { run: path[1] });
   if (route === "GET /modules") return call("modules.list");
   if (route === "GET /tools") return call("modules.tools", { query: url.searchParams.get("query") ?? undefined });
   if (route === "POST /call") {
     // Conversations, approvals and app records have their own routes above.
     const target = String(body.target);
-    if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
+    if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules|settings|schedules)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
     return chrona.call(target, (body.args ?? {}) as Args);
   }
   throw Object.assign(new Error(`No route ${route}`), { code: "not_found" });
@@ -68,6 +81,17 @@ chrona.serve(async (request: Request) => {
   if (path.startsWith("/api/web/")) {
     const parts = path.slice("/api/web/".length).split("/").filter(Boolean).map(decodeURIComponent);
     if (request.method === "GET" && parts.join("/") === "events") return events();
+    if (request.method === "GET" && parts.join("/") === "file") {
+      // A conversation's attachment, served as a download: never rendered as a page of this origin.
+      const url = new URL(request.url);
+      try {
+        const file = await call("chat.file", { message: url.searchParams.get("message") ?? "", ref: url.searchParams.get("ref") ?? "" }) as { base64: string; mime: string };
+        return new Response(Buffer.from(file.base64, "base64"), { headers: { "content-type": file.mime, "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'" } });
+      } catch (error) {
+        const { code = "failed", message = "failed" } = error as { code?: string; message?: string };
+        return Response.json({ code, message }, { status: STATUS[code] ?? 502 });
+      }
+    }
     try { return Response.json(await api(request, parts) ?? null); }
     catch (error) {
       const { code = "failed", message = "failed" } = error as { code?: string; message?: string };

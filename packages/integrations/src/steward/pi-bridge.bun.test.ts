@@ -47,7 +47,7 @@ test("bridge refuses non-loopback URLs without sending the capability", async ()
 });
 test("bridge preserves refusal and cancellation and redacts run token", async () => {
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
-    if (String(url).endsWith("/catalog")) return Response.json({ tools: [{ name: "chrona_send_email", description: "Send", parameters: {} }] });
+    if (String(url).endsWith("/catalog")) return Response.json({ tools: [{ name: "chrona_schedule", description: "Schedule", parameters: {} }] });
     init?.signal?.throwIfAborted();
     return Response.json({ ok: false, error: { code: "forbidden", message: "bridge-token refused" } });
   }) as typeof fetch;

@@ -24,8 +24,9 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
     try { output = moduleOutputSchema.parse(JSON.parse(result.output)); }
     catch { throw new Error(`invalid module output: ${result.output}`); }
     for (const effect of output.effects ?? []) {
-      const { type, ...params } = effect;
-      await call(type === "notify_user" ? "notify" : "wakeProvider", params);
+      // As the SDK shorthands do: keys scoped to the event.
+      const { type, ...args } = effect, key = `${event.trigger.id}:${event.trigger.firedAt}:${effect.key}`;
+      await call("call", { target: type === "notify_user" ? "notify.send" : "ai.wake", args: type === "notify_user" ? { ...args, key } : { prompt: (args as { prompt: string }).prompt }, mode: "async", key } as unknown as ModuleCall["params"]);
     }
     return { ...(output.handled === undefined ? {} : { handled: output.handled }), ...(output.result === undefined ? {} : { result: output.result }) };
   });

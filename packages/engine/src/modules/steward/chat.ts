@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { attachmentSchema, messageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
@@ -21,6 +21,52 @@ const inputSchema = z.object({
 });
 export type ChatInput = z.input<typeof inputSchema>;
 const unavailable = "模型暂时不可用，消息已记下，恢复后会继续处理。";
+/** The conversations' files (uploads and reply attachments), kept by the system module chat like a module keeps its data (v2-8). */
+export const chatFilesDir = (ports: Pick<StewardPorts, "dataDir">) => join(ports.dataDir, "platform", "data", "chat");
+/** Stores bytes under a unique name; the reference is `chat/<file>` (Provider runs see content/chat/<file>). */
+export async function storeChatFile(ports: Pick<StewardPorts, "dataDir">, name: string, bytes: Uint8Array) {
+  const safe = name.normalize("NFKC").replaceAll("\\", "/").split("/").pop()!.replace(/[^\p{L}\p{N}._-]/gu, "_").replace(/^\.+/, "").slice(0, 180) || "attachment";
+  const file = `${randomUUID()}-${safe}`;
+  await mkdir(chatFilesDir(ports), { recursive: true });
+  await writeFile(join(chatFilesDir(ports), file), bytes, { flag: "wx" });
+  return { name: safe, ref: `chat/${file}`, size: bytes.byteLength };
+}
+/** A stored conversation file by its `chat/<file>` reference, or null. */
+export async function readChatFile(ports: Pick<StewardPorts, "dataDir">, ref: string) {
+  const file = ref.startsWith("chat/") ? ref.slice(5) : "";
+  if (!file || file.includes("/") || file.startsWith(".")) return null;
+  const path = join(chatFilesDir(ports), file);
+  if (!(await stat(path).catch(() => null))?.isFile()) return null;
+  return { bytes: await readFile(path), mime: Bun.file(path).type || "application/octet-stream" };
+}
+const CHAT_FILES_MIGRATED = "chat_files_migrated";
+/**
+ * Once per workspace (v2-8): attachments that pointed into app content areas are copied into chat's store, and web
+ * conversations get the web module as their entry, so replies reach the page and chat.file serves their files.
+ */
+export async function migrateConversationFiles(ports: StewardPorts, workspaceId: string) {
+  const { db } = ports;
+  if (await db.audit.findFirst({ where: { workspaceId, kind: CHAT_FILES_MIGRATED } })) return 0;
+  const modules = new Map((await db.module.findMany({ where: { workspaceId } })).map(module => [module.name, module.id]));
+  let moved = 0;
+  for (const message of await db.message.findMany({ where: { workspaceId }, select: { id: true, attachments: true } })) {
+    const files = attachmentSchema.strip().array().catch([]).parse(message.attachments);
+    if (!files.some(file => file.ref && !file.ref.startsWith("chat/"))) continue;
+    const next = [];
+    for (const file of files) {
+      if (!file.ref || file.ref.startsWith("chat/")) { next.push(file); continue; }
+      const [app, ...path] = file.ref.split("/"), id = modules.get(app!);
+      const bytes = id ? await readFile(join(ports.dataDir, "platform", "content", id, ...path)).catch(() => null) : null;
+      next.push({ ...file, ref: bytes ? (await storeChatFile(ports, file.name, bytes)).ref : null });
+      moved++;
+    }
+    await db.message.update({ where: { id: message.id }, data: { attachments: next } });
+  }
+  const web = modules.get("web");
+  if (web) await db.session.updateMany({ where: { workspaceId, source: "web", entryModuleId: null }, data: { entryModuleId: web } });
+  await audit(db, { workspaceId, actor: "chrona", kind: CHAT_FILES_MIGRATED, subjectId: workspaceId, details: { moved } });
+  return moved;
+}
 /** Only inline bytes are accepted: attachment paths never authorize host filesystem reads. */
 export function chatImages(attachments: unknown): { mime: string; base64: string }[] {
   const rows = z.array(attachmentSchema.extend({ base64: image.optional() })).parse(attachments);
@@ -39,7 +85,7 @@ async function serial<T>(key: string, action: () => Promise<T>): Promise<T> {
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   const chat = new ChatService(ports, wake);
   return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), accept: chat.accept.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
-    runReplies: chat.runReplies.bind(chat), recordMessage: chat.recordMessage.bind(chat), setExternalId: chat.setExternalId.bind(chat) };
+    recordMessage: chat.recordMessage.bind(chat), setExternalId: chat.setExternalId.bind(chat) };
 }
 class ChatService {
   constructor(private readonly ports: StewardPorts, private readonly wake: () => Promise<unknown>) {}
@@ -146,31 +192,15 @@ class ChatService {
   /** Trusted transport bytes only; paths are generated, never supplied by callers. */
   async intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
     if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
-    const module = await this.ports.db.module.findFirst({ where: { workspaceId: input.workspaceId, name: "files", status: "active" } });
-    if (!module) throw new StewardError("not_found", "Files module not found");
-    const directory = join(this.ports.dataDir, "platform", "content", module.id, "uploads");
-    await mkdir(directory, { recursive: true });
     const attachments: NonNullable<ChatInput["attachments"]> = [];
     let images = 0;
     for (const file of files) {
-      const name = file.name.normalize("NFKC").replaceAll("\\", "/").split("/").pop()!.replace(/[^\p{L}\p{N}._-]/gu, "_").replace(/^\.+/, "").slice(0, 180) || "attachment";
-      const unique = `${randomUUID()}-${name}`;
-      await writeFile(join(directory, unique), file.bytes, { flag: "wx" });
+      const stored = await storeChatFile(this.ports, file.name, file.bytes);
       const inline = file.mime.startsWith("image/") && file.bytes.byteLength <= 5 * 1024 * 1024 && images < 4;
       if (inline) images++;
-      attachments.push({ name, ref: `files/uploads/${unique}`, mime: file.mime, size: file.bytes.byteLength, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
+      attachments.push({ name: stored.name, ref: stored.ref, mime: file.mime, size: stored.size, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
     }
     return { attachments };
-  }
-  /** Replies a run has sent so far that no transport has delivered yet (entry modules relay ones arriving after the chat call returned). */
-  async runReplies(workspaceId: string, runId: string) {
-    const { db } = this.ports;
-    const run = await db.run.findFirst({ where: { id: runId, workspaceId }, select: { status: true } });
-    if (!run) throw new StewardError("not_found", "Run not found");
-    const ids = (await db.audit.findMany({ where: { workspaceId, kind: "run_reply", subjectId: runId }, orderBy: { createdAt: "asc" } }))
-      .flatMap(row => { const id = (row.details as { messageId?: unknown } | null)?.messageId; return typeof id === "string" ? [id] : []; });
-    const rows = await db.message.findMany({ where: { id: { in: ids }, workspaceId, externalId: null }, orderBy: [{ at: "asc" }, { id: "asc" }] });
-    return { done: !["queued", "running"].includes(run.status), items: rows.map(toMessage) };
   }
   /** Outbound only: an entry module records what it delivered outside a chat reply, or the transport id of a reply. */
   async recordMessage(workspaceId: string, input: { key: string; channel: MessageRow["channel"]; text: string; externalId: string }) {

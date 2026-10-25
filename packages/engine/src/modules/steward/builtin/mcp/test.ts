@@ -3,14 +3,13 @@ import { strict as assert } from "node:assert";
 import { startModule } from "chrona/testing";
 
 type Args = Record<string, unknown>;
-const owner: { method: string; path: string; body?: unknown }[] = [], calls: [string, Args][] = [];
+const calls: [string, Args][] = [];
 const moduleTools: { target: string; description: string; inputSchema: Args }[] = [{ target: "files.list", description: "List a document directory.", inputSchema: { type: "object", properties: {}, required: [] } }];
 const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: target })) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
 const module = await startModule("index.ts", { stubs: {
-  owner: (params: { method: string; path: string; body?: unknown }) => { owner.push(params); return { status: 200, body: { ok: params.path } }; },
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
-    routed("chat.ask"), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
+    routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }] })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
     routed("planning.get", args => ({ plan: args.id })),
   ]),
 } });
@@ -39,16 +38,19 @@ try {
   assert.deepEqual(calls.at(-1), ["chat.messages", { session: "s1", limit: 5 }]);
   await tool("chrona_approval_resolve", { approvalId: "a1", decision: "approve" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
+  await tool("chrona_run_answer", { interactionId: "i1", decision: "submit", value: 2 });
+  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "submit", value: 2 }) }]);
+  await tool("chrona_run_answer", { interactionId: "i1", decision: "cancel", value: 2 });
+  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "cancel" }) }]);
   // A module activated after the client listed its tools is found and callable at once.
   moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } });
   assert.deepEqual((await json("chrona_module_tools", { query: "planning" })).map((entry: { target: string }) => entry.target), ["planning.get"]);
   assert.deepEqual(await json("chrona_module_call", { name: "planning.get", arguments: { id: "x" } }), { plan: "x" });
   assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "m_files_list" })).isError, true);
-  // Content still goes through the owner API until the web migration.
-  owner.length = 0;
-  await tool("chrona_content_read", { appId: "a b" });
-  assert.deepEqual(owner, [{ method: "GET", path: "/apps/a%20b/file?path=README.md" }]);
+  // Today and notifications come from chat.today; app content is reached through the apps' own tools.
+  assert.deepEqual(await json("chrona_notifications"), [{ title: "n1" }]);
+  assert.ok(!names.some((name: string) => name.startsWith("chrona_content") || name === "chrona_apps"));
   assert.equal((await tool("nope")).isError, true);
   assert.equal((await rpc("nope")).body.error.code, -32601);
 } finally { await module.stop(); }

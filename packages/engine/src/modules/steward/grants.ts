@@ -17,7 +17,6 @@ export async function consumeOnce(tx: Prisma.TransactionClient, workspaceId: str
 }
 export async function effectivePolicyIn(db: Prisma.TransactionClient, workspaceId: string, action: Action, target: Parameters<typeof decidePolicy>[1], now: Date) {
   if (target.moduleId && !await db.module.findFirst({ where: { workspaceId, id: target.moduleId } })) throw new StewardError("not_found", "Module not found");
-  if (target.connectorId && !await db.connector.findFirst({ where: { workspaceId, id: target.connectorId } })) throw new StewardError("not_found", "Connector not found");
   return decidePolicy(action, target, (await db.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now);
 }
 export function createGrants({ db, workspaceId, now }: RecordContext) {
@@ -31,7 +30,6 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
       const input = parseInput(createGrantSchema, raw), scope = input.scope;
       if (DEFAULT_POLICY[input.action] === "never" && input.mode !== "never") throw new StewardError("forbidden", "Built-in never cannot be loosened");
       if (scope.kind === "module" && !await tx.module.findFirst({ where: { workspaceId, id: scope.moduleId } })) throw new StewardError("not_found", "Module not found");
-      if (scope.kind === "connector" && !await tx.connector.findFirst({ where: { workspaceId, id: scope.connectorId } })) throw new StewardError("not_found", "Connector not found");
       const row = await tx.grant.create({ data: { ...input, workspaceId, createdAt: now(), expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } });
       await audit(tx, { workspaceId, kind: "grant_created", actor: "user", subjectId: row.id, details: input });
       return toGrant(row);

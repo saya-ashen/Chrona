@@ -40,8 +40,10 @@ async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: str
       continuity.output = { stdout: JSON.stringify(reply), stderr: "", exitCode: "error" in reply ? 1 : 0 };
       if ("error" in reply) { fail(continuity, "entry failed"); return; }
       for (const call of calls) {
-        if (call.method === "notify") continuity.effects.push({ type: "notify_user", ...call.params });
-        else if (call.method === "wakeProvider") continuity.effects.push({ type: "wake_provider", ...call.params });
+        if (call.method !== "call" || call.params.mode !== "async") continue;
+        const args = call.params.args as Record<string, string>, key = call.params.key!;
+        if (call.params.target === "notify.send") continuity.effects.push({ type: "notify_user", key, level: args.level as "now", title: args.title!, body: args.body! });
+        else if (call.params.target === "ai.wake") continuity.effects.push({ type: "wake_provider", key, prompt: args.prompt! });
       }
     }
     continuity.status = "passed"; delete continuity.reason;

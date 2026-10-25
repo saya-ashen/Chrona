@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { isEntryModule, MODULE_METHODS, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { grantedUses, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { createModuleChannel } from "./module-channel";
 
@@ -16,19 +16,18 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     await chmod(dir, 0o700);
     channel = await createModuleChannel(join(dir, "s"), { onCall: async call => {
       calls.push(call);
-      // Routed calls are answered, never routed: a build must not reach another module.
-      if (call.method === "call") {
-        if (!manifest.uses.includes(call.params.target) && !manifest.uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${call.params.target} is not in uses` } };
-        return { id: call.id, result: call.params.mode === "async" ? { callId: randomUUID(), status: "queued" } : { output: null } };
-      }
       if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
-      if (call.method === "secret") return { id: call.id, error: { code: isEntryModule(manifest) && manifest.secrets.includes(call.params.name) ? "unconfigured" : "undeclared", message: "No secrets during build" } };
-      if (!manifest.effects.includes(MODULE_METHODS[call.method])) return { id: call.id, error: { code: "undeclared", message: "Undeclared capability" } };
-      if (call.method === "model") return { id: call.id, result: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } };
-      if (call.method === "owner") return { id: call.id, result: { status: 503, body: { error: "Owner API unavailable during build" } } };
-      const key = `${call.method}:${call.params.key}`, duplicate = seen.has(key);
-      seen.add(key);
-      return { id: call.id, result: { status: duplicate ? "duplicate" : "executed" } };
+      // Routed calls are answered, never routed: a build reaches no other module, no credential and no model.
+      const { target } = call.params, uses = grantedUses(manifest);
+      if (!uses.includes(target) && !uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${target} is not in uses` } };
+      if (call.params.mode === "async") {
+        const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
+        seen.add(key);
+        return { id: call.id, result: { callId: randomUUID(), status: "queued", duplicate } };
+      }
+      if (target === "ai.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
+      if (target === "secrets.get") return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
+      return { id: call.id, result: { output: null } };
     } });
     const contentDir = manifest.content ? join(data, ".build-content") : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });
@@ -53,9 +52,7 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
 export function syntheticEvents(manifest: ModuleManifest, now: string, tools = false): ModuleEvent[] {
   const params = Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
   return [
-    ...manifest.triggers.map(trigger => ({ now, params, trigger: "schedule" in trigger
-      ? { id: trigger.id, kind: "schedule" as const, firedAt: now }
-      : { id: trigger.id, kind: "inbound" as const, firedAt: now, item: { externalId: "build", from: "build@chrona.invalid", subject: "Chrona build check", receivedAt: now, body: "" } } })),
+    ...manifest.triggers.map(trigger => ({ now, params, trigger: { id: trigger.id, kind: "schedule" as const, firedAt: now } })),
     ...(tools ? manifest.tools.map(tool => ({ now, params, trigger: { id: tool.name, kind: "tool" as const, firedAt: now, args: Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, value]) => [key, "enum" in value ? value.enum[0] : value.type === "string" ? "build" : value.type === "number" ? 0 : false])) } })) : []),
   ];
 }

@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 export function createSecrets(dataDir: string) {
   const root = resolve(dataDir), dir = join(root, "secrets");
   async function path(id: string) {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) throw new Error("Invalid connector id");
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) throw new Error("Invalid secret id");
     await mkdir(root, { recursive: true });
     if (await realpath(root) !== root) throw new Error("Unsafe data directory");
     await mkdir(dir, { mode: 0o700, recursive: true });

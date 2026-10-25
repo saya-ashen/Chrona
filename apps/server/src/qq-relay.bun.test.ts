@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
@@ -32,11 +32,13 @@ async function fixture(reply: (input: ProviderRunInput, service: ReturnType<type
   return { db, dataDir, now, prompts, service, relay, qq, settle };
 }
 
-test("QQ attachments and quoted replies stay in qq:dm; replies are pushed to qq.reply by chat and link to app content", async () => {
+test("QQ attachments and quoted replies stay in qq:dm; replies are pushed to qq.reply by chat and link to the conversation", async () => {
   let replyFiles: string[] = [];
-  const f = await fixture(async (input, service) => { await service.tools.call(input.token, "chrona_reply", { text: "Stored reply", files: replyFiles }); });
-  const module = await f.db.module.create({ data: { workspaceId: "w", name: "files", status: "active", activeHash: "hash" } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", status: "active", intent: "fixture", source: "user", report: {}, manifest: { name: "files", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], content: true } } });
+  const f = await fixture(async (input, service) => {
+    // A run writes a file in its working directory and attaches it by path.
+    for (const path of replyFiles) { await mkdir(input.cwd, { recursive: true }); await writeFile(join(input.cwd, path), new Uint8Array([1, 2, 3])); }
+    await service.tools.call(input.token, "chrona_reply", { text: "Stored reply", files: replyFiles });
+  });
   const state = createQqBotState(join(f.dataDir, "qq"), "12345"), challenge = await state.createChallenge({ workspaceId: "w", now: f.now() });
   await state.redeem("owner", challenge.code, f.now());
   const sends: { content: string; image: boolean }[] = [];
@@ -55,22 +57,21 @@ test("QQ attachments and quoted replies stay in qq:dm; replies are pushed to qq.
     const first = await f.db.message.findFirstOrThrow({ where: { direction: "in" } });
     expect(first).toMatchObject({ channel: "chrona_qqbot", externalId: "first" });
     const attachment = (first.attachments as { ref: string }[])[0]!;
-    expect(attachment.ref).toStartWith("files/uploads/");
-    expect(await readFile(join(f.dataDir, "platform", "content", module.id, attachment.ref.slice(6)))).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    expect(attachment.ref).toStartWith("chat/");
+    expect(await readFile(join(f.dataDir, "platform", "data", attachment.ref))).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     expect(await f.db.session.findUnique({ where: { id: first.sessionId } })).toMatchObject({ key: "qq:dm", source: "qq", entryModuleId: f.qq.module.id });
     expect(await f.qq.pushed()).toMatchObject([{ caller: "system:chat", inReplyTo: "first", text: "Stored reply", sessionId: first.sessionId }]);
     await deliverPushed("first");
     const outbound = await f.db.message.findFirstOrThrow({ where: { direction: "out" } });
     expect(outbound.externalId).toBe("qq:out:sent-1");
-    await f.db.module.update({ where: { id: module.id }, data: { status: "paused" } });
-    await f.service.forWorkspace("w").content.upload(module.id, "output", "chart.png", new Uint8Array([1, 2, 3]));
-    await f.db.module.update({ where: { id: module.id }, data: { status: "active" } });
-    replyFiles = ["files/output/chart.png"];
+    replyFiles = ["chart.png"];
     await handler.onMessage(message("second", { content: "about that", quotedId: "sent-1" }));
     await f.settle(); await deliverPushed("second");
     const second = await f.db.message.findFirstOrThrow({ where: { externalId: "second" } });
     expect(second.sessionId).toBe(first.sessionId); expect(second.quotedMessageId).toBe(outbound.id);
-    expect(sends[1]!.content).toContain(`/api/steward/apps/${module.id}/raw?workspaceId=w&path=output%2Fchart.png`);
+    expect(sends[1]!.content).toContain(`chart.png：`); expect(sends[1]!.content).toContain(`/sessions/${first.sessionId}`);
+    const reply = await f.db.message.findFirstOrThrow({ where: { externalId: "qq:out:sent-2" } });
+    expect((reply.attachments as { ref: string }[])[0]!.ref).toMatch(/^chat\/[0-9a-f-]{36}-chart\.png$/);
     // The engine labels reply files application/octet-stream: keep a download link rather than upload undeclared bytes.
     expect(sends[1]!.image).toBe(false);
   } finally { await handler.drain(); await f.db.$disconnect(); }
@@ -88,11 +89,9 @@ test("/new ends the qq:dm session; the next message starts a new one", async () 
   await f.db.$disconnect();
 });
 
-test("file links use the app id Chrona sent with the reply; unresolved references stay honest", () => {
-  const message = { text: "Ready", attachments: [{ name: "a b.pdf", ref: "files/out/a b.pdf", mime: "application/pdf", size: 3, appId: "app-id" }] };
-  expect(qqReplyText(message, "https://chrona.example/", "w")).toContain("https://chrona.example/api/steward/apps/app-id/raw?workspaceId=w&path=out%2Fa+b.pdf");
-  const page = { ...message, attachments: [{ ...message.attachments[0]!, name: "README.md", ref: "files/README.md" }] };
-  expect(qqReplyText(page, "https://chrona.example", "w")).toContain("总览：https://chrona.example/apps/app-id?path=README.md");
-  expect(qqReplyText(message, null, "w")).toContain("请在 Chrona 网页查看附件");
-  expect(qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, appId: null }] }, "https://chrona.example", "w")).toContain("请在 Chrona 网页查看附件");
+test("file links open the conversation on the web; without a public URL the reply says so", () => {
+  const message = { text: "Ready", attachments: [{ name: "a b.pdf", ref: "chat/x-a_b.pdf", mime: "application/pdf", size: 3 }] };
+  expect(qqReplyText(message, "https://chrona.example/", "s 1")).toContain("a b.pdf：https://chrona.example/sessions/s%201");
+  expect(qqReplyText(message, null, "s1")).toContain("请在 Chrona 网页查看附件");
+  expect(qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, ref: null }] }, "https://chrona.example", "s1")).toContain("请在 Chrona 网页查看附件");
 });

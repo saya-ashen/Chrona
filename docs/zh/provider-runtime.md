@@ -47,13 +47,13 @@ Pi 1.3 还可显式选择 `builtin:mcp`、`builtin:codemode`、`builtin:tool-sea
 
 当前用既有 Audit 追加技术事件、请求元数据与唯一答复回执，未改 schema/迁移。请求 controller 和原文/自由文本答复仅在内存；持久记录不会重放授权。旧请求没有存活 controller 时显示中断。
 
-owner API（均须原有 owner 认证及 `workspaceId`）：
+系统模块 `chat` 的接口（入口模块在 `uses` 中列出，v2-9；网页“今天”页与 MCP 的 `chrona_runs` / `chrona_run_answer` / `chrona_run_cancel` 使用）：
 
-- `GET /api/steward/provider/runs?workspaceId=...&affairId=...`：最近运行、安全进度/统计/资源与请求。`affairId` 可省略；不是无界历史导出。
-- `POST /api/steward/provider/interactions/:id/answer`：`{"decision":"submit","value":false}`；选择为整数序号，文本为字符串。关闭为 `{"decision":"cancel"}`。类型/选项不符 400，跨工作区 404，已失效/重复 409。
-- `POST /api/steward/provider/runs/:id/cancel`：停止本次，不重试。
+- `chat.runs`：最近运行、安全进度/统计/资源与请求，可按会话过滤；不是无界历史导出。
+- `chat.answer`：`answer` 为 JSON `{"decision":"submit","value":false}`；选择为整数序号，文本为字符串。关闭为 `{"decision":"cancel"}`。类型/选项不符为 `invalid`，已失效/重复为 `failed`。
+- `chat.cancel`：停止本次，不重试。
 
-这些 API 不接受 Grant scope，不属于 `chrona_request_approval`，不能扩大 Chrona 的邮件发送、来源、购买等权限。Provider-owned tool 的风险还须由其运行环境/已审查扩展控制。
+这些接口不接受 Grant scope，不属于 `chrona_request_approval`，不能扩大 Chrona 的邮件发送、来源、购买等权限。Provider-owned tool 的风险还须由其运行环境/已审查扩展控制。
 
 ## 材料的查看与下载
 

@@ -5,9 +5,7 @@ import { join } from "node:path";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
-import { createStewardRoutes } from "./routes/steward.routes";
-import { createRelay, qqEntry } from "@chrona/engine/test-support";
-import { resetEnvCacheForTests } from "./config/env";
+import { builtinEntry, createRelay, qqEntry } from "@chrona/engine/test-support";
 import { buildArtifacts } from "../../../build/manifest";
 
 const dbs: ReturnType<typeof testDb>[] = [];
@@ -67,28 +65,18 @@ test("rescue chat uses only session rescue; Provider failure points to chrona ad
   expect((await f.request("/api/chat", { text: "hi", attachments: [] })).status).toBe(400);
 });
 // The mcp module resolves through this same owner HTTP route.
-test("HTTP and QQ resolve policy approvals like any other", async () => {
+test("the web page and QQ resolve policy approvals like any other entry", async () => {
   const f = await fixture();
-  const saved = process.env.API_KEY;
-  process.env.API_KEY = "owner-test-key";
-  resetEnvCacheForTests();
-  try {
-    const create = () => f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });
-    const viaHttp = await create(), viaQq = await create();
-    const headers = { Authorization: "Bearer owner-test-key", "Content-Type": "application/json" };
-    const http = createStewardRoutes(f.ports, f.service);
-    const response = await http.request(`/approvals/${viaHttp.id}/resolve?workspaceId=ws_default`, { method: "POST", headers, body: JSON.stringify({ decision: "approve" }) });
-    expect(response.status).toBe(200);
-    const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
-    // The qq module resolves through the approvals system module, as an entry (no owner API).
-    const qq = await qqEntry(f.ports, "ws_default");
-    const relay = createRelay({ call: qq.call, notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
-    expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
-    expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
-  } finally {
-    if (saved === undefined) delete process.env.API_KEY; else process.env.API_KEY = saved;
-    resetEnvCacheForTests();
-  }
+  const create = () => f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });
+  const viaWeb = await create(), viaQq = await create();
+  const web = await builtinEntry(f.ports, "ws_default", "web");
+  expect(await web.call("approvals.resolve", { approval: viaWeb.id, decision: "approve" })).toMatchObject({ status: "approved" });
+  const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
+  // The qq module resolves through the approvals system module, as an entry (no owner API).
+  const qq = await qqEntry(f.ports, "ws_default");
+  const relay = createRelay({ call: qq.call, notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
+  expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
+  expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
 });
 test("rescue HTML is a required release resource", () => {
   expect(buildArtifacts.resources).toContainEqual({ from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true });

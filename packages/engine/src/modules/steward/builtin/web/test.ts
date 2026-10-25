@@ -13,6 +13,9 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.tools", () => [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
   stub("planning.get", () => ({ plan: 1 })),
+  stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
+  stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
+  stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
 async function get(path: string, init: RequestInit = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -46,6 +49,20 @@ try {
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
   assert.equal((await post("/api/web/call", { target: "approvals.resolve", args: {} })).status, 404);
   assert.equal((await get("/api/web/nope")).status, 404);
+  // Settings and Provider questions go to their system interfaces (v2-9).
+  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [] });
+  await post("/api/web/settings", { notifications: { dailyCap: 3 } });
+  assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
+  await post("/api/web/interactions/i1/answer", { decision: "submit", value: true });
+  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "submit", value: true }) }]);
+  await post("/api/web/schedules/s1", { status: "paused" });
+  assert.deepEqual(calls.at(-1), ["schedules.update", { schedule: "s1", status: "paused" }]);
+  assert.equal((await post("/api/web/call", { target: "settings.update", args: {} })).status, 404);
+  // Attachments come from chat.file and are served as downloads, never as pages of this origin.
+  const file = await get("/api/web/file?message=m1&ref=chat%2Fx-a.txt");
+  assert.equal(await file.text(), "file chat/x-a.txt");
+  assert.match(file.headers.get("content-security-policy")!, /sandbox/);
+  assert.deepEqual(calls.at(-1), ["chat.file", { message: "m1", ref: "chat/x-a.txt" }]);
 
   // A pushed reply reaches an open page.
   const stream = await get("/api/web/events");

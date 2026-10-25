@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas, type ModuleTrigger } from "@chrona/contracts/steward";
+import { createScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -15,11 +15,8 @@ describe("module manifest contract", () => {
     expect(moduleManifestSchema.parse({ ...manifest, params }).params).toEqual(params);
     for (const ext of ["ts", "py", "sh"]) expect(moduleManifestSchema.safeParse({ ...manifest, entry: `index.${ext}`, tests: [`test.${ext}`], effects: [] }).success).toBe(true);
   });
-  test.each([true, false])("accepts inbound triggers (inbound only: %s)", only => {
-    const inbound: ModuleTrigger = { id: "mail", inbound: { connector: "mailbox", match: { from: "*@shop.example", subject: "Order" } } };
-    const triggers: ModuleTrigger[] = only ? [inbound] : [...manifest.triggers as ModuleTrigger[], inbound];
-    expect(moduleManifestSchema.parse({ ...manifest, triggers }).triggers).toEqual(triggers);
-    expect(moduleManifestSchema.parse({ ...manifest, triggers: [{ id: "mail", inbound: { connector: "mailbox" } }] }).triggers).toEqual([{ id: "mail", inbound: { connector: "mailbox", match: {} } }]);
+  test("rejects inbound triggers: outside sources are modules now (v2-8)", () => {
+    expect(moduleManifestSchema.safeParse({ ...manifest, triggers: [{ id: "mail", inbound: { connector: "mailbox" } }] }).success).toBe(false);
   });
   test.each(["unknown required", "duplicate names"])("rejects tools with %s", kind => {
     const tool = { name: "lookup", description: "Lookup", parameters: { type: "object", properties: { query: { type: "string" } }, required: kind === "unknown required" ? ["missing"] : ["query"] } };
@@ -56,12 +53,11 @@ describe("module manifest contract", () => {
 });
 
 const notify = { key: "price", level: "now", title: "Price changed", body: "New price" };
-const wake = { key: "analyse", prompt: "Analyse the change" };
 describe("module channel contract", () => {
-  test("accepts notify and wakeProvider calls", () => {
-    expect(moduleCallSchema.safeParse({ id: "1", method: "notify", params: notify }).success).toBe(true);
-    expect(moduleCallSchema.safeParse({ id: "1", method: "notify", params: { ...notify, level: "digest" } }).success).toBe(true);
-    expect(moduleCallSchema.safeParse({ id: "1", method: "wakeProvider", params: wake }).success).toBe(true);
+  test("only routed calls cross the channel (v2-10): notify, wake and model are system interfaces", () => {
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "notify.send", args: notify, mode: "async", key: "price" } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "ai.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
+    for (const method of ["notify", "wakeProvider", "model", "secret"]) expect(moduleCallSchema.safeParse({ id: "1", method, params: {} }).success).toBe(false);
   });
   test("event replies default result and cap it at 256 KiB serialized", () => {
     const result = "x".repeat(256 * 1024 - 2);
@@ -71,15 +67,14 @@ describe("module channel contract", () => {
     expect(moduleEventReplySchema.safeParse({ id: "1", result: { result: "界".repeat(90_000) } }).success).toBe(false);
   });
   test.each([
-    { method: "notify", params: { ...notify, level: "web" } }, { method: "notify", params: { ...notify, key: "" } },
-    { method: "notify", params: { ...notify, key: "x".repeat(201) } },
-    { method: "notify", params: { ...notify, title: " " } }, { method: "notify", params: { ...notify, title: "x".repeat(201) } },
-    { method: "notify", params: { ...notify, body: "" } }, { method: "notify", params: { ...notify, body: "x".repeat(4001) } },
-    { method: "wakeProvider", params: { ...wake, prompt: " " } }, { method: "wakeProvider", params: { ...wake, prompt: "x".repeat(4001) } },
-    { method: "wakeProvider", params: { ...wake, extra: true } }, { method: "notify", params: { ...notify, extra: true } },
-    { method: "network", params: { key: "net" } }, { method: "notify", params: notify, extra: true },
+    { method: "call", params: { target: "notify.send", mode: "async" } }, { method: "call", params: { target: "bad" } },
+    { method: "call", params: { target: "notify.send", extra: true } }, { method: "call", params: { target: "notify.send" }, extra: true },
+    { method: "network", params: { key: "net" } },
   ])("rejects invalid call %j", call => {
     expect(moduleCallSchema.safeParse({ id: "1", ...call }).success).toBe(false);
+  });
+  test("deprecated effects and secrets stand for system interfaces", () => {
+    expect(grantedUses({ effects: ["model", "wake_provider", "notify_user", "network"], uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["ai.complete", "ai.wake", "files.read", "notify.send", "secrets.get"]);
   });
 });
 

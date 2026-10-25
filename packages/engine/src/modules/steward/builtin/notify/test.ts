@@ -5,7 +5,9 @@ import { startModule } from "chrona/testing";
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
 const module = await startModule("index.ts");
 const kernel = { kind: "kernel" };
-const now = () => new Date().toISOString();
+// A fixed daytime clock (12:00 in the default Asia/Shanghai zone): the wall clock would fall in quiet hours at night and fold.
+let clock = Date.parse("2026-10-21T04:00:00.000Z");
+const now = () => new Date(clock += 1000).toISOString();
 const tool = (id: string, args: Record<string, unknown>, caller: unknown = kernel) => module.send({ trigger: { kind: "tool", id, firedAt: now(), args, caller }, now: now(), params: {} });
 const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && call.params.target === "qq.deliver");
 async function until(condition: () => boolean) { for (let i = 0; i < 200 && !condition(); i++) await new Promise(resolve => setTimeout(resolve, 10)); assert.ok(condition()); }

@@ -18,7 +18,7 @@ const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const intent = { changes: ["Sort shop mail without the model"], preserves: [] };
 const request = { name: "mail-sort", goal: "Mark mail from *@shop.example handled", examples: ["from a@shop.example → handled"] };
-const manifest = { name: "mail-sort", entry: "index.ts", triggers: [{ id: "mail", inbound: { connector: "box", match: { from: "*@shop.example" } } }], effects: ["notify_user"], tests: ["test.ts"] };
+const manifest = { name: "mail-sort", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
 type Build = (input: ProviderRunInput, f: { call: (name: string, args: unknown) => Promise<unknown> }) => Promise<void>;
 
 async function fixture() {
@@ -127,17 +127,16 @@ test("build helper runs SDK tests in place without bwrap", async () => {
   f.onBuild(async input => {
     await f.writeModule(input.cwd);
     const entry = `import { on, chrona } from "chrona";
-on("inbound", async ev => {
-  await chrona.notify({ key: ev.item.externalId, level: "now", title: "Mail", body: ev.item.subject });
-  return { handled: true };
+on("schedule", async ev => {
+  await chrona.notify({ key: ev.firedAt, level: "now", title: "Mail", body: "Shop mail" });
 });`;
     const testSource = `import { startModule } from "chrona/testing";
 import { strict as assert } from "node:assert";
 const module = await startModule("index.ts");
 try {
-  for (const externalId of ["mail-1", "mail-2"]) {
-    const reply = await module.send({ trigger: { kind: "inbound", id: "mail", firedAt: "2026-10-21T04:00:00Z", item: { externalId, subject: "Shop mail" } }, now: "2026-10-21T04:00:00Z", params: {} });
-    assert.equal(reply.result?.handled, true);
+  for (const firedAt of ["2026-10-21T04:00:00Z", "2026-10-22T04:00:00Z"]) {
+    const reply = await module.send({ trigger: { kind: "schedule", id: "daily", firedAt }, now: firedAt, params: {} });
+    assert.equal(reply.error, undefined);
   }
   assert.equal(module.calls.length, 2);
   assert.notEqual(module.calls[0].params.key, module.calls[1].params.key);

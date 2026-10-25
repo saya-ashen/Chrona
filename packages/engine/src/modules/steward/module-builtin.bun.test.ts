@@ -81,6 +81,8 @@ test.each([false, true])("built-in upgrade preserves user version: %s", async us
     if (user) {
       expect(after.activeHash).toBe(before.activeHash);
       expect(await f.db.moduleVersion.findFirst({ where: { source: "builtin", hash: { not: first.activeHash! } } })).toMatchObject({ status: "pending_review" });
+      // The review says the release would replace the user's modification.
+      expect(await f.db.approval.findFirst({ where: { status: "open" } })).toMatchObject({ title: "启用模块 sample 的内置新版本（替换当前修改版）", detail: expect.stringContaining(`你修改的版本 ${before.activeHash!.slice(0, 8)}`) });
       expect((await notices(f.db))[0]).toMatchObject({ level: "web" });
       await f.start(); expect((await notices(f.db)).length).toBe(1);
     } else {

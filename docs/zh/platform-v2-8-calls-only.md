@@ -1,6 +1,6 @@
 # v2-8 规格：模块之间只经路由调用
 
-状态：用户已确认（2026-10-24）。§11 第 1 步（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）与第 2 步（`listen` 多路径、web 改为路由调用、`chat.today`、回复推送）已实现；第 3、4 步未实现。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
+状态：用户已确认（2026-10-24）。§11 第 1 步（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）、第 2 步（`listen` 多路径、web 改为路由调用、`chat.today`、回复推送）与第 3 步（删除内容区对外暴露、连接器与 `owner` 能力）已实现；第 4 步的行为在 v2-8 之前已存在（见 §9）。`planning` 自带的 `/api/planning` 页面要等它重建后才去掉（§8 末）。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
 
 ## 1. 目标
 
@@ -73,29 +73,34 @@
 - **专门页面**：模块需要更好的展示时，由 AI 修改 web 模块（构建、测试、用户批准启用，与其他模块相同）。web 代码中按模块名组织专门页面；对应模块不存在或工具调用失败时退回通用页面。
 - 对话：`chat.send` 发消息；web 提供 `reply` 工具（`callers: ["chat"]`）接收回复推送（v2-7 §4），经 SSE（`GET /api/web/events`，浏览器用 `fetch` 读以便带上密钥，每 5 秒心跳）推给打开的页面，取代等待 `/chat` 返回。没有页面打开时回复不丢：页面打开时读会话。网页会话因此有入口模块，后台结果推回网页对话，不再另发通知。
 - 今天：`chat.today`。
-- 第 2 步后：应用内容页（内容区的文件树、读写、勾选、附件链接）仍由浏览器直接请求 owner API `/api/steward/apps/*`，第 3 步删除内容区时移走。
+- 文档：“文档”页经 `files.list` / `files.read` / `files.write` 浏览、阅读（Markdown 渲染、勾选框）和修改用户的文档；`files.read` 截断的长文档只读。附件经 `GET /api/web/file`（`chat.file`）以下载方式提供，不作为本站页面渲染。
 
 ## 7. MCP 模块
 
 - `uses`：`chat.*`、`approvals.*`、`modules.*`、`*`；删除 `owner`。
 - 工具映射：`chrona_chat` → `chat.ask`；会话类工具 → `chat.*`；审批 → `approvals.*`；`chrona_modules` → `modules.list`；`chrona_notifications` → `notify.list`；`chrona_module_tools` → `modules.tools`；`chrona_module_call` → 路由调用目标 `<module>.<tool>`（不接受系统模块，它们有专门的工具）。
-- 第 1 步后：`chrona_today`、`chrona_apps`、`chrona_content_*`、`chrona_notifications` 仍走 owner API（保留 `owner`），第 2、3 步移走。
+- `chrona_today`、`chrona_notifications` 取自 `chat.today`；`chrona_apps`、`chrona_content_*` 已删除；MCP 不再有 `owner` 能力。
 - 删除 `chrona_apps`、`chrona_content_tree`、`chrona_content_read`、`chrona_content_write`（内容经 `files` 等模块的工具读写）。
 
 ## 8. 删除内容区
 
-| 现在依赖内容区的 | 改为 |
-|---|---|
-| `files` 模块的文档（`content/<files>/`） | `files` 模块私有数据目录；对外仍是 `files.*` 工具（list、read、write、move、delete、history、restore） |
-| 用户上传的附件、Provider 回复附件（`chrona_reply.files`、`chat.file`） | **`chat` 的附件**：系统模块 `chat` 和普通模块一样把附件存在自己的数据目录（`<dataDir>/platform/data/chat/`），按会话组织；`chrona_reply.files` 改为 Provider 工作目录中的文件路径，`chat` 收进自己的数据目录；其他模块用 `chat.file` 取 |
-| 通知附件（`chrona_notify.file`） | 同上，由 `chat` 收下，通知里带 `chat` 附件 id，入口模块用 `chat.file` 取 |
-| 收件箱条目（`files/inbox/<connectorId>/…`） | 随连接器删除（§8.1） |
-| AI 生成页面（`chrona_ui_set`、`chrona_ui_guide`、`*.ui.json`、面板） | 删除；展示由 web 模块负责 |
-| Provider 工作目录中的 `content/` 与 `chrona_focus` | 删除；Provider 用模块工具 |
-| 模块清单 `content`、`chrona.paths.content`、`content_edit` 事件 | 删除 |
-| owner API `/apps/*` | 删除 |
+内容区不再是共享的东西：用户和 Provider 都看不到任何模块的文件，只能调用模块的工具。实现时与上面草案不同的地方已在表中写明。
 
-迁移：`files` 的文档原样移动到其数据目录（保留历史）；已有附件引用 `<module>/<path>` 迁为 `chat` 附件；`github-trending-daily` 内容区的 3 个文件由 AI 改为工具后重建（迁移前通知用户）；`planning` 已只用工具，不受影响。
+| 原来依赖内容区的 | 现在 |
+|---|---|
+| 模块自己的文件（`files` 的文档、`github-trending-daily` 的报告） | 原地不动（`<dataDir>/platform/content/<moduleId>/`，模块仍在 `chrona.paths.content` 读写，清单 `content` 字段保留），但只有模块自己能看到，成了模块的私有目录。没有搬到数据目录，模块代码也不用改。`files` 的文档在网页的“文档”页经 `files.*` 工具读写；`github-trending-daily` 的报告只有它开放工具后才能在别处看到 |
+| 用户上传的附件、Provider 回复附件 | **`chat` 的附件**：存在 `<dataDir>/platform/data/chat/`，引用为 `chat/<文件>`。Provider 运行时只读挂载在工作目录的 `content/chat/`（这是运行目录里唯一的挂载）。`chrona_reply.files` 是工作目录里的文件路径（`chat` 复制收下）或 `content/chat/…`（已收到的附件）；工作目录之外的路径（包括指向外面的链接）被拒绝。入口模块用 `chat.file` 取附件字节；声明 `*` 的入口（web）可以读任何会话的附件 |
+| 通知附件（`chrona_notify.file`） | 删除。原来只校验、从未送达 |
+| QQ 回复里非图片附件的下载链接（指向 owner API `/apps/:id/raw`） | 改为指向网页上的这段对话（`/sessions/<id>`），在那里带密钥下载 |
+| 收件箱条目 | 随连接器删除（§8.1） |
+| AI 生成页面（`chrona_ui_set`、`chrona_ui_guide`、`*.ui.json`、面板） | 删除；展示由 web 模块负责。`@chrona/ui-catalog` 包已无人使用，暂留（删除要改 `bun.lock`） |
+| `chrona_focus` 与可写内容区 | `chrona_focus` 删除。会话的 `focus` 只剩一个用途：这些模块的工具直接给 Provider（默认 `files`），其他模块的工具经工具搜索取得 |
+| `content_edit` 事件 | 删除（不再有人从外面改模块的文件） |
+| owner API `/apps/*` | 删除；今天视图的 `apps` 只剩名称、说明、状态 |
+
+迁移（启动时一次，`migrateConversationFiles`）：已有附件引用 `<module>/<path>` 的文件复制进 `chat` 的附件目录并改写引用，找不到的文件引用置空；来源为 `web` 且没有入口模块的旧会话记为 web 模块的会话。
+
+另外：普通模块不能再声明 `listen`（构建时拒绝：“listen is only for entry modules”），只有 web、MCP 这类入口模块提供 HTTP。这条不放在清单格式校验里，所以已经启用的 `planning`（声明了 `/api/planning`）照常运行；它重建时必须去掉页面，界面改由 web 提供。
 
 ### 8.1 删除连接器
 
@@ -107,21 +112,22 @@
 ## 9. 内置模块与 AI 修改
 
 - 内置模块（web、mcp、qq、files、notify、remind）可以由 AI 修改，版本照常构建、审批、启用、回滚。
-- Chrona 启动时提交发布包内置版本（`module-builtin.ts`）：
-  - 该模块当前启用的是发布包版本 → 照旧自动启用新发布版本；
-  - 当前启用的是 AI 修改的版本 → 新发布版本只作为待审批提案保存，**不自动覆盖**；由用户或 AI 合并后再启用。
+- Chrona 启动时提交发布包内置版本（`module-builtin.ts`，构建后由 `module-build.ts` 处理）：
+  - 该模块当前启用的是上一个发布包版本 → 自动启用新发布版本；
+  - 当前启用的是 AI 或用户修改的版本 → **不自动覆盖**：保留当前版本，通知用户，新发布版本作为待审批提案；由用户或 AI 合并后再启用。
+- 这一行为在 v2-8 之前已实现。2026-10-24 部署 0.5.12 时，web 正启用 AI 修改版，发布版按此进入审批，用户批准后替换了 AI 版本；当时审批卡片只写“启用模块 web”，看不出会替换修改版。现在这类审批的标题为“启用模块 <名> 的内置新版本（替换当前修改版）”，说明写明被替换的版本和“那些修改不会带过来”。
 
 ## 10. owner API 与 `owner` 能力
 
 - 删除 `owner` 能力、`chrona.owner`、模块侧的 owner API 通道。
-- owner HTTP API 保留给救援控制台与 `chrona admin`（内核进程内调用）。网页和 MCP 不再使用。
+- owner HTTP API 随后在 [v2-9](platform-v2-9-owner-api.md) 删除；救援控制台与 `chrona admin` 一直是进程内调用服务，不经 HTTP。
 
 ## 11. 实施步骤（每步单独部署）
 
 1. `*` 授权与可见性规则；系统模块 `modules`；`chat` 补充接口；MCP 迁移为路由调用（内容类工具暂时保留走 owner API）。
 2. `listen` 多路径；web 迁移：`/api/web`、通用页面、SSE 回复推送、今天页；`notify` / `remind` 可见性调整。
-3. 删除内容区与连接器：`chat` 附件、`files` 迁移、Provider 工具调整、删除 `/apps/*`、`owner` 能力、MCP 内容类工具与连接器；`github-trending-daily` 重建。
-4. 内置模块升级不覆盖 AI 修改版。
+3. 删除内容区对外暴露与连接器：`chat` 附件与迁移、Provider 工具与提示调整、web 文档页、删除 `/apps/*`、`owner` 能力、MCP 内容类工具与连接器；普通模块不能声明 `listen`。
+4. 内置模块升级不覆盖 AI 修改版（已存在；补充审批卡片说明）。
 
 ## 12. 验收
 

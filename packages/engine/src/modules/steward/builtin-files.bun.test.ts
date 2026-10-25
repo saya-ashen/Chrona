@@ -10,7 +10,6 @@ import { createStewardService } from "./service";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { createLocalTestSource } from "../../../../integrations/src/steward/local-test-source";
 
 const resources = fileURLToPath(new URL("./builtin", import.meta.url));
 const now = new Date("2026-10-22T00:00:00Z");
@@ -18,19 +17,17 @@ const now = new Date("2026-10-22T00:00:00Z");
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-files-engine-");
   const workspaceId = (await db.workspace.create({ data: { name: "files" } })).id;
-  const local = createLocalTestSource();
   const peer = testModuleProcess(async (event, _call, input) => {
     const app = createFiles(input.contentDir!, input.dataDir);
-    if (event.trigger.kind === "content_edit") { await app.contentEdit(event.trigger.paths, event.now); return {}; }
     if (event.trigger.kind === "tool") return { result: await app.tool(event.trigger.id, event.trigger.args, event.now) };
     throw new Error("Unexpected event");
   });
   const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined }) : null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, connectors: [local.adapter], moduleBuiltinResources: resources,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
     // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
     sandbox: { available: true, isolated: true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   const api = createStewardService(ports).forWorkspace(workspaceId);
-  return { db, ports, workspaceId, api, local,
+  return { db, ports, workspaceId, api,
     async start() {
       await registerBuiltins(ports, workspaceId);
       return db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId, name: "files" } } });
@@ -40,7 +37,7 @@ async function fixture(real = false) {
   };
 }
 
-test("files fresh workspace: author SDK tests, automatic activation, owner tools, history, trash and connector intake", async () => {
+test("files fresh workspace: author SDK tests, automatic activation, owner tools, history and trash", async () => {
   const f = await fixture();
   try {
     const app = await f.start();
@@ -60,14 +57,6 @@ test("files fresh workspace: author SDK tests, automatic activation, owner tools
     const deleted = await f.call("delete", { path: "reports" });
     expect(deleted.path).toStartWith(".trash/");
     expect(await f.call("read", { path: deleted.path + "/final.txt" })).toMatchObject({ content: "one" });
-    await f.api.content.save(app.id, { path: "external.txt", content: "edited", baseRevision: null });
-    expect((await f.call("history", { path: "external.txt" })).versions).toHaveLength(1);
-    const connector = await f.api.connectors.create({ kind: "local_test", label: "Inbox" });
-    f.local.push([{ externalId: "mail-1", from: "sender", subject: "Document", body: "Connector document", receivedAt: now.toISOString(), url: null, attachments: [] }]);
-    await f.api.connectors.sync(connector.id);
-    const [item] = await f.api.connectors.items(connector.id);
-    expect(item!.ref).toStartWith(`inbox/${connector.id}/`);
-    expect(await f.call("read", { path: item!.ref })).toMatchObject({ content: expect.stringContaining("Connector document") });
     expect(await f.db.audit.findFirst({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user" });
     await f.start(); expect(await f.db.moduleVersion.count({ where: { moduleId: app.id } })).toBe(1);
   } finally { await f.close(); }

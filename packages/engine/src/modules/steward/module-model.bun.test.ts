@@ -2,7 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { handleModuleCall, type CallScope } from "./module-effects";
+import { type CallScope } from "./module-effects";
+import { completeForModule } from "./module-model";
 import { createSettings } from "./settings";
 import { buildPending } from "./module-build";
 import { moduleContext } from "./module-context";
@@ -11,6 +12,7 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { notices } from "./test-notices";
+import { registerSystemModules } from "./system-modules";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -27,7 +29,11 @@ async function fixture() {
   let calls = 0;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, modelGateway: { async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
   const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
-  const call = (maxOutputTokens = 20) => handleModuleCall(ports, scope, { id: "model-call", method: "model", params: { prompt, maxOutputTokens } });
+  // What ai.complete runs for the calling module; a refusal's message starts with its reason.
+  const call = async (maxOutputTokens = 20) => {
+    try { return { result: await completeForModule(ports, scope, { prompt, maxOutputTokens }) }; }
+    catch (error) { return { error: { code: /^(\w+):/.exec((error as Error).message)?.[1] } }; }
+  };
   return { db, dataDir, workspace, module, manifest, ports, scope, call, calls: () => calls };
 }
 
@@ -89,8 +95,20 @@ for (const setting of [null, { ...limits, models: { fast: "fake/fast" } }, { ...
   const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
   expect(row.status).toBe("rejected"); expect(JSON.stringify(row.report)).toContain(!setting ? "configure moduleModel" : "strong" in setting.models ? "limits exceed" : 'tier \\"strong\\" is not configured'); expect(f.calls()).toBe(0);
 });
+test("build refuses listen outside entry modules: apps offer tools, the web module shows them (v2-8)", async () => {
+  const f = await fixture();
+  for (const [hash, extra] of [["page", {}], ["entry", { uses: ["chat.send"] }]] as const) {
+    const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], listen: "/api/page", ...extra });
+    const version = await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, intent: { changes: ["page"] }, source: "user", report: {}, status: "building" } });
+    const staging = join(f.dataDir, "platform/staging", version.id); await mkdir(staging, { recursive: true }); await writeFile(join(staging, "index.ts"), "");
+    await buildPending(moduleContext(f.ports, f.workspace.id));
+    const report = JSON.stringify((await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).report);
+    expect(report.includes("listen is only for entry modules")).toBe(hash === "page");
+  }
+});
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (sandbox.health.available ? test : test.skip)("sandbox schedule calls SDK model then notify; model audit excludes content", async () => {
+  registerSystemModules();
   const f = await fixture(), code = join(f.dataDir, "platform/store/v1");
   await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `import { on, chrona } from 'chrona'; on('schedule', async ev => { const reply = await chrona.model({ prompt: '${prompt}', maxOutputTokens: 20 }); await chrona.notify({ key: ev.firedAt, level: 'now', title: 'Summary', body: reply.text }); });`);
@@ -100,11 +118,16 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   await supervisor.deliver(f.module.id, "v1", { trigger: { kind: "schedule", id: "daily", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: {} });
   expect((await notices(f.db))[0]).toMatchObject({ body: text });
   const calls = await f.db.moduleCall.findMany({ orderBy: { createdAt: "asc" } });
-  expect(calls).toHaveLength(2);
+  // The completion record (budgets) plus the two routed calls the SDK made: ai.complete and notify.send.
+  expect(calls).toHaveLength(3);
   expect(calls).toEqual(expect.arrayContaining([
     expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "model", status: "executed", error: null }),
-    expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "notify", status: "executed" }),
+    expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "call", status: "executed" }),
   ]));
+  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["ai.complete", "notify.send"]);
+  // ai.complete is unrecorded: neither the prompt nor the completion is stored with the call.
+  const invocations = JSON.stringify(await f.db.moduleInvocation.findMany({ where: { target: "ai" } }));
+  expect(invocations).not.toContain(prompt); expect(invocations).not.toContain(text);
   expect(calls.every(call => call.moduleRunId && call.eventKey)).toBe(true);
   expect(f.calls()).toBe(1);
   expect(await f.db.run.count()).toBe(0);

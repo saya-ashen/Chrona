@@ -15,7 +15,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   try {
     const code = join(dir, "code"); await mkdir(code);
     const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "model"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
-      triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }, { id: "mail", inbound: { connector: "box", match: {} } }],
+      triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }],
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
     await writeFile(join(code, "index.ts"), `
@@ -29,9 +29,8 @@ on('schedule', async ev => {
   await chrona.notify(params);
   if ((await chrona.notify(params)).status !== 'duplicate') throw new Error('dedup missing');
   try { await chrona.wakeProvider({ key: 'no', prompt: 'No execution' }); throw new Error('accepted undeclared'); }
-  catch (error) { if (!String(error).includes('Undeclared')) throw error; }
+  catch (error) { if (error.code !== 'undeclared') throw error; }
 });
-on('inbound', async ev => { await chrona.notify({ key: 'mail:' + ev.firedAt, level: 'digest', title: 'Mail', body: 'Recorded' }); return { handled: true }; });
 on('tool', () => ({ result: 'tool answered' }));
 `);
     await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync('/data/state', 'migrated');`);
@@ -46,15 +45,15 @@ try {
   const reply = await module.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
   assert.equal(module.calls.length, 4);
-  assert.equal(module.calls[1].params.body, 'Stub summary');
-  assert.equal(module.calls[3].method, 'wakeProvider');
+  assert.equal(module.calls[1].params.args.body, 'Stub summary');
+  assert.equal(module.calls[3].params.target, 'ai.wake');
 } finally { await module.stop(); }
 const defaultModule = await startModule('index.ts');
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await defaultModule.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(defaultModule.calls[1].params.body, 'Chrona test model response');
+  assert.equal(defaultModule.calls[1].params.args.body, 'Chrona test model response');
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });
@@ -63,17 +62,14 @@ try {
     expect(await runTests(context, code, manifest, tests)).toBe(true);
     expect(tests).toMatchObject([{ exitCode: 0 }]);
     expect(await smokeRun(context, code, manifest)).toEqual([]);
-    expect(await probeKeys(context, code, manifest)).toEqual({ status: "repeated", keys: ["wake_provider:no"] });
-    // Rejected calls are recorded too; a fixed key remains visible in the probe.
-    const entry = await readFile(join(code, "index.ts"), "utf8");
-    await writeFile(join(code, "index.ts"), entry.replace("key: 'no'", "key: 'no:' + ev.firedAt"));
+    // The SDK shorthands scope their keys to the event (as Chrona scoped effect keys), so a fixed shorthand key is not repeated.
     expect(await probeKeys(context, code, manifest)).toEqual({ status: "passed" });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: "sdk-check", activeHash: "old", dataSchema: 1 } });
     const live = join(dir, "platform/data", module.id); await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "original");
     const continuity: ContinuityReport = { status: "skipped", fromSchema: 1, toSchema: 2, migrated: false };
     expect(await checkContinuity(context, code, module, manifest, continuity)).toEqual({ passed: true, needsMigration: true });
     expect(continuity).toMatchObject({ status: "passed", migrated: true });
-    expect(continuity.effects).toHaveLength(4);
+    expect(continuity.effects).toHaveLength(3);
     expect(await readFile(join(live, "state"), "utf8")).toBe("original");
     expect((await notices(db)).length).toBe(0);
     expect(await db.run.count()).toBe(0);

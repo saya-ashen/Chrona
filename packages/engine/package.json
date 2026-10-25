@@ -9,8 +9,7 @@
     "@chrona/domain": "workspace:*",
     "@chrona/integrations": "workspace:*",
     "@chrona/logging": "workspace:*",
-    "@chrona/shared": "workspace:*",
-    "@chrona/ui-catalog": "workspace:*"
+    "@chrona/shared": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",

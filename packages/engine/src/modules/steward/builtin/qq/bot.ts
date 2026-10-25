@@ -76,7 +76,7 @@ export function createQqBotState(dir: string, appId: string) {
 export type QqBotState = ReturnType<typeof createQqBotState>;
 /** One reply Chrona pushed (`qq.reply`): `inReplyTo` is the QQ message id it answers, when known. */
 export type QqReplyItem = { messageId: string; sessionId: string | null; text: string; workspace: string; inReplyTo: string | null;
-  attachments: { name: string; ref: string | null; mime: string; size: number; appId?: string | null }[] };
+  attachments: { name: string; ref: string | null; mime: string; size: number }[] };
 /** Sends the owner's message to Chrona (`chat.send`); returns at once. `reply` is an immediate answer (e.g. `/new`). */
 export type QqChatPort = { send(input: { workspaceId: string; key: "qq:dm"; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<{ reply?: string }> };
 const HELP_WORDS = new Set(["help", "帮助", "?", "？", "用法", "菜单"]);

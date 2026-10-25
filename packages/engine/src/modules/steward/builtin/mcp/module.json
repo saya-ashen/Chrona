@@ -5,8 +5,8 @@
   "keepAlive": true,
   "listen": "/api/mcp",
   "triggers": [],
-  "effects": ["owner"],
-  "uses": ["chat.ask", "chat.sessions", "chat.session", "chat.session-update", "chat.new-session", "chat.messages", "approvals.list", "approvals.resolve", "modules.list", "modules.tools", "*"],
+  "effects": [],
+  "uses": ["chat.ask", "chat.today", "chat.sessions", "chat.session", "chat.session-update", "chat.new-session", "chat.messages", "chat.runs", "chat.answer", "chat.cancel", "approvals.list", "approvals.resolve", "modules.list", "modules.tools", "*"],
   "data": { "schema": 1 },
   "tests": ["test.ts"]
 }

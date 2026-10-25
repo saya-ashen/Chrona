@@ -86,7 +86,7 @@ bun run packages/cli/src/index.ts doctor
 - **设置 → 运行状况**：Agent、来源积压、发件箱等应用级状态。
 - API 端口的 **`/health`**：服务存活与 Agent 配置状态；Agent 显示可用不代表已成功调用模型。
 - API 端口的 **`/ready`**：执行数据库查询，成功返回 ready，失败返回 503；不检查 QQ 或模型。
-- **`/api/steward/health?workspaceId=ws_default`**：工作区级运行状况，遵循 API 认证。
+- **网页“今天”页**（`/api/web/today`，`chat.today`）：工作区级运行状况与待办，遵循 API 认证。
 
 健康接口不能替代端到端验收。不要为了探测健康而关闭认证。
 

@@ -6,14 +6,14 @@ A local-first personal steward: talk in the web composer or QQ private chat, and
 
 ## How it works
 
-**Sessions** have directories under `<dataDir>/sessions/<id>/`. Each **app content area** lives under `<dataDir>/platform/content/<moduleId>/`; module code and data live under `<dataDir>/platform/store` and `<dataDir>/platform/data`. The Provider (currently Pi) organizes content files, edits pages, researches and uses its own tools. Chrona supplies persistent schedules, foreground/background queues, connector credentials, approvals and delivery. Model prose alone does not schedule work or send messages: those actions use Chrona tools.
+**Sessions** have directories under `<dataDir>/sessions/<id>/`. Apps (modules) keep their own files under `<dataDir>/platform/data` (code under `<dataDir>/platform/store`) and offer tools; conversation attachments are kept under `<dataDir>/platform/data/chat`. The Provider (currently Pi) works through app tools, researches and uses its own tools. Chrona supplies persistent schedules, foreground/background queues, credentials, approvals and delivery. Model prose alone does not schedule work or send messages: those actions use Chrona tools.
 
 - **Today**: approvals, schedules and recent activity.
 - **Sessions**: conversations and saved work.
-- **Apps**: content areas, pages, files and module capabilities.
-- **Settings**: notifications, permissions, preferences, connectors and Provider/runtime health.
+- **Documents and apps**: the files app's documents, each app's runs, versions and tools.
+- **Settings**: notifications, permissions, preferences and Provider/runtime health.
 
-Schedules can wake the Provider, send a fixed reminder without a model call, or run a deterministic job. Proactive notifications pass through the notification budget, including quiet hours and digests. External content cannot grant permission. Email sends through Chrona require approval.
+Schedules can wake the Provider, send a fixed reminder without a model call, or run a deterministic job. Proactive notifications pass through the notification budget, including quiet hours and digests. External content cannot grant permission.
 
 ## Quick start
 
@@ -61,13 +61,12 @@ Set these in the server environment, then restart:
 | `CHRONA_STEWARD_PI_WEB_EXTENSION` | Optional explicit web extension path |
 | `CHRONA_STEWARD_SANDBOX_BWRAP` | bubblewrap executable for Provider isolation and schedule jobs |
 | `CHRONA_STEWARD_TICK_SECONDS` | Background tick interval; default `30` seconds |
-| `CHRONA_CHINO_DASHBOARD_URL` | Chino service-health source URL |
 | `CHRONA_PUBLIC_URL` | Public HTTP(S) origin for notification links |
 | `CHRONA_QQ_APP_ID` | Dedicated QQ bot application ID |
 | `CHRONA_QQ_SECRET_FILE` | Private app-secret file owned by the server user |
 | `CHRONA_QQ_STATE_DIR` | QQ state; fallback `<dataDir>/qq-bot/<appId>` |
 
-Without bubblewrap, Pi's bash tool is disabled; its file tools and explicitly configured web tools remain available. With bubblewrap, the Provider has read-only host mounts and scoped writable app content/session directories plus its dedicated Pi profile, with network access. This is not a confidentiality boundary against all host reads. Chrona does not duplicate Provider web or shell tools. Its separate schedule-job sandbox needs a successful isolation probe; it currently assumes `/nix/store` and never falls back to host execution.
+Without bubblewrap, Pi's bash tool is disabled; its file tools and explicitly configured web tools remain available. With bubblewrap, the Provider has read-only host mounts, the conversations' attachments read-only (`content/chat`), and a writable session directory plus its dedicated Pi profile, with network access. This is not a confidentiality boundary against all host reads. Chrona does not duplicate Provider web or shell tools. Its separate schedule-job sandbox needs a successful isolation probe; it currently assumes `/nix/store` and never falls back to host execution.
 
 Pi resource auto-discovery and project trust are disabled. An optional reviewed [resource manifest](docs/zh/provider-runtime.md) adds explicit skills/extensions using Pi's own loading mechanism; native MCP requires an explicit `1.3.0` pin. Startup checks command resources before prompting. This is not a full tool manifest or proof that wrappers/extensions are safe: review the executable, extension code and service profile independently. Health checks validate launch configuration/version, not authentication or model success.
 
@@ -76,10 +75,6 @@ Pi resource auto-discovery and project trust are disabled. An optional reviewed 
 Safe progress summaries and usage estimates appear on session/app pages. Blocking Pi `select/confirm/input/editor` requests appear in the shared shell, including when you are viewing a different session, app or Settings. You must answer explicitly; requests are bound to one attempt, expire within its deadline and cannot be reused after interruption/restart. Editor originals are available only from the live controller; originals and free-text answers are not stored in request history or copied into the chat composer. Overlong/sensitive request context fails closed instead of offering approval of hidden details. Chrona's own approvals remain separate.
 
 Stopping an attempt preserves saved work/messages, blocks new Chrona actions and does not automatically retry that attempt. It does not undo external effects or cancel future schedules. Usage is a Provider estimate: the UI distinguishes this attempt from session totals and never invents zero for missing data. See [runtime behavior and limitations](docs/zh/provider-runtime.md).
-
-### Email connector
-
-In **Settings → Connectors**, add an email address, IMAP host/port (TLS, default 993), folders (default INBOX), password/app password and the owning app. Optional SMTP host/port enables sending (default 465; TLS required). The connector synchronizes mail read-only, deduplicates inbound events and stores material for the app. Chrona holds credentials under `<dataDir>/secrets`; they are not supplied as Provider context. SMTP sends require user approval. Testing a real connection contacts the mail server; automatic tests use fakes.
 
 ### QQ
 
@@ -93,9 +88,9 @@ In a source checkout, replace `chrona` with `bun run packages/cli/src/index.ts`.
 
 ## Backups and safety
 
-**Back up the data directory, not only SQLite.** Stop the server before `chrona backup /absolute/private/path/backup.db`: it creates a consistent DB copy plus `backup.db.tar` containing `platform` (app content and module store/data), `sessions` and `secrets`. Keep the pair together and private; neither file is encrypted. `chrona restore /absolute/private/path/backup.db` restores both while stopped and refuses existing data without `--force`. Archive QQ state and the Provider profile (including `<dataDir>/providers/pi`) separately; neither is in that tar. See [operations](docs/zh/operations.md) for recovery caveats.
+**Back up the data directory, not only SQLite.** Stop the server before `chrona backup /absolute/private/path/backup.db`: it creates a consistent DB copy plus `backup.db.tar` containing `platform` (module store and data, conversation attachments), `sessions` and `secrets`. Keep the pair together and private; neither file is encrypted. `chrona restore /absolute/private/path/backup.db` restores both while stopped and refuses existing data without `--force`. Archive QQ state and the Provider profile (including `<dataDir>/providers/pi`) separately; neither is in that tar. See [operations](docs/zh/operations.md) for recovery caveats.
 
-Local-first is not offline-only: model requests, web tools, QQ and email can contact external services. Protect backups, review approvals and verify model claims. The Provider environment filters Chrona credentials but retains its own model access. No compatibility with pre-rebuild databases; only Pi is currently implemented, not every future Provider described in design notes.
+Local-first is not offline-only: model requests, web tools and QQ can contact external services. Protect backups, review approvals and verify model claims. The Provider environment filters Chrona credentials but retains its own model access. No compatibility with pre-rebuild databases; only Pi is currently implemented, not every future Provider described in design notes.
 
 [Documentation](docs/README.md) · [Goals](docs/zh/steward-goals.md) · [Architecture](docs/zh/platform-v2.md) · [Contributing](CONTRIBUTING.md)
 
