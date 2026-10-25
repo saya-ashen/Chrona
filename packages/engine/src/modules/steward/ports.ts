@@ -10,9 +10,6 @@ export type OnApproved = (action: ApprovedAction) => Promise<void>;
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   provider?: ProviderAdapter;
-  modelGateway?: {
-    complete(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
-  };
   /** Kernel-held credentials for modules declaring them in `secrets` (e.g. qq_bot: { appId, clientSecret }). */
   secrets?(name: string): Promise<Record<string, string> | null>;
   /** v2-6 dependency installer: lockfile libraries and host system programs, into a staging module directory. */

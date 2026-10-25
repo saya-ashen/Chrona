@@ -46,7 +46,7 @@ try {
   assert.equal(reply.error, undefined);
   assert.equal(module.calls.length, 4);
   assert.equal(module.calls[1].params.args.body, 'Stub summary');
-  assert.equal(module.calls[3].params.target, 'ai.wake');
+  assert.equal(module.calls[3].params.target, 'provider.wake');
 } finally { await module.stop(); }
 const defaultModule = await startModule('index.ts');
 try {

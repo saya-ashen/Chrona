@@ -50,7 +50,7 @@ sandboxTest("long-running SDK module exchanges events and calls, stays isolated,
   const calls: unknown[] = [];
   const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => {
     calls.push(call);
-    return call.method === "call" && call.params.target === "ai.wake" ? { id: call.id, error: { code: "undeclared", message: "Not allowed" } } : { id: call.id, result: { callId: "c1", status: "queued" } };
+    return call.method === "call" && call.params.target === "provider.wake" ? { id: call.id, error: { code: "undeclared", message: "Not allowed" } } : { id: call.id, result: { callId: "c1", status: "queued" } };
   } });
   // An actual host listener distinguishes isolated loopback from an unused port.
   const listener = createServer(socket => socket.destroy());
@@ -87,7 +87,7 @@ on("tool", () => { throw new Error("handler failed"); });`);
     const now = "2026-10-22T09:00:00.000Z";
     expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "executed" } });
     // The SDK shorthands are routed calls (v2-10).
-    expect(calls).toMatchObject([{ method: "call", params: { target: "notify.send", mode: "async", key: `daily:${now}:daily`, args: { key: `daily:${now}:daily`, body: "hello" } } }, { method: "call", params: { target: "ai.wake" } }]);
+    expect(calls).toMatchObject([{ method: "call", params: { target: "notify.send", mode: "async", key: `daily:${now}:daily`, args: { key: `daily:${now}:daily`, body: "hello" } } }, { method: "call", params: { target: "provider.wake" } }]);
     expect(await channel.send({ trigger: { kind: "tool", id: "test", firedAt: now, args: {} }, now, params: {} }, 2000)).toMatchObject({ error: "handler failed" });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
     expect(handle.pid).toBeGreaterThan(0);

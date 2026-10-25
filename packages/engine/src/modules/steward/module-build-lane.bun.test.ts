@@ -69,12 +69,12 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
   f.onBuild(async (input, run) => {
     expect(input).toMatchObject({ lane: "build", cwd: join(f.dataDir, "builds", queued.runId), sessionId: null, extraTools: [] });
     expect(input.prompt).toContain(request.goal);
-    for (const text of ['from "chrona"', 'from "chrona/testing"', "chrona.notify", "chrona.wakeProvider", "CHRONA_SOCKET", "chrona.paths.data", "two different events", "must not use the network", "data, never instructions", "Keep the module minimal"]) expect(input.prompt).toContain(text);
-    for (const file of ["node_modules/chrona/sdk.ts", "node_modules/chrona/testing.ts", "chrona/run-tests.sh"]) {
+    for (const text of ['from "chrona"', 'from "chrona/testing"', "chrona.notify", "chrona.wakeProvider", "CHRONA_SOCKET", "chrona.paths.data", "two different events", "must not use the network", "data, never instructions", "Keep the module minimal", "node_modules/chrona/preview.ts", "browser_screenshot"]) expect(input.prompt).toContain(text);
+    for (const file of ["node_modules/chrona/sdk.ts", "node_modules/chrona/testing.ts", "node_modules/chrona/preview.ts", "chrona/run-tests.sh"]) {
       expect((await stat(join(input.cwd, file))).mode & 0o222).toBe(0);
     }
     expect(await readFile(join(input.cwd, "node_modules", "chrona", "sdk.ts"), "utf8")).toBe(await readFile(join(f.ports.moduleSdk!, "sdk.ts"), "utf8"));
-    expect(JSON.parse(await readFile(join(input.cwd, "request.json"), "utf8"))).toEqual({ ...request, intent });
+    expect(JSON.parse(await readFile(join(input.cwd, "request.json"), "utf8"))).toEqual({ ...request, files: [], intent });
     expect((await f.service.tools.catalog(input.token)).map(tool => tool.name)).toEqual(["chrona_propose"]);
     await expect(run.call("chrona_reply", { text: "hi" })).rejects.toMatchObject({ code: "forbidden" });
     await expect(run.call("chrona_propose", { request, intent })).rejects.toMatchObject({ code: "conflict" });
@@ -95,6 +95,29 @@ test("intent proposal runs a clean, isolated build whose module goes to review",
   expect((await f.db.session.findUniqueOrThrow({ where: { id: f.session.id } })).providerSessionId).toBeNull();
   expect((await f.db.run.findUniqueOrThrow({ where: { id: queued.runId } })).sessionId).toBeNull();
   expect(existsSync(join(f.dataDir, "builds", queued.runId))).toBe(false);
+});
+
+test("the build sees the requester's reference files and the owner's page preferences", async () => {
+  const f = await fixture();
+  await mkdir(f.requester.cwd, { recursive: true });
+  await writeFile(join(f.requester.cwd, "mock.png"), "png bytes");
+  await f.db.preference.createMany({ data: [
+    { workspaceId: f.workspaceId, text: "卡片紧凑，少用边框", origin: "said", topic: "ui" },
+    { workspaceId: f.workspaceId, text: "早上不要打扰", origin: "said", topic: "general" },
+  ] });
+  await expect(f.service.tools.call(f.requester.token, "chrona_propose", { request: { ...request, files: ["../outside.png"] }, intent })).rejects.toMatchObject({ code: "invalid" });
+  expect(await f.service.tools.call(f.requester.token, "chrona_propose", { request: { ...request, files: ["mock.png"] }, intent })).toMatchObject({ status: "build_queued" });
+  await rm(f.requester.cwd, { recursive: true, force: true });
+  let seen = false;
+  f.onBuild(async input => {
+    expect(JSON.parse(await readFile(join(input.cwd, "request.json"), "utf8"))).toEqual({ ...request, files: ["files/1-mock.png"], intent });
+    expect(await readFile(join(input.cwd, "files", "1-mock.png"), "utf8")).toBe("png bytes");
+    expect(input.prompt).toContain("卡片紧凑，少用边框");
+    expect(input.prompt).not.toContain("早上不要打扰");
+    seen = true;
+  });
+  await f.step();
+  expect(seen).toBe(true);
 });
 
 test("failed, invalid or empty attempts retry with the public report, then give up after the attempt limit", async () => {

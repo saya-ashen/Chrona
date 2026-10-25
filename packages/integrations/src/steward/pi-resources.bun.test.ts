@@ -89,3 +89,27 @@ test("native MCP stays in Pi and Pi builtins need the explicit 1.3 pin", () => {
   // Code execution no longer requires bubblewrap (unsandboxed like Hermes' local backend).
   expect(resourceVersionError({ ...selected, tools: ["bash"] }, "1.3.0")).toBeNull();
 });
+test("a run gets the browser tool only with a browser; one acquired under the masked data dir is re-exposed read-only", async () => {
+  const f = await fixture(), dataDir = join(f.root, "data"), workspace = join(dataDir, "sessions", "session-id"), sessions = join(workspace, "pi");
+  const agentDir = join(dataDir, "providers", "pi"), shellDir = join(dataDir, "providers", "browser", "1.0.0", "chrome-headless-shell-linux64");
+  for (const path of [sessions, agentDir, shellDir]) await mkdir(path, { recursive: true });
+  const browserExtension = join(f.root, "browser-tools.ts"), browser = join(shellDir, "chrome-headless-shell");
+  await writeFile(browserExtension, ""); await writeFile(browser, "");
+  const config = piLaunchConfig({ command: "/fake-pi", agentDir, dataDir, workspaceRoot: workspace, chronaExtension: f.extension, browserExtension, bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
+  const input = { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "build" } as ProviderRunInput;
+  const tools = (args: string[]) => args[args.indexOf("--tools") + 1]!.split(",");
+  const without = piArguments(config, input, "Fixture");
+  expect(without).not.toContain(browserExtension);
+  expect(tools(without)).not.toContain("browser_screenshot");
+  const args = piArguments(config, input, "Fixture", browser);
+  const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
+  expect(args.slice(args.indexOf(browserExtension) - 1, args.indexOf(browserExtension) + 1)).toEqual(["-e", browserExtension]);
+  expect(tools(args)).toContain("browser_screenshot");
+  expect(mount("--ro-bind", shellDir)).toBeGreaterThan(mount("--tmpfs", dataDir));
+  expect(mount("--bind", shellDir)).toBe(-1);
+  // A browser outside the data dir (e.g. /nix/store or /usr/bin) is already visible through the read-only root.
+  expect(mount("--ro-bind", "/usr")).toBeGreaterThan(-1);
+  expect(mount("--ro-bind", "/usr")).toBeLessThan(mount("--tmpfs", dataDir));
+  // Without the extension there is no browser tool, whatever was found.
+  expect(tools(piArguments({ ...config, browserExtension: null }, input, "Fixture", browser))).not.toContain("browser_screenshot");
+});

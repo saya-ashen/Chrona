@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { grantedUses, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { currentTarget, grantedUses, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { createModuleChannel } from "./module-channel";
 
@@ -18,14 +18,14 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
       calls.push(call);
       if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
       // Routed calls are answered, never routed: a build reaches no other module, no credential and no model.
-      const { target } = call.params, uses = grantedUses(manifest);
+      const target = currentTarget(call.params.target), uses = grantedUses(manifest);
       if (!uses.includes(target) && !uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${target} is not in uses` } };
       if (call.params.mode === "async") {
         const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
         seen.add(key);
         return { id: call.id, result: { callId: randomUUID(), status: "queued", duplicate } };
       }
-      if (target === "ai.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
+      if (target === "provider.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
       if (target === "secrets.get") return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
       return { id: call.id, result: { output: null } };
     } });

@@ -174,7 +174,7 @@ export const moduleManifestSchema = z.object({
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length) ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
-  if (grantedUses(manifest).includes("ai.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses ai.complete" });
+  if (grantedUses(manifest).includes("provider.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses provider.complete" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
@@ -236,17 +236,24 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /**
- * What a module may call: its `uses`, plus what deprecated declarations stand for (v2-10) — `effects` `model`, `wake_provider`
- * and `notify_user` for `ai.complete`, `ai.wake` and `notify.send`, and listed `secrets` for `secrets.get`.
+ * v2-10 names of the `provider` system module's tools (v2-11). Approved versions are hash-bound, so their `uses` and calls
+ * keep these names. shortcut: aliases stay until every module version naming `ai.*` is rebuilt; then delete this map.
+ */
+const LEGACY_TARGETS: Record<string, string> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
+/** A call target or `uses` entry under its current name. */
+export const currentTarget = (target: string) => LEGACY_TARGETS[target] ?? target;
+/**
+ * What a module may call: its `uses` (current names), plus what deprecated declarations stand for (v2-10) — `effects` `model`,
+ * `wake_provider` and `notify_user` for `provider.complete`, `provider.wake` and `notify.send`, and listed `secrets` for `secrets.get`.
  */
 export function grantedUses(manifest: { effects: readonly string[]; uses?: readonly string[]; secrets?: readonly string[] }): string[] {
-  const implied = { model: "ai.complete", wake_provider: "ai.wake", notify_user: "notify.send" } as Record<string, string>;
-  return [...new Set([...(manifest.uses ?? []), ...manifest.effects.flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])])];
+  const implied = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" } as Record<string, string>;
+  return [...new Set([...(manifest.uses ?? []).map(currentTarget), ...manifest.effects.flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])])];
 }
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "ai", "secrets"] as const;
+export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [
@@ -429,7 +436,8 @@ export const chronaToolInputSchemas = {
     .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model."),
   chrona_propose: z.object({
     dir: relativePathSchema.optional().describe("Module directory relative to the session directory"),
-    request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]) }).strict().optional(),
+    request: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]),
+      files: z.array(relativePathSchema).max(10).default([]).describe("Reference files for the build (e.g. screenshots or mockups the user sent): received attachments under content/chat/ or files in your working directory") }).strict().optional(),
     intent: z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict(),
   }).strict().refine(input => (input.dir === undefined) !== (input.request === undefined), "Pass exactly one of dir or request").describe('Or pass request {name,goal,examples}: a build run writes it. Submit module dir → building → hash-bound approval or repair wake. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, ai.wake, ai.complete (with model); params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["ai.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["ai.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   chrona_modules: z.object({}).strict().describe("List modules (apps), versions, approval status and recent runs."),
@@ -467,6 +475,8 @@ export type ProviderRunInput = {
 export type ProviderAdapter = {
   name: string;
   health(): Promise<{ available: boolean; sandboxed: boolean; error: string | null }>;
+  /** One completion with `model`: no tools, session or fallback model (`provider.complete`). Absent: unconfigured. */
+  complete?(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
   /** Starts a run; returns a handle that can receive messages while running. */
   start(input: ProviderRunInput): { inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
 };

@@ -111,7 +111,11 @@ async function proposeModule(ctx: ToolContext, raw: unknown) {
     if (!dir) throw new StewardError("conflict", "Build runs submit module directories, not requests");
     return proposeFromBuild(ctx.ports, ctx.workspaceId, ctx.run, { dir, intent: input.intent });
   }
-  if (request) return requestBuild(ctx.ports, ctx.workspaceId, ctx.run, { request, intent: input.intent });
+  if (request) {
+    // Kept by chat like reply attachments: the session directory is gone by the time the build runs.
+    const files = await Promise.all(request.files.map(async path => { const { name, ref } = await replyFile(ctx, path); return { name, ref }; }));
+    return requestBuild(ctx.ports, ctx.workspaceId, ctx.run, { request: { ...request, files }, intent: input.intent });
+  }
   return ctx.modules.propose({ ...input, dir: dir!, root: ctx.run.cwd }, "provider");
 }
 async function listModules(ctx: ToolContext, raw: unknown) {

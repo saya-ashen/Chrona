@@ -17,6 +17,6 @@ export async function writeBuildHelpers(cwd: string, sdk: string) {
   await mkdir(dir, { recursive: true });
   await mkdir(join(cwd, "node_modules"), { recursive: true });
   await cp(sdk, pkg, { recursive: true });
-  for (const file of ["package.json", "sdk.ts", "testing.ts"]) await chmod(join(pkg, file), 0o444);
+  for (const file of ["package.json", "sdk.ts", "testing.ts", "preview.ts"]) await chmod(join(pkg, file), 0o444);
   await writeFile(join(dir, "run-tests.sh"), RUN_TESTS, { mode: 0o555 });
 }

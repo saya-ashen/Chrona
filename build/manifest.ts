@@ -19,6 +19,7 @@ export const buildArtifacts = {
     { from: "packages/integrations/src/steward/module-sdk/package.json", to: "resources/module-sdk/package.json", required: true },
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
   ] satisfies ReleaseResource[],
 } as const;
 

@@ -116,6 +116,21 @@ test("approvals through the approvals system module; other modules and Chrona it
   expect(moduleManifestSchema.safeParse({ ...manifest, secrets: ["qq_bot"] }).success).toBe(false);
 });
 
+test("provider.wake starts the Provider for a module; an approved version still naming ai.wake (v2-10) reaches it too", async () => {
+  const f = await fixture();
+  for (const [name, target] of [["fresh", "provider.wake"], ["older", "ai.wake"]] as const) {
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: [target] });
+    const module = await f.db.module.create({ data: { workspaceId: f.w, name, activeHash: name } });
+    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
+    const reply = await handleModuleCall(f.ports, { workspaceId: f.w, moduleId: module.id, hash: name, manifest }, { id: "1", method: "call", params: { target, args: { prompt: `${name} 发现变化` }, mode: "async", key: `${name}:1`, reply: false } });
+    expect(reply).toMatchObject({ result: { status: "queued" } });
+  }
+  f.behaviors.push({ reply: "看过了" }, { reply: "也看过了" });
+  await f.settle();
+  expect((await f.db.moduleInvocation.findMany({ where: { target: { in: ["provider", "ai"] } } })).map(row => [row.target, row.tool, row.status])).toEqual([["provider", "wake", "succeeded"], ["provider", "wake", "succeeded"]]);
+  expect(f.started.map(input => input.prompt).filter(prompt => prompt.includes("发现变化")).length).toBe(2);
+});
+
 test("chat.file and chat.delivered only reach replies in the caller's own conversations", async () => {
   const f = await fixture();
   const web = await f.db.session.create({ data: { workspaceId: f.w, key: "web:y", source: "web" } });

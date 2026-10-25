@@ -104,16 +104,16 @@ export const chrona = {
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
   serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
   /**
-   * One completion: a routed call to `ai.complete` (uses ["ai.complete"] and the manifest's `model` tier and limits).
+   * One completion: a routed call to `provider.complete` (uses ["provider.complete"] and the manifest's `model` tier and limits).
    * Rejects with ModelError code unconfigured, budget_exceeded, provider_error, timeout or undeclared.
    */
-  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => chrona.call<ModelResult>("ai.complete", params).catch((error: ModelError) => {
+  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => chrona.call<ModelResult>("provider.complete", params).catch((error: ModelError) => {
     throw new ModelError(/^(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(error.message)?.[1] ?? error.code, error.message);
   }),
   /** Shorthand for an async call to `notify.send` (uses ["notify.send"]); `key` is the idempotency key. */
   notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => chrona.call<CallState>("notify.send", { ...params, key: scoped(params.key) }, { mode: "async", key: scoped(params.key) })
     .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
-  /** Shorthand for an async call to `ai.wake` (uses ["ai.wake"]): the Provider runs with `prompt` as untrusted data. */
-  wakeProvider: (params: { key: string; prompt: string }) => chrona.call<CallState>("ai.wake", { prompt: params.prompt }, { mode: "async", key: scoped(params.key) })
+  /** Shorthand for an async call to `provider.wake` (uses ["provider.wake"]): the Provider runs with `prompt` as untrusted data. */
+  wakeProvider: (params: { key: string; prompt: string }) => chrona.call<CallState>("provider.wake", { prompt: params.prompt }, { mode: "async", key: scoped(params.key) })
     .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
 };

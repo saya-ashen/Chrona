@@ -18,17 +18,18 @@ request: z.object({
   name: slug,                                   // 模块名；已存在则视为更新
   goal: text.max(4000),
   examples: z.array(text.max(1000)).max(10).default([]),
+  files: z.array(relativePathSchema).max(10).default([]), // 参考文件：收到的附件 content/chat/… 或工作目录中的文件
 }).strict()
 ```
 
 - 返回 `{ status: "build_queued", requestId, runId }`。
 - 拒绝（`conflict`）：构建运行自身提交 `request`（不递归）；同一事务已有排队或运行中的构建；当日构建运行已达上限。
-- 记 audit `module_build_request`（subjectId = requestId，details = affairId、name、goal、examples、intent）。
+- 记 audit `module_build_request`（subjectId = requestId，details = affairId、name、goal、examples、intent，以及 `files` 存入 `chat` 附件目录后的 `{ name, ref }`；会话目录在构建开始前可能已不存在）。
 
 ## 3. 构建运行
 
 - 新 lane `build`：每工作区同时最多 1 个运行；与 foreground/background 互不阻塞；时限 `RUN_LIMITS.buildTimeoutMs` = 10 分钟。
-- Run 的 `affairId` 为目标事务（计入事务每日运行上限），`cwd` 为 `<dataDir>/builds/<runId>/`。该目录只含：`request.json`；已有模块的当前激活版本源码 `current/`（若有）；上次尝试的公开报告 `previous-report.json`（若有）。沙箱只绑定该目录，看不到事务目录与对话。
+- Run 的 `affairId` 为目标事务（计入事务每日运行上限），`cwd` 为 `<dataDir>/builds/<runId>/`。该目录只含：`request.json`；已有模块的当前激活版本源码 `current/`（若有）；上次尝试的公开报告 `previous-report.json`（若有）；参考文件 `files/<序号>-<文件名>`（`request.json` 的 `files` 列出路径，读不到的跳过）。提示里附上用户的 `ui` 偏好（作为数据），其他偏好不给。`current/` 中的 `DESIGN.md` / `README.md` 是该模块自己的约定（如 web 模块的页面设计规范）。沙箱只绑定该目录，看不到事务目录与对话。
 - 无会话延续（`sessionId` 始终为空），不写回事务的 `sessionId`；不触发运行失败后的自动重试。
 - 提示词为固定的构建说明 + `chrona_propose` 的模块格式说明；请求内容按 untrusted data 注入。
 - 目录只暴露 `chrona_propose`；调用其他 Chrona 工具或模块工具 → `forbidden`。

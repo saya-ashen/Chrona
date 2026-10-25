@@ -1,6 +1,6 @@
 # v2-10 规格：AI、唤醒与凭据也是路由调用
 
-状态：已实现（2026-10-24）。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-9](platform-v2-9-owner-api.md)。
+状态：已实现（2026-10-24）。系统模块 `ai` 已在 [v2-11](platform-v2-11-provider-module.md) 改名为 `provider`（旧名作为别名保留）。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-9](platform-v2-9-owner-api.md)。
 
 ## 1. 背景
 

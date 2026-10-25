@@ -10,6 +10,9 @@ import { moduleContext } from "./module-context";
 import { createModuleSupervisor } from "./module-supervisor";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { testDb } from "./test-db";
+import type { ProviderAdapter } from "@chrona/contracts/steward";
+
+const fakeProvider: ProviderAdapter = { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start() { throw new Error("No runs in model tests"); } };
 import type { StewardPorts } from "./ports";
 import { notices } from "./test-notices";
 import { registerSystemModules } from "./system-modules";
@@ -27,9 +30,9 @@ async function fixture() {
   const now = new Date("2026-10-21T04:00:00Z");
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
   let calls = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, modelGateway: { async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, provider: { ...fakeProvider, async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
   const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
-  // What ai.complete runs for the calling module; a refusal's message starts with its reason.
+  // What provider.complete runs for the calling module; a refusal's message starts with its reason.
   const call = async (maxOutputTokens = 20) => {
     try { return { result: await completeForModule(ports, scope, { prompt, maxOutputTokens }) }; }
     catch (error) { return { error: { code: /^(\w+):/.exec((error as Error).message)?.[1] } }; }
@@ -72,7 +75,7 @@ test("daily budget uses workspace timezone midnight and includes failed calls", 
 });
 for (const code of ["timeout", "provider_error"]) test(`records ${code} without prompt or completion`, async () => {
   const f = await fixture();
-  f.ports.modelGateway = { async complete() { throw Object.assign(new Error(prompt + text), { code }); } };
+  f.ports.provider = { ...fakeProvider, async complete() { throw Object.assign(new Error(prompt + text), { code }); } };
   expect(await f.call()).toMatchObject({ error: { code } });
   expect(await f.db.moduleCall.findFirst()).toMatchObject({ method: "model", status: "failed", error: code });
   const logs = JSON.stringify(await f.db.audit.findMany());
@@ -118,14 +121,14 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   await supervisor.deliver(f.module.id, "v1", { trigger: { kind: "schedule", id: "daily", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: {} });
   expect((await notices(f.db))[0]).toMatchObject({ body: text });
   const calls = await f.db.moduleCall.findMany({ orderBy: { createdAt: "asc" } });
-  // The completion record (budgets) plus the two routed calls the SDK made: ai.complete and notify.send.
+  // The completion record (budgets) plus the two routed calls the SDK made: provider.complete and notify.send.
   expect(calls).toHaveLength(3);
   expect(calls).toEqual(expect.arrayContaining([
     expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "model", status: "executed", error: null }),
     expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "call", status: "executed" }),
   ]));
-  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["ai.complete", "notify.send"]);
-  // ai.complete is unrecorded: neither the prompt nor the completion is stored with the call.
+  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["notify.send", "provider.complete"]);
+  // provider.complete is unrecorded: neither the prompt nor the completion is stored with the call.
   const invocations = JSON.stringify(await f.db.moduleInvocation.findMany({ where: { target: "ai" } }));
   expect(invocations).not.toContain(prompt); expect(invocations).not.toContain(text);
   expect(calls.every(call => call.moduleRunId && call.eventKey)).toBe(true);

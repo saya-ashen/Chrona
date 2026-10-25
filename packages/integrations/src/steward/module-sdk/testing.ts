@@ -11,16 +11,20 @@ type Reply = { id: string; result?: { result?: unknown }; error?: string };
 /** The directories the module under test sees (same variables as `chrona.paths`). */
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
 /** What the manifest may call, as Chrona computes it: `uses` plus what deprecated declarations stand for. */
+// v2-10 names of the provider tools; Chrona maps them the same way (currentTarget).
+const legacy: Partial<Record<string, string>> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
+const current = (target: string) => legacy[target] ?? target;
 function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: string[] }) {
-  const implied: Record<string, string> = { model: "ai.complete", wake_provider: "ai.wake", notify_user: "notify.send" };
-  return [...(manifest.uses ?? []), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])];
+  const implied: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
+  return [...(manifest.uses ?? []).map(current), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])];
 }
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`, and the SDK
  * shorthands notify, wakeProvider, model, secret) to a granted target answer from `stubs["<module>.<tool>"]` (sync: its
  * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
  */
-export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
+export async function startModule(entry: string, { stubs: given = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
+  const stubs = Object.fromEntries(Object.entries(given).map(([target, stub]) => [current(target), stub]));
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: string[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
@@ -45,7 +49,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       let reply: unknown;
       if (call.method === "callStatus") reply = { result: { callId: String(call.params.callId), status: "queued" } };
       else {
-        const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
+        const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
         if (!uses.includes(target) && !uses.includes("*")) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
         else if (call.params.mode === "async") {
           // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
@@ -56,8 +60,8 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
           // Never real values in tests: only a stub, for a secret the manifest lists.
           const listed = (manifest.secrets ?? []).includes(String(args.name)), stub = stubs["secrets.get"] ?? stubs.secret;
           reply = listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
-        } else if (target === "ai.complete") {
-          const stub = stubs["ai.complete"] ?? stubs.model;
+        } else if (target === "provider.complete") {
+          const stub = stubs["provider.complete"] ?? stubs.model;
           reply = { result: { output: stub ? await stub(args) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
         } else reply = { result: { output: stubs[target] ? await stubs[target]!(args) ?? null : null } };
       }

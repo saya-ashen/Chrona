@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
+import { createScheduleSchema, currentTarget, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -74,7 +74,11 @@ describe("module channel contract", () => {
     expect(moduleCallSchema.safeParse({ id: "1", ...call }).success).toBe(false);
   });
   test("deprecated effects and secrets stand for system interfaces", () => {
-    expect(grantedUses({ effects: ["model", "wake_provider", "notify_user", "network"], uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["ai.complete", "ai.wake", "files.read", "notify.send", "secrets.get"]);
+    expect(grantedUses({ effects: ["model", "wake_provider", "notify_user", "network"], uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["files.read", "notify.send", "provider.complete", "provider.wake", "secrets.get"]);
+    // v2-10 names in approved manifests and calls keep working.
+    expect(grantedUses({ effects: [], uses: ["ai.complete", "ai.wake"] })).toEqual(["provider.complete", "provider.wake"]);
+    expect(currentTarget("ai.wake")).toBe("provider.wake");
+    expect(currentTarget("files.read")).toBe("files.read");
   });
 });
 

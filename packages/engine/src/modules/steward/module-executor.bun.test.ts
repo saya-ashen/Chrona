@@ -74,7 +74,7 @@ test("undeclared wake_provider is dropped and recorded without creating a Run", 
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake] }), error: null });
   await f.fire();
   expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", key: "ai.wake", status: "rejected", error: "undeclared" });
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", key: "provider.wake", status: "rejected", error: "undeclared" });
 });
 
 test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {

@@ -2,20 +2,22 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
 export type PiProviderOptions = {
   command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string;
   chronaExtension: string; webExtension?: string | null; agentUrl: string; bwrap?: string | null;
+  /** The browser tool (v2-12): its extension, and where runs get a browser from; without either runs have no browser tool. */
+  browserExtension?: string | null; browsers?: { ensure(): string | null };
   workspaceRoot?: string; dataDir?: string;
   /** End a run whose Pi RPC stream is silent this long outside tool runs and user questions (default 5 min). */
   idleTimeoutMs?: number;
 };
 export type PiLaunchConfig = {
   options: PiProviderOptions; command: string; agentDir: string; version: string;
-  extension: string; web: string | null; bwrap: string | null; resources: PiResources; resourceError: string | null;
+  extension: string; web: string | null; browserExtension: string | null; bwrap: string | null; resources: PiResources; resourceError: string | null;
 };
 const supportedVersions = new Set(["0.85.0", "1.3.0"]);
 const inside = (parent: string, child: string) => { const path = relative(parent, child); return path === "" || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path); };
@@ -26,6 +28,7 @@ export function piLaunchConfig(options: PiProviderOptions): PiLaunchConfig {
   const selected = readPiResources(options.resourcesFile, options.agentDir ?? "", options.workspaceRoot);
   return { options, command: options.command ?? "", agentDir: options.agentDir ?? "", version: options.expectedVersion ?? "0.85.0", resources: selected.resources, resourceError: selected.error,
     extension: resolve(options.chronaExtension), web: options.webExtension ? resolve(options.webExtension) : null,
+    browserExtension: options.browserExtension ? resolve(options.browserExtension) : null,
     bwrap: options.bwrap ? (options.bwrap.includes("/") ? resolve(options.bwrap) : options.bwrap) : null };
 }
 function privateProfile(path: string): boolean {
@@ -42,9 +45,8 @@ function configurationError(config: PiLaunchConfig): string | null {
   if (config.resourceError) return config.resourceError;
   const resourceError = resourceVersionError(config.resources, config.version);
   if (resourceError) return resourceError;
-  if (!existsSync(config.extension)) return "Chrona tools extension missing";
-  if (config.web && !existsSync(config.web)) return "Pi web extension missing";
-  return null;
+  const extensions = [[config.extension, "Chrona tools extension missing"], [config.web, "Pi web extension missing"], [config.browserExtension, "Pi browser extension missing"]] as const;
+  return extensions.find(([path]) => path && !existsSync(path))?.[1] ?? null;
 }
 /** Chrona/QQ/database secrets are not inherited. Pi's own model credentials remain its responsibility. */
 export function piEnvironment(config: PiLaunchConfig): NodeJS.ProcessEnv {
@@ -100,15 +102,27 @@ export function prepareContent(input: ProviderRunInput, link: boolean) {
   for (const entry of readdirSync(root, { withFileTypes: true })) if (entry.isSymbolicLink()) unlinkSync(join(root, entry.name));
   if (link) for (const area of areas) if (!existsSync(join(root, area.name))) symlinkSync(area.dir, join(root, area.name));
 }
-export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string) {
+/**
+ * Explicit Pi extensions beside Chrona's: each with the tools it adds and the files it needs in the sandbox. The browser
+ * tool (v2-12) needs a browser this run; one Chrona acquired lives under its (masked) data dir, so its directory too.
+ */
+function optionalExtensions(config: PiLaunchConfig, browser: string | null) {
+  return [
+    ...(config.web ? [{ extension: config.web, tools: ["web_search", "fetch_content"], files: [config.web] }] : []),
+    ...(browser && config.browserExtension ? [{ extension: config.browserExtension, tools: ["browser_screenshot"], files: [config.browserExtension, dirname(browser)] }] : []),
+  ];
+}
+/** `browser`: the executable this run's browser tool uses (v2-12), or null for no browser tool. */
+export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string, browser: string | null = null) {
+  const optional = optionalExtensions(config, browser);
   const args = ["--mode", "rpc", "--session-dir", resolve(input.sessionDir), "--session-id", input.sessionId ?? randomUUID(),
     "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "-e", config.extension];
-  if (config.web) args.push("-e", config.web);
+  for (const { extension } of optional) args.push("-e", extension);
   // --no-extensions also drops Pi's built-in tool search; deferred module tools need it.
   if (input.searchTools) args.push("-e", "builtin:tool-search");
   for (const extension of config.resources.extensions) args.push("-e", extension);
   for (const skill of config.resources.skills) args.push("--skill", skill);
-  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...CHRONA_TOOLS, ...(config.web ? ["web_search", "fetch_content"] : []), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
+  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...CHRONA_TOOLS, ...optional.flatMap(extension => extension.tools), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
     // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
     ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
   if (config.options.model) args.push("--model", config.options.model);
@@ -117,7 +131,7 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   // Parent masks precede child masks; all masks precede the explicit resource/workspace mounts.
   const hidden = [...new Set([homedir(), config.options.dataDir].filter((p): p is string => !!p).flatMap(both))]
     .sort((a, b) => a.split(sep).length - b.split(sep).length);
-  const resources = [config.command, config.extension, config.web, ...config.resources.extensions, ...config.resources.skills]
+  const resources = [config.command, config.extension, ...optional.flatMap(extension => extension.files), ...config.resources.extensions, ...config.resources.skills]
     .filter((p): p is string => !!p && isAbsolute(p));
   const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
     .filter(p => hidden.some(root => inside(root, p)));

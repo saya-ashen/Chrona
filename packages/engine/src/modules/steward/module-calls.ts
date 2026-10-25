@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
@@ -12,7 +12,7 @@ export type Caller = z.infer<typeof callerSchema>;
 export type Json = z.output<ReturnType<typeof z.json>>;
 /**
  * Who is calling, as Chrona knows it. `chain` holds the modules waiting on this call path (sync), `path` every module on it.
- * `run`: the module event being handled, for system modules that budget per event (ai.complete).
+ * `run`: the module event being handled, for system modules that budget per event (provider.complete).
  */
 export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string } };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
@@ -113,6 +113,7 @@ function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = 
  * (the target's events are serial, so it could never answer). Unknown outcomes are reported, never retried.
  */
 export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
+  target = currentTarget(target);
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
   if (resolved instanceof CallError) throw resolved;
   if (!await admitted(ports.db, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
@@ -169,6 +170,7 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, target: 
  * Other module calls must name an active, admitting target.
  */
 export async function enqueueCall(tx: Db, ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { key, reply = false, lenient = false }: { key: string; reply?: boolean; lenient?: boolean }) {
+  target = currentTarget(target);
   const name = splitTarget(target), caller = callerKey(origin.caller);
   const existing = await tx.moduleInvocation.findUnique({ where: { workspaceId_caller_target_tool_key: { workspaceId: origin.workspaceId, caller, target: name.module, tool: name.tool, key } } });
   if (existing) return { callId: existing.id, status: existing.status as "queued", duplicate: true };
@@ -205,12 +207,13 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   const { db } = ports, now = ports.now();
   const settle = (data: Prisma.ModuleInvocationUpdateManyMutationInput) => db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { leaseToken: null, leaseUntil: null, ...data } });
   const retryOrFail = (error: string) => settle(row.attempts < MAX_ATTEMPTS ? { status: "queued", nextAttemptAt: backoff(now, row.attempts), error } : { status: "failed", error, finishedAt: now });
-  const resolved = await resolveTarget(db, row.workspaceId, `${row.target}.${row.tool}`);
+  // Rows queued before v2-11 name `ai.*`.
+  const target = currentTarget(`${row.target}.${row.tool}`), resolved = await resolveTarget(db, row.workspaceId, target);
   // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
   if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
   const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
   const caller = originOf(row, callerModule);
-  if (!await admitted(db, caller, resolved.tool, `${row.target}.${row.tool}`)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
+  if (!await admitted(db, caller, resolved.tool, target)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
   let args;
   try { args = validArgs(resolved.tool, row.args); }
   catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }

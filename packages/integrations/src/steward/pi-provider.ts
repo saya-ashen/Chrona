@@ -4,6 +4,7 @@ import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
 import { PiEvents } from "./pi-events";
 import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/steward";
+import { createPiModelGateway } from "./pi-model-gateway";
 import { expectedPiCommands, inspectPiLaunch, piArguments, piEnvironment, piLaunchConfig, prepareContent, profileOverlaps, type PiLaunchConfig, type PiProviderOptions } from "./pi-launch";
 export type { PiProviderOptions } from "./pi-launch";
 
@@ -265,8 +266,9 @@ class PiRun {
       if (invalid) { this.stop("unavailable", invalid); return; }
       if (profileOverlaps(config.agentDir, resolve(this.input.cwd))) { this.stop("unavailable", "Pi profile must be separate from the working directory"); return; }
       prepareContent(this.input, !config.bwrap);
-      this.child = spawn(config.bwrap ?? config.command, piArguments(config, this.input, STEWARD_PROMPT), { cwd: resolve(this.input.cwd), shell: false,
-        env: { ...piEnvironment(config), CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token }, stdio: ["pipe", "pipe", "pipe"] });
+      const browser = config.browserExtension ? config.options.browsers?.ensure() ?? null : null;
+      this.child = spawn(config.bwrap ?? config.command, piArguments(config, this.input, STEWARD_PROMPT, browser), { cwd: resolve(this.input.cwd), shell: false,
+        env: { ...piEnvironment(config), CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token, ...(browser ? { CHRONA_BROWSER: browser } : {}) }, stdio: ["pipe", "pipe", "pipe"] });
       this.listen(this.child);
       this.touch();
       void this.prompt(config);
@@ -302,6 +304,7 @@ export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
       const error = await inspectPiLaunch(config);
       return { available: error === null, sandboxed: error === null && config.bwrap !== null, error };
     },
+    complete: createPiModelGateway(options).complete,
     start(input) {
       const run = new PiRun(input, options.idleTimeoutMs);
       run.start(config);

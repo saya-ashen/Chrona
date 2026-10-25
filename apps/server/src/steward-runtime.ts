@@ -9,10 +9,11 @@ import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { moduleSupervisor, createStewardService, type StewardPorts } from "@chrona/engine";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
-import { createPiModelGateway } from "../../../packages/integrations/src/steward/pi-model-gateway";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { createModulePackages } from "../../../packages/integrations/src/steward/module-packages";
+import { createBrowsers } from "../../../packages/integrations/src/steward/browser";
+import { createLogger } from "@chrona/logging";
 
 function publicOrigin(): string | null {
   try {
@@ -38,6 +39,14 @@ type RuntimeOptions = {
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
+/** Where the Provider's browser comes from (v2-12). */
+function providerBrowsers(options: RuntimeOptions) {
+  return createBrowsers({
+    configured: process.env.CHRONA_STEWARD_BROWSER?.trim() || undefined, dir: resolve(options.dataDir ?? stewardDataDir(), "providers/browser"),
+    nix: Bun.which("nix"), nixpkgs: process.env.CHRONA_NIXPKGS?.trim() || undefined,
+    onError: error => createLogger("steward.browser").warn("browser.unavailable", { error }),
+  });
+}
 function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) {
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
@@ -48,6 +57,8 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
     resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
     webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
+    browserExtension: resourcePath(join("external-plugins", "pi-steward-agent", "browser-tools.ts")),
+    browsers: providerBrowsers(options),
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
     dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
@@ -62,7 +73,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const configured = configuredProvider(options, bwrap);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
-  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, health: () => configured.health(), start(input) {
+  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), start(input) {
     if (stopping) throw new Error("Runtime stopping");
     const handle = configured.start(input); handles.add(handle);
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});
@@ -77,13 +88,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   };
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
-    modelGateway: createPiModelGateway({
-      command: process.env.CHRONA_STEWARD_PI_COMMAND,
-      agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
-      expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
-      chronaExtension: resourcePath(join("external-plugins", "pi-steward-agent", "chrona-tools.ts")),
-      agentUrl: "", workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
-    }),
     secrets: configuredSecret, packages: createModulePackages(),
     sandbox: options.sandbox ?? sandbox, moduleSdk,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
