@@ -751,7 +751,7 @@ test("huge code diff truncates with checkout hash while manifest and intent stay
   for (const line of JSON.stringify(manifest, null, 2).split("\n")) {
     expect(preview).toContain(`- ${line}`); expect(preview).toContain(`+ ${line}`);
   }
-  expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 chrona_module_checkout 检出 hash ${second.hash}`)).toBe(true);
+  expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${second.hash}`)).toBe(true);
 });
 
 test("hash follows sorted path-NUL-content-NUL; identical content reuses approved version without approval", async () => {

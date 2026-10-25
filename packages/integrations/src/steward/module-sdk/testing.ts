@@ -23,7 +23,11 @@ function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: stri
  * shorthands notify, wakeProvider, model, secret) to a granted target answer from `stubs["<module>.<tool>"]` (sync: its
  * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
  */
-export async function startModule(entry: string, { stubs: given = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
+/**
+ * `grants`: targets whose tools name this module in `callers` (v2-14), so it may call them without listing them in `uses`
+ * (e.g. the events module delivering to a subscriber).
+ */
+export async function startModule(entry: string, { stubs: given = {}, grants = [] }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>>; grants?: string[] } = {}) {
   const stubs = Object.fromEntries(Object.entries(given).map(([target, stub]) => [current(target), stub]));
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: string[] };
   const dir = await mkdtemp("/tmp/ct-");
@@ -50,7 +54,7 @@ export async function startModule(entry: string, { stubs: given = {} }: { stubs?
       if (call.method === "callStatus") reply = { result: { callId: String(call.params.callId), status: "queued" } };
       else {
         const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
-        if (!uses.includes(target) && !uses.includes("*")) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
+        if (!uses.includes(target) && !uses.includes("*") && !grants.includes(target)) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
         else if (call.params.mode === "async") {
           // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
           const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);

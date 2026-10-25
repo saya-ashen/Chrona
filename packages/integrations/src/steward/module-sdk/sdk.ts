@@ -116,4 +116,10 @@ export const chrona = {
   /** Shorthand for an async call to `provider.wake` (uses ["provider.wake"]): the Provider runs with `prompt` as untrusted data. */
   wakeProvider: (params: { key: string; prompt: string }) => chrona.call<CallState>("provider.wake", { prompt: params.prompt }, { mode: "async", key: scoped(params.key) })
     .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
+  /**
+   * Emit an event this module declares in `contributes.events.emits` (v2-14): a sync call to `events.emit` (uses ["events.emit"]).
+   * `name` is the event's own name (the module name is added); `key` is the idempotency key, derived from the triggering event.
+   */
+  emit: (name: string, payload: Record<string, unknown>, options: { key: string }) =>
+    chrona.call<{ delivered: number }>("events.emit", { event: name, payload: JSON.stringify(payload), key: scoped(options.key) }),
 };

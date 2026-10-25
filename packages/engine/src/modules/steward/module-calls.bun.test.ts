@@ -21,9 +21,10 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
   const workspace = await db.workspace.create({ data: { name: "calls" } });
   const manifests = {
     alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }],
-      uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again"], tools: [tool("pong")] },
+      uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong")] },
     beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], uses: ["alpha.pong"],
-      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { callers: ["gamma"] }), tool("hidden", { visibility: ["provider", "owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] })] },
+      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { callers: ["gamma"] }), tool("hidden", { visibility: ["provider", "owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("granted", { callers: ["alpha"] })],
+      contributes: { alpha: { hello: "from beta" }, gamma: { secret: true } } },
   };
   const modules: Record<string, { id: string }> = {};
   for (const [name, manifest] of Object.entries(manifests)) {
@@ -174,6 +175,22 @@ test("uses \"*\" reaches the tools open to the user, never modules-only tools it
   expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
   expect(results["beta.echo"]).toMatchObject({ error: { code: "forbidden" } });
   expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
-  // modules.tools lists exactly what the caller may reach.
-  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target)).toEqual(["beta.hidden"]);
+  // modules.tools lists exactly what the caller may reach: beta.granted names alpha in callers (v2-14).
+  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target)).toEqual(["beta.hidden", "beta.granted"]);
+});
+
+test("v2-14: a tool that names its caller in callers needs no uses entry; contributions reach only the module they address", async () => {
+  const f = await fixture({
+    alpha: async (event, call) => {
+      const target = (event.trigger as { id: string }).id === "daily" ? "beta.granted" : "";
+      return { result: { granted: await call("call", { target, args: { text: "hi" } } as never),
+        mine: await call("call", { target: "modules.contributions", args: { section: "alpha" } } as never),
+        theirs: await call("call", { target: "modules.contributions", args: { section: "gamma" } } as never) } };
+    },
+    beta: async event => ({ result: { caller: (event.trigger as { caller?: { module?: string } }).caller?.module } }),
+  });
+  const reply = output(await f.fire()) as { granted: unknown; mine: unknown; theirs: unknown };
+  expect(reply.granted).toMatchObject({ result: { output: { caller: "alpha" } } });
+  expect(reply.mine).toMatchObject({ result: { output: [{ module: "beta", hash: "beta-v1", value: { hello: "from beta" } }] } });
+  expect(reply.theirs).toMatchObject({ error: { code: "forbidden" } });
 });

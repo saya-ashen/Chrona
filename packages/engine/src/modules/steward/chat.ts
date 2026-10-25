@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { isAbsolute, join, relative } from "node:path";
 import { z } from "zod";
 import { attachmentSchema, messageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
@@ -32,6 +32,25 @@ export async function storeChatFile(ports: Pick<StewardPorts, "dataDir">, name: 
   return { name: safe, ref: `chat/${file}`, size: bytes.byteLength };
 }
 /** A stored conversation file by its `chat/<file>` reference, or null. */
+/**
+ * A file a run hands over, kept by chat: an attachment it received (content/chat/<file>) or a file in its working
+ * directory, copied in. Never a host path outside the run's directory.
+ */
+export async function runFile(ports: Pick<StewardPorts, "dataDir">, cwd: string, path: string) {
+  if (path.startsWith("content/chat/")) {
+    const ref = `chat/${path.slice("content/chat/".length)}`, file = await readChatFile(ports, ref);
+    if (!file) throw new StewardError("not_found", `No received attachment ${path}`);
+    return { name: path.split("/").pop()!.replace(/^[0-9a-f-]{36}-/, ""), ref, size: file.bytes.byteLength };
+  }
+  const root = await realpath(cwd);
+  const full = await realpath(join(root, path)).catch(() => { throw new StewardError("not_found", `No file ${path} in the working directory`); });
+  const rel = relative(root, full);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new StewardError("forbidden", "Files must be in the working directory");
+  const info = await stat(full);
+  if (!info.isFile()) throw new StewardError("invalid", `${path} is not a file`);
+  if (info.size > 20 * 1024 * 1024) throw new StewardError("invalid", `${path} is larger than 20 MiB`);
+  return storeChatFile(ports, path.split("/").pop()!, await readFile(full));
+}
 export async function readChatFile(ports: Pick<StewardPorts, "dataDir">, ref: string) {
   const file = ref.startsWith("chat/") ? ref.slice(5) : "";
   if (!file || file.includes("/") || file.startsWith(".")) return null;
@@ -136,16 +155,20 @@ class ChatService {
         const caller = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_caller", subjectId: existing.id } });
         if (caller) return { inbound: existing, ...callerSchema.parse(caller.details) };
       }
+      // Build conversations (v2-13) run only what modules.build gave them; their result comes back to the origin conversation.
+      const buildRefused = () => new StewardError("forbidden", "A module build conversation does not take messages");
       const session = await db.$transaction(async tx => {
         if (input.sessionId) {
           const row = await tx.session.findFirst({ where: { id: input.sessionId, workspaceId: input.workspaceId, status: "active" } });
           if (!row) throw new StewardError("not_found", "Active session not found");
+          if (row.source === "build") throw buildRefused();
           return row;
         }
         const key = input.key ?? `web:${randomUUID()}`;
         const row = await tx.session.findFirst({ where: { workspaceId: input.workspaceId, key, status: "active" } });
         const prefix = key.split(":")[0];
         const source = SESSION_SOURCES.find(source => source === prefix) ?? "web";
+        if ((row?.source ?? source) === "build") throw buildRefused();
         return row ?? tx.session.create({ data: { workspaceId: input.workspaceId, key, source, createdAt: ports.now(), lastActivityAt: ports.now() } });
       });
       if (entryModuleId && session.entryModuleId !== entryModuleId) await db.session.update({ where: { id: session.id }, data: { entryModuleId } });

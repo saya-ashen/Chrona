@@ -46,7 +46,7 @@ test("files fresh workspace: author SDK tests, automatic activation, owner tools
     const version = await f.db.moduleVersion.findFirstOrThrow();
     expect(version.report).toMatchObject({ tests: [{ exitCode: 0 }] });
     expect(app.activeHash).toBeTruthy();
-    expect((await f.api.modules.tools()).tools.map(tool => tool.name)).toEqual(["list", "read", "write", "move", "delete", "history", "restore"].map(name => `m_files_${name}`));
+    expect((await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_files_"))).toEqual(["list", "read", "write", "move", "delete", "history", "restore"].map(name => `m_files_${name}`));
     expect(await f.call("write", { path: "report.txt", content: "one" })).toEqual({ ok: true });
     await f.call("write", { path: "report.txt", content: "two" });
     const history = await f.call("history", { path: "report.txt" });

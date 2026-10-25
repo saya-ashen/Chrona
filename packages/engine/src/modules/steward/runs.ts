@@ -11,7 +11,6 @@ import { pushReply } from "./chat-replies";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
-import { settleBuildAttempt } from "./module-build-lane";
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
@@ -52,8 +51,8 @@ class RunService {
     const { ports, workspaceId } = this;
     const session = input.sessionId ? await tx.session.findFirst({ where: { id: input.sessionId, workspaceId, status: "active" } }) : null;
     if (input.sessionId && !session) throw new StewardError("not_found", "Active session not found");
-    if (!session && input.lane !== "build") throw new StewardError("invalid", "Run requires a session");
-    const cwd = join(ports.dataDir, "sessions", session?.id ?? randomUUID());
+    if (!session) throw new StewardError("invalid", "Run requires a session");
+    const cwd = join(ports.dataDir, "sessions", session.id);
     await mkdir(cwd, { recursive: true });
     return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt: ports.now() } });
   }
@@ -74,7 +73,7 @@ class RunService {
           await tx.run.update({ where: { id: run.id }, data: { leaseUntil: nextLocalMidnight(now, timezone) } }); continue;
         }
         if (run.sessionId && await tx.run.count({ where: { workspaceId, sessionId: run.sessionId, status: "running" } })) continue;
-        const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane]);
+        const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.backgroundTimeoutMs }[lane]);
         if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt } })).count) continue;
         await audit(tx, { workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane } });
         return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, token, runId: run.id };
@@ -94,21 +93,18 @@ class RunService {
       const error = cancelled ? "Cancelled by owner" : expired ? "Run lease expired" : outcome.error;
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return false;
       if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
-      if (run.lane !== "build") {
-        if (status === "finished") await this.deliverResult(tx, run, now);
-        await this.followUp(tx, run, status, now);
-      }
+      if (status === "finished") await this.deliverResult(tx, run, now);
+      await this.followUp(tx, run, status, now);
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
       return true;
     });
     if (!finalized) return;
     liveRuns.delete(runId);
-    await settleBuildAttempt(ports, workspaceId, runId);
     await ports.onRunFinished?.(workspaceId, runId);
   }
   private async deliverResult(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
     const session = run.session;
-    if (!session || !["wake", "module"].includes(session.source)) return;
+    if (!session || !["wake", "module", "build"].includes(session.source)) return;
     const receipts = await tx.audit.findMany({ where: { workspaceId: this.workspaceId, kind: "run_reply", subjectId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
     const ids = receipts.flatMap(receipt => {
       const details = receipt.details as { messageId?: unknown } | null;

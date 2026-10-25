@@ -89,14 +89,15 @@ export async function startBunServer() {
     hostname: host,
     port,
     idleTimeout: 120,
-    fetch: (request) => {
+    fetch: (request, server) => {
       if (isShuttingDown) {
         return new Response(JSON.stringify({ error: "Server is shutting down" }), {
           status: 503,
           headers: { "content-type": "application/json" },
         });
       }
-      return app.fetch(request);
+      // Routes that wait longer than idleTimeout widen it per request (v2-13).
+      return app.fetch(request, { server });
     },
   });
 

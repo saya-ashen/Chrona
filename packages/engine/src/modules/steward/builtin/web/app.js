@@ -154,6 +154,7 @@ async function chat(sessionId) {
     if (loaded) await show(message); else early.push(message);
   });
   for (const message of current ? await web(`/sessions/${current}/messages`) : []) await show(message);
+  const building = sessions.find(s => s.id === current)?.source === "build";
   loaded = true;
   for (const message of early) await show(message);
   const form = h("form", { onsubmit: async event => {
@@ -173,8 +174,23 @@ async function chat(sessionId) {
     h("section", {}, h("h2", {}, "会话"),
       h("button", { onclick: () => go("/chat/new") }, "新会话"),
       h("ul", { class: "plain" }, sessions.map(s => h("li", { class: s.id === current ? "selected" : "" }, h("a", { href: `/sessions/${s.id}` }, s.title ?? when(s.createdAt)))))),
-    h("section", {}, list, form)));
+    h("section", {}, list, building ? h("p", { class: "muted" }, "这是 Chrona 自己的构建对话，不接收消息；结果会发回发起它的对话。") : form, current ? transcript(current, building) : "")));
   list.scrollTop = list.scrollHeight;
+}
+// What the Provider did (v2-13): open for module builds, on request for conversations.
+function transcript(sessionId, open) {
+  const body = h("div", { class: "transcript" }, h("p", { class: "muted" }, "加载中……"));
+  const load = async () => {
+    try {
+      const items = await web(`/sessions/${sessionId}/transcript`);
+      body.replaceChildren(...(items.length ? items.map(item => item.kind === "text" ? h("p", {}, item.text)
+        : item.kind === "tool" ? h("p", { class: "muted" }, "▶ ", h("code", {}, item.tool), " ", item.args)
+        : h("pre", { class: item.error ? "error" : "" }, item.text || "（无输出）")) : [h("p", { class: "muted" }, "还没有过程记录。")]));
+    } catch (error) { body.replaceChildren(h("p", { class: "error" }, error.message)); }
+  };
+  const details = h("details", { open }, h("summary", {}, "过程"), body);
+  if (open) void load(); else details.addEventListener("toggle", () => { if (details.open) void load(); }, { once: true });
+  return details;
 }
 
 // ------------------------------------------------------------------- apps --

@@ -8,6 +8,8 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+// The `modules` tools the Provider always has (v2-13): list, check, checkout, propose, rollback, build.
+const MODULES_TOOLS = 6;
 import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -60,7 +62,8 @@ test("module names are unique within the workspace", async () => {
 test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
-  expect(tools.map(tool => tool.name)).toEqual(["m_mail_sort_find_mail"]);
+  // Chrona's own tools open to the user (v2-13) come first.
+  expect(tools.map(tool => tool.name)).toEqual(["m_modules_check", "m_modules_rollback", "m_mail_sort_find_mail"]);
   expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
@@ -98,7 +101,7 @@ test("module failure returns truncated public stderr and shares the consecutive 
   expect(await f.db.moduleRun.count()).toBe(3);
   expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
-  expect((await f.service.tools.catalog(f.run.token)).some(tool => tool.name.startsWith("m_"))).toBe(false);
+  expect((await f.service.tools.catalog(f.run.token)).some(tool => tool.name.startsWith("m_mail_sort_"))).toBe(false);
   expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ ok: false }, { ok: false }, { ok: false }]);
   expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(3);
 });
@@ -106,7 +109,7 @@ test.each(["paused", "migrating", "no-hash"])("catalog and call re-resolve modul
   const f = await fixture(); await f.service.tools.catalog(f.run.token);
   await f.db.module.update({ where: { id: f.module.id }, data: status === "no-hash" ? { activeHash: null } : { status } });
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
-  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length);
+  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length + MODULES_TOOLS);
 });
 test("ambiguous concatenated names expose and call only the first tool; overlong names are hidden", async () => {
   const f = await fixture();
@@ -117,7 +120,7 @@ test("ambiguous concatenated names expose and call only the first tool; overlong
   expect(catalog.at(-1)?.inputSchema.description).toBe("[module mail-sort] Find matching mail");
   await f.call(); expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ moduleId: f.module.id });
   await f.db.module.update({ where: { id: module.id }, data: { name: "a".repeat(64) } });
-  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length + 1);
+  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length + MODULES_TOOLS + 1);
 });
 test("call uses the current version rather than a previously catalogued schema", async () => {
   const f = await fixture(); await f.service.tools.catalog(f.run.token);

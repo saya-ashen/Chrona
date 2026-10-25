@@ -18,7 +18,12 @@ export function createStewardAgentRoutes(ports: StewardPorts, service: StewardSe
   });
   router.use("*", bodyLimit({ maxSize: 128 * 1024, onError: c => c.json(failure("BODY_TOO_LARGE"), 413) }));
   router.get("/catalog", c => c.json({ tools: c.get("catalog").map(({ inputSchema, ...tool }) => ({ ...tool, description: inputSchema.description ?? tool.name, parameters: inputSchema })) }));
-  router.post("/tools/:name", async c => c.json({ ok: true, data: await endpoint.call(c.get("token"), c.req.param("name"), await c.req.json()) }));
+  router.post("/tools/:name", async c => {
+    // v2-13: the caller says how long this call may take; Chrona caps it (and at the run's deadline).
+    const asked = Number(c.req.header("x-chrona-timeout-seconds")), timeoutSeconds = Number.isInteger(asked) && asked >= 1 ? Math.min(asked, 600) : undefined;
+    if (timeoutSeconds) (c.env as { server?: { timeout(request: Request, seconds: number): void } } | undefined)?.server?.timeout(c.req.raw, timeoutSeconds + 10);
+    return c.json({ ok: true, data: await endpoint.call(c.get("token"), c.req.param("name"), await c.req.json(), { timeoutSeconds }) });
+  });
   router.onError((error, c) => {
     if (error instanceof SyntaxError) return c.json(failure("INVALID_JSON"), 400);
     if (error instanceof StewardError) return c.json(failure(error.code, error.message), { forbidden: 403, invalid: 400, not_found: 404, conflict: 409 }[error.code] as 400 | 403 | 404 | 409);

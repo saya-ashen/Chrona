@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute } from "node:path";
 import { CHRONA_TOOLS, chronaToolInputSchemas as schemas, RUN_LIMITS, type Action } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
@@ -9,13 +9,12 @@ import { authenticateRun } from "./runs";
 import { createSchedules } from "./schedules";
 import { createModules } from "./modules";
 import { callModuleTool, moduleToolCatalog } from "./module-tools";
-import { proposeFromBuild, requestBuild } from "./module-build-lane";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { notifyUser } from "./notify-user";
 import { drainCalls } from "./module-calls";
 import { pushReply } from "./chat-replies";
-import { readChatFile, storeChatFile } from "./chat";
+import { runFile } from "./chat";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -56,25 +55,7 @@ export async function searchSessions(db: StewardPorts["db"], workspaceId: string
     }) }] : [];
   });
 }
-/**
- * A file to attach, kept by chat: an attachment the run received (content/chat/<file>) or a file the run wrote in its
- * working directory, copied in. Never a host path outside the run's directory.
- */
-async function replyFile(ctx: ToolContext, path: string) {
-  if (path.startsWith("content/chat/")) {
-    const ref = `chat/${path.slice("content/chat/".length)}`, file = await readChatFile(ctx.ports, ref);
-    if (!file) throw new StewardError("not_found", `No received attachment ${path}`);
-    return { name: path.split("/").pop()!.replace(/^[0-9a-f-]{36}-/, ""), ref, size: file.bytes.byteLength };
-  }
-  const root = await realpath(ctx.run.cwd);
-  const full = await realpath(join(root, path)).catch(() => { throw new StewardError("not_found", `No file ${path} in the working directory`); });
-  const rel = relative(root, full);
-  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new StewardError("forbidden", "Attachments must be files in the working directory");
-  const info = await stat(full);
-  if (!info.isFile()) throw new StewardError("invalid", `${path} is not a file`);
-  if (info.size > 20 * 1024 * 1024) throw new StewardError("invalid", `${path} is larger than 20 MiB`);
-  return storeChatFile(ctx.ports, path.split("/").pop()!, await readFile(full));
-}
+const replyFile = (ctx: ToolContext, path: string) => runFile(ctx.ports, ctx.run.cwd, path);
 async function reply(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;
   if (!session || !run.sessionId) throw new StewardError("invalid", "Reply requires a session");
@@ -86,7 +67,7 @@ async function reply(ctx: ToolContext, raw: unknown) {
     const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation?.channel ?? "in_app", sessionId: session.id, text: input.text, attachments, at: now() } });
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });
     // Background results reach their origin conversation at finalization; conversation replies go to its entry now.
-    if (session.source !== "wake" && session.source !== "module") await pushReply(tx, ctx.ports, message, run.id);
+    if (!["wake", "module", "build"].includes(session.source)) await pushReply(tx, ctx.ports, message, run.id);
     return message;
   });
   void drainCalls(ctx.ports, workspaceId).catch(() => {});
@@ -104,38 +85,6 @@ async function schedule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_schedule, raw);
   const pending = await gate(ctx, "schedule", {}, { tool: ctx.tool, ...input });
   return pending ?? ctx.schedules.create(ctx.run.sessionId ?? undefined, input, "chrona");
-}
-async function proposeModule(ctx: ToolContext, raw: unknown) {
-  const { request, dir, ...input } = parseInput(schemas.chrona_propose, raw);
-  if (ctx.run.lane === "build") {
-    if (!dir) throw new StewardError("conflict", "Build runs submit module directories, not requests");
-    return proposeFromBuild(ctx.ports, ctx.workspaceId, ctx.run, { dir, intent: input.intent });
-  }
-  if (request) {
-    // Kept by chat like reply attachments: the session directory is gone by the time the build runs.
-    const files = await Promise.all(request.files.map(async path => { const { name, ref } = await replyFile(ctx, path); return { name, ref }; }));
-    return requestBuild(ctx.ports, ctx.workspaceId, ctx.run, { request: { ...request, files }, intent: input.intent });
-  }
-  return ctx.modules.propose({ ...input, dir: dir!, root: ctx.run.cwd }, "provider");
-}
-async function listModules(ctx: ToolContext, raw: unknown) {
-  parseInput(schemas.chrona_modules, raw);
-  return ctx.modules.list();
-}
-async function requireRunModule(ctx: ToolContext, moduleId: string) {
-  const row = await ctx.db.module.findFirst({ where: { id: moduleId, workspaceId: ctx.workspaceId } });
-  if (!row) throw new StewardError("not_found", "Module not found");
-  return row;
-}
-async function checkoutModule(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_module_checkout, raw), module = await requireRunModule(ctx, input.moduleId);
-  await ctx.modules.checkout(module.id, input.hash, input.dir, ctx.run.cwd);
-  return { moduleId: module.id, hash: input.hash ?? module.activeHash, dir: input.dir };
-}
-async function rollbackModule(ctx: ToolContext, raw: unknown) {
-  const input = parseInput(schemas.chrona_module_rollback, raw);
-  await requireRunModule(ctx, input.moduleId);
-  return ctx.modules.rollback(input.moduleId, input.hash);
 }
 async function schedules(ctx: ToolContext, raw: unknown) {
   parseInput(schemas.chrona_schedules, raw);
@@ -162,7 +111,6 @@ async function requestPathAccess(ctx: ToolContext, raw: unknown) {
   return ctx.approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，后续运行可以读写：\n${path}`, payload: { tool: ctx.tool, kind: "host_path", path, sessionId: ctx.run.sessionId } });
 }
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {
-  chrona_propose: proposeModule, chrona_modules: listModules, chrona_module_checkout: checkoutModule, chrona_module_rollback: rollbackModule,
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
   chrona_schedule_cancel: cancelSchedule,
   chrona_session_search: async (ctx, raw) => { const input = parseInput(schemas.chrona_session_search, raw); return searchSessions(ctx.db, ctx.workspaceId, input.query, input.limit); },
@@ -172,9 +120,12 @@ const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unk
   chrona_preferences: async (ctx, raw) => { parseInput(schemas.chrona_preferences, raw); return ctx.preferences.list(); },
 };
 /** No provider-supplied workspace IDs: all ownership comes from the capability. */
+/** A build conversation (v2-13) writes and submits one module: it reports back and nothing else (no user data, no other apps). */
+const BUILD_TOOLS = ["chrona_reply", "m_modules_propose", "m_modules_check", "m_modules_checkout"];
 export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
-  async function call(token: string, name: string, raw: unknown) {
+  /** `timeoutSeconds` (v2-13): how long the caller waits; tools that wait stop by then, and never past the run's deadline. */
+  async function call(token: string, name: string, raw: unknown, { timeoutSeconds = 60 }: { timeoutSeconds?: number } = {}) {
     const claim = await db.$transaction(async tx => {
       const auth = await authenticateRun(tx, token, now(), name);
       const calls = Array.isArray(auth.run.toolCalls) ? auth.run.toolCalls as Prisma.InputJsonObject[] : [];
@@ -190,11 +141,12 @@ export function createTools(ports: StewardPorts) {
     });
     if (!claim) throw new StewardError("forbidden", "Chrona tool call limit reached");
     const { workspaceId, run, index } = claim;
+    const deadline = Math.min(now().getTime() + timeoutSeconds * 1000, run.deadlineAt!.getTime());
     let ok = false;
     try {
-      if (run.lane === "build" && name !== "chrona_propose") throw new StewardError("forbidden", "Build runs may only call chrona_propose");
+      if (claim.session?.source === "build" && !BUILD_TOOLS.includes(name)) throw new StewardError("forbidden", "A build conversation may only reply and use module tools");
       if (name.startsWith("m_")) {
-        const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id }, name, raw);
+        const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline }, name, raw);
         ok = true; return result;
       }
       if (!CHRONA_TOOLS.includes(name as ToolName)) throw new StewardError("invalid", "Unknown Chrona tool");
@@ -210,8 +162,8 @@ export function createTools(ports: StewardPorts) {
     }
   }
   return { catalog: async (token: string) => {
-    const { run } = await authenticateRun(db, token, now());
-    if (run.lane === "build") return [{ name: "chrona_propose", inputSchema: z.toJSONSchema(schemas.chrona_propose) }];
+    const { run, session } = await authenticateRun(db, token, now());
+    if (session?.source === "build") return [{ name: "chrona_reply", inputSchema: z.toJSONSchema(schemas.chrona_reply) }, ...(await moduleToolCatalog(ports, run)).filter(tool => BUILD_TOOLS.includes(tool.name))];
     return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...await moduleToolCatalog(ports, run)];
   }, call };
 }

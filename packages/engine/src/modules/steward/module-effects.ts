@@ -2,7 +2,7 @@ import type { Prisma } from "@chrona/db";
 import { currentTarget, grantedUses, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { CallScope } from "./module-model";
-import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
+import { callerGranted, CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
 import { notifyUser } from "./notify-user";
 export type { CallScope } from "./module-model";
 
@@ -25,7 +25,7 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
   const { args, mode, key, reply, timeoutMs } = call.params, target = currentTarget(call.params.target), now = ports.now();
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
   const uses = grantedUses(scope.manifest);
-  if (!uses.includes(target) && !uses.includes("*")) {
+  if (!uses.includes(target) && !uses.includes("*") && !await callerGranted(ports.db, scope.workspaceId, target, scope.manifest.name)) {
     await ports.db.moduleCall.create({ data: { ...record, key: target, status: "rejected", error: "undeclared" } });
     return { id: call.id, error: { code: "undeclared", message: `${target} is not in the manifest's uses` } };
   }

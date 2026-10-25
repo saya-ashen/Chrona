@@ -26,7 +26,8 @@ test("bridge registers catalog schemas, forwards calls, never terminates or nudg
     return Response.json(String(url).endsWith("/catalog") ? { tools: [{ name: "chrona_reply", description: "Reply", parameters }] } : { ok: true, data: { messageId: "id" } });
   }) as typeof fetch;
   await withBridge(base, fetcher, async tools => {
-    expect(tools).toHaveLength(1); expect(tools[0].parameters).toEqual(parameters);
+    // Every tool also takes timeoutSeconds (v2-13): how long the caller lets this call take.
+    expect(tools).toHaveLength(1); expect(tools[0].parameters).toMatchObject({ ...parameters, properties: { ...parameters.properties, timeoutSeconds: { type: "integer", minimum: 1, maximum: 600 } } });
     const result = await tools[0].execute("call", { text: "hello" });
     expect(result.content[0].text).toBe('{"messageId":"id"}');
     expect("terminate" in result).toBe(false);
@@ -34,7 +35,13 @@ test("bridge registers catalog schemas, forwards calls, never terminates or nudg
     expect(seen[0].init?.method).toBe("GET"); expect(seen[1].init?.method).toBe("POST");
     expect(seen[1].init?.body).toBe('{"text":"hello"}');
     expect(seen[1].init?.redirect).toBe("error");
-    expect(seen[1].init?.headers).toEqual({ authorization: "Bearer bridge-token", "content-type": "application/json" });
+    expect(seen[1].init?.headers).toEqual({ authorization: "Bearer bridge-token", "content-type": "application/json", "x-chrona-timeout-seconds": "60" });
+    // It travels as a header, not as a tool argument; out-of-range values fall back to the default or the cap.
+    await tools[0].execute("call", { text: "wait", timeoutSeconds: 300 });
+    expect(seen[2].init?.body).toBe('{"text":"wait"}');
+    expect(seen[2].init?.headers).toMatchObject({ "x-chrona-timeout-seconds": "300" });
+    await tools[0].execute("call", { text: "long", timeoutSeconds: 5000 });
+    expect(seen[3].init?.headers).toMatchObject({ "x-chrona-timeout-seconds": "600" });
   });
 });
 test("bridge refuses non-loopback URLs without sending the capability", async () => {

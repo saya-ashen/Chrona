@@ -69,7 +69,7 @@ export function continuityPreview(continuity: ContinuityReport, needsMigration: 
 export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string) {
   const available = 20_000 - (prefix.length + suffix.length);
   if (codeDiff.length <= available) return prefix + codeDiff + suffix;
-  const marker = `…代码差异过长，已截断；完整代码可用 chrona_module_checkout 检出 hash ${hash}`;
+  const marker = `…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${hash}`;
   // Leave mandatory review text intact, even when it leaves no room for the marker.
   if (available < marker.length + 2) return null;
   return prefix + codeDiff.slice(0, available - marker.length - 2) + "\n" + suffix + "\n" + marker;

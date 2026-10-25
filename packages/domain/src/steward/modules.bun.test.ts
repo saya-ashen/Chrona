@@ -75,6 +75,11 @@ describe("module channel contract", () => {
   });
   test("deprecated effects and secrets stand for system interfaces", () => {
     expect(grantedUses({ effects: ["model", "wake_provider", "notify_user", "network"], uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["files.read", "notify.send", "provider.complete", "provider.wake", "secrets.get"]);
+    // v2-14: contributes is opaque JSON for the module it names, at most 32 KiB.
+    const base = { name: "mod", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] };
+    expect(moduleManifestSchema.parse({ ...base, contributes: { events: { emits: [{ name: "updated" }] } } }).contributes).toEqual({ events: { emits: [{ name: "updated" }] } });
+    expect(moduleManifestSchema.safeParse({ ...base, contributes: { events: "x".repeat(33 * 1024) } }).success).toBe(false);
+    expect(moduleManifestSchema.safeParse({ ...base, contributes: { "Bad Name": 1 } }).success).toBe(false);
     // v2-10 names in approved manifests and calls keep working.
     expect(grantedUses({ effects: [], uses: ["ai.complete", "ai.wake"] })).toEqual(["provider.complete", "provider.wake"]);
     expect(currentTarget("ai.wake")).toBe("provider.wake");

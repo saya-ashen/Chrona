@@ -35,4 +35,4 @@ bubblewrap 下浏览器与 Pi 在同一沙箱内：只读根目录让 PATH 和 `
 
 - 首页健康信息不显示浏览器状态，只有日志。
 - 截图只限视口，不支持整页长图和交互（点击、输入）。
-- 对话运行里用 `chrona_module_checkout` 取出的模块没有预览脚本；预览只在构建运行中提供。
+- 对话运行里用 `m_modules_checkout` 取出的模块没有预览脚本；预览只在构建会话中提供（[v2-13](platform-v2-13-modules-tools.md)）。

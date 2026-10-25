@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPROVAL_SCOPES, APPROVAL_STATUSES, attachmentSchema, isEntryModule, providerAnswerSchema, DELIVERY_CHANNELS, moduleManifestSchema, SESSION_SOURCES, SESSION_STATUSES } from "@chrona/contracts/steward";
+import { APPROVAL_SCOPES, APPROVAL_STATUSES, attachmentSchema, modulesToolInputSchemas, RUN_LIMITS, isEntryModule, providerAnswerSchema, DELIVERY_CHANNELS, moduleManifestSchema, SESSION_SOURCES, SESSION_STATUSES } from "@chrona/contracts/steward";
 import { createChat, readChatFile } from "./chat";
 import { createSessions } from "./sessions";
 import { createApprovals } from "./approvals";
@@ -13,13 +13,15 @@ import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
 import { createSchedules } from "./schedules";
 import { createNotificationsView, forwardSettings } from "./notify-user";
-import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type Tool } from "./module-calls";
+import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "./module-calls";
+import { startBuild } from "./module-build-session";
+import { sessionTranscript } from "./transcript";
 import { parseInput } from "./errors";
 import { storedAttachments } from "./store";
 import type { StewardPorts } from "./ports";
 
 type Properties = Tool["parameters"]["properties"];
-const tool = (name: string, description: string, properties: Properties, required: string[], extra: Partial<Tool> = {}): Tool =>
+const tool = (name: string, description: string, properties: Properties, required: string[], extra: Partial<SystemTool> = {}): SystemTool =>
   ({ name, description, parameters: { type: "object", properties, required }, visibility: ["modules"], idempotent: false, ...extra });
 const text = (description?: string) => ({ type: "string" as const, ...(description ? { description } : {}) });
 /** Conversations and approvals act for the user: only a module (its manifest `uses`, approved with it) may call them. */
@@ -58,6 +60,8 @@ const chat: SystemModule = {
     tool("today", "The user's overview: approvals waiting, the next 7 days of schedules, recent notifications, apps, recent conversations and health.", {}, [], { idempotent: true }),
     tool("messages", "A conversation's recent messages, oldest first.", { session: text(), limit: { type: "number", description: "1-200, default 50" } }, ["session"], { idempotent: true }),
     tool("runs", "Recent Provider runs (progress, usage, questions waiting for the user), optionally of one conversation.", { session: text() }, [], { idempotent: true }),
+    // v2-13: what the Provider did, for the user's own pages; only the entry modules that show it (not modules with uses "*").
+    tool("transcript", "What the Provider did in a conversation: its text, tool calls and clipped results, credentials redacted.", { session: text() }, ["session"], { idempotent: true, callers: ["web", "mcp"] }),
     tool("answer", "Answer a question a running Provider asked the user.", { interaction: text(), answer: text('JSON {"decision":"submit","value":…} or {"decision":"cancel"}') }, ["interaction", "answer"]),
     tool("cancel", "Stop a running Provider run.", { run: text() }, ["run"], { idempotent: true }),
   ],
@@ -90,6 +94,11 @@ const chat: SystemModule = {
       case "session": return json(await createSessions(ports, workspaceId).get(String(args.session)));
       case "session-update": return json(await createSessions(ports, workspaceId).update(String(args.session), { ...(args.title !== undefined ? { title: args.title } : {}), ...(args.status !== undefined ? { status: args.status } : {}) }));
       case "messages": return json(await createSessions(ports, workspaceId).messages(String(args.session), args.limit ?? 50));
+      case "transcript": {
+        const session = await db.session.findFirst({ where: { id: String(args.session), workspaceId } });
+        if (!session) throw new CallError("not_found", "Conversation not found");
+        return json(await sessionTranscript(ports, session.id));
+      }
       case "runs": return json(await createProviderControl(ports, workspaceId).list(args.session ? String(args.session) : undefined));
       case "answer": return json(await createProviderControl(ports, workspaceId).answer(String(args.interaction), parseInput(providerAnswerSchema, parsed(args.answer, "answer"))));
       case "cancel": return json(await createProviderControl(ports, workspaceId).cancel(String(args.run)));
@@ -139,27 +148,103 @@ const approvals: SystemModule = {
   },
 };
 
-/** `modules`: what Chrona knows about the apps (versions, runs) and which tools a caller may reach; never what an app reports about itself. */
+/** Test output kept short, as the approval card and build reports show it. */
+const shortReport = (report: unknown) => JSON.parse(JSON.stringify(report ?? null, (key, value: unknown) => ["stdout", "stderr"].includes(key) && typeof value === "string" ? value.slice(-1500) : value)) as Json;
+async function moduleNamed(db: StewardPorts["db"], workspaceId: string, name: unknown) {
+  const module = await db.module.findFirst({ where: { workspaceId, name: String(name) } });
+  if (!module) throw new CallError("not_found", `Module ${String(name)} not found`);
+  return module;
+}
+/** `modules.check`: a version's status and report, waiting (to `wait` seconds, and the caller's deadline) while it is checked. */
+async function checkVersion(ports: StewardPorts, workspaceId: string, args: z.output<typeof modulesToolInputSchemas.check>, deadline = Infinity) {
+  const module = await moduleNamed(ports.db, workspaceId, args.module), until = Math.min(Date.now() + args.wait * 1000, deadline - 1000);
+  for (;;) {
+    const version = await ports.db.moduleVersion.findFirst({ where: { moduleId: module.id, ...(args.hash ? { hash: args.hash } : {}) }, orderBy: { createdAt: "desc" } });
+    if (!version) throw new CallError("not_found", `No version${args.hash ? ` ${args.hash}` : ""} of ${module.name}`);
+    if (!["building", "testing"].includes(version.status) || Date.now() >= until) {
+      return { module: module.name, hash: version.hash, status: version.status, active: module.activeHash === version.hash, report: shortReport(version.report) };
+    }
+    await Bun.sleep(Math.min(2000, Math.max(0, until - Date.now())));
+  }
+}
+/** `modules` tools that read or write the calling run's working directory: the Provider's only (v2-13). */
+async function workspaceTool(ports: StewardPorts, workspaceId: string, caller: Caller, name: string, args: Record<string, unknown>) {
+  if (caller.kind !== "provider") throw new CallError("forbidden", "Only the Provider may call this");
+  const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId } });
+  if (!run) throw new CallError("not_found", "Run not found");
+  const api = createModules(ports, workspaceId);
+  if (name === "checkout") {
+    const module = await moduleNamed(ports.db, workspaceId, args.module), hash = typeof args.hash === "string" ? args.hash : undefined;
+    await api.checkout(module.id, hash, String(args.dir), run.cwd);
+    return { module: module.name, hash: hash ?? module.activeHash, dir: args.dir };
+  }
+  if (name === "propose") {
+    const submitted = await ports.db.audit.count({ where: { workspaceId, kind: "module_submission", actorKey: `provider:${run.id}` } });
+    if (submitted >= RUN_LIMITS.maxBuildSubmissionsPerRun) throw new CallError("failed", "Submission limit for this run reached");
+    const input = args as z.output<typeof modulesToolInputSchemas.propose>;
+    const proposal = await api.propose({ dir: input.dir, intent: input.intent, root: run.cwd }, run.lane === "build" ? "build" : "provider");
+    // Who submitted (run, conversation): for reports now and for callbacks later.
+    await ports.db.audit.create({ data: { workspaceId, actorKey: `provider:${run.id}`, kind: "module_submission", subjectId: proposal.moduleId, details: { hash: proposal.hash, runId: run.id, sessionId: run.sessionId } } });
+    return proposal;
+  }
+  return startBuild(ports, workspaceId, run.id, args as z.output<typeof modulesToolInputSchemas.build>);
+}
+/** `modules.contributions` (v2-14): what active modules declared for the calling module, in `contributes.<its name>`. */
+async function contributions(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>, section: string) {
+  if (section !== caller.module) throw new CallError("forbidden", "A module reads only the declarations addressed to it");
+  const found = [];
+  for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
+    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+    const value = moduleManifestSchema.safeParse(version?.manifest).data?.contributes?.[section];
+    if (value !== undefined) found.push({ module: module.name, hash: module.activeHash!, value });
+  }
+  return found;
+}
+/** `modules.tools`: module tools the calling module may reach; every word of the query must match a name or description. */
+async function toolSearch(ports: StewardPorts, workspaceId: string, caller: Caller, query: unknown) {
+  const words = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean), found = [];
+  for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
+    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+    for (const candidate of moduleManifestSchema.safeParse(version?.manifest).data?.tools ?? []) {
+      const target = `${module.name}.${candidate.name}`;
+      if (!words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) || !await admitted(ports.db, caller, candidate, target)) continue;
+      found.push({ target, description: candidate.description, inputSchema: { ...candidate.parameters, additionalProperties: false }, idempotent: candidate.idempotent });
+    }
+  }
+  return found;
+}
+const provider = (input: z.ZodType, extra: Partial<SystemTool> = {}) => ({ visibility: ["provider" as const], input, ...extra });
+
+/**
+ * `modules`: what Chrona knows about the apps (versions, runs) and which tools a caller may reach; never what an app reports
+ * about itself. v2-13: the Provider changes modules here (checkout, propose, check, rollback, build) — never an ordinary module.
+ */
 const modules: SystemModule = {
   name: "modules",
   tools: [
-    tool("list", "Apps with their status, active and recent versions (with rejection reasons) and recent runs.", {}, [], { idempotent: true }),
+    tool("list", "Apps with their status, active and recent versions (with rejection reasons) and recent runs.", {}, [], { idempotent: true, visibility: ["modules", "provider"] }),
     tool("tools", "Module tools the caller may call (<module>.<tool>, description, input schema); query matches every word against names and descriptions.", { query: text() }, [], { idempotent: true }),
+    // v2-14: a module reads the `contributes.<its name>` declarations of the active modules; nobody else reads them.
+    tool("contributions", "Active modules' declarations in contributes.<section>, where section is the caller's own name: [{ module, hash, value }].", { section: text() }, ["section"], { idempotent: true }),
+    tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["provider", "owner"], idempotent: true })),
+    tool("checkout", modulesToolInputSchemas.checkout.description!, {}, [], provider(modulesToolInputSchemas.checkout)),
+    tool("propose", modulesToolInputSchemas.propose.description!, {}, [], provider(modulesToolInputSchemas.propose)),
+    tool("rollback", modulesToolInputSchemas.rollback.description!, {}, [], provider(modulesToolInputSchemas.rollback, { visibility: ["provider", "owner"] })),
+    tool("build", modulesToolInputSchemas.build.description!, {}, [], provider(modulesToolInputSchemas.build)),
   ],
-  async handle({ ports, workspaceId, caller }, name, args) {
-    if (caller.kind !== "module") throw new CallError("forbidden", "Only a module may call this");
-    if (name === "list") return json(await createModules(ports, workspaceId).list());
-    if (name !== "tools") throw new CallError("not_found", `modules.${name} not found`);
-    const words = String(args.query ?? "").toLowerCase().split(/\s+/).filter(Boolean), found = [];
-    for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
-      const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-      for (const candidate of moduleManifestSchema.safeParse(version?.manifest).data?.tools ?? []) {
-        const target = `${module.name}.${candidate.name}`;
-        if (!words.every(word => `${target} ${candidate.description}`.toLowerCase().includes(word)) || !await admitted(ports.db, caller, candidate, target)) continue;
-        found.push({ target, description: candidate.description, inputSchema: { ...candidate.parameters, additionalProperties: false }, idempotent: candidate.idempotent });
-      }
+  async handle({ ports, workspaceId, caller, deadline }, name, args) {
+    const api = createModules(ports, workspaceId);
+    if (name === "list") {
+      if (caller.kind !== "module" && caller.kind !== "provider") throw new CallError("forbidden", "Only a module or the Provider may call this");
+      return json(await api.list());
     }
-    return json(found);
+    if (name === "check") return json(await checkVersion(ports, workspaceId, args as z.output<typeof modulesToolInputSchemas.check>, deadline));
+    if (name === "rollback") return json(await api.rollback((await moduleNamed(ports.db, workspaceId, args.module)).id, String(args.hash)));
+    if (["checkout", "propose", "build"].includes(name)) return json(await workspaceTool(ports, workspaceId, caller, name, args));
+    if (caller.kind !== "module") throw new CallError("forbidden", "Only a module may call this");
+    if (name === "contributions") return json(await contributions(ports, workspaceId, caller, String(args.section)));
+    if (name !== "tools") throw new CallError("not_found", `modules.${name} not found`);
+    return json(await toolSearch(ports, workspaceId, caller, args.query));
   },
 };
 

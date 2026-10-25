@@ -1,0 +1,184 @@
+import { afterEach, expect, test } from "bun:test";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { moduleManifestSchema, type ProviderRunInput } from "@chrona/contracts/steward";
+import { createStewardService } from "./service";
+import { createTick } from "./tick";
+import type { StewardPorts } from "./ports";
+import { testModuleSandbox } from "./module-test-process";
+import { testDb } from "./test-db";
+import { createModules } from "./modules";
+import { handleModuleCall } from "./module-effects";
+import { sessionTranscript } from "./transcript";
+import { notices } from "./test-notices";
+
+const cleanups: (() => Promise<unknown>)[] = [];
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+const intent = { changes: ["Sort shop mail without the model"], preserves: [] };
+const request = { name: "mail-sort", goal: "Mark mail from *@shop.example handled", examples: ["from a@shop.example → handled"], intent };
+const manifest = { name: "mail-sort", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], tests: ["test.ts"] };
+type Run = (input: ProviderRunInput, call: (name: string, args: unknown, options?: { timeoutSeconds?: number }) => Promise<unknown>) => Promise<void>;
+
+/** A real service and tick with a scripted Provider; one web conversation with a running foreground run. */
+async function fixture() {
+  const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-build-session-"));
+  cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
+  let script: Run = async () => {};
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null,
+    moduleSdk: fileURLToPath(new URL("../../../../integrations/src/steward/module-sdk", import.meta.url)),
+    sandbox: { available: true, isolated: true, async runModule() { return { status: "succeeded", output: '{"effects":[]}', error: null, exitCode: 0 }; } },
+    provider: { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start(input) {
+      starts.push(input);
+      const done = script(input, async (name, args, options) => {
+        const answer = await service.tools.call(input.token, name, args, options) as { result?: unknown };
+        return name.startsWith("m_") ? answer.result : answer;
+      }).then(() => ({ outcome: "finished" as const, sessionId: `pi-${input.runId}`, error: null }));
+      pending.push(done);
+      return { async inject() {}, async abort() {}, done };
+    } },
+  };
+  ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
+  const service = createStewardService(ports);
+  const workspaceId = (await db.workspace.create({ data: { name: "build" } })).id, api = service.forWorkspace(workspaceId);
+  const session = await db.session.create({ data: { workspaceId, key: "web:build", source: "web" } });
+  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Sort mail" });
+  const requester = (await api.runs.claimNext("foreground"))!;
+  const tick = createTick(ports);
+  async function step() {
+    await tick();
+    await Promise.all(pending.splice(0));
+    // Finishing a run (and delivering a build's reply) follows the Provider's completion.
+    for (let i = 0; i < 100 && await db.run.count({ where: { workspaceId, status: "running" } }) > 1; i++) await Bun.sleep(10);
+    await tick.settled();
+  }
+  async function writeModule(cwd: string) {
+    await mkdir(join(cwd, "mail-sort"), { recursive: true });
+    await writeFile(join(cwd, "mail-sort", "module.json"), JSON.stringify(manifest));
+    await writeFile(join(cwd, "mail-sort", "index.ts"), 'import { on } from "chrona"; on("schedule", async () => ({}));');
+    await writeFile(join(cwd, "mail-sort", "test.ts"), "process.exit(0)");
+  }
+  // Module tools (m_*) answer { result }, like any app's tools.
+  const call = async (name: string, args: unknown, options?: { timeoutSeconds?: number }) => {
+    const answer = await service.tools.call(requester.token, name, args, options) as { result?: unknown };
+    return name.startsWith("m_") ? answer.result : answer;
+  };
+  return { db, dataDir, ports, service, api, workspaceId, session, requester, starts, step, writeModule, call, onRun: (next: Run) => { script = next; } };
+}
+
+test("a build is its own conversation: restricted tools, it submits and checks, and its reply comes back to the conversation that asked", async () => {
+  const f = await fixture();
+  await mkdir(f.requester.cwd, { recursive: true });
+  await writeFile(join(f.requester.cwd, "mock.png"), "png bytes");
+  await f.db.preference.create({ data: { workspaceId: f.workspaceId, text: "卡片紧凑，少用边框", origin: "said", topic: "ui" } });
+  const started = await f.call("m_modules_build", { ...request, files: ["mock.png"] }) as { status: string; sessionId: string };
+  expect(started).toMatchObject({ status: "build_started" });
+  await expect(f.call("m_modules_build", request)).rejects.toMatchObject({ message: expect.stringContaining("already running") });
+
+  const build = await f.db.session.findUniqueOrThrow({ where: { id: started.sessionId } });
+  expect(build).toMatchObject({ source: "build", originSessionId: f.session.id, title: "构建模块 mail-sort", status: "active" });
+  const queued = await f.db.run.findFirstOrThrow({ where: { sessionId: build.id } });
+  expect(queued).toMatchObject({ lane: "build", status: "queued", cwd: join(f.dataDir, "sessions", build.id) });
+  for (const text of [request.goal, "卡片紧凑，少用边框", "m_modules_propose", "m_modules_check", "chrona_reply"]) expect(queued.prompt).toContain(text);
+  expect(JSON.parse(await readFile(join(queued.cwd, "request.json"), "utf8"))).toMatchObject({ name: "mail-sort", files: ["files/1-mock.png"] });
+  expect(await readFile(join(queued.cwd, "files", "1-mock.png"), "utf8")).toBe("png bytes");
+  expect((await stat(join(queued.cwd, "node_modules", "chrona", "sdk.ts"))).mode & 0o222).toBe(0);
+  // Nobody can talk into a build conversation.
+  await expect(f.api.chat.handleMessage({ sessionId: build.id, text: "也加上周报", channel: "in_app" })).rejects.toMatchObject({ code: "forbidden" });
+
+  let report: { status?: string; report?: unknown } = {};
+  f.onRun(async (input, call) => {
+    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout"] });
+    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose"]);
+    await expect(call("chrona_schedule", {})).rejects.toMatchObject({ code: "forbidden" });
+    await expect(call("m_modules_build", request)).rejects.toMatchObject({ code: "forbidden" });
+    await f.writeModule(input.cwd);
+    const proposal = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string; status: string };
+    expect(proposal.status).toBe("building");
+    await createModules(f.ports, f.workspaceId).buildPending();
+    report = await call("m_modules_check", { module: "mail-sort", hash: proposal.hash }) as typeof report;
+    await call("chrona_reply", { text: `构建完成：mail-sort ${proposal.hash.slice(0, 8)} 待你批准` });
+  });
+  await f.step();
+  expect(f.starts.map(input => input.lane)).toEqual(["build"]);
+  expect(report).toMatchObject({ status: "pending_review", report: { tests: expect.any(Array) } });
+  const version = await f.db.moduleVersion.findFirstOrThrow();
+  expect(version).toMatchObject({ source: "build", status: "pending_review" });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_submission" } })).toMatchObject({ details: { hash: version.hash, sessionId: build.id } });
+  // The reply went back to the web conversation that asked.
+  expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准`]);
+});
+
+test("who may manage modules: the Provider in its own directory; the user may check and roll back; ordinary modules never", async () => {
+  const f = await fixture();
+  await expect(f.call("m_modules_checkout", { module: "mail-sort", dir: "../escape" })).rejects.toThrow();
+  await mkdir(f.requester.cwd, { recursive: true });
+  await f.writeModule(f.requester.cwd);
+  const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
+  // The owner (MCP, web) sees check and rollback, never propose, checkout or build.
+  const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
+  expect(owner).toEqual(["m_modules_check", "m_modules_rollback"]);
+  expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
+  await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
+  // An ordinary module cannot reach them even if it lists them.
+  const other = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["modules.propose", "modules.build", "*"] });
+  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "o" } });
+  for (const target of ["modules.propose", "modules.build", "modules.checkout"]) {
+    expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
+  }
+});
+
+test("check waits while a version is checked, but never past the caller's timeoutSeconds", async () => {
+  const f = await fixture();
+  await mkdir(f.requester.cwd, { recursive: true });
+  await f.writeModule(f.requester.cwd);
+  await f.call("m_modules_propose", { dir: "mail-sort", intent });
+  const started = Date.now();
+  expect(await f.call("m_modules_check", { module: "mail-sort", wait: 600 }, { timeoutSeconds: 3 })).toMatchObject({ status: "building" });
+  expect(Date.now() - started).toBeLessThan(3000);
+  expect(Date.now() - started).toBeGreaterThanOrEqual(1500);
+});
+
+test("transcripts: the Provider's text, tool calls and clipped results, credentials redacted; only web and mcp may read them", async () => {
+  const f = await fixture(), secret = "sk-live-1234567890abcdefXYZ";
+  process.env.CHRONA_TEST_API_KEY = "very-secret-value";
+  cleanups.push(async () => { delete process.env.CHRONA_TEST_API_KEY; });
+  const dir = join(f.dataDir, "sessions", f.session.id, ".chrona", "sessions");
+  await mkdir(dir, { recursive: true });
+  const lines = [
+    { type: "session", version: 3, id: "s" },
+    { type: "message", timestamp: "2026-10-25T01:00:00Z", message: { role: "user", content: "the whole prompt" } },
+    { type: "message", timestamp: "2026-10-25T01:00:01Z", message: { role: "assistant", content: [{ type: "thinking", thinking: "private reasoning" }, { type: "text", text: "先看看测试" }, { type: "toolCall", name: "bash", arguments: { command: "bun test" } }] } },
+    { type: "message", timestamp: "2026-10-25T01:00:02Z", message: { role: "toolResult", toolName: "bash", isError: true, content: [{ type: "text", text: `key very-secret-value ${secret} ${"x".repeat(3000)}` }] } },
+  ];
+  await writeFile(join(dir, "2026-10-25_s.jsonl"), lines.map(line => JSON.stringify(line)).join("\n") + "\nnot json\n");
+  const items = await sessionTranscript(f.ports, f.session.id);
+  expect(items.map(item => item.kind)).toEqual(["text", "tool", "result"]);
+  expect(items[0]).toMatchObject({ text: "先看看测试" });
+  expect(items[1]).toMatchObject({ tool: "bash", args: '{"command":"bun test"}' });
+  const result = items[2] as { text: string; error: boolean };
+  expect(result.error).toBe(true);
+  expect(result.text).not.toContain("very-secret-value");
+  expect(result.text).not.toContain(secret);
+  expect(result.text.length).toBeLessThan(2100);
+  expect(JSON.stringify(items)).not.toContain("private reasoning");
+
+  const reader = async (name: string, uses: string[]) => {
+    const manifestOf = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses, ...(name === "web" ? { listen: ["/"] } : {}) });
+    const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: name } });
+    await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: name, manifest: manifestOf, source: "builtin", intent: {}, report: {}, status: "approved" } });
+    return handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: row.id, hash: name, manifest: manifestOf }, { id: "t", method: "call", params: { target: "chat.transcript", args: { session: f.session.id }, mode: "sync", reply: false } });
+  };
+  expect(await reader("web", ["chat.transcript"])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
+  expect(await reader("snoop", ["chat.transcript", "*"])).toMatchObject({ error: { code: "forbidden" } });
+});
+
+test("upgrade: builds from the old build lane (no conversation) are cancelled once and the user is told", async () => {
+  const f = await fixture();
+  const legacy = await f.db.run.create({ data: { workspaceId: f.workspaceId, lane: "build", trigger: "build", status: "queued", prompt: "", provider: "fake", tokenHash: "legacy", cwd: join(f.dataDir, "builds", "x"), createdAt: new Date() } });
+  await f.step(); await f.step();
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled" });
+  expect((await notices(f.db, { title: "模块构建已取消" })).length).toBe(1);
+});

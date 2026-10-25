@@ -5,7 +5,7 @@ import type { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
 import { validateToolArgs } from "./module-tools";
-import { StewardError } from "./errors";
+import { parseInput, StewardError } from "./errors";
 
 export type Caller = z.infer<typeof callerSchema>;
 /** A JSON value as the contract carries it. */
@@ -14,7 +14,8 @@ export type Json = z.output<ReturnType<typeof z.json>>;
  * Who is calling, as Chrona knows it. `chain` holds the modules waiting on this call path (sync), `path` every module on it.
  * `run`: the module event being handled, for system modules that budget per event (provider.complete).
  */
-export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string } };
+/** `deadline` (ms since epoch, v2-13): when the caller stops waiting; system tools that wait finish by then. */
+export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string }; deadline?: number };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 export type Tool = ModuleManifest["tools"][number];
 export type CallErrorCode = "forbidden" | "not_found" | "cycle" | "invalid" | "unknown" | "failed" | "unavailable";
@@ -27,9 +28,13 @@ export class CallError extends Error {
  * built, sandboxed or paused, and its name is reserved.
  */
 /** `unrecorded`: tools called only synchronously whose arguments and results are never stored (credentials, model prompts and completions). */
-export type SystemModule = { name: string; tools: Tool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"] }, tool: string, args: Record<string, unknown>): Promise<Json> };
+/** A system tool may validate with a full schema (`input`) instead of scalar parameters: system modules are Chrona's own code. */
+export type SystemTool = Tool & { input?: z.ZodType };
+export type SystemModule = { name: string; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"]; deadline?: number }, tool: string, args: Record<string, unknown>): Promise<Json> };
 const systemModules = new Map<string, SystemModule>();
 export function registerSystemModule(module: SystemModule) { systemModules.set(module.name, module); }
+/** System modules and their tools, for catalogs (v2-13: the Provider reaches those visible to it). */
+export const listSystemModules = () => [...systemModules.values()];
 type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: Tool; system?: SystemModule };
 const MAX_ATTEMPTS = 6;
 const BATCH = 20;
@@ -64,7 +69,8 @@ async function resolveTarget(db: Db, workspaceId: string, target: string): Promi
 }
 /**
  * The target decides who may reach it: its visibility, and for modules (system ones too) its `callers` list.
- * A module reaches a `modules` tool it lists in `uses`; with `uses: ["*"]` it reaches the tools open to the user (v2-8 §3).
+ * A module reaches a `modules` tool it lists in `uses`, or one whose `callers` names it (v2-14: the target grants it);
+ * with `uses: ["*"]` it reaches the tools open to the user (v2-8 §3).
  */
 export async function admitted(db: Db, caller: Caller, tool: Tool, target: string) {
   const name = callerName(caller);
@@ -73,7 +79,13 @@ export async function admitted(db: Db, caller: Caller, tool: Tool, target: strin
   if (caller.kind !== "module") return tool.visibility.includes("modules");
   const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data, uses = manifest ? grantedUses(manifest) : [];
-  return (uses.includes(target) && tool.visibility.includes("modules")) || (uses.includes("*") && tool.visibility.includes("owner"));
+  // Past the check above, a `callers` list names this caller.
+  return ((uses.includes(target) || !!tool.callers) && tool.visibility.includes("modules")) || (uses.includes("*") && tool.visibility.includes("owner"));
+}
+/** v2-14: whether `target` names `module` in its `callers` (and is open to modules), so the caller need not list it in `uses`. */
+export async function callerGranted(db: Db, workspaceId: string, target: string, module: string) {
+  const resolved = await resolveTarget(db, workspaceId, currentTarget(target)).catch(() => null);
+  return !!resolved && !(resolved instanceof CallError) && !!resolved.tool.callers?.includes(module) && resolved.tool.visibility.includes("modules");
 }
 /** A system module's errors as call errors: its own refusals keep their code. */
 function systemError(error: unknown) {
@@ -85,8 +97,8 @@ function nextPath(origin: CallOrigin) {
   const name = callerName(origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
 }
-function validArgs(tool: Tool, raw: unknown) {
-  try { return validateToolArgs(tool, raw); }
+function validArgs(tool: SystemTool, raw: unknown) {
+  try { return tool.input ? parseInput(tool.input, raw) as Record<string, unknown> : validateToolArgs(tool, raw); }
   catch (error) { throw new CallError("invalid", error instanceof StewardError ? error.message : "Invalid call arguments"); }
 }
 function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null; attempt: number; chain: string[] }): ModuleEvent {
@@ -127,7 +139,7 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, target: 
   if (resolved.system) {
     // In-process: no event queue to wait on, so no deadlock to guard against.
     try {
-      const output = await resolved.system.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run }, resolved.tool.name, args);
+      const output = await resolved.system.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run, deadline: origin.deadline }, resolved.tool.name, args);
       await finish({ status: "succeeded", output: (quiet ? {} : output) as Prisma.InputJsonValue });
       return { callId: row.id, output };
     } catch (error) {

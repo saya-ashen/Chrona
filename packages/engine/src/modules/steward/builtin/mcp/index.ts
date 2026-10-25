@@ -9,7 +9,7 @@ type McpTool = { name: string; description: string; inputSchema: Args; run(args:
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
 const tools: McpTool[] = [
   { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), run: () => call("chat.today") },
-  { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module"] }, status: { type: "string", enum: ["active", "ended"] } }),
+  { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module", "build"] }, status: { type: "string", enum: ["active", "ended"] } }),
     run: ({ source, status }) => call("chat.sessions", { source, status }) },
   { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: ({ sessionId }) => call("chat.session", { session: sessionId }) },
   { name: "chrona_session_update", description: "Rename or end a conversation.", inputSchema: schema({ sessionId: str(), title: str(), status: { type: "string", enum: ["ended"] } }, ["sessionId"]),
@@ -17,6 +17,8 @@ const tools: McpTool[] = [
   { name: "chrona_session_new", description: "End the active conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), run: ({ key }) => call("chat.new-session", { key }) },
   { name: "chrona_session_messages", description: "Read a conversation's recent messages.", inputSchema: schema({ sessionId: str(), limit: { type: "integer", minimum: 1, maximum: 200 } }, ["sessionId"]),
     run: ({ sessionId, limit }) => call("chat.messages", { session: sessionId, limit }) },
+  { name: "chrona_session_transcript", description: "What Chrona did in a conversation or module build: its text, tool calls and clipped results.", inputSchema: schema({ sessionId: str() }, ["sessionId"]),
+    run: ({ sessionId }) => call("chat.transcript", { session: sessionId }) },
   { name: "chrona_chat", description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: schema({ text: str(), sessionId: str(), key: str() }, ["text"]),
     run: ({ text, sessionId, key }) => call("chat.ask", { text, session: sessionId, key: sessionId || key ? key : `mcp:${crypto.randomUUID()}` }) },
   { name: "chrona_approvals", description: "List approvals; defaults to open ones waiting for the user.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }),

@@ -44,7 +44,12 @@ async function api(request: Request, path: string[]) {
   const url = new URL(request.url), body = request.method === "POST" ? await request.json() as Args : {};
   const route = `${request.method} /${path.join("/")}`;
   if (route === "GET /today") return call("chat.today");
-  if (route === "GET /sessions") return call("chat.sessions", { source: "web", status: "active" });
+  if (route === "GET /sessions") {
+    // Web conversations and module builds (v2-13), newest first.
+    const lists = await Promise.all(["web", "build"].map(source => call("chat.sessions", { source, status: "active" }) as Promise<{ lastActivityAt: string }[]>));
+    return lists.flat().sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+  }
+  if (request.method === "GET" && path[0] === "sessions" && path[2] === "transcript" && path.length === 3) return call("chat.transcript", { session: path[1] });
   if (request.method === "GET" && path[0] === "sessions" && path[2] === "messages" && path.length === 3) return call("chat.messages", { session: path[1], limit: 100 });
   if (route === "POST /chat") {
     // An existing conversation continues under its key; without one the first message starts a new conversation.

@@ -28,3 +28,6 @@ pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); padd
 .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .markdown li.task { list-style: none; margin-left: -1.2rem; }
 .selected { font-weight: 600; }
+details > summary { cursor: pointer; font-weight: 600; margin: .6rem 0 .3rem; }
+.transcript { max-height: 60vh; overflow: auto; }
+.transcript p { margin: .3rem 0; }
