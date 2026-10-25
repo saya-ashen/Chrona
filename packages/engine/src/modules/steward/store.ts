@@ -11,7 +11,12 @@ export const toRun = (row: db.Run) => project(c.runSchema, row);
 export const toApproval = (row: db.Approval) => project(c.approvalSchema, row);
 export const toGrant = (row: db.Grant) => project(c.grantSchema, row);
 export const toPreference = (row: db.Preference) => project(c.preferenceSchema, row);
+/** Stored attachments. The earliest web replies recorded `path` without `ref`: they keep their name and have no file. */
+export function storedAttachments(value: unknown): c.Attachment[] {
+  const files = (Array.isArray(value) ? value : []).map(file => (file && typeof file === "object" ? { ...file, ref: (file as { ref?: unknown }).ref ?? null } : file));
+  return c.attachmentSchema.strip().array().catch([]).parse(files);
+}
 export function toMessage(row: db.Message): c.Message {
-  const attachments = c.attachmentSchema.strip().array().parse(row.attachments);
+  const attachments = storedAttachments(row.attachments);
   return c.messageSchema.parse({ id: row.id, direction: row.direction, channel: row.channel, text: row.text, attachments, sessionId: row.sessionId, quotedMessageId: row.quotedMessageId, at: row.at.toISOString() });
 }

@@ -15,6 +15,7 @@ import { createSchedules } from "./schedules";
 import { createNotificationsView, forwardSettings } from "./notify-user";
 import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type Tool } from "./module-calls";
 import { parseInput } from "./errors";
+import { storedAttachments } from "./store";
 import type { StewardPorts } from "./ports";
 
 type Properties = Tool["parameters"]["properties"];
@@ -94,7 +95,7 @@ const chat: SystemModule = {
       case "cancel": return json(await createProviderControl(ports, workspaceId).cancel(String(args.run)));
       case "file": {
         const message = await db.message.findFirst({ where: { id: String(args.message), workspaceId } });
-        const ref = parseInput(z.string().max(542), args.ref), files = attachmentSchema.strip().array().catch([]).parse(message?.attachments ?? []);
+        const ref = parseInput(z.string().max(542), args.ref), files = storedAttachments(message?.attachments ?? []);
         // A page offering everything to the user (`uses: ["*"]`, the web) reads files of every conversation.
         if (!message || !(await own(message.sessionId) || await usesAll(db, module)) || !files.some(file => file.ref === ref)) throw new CallError("not_found", "No such file on a message of yours");
         const file = await readChatFile(ports, ref);

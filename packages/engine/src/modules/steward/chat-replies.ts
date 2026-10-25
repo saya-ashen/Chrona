@@ -1,5 +1,5 @@
 import type { Prisma } from "@chrona/db";
-import { attachmentSchema } from "@chrona/contracts/steward";
+import { storedAttachments } from "./store";
 import type { StewardPorts } from "./ports";
 import { enqueueCall, systemOrigin } from "./module-calls";
 
@@ -22,7 +22,7 @@ export async function pushReply(db: Db, ports: StewardPorts, message: { id: stri
   if (!session?.entryModuleId) return null;
   const entry = await db.module.findFirst({ where: { id: session.entryModuleId, workspaceId: message.workspaceId } });
   if (!entry) return null;
-  const files = attachmentSchema.strip().array().catch([]).parse(message.attachments);
+  const files = storedAttachments(message.attachments);
   const inReplyTo = await inboundExternalId(db, message.workspaceId, runId);
   return enqueueCall(db, ports, systemOrigin(message.workspaceId, "chat"), `${entry.name}.reply`, {
     session: session.id, message: message.id, text: message.text.slice(0, 8000), workspace: message.workspaceId,

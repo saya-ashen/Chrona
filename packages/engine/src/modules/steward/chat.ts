@@ -8,7 +8,7 @@ import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
-import { toMessage } from "./store";
+import { storedAttachments, toMessage } from "./store";
 import { pushReply } from "./chat-replies";
 import { drainCalls } from "./module-calls";
 
@@ -50,7 +50,7 @@ export async function migrateConversationFiles(ports: StewardPorts, workspaceId:
   const modules = new Map((await db.module.findMany({ where: { workspaceId } })).map(module => [module.name, module.id]));
   let moved = 0;
   for (const message of await db.message.findMany({ where: { workspaceId }, select: { id: true, attachments: true } })) {
-    const files = attachmentSchema.strip().array().catch([]).parse(message.attachments);
+    const files = storedAttachments(message.attachments);
     if (!files.some(file => file.ref && !file.ref.startsWith("chat/"))) continue;
     const next = [];
     for (const file of files) {

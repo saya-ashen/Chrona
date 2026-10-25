@@ -180,3 +180,11 @@ test("settings, grants, preferences and schedules are system interfaces for entr
   // QQ does not list them, so it cannot change settings.
   await expect(f.qq.call("settings.update", { settings: "{}" })).rejects.toMatchObject({ code: "undeclared" });
 });
+
+test("the earliest web replies (attachments with path, no ref) still read: name kept, no file", async () => {
+  const f = await fixture();
+  const web = await builtinEntry(f.ports, f.w, "web");
+  const session = await f.db.session.create({ data: { workspaceId: f.w, key: "chat:in_app", source: "web" } });
+  await f.db.message.create({ data: { workspaceId: f.w, sessionId: session.id, direction: "out", channel: "in_app", text: "old", attachments: [{ name: "README.md", path: "README.md", mime: "text/markdown", size: 857 }] } });
+  expect(await web.call("chat.messages", { session: session.id })).toMatchObject([{ text: "old", attachments: [{ name: "README.md", ref: null, mime: "text/markdown", size: 857 }] }]);
+});
