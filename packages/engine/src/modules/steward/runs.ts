@@ -12,6 +12,8 @@ import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
 
+const BUILD_IDLE_MS = 7 * 24 * 3600_000;
+
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
 export function nextLocalMidnight(now: Date, timezone: string) {
@@ -43,7 +45,7 @@ export function createRunSession(tx: Prisma.TransactionClient, workspaceId: stri
 }
 export function createRuns(ports: StewardPorts, workspaceId: string) {
   const runs = new RunService(ports, workspaceId);
-  return { enqueue: runs.enqueue.bind(runs), claimNext: runs.claimNext.bind(runs), finish: runs.finish.bind(runs), expireLeases: runs.expireLeases.bind(runs), authenticate: (token: string) => authenticateRun(ports.db, token, ports.now()) };
+  return { enqueue: runs.enqueue.bind(runs), claimNext: runs.claimNext.bind(runs), finish: runs.finish.bind(runs), expireLeases: runs.expireLeases.bind(runs), endIdleBuilds: runs.endIdleBuilds.bind(runs), authenticate: (token: string) => authenticateRun(ports.db, token, ports.now()) };
 }
 class RunService {
   constructor(private readonly ports: StewardPorts, private readonly workspaceId: string) {}
@@ -118,6 +120,7 @@ class RunService {
       if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
       if (status === "finished") await this.deliverResult(tx, run, now);
       await this.followUp(tx, run, status, now);
+      if (status === "finished") await this.endIfDone(tx, run, now);
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
       return true;
     });
@@ -141,6 +144,24 @@ class RunService {
     const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
     await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,
       session: session.originSessionId ?? session.id, ...(module ? { module: module.id, app: module.name } : {}) });
+  }
+  /** A wake or module conversation ends with its work: nothing queued and no approval it asked for still open (its decision resumes it). */
+  private async endIfDone(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
+    const session = run.session, { workspaceId } = this;
+    if (!session || !["wake", "module"].includes(session.source)) return;
+    if (await tx.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
+    const open = await tx.approval.findMany({ where: { workspaceId, status: "open" }, select: { payload: true } });
+    if (open.some(row => (row.payload as { sessionId?: unknown } | null)?.sessionId === session.id)) return;
+    await tx.session.update({ where: { id: session.id }, data: { status: "ended", endedAt: now } });
+  }
+  /** Build conversations stay open for revisions; one left idle for a week ends (the user can ask for a new build). */
+  async endIdleBuilds(now = this.ports.now()) {
+    const { db } = this.ports, { workspaceId } = this;
+    const idle = await db.session.findMany({ where: { workspaceId, source: "build", status: "active", lastActivityAt: { lt: new Date(now.getTime() - BUILD_IDLE_MS) } } });
+    for (const session of idle) {
+      if (await db.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) continue;
+      await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } });
+    }
   }
   private async pushResult(tx: Prisma.TransactionClient, originSessionId: string, ordered: Awaited<ReturnType<Prisma.TransactionClient["message"]["findMany"]>>, now: Date) {
     const origin = await tx.session.findFirst({ where: { id: originSessionId, workspaceId: this.workspaceId } });

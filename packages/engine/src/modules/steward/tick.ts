@@ -114,7 +114,7 @@ export function createTick(ports: StewardPorts) {
         ["legacy-notifications", () => moveLegacyNotifications(ports, workspaceId)],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); await cancelLegacyBuilds(ports, workspaceId); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
-        ["launch", launch], ["expire", () => runs.expireLeases(now)],
+        ["launch", launch], ["expire", async () => { await runs.expireLeases(now); await runs.endIdleBuilds(now); }],
         ["approvals", () => announceApprovals(ports, workspaceId)],
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],

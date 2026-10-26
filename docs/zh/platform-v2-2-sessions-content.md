@@ -50,6 +50,7 @@
 - `chrona_schedule {mode: "wake", text}`：到点在**全新会话**（`source = wake`）中运行，`text` 必须自带完整指令与上下文。结果作为一条助手消息投递回 `origin`（创建它的会话），并按通知预算告知。
 - 长任务：`chrona_schedule {mode: "wake", at: now}` 转后台，同上。
 - 模块 `wakeProvider`：在全新会话（`source = module`）中运行，结果以通知投递，`origin` 为该模块；网页在该应用下可查看这些会话。
+- `wake` / `module` 会话在运行成功结束、没有排队运行、也没有它发起且仍待决定的审批时自动结束（审批的决定会在原会话继续，所以那时保留）；失败重试期间保持打开。
 
 ## 3. 内容区
 

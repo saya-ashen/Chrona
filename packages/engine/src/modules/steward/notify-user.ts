@@ -30,8 +30,20 @@ export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string,
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
   for (const row of await ports.db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" }, take: 50 })) {
     await notifyUser(ports.db, ports, workspaceId, { ...(row.moduleId ? { module: row.moduleId } : {}), approval: row.id, scoped: !!row.moduleId, level: "now", responds: true,
-      title: `需要你批准：${row.title}`, body: [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500), key: `approval:${row.id}` });
+      title: `需要你批准：${row.title}`, body: approvalNoticeBody(row), key: `approval:${row.id}` });
   }
+}
+/**
+ * Chat shows the decision, not the review: a module version keeps its capabilities and intended changes,
+ * and the manifest/code diff, tests and hash stay on the page. Other approvals (e.g. data restores) keep their full text.
+ */
+export function approvalNoticeBody(row: { action: string; detail: string | null; preview: string | null }) {
+  const lines = row.preview?.split("\n") ?? [], diffAt = lines.findIndex(line => line.startsWith("--- active"));
+  if (row.action !== "activate_module" || diffAt < 0) return [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500);
+  let changes: string[] = [];
+  try { changes = z.object({ changes: z.string().array() }).parse(JSON.parse(lines.find(line => line.startsWith("意图："))?.slice(3) ?? "")).changes; } catch { /* no readable intent: the page has it */ }
+  return [row.detail, lines.slice(0, diffAt).join("\n"), changes.length ? `改动：\n${changes.map(change => `• ${change}`).join("\n")}` : null, "完整差异、测试结果和 hash 请在网页「待你决定」中查看。"]
+    .filter(Boolean).join("\n\n").slice(0, 1500);
 }
 /** Forwards the user's notification settings (kept in the workspace, where the page edits them) to the notify module. */
 export function forwardSettings(tx: Db, ports: StewardPorts, workspaceId: string, settings: NotificationSettings, at: Date) {

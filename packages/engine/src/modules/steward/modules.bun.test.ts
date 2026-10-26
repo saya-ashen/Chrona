@@ -13,6 +13,7 @@ import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "./test-notices";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
+import { approvalNoticeBody } from "./notify-user";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -69,6 +70,35 @@ test("activation schedules the module's schedule triggers", async () => {
   const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
   expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual([{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "active", activeHash: result.hash });
+});
+
+test("a newer candidate supersedes older pending ones instead of leaving them pending forever", async () => {
+  const f = await fixture(), first = await f.propose();
+  await f.approve(first.approvalId!);
+  await f.write(2); const older = await f.propose();
+  await f.write(3); const newer = await f.propose();
+  const version = (hash: string) => f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.moduleId!, hash } } });
+  expect(await version(older.hash)).toMatchObject({ status: "rejected", report: expect.objectContaining({ errors: [`Superseded by newer candidate ${newer.hash}`] }) });
+  expect((await version(newer.hash)).status).toBe("pending_review");
+  expect((await f.db.approval.findUniqueOrThrow({ where: { id: older.approvalId! } })).status).toBe("expired");
+  expect((await version(first.hash)).status).toBe("approved");
+  // The superseded hash can be submitted again and asks for review once more.
+  await f.write(2);
+  expect((await f.propose()).status).toBe("pending_review");
+  expect((await version(newer.hash)).status).toBe("rejected");
+});
+
+test("the chat notice of a module approval keeps capabilities and intent and leaves the diff to the page", async () => {
+  const f = await fixture(), result = await f.propose();
+  const row = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
+  const body = approvalNoticeBody(row);
+  expect(body).toContain("联网：否");
+  expect(body).toContain("改动：\n• Track the price");
+  expect(body).toContain("完整差异、测试结果和 hash 请在网页「待你决定」中查看。");
+  expect(body).not.toContain("--- active");
+  expect(body).not.toContain(result.hash);
+  const restore = { action: "activate_module", detail: "恢复旧版本的数据快照", preview: "将恢复 2026-10-20 的数据，此后写入的数据会丢失" };
+  expect(approvalNoticeBody(restore)).toBe("恢复旧版本的数据快照\n\n将恢复 2026-10-20 的数据，此后写入的数据会丢失");
 });
 
 async function dataFixture() {

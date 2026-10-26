@@ -54,6 +54,16 @@ async function reviewPreview(context: ModuleContext, review: Review, active: Awa
   if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, await codeDifference(store, module.activeHash, files), hash);
   return { active, manifest, hash, preview };
 }
+const SUPERSEDED = "Superseded by newer candidate ";
+const superseded = (report: unknown) => (report as BuildReport | null)?.errors?.[0]?.startsWith(SUPERSEDED) === true;
+/** Their approvals just expired: say so on the versions too, instead of leaving them pending forever. Built-in releases stay on file. */
+async function supersedeCandidates(context: ModuleContext, moduleId: string, hash: string) {
+  const { db } = context;
+  for (const row of await db.moduleVersion.findMany({ where: { moduleId, status: "pending_review", source: { not: "builtin" }, hash: { not: hash } } })) {
+    const report = row.report && typeof row.report === "object" && !Array.isArray(row.report) ? row.report : {};
+    await db.moduleVersion.updateMany({ where: { id: row.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...report, errors: [`${SUPERSEDED}${hash}`] }) } });
+  }
+}
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
@@ -65,6 +75,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
+  await supersedeCandidates(context, module.id, hash);
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`,
     detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
@@ -79,7 +90,7 @@ async function validateBuildManifest(context: ModuleContext, version: ModuleVers
   if (!error && manifest.model) {
     const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
     const limits = moduleModelSettings(workspace.settings);
-    error = !limits ? "Module model capability unavailable: configure moduleModel in owner settings"
+    error = !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
       : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
       : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
   }
@@ -171,7 +182,8 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
   const module = await requireModule(context, db, version.moduleId);
   const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, status: { in: ["rejected", "pending_review", "approved"] } }, orderBy: { createdAt: "desc" } });
   let failures = 0;
-  for (const row of versions) { if (row.status !== "rejected") break; failures++; }
+  // A superseded version passed its checks: it ends a failure streak like a pending one.
+  for (const row of versions) { if (row.status !== "rejected" || superseded(row.report)) break; failures++; }
   if (failures >= 3) {
     // Key streak by preceding successful build; failures may share timestamps.
     await notifyUser(db, ports, workspaceId, { module: module.id, app: module.name, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", key: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });

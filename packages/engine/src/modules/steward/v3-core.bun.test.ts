@@ -34,6 +34,29 @@ test("wake creates a fresh session per firing and final reply returns to origin 
   const notification = await notice(db, { idempotencyKey: `session-result:${run.id}` });
   expect(notification.sessionId).toBe(sessionId); expect(notification.body).toBe("Completed work");
 });
+test.each([
+  ["finished", false, "ended"],
+  ["finished", true, "active"],
+  ["failed", false, "active"],
+] as const)("a wake conversation %s (open approval=%p) ends only when nothing waits on it: %s", async (outcome, approval, expected) => {
+  const schedules = createSchedules(ports, workspaceId), runs = createRuns(ports, workspaceId);
+  await schedules.create(sessionId, { mode: "wake", rule: { kind: "at", at: ports.now().toISOString() }, text: "Self-contained instruction", label: "Visible work" });
+  await schedules.fireDue();
+  const run = (await runs.claimNext("background"))!;
+  if (approval) await db.approval.create({ data: { workspaceId, action: "mount_path", title: "mount", detail: "mount", preview: "mount", payload: { sessionId: run.sessionId, lane: "background" } } });
+  await runs.finish(run.id, { outcome, sessionId: null, error: outcome === "failed" ? "boom" : null });
+  expect((await db.session.findUniqueOrThrow({ where: { id: run.sessionId! } })).status).toBe(expected);
+});
+test.each([
+  [8, false, "ended"],
+  [1, false, "active"],
+  [8, true, "active"],
+] as const)("a build conversation idle %i days (queued run=%p) is %s", async (days, queued, expected) => {
+  const build = await db.session.create({ data: { workspaceId, key: `build:${days}:${queued}`, source: "build", originSessionId: sessionId, lastActivityAt: new Date(ports.now().getTime() - days * 86_400_000) } });
+  if (queued) await createRuns(ports, workspaceId).enqueue({ sessionId: build.id, lane: "build", trigger: "build", label: "build", prompt: "p" });
+  await createRuns(ports, workspaceId).endIdleBuilds();
+  expect((await db.session.findUniqueOrThrow({ where: { id: build.id } })).status).toBe(expected);
+});
 test("schedules validate origin workspace and list by origin", async () => {
   const schedules = createSchedules(ports, workspaceId), input = { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Future work" };
   await expect(schedules.create(undefined, input)).rejects.toMatchObject({ code: "invalid" });
