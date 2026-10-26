@@ -113,7 +113,7 @@ async function runWithFreshDatabase(
 		return initCode;
 	}
 
-	const proc = Bun.spawn(["bun", "test", "--timeout=20000", file], {
+	const proc = Bun.spawn(["bun", "test", "--timeout=20000", `./${file}`], {
 		cwd: rootDir,
 		env,
 		stdout: "inherit",

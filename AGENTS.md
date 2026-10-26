@@ -25,7 +25,7 @@ Rules that follow from the goals:
   (`uses` + `chrona.call`; the callee's `visibility`/`callers` decide who may call; Chrona records the real caller). That is the only way modules
   interact (v2-8): a module keeps its files private (`chrona.paths.data`, `chrona.paths.content`) and offers tools; the web module decides how to show
   them (an app that needs its own page gets it by changing the web module). Only entry modules serve HTTP (`listen`). Built-in modules (e.g. `files`)
-  ship with Chrona and activate without approval; a release never replaces a version the user or the AI modified without an approval.
+  ship with Chrona and activate without approval. When the active version is user/AI-modified, releases skip that built-in and never create ordinary replacement approvals. Merge features into the active custom version; discarding customization requires an explicit recovery rollback (e.g. `chrona admin rollback web builtin` to a saved approved built-in), not an update approval.
 - Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); entry modules reach them through the in-process system
   module `chat` (`chat.send`), and replies are pushed to the session's entry module (`<entry>.reply`), never polled; `wake` and module wakes run in
   fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.

@@ -54,7 +54,7 @@ function parseConfigFile(path: string): ChronaRuntimeConfig {
     raw = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid Chrona config ${path}: ${message}`);
+    throw new Error(`Invalid Chrona config ${path}: ${message}`, { cause: error });
   }
 
   const parsed = runtimeConfigSchema.safeParse(raw);

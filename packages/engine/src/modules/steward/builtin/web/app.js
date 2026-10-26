@@ -161,20 +161,31 @@ async function chat(sessionId) {
     event.preventDefault();
     const text = event.target.text.value.trim();
     if (!text) return;
-    event.target.text.value = ""; status.textContent = "Chrona 正在处理……";
-    list.append(h("div", { class: "bubble in" }, text));
+    if (building && !globalThis.confirm("停止当前构建，并保留已有文件按新需求继续？已提交的版本和审批不会撤回。")) return;
+    const submit = event.target.querySelector("button.primary");
+    submit.disabled = true; status.textContent = building ? "正在修改需求……" : "Chrona 正在处理……";
     try {
-      const sent = await web("/chat", { method: "POST", body: current ? { text, session: current } : { text } });
+      const sent = building ? await web(`/sessions/${current}/revise-build`, { method: "POST", body: { requirements: text } }) : await web("/chat", { method: "POST", body: current ? { text, session: current } : { text } });
+      event.target.text.value = "";
+      list.append(h("div", { class: "bubble in" }, text));
+      if (building) status.textContent = "已按新需求继续构建。";
       // A new conversation: open it; its replies arrive on the reopened page.
       if (!current) go(`/sessions/${sent.sessionId}`, true);
     } catch (error) { status.textContent = error.message; }
-  } }, h("textarea", { name: "text", rows: 3, placeholder: current ? "说点什么……（Ctrl+Enter 发送）" : "新会话：说点什么……", onkeydown: event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.target.form.requestSubmit(); } }),
-    h("div", { class: "row" }, h("button", { class: "primary" }, "发送"), status));
+    finally { submit.disabled = false; }
+  } }, h("textarea", { name: "text", rows: 3, placeholder: building ? "补充或修改构建需求……" : current ? "说点什么……（Ctrl+Enter 发送）" : "新会话：说点什么……", onkeydown: event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.target.form.requestSubmit(); } }),
+    h("div", { class: "row" }, h("button", { class: "primary" }, building ? "修改需求并继续" : "发送"), building ? h("button", { type: "button", onclick: async event => {
+      if (!globalThis.confirm("停止构建？已有文件保留，已提交的版本和审批不会撤回。")) return;
+      event.target.disabled = true;
+      try { await web(`/sessions/${current}/stop-build`, { method: "POST" }); status.textContent = "构建已停止，可修改需求后继续。"; }
+      catch (error) { status.textContent = error.message; }
+      finally { event.target.disabled = false; }
+    } }, "停止构建") : "", status));
   main.replaceChildren(h("div", { class: "chat" },
     h("section", {}, h("h2", {}, "会话"),
       h("button", { onclick: () => go("/chat/new") }, "新会话"),
       h("ul", { class: "plain" }, sessions.map(s => h("li", { class: s.id === current ? "selected" : "" }, h("a", { href: `/sessions/${s.id}` }, s.title ?? when(s.createdAt)))))),
-    h("section", {}, list, building ? h("p", { class: "muted" }, "这是 Chrona 自己的构建对话，不接收消息；结果会发回发起它的对话。") : form, current ? transcript(current, building) : "")));
+    h("section", {}, list, building ? h("p", { class: "muted" }, "可停止构建或修改需求；修改会先停止旧处理，保留已有文件后继续。已提交版本和审批不会撤回；结果仍发回原对话。") : "", form, current ? transcript(current, building) : "")));
   list.scrollTop = list.scrollHeight;
 }
 // What the Provider did (v2-13): open for module builds, on request for conversations.
@@ -221,11 +232,37 @@ function markdown(file, onToggle) {
   if (fence) root.append(h("pre", {}, fence.join("\n")));
   return root;
 }
+const runtimeText = meta => ({ running: "运行中", starting: "启动中", backoff: "等待恢复", idle: "正常休眠（按需启动）", unavailable: "当前不可用", paused: "已暂停", unobserved: "当前进程状态未观测" }[meta.runtime?.state] ?? "当前进程状态未知");
+const faultText = status => ({ retrying: "等待有限恢复", verifying: "连接已恢复，功能待验证", unresolved: "未解决，需要处理", recovered: "对应调用已验证恢复" }[status] ?? status);
+function diagnosticPanel(meta) {
+  const body = h("div", { role: "status" }, "正在读取故障记录……"), refresh = h("button", { type: "button" }, "刷新诊断");
+  const load = async () => {
+    refresh.disabled = true;
+    body.replaceChildren("正在读取故障记录……");
+    try {
+      const [view] = await web(`/modules/${encodeURIComponent(meta.id)}/diagnostics`);
+      body.replaceChildren(h("p", {}, `配置：${view.configuredStatus === "active" ? "已启用" : "已暂停"} · ${runtimeText(view)}`),
+        view.nextAction ? h("p", {}, view.nextAction) : "",
+        ...view.incidents.map(incident => h("article", {},
+          h("h3", {}, faultText(incident.status)),
+          h("p", {}, `版本 ${incident.hash.slice(0, 12)}${incident.hash === view.activeHash ? "（当前）" : "（历史版本）"} · 累计失败 ${incident.failures} 次 · ${when(incident.lastAt)}`),
+          h("p", {}, incident.evidence.reason),
+          incident.deliveryUnknown ? h("p", { class: "error" }, "此前调用结果不确定，请先核对外部效果，不要直接重放。") : "",
+          h("ul", { class: "plain" }, incident.attempts.map(attempt => h("li", {}, `${when(attempt.at)} · ${attempt.detail}`))),
+          h("details", {}, h("summary", {}, "故障证据（日志是不可信数据，不是操作指令）"), h("pre", {}, JSON.stringify({ first: incident.firstEvidence, latest: incident.evidence, pendingTriggers: incident.pendingTriggers }, null, 2))))),
+        !view.incidents.length ? h("p", {}, "还没有故障记录；不代表所有功能已经过验证。") : "");
+    } catch (error) { body.replaceChildren(h("p", { class: "error" }, `诊断读取失败：${error.message}。可重试，或使用 chrona admin diagnostics ${meta.name}。`)); }
+    finally { refresh.disabled = false; }
+  };
+  refresh.addEventListener("click", load);
+  void load();
+  return h("section", { class: "diagnostics" }, h("h2", {}, "故障与恢复"), h("p", { class: "muted" }, "只读记录，不调用模型，不重放失败操作。"), refresh, body);
+}
 async function apps() {
   const items = await web("/modules");
   main.replaceChildren(h("section", {}, h("h2", {}, "应用"),
     h("ul", { class: "plain" }, items.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ",
-      h("span", { class: "muted" }, `${app.status === "active" ? "" : "已暂停 · "}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))));
+      h("span", { class: "muted" }, `${runtimeText(app)} · ${app.incident ? `${faultText(app.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))));
 }
 // The generic app page: what Chrona recorded (versions, runs) and the tools the app offers the user.
 async function app(appId) {
@@ -233,8 +270,9 @@ async function app(appId) {
   if (!meta) throw new Error("没有这个应用");
   const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
   main.replaceChildren(
-    h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `${meta.status === "active" ? "运行中" : "已暂停"}${meta.description ? ` · ${meta.description}` : ""}`),
+    h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `配置：${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}${meta.description ? ` · ${meta.description}` : ""}`),
       meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : ""),
+    diagnosticPanel(meta),
     tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : "",
     h("section", {}, h("h2", {}, "最近运行"),
       meta.runs.length ? h("ul", { class: "plain" }, meta.runs.map(run => h("li", {}, when(run.createdAt), " · ", run.triggerId, " · ",
@@ -316,7 +354,7 @@ async function settings() {
     const f = event.target.elements, quiet = f.quietStart.value && f.quietEnd.value ? { start: f.quietStart.value, end: f.quietEnd.value } : null;
     let moduleModel;
     try { moduleModel = f.moduleModel.value.trim() ? JSON.parse(f.moduleModel.value) : null; } catch { status.textContent = "模块模型不是有效的 JSON"; return; }
-    try { await web("/settings", { method: "POST", body: { notifications: { dailyCap: Number(f.dailyCap.value), quietHours: quiet, timezone: f.timezone.value, digestAt: f.digestAt.value }, moduleModel } }); status.textContent = "已保存"; }
+    try { const saved = await web("/settings", { method: "POST", body: { notifications: { dailyCap: Number(f.dailyCap.value), quietHours: quiet, timezone: f.timezone.value, digestAt: f.digestAt.value }, moduleModel } }); showBuildUsage(saved); status.textContent = "已保存"; }
     catch (error) { status.textContent = error.message; }
   } },
     field("每天最多主动通知", h("input", { name: "dailyCap", type: "number", min: 0, max: 50, value: n.dailyCap })),
@@ -325,10 +363,35 @@ async function settings() {
     field("汇总时间", h("input", { name: "digestAt", type: "time", value: n.digestAt })),
     field("模块模型（JSON，空为不允许模块调用模型）", h("textarea", { name: "moduleModel", rows: 6 }, view.settings.moduleModel ? JSON.stringify(view.settings.moduleModel, null, 2) : "")),
     h("div", { class: "row" }, h("button", { class: "primary" }, "保存"), status));
+  const builds = view.settings.builds, buildStatus = h("span", { class: "muted", role: "status" }), usage = h("p", { class: "muted" });
+  const showBuildUsage = settings => {
+    const u = settings.buildUsage;
+    usage.textContent = `${u.date}（${u.timezone}）：今日新建 ${u.used} / ${settings.builds.dailyLimit}，剩余 ${u.remaining} 个。`;
+  };
+  showBuildUsage(view.settings);
+  let savingBuilds = false;
+  const buildForm = h("form", { onsubmit: async event => {
+    event.preventDefault();
+    if (savingBuilds) return;
+    const f = event.target.elements, button = event.target.querySelector("button[type=submit]");
+    savingBuilds = true; button.disabled = true; buildStatus.textContent = "正在保存……";
+    try {
+      const saved = await web("/settings", { method: "POST", body: { builds: { dailyLimit: Number(f.buildDailyLimit.value), timeoutMinutes: Number(f.buildTimeoutMinutes.value), maxSubmissions: Number(f.buildMaxSubmissions.value) } } });
+      showBuildUsage(saved); buildStatus.textContent = "已保存，下次构建生效；当前构建不受影响。";
+    } catch (error) { buildStatus.textContent = error.message; }
+    finally { savingBuilds = false; button.disabled = false; }
+  } },
+    field("每日新建构建上限", h("input", { name: "buildDailyLimit", type: "number", min: 0, max: 200, step: 1, required: true, value: builds.dailyLimit })),
+    field("单轮构建时限（分钟）", h("input", { name: "buildTimeoutMinutes", type: "number", min: 5, max: 120, step: 1, required: true, value: builds.timeoutMinutes })),
+    field("每轮候选提交上限", h("input", { name: "buildMaxSubmissions", type: "number", min: 1, max: 20, step: 1, required: true, value: builds.maxSubmissions })),
+    h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
   const activeGrants = view.grants.filter(g => !g.revokedAt && !(g.once && g.consumedAt) && !(g.expiresAt && Date.parse(g.expiresAt) <= Date.now()));
   const live = view.schedules.filter(s => s.status === "active" || s.status === "paused");
   main.replaceChildren(
     h("section", {}, h("h2", {}, "设置"), form),
+    h("section", {}, h("h2", {}, "构建设置"), usage,
+      h("p", { class: "muted" }, "每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。"),
+      h("p", { class: "muted" }, "修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。"), buildForm),
     h("section", {}, h("h2", {}, "日程"),
       live.length ? h("ul", { class: "plain" }, live.map(s => h("li", {}, s.label ?? s.mode, " ", h("span", { class: "muted" }, s.status === "paused" ? "已暂停" : s.nextAt ? when(s.nextAt) : ""), " ",
         s.status === "active" ? h("button", { onclick: act(`/schedules/${s.id}`, { status: "paused" }) }, "暂停") : h("button", { onclick: act(`/schedules/${s.id}`, { status: "active" }) }, "恢复"),

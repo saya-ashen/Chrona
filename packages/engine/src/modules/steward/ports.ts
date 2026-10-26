@@ -19,6 +19,7 @@ export type StewardPorts = {
   };
   /** The `chrona` SDK package directory (sdk.ts, testing.ts) given to module builds. */
   moduleSdk?: string;
+  /** Trusted resources from the running release: built-in installation and development-reference checkout, never app data. */
   moduleBuiltinResources?: string;
   chatTimeoutMs?: number;
   onQueued?: () => Promise<unknown>;
@@ -29,8 +30,8 @@ export type StewardPorts = {
     available: boolean;
     /** Modules run inside bubblewrap; otherwise as plain processes of the Chrona user (declared limits are not enforced). */
     isolated: boolean;
-    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void };
-    runModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;
+    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void; limits?: { virtualMemoryMb: number } };
+    runModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;
   };
 
   gitHealth?: () => Promise<boolean>;

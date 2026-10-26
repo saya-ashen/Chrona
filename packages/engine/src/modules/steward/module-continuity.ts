@@ -10,20 +10,23 @@ import type { ModuleContext, ContinuityReport, TestReport, requireModule } from 
 type Manifest = z.output<typeof moduleManifestSchema>;
 type Module = Awaited<ReturnType<typeof requireModule>>;
 export const moduleParams = (manifest: Manifest) => Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
+async function runOneTest(context: ModuleContext, staging: string, manifest: Manifest, entry: string, tests: TestReport) {
+  const { ports } = context, sandbox = ports.sandbox;
+  if (!sandbox?.available || !sandbox.runModule) return false;
+  const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
+  try {
+    const contentDir = manifest.content ? join(data, ".build-content") : undefined;
+    if (contentDir) await mkdir(contentDir, { recursive: true });
+    const result = await sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes, memoryMb: RUN_LIMITS.moduleTestMemoryMb });
+    tests.push({ stdout: result.output.slice(0, RUN_LIMITS.jobOutputBytes), stderr: (result.error ?? "").slice(0, RUN_LIMITS.jobOutputBytes), exitCode: result.exitCode ?? 1 });
+    return result.status === "succeeded" && result.exitCode === 0;
+  } catch { return false; }
+  finally { await rm(data, { recursive: true, force: true }); }
+}
 export async function runTests(context: ModuleContext, staging: string, manifest: Manifest, tests: TestReport) {
-  const { ports } = context;
   let passed = true;
   for (const entry of manifest.tests) {
-    const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
-    try {
-      if (!ports.sandbox?.available || !ports.sandbox.runModule) { passed = false; break; }
-      const contentDir = manifest.content ? join(data, ".build-content") : undefined;
-      if (contentDir) await mkdir(contentDir, { recursive: true });
-      const result = await ports.sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
-      tests.push({ stdout: result.output.slice(0, RUN_LIMITS.jobOutputBytes), stderr: (result.error ?? "").slice(0, RUN_LIMITS.jobOutputBytes), exitCode: result.exitCode ?? 1 });
-      if (result.status !== "succeeded" || result.exitCode !== 0) passed = false;
-    } catch { passed = false; }
-    finally { await rm(data, { recursive: true, force: true }); }
+    if (!await runOneTest(context, staging, manifest, entry, tests)) passed = false;
   }
   return passed;
 }

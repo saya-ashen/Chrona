@@ -67,6 +67,19 @@ test("CLI dry-run reports titles, deduplication, fallback and connector destinat
   } finally { f.clean(); }
 });
 
+test("control characters in titles are replaced and unsafe filename controls remain excluded", () => {
+  const f = fixture();
+  try {
+    writeFileSync(join(f.source, "README.md"), "# Travel\x01😀 / plans\n");
+    writeFileSync(join(f.source, "bad\x01name.txt"), "must not copy");
+    f.makeBackup();
+    const { report } = migrateAffairs(f.url, f.data, { backup: f.backup });
+    expect(report.affairs[0]!.target).toBe("files/Travel_😀 _ plans/");
+    expect(report.affairs[0]!.skipped).toContainEqual({ path: "bad\x01name.txt", reason: "unsafe path" });
+    expect(existsSync(join(f.data, "platform"))).toBe(false);
+  } finally { f.clean(); }
+});
+
 test("apply copies only content, preserves originals and database, and is idempotent", () => {
   const f = fixture();
   try {

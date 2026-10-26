@@ -12,8 +12,11 @@ let busy = false, again = false;
 async function tick() {
   if (busy) { again = true; return; }
   busy = true;
-  try { do { again = false; await notify.tick(new Date()); } while (again); }
-  catch (error) { console.error(JSON.stringify({ component: "notify", event: "tick_failed", error: String(error).slice(0, 500) })); }
+  const pass = async () => { again = false; await notify.tick(new Date()); return again; };
+  try {
+    let rerun = await pass();
+    while (rerun) rerun = await pass();
+  } catch (error) { console.error(JSON.stringify({ component: "notify", event: "tick_failed", error: String(error).slice(0, 500) })); }
   finally { busy = false; }
 }
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller; now: string }) => {

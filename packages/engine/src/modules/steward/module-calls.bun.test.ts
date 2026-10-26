@@ -91,7 +91,7 @@ test("a sync call into a module that waits on the caller in another event is ref
   });
   const started = Date.now();
   // beta is busy in "bounce" (Chrona's async call) when alpha starts waiting on beta.echo; then bounce calls alpha.
-  await enqueueCall(f.db, f.ports, kernelOrigin(f.workspace.id), "beta.bounce", {}, { key: "bounce" });
+  await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.bounce", raw: {} }, { key: "bounce" });
   const delivering = runDueCalls(f.ports, f.workspace.id);
   await Bun.sleep(50);
   const alpha = f.fire();
@@ -136,20 +136,20 @@ test("delivery outcomes: never-delivered retries, lost after sending is unknown,
   const origin = kernelOrigin(f.workspace.id), find = (key: string) => f.db.moduleInvocation.findFirstOrThrow({ where: { key } });
   // Paused target: the call waits and is delivered once the target is back.
   await f.db.module.update({ where: { id: f.beta.id }, data: { status: "paused" } });
-  await enqueueCall(f.db, f.ports, origin, "beta.echo", { text: "later" }, { key: "paused" });
+  await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: { text: "later" } }, { key: "paused" });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await find("paused")).toMatchObject({ status: "queued", attempts: 1, error: expect.stringContaining("not active") });
   await f.db.module.update({ where: { id: f.beta.id }, data: { status: "active" } });
   f.advance(60_000); await runDueCalls(f.ports, f.workspace.id);
   expect(await find("paused")).toMatchObject({ status: "succeeded", attempts: 2 });
 
-  await enqueueCall(f.db, f.ports, origin, "beta.crash", {}, { key: "crash" });
+  await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.crash", raw: {} }, { key: "crash" });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await find("crash")).toMatchObject({ status: "unknown", error: expect.stringContaining("Outcome unknown") });
 
   // Chrona stopped mid-delivery (lease expired while running): only the idempotent call is sent again.
   for (const [target, key] of [["beta.echo", "interrupted"], ["beta.again", "interrupted-idempotent"]] as const) {
-    const queued = await enqueueCall(f.db, f.ports, origin, target, {}, { key });
+    const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target, raw: {} }, { key });
     await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "running", attempts: 1, leaseToken: "old", leaseUntil: new Date(f.ports.now().getTime() - 1) } });
   }
   seen.length = 0;

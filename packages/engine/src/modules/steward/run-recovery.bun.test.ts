@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { notices } from "./test-notices";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date;
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
@@ -24,6 +25,20 @@ test("failure retry retains session, prompt and cwd and preserves input linkage"
   expect(retry.leaseUntil!.getTime()).toBeGreaterThan(time.getTime());
   expect((await db.session.findUniqueOrThrow({ where: { id: sessionId } })).providerSessionId).toBe("provider-context");
   expect(await db.audit.findFirst({ where: { subjectId: retry.id, kind: "chat_run_input" } })).not.toBeNull();
+});
+test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves work, notifies and never automatically retries", async outcome => {
+  const runs = createRuns(ports, workspaceId);
+  await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
+  await runs.enqueue({ sessionId, lane: "build", trigger: "build", prompt: "Keep this draft" });
+  const run = (await runs.claimNext("build"))!;
+  await writeFile(join(run.cwd, "draft.txt"), "kept");
+  if (outcome === "timed_out") time = new Date(run.deadlineAt.getTime() + 1);
+  await runs.finish(run.id, { outcome, sessionId: "provider-context", error: "Synthetic" });
+  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
+  expect(await db.audit.count({ where: { kind: "run_continuation", subjectId: run.id } })).toBe(0);
+  expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
+  expect(await notices(db, { title: "模块构建已暂停" })).toMatchObject([{ sessionId, body: expect.stringContaining("不会自动重试") }]);
+  await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
 });
 test("expired lease aborts before finalization and rotates capability", async () => {
   const runs = createRuns(ports, workspaceId);

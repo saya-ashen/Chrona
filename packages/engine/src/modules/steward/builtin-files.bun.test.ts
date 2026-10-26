@@ -22,10 +22,10 @@ async function fixture(real = false) {
     if (event.trigger.kind === "tool") return { result: await app.tool(event.trigger.id, event.trigger.args, event.now) };
     throw new Error("Unexpected event");
   });
-  const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined }) : null;
+  const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir }) : null;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
     // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
-    sandbox: { available: true, isolated: true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
+    sandbox: { available: sandbox?.health.available ?? true, isolated: sandbox?.health.isolated ?? true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   const api = createStewardService(ports).forWorkspace(workspaceId);
   return { db, ports, workspaceId, api,
     async start() {
@@ -87,12 +87,17 @@ test("files rejects unsafe paths, links, oversized output; caps persisted versio
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(16_384);
     await writeFile(join(content, "binary.png"), Buffer.from([137, 80, 78, 71, 0, 255]));
     expect(await app.tool("read", { path: "binary.png" }, now.toISOString())).toEqual({ size: 6, mime: "image/png" });
+    for (let byte = 0; byte <= 32; byte++) {
+      await writeFile(join(content, "control.txt"), `before${String.fromCharCode(byte)}after`);
+      const read = await app.tool("read", { path: "control.txt" }, now.toISOString());
+      expect(typeof read === "object" && read !== null && "content" in read).toBe((byte >= 9 && byte <= 13) || byte === 32);
+    }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-if (!realSandbox.health.available) console.info("SKIP files real process: bwrap sandbox unavailable");
-(realSandbox.health.available ? test : test.skip)("files real bwrap SDK process registers and reads/writes content", async () => {
+if (!realSandbox.health.available) console.info("SKIP files real process: module runtime unavailable");
+(realSandbox.health.available ? test : test.skip)("files real SDK process registers and reads/writes content", async () => {
   const f = await fixture(true);
   try {
     const app = await f.start();

@@ -116,7 +116,8 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `import { on, chrona } from 'chrona'; on('schedule', async ev => { const reply = await chrona.model({ prompt: '${prompt}', maxOutputTokens: 20 }); await chrona.notify({ key: ev.firedAt, level: 'now', title: 'Summary', body: reply.text }); });`);
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v1", manifest: f.manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  f.ports.sandbox = { available: true, isolated: true, startModule: sandbox.startModule };
+  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: f.dataDir });
+  f.ports.sandbox = { ...runtime.health, startModule: runtime.startModule };
   const supervisor = createModuleSupervisor(f.ports); cleanups.push(() => supervisor.stop());
   await supervisor.deliver(f.module.id, "v1", { trigger: { kind: "schedule", id: "daily", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: {} });
   expect((await notices(f.db))[0]).toMatchObject({ body: text });

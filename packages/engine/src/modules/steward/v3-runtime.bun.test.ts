@@ -17,6 +17,13 @@ test("run cwd and context belong to the session", async () => {
   const run = await createRuns(ports, workspaceId).enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
   expect(run.cwd).toBe(join(ports.dataDir, "sessions", sessionId));
 });
+test.each([['foreground', 5], ['background', 20], ['build', 60]] as const)("%s has its own %i minute deadline", async (lane, minutes) => {
+  const runs = createRuns(ports, workspaceId);
+  await runs.enqueue({ sessionId, lane, trigger: lane === 'build' ? 'build' : 'message', prompt: 'Bounded work' });
+  const run = (await runs.claimNext(lane))!;
+  expect(run.deadlineAt.getTime() - ports.now().getTime()).toBe(minutes * 60_000);
+  expect(run.leaseUntil).toEqual(run.deadlineAt);
+});
 test("one session never runs two lanes concurrently; other sessions remain independent", async () => {
   const runs = createRuns(ports, workspaceId);
   await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "One" });

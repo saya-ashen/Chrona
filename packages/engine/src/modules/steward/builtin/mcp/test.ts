@@ -11,6 +11,7 @@ const module = await startModule("index.ts", { stubs: {
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
     routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }] })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
     routed("planning.get", args => ({ plan: args.id })),
+    routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.diagnostics", args => [{ module: args.module, incidents: [] }]),
   ]),
 } });
 async function rpc(method: string, params: unknown = {}, id: number | null = 1) {
@@ -29,7 +30,9 @@ try {
   assert.match(init.body.result.instructions, /Apps with tools: files\./);
   assert.equal((await rpc("notifications/initialized", {}, null)).status, 202);
   const names = (await rpc("tools/list")).body.result.tools.map((entry: { name: string }) => entry.name);
-  assert.ok(["chrona_chat", "chrona_module_tools", "chrona_module_call"].every(name => names.includes(name)));
+  assert.ok(["chrona_chat", "chrona_module_tools", "chrona_module_call", "chrona_module_diagnostics"].every(name => names.includes(name)));
+  assert.deepEqual(await json("chrona_module_diagnostics", { module: "web" }), [{ module: "web", incidents: [] }]);
+  assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "web" }]);
   // Conversations, approvals and app records are routed calls with the system modules' argument names.
   calls.length = 0;
   await tool("chrona_chat", { text: "hi" });
@@ -46,6 +49,11 @@ try {
   moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } });
   assert.deepEqual((await json("chrona_module_tools", { query: "planning" })).map((entry: { target: string }) => entry.target), ["planning.get"]);
   assert.deepEqual(await json("chrona_module_call", { name: "planning.get", arguments: { id: "x" } }), { plan: "x" });
+  await json("chrona_module_call", { name: "modules.stop-build", arguments: { session: "b1" } });
+  assert.deepEqual(calls.at(-1), ["modules.stop-build", { session: "b1" }]);
+  await json("chrona_module_call", { name: "modules.revise-build", arguments: { session: "b1", requirements: "new goal" } });
+  assert.deepEqual(calls.at(-1), ["modules.revise-build", { session: "b1", requirements: "new goal" }]);
+  assert.equal((await tool("chrona_module_call", { name: "modules.build", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "m_files_list" })).isError, true);
   // Today and notifications come from chat.today; app content is reached through the apps' own tools.

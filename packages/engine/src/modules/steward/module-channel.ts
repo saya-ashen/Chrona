@@ -12,33 +12,37 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
   let pending: { id: string; resolve(reply: EventReply): void; reject(error: Error): void } | undefined;
   let connected!: () => void, disconnected!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => { connected = resolve; disconnected = reject; });
+  let ended!: (error: Error) => void;
+  const closedWithError = new Promise<Error>(resolve => { ended = resolve; });
   // A process can fail before the caller starts awaiting its connection.
   void ready.catch(() => {});
   const records: string[] = [];
   function record(message: string) { records.push(message); if (records.length > 32) records.shift(); }
-  function fail(error: Error) { disconnected(error); pending?.reject(error); }
+  function fail(error: Error) { ended(error); disconnected(error); pending?.reject(error); }
   function reply(message: CallReply) {
     const validated = moduleCallReplySchema.parse(message);
     if (socket && !socket.destroyed) socket.write(JSON.stringify(validated) + "\n");
   }
+  async function handleCall(value: unknown) {
+    if (!value || typeof value !== "object" || !("method" in value || "params" in value)) return false;
+    const call = moduleCallSchema.safeParse(value);
+    if (!call.success) {
+      record("Invalid module call");
+      if ("id" in value && typeof value.id === "string" && value.id.length > 0 && value.id.length <= 64)
+        reply({ id: value.id, error: { code: "invalid", message: "Invalid module call" } });
+      return true;
+    }
+    try {
+      const result = moduleCallReplySchema.parse(await onCall(call.data));
+      if (result.id !== call.data.id) throw new Error("Mismatched call reply");
+      reply(result);
+    } catch { reply({ id: call.data.id, error: { code: "internal", message: "Module call failed" } }); }
+    return true;
+  }
   async function line(text: string) {
     let value: unknown;
     try { value = JSON.parse(text); } catch { record("Malformed JSON"); return; }
-    if (value && typeof value === "object" && ("method" in value || "params" in value)) {
-      const call = moduleCallSchema.safeParse(value);
-      if (!call.success) {
-        record("Invalid module call");
-        if ("id" in value && typeof value.id === "string" && value.id.length > 0 && value.id.length <= 64)
-          reply({ id: value.id, error: { code: "invalid", message: "Invalid module call" } });
-        return;
-      }
-      try {
-        const result = moduleCallReplySchema.parse(await onCall(call.data));
-        if (result.id !== call.data.id) throw new Error("Mismatched call reply");
-        reply(result);
-      } catch { reply({ id: call.data.id, error: { code: "internal", message: "Module call failed" } }); }
-      return;
-    }
+    if (await handleCall(value)) return;
     const result = moduleEventReplySchema.safeParse(value);
     if (!result.success) { record("Invalid event reply"); return; }
     if (pending?.id === result.data.id) pending.resolve(result.data);
@@ -71,7 +75,8 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
   });
   let queue: Promise<unknown> = Promise.resolve();
   return {
-    ready,
+    ready, closedWithError,
+    connected: () => accepted && !closed && !!socket && !socket.destroyed,
     diagnostics: () => [...records],
     send(event: ModuleEvent, timeoutMs = 60_000): Promise<EventReply> {
       const message = moduleEventMessageSchema.parse({ id: randomUUID(), event });

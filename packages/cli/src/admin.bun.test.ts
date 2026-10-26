@@ -26,7 +26,7 @@ async function fixture() {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["modules", "approvals", "rollback", "disable", "approve", "reject"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject"]);
 });
 test("admin reads while runtime locked but refuses writes; approval audit source is cli", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
@@ -35,6 +35,9 @@ test("admin reads while runtime locked but refuses writes; approval audit source
   try {
     expect(await runAdmin("approvals", [], f.options)).toContainEqual(expect.objectContaining({ id: approval.id }));
     expect(await runAdmin("modules", [], f.options)).toContainEqual({ name: "rescue", status: "immutable" });
+    const before = await f.db.audit.count();
+    expect(await runAdmin("diagnostics", [f.module.name], f.options)).toContainEqual(expect.objectContaining({ module: f.module.name, runtime: { state: "unobserved", pid: null }, incidents: [] }));
+    expect(await f.db.audit.count()).toBe(before);
     await expect(runAdmin("approve", [approval.id], f.options)).rejects.toThrow("already in use");
   } finally { lock.release(); }
   try {

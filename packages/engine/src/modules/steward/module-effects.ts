@@ -37,7 +37,7 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
     // A notification is stored even while the built-in notify module is not running (e.g. rebuilding); it is delivered later.
-    const queued = await enqueueCall(ports.db, ports, originOf(scope), target, args, { key: key!, reply, lenient: target === NOTIFY_INTERFACE });
+    const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, lenient: target === NOTIFY_INTERFACE });
     await ports.db.moduleCall.create({ data: { ...record, key: queued.callId, status: queued.duplicate ? "duplicate" : "executed" } });
     if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
     return { id: call.id, result: queued };
@@ -56,11 +56,11 @@ export async function handleModuleCall(ports: StewardPorts, scope: CallScope, ca
 
 export async function pauseFailedModule(tx: Prisma.TransactionClient, ports: StewardPorts, execution: ModuleExecution, runId: string) {
   const { moduleId, workspaceId } = execution;
-  const recent = await tx.moduleRun.findMany({ where: { moduleId, id: { not: runId } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 2 });
+  const recent = await tx.moduleRun.findMany({ where: { moduleId, hash: execution.hash, id: { not: runId } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 2 });
   if (recent.length !== 2 || recent.some(run => !run.error)) return;
-  const paused = await tx.module.updateMany({ where: { id: moduleId, status: "active" }, data: { status: "paused" } });
+  const paused = await tx.module.updateMany({ where: { id: moduleId, status: "active", activeHash: execution.hash }, data: { status: "paused" } });
   if (!paused.count) return;
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "paused" } });
   const module = await tx.module.findUnique({ where: { id: moduleId } });
-  await notifyUser(tx, ports, workspaceId, { module: moduleId, ...(module ? { app: module.name } : {}), level: "now", title: "模块连续失败，已暂停", body: "模块连续三次执行失败，请检查后再启用。", key: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` });
+  await notifyUser(tx, ports, workspaceId, { module: moduleId, ...(module ? { app: module.name } : {}), level: "now", title: "模块连续失败，已暂停", body: `应用 ${module?.name ?? moduleId} 连续三次失败，已停止自动恢复。请在应用页查看故障详情，或运行 chrona admin diagnostics ${module?.name ?? moduleId}。修复后再启用；此前失败调用不会自动重放。`, key: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` });
 }

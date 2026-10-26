@@ -16,6 +16,19 @@ function redactor() {
 }
 type Block = { type?: string; text?: string; name?: string; arguments?: unknown };
 type Entry = { type?: string; timestamp?: string; message?: { role?: string; content?: Block[] | string; toolName?: string; isError?: boolean } };
+function transcriptItems(entry: Entry, redact: (text: string) => string): TranscriptItem[] {
+  const message = entry.message, at = entry.timestamp ?? "";
+  if (entry.type !== "message" || !message) return [];
+  const blocks = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content ?? [];
+  if (message.role === "assistant") return blocks.flatMap<TranscriptItem>(block => {
+    if (block.type === "text" && block.text?.trim()) return [{ at, kind: "text" as const, text: redact(clip(block.text.trim(), 4000)) }];
+    if (block.type === "toolCall" && block.name) return [{ at, kind: "tool" as const, tool: block.name, args: redact(clip(JSON.stringify(block.arguments ?? {}), 500)) }];
+    return [];
+  });
+  if (message.role !== "toolResult") return [];
+  const text = blocks.filter(block => block.type === "text").map(block => block.text ?? "").join("\\n");
+  return [{ at, kind: "result", tool: message.toolName ?? "", text: redact(clip(text, 2000)), error: message.isError === true }];
+}
 
 /**
  * `chat.transcript` (v2-13): what the Provider did in a conversation, from its Pi session files (`.chrona/sessions/`), as a
@@ -29,18 +42,7 @@ export async function sessionTranscript(ports: Pick<StewardPorts, "dataDir">, se
     for (const line of (await readFile(join(dir, file), "utf8")).split("\n")) {
       let entry: Entry;
       try { entry = JSON.parse(line) as Entry; } catch { continue; }
-      const message = entry.message, at = entry.timestamp ?? "";
-      if (entry.type !== "message" || !message) continue;
-      const blocks = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content ?? [];
-      if (message.role === "assistant") {
-        for (const block of blocks) {
-          if (block.type === "text" && block.text?.trim()) items.push({ at, kind: "text", text: redact(clip(block.text.trim(), 4000)) });
-          if (block.type === "toolCall" && block.name) items.push({ at, kind: "tool", tool: block.name, args: redact(clip(JSON.stringify(block.arguments ?? {}), 500)) });
-        }
-      } else if (message.role === "toolResult") {
-        const text = blocks.filter(block => block.type === "text").map(block => block.text ?? "").join("\n");
-        items.push({ at, kind: "result", tool: message.toolName ?? "", text: redact(clip(text, 2000)), error: message.isError === true });
-      }
+      items.push(...transcriptItems(entry, redact));
     }
   }
   return items.slice(-limit);

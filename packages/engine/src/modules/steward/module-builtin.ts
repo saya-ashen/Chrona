@@ -16,6 +16,23 @@ async function writable(dir: string) {
     else if (entry.isFile()) await chmod(join(dir, entry.name), 0o600);
   }
 }
+async function preserveCustomization(ports: StewardPorts, workspaceId: string, name: string) {
+  return ports.db.$transaction(async tx => {
+    const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
+    if (!module?.activeHash) return false;
+    const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
+    if (!active || active.source === "builtin") return false;
+    // Retire only old built-in replacement cards, not pending custom updates.
+    const hashes = new Set((await tx.moduleVersion.findMany({ where: { moduleId: module.id, source: "builtin" }, select: { hash: true } })).map(row => row.hash));
+    const open = await tx.approval.findMany({ where: { workspaceId, moduleId: module.id, action: "activate_module", status: "open" } });
+    const ids = open.filter(row => {
+      const p = row.payload;
+      return p && typeof p === "object" && !Array.isArray(p) && p.restore === undefined && typeof p.hash === "string" && hashes.has(p.hash);
+    }).map(row => row.id);
+    await tx.approval.updateMany({ where: { id: { in: ids }, status: "open" }, data: { status: "expired", resolvedAt: ports.now() } });
+    return true;
+  });
+}
 /** Release resources, never Provider-controlled directories. Repeated starts are idempotent. */
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
@@ -25,8 +42,9 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
   try {
     await cp(resolve(ports.moduleBuiltinResources), root, { recursive: true });
     await writable(root);
-    for (const entry of await readdir(root, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    const entries = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory() && !entry.isSymbolicLink());
+    for (const entry of entries) {
+      if (await preserveCustomization(ports, workspaceId, entry.name)) continue;
       const result = await proposeBuiltin(context, root, entry.name);
       if (result.status === "rejected") throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
     }

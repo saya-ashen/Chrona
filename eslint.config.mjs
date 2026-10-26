@@ -8,8 +8,8 @@ const eslintConfig = defineConfig([
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Standalone HTML prototypes execute in a browser, including their checks.
-    files: ["docs/prototypes/**/*.js"],
+    // Standalone prototypes and the built-in web module execute in a browser.
+    files: ["docs/prototypes/**/*.js", "packages/engine/src/modules/steward/builtin/web/*.js"],
     languageOptions: { globals: globals.browser },
   },
   {

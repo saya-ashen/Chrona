@@ -74,6 +74,17 @@ describe("runtime config", () => {
     expect(isDashboardAiSummaryEnabled({ CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: "true" })).toBe(true);
   });
 
+  it("preserves the parser cause for malformed JSON", () => {
+    const path = tempConfig({});
+    writeFileSync(path, "{");
+    let failure: unknown;
+    try { loadChronaRuntimeConfig({ CHRONA_CONFIG_FILE: path }); }
+    catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain(`Invalid Chrona config ${path}`);
+    expect((failure as Error).cause).toBeInstanceOf(SyntaxError);
+  });
+
   it("reports invalid config path and field", () => {
     const path = tempConfig({ server: { port: 70000 } });
 

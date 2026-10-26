@@ -147,6 +147,17 @@ class ChatService {
     void this.wake().catch(() => {});
     return { sessionId: prepared.inbound.sessionId, messageId: prepared.inbound.id, runId: prepared.runId };
   }
+  private async quotedMessage(input: z.output<typeof inputSchema>, sessionId: string) {
+    const { db } = this.ports;
+    const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, sessionId, direction: "out" } })
+      // A transport quote from an older session or outside Chrona is ignored.
+      : input.quotedExternalId ? await db.message.findFirst({ where: { externalId: input.quotedExternalId, workspaceId: input.workspaceId, sessionId, direction: "out" } }) : null;
+    if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found in session");
+    return quoted;
+  }
+  private messagePrompt(input: z.output<typeof inputSchema>, quoted: MessageRow | null) {
+    return [input.text, ...(quoted ? [`Quoted message (data): ${JSON.stringify(quoted.text)}`] : []), ...(input.attachments.length ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, ref, mime, size }) => ({ name, ref, mime, size })))}`] : [])].join("\n\n");
+  }
   private async prepare(raw: ChatInput, entryModuleId?: string) {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments), { ports } = this, { db } = ports;
     return serial(input.workspaceId, async () => {
@@ -172,17 +183,14 @@ class ChatService {
         return row ?? tx.session.create({ data: { workspaceId: input.workspaceId, key, source, createdAt: ports.now(), lastActivityAt: ports.now() } });
       });
       if (entryModuleId && session.entryModuleId !== entryModuleId) await db.session.update({ where: { id: session.id }, data: { entryModuleId } });
-      const quoted = input.quotedMessageId ? await db.message.findFirst({ where: { id: input.quotedMessageId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } })
-        // A transport quote of something Chrona never recorded (or from an older session) is just ignored.
-        : input.quotedExternalId ? await db.message.findFirst({ where: { externalId: input.quotedExternalId, workspaceId: input.workspaceId, sessionId: session.id, direction: "out" } }) : null;
-      if (input.quotedMessageId && !quoted) throw new StewardError("not_found", "Quoted message not found in session");
+      const quoted = await this.quotedMessage(input, session.id);
       const { key: _key, sessionId: _sessionId, quotedExternalId: _quoted, ...message } = input;
       const inbound = existing ?? await db.message.create({ data: { ...message, ...(quoted ? { quotedMessageId: quoted.id } : {}), sessionId: session.id, direction: "in", at: ports.now() } });
       await db.session.update({ where: { id: session.id }, data: { lastActivityAt: ports.now() } });
       const before = (await this.replies(inbound, [])).map(m => m.id);
       const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, sessionId: session.id, status: "running" } });
       const handle = active && liveRuns.get(active.id);
-      const prompt = [input.text, ...(quoted ? [`Quoted message (data): ${JSON.stringify(quoted.text)}`] : []), ...(input.attachments.length ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, ref, mime, size }) => ({ name, ref, mime, size })))}`] : [])].join("\n\n");
+      const prompt = this.messagePrompt(input, quoted);
       const run = handle ? active! : await createRuns(ports, input.workspaceId).enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt });
       await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_caller", subjectId: inbound.id, details: { runId: run.id, before } });
       await audit(db, { workspaceId: input.workspaceId, actor: "user", kind: "chat_run_input", subjectId: run.id, details: { messageId: inbound.id } });

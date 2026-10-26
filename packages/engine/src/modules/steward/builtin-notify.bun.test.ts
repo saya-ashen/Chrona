@@ -33,7 +33,8 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
   await cp(resolve(import.meta.dirname, "builtin/notify"), join(resources, "notify"), { recursive: true });
   for (const [name, content] of Object.entries(fakeQq)) await writeFile(join(resources, "qq", name), content);
   const db = testDb();
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleBuiltinResources: resources, sandbox: { ...sandbox.health, runModule: sandbox.runModule, startModule: sandbox.startModule } };
+  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleBuiltinResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   try {
     // No quiet hours: the test runs on the real clock, at any time of day.
     const workspace = await db.workspace.create({ data: { name: "notify", settings: { notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" } } } }), w = workspace.id;

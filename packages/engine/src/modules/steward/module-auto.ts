@@ -9,6 +9,7 @@ import { dataEmpty } from "./module-data";
 import { intentSchema, requireModule, type BuildReport, type ModuleContext, type ModuleVersion } from "./module-context";
 import { notifyUser } from "./notify-user";
 
+type Manifest = ReturnType<typeof moduleManifestSchema.parse>;
 type ReviewCard = { moduleId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
 function checksPassed(report: BuildReport) {
   const continuity = report.continuity;
@@ -16,31 +17,38 @@ function checksPassed(report: BuildReport) {
     && !continuity.migrated && report.tests.length > 0 && report.tests.every(test => test.exitCode === 0)
     && !report.errors?.length && (!report.keyProbe || report.keyProbe.status === "passed");
 }
+function toolsDoNotExpand(previous: Manifest, next: Manifest) {
+  return next.tools.every(tool => {
+    const old = previous.tools.find(candidate => candidate.name === tool.name);
+    const wider = (visibility: string[]) => visibility.some(value => value !== "provider" && value !== "owner");
+    if (!old) return !wider(tool.visibility);
+    const callers = !tool.visibility.includes("modules") || old.callers === undefined || (tool.callers?.every(name => old.callers!.includes(name)) ?? false);
+    return tool.visibility.every(value => old.visibility.includes(value)) && callers;
+  });
+}
+async function dependenciesUnchanged(context: ModuleContext, version: ModuleVersion, activeHash: string, manifest: Manifest, current: Manifest) {
+  if (!manifest.packages.every(name => current.packages.includes(name))) return false;
+  for (const lockfile of ["package.json", "bun.lock", "pyproject.toml", "uv.lock"]) {
+    const [next, previous] = await Promise.all([version.hash, activeHash].map(hash => readFile(join(context.store, hash, lockfile)).catch(() => null)));
+    if (!(next === null ? previous === null : previous !== null && next.equals(previous))) return false;
+  }
+  return true;
+}
+async function capabilitiesUnchanged(context: ModuleContext, { module, active, version, current, manifest }: { module: Awaited<ReturnType<typeof requireModule>>; active: ModuleVersion; version: ModuleVersion; current: Manifest; manifest: Manifest }) {
+  if (isEntryModule(current) || !manifest.effects.every(effect => current.effects.includes(effect))
+    || !manifest.uses.every(target => current.uses.includes(target)) || !toolsDoNotExpand(current, manifest)) return false;
+  // New or changed dependencies count as new capabilities (v2-6 §4).
+  if (!await dependenciesUnchanged(context, version, active.hash, manifest, current)) return false;
+  return manifest.data.schema === module.dataSchema || await dataEmpty(join(context.platform, "data", module.id));
+}
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
   // Without isolation any code change can do anything the Chrona user can: every version needs the user.
   if (!context.ports.sandbox?.isolated || isEntryModule(manifest)) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
-  const current = moduleManifestSchema.parse(active.manifest), effects = current.effects;
-  if (isEntryModule(current)) return false;
-  if (!manifest.effects.every(effect => effects.includes(effect))) return false;
-  // Calling another module, or being callable by more parties, is a capability too.
-  if (!manifest.uses.every(target => current.uses.includes(target))) return false;
-  if (!manifest.tools.every(tool => {
-    const previous = current.tools.find(candidate => candidate.name === tool.name);
-    const wider = (visibility: string[]) => visibility.some(value => value !== "provider" && value !== "owner");
-    if (!previous) return !wider(tool.visibility);
-    const callers = !tool.visibility.includes("modules") || previous.callers === undefined || (tool.callers?.every(name => previous.callers!.includes(name)) ?? false);
-    return tool.visibility.every(value => previous.visibility.includes(value)) && callers;
-  })) return false;
-  // New or changed dependencies count as new capabilities (v2-6 §4).
-  if (!manifest.packages.every(name => moduleManifestSchema.parse(active.manifest).packages.includes(name))) return false;
-  for (const lockfile of ["package.json", "bun.lock", "pyproject.toml", "uv.lock"]) {
-    const [next, current] = await Promise.all([version.hash, active.hash].map(hash => readFile(join(context.store, hash, lockfile)).catch(() => null)));
-    if (!(next === null ? current === null : current !== null && next.equals(current))) return false;
-  }
-  if (manifest.data.schema !== module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id))) return false;
+  const current = moduleManifestSchema.parse(active.manifest);
+  if (!await capabilitiesUnchanged(context, { module, active, version, current, manifest })) return false;
   return checksPassed(report);
 }
 async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport, card: ReviewCard) {

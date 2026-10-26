@@ -31,3 +31,4 @@ pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); padd
 details > summary { cursor: pointer; font-weight: 600; margin: .6rem 0 .3rem; }
 .transcript { max-height: 60vh; overflow: auto; }
 .transcript p { margin: .3rem 0; }
+.diagnostics { overflow-wrap: anywhere; }

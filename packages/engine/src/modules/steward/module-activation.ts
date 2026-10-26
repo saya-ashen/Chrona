@@ -5,7 +5,7 @@ import { createApprovals } from "./approvals";
 import type { ApprovedAction } from "./ports";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { StewardError } from "./errors";
-import { expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";
+import { assertBuiltinUpgrade, expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
@@ -38,6 +38,8 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await checkApproval(context, tx, action, module.id);
   const version = await approvedVersion(tx, moduleId, hash, restore);
+  // Restore confirmations and explicit rollback use their own owner-authorized path.
+  if (!restore) await assertBuiltinUpgrade(tx, context.workspaceId, moduleId, { hash });
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
   if (restore || (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId)))) {

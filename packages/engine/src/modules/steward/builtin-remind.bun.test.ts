@@ -37,8 +37,9 @@ async function fixture(migrated = false) {
     db = testDb();
     await db.workspace.create({ data: { id: "w", name: "Reminders" } });
   }
+  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
-    sandbox: { ...sandbox.health, runModule: sandbox.runModule, startModule: sandbox.startModule } };
+    sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   const service = createStewardService(ports), api = service.forWorkspace("w");
   return { db, ports, service, api, async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
 }

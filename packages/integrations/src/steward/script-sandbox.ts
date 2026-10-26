@@ -1,12 +1,15 @@
 import { accessSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { StringDecoder } from "node:string_decoder";
+import { redactSensitiveText } from "@chrona/logging/redaction";
 
 type Language = "python" | "shell" | "typescript";
 export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number };
 type ModuleDirs = { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; socketPath?: string; env?: Record<string, string> };
+type Command = (entry: string, code: string, host: string, memoryLimitMb: number) => string[];
 function executable(path: string | null | undefined): string | null {
   try { if (!path) return null; accessSync(path, constants.X_OK); return realpathSync(path); } catch { return null; }
 }
@@ -29,12 +32,48 @@ function language(entry: string): Language {
   if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
   return ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
 }
+function spawnLocal({ dirs, entry, code, data, content, socket, http, bin, paths, command, memoryLimitMb }: { dirs: ModuleDirs; entry: string; code: string; data: string; content: string | undefined; socket: string | undefined; http: string | undefined; bin: string[]; paths: string[]; command: Command; memoryLimitMb: number }) {
+  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
+  const env = { ...extra, PATH: [...bin, process.env.PATH ?? paths.map(dirname).join(":")].join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
+    CHRONA_MODULE: code, CHRONA_DATA: data, ...(content ? { CHRONA_CONTENT: content } : {}), ...(socket ? { CHRONA_SOCKET: socket } : {}), ...(http ? { CHRONA_HTTP_SOCKET: join(http, "s") } : {}) };
+  const [file, ...args] = command(entry, code, code, memoryLimitMb);
+  // Own process group, so kill() also ends anything the module started.
+  return spawn(file!, args, { cwd: code, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+}
+function spawnIsolated({ dirs, entry, code, data, content, socket, http, bin, paths, bwrap, moduleSdk, dataDir, command, network, memoryLimitMb }: { dirs: ModuleDirs; entry: string; code: string; data: string; content: string | undefined; socket: string | undefined; http: string | undefined; bin: string[]; paths: string[]; bwrap: string; moduleSdk: string; dataDir: string | undefined; command: Command; network: boolean; memoryLimitMb: number }) {
+  const hidden = [...new Set([homedir(), dataDir].filter((p): p is string => !!p).flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
+    .sort((a, b) => a.split(sep).length - b.split(sep).length);
+  // A private root supplies mount points without creating anything on the host; it is frozen read-only before exec.
+  const root = readdirSync("/").filter(name => !["module", "data", "content", "chrona", "node_modules", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
+  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
+  const env = { ...extra, PATH: [...bin, ...paths.map(dirname), "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
+    ...(socket ? { CHRONA_SOCKET: "/chrona/chrona.sock" } : {}), ...(http ? { CHRONA_HTTP_SOCKET: "/chrona/http/s" } : {}) };
+  const profile = ["--unshare-all", ...(network ? ["--share-net"] : []), "--die-with-parent", "--new-session", "--tmpfs", "/", ...root,
+    "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]), "--proc", "/proc", "--dev", "/dev", ...paths.flatMap(p => ["--ro-bind", p, p]),
+    "--ro-bind", code, "/module", "--bind", data, "/data", ...(content ? ["--bind", content, "/content"] : []),
+    "--ro-bind", resolve(moduleSdk), "/node_modules/chrona", "--dir", "/chrona", ...(socket ? ["--ro-bind", socket, "/chrona/chrona.sock"] : []),
+    ...(http ? ["--bind", http, "/chrona/http"] : []), "--remount-ro", "/", "--chdir", "/module",
+    "--clearenv", ...Object.entries(env).flatMap(([key, value]) => ["--setenv", key, value])];
+  return spawn(bwrap, [...profile, "--", ...command(entry, "/module", code, memoryLimitMb)], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
+}
+function createSpawnModule({ isolated, bwrap, dataDir, moduleSdk, paths, command, memoryMb }: { isolated: boolean; bwrap: string | null; dataDir?: string; moduleSdk: string; paths: string[]; command: Command; memoryMb: number }) {
+  return (dirs: ModuleDirs, entry: string, network: boolean, memoryLimitMb = memoryMb) => {
+    const code = directory(dirs.codeDir), data = directory(dirs.dataDir), content = dirs.contentDir ? directory(dirs.contentDir) : undefined;
+    const socket = dirs.socketPath ? resolve(dirs.socketPath) : undefined;
+    if (socket && !statSync(socket).isSocket()) throw new Error("Invalid module socket");
+    const http = dirs.httpDir ? directory(dirs.httpDir) : undefined, bin = packageBins(code);
+    // Only non-secret CHRONA_* settings pass through. SHLVL=1 prevents shell startup files from replacing PATH.
+    const context = { dirs, entry, code, data, content, socket, http, bin, paths, command, memoryLimitMb };
+    if (!isolated) return spawnLocal(context);
+    return spawnIsolated({ ...context, bwrap: bwrap!, moduleSdk, dataDir, network });
+  };
+}
 /**
  * Runs module processes inside bubblewrap when it is usable (isolated), otherwise as plain child
  * processes of the Chrona user, like Hermes' local backend. Modules find everything through
  * CHRONA_* variables and import the SDK as `chrona`, so the same code runs either way.
  */
-export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 512, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
+export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
   bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
   /** The `chrona` package directory; packaged binaries pass the shipped copy. */
   moduleSdk?: string;
@@ -55,43 +94,14 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     cpSync(moduleSdk, target, { recursive: true });
   }
   /** v2-6: the module's installed Python environment wins over the host interpreter. */
-  function command(entry: string, code: string, host: string) {
+  const command: Command = (entry, code, host, memoryLimitMb) => {
     const kind = language(entry), venv = kind === "python" && existsSync(join(host, ".venv", "bin", "python"));
     const interpreter = venv ? join(code, ".venv", "bin", "python") : interpreters[kind];
     if (!shell || !interpreter) throw new Error("模块运行环境不可用");
     // --no-install: never let Bun fetch an npm package named like a missing import.
-    return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install"] : []), join(code, entry)];
-  }
-  function spawnModule(dirs: ModuleDirs, entry: string, network: boolean) {
-    const code = directory(dirs.codeDir), data = directory(dirs.dataDir), content = dirs.contentDir ? directory(dirs.contentDir) : undefined;
-    const socket = dirs.socketPath ? resolve(dirs.socketPath) : undefined;
-    if (socket && !statSync(socket).isSocket()) throw new Error("Invalid module socket");
-    const http = dirs.httpDir ? directory(dirs.httpDir) : undefined;
-    const bin = packageBins(code);
-    // Only non-secret CHRONA_* settings (e.g. CHRONA_PUBLIC_URL) pass through. SHLVL=1: bash sources ~/.bashrc
-    // when stdin is a socket (Bun's pipes are), which would replace PATH and leak the user's shell setup.
-    const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
-    if (!isolated) {
-      const env = { ...extra, PATH: [...bin, process.env.PATH ?? paths.map(dirname).join(":")].join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
-        CHRONA_MODULE: code, CHRONA_DATA: data, ...(content ? { CHRONA_CONTENT: content } : {}), ...(socket ? { CHRONA_SOCKET: socket } : {}), ...(http ? { CHRONA_HTTP_SOCKET: join(http, "s") } : {}) };
-      const [file, ...args] = command(entry, code, code);
-      // Own process group, so kill() also ends anything the module started.
-      return spawn(file!, args, { cwd: code, env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
-    }
-    const hidden = [...new Set([homedir(), dataDir].filter((p): p is string => !!p).flatMap(p => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; }))]
-      .sort((a, b) => a.split(sep).length - b.split(sep).length);
-    // A private root supplies mount points without creating anything on the host; it is frozen read-only before exec.
-    const root = readdirSync("/").filter(name => !["module", "data", "content", "chrona", "node_modules", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
-    const env = { ...extra, PATH: [...bin, ...paths.map(dirname), "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
-      ...(socket ? { CHRONA_SOCKET: "/chrona/chrona.sock" } : {}), ...(http ? { CHRONA_HTTP_SOCKET: "/chrona/http/s" } : {}) };
-    const profile = ["--unshare-all", ...(network ? ["--share-net"] : []), "--die-with-parent", "--new-session", "--tmpfs", "/", ...root,
-      "--tmpfs", "/tmp", ...hidden.flatMap(p => ["--tmpfs", p]), "--proc", "/proc", "--dev", "/dev", ...paths.flatMap(p => ["--ro-bind", p, p]),
-      "--ro-bind", code, "/module", "--bind", data, "/data", ...(content ? ["--bind", content, "/content"] : []),
-      "--ro-bind", resolve(moduleSdk), "/node_modules/chrona", "--dir", "/chrona", ...(socket ? ["--ro-bind", socket, "/chrona/chrona.sock"] : []),
-      ...(http ? ["--bind", http, "/chrona/http"] : []), "--remount-ro", "/", "--chdir", "/module",
-      "--clearenv", ...Object.entries(env).flatMap(([key, value]) => ["--setenv", key, value])];
-    return spawn(bwrap!, [...profile, "--", ...command(entry, "/module", code)], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
-  }
+    return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryLimitMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install"] : []), join(code, entry)];
+  };
+  const spawnModule = createSpawnModule({ isolated, bwrap, dataDir, moduleSdk, paths, command, memoryMb });
   function kill(child: ReturnType<typeof spawn>) {
     try { if (!isolated && child.pid) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* Already exited. */ }
   }
@@ -101,21 +111,36 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
       const child = spawnModule({ codeDir, dataDir: moduleData, contentDir, httpDir, socketPath, env }, entry, network);
       child.stdin!.end();
       child.stdout!.resume();
-      let errors = Buffer.alloc(0);
-      // Long-running modules have no other log: their stderr goes to the host log too.
-      child.stderr!.on("data", (chunk: Buffer) => { errors = Buffer.concat([errors, chunk]).subarray(-16 * 1024); process.stderr.write(chunk); });
+      let errors = Buffer.alloc(0), line = "", dropping = false;
+      const decoder = new StringDecoder("utf8");
+      const credentials = Object.entries(process.env).filter(([key, value]) => /(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) && value && value.length >= 8).map(([, value]) => value!);
+      const scrub = (text: string) => redactSensitiveText(credentials.reduce((safe, value) => safe.replaceAll(value, "[Redacted]"), text), 16 * 1024);
+      // Frame before redaction: neither chunk boundaries nor the tail cap may expose a credential fragment.
+      const logLine = (text: string) => {
+        const safe = scrub(text);
+        errors = Buffer.concat([errors, Buffer.from(safe)]).subarray(-16 * 1024);
+        process.stderr.write(JSON.stringify({ component: "module", moduleId: basename(moduleData), hash: basename(codeDir), pid: child.pid, stderr: redactSensitiveText(safe, 4000) }) + "\n");
+      };
+      child.stderr!.on("data", (chunk: Buffer) => {
+        for (const part of decoder.write(chunk).split(/(?<=\n)/)) {
+          if (!dropping) line += part;
+          if (line.length > 16 * 1024) { line = ""; dropping = true; }
+          if (part.endsWith("\n")) { if (!dropping) logLine(line); else logLine("[oversized stderr line omitted]"); line = ""; dropping = false; }
+        }
+      });
+      child.stderr!.once("end", () => { line += decoder.end(); if (line && !dropping) logLine(line); line = ""; });
       const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => {
         child.once("error", reject);
         child.once("close", (code, signal) => resolve({ code, signal }));
       });
-      return { pid: child.pid!, exited, stderr: () => errors.toString("utf8"), kill: () => kill(child) };
+      return { pid: child.pid!, exited, stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: () => kill(child), limits: { virtualMemoryMb: memoryMb } };
     },
     /** One-shot run with JSON on stdin: author tests and data migrations. */
-    async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<ScriptSandboxResult> {
-      limits(runTimeout, outputLimit);
+    async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes, memoryMb: runMemoryMb = memoryMb }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number }): Promise<ScriptSandboxResult> {
+      limits(runTimeout, outputLimit, runMemoryMb);
       language(entry);
       if (!available) return { status: "unavailable", output: "", error: "模块运行环境不可用" };
-      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir }, entry, network);
+      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir }, entry, network, runMemoryMb);
       return new Promise(resolve => {
         let output = Buffer.alloc(0), errors = Buffer.alloc(0), timedOut = false;
         const timer = setTimeout(() => { timedOut = true; kill(child); }, runTimeout);

@@ -29,16 +29,22 @@ function openStore(dataDir: string) {
   };
 }
 /** Enough of JSON Schema for declared payloads: an object, required keys, and the type of each declared property. */
-function check(schema: Schema | undefined, value: unknown) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw fail("invalid", "payload must be a JSON object");
-  const data = value as Record<string, unknown>;
+function checkRequired(schema: Schema | undefined, data: Record<string, unknown>) {
   for (const key of schema?.required ?? []) if (!(key in data)) throw fail("invalid", `payload.${key} is required`);
+}
+function checkProperties(schema: Schema | undefined, data: Record<string, unknown>) {
   for (const [key, property] of Object.entries(schema?.properties ?? {})) {
     if (!(key in data) || !property.type) continue;
     const actual = Array.isArray(data[key]) ? "array" : data[key] === null ? "null" : typeof data[key];
     const ok = property.type === actual || (property.type === "integer" && Number.isInteger(data[key]));
     if (!ok) throw fail("invalid", `payload.${key} must be ${property.type}`);
   }
+}
+function check(schema: Schema | undefined, value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw fail("invalid", "payload must be a JSON object");
+  const data = value as Record<string, unknown>;
+  checkRequired(schema, data);
+  checkProperties(schema, data);
 }
 
 /**
@@ -61,39 +67,45 @@ export function createEvents(ports: Ports) {
     return caller.module;
   }
   const same = (a: Subscription, b: Subscription) => a.event === b.event && a.module === b.module && a.tool === b.tool;
+  async function subscribe(args: Record<string, unknown>, module: string) {
+    const event = String(args.event ?? ""), tool = String(args.tool ?? "");
+    if (!await declared(event)) throw fail("not_found", `No module declares the event ${event}`);
+    const target = `${module}.${tool}`;
+    if (!(await ports.reachable(target)).includes(target)) throw fail("forbidden", `${target} must be your own tool and list "events" in callers`);
+    const row = { event, module, tool };
+    if (!store.rows().some(other => same(other, row))) store.save([...store.rows(), row]);
+    return { subscribed: true };
+  }
+  async function emit(args: Record<string, unknown>, module: string) {
+    const event = String(args.event ?? ""), full = `${module}.${event}`, declaration = await declared(full);
+    if (!declaration) throw fail("not_found", `${full} is not declared in contributes.events.emits`);
+    const payload = String(args.payload ?? "");
+    if (Buffer.byteLength(payload) > MAX_PAYLOAD) throw fail("invalid", "payload is larger than 64 KiB");
+    let data: unknown;
+    try { data = JSON.parse(payload); } catch { throw fail("invalid", "payload must be JSON"); }
+    check(declaration.payload, data);
+    const subscribers = store.rows().filter(row => row.event === full).slice(0, MAX_SUBSCRIBERS);
+    for (const row of subscribers) {
+      const reply = await ports.call(`${row.module}.${row.tool}`, { event: full, from: module, payload }, { mode: "async", key: `${full}:${String(args.key ?? "")}:${row.module}.${row.tool}`, reply: true });
+      pending.set(reply.callId, row);
+    }
+    return { delivered: subscribers.length };
+  }
+  const handlers: Record<string, (args: Record<string, unknown>, module: string) => unknown> = {
+    subscriptions: (_args, module) => ({ subscriptions: store.rows().filter(row => row.module === module) }),
+    unsubscribe: (args, module) => {
+      const row = { event: String(args.event ?? ""), module, tool: String(args.tool ?? "") };
+      store.save(store.rows().filter(other => !same(other, row)));
+      return { unsubscribed: true };
+    },
+    subscribe,
+    emit,
+  };
   return {
     async handle(id: string, args: Record<string, unknown>, caller: Caller) {
       const module = moduleOf(caller);
-      if (id === "subscriptions") return { subscriptions: store.rows().filter(row => row.module === module) };
-      const event = String(args.event ?? "");
-      if (id === "unsubscribe") {
-        const row = { event, module, tool: String(args.tool ?? "") };
-        store.save(store.rows().filter(other => !same(other, row)));
-        return { unsubscribed: true };
-      }
-      if (id === "subscribe") {
-        if (!await declared(event)) throw fail("not_found", `No module declares the event ${event}`);
-        const row = { event, module, tool: String(args.tool ?? "") }, target = `${module}.${row.tool}`;
-        if (!(await ports.reachable(target)).includes(target)) throw fail("forbidden", `${target} must be your own tool and list "events" in callers`);
-        if (!store.rows().some(other => same(other, row))) store.save([...store.rows(), row]);
-        return { subscribed: true };
-      }
-      if (id === "emit") {
-        const full = `${module}.${event}`, declaration = await declared(full);
-        if (!declaration) throw fail("not_found", `${full} is not declared in contributes.events.emits`);
-        const payload = String(args.payload ?? "");
-        if (Buffer.byteLength(payload) > MAX_PAYLOAD) throw fail("invalid", "payload is larger than 64 KiB");
-        let data: unknown;
-        try { data = JSON.parse(payload); } catch { throw fail("invalid", "payload must be JSON"); }
-        check(declaration.payload, data);
-        const subscribers = store.rows().filter(row => row.event === full).slice(0, MAX_SUBSCRIBERS);
-        for (const row of subscribers) {
-          const reply = await ports.call(`${row.module}.${row.tool}`, { event: full, from: module, payload }, { mode: "async", key: `${full}:${String(args.key ?? "")}:${row.module}.${row.tool}`, reply: true });
-          pending.set(reply.callId, row);
-        }
-        return { delivered: subscribers.length };
-      }
-      throw fail("not_found", `events.${id} not found`);
+      if (!Object.hasOwn(handlers, id)) throw fail("not_found", `events.${id} not found`);
+      return handlers[id]!(args, module);
     },
     /** A delivery the subscriber can no longer take (removed, paused, its tool gone or no longer open to events) ends the subscription. */
     result(event: CallResult) {

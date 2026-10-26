@@ -54,11 +54,13 @@ export const DEFAULT_NOTIFICATION_SETTINGS = { dailyCap: 5, quietHours: { start:
 
 
 export const RUN_LIMITS = {
-  foregroundTimeoutMs: 5 * 60_000, backgroundTimeoutMs: 20 * 60_000,
+  foregroundTimeoutMs: 5 * 60_000, backgroundTimeoutMs: 20 * 60_000, buildTimeoutMs: 60 * 60_000,
   maxChronaToolCalls: 60, maxRunsPerSessionPerDay: 24, maxRunsPerDay: 200, maxFailures: 3,
   jobTimeoutMs: 60_000, jobOutputBytes: 64 * 1024,
+  /** Author tests compile frontend dependencies; runtime modules keep their smaller sandbox limit. */
+  moduleTestMemoryMb: 2048,
   /** Build sessions (v2-13): new ones per day, and module submissions per run. */
-  maxBuildRunsPerDay: 6, maxBuildSubmissionsPerRun: 5,
+  maxBuildRunsPerDay: 20, maxBuildSubmissionsPerRun: 5, maxQueuedBuilds: 10,
 } as const;
 
 export type SessionSource = (typeof SESSION_SOURCES)[number];
@@ -176,6 +178,7 @@ export const moduleManifestSchema = z.object({
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   if (manifest.secrets.length && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "secrets are only for entry modules (chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
+}).superRefine((manifest, ctx) => {
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
@@ -279,7 +282,7 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
 ]);
 export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
   /** Routed calls: refused by the target's visibility/callers, unknown target, would wait on itself, outcome unknown, the target failed or never got it. */
-  "forbidden", "not_found", "cycle", "unknown", "failed", "unavailable"] as const;
+  "forbidden", "not_found", "conflict", "cycle", "unknown", "failed", "unavailable"] as const;
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   /** Sync `call` replies: the target's result. */
   z.object({ output: z.json() }).strict(),
@@ -376,8 +379,15 @@ export const moduleModelSettingsSchema = z.object({
   maxCallsPerEvent: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000),
   dailyCalls: z.number().int().min(1).max(10_000), timeoutMs: z.number().int().min(5_000).max(600_000),
 }).strict();
+export const buildSettingsSchema = z.object({
+  dailyLimit: z.number().int().min(0).max(200),
+  timeoutMinutes: z.number().int().min(5).max(120),
+  maxSubmissions: z.number().int().min(1).max(20),
+}).strict();
 export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
+  builds: buildSettingsSchema,
+  buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
   moduleModel: moduleModelSettingsSchema.nullable(),
   chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
@@ -414,7 +424,7 @@ export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]),
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional() }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
@@ -446,7 +456,7 @@ export const chronaToolInputSchemas = {
   /** Full-text search over past sessions' messages; returns matching sessions with snippets. */
   chrona_session_search: z.object({ query: text.max(200), limit: z.number().int().min(1).max(10).default(3) }).strict(),
   chrona_request_approval: z.object({ action: z.enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20_000) }).strict(),
-  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to mount an absolute host directory or file (read-write) into later runs of this session. The current run cannot see it; after approval, schedule a wake to continue."),
+  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to mount an absolute host directory or file (read-write) into later runs of this session. The current run cannot see it; after the decision Chrona continues this conversation in a new run."),
   chrona_remember: z.object({ text: text.max(500), topic: z.enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
   chrona_forget: z.object({ preferenceId: id }).strict(),
   chrona_preferences: z.object({}).strict(),
@@ -455,19 +465,28 @@ const moduleIntent = z.object({ changes: z.array(text.max(500)).min(1).max(20), 
   .describe("What this version changes and what it keeps (shown on the approval card)");
 /** Inputs of the `modules` system module's tools for the Provider (v2-13), reached as m_modules_<tool>. */
 export const modulesToolInputSchemas = {
+  reference: z.object({ target: z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/).optional() }).strict()
+    .describe("Read development reference only: without target, list available interfaces; with <module>.<tool>, get its input schema, declared output schema/examples and admission rules. Never executes the target or reads its business data. Undeclared outputs are explicitly unknown, not inferred from empty results."),
   check: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/).optional().describe("Defaults to the newest version"),
     wait: z.number().int().min(0).max(600).default(0).describe("Seconds to wait while it is still being checked (set timeoutSeconds at least as long)") }).strict()
     .describe("A module version's status and check report (tests, errors, data continuity, key probe); waits while it is building or testing."),
-  checkout: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema }).strict()
-    .describe("Copy a module version's files into an empty directory of your working directory for editing; hash defaults to the active version."),
+  checkout: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema,
+    source: z.enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation") }).strict()
+    .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
+    .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the running release's reference even when customization prevented registering that built-in. Returns the exact content hash; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
     .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; activation needs the user\'s hash-bound approval. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with callers:["events"] and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   rollback: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
+  "stop-build": z.object({ session: id }).strict()
+    .describe("Stop a module build conversation's queued/running work; keep its files and history. Already submitted versions and approvals are not withdrawn."),
+  "revise-build": z.object({ session: id, requirements: text.max(4000),
+    files: z.array(relativePathSchema).max(10).optional().describe("Additional required references from the calling Provider's cwd or content/chat/. Provider only; owner requests cannot supply filesystem paths.") }).strict()
+    .describe("Stop the old module build run and queue a revision at the tail in the same conversation, preserving files and history. Providers may supplement references via files; missing files fail before stopping the old run. Existing approval decisions are unchanged. Returns runId and queuePosition; no automatic retry."),
   build: z.object({ name: slug, goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]),
     files: z.array(relativePathSchema).max(10).default([]).describe("Reference files (e.g. screenshots the user sent): attachments under content/chat/ or files in your working directory"),
     intent: moduleIntent }).strict()
-    .describe("Start a build conversation: a separate session writes, tests and submits the module, then reports back to this conversation. Use for new modules or larger changes."),
+    .describe("Queue a build conversation: a separate session writes, tests and submits the module, then reports back here. FIFO, one running and up to 10 waiting per workspace; waiting makes no model calls. Returns status (build_queued/build_running), sessionId, runId, queuePosition and aheadCount. Identical outstanding requests from this conversation reuse the build. Daily new-session allowance is charged at admission; runtime limits start at claim. No dependency ordering beyond FIFO and no automatic retry."),
 } as const;
 export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof chronaToolInputSchemas)[];
 

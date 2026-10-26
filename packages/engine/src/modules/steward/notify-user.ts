@@ -16,14 +16,15 @@ export type UserNotice = {
 };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 const NOTIFY = NOTIFY_INTERFACE.split(".")[0]!;
+const isDefined = (value: unknown) => value !== undefined;
 /** Queues the notice in the caller's transaction, so it commits (or rolls back) with what it reports. */
 export function notifyUser(tx: Db, ports: StewardPorts, workspaceId: string, notice: UserNotice) {
-  const args = Object.fromEntries(Object.entries({ ...notice, title: notice.title.slice(0, 200), body: notice.body.slice(0, 4000) }).filter(([, value]) => value !== undefined));
-  return enqueueCall(tx, ports, kernelOrigin(workspaceId), NOTIFY_INTERFACE, args, { key: `notify:${notice.key}`.slice(0, 200) });
+  const args = Object.fromEntries(Object.entries({ ...notice, title: notice.title.slice(0, 200), body: notice.body.slice(0, 4000) }).filter(entry => isDefined(entry[1])));
+  return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: NOTIFY_INTERFACE, raw: args }, { key: `notify:${notice.key}`.slice(0, 200) });
 }
 /** Withdraws a queued notice that is no longer relevant (e.g. a question that was answered elsewhere). */
 export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string, key: string) {
-  return enqueueCall(tx, ports, kernelOrigin(workspaceId), `${NOTIFY}.withdraw`, { key }, { key: `withdraw:${key}`.slice(0, 200) });
+  return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.withdraw`, raw: { key } }, { key: `withdraw:${key}`.slice(0, 200) });
 }
 /** Every open approval is announced once, wherever it was created; the user is waiting on it, so no cap or quiet hours. */
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
@@ -34,8 +35,8 @@ export async function announceApprovals(ports: StewardPorts, workspaceId: string
 }
 /** Forwards the user's notification settings (kept in the workspace, where the page edits them) to the notify module. */
 export function forwardSettings(tx: Db, ports: StewardPorts, workspaceId: string, settings: NotificationSettings, at: Date) {
-  return enqueueCall(tx, ports, kernelOrigin(workspaceId), `${NOTIFY}.configure`, { "daily-cap": settings.dailyCap, timezone: settings.timezone, "digest-at": settings.digestAt, at: at.toISOString(),
-    ...(settings.quietHours ? { "quiet-start": settings.quietHours.start, "quiet-end": settings.quietHours.end } : {}) }, { key: `settings:${at.toISOString()}` });
+  return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.configure`, raw: { "daily-cap": settings.dailyCap, timezone: settings.timezone, "digest-at": settings.digestAt, at: at.toISOString(),
+    ...(settings.quietHours ? { "quiet-start": settings.quietHours.start, "quiet-end": settings.quietHours.end } : {}) } }, { key: `settings:${at.toISOString()}` });
 }
 
 /** A sync question to the notify module; null when it cannot answer (the page still renders). */
@@ -68,7 +69,7 @@ export async function moveLegacyNotifications(ports: StewardPorts, workspaceId: 
     if (settings) await forwardSettings(tx, ports, workspaceId, settings, workspace.updatedAt);
     for (let start = 0; start < rows.length; start += 100) {
       const chunk = rows.slice(start, start + 100).map(({ module, ...row }) => ({ ...row, app: module?.name ?? null }));
-      await enqueueCall(tx, ports, kernelOrigin(workspaceId), `${NOTIFY}.import`, { rows: JSON.stringify(chunk) }, { key: `legacy:${start}` });
+      await enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.import`, raw: { rows: JSON.stringify(chunk) } }, { key: `legacy:${start}` });
     }
     await audit(tx, { workspaceId, actor: "chrona", kind: LEGACY, subjectId: workspaceId, details: { rows: rows.length, queued: rows.filter(row => row.status === "queued").length } });
     return rows.length;

@@ -11,8 +11,11 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
+  stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
   stub("modules.tools", () => [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
   stub("planning.get", () => ({ plan: 1 })),
+  stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
+  stub("modules.revise-build", args => ({ status: "build_revised", sessionId: args.session })),
   stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
   stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
   stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
@@ -40,6 +43,8 @@ try {
 
   // The data API answers from routed calls.
   assert.deepEqual(await (await get("/api/web/today")).json(), { approvals: [] });
+  assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
+  assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
   assert.deepEqual(await (await post("/api/web/chat", { text: "hi", session: "s1" })).json(), { sessionId: "s1", messageId: "m1" });
   assert.deepEqual(calls.at(-1), ["chat.send", { key: "web:k1", text: "hi", channel: "in_app" }]);
   await post("/api/web/chat", { text: "new" });
@@ -49,10 +54,16 @@ try {
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
   assert.equal((await post("/api/web/call", { target: "approvals.resolve", args: {} })).status, 404);
   assert.equal((await get("/api/web/nope")).status, 404);
+  assert.deepEqual(await (await post("/api/web/sessions/b1/stop-build", {})).json(), { status: "build_stopped", sessionId: "b1" });
+  assert.deepEqual(calls.at(-1), ["modules.stop-build", { session: "b1" }]);
+  await post("/api/web/sessions/b1/revise-build", { requirements: "保留原文件" });
+  assert.deepEqual(calls.at(-1), ["modules.revise-build", { session: "b1", requirements: "保留原文件" }]);
   // Settings and Provider questions go to their system interfaces (v2-9).
   assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [] });
   await post("/api/web/settings", { notifications: { dailyCap: 3 } });
   assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
+  await post("/api/web/settings", { builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } });
+  assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } }) }]);
   await post("/api/web/interactions/i1/answer", { decision: "submit", value: true });
   assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "submit", value: true }) }]);
   await post("/api/web/schedules/s1", { status: "paused" });

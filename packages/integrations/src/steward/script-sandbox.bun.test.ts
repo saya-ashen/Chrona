@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile, readFile, readlink, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,6 +40,17 @@ sandboxTest("module interpreters, timeout, output caps and entry validation", as
     expect(Buffer.byteLength(result.output)).toBe(100);
     expect(Buffer.byteLength(result.error!)).toBe(100);
     await expect(sandbox.runModule({ codeDir, dataDir, entry: "../test.py", input: {} })).rejects.toThrow("Invalid module entry");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+sandboxTest("trusted author-test memory overrides stay bounded and do not change the default sandbox limit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-test-memory-"));
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data");
+    await mkdir(codeDir); await mkdir(dataDir);
+    await writeFile(join(codeDir, "test.sh"), 'ulimit -v');
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {}, memoryMb: 2048 })).toMatchObject({ status: "succeeded", output: "2097152\n" });
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "1048576\n" });
+    await expect(sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {}, memoryMb: 0 })).rejects.toThrow("Invalid sandbox limit");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 sandboxTest("long-running SDK module exchanges events and calls, stays isolated, and can be killed", async () => {
@@ -98,6 +109,71 @@ on("tool", () => { throw new Error("handler failed"); });`);
     await channel.close();
     await new Promise<void>(resolve => listener.close(() => resolve()));
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("default per-process virtual address limit is 1 GiB without requiring namespaces", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-default-memory-"));
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data");
+    await mkdir(codeDir); await mkdir(dataDir);
+    await writeFile(join(codeDir, "limit.sh"), "ulimit -v");
+    const local = createScriptSandbox({ dataDir: root });
+    expect(await local.runModule({ codeDir, dataDir, entry: "limit.sh", input: {} })).toMatchObject({ status: "succeeded", output: "1048576\n" });
+    expect(await local.runModule({ codeDir, dataDir, entry: "limit.sh", input: {}, memoryMb: 2048 })).toMatchObject({ status: "succeeded", output: "2097152\n" });
+    await expect(local.runModule({ codeDir, dataDir, entry: "limit.sh", input: {}, memoryMb: 0 })).rejects.toThrow("Invalid sandbox limit");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("long-running stderr is attributed and credentials split across chunks are redacted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-logs-"));
+  const codeDir = join(root, "code"), dataDir = join(root, "data");
+  await mkdir(codeDir); await mkdir(dataDir);
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => ({ id: call.id, result: { output: null } }) });
+  const lines: string[] = [];
+  const write = spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write);
+  let handle: ReturnType<typeof sandbox.startModule> | undefined;
+  try {
+    await writeFile(join(codeDir, "index.sh"), "printf 'pass' >&2; sleep 0.05; printf 'word=synthetic-private\\npanic: example\\n' >&2; exit 1");
+    handle = createScriptSandbox({ dataDir: root }).startModule({ codeDir, dataDir, entry: "index.sh", socketPath: join(root, "channel.sock") });
+    expect(await handle.exited).toEqual({ code: 1, signal: null });
+    expect(handle.limits).toEqual({ virtualMemoryMb: 1024 });
+    const output = lines.join("");
+    expect(output).not.toContain("synthetic-private");
+    expect(output).toContain("[Redacted]");
+    expect(output).toContain('"moduleId":"data"');
+    expect(output).toContain('"hash":"code"');
+    expect(output).toContain("panic: example");
+  } finally {
+    write.mockRestore(); handle?.kill(); if (handle) await handle.exited;
+    await channel.close(); await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("live stderr snapshots omit incomplete credentials until the line is complete", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-partial-log-"));
+  const codeDir = join(root, "code"), dataDir = join(root, "data");
+  await mkdir(codeDir); await mkdir(dataDir);
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => ({ id: call.id, result: { output: null } }) });
+  const key = "CHRONA_DIAGNOSTIC_TEST_TOKEN", previous = process.env[key];
+  process.env[key] = "synthetic-chunked-credential";
+  const lines: string[] = [];
+  const write = spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write);
+  let handle: ReturnType<typeof sandbox.startModule> | undefined;
+  try {
+    await writeFile(join(codeDir, "index.sh"), 'printf "synthetic-chunked-" >&2; while [ ! -f "$CHRONA_DATA/release" ]; do sleep 0.01; done; printf "credential\\n" >&2');
+    handle = createScriptSandbox({ dataDir: root }).startModule({ codeDir, dataDir, entry: "index.sh", socketPath: join(root, "channel.sock") });
+    for (let i = 0; i < 200 && !handle.stderr(); i++) await Bun.sleep(5);
+    expect(handle.stderr()).not.toContain("synthetic-chunked-");
+    expect(handle.stderr()).toContain("incomplete stderr line omitted");
+    await writeFile(join(dataDir, "release"), "");
+    expect(await handle.exited).toEqual({ code: 0, signal: null });
+    expect(handle.stderr()).toContain("[Redacted]");
+    expect(lines.join("")).not.toContain("synthetic-chunked-");
+  } finally {
+    if (previous === undefined) delete process.env[key]; else process.env[key] = previous;
+    handle?.kill(); if (handle) await handle.exited;
+    write.mockRestore(); await channel.close(); await rm(root, { recursive: true, force: true });
   }
 });
 

@@ -53,7 +53,7 @@ async function runFile(
 		return initCode;
 	}
 
-	const proc = Bun.spawn(["bun", "test", "--timeout=20000", path], {
+	const proc = Bun.spawn(["bun", "test", "--timeout=20000", `./${path}`], {
 		cwd: rootDir,
 		env: {
 			...process.env,

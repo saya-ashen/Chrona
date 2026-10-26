@@ -7,6 +7,8 @@ type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toApproval, toGrant } from "./store";
+import { assertBuiltinUpgrade } from "./module-context";
+import { createRuns } from "./runs";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
   const { workspaceId, now } = context;
@@ -16,7 +18,19 @@ async function grantApproval(tx: Prisma.TransactionClient, context: RecordContex
   if (decision.mode === "never" || decision.mode === "ask") throw new StewardError("forbidden", "Policy does not allow this approval");
   return grant.id;
 }
-export function createApprovals({ db, workspaceId, now }: RecordContext, onApproved?: OnApproved) {
+/** A run that asked does not wait: the decision continues its conversation as a new run, which retries under the new grant. */
+async function resume(tx: Prisma.TransactionClient, ports: StewardPorts, workspaceId: string, row: Parameters<typeof toApproval>[0], { decision, scope }: z.infer<typeof resolveApprovalSchema>) {
+  const payload = row.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.sessionId !== "string") return false;
+  // A closed conversation is not reopened; the decision still stands.
+  if (!await tx.session.findFirst({ where: { workspaceId, id: payload.sessionId, status: "active" } })) return false;
+  const prompt = decision === "approve"
+    ? `The user approved approval ${row.id} ("${row.title}", scope ${scope}). Continue the task that was waiting for it; the approved action is now allowed.`
+    : `The user denied approval ${row.id} ("${row.title}"). Do not retry it; continue another way or tell the user.`;
+  await createRuns(ports, workspaceId).enqueue({ sessionId: payload.sessionId, lane: payload.lane === "background" ? "background" : "foreground", trigger: "approval", label: row.title, prompt }, tx);
+  return true;
+}
+export function createApprovals({ db, workspaceId, now }: RecordContext, onApproved?: OnApproved, ports?: StewardPorts) {
   return {
     list: async (status?: "open" | "approved" | "denied" | "expired") => (await db.approval.findMany({ where: { workspaceId, status }, orderBy: { createdAt: "desc" } })).map(toApproval),
     create: (raw: unknown) => db.$transaction(async tx => {
@@ -39,14 +53,17 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
       let grantId: string | null = null;
       if (input.decision === "approve") {
+        if (row.action === "activate_module") await assertBuiltinUpgrade(tx, workspaceId, row.moduleId, row.payload);
         grantId = await grantApproval(tx, { db, workspaceId, now }, row, input.scope);
       }
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
-      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null };
+      const resumed = ports ? await resume(tx, ports, workspaceId, row, input) : false;
+      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, resumed };
     }).then(async result => {
       if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
+      if (result.resumed) await ports!.onQueued?.();
       return result;
     }),
   };

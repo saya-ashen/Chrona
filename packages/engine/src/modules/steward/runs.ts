@@ -5,7 +5,7 @@ import type { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger, type SessionSource } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
-import { notificationSettings } from "./settings";
+import { buildSettings, notificationSettings } from "./settings";
 import { notifyUser } from "./notify-user";
 import { pushReply } from "./chat-replies";
 import { audit } from "./audit";
@@ -54,29 +54,52 @@ class RunService {
     if (!session) throw new StewardError("invalid", "Run requires a session");
     const cwd = join(ports.dataDir, "sessions", session.id);
     await mkdir(cwd, { recursive: true });
-    return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt: ports.now() } });
+    // The clock may tie or move backwards; builds still enter FIFO in admission order.
+    const tail = input.lane === "build" ? await tx.run.findFirst({ where: { workspaceId, lane: "build" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }) : null;
+    const createdAt = new Date(Math.max(ports.now().getTime(), tail ? tail.createdAt.getTime() + 1 : 0));
+    return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt } });
+  }
+  private async admitQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, { lane, today, timezone }: { lane: RunLane; today: { sessionId: string | null }[]; timezone: string }) {
+    if ((run.session && run.session.status !== "active") || await tx.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) {
+      await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } });
+      return "skip";
+    }
+    if (lane === "build" && run.leaseUntil && run.leaseUntil > now) return "blocked";
+    if (today.length >= RUN_LIMITS.maxRunsPerDay || (run.sessionId && today.filter(r => r.sessionId === run.sessionId).length >= RUN_LIMITS.maxRunsPerSessionPerDay)) {
+      await tx.run.update({ where: { id: run.id }, data: { leaseUntil: nextLocalMidnight(now, timezone) } });
+      return lane === "build" ? "blocked" : "skip";
+    }
+    return "ready";
+  }
+  private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, now: Date, builds: ReturnType<typeof buildSettings> | null) {
+    const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (builds ? builds.timeoutMinutes * 60_000 : { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane]));
+    const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
+    if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;
+    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane, ...(builds ? { builds } : {}) } });
+    return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id };
+  }
+  private async foregroundHasPriority(tx: Prisma.TransactionClient, now: Date) {
+    const { workspaceId } = this;
+    return !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }], lane: "foreground" } });
   }
   async claimNext(lane: RunLane, now = this.ports.now()) {
     return this.ports.db.$transaction(async tx => {
       const { workspaceId } = this;
       if (await tx.run.count({ where: { workspaceId, lane, status: "running" } })) return null;
       const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
-      if (lane === "background" && !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { ...eligible, lane: "foreground" } })) return null;
-      const timezone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
+      if (lane === "background" && await this.foregroundHasPriority(tx, now)) return null;
+      const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
+      const timezone = notificationSettings(settings).timezone, builds = lane === "build" ? buildSettings(settings) : null;
       const recent = await tx.run.findMany({ where: { workspaceId, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true, sessionId: true } });
       const today = recent.filter(r => r.startedAt && localDayKey(r.startedAt, timezone) === localDayKey(now, timezone));
-      for (const run of await tx.run.findMany({ where: { ...eligible, lane }, include: { session: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
-        if ((run.session && run.session.status !== "active") || await tx.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) {
-          await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } }); continue;
-        }
-        if (today.length >= RUN_LIMITS.maxRunsPerDay || (run.sessionId && today.filter(r => r.sessionId === run.sessionId).length >= RUN_LIMITS.maxRunsPerSessionPerDay)) {
-          await tx.run.update({ where: { id: run.id }, data: { leaseUntil: nextLocalMidnight(now, timezone) } }); continue;
-        }
+      const waiting = lane === "build" ? { workspaceId, status: "queued" } : eligible;
+      for (const run of await tx.run.findMany({ where: { ...waiting, lane }, include: { session: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
+        const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
+        if (admission === "blocked") return null;
+        if (admission === "skip") continue;
         if (run.sessionId && await tx.run.count({ where: { workspaceId, sessionId: run.sessionId, status: "running" } })) continue;
-        const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.backgroundTimeoutMs }[lane]);
-        if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt } })).count) continue;
-        await audit(tx, { workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane } });
-        return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, token, runId: run.id };
+        const claimed = await this.claimQueued(tx, run, lane, now, builds);
+        if (claimed) return claimed;
       }
       return null;
     });
@@ -113,25 +136,30 @@ class RunService {
     const replies = await tx.message.findMany({ where: { workspaceId: this.workspaceId, sessionId: session.id, id: { in: ids } } });
     const ordered = ids.flatMap(id => replies.filter(reply => reply.id === id));
     if (!ordered.length) return;
-    if (session.originSessionId) {
-      const origin = await tx.session.findFirst({ where: { id: session.originSessionId, workspaceId: this.workspaceId } });
-      if (!origin) throw new StewardError("not_found", "Origin session not found");
-      const latest = await tx.message.findFirst({ where: { sessionId: origin.id }, orderBy: [{ at: "desc" }, { id: "desc" }] });
-      for (const reply of ordered) {
-        const copy = await tx.message.create({ data: { workspaceId: this.workspaceId, sessionId: origin.id, channel: latest?.channel ?? "in_app", direction: "out", text: reply.text, attachments: reply.attachments as Prisma.InputJsonValue, at: now } });
-        await pushReply(tx, this.ports, copy, null);
-      }
-      await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
-      // Pushed into the original conversation (e.g. QQ): the result needs no separate notice there.
-      if (origin.entryModuleId) return;
-    }
+    // Pushed into the original conversation (e.g. QQ): the result needs no separate notice there.
+    if (session.originSessionId && await this.pushResult(tx, session.originSessionId, ordered, now)) return;
     const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
     await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,
       session: session.originSessionId ?? session.id, ...(module ? { module: module.id, app: module.name } : {}) });
   }
+  private async pushResult(tx: Prisma.TransactionClient, originSessionId: string, ordered: Awaited<ReturnType<Prisma.TransactionClient["message"]["findMany"]>>, now: Date) {
+    const origin = await tx.session.findFirst({ where: { id: originSessionId, workspaceId: this.workspaceId } });
+    if (!origin) throw new StewardError("not_found", "Origin session not found");
+    const latest = await tx.message.findFirst({ where: { sessionId: origin.id }, orderBy: [{ at: "desc" }, { id: "desc" }] });
+    for (const reply of ordered) {
+      const copy = await tx.message.create({ data: { workspaceId: this.workspaceId, sessionId: origin.id, channel: latest?.channel ?? "in_app", direction: "out", text: reply.text, attachments: reply.attachments as Prisma.InputJsonValue, at: now } });
+      await pushReply(tx, this.ports, copy, null);
+    }
+    await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
+    return !!origin.entryModuleId;
+  }
   private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date) {
     const { workspaceId, ports } = this;
     if (["failed", "timed_out", "provider_unavailable"].includes(status)) {
+      if (run.lane === "build") {
+        await notifyUser(tx, ports, workspaceId, { level: "now", title: "模块构建已暂停", body: `${status === "timed_out" ? "本轮构建已达到时限" : "本轮构建未完成"}，已有文件和过程已保留。请查看构建会话，决定是否修改需求并继续；不会自动重试。`, key: `build-paused:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });
+        return;
+      }
       const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }

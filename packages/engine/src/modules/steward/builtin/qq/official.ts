@@ -136,19 +136,9 @@ function sniffImage(bytes: Buffer): string | null {
   if (starts(0x52, 0x49, 0x46, 0x46) && bytes.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
   return null;
 }
-/** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
-export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
-  const url = attachmentUrl(attachment);
-  const cap = attachmentSizeCap;
-  const response = await fetch(url.href, { redirect: "error", signal: AbortSignal.timeout(20_000) });
-  const mime = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
-  const expected = attachment.mime.split(";")[0]!.trim().toLowerCase();
-  const image = expected.startsWith("image");
-  if (!response.ok || !response.body || (!image && !validAttachmentMime(mime, expected))) {
-    await response.body?.cancel(); throw new QqTransportError(`Invalid attachment content type (${response.status} ${mime || "none"}, declared ${expected || "none"})`);
-  }
-  if (Number(response.headers.get("content-length")) > cap) { await response.body.cancel(); throw new QqTransportError("Attachment exceeds size limit"); }
-  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+async function readAttachment(response: Response, cap: number) {
+  if (Number(response.headers.get("content-length")) > cap) { await response.body!.cancel(); throw new QqTransportError("Attachment exceeds size limit"); }
+  const reader = response.body!.getReader(), chunks: Uint8Array[] = [];
   let size = 0;
   try {
     let chunk = await reader.read();
@@ -159,7 +149,20 @@ export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetc
       chunk = await reader.read();
     }
   } finally { await reader.cancel(); reader.releaseLock(); }
-  const bytes = Buffer.concat(chunks, size);
+  return Buffer.concat(chunks, size);
+}
+async function validateAttachmentResponse(response: Response, mime: string, expected: string, image: boolean) {
+  if (response.ok && response.body && (image || validAttachmentMime(mime, expected))) return;
+  await response.body?.cancel();
+  throw new QqTransportError(`Invalid attachment content type (${response.status} ${mime || "none"}, declared ${expected || "none"})`);
+}
+/** Event URLs are untrusted. Only QQ media CDN endpoints, without redirects or credentials. */
+export async function downloadQqAttachment(attachment: QqAttachment, fetch: Fetch = globalThis.fetch) {
+  const url = attachmentUrl(attachment), response = await fetch(url.href, { redirect: "error", signal: AbortSignal.timeout(20_000) });
+  const mime = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const expected = attachment.mime.split(";")[0]!.trim().toLowerCase(), image = expected.startsWith("image");
+  await validateAttachmentResponse(response, mime, expected, image);
+  const bytes = await readAttachment(response, attachmentSizeCap);
   if (!image) return { name: attachment.name, mime, bytes };
   const sniffed = sniffImage(bytes);
   if (!sniffed) throw new QqTransportError(`Attachment is not a supported image (${mime || "none"}, declared ${expected})`);

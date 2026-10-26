@@ -43,15 +43,18 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
     effectivePolicy: (action: Action, target: Parameters<typeof decidePolicy>[1]) => effectivePolicyIn(db, workspaceId, action, target, now()),
   };
 }
+function hostGrantApplies(grant: { expiresAt: Date | null; once: boolean; consumedAt: Date | null; scope: unknown }, path: unknown, moduleIds: readonly string[], at: Date): path is string {
+  if (typeof path !== "string" || (grant.expiresAt && grant.expiresAt <= at) || (grant.once && grant.consumedAt)) return false;
+  const scope = grant.scope as { kind?: string; moduleId?: string };
+  return scope.kind === "global" || (scope.kind === "module" && !!scope.moduleId && moduleIds.includes(scope.moduleId));
+}
 /** Host paths approved globally or for focused modules; mounting spends once grants. */
 export async function hostPathsFor(db: Prisma.TransactionClient, workspaceId: string, moduleIds: readonly string[], at: Date) {
   const rows = await db.approval.findMany({ where: { workspaceId, action: "access_host_path", status: "approved", grant: { revokedAt: null } }, include: { grant: true } });
   const paths: string[] = [];
   for (const row of rows) {
     const grant = row.grant, path = (row.payload as { path?: unknown }).path;
-    if (!grant || typeof path !== "string" || (grant.expiresAt && grant.expiresAt <= at) || (grant.once && grant.consumedAt)) continue;
-    const scope = grant.scope as { kind?: string; moduleId?: string };
-    if (scope.kind !== "global" && !(scope.kind === "module" && scope.moduleId && moduleIds.includes(scope.moduleId))) continue;
+    if (!grant || !hostGrantApplies(grant, path, moduleIds, at)) continue;
     if (grant.once) { try { await consumeOnce(db, workspaceId, grant.id, at); } catch { continue; } }
     paths.push(path);
   }

@@ -1,10 +1,30 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { currentTarget, grantedUses, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { currentTarget, grantedUses, moduleCallReplySchema, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { createModuleChannel } from "./module-channel";
 
+function buildCallResult(call: ModuleCall, manifest: ModuleManifest, seen: Set<string>): ReturnType<typeof moduleCallReplySchema.parse> {
+  if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
+  const target = currentTarget(call.params.target), uses = grantedUses(manifest);
+  if (!uses.includes(target) && !uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${target} is not in uses` } };
+  if (call.params.mode === "async") {
+    const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
+    seen.add(key);
+    return { id: call.id, result: { callId: randomUUID(), status: "queued", duplicate } };
+  }
+  if (target === "provider.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
+  if (target === "secrets.get") return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
+  return { id: call.id, result: { output: null } };
+}
+async function createBuildDirs(data: string, dir: string, manifest: ModuleManifest) {
+  const contentDir = manifest.content ? join(data, ".build-content") : undefined;
+  if (contentDir) await mkdir(contentDir, { recursive: true });
+  const httpDir = manifest.listen ? join(dir, "http") : undefined;
+  if (httpDir) await mkdir(httpDir, { mode: 0o700 });
+  return { contentDir, httpDir };
+}
 /** Build-only kernel: records public calls, never performs effects. */
 export async function withBuildProcess<T>(context: ModuleContext, staging: string, data: string, manifest: ModuleManifest, run: (send: (event: ModuleEvent) => Promise<{ reply: Awaited<ReturnType<Awaited<ReturnType<typeof createModuleChannel>>["send"]>>; calls: ModuleCall[] }>) => Promise<T>) {
   if (!context.ports.sandbox?.available || !context.ports.sandbox.startModule) throw new Error("Module sandbox unavailable");
@@ -16,23 +36,10 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     await chmod(dir, 0o700);
     channel = await createModuleChannel(join(dir, "s"), { onCall: async call => {
       calls.push(call);
-      if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
       // Routed calls are answered, never routed: a build reaches no other module, no credential and no model.
-      const target = currentTarget(call.params.target), uses = grantedUses(manifest);
-      if (!uses.includes(target) && !uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${target} is not in uses` } };
-      if (call.params.mode === "async") {
-        const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
-        seen.add(key);
-        return { id: call.id, result: { callId: randomUUID(), status: "queued", duplicate } };
-      }
-      if (target === "provider.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
-      if (target === "secrets.get") return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
-      return { id: call.id, result: { output: null } };
+      return buildCallResult(call, manifest, seen);
     } });
-    const contentDir = manifest.content ? join(data, ".build-content") : undefined;
-    if (contentDir) await mkdir(contentDir, { recursive: true });
-    const httpDir = manifest.listen ? join(dir, "http") : undefined;
-    if (httpDir) await mkdir(httpDir, { mode: 0o700 });
+    const { contentDir, httpDir } = await createBuildDirs(data, dir, manifest);
     process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false });
     const exited = process.exited.then(() => { throw new Error("Module process exited"); });
     void exited.catch(() => {});

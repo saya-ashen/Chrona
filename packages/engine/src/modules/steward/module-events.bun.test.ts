@@ -13,7 +13,8 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 (sandbox.health.available ? test : test.skip)("real sandbox SDK serves schedule and tool on one process", async () => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cm-events-");
   const now = new Date("2026-10-21T04:00:00Z");
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } };
+  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, sandbox: { ...runtime.health, startModule: runtime.startModule } };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);

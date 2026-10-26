@@ -57,18 +57,25 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
 function submissionErrors(manifest: Manifest, permitted: boolean, hasEntry: boolean, hasMigrate: boolean) {
   return [...(permitted ? [] : ["policy: module activation or notifications are set to never"]), ...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
 }
-async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
-  const { db, workspaceId, ports } = context, { hash, report, versionId } = submission;
+function proposedModule(context: ModuleContext, manifest: Manifest, source: Submission["source"]) {
+  const { db, workspaceId, ports } = context;
+  return db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: source === "builtin", createdAt: ports.now() }, update: source === "builtin" ? { builtin: true } : {} });
+}
+async function writeStaging(staging: string, files: { path: string; bytes: Uint8Array }[]) {
   for (const file of files) {
     const target = join(staging, file.path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, file.bytes, { mode: 0o444 });
   }
+}
+async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
+  const { db } = context, { hash, report, versionId } = submission;
+  await writeStaging(staging, files);
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
   if (manifest.name === "rescue") throw new StewardError("forbidden", "The rescue console is immutable");
-  const module = await db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: submission.source === "builtin", createdAt: ports.now() }, update: submission.source === "builtin" ? { builtin: true } : {} });
+  const module = await proposedModule(context, manifest, submission.source);
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);

@@ -3,22 +3,29 @@ import { lstat, mkdir, open, readdir, realpath } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { StewardError } from "./errors";
 
-async function confined(root: string, path: string, parents = false) {
+function validatePath(path: string) {
   if (!path || path.startsWith("/") || path.includes("\\") || path.includes("\0") || path.split("/").some(part => !part || part === "." || part === ".." || part === ".git")) throw new StewardError("invalid", "Invalid module path");
+  return path.split("/");
+}
+async function safeNode(current: string, base: string, info: Awaited<ReturnType<typeof lstat>>) {
+  return !info.isSymbolicLink() && (info.isFile() || info.isDirectory()) && (!info.isFile() || info.nlink === 1) && (await realpath(current)).startsWith(base + sep);
+}
+async function confined(root: string, path: string, parents = false) {
+  const parts = validatePath(path);
   const base = resolve(root);
   if (await realpath(base) !== base) throw new StewardError("forbidden", "Unsafe module root");
   let current = base;
-  for (const [index, part] of path.split("/").entries()) {
+  for (const [index, part] of parts.entries()) {
     current = join(current, part);
     let info;
     try { info = await lstat(current); }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      if (index === path.split("/").length - 1) return current;
+      if (index === parts.length - 1) return current;
       if (!parents) throw error;
       await mkdir(current); info = await lstat(current);
     }
-    if (info.isSymbolicLink() || (!info.isFile() && !info.isDirectory()) || (info.isFile() && info.nlink !== 1) || !(await realpath(current)).startsWith(base + sep)) throw new StewardError("forbidden", "Unsafe module file");
+    if (!await safeNode(current, base, info)) throw new StewardError("forbidden", "Unsafe module file");
   }
   return current;
 }
@@ -33,7 +40,10 @@ export async function snapshotModule(root: string, path: string) {
       for (const entry of await readdir(target)) if (relative || !INSTALLED_DIRS.has(entry)) await walk(`${path}/${entry}`, relative ? `${relative}/${entry}` : entry);
       return;
     }
-    if (files.length >= 200 || total + info.size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+    await snapshotFile(target, relative, info.size);
+  }
+  async function snapshotFile(target: string, relative: string, size: number) {
+    if (files.length >= 200 || total + size > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
     const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
       const stat = await handle.stat();

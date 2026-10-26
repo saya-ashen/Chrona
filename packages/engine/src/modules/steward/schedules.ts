@@ -32,6 +32,18 @@ function moduleResultSummary(exitCode: number, effectCount: number, delayMs: num
   return `Module exit ${exitCode}; effects ${effectCount}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000);
 }
 
+async function validateRemind(tx: Prisma.TransactionClient, workspaceId: string, remind: Awaited<ReturnType<Prisma.TransactionClient["module"]["findFirst"]>>) {
+  const version = remind?.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } }) : null;
+  const manifest = moduleManifestSchema.safeParse(version?.manifest);
+  if (!remind || !manifest.success || !manifest.data.dynamicSchedules) throw new StewardError("conflict", "Built-in remind module does not accept dynamic schedules");
+}
+async function validateScheduleMode(tx: Prisma.TransactionClient, workspaceId: string, originSessionId: string | undefined, mode: string) {
+  if (originSessionId && !await tx.session.findFirst({ where: { id: originSessionId, workspaceId } })) throw new StewardError("not_found", "Session not found");
+  if (mode === "wake" && !originSessionId) throw new StewardError("invalid", "Wake requires an origin session");
+  const remind = mode === "remind" ? await tx.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } }) : null;
+  if (mode === "remind") await validateRemind(tx, workspaceId, remind);
+  return remind;
+}
 export function createSchedules(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, runs = createRuns(ports, workspaceId);
   const timezone = async () => notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
@@ -43,14 +55,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     const until = input.until ? new Date(input.until) : null;
     nextAt = beforeDeadline(nextAt, until);
     return db.$transaction(async tx => {
-      if (originSessionId && !await tx.session.findFirst({ where: { id: originSessionId, workspaceId } })) throw new StewardError("not_found", "Session not found");
-      if (input.mode === "wake" && !originSessionId) throw new StewardError("invalid", "Wake requires an origin session");
-      const remind = input.mode === "remind" ? await tx.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } }) : null;
-      if (input.mode === "remind") {
-        const version = remind?.activeHash ? await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } }) : null;
-        const manifest = moduleManifestSchema.safeParse(version?.manifest);
-        if (!remind || !manifest.success || !manifest.data.dynamicSchedules) throw new StewardError("conflict", "Built-in remind module does not accept dynamic schedules");
-      }
+      const remind = await validateScheduleMode(tx, workspaceId, originSessionId, input.mode);
       const row = await tx.schedule.create({ data: { ...input, ...(remind ? { mode: "module", moduleId: remind.id, payload: { text: input.text } } : {}), label: input.label ?? null, workspaceId, originSessionId, createdBy, createdAt: now, until, nextAt, status: nextAt ? "active" : "done" } });
       await audit(tx, { workspaceId, actor: createdBy, kind: "schedule_created", subjectId: row.id, details: {} });
       return toSchedule(row);

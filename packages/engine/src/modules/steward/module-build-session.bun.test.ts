@@ -1,5 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +13,9 @@ import { createModules } from "./modules";
 import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
 import { notices } from "./test-notices";
+import { liveRuns } from "./runs";
+import { moduleSupervisor } from "./module-supervisor";
+import * as chatFiles from "./chat";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -24,7 +27,7 @@ type Run = (input: ProviderRunInput, call: (name: string, args: unknown, options
 /** A real service and tick with a scripted Provider; one web conversation with a running foreground run. */
 async function fixture() {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-build-session-"));
-  cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const starts: ProviderRunInput[] = [], pending: Promise<unknown>[] = [];
   let script: Run = async () => {};
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null,
@@ -74,8 +77,8 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
   await writeFile(join(f.requester.cwd, "mock.png"), "png bytes");
   await f.db.preference.create({ data: { workspaceId: f.workspaceId, text: "卡片紧凑，少用边框", origin: "said", topic: "ui" } });
   const started = await f.call("m_modules_build", { ...request, files: ["mock.png"] }) as { status: string; sessionId: string };
-  expect(started).toMatchObject({ status: "build_started" });
-  await expect(f.call("m_modules_build", request)).rejects.toMatchObject({ message: expect.stringContaining("already running") });
+  expect(started).toMatchObject({ status: "build_queued", queuePosition: 1, aheadCount: 0 });
+  expect(await f.call("m_modules_build", { ...request, files: ["mock.png"] })).toMatchObject({ sessionId: started.sessionId, duplicate: true });
 
   const build = await f.db.session.findUniqueOrThrow({ where: { id: started.sessionId } });
   expect(build).toMatchObject({ source: "build", originSessionId: f.session.id, title: "构建模块 mail-sort", status: "active" });
@@ -90,10 +93,14 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
 
   let report: { status?: string; report?: unknown } = {};
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout"] });
-    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose"]);
+    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference"] });
+    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose", "m_modules_reference"]);
     await expect(call("chrona_schedule", {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(call("m_modules_build", request)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
+    const reference = await call("m_modules_reference", { target: "modules.diagnostics" });
+    expect(reference).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array), admission: { callers: ["web", "mcp"] } });
+    expect(input.prompt).toContain("Development references");
     await f.writeModule(input.cwd);
     const proposal = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string; status: string };
     expect(proposal.status).toBe("building");
@@ -117,17 +124,121 @@ test("who may manage modules: the Provider in its own directory; the user may ch
   await mkdir(f.requester.cwd, { recursive: true });
   await f.writeModule(f.requester.cwd);
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
-  // The owner (MCP, web) sees check and rollback, never propose, checkout or build.
+  // The owner sees diagnostics, check, rollback and build controls, never propose, checkout or build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_check", "m_modules_rollback"]);
+  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // An ordinary module cannot reach them even if it lists them.
   const other = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["modules.propose", "modules.build", "*"] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "o" } });
-  for (const target of ["modules.propose", "modules.build", "modules.checkout"]) {
+  for (const target of ["modules.propose", "modules.build", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
     expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
   }
+});
+
+test("stop/revise tools keep build files, cancel old capabilities and continue with new requirements in the same session", async () => {
+  const f = await fixture();
+  const { sessionId } = await f.call("m_modules_build", request) as { sessionId: string };
+  const old = (await f.api.runs.claimNext("build"))!;
+  await writeFile(join(old.cwd, "draft.txt"), "keep this work");
+  await expect(f.api.modules.callTool("m_modules_revise_build", { session: sessionId, requirements: "  " })).rejects.toThrow();
+  expect((await f.db.run.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("running");
+  const revised = await f.api.modules.callTool("m_modules_revise_build", { session: sessionId, requirements: "只标记，不删除邮件" });
+  expect(revised).toMatchObject({ result: { status: "build_revised", sessionId } });
+  expect((await f.db.run.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("cancelled");
+  await expect(f.service.tools.catalog(old.token)).rejects.toThrow();
+  const next = await f.db.run.findFirstOrThrow({ where: { sessionId, status: "queued" } });
+  expect(next.cwd).toBe(old.cwd);
+  expect(next.prompt).toContain("只标记，不删除邮件");
+  expect(await readFile(join(old.cwd, "draft.txt"), "utf8")).toBe("keep this work");
+  expect(JSON.parse(await readFile(join(old.cwd, "request.json"), "utf8")).revisedRequirements).toBe("只标记，不删除邮件");
+  expect(await f.db.message.findFirst({ where: { sessionId, direction: "in" } })).toMatchObject({ text: "只标记，不删除邮件" });
+  await f.call("m_modules_stop_build", { session: sessionId });
+  await f.call("m_modules_stop_build", { session: sessionId });
+  expect(await f.db.run.count({ where: { sessionId, status: { in: ["queued", "running"] } } })).toBe(0);
+  expect(await f.db.run.count({ where: { sessionId } })).toBe(2);
+  await expect(f.call("m_modules_stop_build", { session: f.session.id })).rejects.toThrow();
+  const other = await f.db.workspace.create({ data: { name: "other" } });
+  await expect(f.service.forWorkspace(other.id).modules.callTool("m_modules_stop_build", { session: sessionId })).rejects.toThrow();
+  // A stopped build can queue behind another without running alongside it.
+  const second = await f.call("m_modules_build", request) as { sessionId: string };
+  expect(await f.call("m_modules_revise_build", { session: sessionId, requirements: "继续" })).toMatchObject({ status: "build_revised", queuePosition: 2, aheadCount: 1 });
+  await f.call("m_modules_stop_build", { session: second.sessionId });
+  await Promise.all(["新要求一", "新要求二"].map(requirements => f.call("m_modules_revise_build", { session: sessionId, requirements })));
+  expect(await f.db.run.count({ where: { sessionId, status: { in: ["queued", "running"] } } })).toBe(1);
+});
+
+test("revision waits for abort before reusing the directory; abort failure never queues replacement work", async () => {
+  const f = await fixture();
+  const { sessionId } = await f.call("m_modules_build", request) as { sessionId: string };
+  const old = (await f.api.runs.claimNext("build"))!;
+  cleanups.push(async () => { liveRuns.delete(old.id); });
+  let aborted = false;
+  liveRuns.set(old.id, { async inject() {}, async abort() {
+    expect(await f.db.run.count({ where: { sessionId, status: "queued" } })).toBe(0);
+    await Bun.sleep(20);
+    aborted = true;
+    throw new Error("abort failed");
+  }, done: Promise.resolve({ outcome: "failed", sessionId: null, error: "aborted" }) });
+  await expect(f.call("m_modules_revise_build", { session: sessionId, requirements: "new goal" })).rejects.toThrow("abort failed");
+  expect(aborted).toBe(true);
+  expect(await f.db.run.count({ where: { sessionId } })).toBe(1);
+  liveRuns.set(old.id, { async inject() {}, async abort() { await Bun.sleep(20); }, done: Promise.resolve({ outcome: "failed", sessionId: null, error: "aborted" }) });
+  expect(await f.call("m_modules_revise_build", { session: sessionId, requirements: "new goal" })).toMatchObject({ status: "build_revised" });
+  expect(await f.db.run.count({ where: { sessionId, status: "queued" } })).toBe(1);
+});
+
+test("owner MCP discovers the build control schemas, but ordinary modules cannot discover them", async () => {
+  const f = await fixture();
+  for (const name of ["mcp", "ordinary"]) {
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["modules.tools", "*"] });
+    const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: name } });
+    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "builtin", intent: {}, report: {}, status: "approved" } });
+    const answer = await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: name, manifest }, { id: "find", method: "call", params: { target: "modules.tools", args: { query: "build" }, mode: "sync", reply: false } });
+    if (name === "mcp") expect(answer).toMatchObject({ result: { output: [
+      { target: "modules.stop-build", inputSchema: { required: ["session"] } },
+      { target: "modules.revise-build", inputSchema: { required: ["session", "requirements"] } },
+    ] } });
+    else expect(answer).toMatchObject({ result: { output: [] } });
+  }
+});
+
+for (const limit of [0, 2, 20]) test(`daily new-build allowance ${limit} is owner configurable and matches settings usage`, async () => {
+  const f = await fixture();
+  await f.api.settings.update({ builds: { dailyLimit: limit } });
+  for (let i = 0; i < limit; i++) await f.db.session.create({ data: { workspaceId: f.workspaceId, key: `history:${i}`, source: "build", status: "ended", createdAt: f.ports.now() } });
+  expect((await f.api.settings.get()).buildUsage).toMatchObject({ used: limit, remaining: 0 });
+  await expect(f.call("m_modules_build", request)).rejects.toThrow("Daily module build budget reached");
+  await f.api.settings.update({ builds: { dailyLimit: limit + 1 } });
+  expect(await f.call("m_modules_build", request)).toMatchObject({ status: "build_queued" });
+  expect((await f.api.settings.get()).buildUsage).toMatchObject({ used: limit + 1, remaining: 0 });
+});
+
+test("submission budget is enforced from the run snapshot, not later owner changes", async () => {
+  const f = await fixture();
+  await f.api.settings.update({ builds: { maxSubmissions: 1 } });
+  const { sessionId } = await f.call("m_modules_build", request) as { sessionId: string };
+  const run = (await f.api.runs.claimNext("build"))!;
+  await f.writeModule(run.cwd);
+  await f.service.tools.call(run.token, "m_modules_propose", { dir: "mail-sort", intent });
+  await f.api.settings.update({ builds: { maxSubmissions: 2 } });
+  await expect(f.service.tools.call(run.token, "m_modules_propose", { dir: "mail-sort", intent })).rejects.toThrow("Submission limit");
+  await f.call("m_modules_revise_build", { session: sessionId, requirements: "Continue with new owner budget" });
+  const next = (await f.api.runs.claimNext("build"))!;
+  await f.service.tools.call(next.token, "m_modules_propose", { dir: "mail-sort", intent });
+  await f.service.tools.call(next.token, "m_modules_propose", { dir: "mail-sort", intent });
+  await expect(f.service.tools.call(next.token, "m_modules_propose", { dir: "mail-sort", intent })).rejects.toThrow("Submission limit");
+});
+
+test("pre-upgrade running builds without a snapshot retain the original five-submission limit", async () => {
+  const f = await fixture();
+  await f.api.settings.update({ builds: { maxSubmissions: 20 } });
+  await f.call("m_modules_build", request);
+  const run = (await f.api.runs.claimNext("build"))!;
+  await f.db.audit.deleteMany({ where: { kind: "run_claimed", subjectId: run.id } });
+  await f.db.audit.createMany({ data: Array.from({ length: 5 }, () => ({ workspaceId: f.workspaceId, kind: "module_submission", actorKey: `provider:${run.id}`, details: {} })) });
+  await expect(f.service.tools.call(run.token, "m_modules_propose", { dir: "missing", intent })).rejects.toThrow("Submission limit");
 });
 
 test("check waits while a version is checked, but never past the caller's timeoutSeconds", async () => {
@@ -181,4 +292,183 @@ test("upgrade: builds from the old build lane (no conversation) are cancelled on
   await f.step(); await f.step();
   expect(await f.db.run.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled" });
   expect((await notices(f.db, { title: "模块构建已取消" })).length).toBe(1);
+});
+
+test("persistent FIFO survives service recreation and tied clocks; waiting has no model calls or running deadline", async () => {
+  const f = await fixture(), now = f.ports.now();
+  f.ports.now = () => now;
+  const builds = [];
+  for (let i = 0; i < 3; i++) builds.push(await f.call("m_modules_build", { ...request, name: `queued-${i}` }) as { sessionId: string });
+  expect(await f.db.run.count({ where: { lane: "build", status: "queued", startedAt: null, deadlineAt: null, leaseUntil: null } })).toBe(3);
+  expect(f.starts).toHaveLength(0);
+  const api = createStewardService(f.ports).forWorkspace(f.workspaceId);
+  f.ports.now = () => new Date(now.getTime() + 2 * 3600_000);
+  await api.settings.update({ builds: { timeoutMinutes: 75, maxSubmissions: 3 } });
+  for (const build of builds) {
+    const run = (await api.runs.claimNext("build"))!;
+    expect(run.sessionId).toBe(build.sessionId);
+    expect(run.deadlineAt.getTime() - run.startedAt.getTime()).toBe(75 * 60_000);
+    expect(run.prompt).toContain("at most 3 candidate submissions");
+    expect(await api.runs.claimNext("build")).toBeNull();
+    await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "fixture failure" });
+  }
+  expect(await api.runs.claimNext("build")).toBeNull();
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(3);
+  expect(f.starts).toHaveLength(0);
+});
+
+test("identical outstanding requests are idempotent across service recreation, but completed/stopped work can be requested again", async () => {
+  const f = await fixture();
+  const [a, b] = await Promise.all([f.call("m_modules_build", request), f.call("m_modules_build", request)]) as { sessionId: string; runId: string }[];
+  expect(a!.sessionId).toBe(b!.sessionId);
+  const repeat = await createStewardService(f.ports).tools.call(f.requester.token, "m_modules_build", request);
+  expect(repeat).toMatchObject({ result: { sessionId: a!.sessionId, runId: a!.runId, duplicate: true } });
+  expect((await f.api.settings.get()).buildUsage.used).toBe(1);
+  const claimed = (await f.api.runs.claimNext("build"))!;
+  expect(await f.call("m_modules_build", request)).toMatchObject({ status: "build_running", runId: claimed.id, duplicate: true });
+  await f.call("m_modules_stop_build", { session: a!.sessionId });
+  const next = await f.call("m_modules_build", request) as { sessionId: string };
+  expect(next.sessionId).not.toBe(a!.sessionId);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(2);
+});
+
+test("queue bound rejects without consuming admission; cancellation frees space and a full queue cannot destroy a running revision", async () => {
+  const f = await fixture(), ids: string[] = [];
+  for (let i = 0; i < 10; i++) ids.push((await f.call("m_modules_build", { ...request, name: `bounded-${i}` }) as { sessionId: string }).sessionId);
+  await expect(f.call("m_modules_build", { ...request, name: "overflow" })).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("queue is full") });
+  expect(await f.call("m_modules_build", { ...request, name: "bounded-0" })).toMatchObject({ sessionId: ids[0], duplicate: true });
+  expect((await f.api.settings.get()).buildUsage.used).toBe(10);
+  // Replacing a queued task is allowed even at capacity, and moves it to the tail.
+  expect(await f.call("m_modules_revise_build", { session: ids[3], requirements: "revised while queued" })).toMatchObject({ queuePosition: 10, aheadCount: 9 });
+  await f.call("m_modules_stop_build", { session: ids[5] });
+  await f.call("m_modules_build", { ...request, name: "replacement" });
+  const active = (await f.api.runs.claimNext("build"))!;
+  expect(active.sessionId).toBe(ids[0]!);
+  expect(await f.call("m_modules_build", { ...request, name: "one-more" })).toMatchObject({ queuePosition: 10, aheadCount: 10 });
+  await expect(f.call("m_modules_revise_build", { session: active.sessionId, requirements: "no room" })).rejects.toThrow("queue is full");
+  expect((await f.db.run.findUniqueOrThrow({ where: { id: active.id } })).status).toBe("running");
+  expect(await f.db.run.count({ where: { lane: "build", status: "queued" } })).toBe(10);
+});
+
+for (const scope of ["session", "global"] as const) test(`${scope} budget-deferred head retains FIFO position without a paid retry`, async () => {
+  const f = await fixture();
+  const first = await f.call("m_modules_build", request) as { sessionId: string };
+  const second = await f.call("m_modules_build", { ...request, name: "second" }) as { sessionId: string };
+  await f.db.run.createMany({ data: Array.from({ length: scope === "global" ? 199 : 24 }, (_, i) => ({ workspaceId: f.workspaceId, sessionId: scope === "global" ? f.session.id : first.sessionId, lane: scope === "global" ? "background" : "build", trigger: "build", status: "finished", provider: "fake", tokenHash: `budget-history-${i}`, cwd: "unused", prompt: "", startedAt: f.ports.now() })) });
+  expect(await f.api.runs.claimNext("build")).toBeNull();
+  expect(await f.api.runs.claimNext("build")).toBeNull();
+  await f.call("m_modules_stop_build", { session: first.sessionId });
+  if (scope === "global") {
+    expect(await f.api.runs.claimNext("build")).toBeNull();
+    const tomorrow = new Date(f.ports.now().getTime() + 86400_000);
+    f.ports.now = () => tomorrow;
+  }
+  expect((await f.api.runs.claimNext("build"))!.sessionId).toBe(second.sessionId);
+  expect(f.starts).toHaveLength(0);
+});
+
+test("existing React process view receives explicit queue position, updated cancellation state, and no fabricated Provider progress", async () => {
+  const f = await fixture();
+  const first = await f.call("m_modules_build", request) as { sessionId: string };
+  const second = await f.call("m_modules_build", { ...request, name: "second" }) as { sessionId: string };
+  const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["chat.transcript"], listen: ["/"] });
+  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", activeHash: "web" } });
+  await f.db.moduleVersion.create({ data: { moduleId: web.id, hash: "web", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
+  const transcript = (session: string) => handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: web.id, hash: "web", manifest }, { id: "view", method: "call", params: { target: "chat.transcript", args: { session }, mode: "sync", reply: false } });
+  expect(await transcript(second.sessionId)).toMatchObject({ result: { output: [{ kind: "text", text: expect.stringContaining("排队第 2 位") }] } });
+  expect((await f.api.provider.list(second.sessionId))[0]).toMatchObject({ active: false, status: "queued", progress: null });
+  await f.call("m_modules_stop_build", { session: first.sessionId });
+  expect(await transcript(first.sessionId)).toMatchObject({ result: { output: [{ text: expect.stringContaining("构建已停止") }] } });
+  expect(await transcript(second.sessionId)).toMatchObject({ result: { output: [{ text: expect.stringContaining("排队第 1 位") }] } });
+  const running = (await f.api.runs.claimNext("build"))!;
+  expect(await transcript(second.sessionId)).toMatchObject({ result: { output: [{ text: expect.stringContaining("正在构建") }] } });
+  for (const [status, text] of [["finished", "本轮运行已结束"], ["failed", "本轮运行失败"], ["timed_out", "本轮运行超时"], ["provider_unavailable", "模型服务不可用"]]) {
+    await f.db.run.update({ where: { id: running.id }, data: { status } });
+    expect(await transcript(second.sessionId)).toMatchObject({ result: { output: [{ text: expect.stringContaining(text!) }] } });
+  }
+  expect(f.starts).toHaveLength(0);
+});
+
+test("missing required references reject before admitting or charging a build", async () => {
+  const f = await fixture();
+  await mkdir(f.requester.cwd, { recursive: true });
+  for (const file of ["missing.txt", "content/chat/missing.txt"]) {
+    await expect(f.call("m_modules_build", { ...request, files: [file] })).rejects.toMatchObject({ code: "not_found" });
+  }
+  await writeFile(join(f.requester.cwd, "selected.txt"), "required reference bytes");
+  // Reproduce an attachment disappearing after selection; the old copy loop silently skipped it.
+  const reader = spyOn(chatFiles, "readChatFile").mockResolvedValue(null);
+  try {
+    await expect(f.call("m_modules_build", { ...request, files: ["selected.txt"] })).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining("Build reference attachment unavailable") });
+  } finally { reader.mockRestore(); }
+  expect(await f.db.session.count({ where: { workspaceId: f.workspaceId, source: "build" } })).toBe(0);
+  expect(await f.db.run.count({ where: { workspaceId: f.workspaceId, lane: "build" } })).toBe(0);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(0);
+  expect(f.starts).toHaveLength(0);
+});
+
+test("a Provider supplements an old build without losing work; missing or owner paths never stop the running build", async () => {
+  const f = await fixture();
+  const started = await f.call("m_modules_build", request) as { sessionId: string };
+  const old = (await f.api.runs.claimNext("build"))!;
+  await writeFile(join(old.cwd, "draft.txt"), "retained draft");
+  await mkdir(f.requester.cwd, { recursive: true });
+  await expect(f.call("m_modules_revise_build", { session: started.sessionId, requirements: "补齐参考", files: ["missing.txt"] })).rejects.toMatchObject({ code: "not_found" });
+  await expect(f.api.modules.callTool("m_modules_revise_build", { session: started.sessionId, requirements: "补齐参考", files: ["private.txt"] })).rejects.toMatchObject({ code: "forbidden" });
+  expect((await f.db.run.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("running");
+  await writeFile(join(f.requester.cwd, "interface.txt"), "supplemental fixture, not production data");
+  await f.call("m_modules_revise_build", { session: started.sessionId, requirements: "使用补齐的契约继续", files: ["interface.txt"] });
+  await expect(f.service.tools.catalog(old.token)).rejects.toThrow();
+  expect(await readFile(join(old.cwd, "draft.txt"), "utf8")).toBe("retained draft");
+  const saved = JSON.parse(await readFile(join(old.cwd, "request.json"), "utf8"));
+  expect(saved.files).toHaveLength(1);
+  expect(saved.files[0]).toMatch(/^files\/revision-[a-f0-9-]+\/1-interface\.txt$/);
+  expect(await readFile(join(old.cwd, saved.files[0]), "utf8")).toBe("supplemental fixture, not production data");
+  f.onRun(async (input, call) => {
+    expect(input).toMatchObject({ searchTools: false, hostPaths: [], content: [] });
+    expect(input.prompt).toContain(saved.files[0]);
+    expect(input.prompt).toContain("Development references");
+    expect(await call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ outputSchema: { type: "array" } });
+    await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
+  });
+  await f.step();
+  expect(f.starts).toHaveLength(1);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(1);
+});
+
+test("a build discovers its own contracts and release reference, merges a fixture and submits without manual reference attachments or activation", async () => {
+  const f = await fixture(), hash = "b".repeat(64);
+  const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
+  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: web.id, hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  f.ports.moduleBuiltinResources = join(f.dataDir, "release");
+  const active = join(f.dataDir, "platform", "store", hash), builtin = join(f.ports.moduleBuiltinResources, "web");
+  for (const [dir, app] of [[active, "// custom layout"], [builtin, "// release feature"]]) {
+    await mkdir(dir!, { recursive: true });
+    await writeFile(join(dir!, "module.json"), JSON.stringify(webManifest));
+    await writeFile(join(dir!, "index.ts"), 'import {on} from "chrona"; on("tool", async () => ({}));');
+    await writeFile(join(dir!, "test.ts"), "process.exit(0)");
+    await writeFile(join(dir!, "app.js"), app!);
+  }
+  const started = await f.call("m_modules_build", { ...request, name: "web", goal: "Merge the release feature without losing customization" }) as { sessionId: string };
+  let submitted: { hash: string } | undefined;
+  f.onRun(async (input, call) => {
+    expect(await call("m_modules_reference", {})).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.diagnostics" })]));
+    expect(await call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array) });
+    expect(await call("m_modules_checkout", { module: "web", dir: "active-latest" })).toMatchObject({ source: "stored", hash });
+    expect(await call("m_modules_checkout", { module: "web", source: "builtin", dir: "release-reference" })).toMatchObject({ source: "builtin" });
+    await cp(join(input.cwd, "active-latest"), join(input.cwd, "candidate"), { recursive: true });
+    const customized = await readFile(join(input.cwd, "candidate", "app.js"), "utf8"), feature = await readFile(join(input.cwd, "release-reference", "app.js"), "utf8");
+    await writeFile(join(input.cwd, "candidate", "app.js"), `${customized}\n${feature}`);
+    submitted = await call("m_modules_propose", { dir: "candidate", intent }) as { hash: string };
+    await createModules(f.ports, f.workspaceId).buildPending();
+    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "pending_review", active: false });
+    await call("chrona_reply", { text: "Fixture merge checked, waiting for approval" });
+  });
+  await f.step();
+  expect(submitted).toBeDefined();
+  expect(await readFile(join(f.dataDir, "platform", "store", submitted!.hash, "app.js"), "utf8")).toBe("// custom layout\n// release feature");
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: web.id } })).activeHash).toBe(hash);
+  expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: web.id, hash: submitted!.hash } } })).status).toBe("pending_review");
+  expect(JSON.parse(await readFile(join(f.dataDir, "sessions", started.sessionId, "request.json"), "utf8")).files).toEqual([]);
 });

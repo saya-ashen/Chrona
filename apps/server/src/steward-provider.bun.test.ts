@@ -46,7 +46,8 @@ test("the user answers a running Provider's question through chat.answer: no app
   await answer(id, { decision: "submit", value: false });
   await finished(run.id); expect(answers).toEqual([{ decision: "submit", value: false }]);
   expect(await db.grant.count()).toBe(0); expect(await db.approval.count()).toBe(0);
-  await expect(answer(id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "failed" });
+  await expect(answer(id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict", message: "Provider interaction is no longer active" });
+  expect(answers).toEqual([{ decision: "submit", value: false }]);
 });
 test("chat.cancel stops current work and closes its questions", async () => {
   const run = await start();

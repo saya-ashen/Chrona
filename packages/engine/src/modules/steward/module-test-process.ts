@@ -23,7 +23,7 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
     let output;
     try { output = moduleOutputSchema.parse(JSON.parse(result.output)); }
     catch { throw new Error(`invalid module output: ${result.output}`); }
-    for (const effect of output.effects ?? []) {
+    for (const effect of output.effects) {
       // As the SDK shorthands do: keys scoped to the event.
       const { type, ...args } = effect, key = `${event.trigger.id}:${event.trigger.firedAt}:${effect.key}`;
       await call("call", { target: type === "notify_user" ? "notify.send" : "provider.wake", args: type === "notify_user" ? { ...args, key } : { prompt: (args as { prompt: string }).prompt }, mode: "async", key } as unknown as ModuleCall["params"]);

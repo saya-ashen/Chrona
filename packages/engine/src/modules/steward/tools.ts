@@ -18,6 +18,7 @@ import { runFile } from "./chat";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
+import { BUILD_MODULE_TOOLS } from "./module-reference";
 
 type ToolName = keyof typeof schemas;
 type Claim = Awaited<ReturnType<typeof authenticateRun>> & { index: number };
@@ -27,13 +28,15 @@ function toolContext(ports: StewardPorts, claim: Claim, tool: ToolName) {
     schedules: createSchedules(ports, workspaceId), preferences: createPreferences(ctx), approvals: createApprovals(ctx) };
 }
 type ToolContext = ReturnType<typeof toolContext>;
-async function gate(ctx: ToolContext, action: Action, target: { moduleId?: string }, payload: Prisma.InputJsonValue) {
+/** Where the decision continues the conversation (see `resume` in approvals). */
+const resumeIn = (ctx: ToolContext) => ({ sessionId: ctx.run.sessionId, lane: ctx.run.lane });
+async function gate(ctx: ToolContext, action: Action, target: { moduleId?: string }, payload: Prisma.InputJsonObject) {
   const { db, workspaceId, now, tool } = ctx;
   return db.$transaction(async tx => {
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
     if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
     if (decision.mode === "ask") {
-      const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload, createdAt: now() } });
+      const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action } });
       return { approvalId: approval.id, status: "awaiting_approval" };
     }
@@ -100,7 +103,7 @@ async function requestApproval(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_request_approval, raw);
   const decision = await effectivePolicyIn(ctx.db, ctx.workspaceId, input.action, {}, ctx.now());
   if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
-  return ctx.approvals.create({ ...input, payload: { tool: ctx.tool, ...input } });
+  return ctx.approvals.create({ ...input, payload: { tool: ctx.tool, ...input, ...resumeIn(ctx) } });
 }
 async function requestPathAccess(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_request_path_access, raw), expanded = input.path.replace(/^~(?=\/|$)/, homedir());
@@ -108,7 +111,7 @@ async function requestPathAccess(ctx: ToolContext, raw: unknown) {
   const path = await realpath(expanded).catch(() => { throw new StewardError("not_found", "Path does not exist"); });
   const decision = await effectivePolicyIn(ctx.db, ctx.workspaceId, "access_host_path", {}, ctx.now());
   if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
-  return ctx.approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，后续运行可以读写：\n${path}`, payload: { tool: ctx.tool, kind: "host_path", path, sessionId: ctx.run.sessionId } });
+  return ctx.approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，后续运行可以读写：\n${path}`, payload: { tool: ctx.tool, kind: "host_path", path, ...resumeIn(ctx) } });
 }
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {
   chrona_reply: reply, chrona_notify: notify, chrona_schedule: schedule, chrona_schedules: schedules,
@@ -121,7 +124,7 @@ const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unk
 };
 /** No provider-supplied workspace IDs: all ownership comes from the capability. */
 /** A build conversation (v2-13) writes and submits one module: it reports back and nothing else (no user data, no other apps). */
-const BUILD_TOOLS = ["chrona_reply", "m_modules_propose", "m_modules_check", "m_modules_checkout"];
+const BUILD_TOOLS = ["chrona_reply", ...BUILD_MODULE_TOOLS];
 export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
   /** `timeoutSeconds` (v2-13): how long the caller waits; tools that wait stop by then, and never past the run's deadline. */

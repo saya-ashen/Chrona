@@ -27,7 +27,7 @@ export async function qqEntry(ports: StewardPorts, workspaceId: string) {
   async function pushed(): Promise<(QqReplyItem & { callId: string; caller: string })[]> {
     const rows = await ports.db.moduleInvocation.findMany({ where: { workspaceId, target: "qq", tool: "reply" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
     return rows.map(row => {
-      const args = row.args as Record<string, string>;
+      const args = row.args as Record<string, string | undefined>;
       return { callId: row.id, caller: row.caller, messageId: args.message!, sessionId: args.session ?? null, text: args.text!, workspace: args.workspace!, inReplyTo: args["in-reply-to"] ?? null, attachments: JSON.parse(args.attachments ?? "[]") };
     });
   }

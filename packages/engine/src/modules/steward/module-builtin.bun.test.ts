@@ -10,6 +10,10 @@ import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { notices } from "./test-notices";
+import { createApprovals } from "./approvals";
+import { onApproved } from "./module-activation";
+import { moduleContext } from "./module-context";
+import { proposeBuiltin } from "./module-proposal";
 
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-builtin-");
@@ -64,27 +68,29 @@ test("built-ins register from a release directory whose files are hard-linked (N
     expect((await readdir(tmpdir())).filter(name => name.startsWith("chrona-builtin-")).length).toBe(before);
   } finally { await chmod(f.root, 0o755); await chmod(f.code, 0o755); await f.close(); }
 });
-test.each([false, true])("built-in upgrade preserves user version: %s", async user => {
+test.each([false, "user", "provider", "build"] as const)("built-in upgrade preserves custom version: %s", async source => {
   const f = await fixture();
   try {
     await f.start(); const first = await f.current();
-    if (user) {
+    if (source) {
       await f.write(2);
       const modules = createModules(f.ports, f.workspace.id);
-      const result = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["User customization"] } }, "user");
+      const result = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["User customization"] } }, source);
       await modules.buildPending();
       await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: result.hash } }, data: { status: "approved" } });
       await modules.activate(first.id, result.hash, "activate");
     }
-    const before = await f.current(); await f.write(3); await f.start();
+    const before = await f.current(), reviews = await f.db.approval.findMany({ where: { status: "open" } });
+    await f.write(3); await f.start();
     const after = await f.current();
-    if (user) {
+    if (source) {
       expect(after.activeHash).toBe(before.activeHash);
-      expect(await f.db.moduleVersion.findFirst({ where: { source: "builtin", hash: { not: first.activeHash! } } })).toMatchObject({ status: "pending_review" });
-      // The review says the release would replace the user's modification.
-      expect(await f.db.approval.findFirst({ where: { status: "open" } })).toMatchObject({ title: "启用模块 sample 的内置新版本（替换当前修改版）", detail: expect.stringContaining(`你修改的版本 ${before.activeHash!.slice(0, 8)}`) });
-      expect((await notices(f.db))[0]).toMatchObject({ level: "web" });
-      await f.start(); expect((await notices(f.db)).length).toBe(1);
+      expect(await f.db.moduleVersion.count({ where: { source: "builtin" } })).toBe(1);
+      expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
+      expect((await notices(f.db)).filter(n => n.title.includes("内置"))).toHaveLength(0);
+      await f.start();
+      expect((await f.current()).activeHash).toBe(before.activeHash);
+      expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
     } else {
       expect(after.activeHash).not.toBe(before.activeHash);
       expect(await f.db.approval.count()).toBe(0);
@@ -92,9 +98,81 @@ test.each([false, true])("built-in upgrade preserves user version: %s", async us
   } finally { await f.close(); }
 });
 
+test("legacy built-in replacement approvals are blocked atomically and retired, custom reviews survive", async () => {
+  const f = await fixture();
+  try {
+    await f.start(); const builtin = await f.current();
+    await f.write(2);
+    const modules = createModules(f.ports, f.workspace.id);
+    const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["React fork"] } }, "build");
+    await modules.buildPending();
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: builtin.id, hash: fork.hash } }, data: { status: "approved" } });
+    await modules.activate(builtin.id, fork.hash, "activate");
+    const approvals = createApprovals({ ...f.ports, workspaceId: f.workspace.id });
+    const old = await approvals.create({ moduleId: builtin.id, action: "activate_module", title: "Legacy replacement", detail: "", preview: "", payload: { kind: "activate_module", moduleId: builtin.id, hash: builtin.activeHash! } });
+    const restore = await approvals.create({ moduleId: builtin.id, action: "activate_module", title: "Explicit snapshot restore", detail: "", preview: "", payload: { kind: "activate_module", moduleId: builtin.id, hash: builtin.activeHash!, restore: { schema: 1, snapshotAt: "fixture" } } });
+    const grants = await f.db.grant.count();
+    for (const source of ["web", "mcp", "qq", "entry", "cli"] as const) await expect(approvals.resolve(old.id, { decision: "approve", scope: "once" }, source)).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("内置版本不能") });
+    expect(await f.db.grant.count()).toBe(grants);
+    expect((await approvals.list("open")).some(a => a.id === old.id)).toBe(true);
+    await f.start();
+    expect((await f.db.approval.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("expired");
+    expect((await f.db.approval.findUniqueOrThrow({ where: { id: restore.id } })).status).toBe("open");
+    expect(await f.db.approval.count({ where: { status: "open", id: { not: restore.id } } })).toBe(1);
+    expect((await f.current()).activeHash).toBe(fork.hash);
+    // Explicit owner rollback still works, without copying old data or creating a model run.
+    expect(await modules.rollback(builtin.id, builtin.activeHash!)).toMatchObject({ status: "active" });
+    expect((await f.current()).activeHash).toBe(builtin.activeHash);
+    expect(await f.db.run.count()).toBe(0);
+  } finally { await f.close(); }
+});
+
+test("a built-in already queued when the user activates a fork cannot create a replacement review", async () => {
+  const f = await fixture();
+  try {
+    await f.start(); const first = await f.current();
+    await f.write(2);
+    const modules = createModules(f.ports, f.workspace.id);
+    const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["Fork"] } }, "user");
+    await modules.buildPending();
+    await f.write(3);
+    const builtin = await proposeBuiltin(moduleContext(f.ports, f.workspace.id), f.root, "sample");
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: fork.hash } }, data: { status: "approved" } });
+    await modules.activate(first.id, fork.hash, "activate");
+    const reviews = await f.db.approval.findMany({ where: { status: "open" } });
+    await modules.buildPending();
+    expect((await f.current()).activeHash).toBe(fork.hash);
+    expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
+    expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.id, hash: builtin.hash } } })).toMatchObject({ status: "pending_review" });
+    expect((await notices(f.db)).filter(n => n.title.includes("内置"))).toHaveLength(0);
+  } finally { await f.close(); }
+});
+
+test("activation rechecks a previously approved builtin card after a fork becomes active", async () => {
+  const f = await fixture();
+  try {
+    await f.start(); const first = await f.current();
+    await f.write(2);
+    const modules = createModules(f.ports, f.workspace.id);
+    const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["Fork"] } }, "build");
+    await modules.buildPending();
+    await f.write(3);
+    const context = moduleContext(f.ports, f.workspace.id), target = await proposeBuiltin(context, f.root, "sample");
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: target.hash } }, data: { status: "pending_review" } });
+    const approvals = createApprovals({ ...f.ports, workspaceId: f.workspace.id });
+    const approval = await approvals.create({ moduleId: first.id, action: "activate_module", title: "Release", detail: "", preview: "", payload: { kind: "activate_module", moduleId: first.id, hash: target.hash } });
+    const approved = await approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: fork.hash } }, data: { status: "approved" } });
+    await modules.activate(first.id, fork.hash, "activate");
+    await expect(onApproved(context, { workspaceId: f.workspace.id, approvalId: approval.id, grantId: approved.grantId!, payload: approved.payload! })).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("内置版本不能") });
+    expect((await f.current()).activeHash).toBe(fork.hash);
+    expect((await f.db.grant.findUniqueOrThrow({ where: { id: approved.grantId! } })).consumedAt).toBeNull();
+  } finally { await f.close(); }
+});
+
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-if (!realSandbox.health.available) console.info("SKIP built-in real process: bwrap sandbox unavailable");
-(realSandbox.health.available ? test : test.skip)("built-in registration runs author tests and smoke in real bwrap SDK processes", async () => {
+if (!realSandbox.health.isolated) console.info("SKIP built-in real process: bwrap isolation unavailable");
+(realSandbox.health.isolated ? test : test.skip)("built-in registration runs author tests and smoke in real bwrap SDK processes", async () => {
   const f = await fixture(true);
   try { await f.start(); expect(await f.current()).toMatchObject({ status: "active" }); }
   finally { await f.close(); }

@@ -91,6 +91,10 @@ on("schedule", async ev => {
 - 处理某个事件期间的幂等键为 `<eventKey>:<key>`；入站事件的 `eventKey` 为 `inbound:<inboundItemId>`（沿用 P5）。
 - 每次调用记录在 `ModuleCall`（替代 `ModuleRun.executed`）：模块、版本、事件、方法、参数摘要、结果。
 
+### 2.5 故障诊断与恢复证据
+
+模块故障的持久证据、有限恢复、功能验证与网页/MCP/CLI 只读入口见 [模块故障诊断与有界恢复](module-recovery.md)。连接恢复不等于功能恢复；不自动重放失败调用，不以诊断为由放宽安全边界。
+
 ## 3. 构建与启用
 
 构建（`module-build.ts`）保留：

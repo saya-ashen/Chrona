@@ -60,6 +60,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     });
   const admin = program.command("admin").description("Local recovery administration (no Provider required)");
   admin.command("modules").description("List modules and versions").action(async () => { await runAdmin("modules"); });
+  admin.command("diagnostics [module]").description("Read saved module faults and recovery attempts without starting Chrona").action(async (module?: string) => { await runAdmin("diagnostics", module ? [module] : []); });
   admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await runAdmin("approvals"); });
   admin.command("rollback <module> <hash-or-builtin>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await runAdmin("rollback", [module, hash]); });
   admin.command("disable <module>").description("Pause a module").action(async (module: string) => { await runAdmin("disable", [module]); });

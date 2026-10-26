@@ -1,7 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
 import { createQqGateway, createQqTokenSource, sendQqC2c, QQ_TOKEN_URL, type QqC2cMessage } from "./builtin/qq/official";
 
 const SECRET = "test-secret-value";

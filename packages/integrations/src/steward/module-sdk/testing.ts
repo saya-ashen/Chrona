@@ -14,9 +14,40 @@ export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data:
 // v2-10 names of the provider tools; Chrona maps them the same way (currentTarget).
 const legacy: Partial<Record<string, string>> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
 const current = (target: string) => legacy[target] ?? target;
+type Stub = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: string[] }) {
   const implied: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
   return [...(manifest.uses ?? []).map(current), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])];
+}
+function findStub(stubs: Record<string, Stub>, target: string) {
+  return Object.hasOwn(stubs, target) ? stubs[target] : undefined;
+}
+function allowed(target: string, uses: string[], grants: string[]) {
+  return uses.includes(target) || uses.includes("*") || grants.includes(target);
+}
+async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: string[] }): Promise<unknown> {
+  if (target === "secrets.get") {
+    const listed = (manifest.secrets ?? []).includes(String(args.name)), stub = findStub(stubs, "secrets.get") ?? findStub(stubs, "secret");
+    return listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
+  }
+  if (target === "provider.complete") {
+    const stub = findStub(stubs, "provider.complete") ?? findStub(stubs, "model");
+    return { result: { output: stub ? await stub(args) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
+  }
+  const stub = findStub(stubs, target);
+  return { result: { output: stub ? await stub(args) ?? null : null } };
+}
+async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { effects: string[]; uses?: string[]; secrets?: string[] }, grants: string[], seen: Set<string>): Promise<unknown> {
+  if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
+  const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
+  if (!allowed(target, uses, grants)) return { error: { code: "undeclared", message: `${target} is not in uses` } };
+  if (call.params.mode === "async") {
+    // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
+    const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
+    seen.add(key);
+    return { result: { callId: call.id, status: "queued", duplicate } };
+  }
+  return effectReply(target, args, stubs, manifest);
 }
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`, and the SDK
@@ -50,30 +81,12 @@ export async function startModule(entry: string, { stubs: given = {}, grants = [
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      let reply: unknown;
-      if (call.method === "callStatus") reply = { result: { callId: String(call.params.callId), status: "queued" } };
-      else {
-        const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
-        if (!uses.includes(target) && !uses.includes("*") && !grants.includes(target)) reply = { error: { code: "undeclared", message: `${target} is not in uses` } };
-        else if (call.params.mode === "async") {
-          // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
-          const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
-          seen.add(key);
-          reply = { result: { callId: call.id, status: "queued", duplicate } };
-        } else if (target === "secrets.get") {
-          // Never real values in tests: only a stub, for a secret the manifest lists.
-          const listed = (manifest.secrets ?? []).includes(String(args.name)), stub = stubs["secrets.get"] ?? stubs.secret;
-          reply = listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
-        } else if (target === "provider.complete") {
-          const stub = stubs["provider.complete"] ?? stubs.model;
-          reply = { result: { output: stub ? await stub(args) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
-        } else reply = { result: { output: stubs[target] ? await stubs[target]!(args) ?? null : null } };
-      }
+      const reply = await callReply(call, stubs, manifest, grants, seen);
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
-    } else {
-      const request = pending.get(message.id);
-      if (request) { pending.delete(message.id); clearTimeout(request.timer); request.resolve(message); }
+      return;
     }
+    const request = pending.get(message.id);
+    if (request) { pending.delete(message.id); clearTimeout(request.timer); request.resolve(message); }
   }
   const server = createServer(client => {
     if (socket || closed) { client.destroy(); return; }

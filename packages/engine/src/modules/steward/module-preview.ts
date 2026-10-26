@@ -46,6 +46,14 @@ function isText(bytes: Buffer) {
 function changeKind(before: Buffer | undefined, after: Buffer | undefined) {
   return !before ? "added" : !after ? "removed" : "changed";
 }
+function renderFileDifference(code: string[], path: string, before: Buffer | undefined, after: Buffer | undefined) {
+  code.push(`=== ${path} (${changeKind(before, after)}) ===`);
+  if ([before, after].some(bytes => bytes && !isText(bytes))) {
+    code.push(`（二进制文件：${before?.length ?? 0} → ${after?.length ?? 0} 字节）`);
+    return;
+  }
+  code.push(...lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? ""));
+}
 export async function codeDifference(store: string, activeHash: string | null, files: { path: string; bytes: Buffer }[]) {
   const previous = new Map<string, Buffer>();
   const activeFiles = activeHash ? await readModuleFiles(join(store, activeHash), "Unsafe module store file") : [];
@@ -55,9 +63,7 @@ export async function codeDifference(store: string, activeHash: string | null, f
   for (const path of [...new Set([...previous.keys(), ...proposed.keys()])].sort()) {
     const before = previous.get(path), after = proposed.get(path);
     if (before && after && before.equals(after)) { unchanged.push(path); continue; }
-    code.push(`=== ${path} (${changeKind(before, after)}) ===`);
-    if ([before, after].some(bytes => bytes && !isText(bytes))) { code.push(`（二进制文件：${before?.length ?? 0} → ${after?.length ?? 0} 字节）`); continue; }
-    for (const line of lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? "")) code.push(line);
+    renderFileDifference(code, path, before, after);
   }
   if (unchanged.length) code.push("未变化:", ...unchanged);
   return code.join("\n") + "\n";

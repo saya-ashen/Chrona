@@ -24,11 +24,11 @@ export async function pushReply(db: Db, ports: StewardPorts, message: { id: stri
   if (!entry) return null;
   const files = storedAttachments(message.attachments);
   const inReplyTo = await inboundExternalId(db, message.workspaceId, runId);
-  return enqueueCall(db, ports, systemOrigin(message.workspaceId, "chat"), `${entry.name}.reply`, {
+  return enqueueCall({ tx: db, ports, origin: systemOrigin(message.workspaceId, "chat"), target: `${entry.name}.reply`, raw: {
     session: session.id, message: message.id, text: message.text.slice(0, 8000), workspace: message.workspaceId,
     attachments: JSON.stringify(files),
     ...(inReplyTo ? { "in-reply-to": inReplyTo } : {}),
-  }, { key: `reply:${message.id}` });
+  } }, { key: `reply:${message.id}` });
 }
 /** Whether replies of this conversation are pushed to an entry module (then they need no separate notice). */
 export async function hasEntry(db: Db, sessionId: string) {

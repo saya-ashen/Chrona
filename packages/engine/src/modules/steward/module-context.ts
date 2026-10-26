@@ -27,6 +27,17 @@ export async function requireModule(context: ModuleContext, tx: Prisma.Transacti
   if (!row) throw new StewardError("not_found", "Module not found");
   return row;
 }
+/** A release is not an incremental update to someone's fork. Explicit rollback is separate. */
+export async function assertBuiltinUpgrade(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | null, payload: Prisma.JsonValue) {
+  const input = z.object({ hash: z.string(), restore: z.unknown().optional() }).safeParse(payload);
+  if (!moduleId || !input.success || input.data.restore !== undefined) return;
+  const target = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: input.data.hash } } });
+  if (target?.source !== "builtin") return;
+  const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId } });
+  if (!module?.activeHash) return;
+  const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
+  if (active && active.source !== "builtin") throw new StewardError("conflict", `内置版本不能作为定制模块的普通更新启用。当前定制会被丢弃；如确需恢复已批准的内置版，请明确执行 chrona admin rollback ${module.name} builtin。`);
+}
 export async function expireModuleApprovals(context: ModuleContext, moduleId: string) {
   const { db, workspaceId, ports } = context;
   const open = await db.approval.findMany({ where: { workspaceId, action: "activate_module", status: "open" } });

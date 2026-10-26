@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
@@ -17,7 +17,7 @@ import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-type Behavior = { reply: string } | "hang";
+type Behavior = { reply: string } | { tool: string; args: unknown } | "hang";
 
 /** A real service with a scripted Provider: each run takes the next behavior (reply through chrona_reply, or never finish). */
 async function fixture() {
@@ -33,7 +33,8 @@ async function fixture() {
     const aborted = new Promise<void>(resolve => { abort = resolve; });
     const done = (async () => {
       if (behavior === "hang") { await aborted; return { outcome: "timed_out" as const, sessionId: null, error: "aborted" }; }
-      await service.tools.call(input.token, "chrona_reply", { text: behavior.reply });
+      if ("tool" in behavior) await service.tools.call(input.token, behavior.tool, behavior.args);
+      else await service.tools.call(input.token, "chrona_reply", { text: behavior.reply });
       return { outcome: "finished" as const, sessionId: null, error: null };
     })();
     return { inject: async () => {}, abort: async () => { abort(); }, done };
@@ -171,6 +172,34 @@ test("v2-8 migration copies content-area attachments into chat's store and gives
   expect(gone!.ref).toBeNull();
   expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ entryModuleId: web.id });
   expect(await migrateConversationFiles(f.ports, f.w)).toBe(0);
+});
+
+test("an approval decision continues the conversation that asked, in a new run; a closed conversation is not reopened", async () => {
+  const f = await fixture();
+  const ask = (title: string) => ({ tool: "chrona_request_approval", args: { action: "schedule", title, detail: "d", preview: "p" } });
+  f.behaviors.push(ask("每天提醒"), { reply: "已设置" }, ask("删除提醒"), { reply: "好的，不删" });
+  const { sessionId } = await send(f, "每天九点提醒我", "m1") as { sessionId: string };
+  await f.settle();
+  const [first] = await f.api.approvals.list("open");
+  expect((await f.db.approval.findUniqueOrThrow({ where: { id: first!.id } })).payload).toMatchObject({ sessionId, lane: "foreground" });
+  await f.qq.call("approvals.resolve", { approval: first!.id, decision: "approve" });
+  await f.settle();
+  expect(await f.db.run.findMany({ where: { sessionId }, orderBy: { createdAt: "asc" }, select: { trigger: true, status: true } })).toEqual([{ trigger: "message", status: "finished" }, { trigger: "approval", status: "finished" }]);
+  expect(f.started[1]!.prompt).toContain(`approved approval ${first!.id}`);
+  // The Provider runs on this host: its files are mounted, not reached over SSH.
+  expect(f.started[0]!.prompt).toContain(`this host is ${JSON.stringify(hostname())}`);
+  await send(f, "把提醒删了", "m2"); await f.settle();
+  const [second] = await f.api.approvals.list("open");
+  await f.api.approvals.resolve(second!.id, { decision: "deny" }, "rescue");
+  await f.settle();
+  expect(f.started[3]!.prompt).toContain("Do not retry it");
+  // The fixture clock stands still, so the two pushes may arrive in either order.
+  expect((await f.qq.pushed()).map(item => item.text).sort()).toEqual(["好的，不删", "已设置"].sort());
+  // Approving after the conversation closed records the decision without a run.
+  const third = await f.api.approvals.create({ action: "schedule", title: "x", detail: "d", preview: "p", payload: { sessionId, lane: "foreground" } });
+  await f.db.session.update({ where: { id: sessionId }, data: { status: "ended" } });
+  expect((await f.api.approvals.resolve(third.id, { decision: "approve" }, "rescue")).approval).toMatchObject({ status: "approved" });
+  expect(await f.db.run.count({ where: { sessionId } })).toBe(4);
 });
 
 test("settings, grants, preferences and schedules are system interfaces for entry modules (v2-9)", async () => {

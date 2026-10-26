@@ -12,6 +12,7 @@ import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "./test-notices";
+import { RUN_LIMITS } from "@chrona/contracts/steward";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -62,6 +63,8 @@ async function fixture() {
 test("activation schedules the module's schedule triggers", async () => {
   const f = await fixture(), manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
   const result = await f.propose();
+  expect(f.calls.filter(call => call.entry === "test.ts")).toMatchObject([{ memoryMb: RUN_LIMITS.moduleTestMemoryMb, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs }]);
+  expect(f.calls.filter(call => call.entry !== "test.ts").every(call => call.memoryMb === undefined)).toBe(true);
   await f.approve(result.approvalId!);
   const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
   expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual([{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);

@@ -13,7 +13,8 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
 (sandbox.health.available ? test : test.skip)("SDK author helper, smoke, key probe and migrated continuity use fake kernels", async () => {
   const dir = await mkdtemp("/tmp/cb-sdk-"), db = testDb();
   try {
-    const code = join(dir, "code"); await mkdir(code);
+    const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: dir });
+    const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
     const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "model"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }],
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
@@ -22,7 +23,8 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
 import { on, chrona } from 'chrona';
 import { existsSync, readFileSync } from 'node:fs';
 on('schedule', async ev => {
-  if (existsSync('/data/state') && readFileSync('/data/state', 'utf8') !== 'migrated') throw new Error('migration missing');
+  const state = chrona.paths.data + '/state';
+  if (existsSync(state) && readFileSync(state, 'utf8') !== 'migrated') throw new Error('migration missing');
   const completion = await chrona.model({ prompt: 'Never send this to a real model', maxOutputTokens: 20 });
   if (!['Chrona test model response', 'Stub summary'].includes(completion.text)) throw new Error('unexpected model response');
   const params = { key: 'daily:' + ev.firedAt, level: 'now', title: 'Build', body: completion.text };
@@ -33,12 +35,12 @@ on('schedule', async ev => {
 });
 on('tool', () => ({ result: 'tool answered' }));
 `);
-    await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync('/data/state', 'migrated');`);
+    await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync(process.env.CHRONA_DATA + '/state', 'migrated');`);
     await writeFile(join(code, "test.ts"), `
 import { startModule } from 'chrona/testing';
 import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
-for (const path of ['chrona', 'chrona/testing']) assert.throws(() => writeFileSync(path, 'changed'));
+if (${runtime.health.isolated}) for (const path of ['/node_modules/chrona/sdk.ts', '/node_modules/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
 const module = await startModule('index.ts', { stubs: { model: () => ({ text: 'Stub summary', inputTokens: 1, outputTokens: 2 }) } });
 try {
   const now = '2026-10-21T04:00:00.000Z';
@@ -57,7 +59,7 @@ try {
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });
-    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, sandbox: { available: true, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule } }, workspace.id);
+    const context = moduleContext({ db, dataDir: dir, now: () => new Date("2026-10-21T04:00:00Z"), publicUrl: null, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } }, workspace.id);
     const tests: TestReport = [];
     expect(await runTests(context, code, manifest, tests)).toBe(true);
     expect(tests).toMatchObject([{ exitCode: 0 }]);
