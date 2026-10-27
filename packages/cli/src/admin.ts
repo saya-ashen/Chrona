@@ -4,7 +4,7 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createQqBotState, createStewardService, moduleSupervisor } from "@chrona/engine";
+import { createQqBotState, createSecrets, createStewardService, moduleSupervisor } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
 
 export type AdminCommand = "diagnostics" | "modules" | "rollback" | "disable" | "approvals" | "approve" | "reject";
@@ -76,4 +76,21 @@ export async function qqBindCode(input: { workspace: string; ttlMinutes: number;
     const challenge = await createQqBotState(join(dataDir, "platform", "data", module.id), appId).createChallenge({ workspaceId: input.workspace, ttlMinutes: input.ttlMinutes, replace: input.replace });
     return { appId, ...challenge };
   } finally { await db.$disconnect(); }
+}
+
+/** Module credentials (v2-16), written to `<dataDir>/secrets` with the same rules as the page; the value is never printed. */
+export async function setSecret(name: string, input: string, options: { dataDir?: string } = {}) {
+  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name) || name === "qq_bot") throw new Error("Invalid credential name");
+  let value: unknown;
+  try { value = JSON.parse(input); } catch { throw new Error("stdin must be a JSON object of string fields"); }
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length || !Object.values(value).every(field => typeof field === "string" && field.length > 0)) {
+    throw new Error("stdin must be a JSON object of non-empty string fields");
+  }
+  await createSecrets(adminLocation(options).dataDir).write(name, value as Record<string, string>);
+  console.log(`Saved credential ${name} (${Object.keys(value).join(", ")}).`);
+}
+export async function removeSecret(name: string, options: { dataDir?: string } = {}) {
+  if (!/^[a-z][a-z0-9_]{1,40}$/.test(name) || name === "qq_bot") throw new Error("Invalid credential name");
+  await createSecrets(adminLocation(options).dataDir).remove(name);
+  console.log(`Removed credential ${name}.`);
 }

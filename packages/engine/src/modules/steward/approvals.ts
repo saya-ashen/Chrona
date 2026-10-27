@@ -9,6 +9,7 @@ import { parseInput, StewardError } from "./errors";
 import { toApproval, toGrant } from "./store";
 import { assertBuiltinUpgrade, groupPayloadSchema, isGroupPayload } from "./module-context";
 import { createRuns } from "./runs";
+import { drainCalls, settleWaiting } from "./module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
   const { workspaceId, now } = context;
@@ -17,6 +18,18 @@ async function grantApproval(tx: Prisma.TransactionClient, context: RecordContex
   const decision = decidePolicy(action, row.moduleId ? { moduleId: row.moduleId } : {}, (await tx.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now());
   if (decision.mode === "never" || decision.mode === "ask") throw new StewardError("forbidden", "Policy does not allow this approval");
   return grant.id;
+}
+/** The grant an approval leaves, if any. */
+async function approve(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
+  // A group never becomes a standing grant: it is approved once, by the user.
+  if (isGroupPayload(row.payload) && scope !== "once") throw new StewardError("invalid", "A group activation can only be approved once");
+  // A module's request is one decision, never a standing grant that would let it approve itself later.
+  if (isModuleRequest(row.payload)) {
+    if (scope !== "once") throw new StewardError("invalid", "A module's request can only be approved once");
+    return null;
+  }
+  if (row.action === "activate_module") await assertBuiltinUpgrade(tx, context.workspaceId, row.moduleId, row.payload);
+  return grantApproval(tx, context, row, scope);
 }
 /** A run that asked does not wait: the decision continues its conversation as a new run, which retries under the new grant. */
 async function resume(tx: Prisma.TransactionClient, ports: StewardPorts, workspaceId: string, row: Parameters<typeof toApproval>[0], { decision, scope }: z.infer<typeof resolveApprovalSchema>) {
@@ -30,6 +43,9 @@ async function resume(tx: Prisma.TransactionClient, ports: StewardPorts, workspa
   await createRuns(ports, workspaceId).enqueue({ sessionId: payload.sessionId, lane: payload.lane === "background" ? "background" : "foreground", trigger: "approval", label: row.title, prompt }, tx);
   return true;
 }
+/** v2-16: something a module asked the user to decide (`approvals.request`); the decision goes back to its waiting call. */
+export const isModuleRequest = (payload: unknown): payload is { kind: "module_request"; hash: string; call: string } =>
+  !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "module_request" && typeof (payload as { call?: unknown }).call === "string";
 /** A module activation is bound to its version hash; a group (v2-15) to every version and no single module. */
 async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | undefined, payload: Prisma.JsonValue) {
   if (isGroupPayload(payload)) {
@@ -58,21 +74,17 @@ export function createApprovals({ db, workspaceId, now }: RecordContext, onAppro
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
-      let grantId: string | null = null;
-      if (input.decision === "approve") {
-        // A group never becomes a standing grant: it is approved once, by the user.
-        if (isGroupPayload(row.payload) && input.scope !== "once") throw new StewardError("invalid", "A group activation can only be approved once");
-        if (row.action === "activate_module") await assertBuiltinUpgrade(tx, workspaceId, row.moduleId, row.payload);
-        grantId = await grantApproval(tx, { db, workspaceId, now }, row, input.scope);
-      }
+      const grantId = input.decision === "approve" ? await approve(tx, { db, workspaceId, now }, row, input.scope) : null;
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
+      if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: input.decision === "approve" ? "approved" : "denied" }, now());
       const resumed = ports ? await resume(tx, ports, workspaceId, row, input) : false;
-      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, resumed };
+      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, resumed, request: isModuleRequest(row.payload) };
     }).then(async result => {
       if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
       if (result.resumed) await ports!.onQueued?.();
+      if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
       return result;
     }),
   };

@@ -155,7 +155,7 @@ export const moduleManifestSchema = z.object({
    */
   contributes: z.record(slug, z.json()).optional()
     .refine(value => value === undefined || JSON.stringify(value).length <= 32 * 1024, "contributes must be at most 32 KiB"),
-  /** Kernel-held credentials this module may read with `secret` (e.g. qq_bot); entry modules only. */
+  /** Kernel-held credentials this module may read with `secret` (v2-16: any module; qq_bot only entry modules). The user sets them on the page or with `chrona admin secret-set`. */
   secrets: z.array(z.string().regex(/^[a-z][a-z0-9_]{1,40}$/)).max(5).default([]),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
   dynamicSchedules: z.boolean().default(false),
@@ -176,7 +176,7 @@ export const moduleManifestSchema = z.object({
   });
   if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
-  if (manifest.secrets.length && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "secrets are only for entry modules (chat.*, approvals.* or *)" });
+  if (manifest.secrets.includes("qq_bot") && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "qq_bot is only for entry modules (chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
 }).superRefine((manifest, ctx) => {
   if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
@@ -196,12 +196,14 @@ export const moduleManifestSchema = z.object({
 });
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 /** Acts as the user, or serves the page holding the user's key: never activated automatically. */
+/** v2-16: any module may ask the user to decide something; these do not make it an entry module. */
+const MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
 /**
  * Acts as the user (their conversations, `chat.*`; their approvals, `approvals.*`; every tool open to them, `*`),
  * or serves the page holding the user's key: every version needs the user, never activated automatically.
  */
 export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string | readonly string[]; uses?: readonly string[] }) =>
-  listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || target.startsWith("approvals."));
+  listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || (target.startsWith("approvals.") && !MODULE_APPROVAL_TOOLS.includes(target)));
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { chmod, lstat, mkdir, open, realpath, rename, unlink } from "node:fs/promises";
+import { chmod, lstat, mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -41,6 +41,12 @@ export function createSecrets(dataDir: string) {
     },
     async remove(id: string) {
       try { await unlink(await path(id)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    },
+    /** Names and update times only: values never leave `read`. */
+    async list() {
+      await path("probe");
+      const names = (await readdir(dir)).filter(file => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\.json$/.test(file));
+      return Promise.all(names.map(async file => ({ name: file.slice(0, -5), updatedAt: (await lstat(join(dir, file))).mtime.toISOString() })));
     },
   };
 }

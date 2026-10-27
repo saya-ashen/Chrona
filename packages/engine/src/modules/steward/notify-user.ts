@@ -29,7 +29,7 @@ export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string,
 /** Every open approval is announced once, wherever it was created; the user is waiting on it, so no cap or quiet hours. */
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
   for (const row of await ports.db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" }, take: 50 })) {
-    await notifyUser(ports.db, ports, workspaceId, { ...(row.moduleId ? { module: row.moduleId } : {}), approval: row.id, scoped: !!row.moduleId, level: "now", responds: true,
+    await notifyUser(ports.db, ports, workspaceId, { ...(row.moduleId ? { module: row.moduleId } : {}), approval: row.id, scoped: !!row.moduleId && (row.payload as { kind?: unknown } | null)?.kind !== "module_request", level: "now", responds: true,
       title: `需要你批准：${row.title}`, body: approvalNoticeBody(row), key: `approval:${row.id}` });
   }
 }

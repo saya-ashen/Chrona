@@ -73,7 +73,7 @@ function approvalItem(approval, after) {
     approval.detail && h("div", {}, approval.detail),
     approval.preview && h("details", {}, h("summary", {}, "详情"), h("pre", {}, approval.preview)),
     h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"),
-      approval.moduleId && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
+      approval.moduleId && approval.action === "activate_module" && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
 }
 // A question a running Provider asked; unanswered questions expire and the run goes on without the answer.
 function interactionItem(interaction, after) {
@@ -385,6 +385,24 @@ async function settings() {
     field("单轮构建时限（分钟）", h("input", { name: "buildTimeoutMinutes", type: "number", min: 5, max: 120, step: 1, required: true, value: builds.timeoutMinutes })),
     field("每轮候选提交上限", h("input", { name: "buildMaxSubmissions", type: "number", min: 1, max: 20, step: 1, required: true, value: builds.maxSubmissions })),
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
+  // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
+  const secretForm = secret => {
+    const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
+    const addRow = () => rows.append(h("div", { class: "row" }, h("input", { name: "field", placeholder: "字段名，如 apiKey", autocomplete: "off" }), h("input", { name: "value", type: "password", placeholder: "值", autocomplete: "new-password" })));
+    for (let i = 0; i < 3; i++) addRow();
+    return h("form", { onsubmit: async event => {
+      event.preventDefault();
+      const value = Object.fromEntries([...rows.children].map(row => [row.querySelector("[name=field]").value.trim(), row.querySelector("[name=value]").value]).filter(([field, text]) => field && text));
+      if (!Object.keys(value).length) { state.textContent = "至少填写一个字段"; return; }
+      try { await web(`/secrets/${secret.name}`, { method: "POST", body: { value } }); reload(); } catch (error) { state.textContent = error.message; }
+    } }, rows, h("div", { class: "row" }, h("button", { type: "button", onclick: addRow }, "加一个字段"), h("button", { type: "submit", class: "primary" }, secret.configured ? "替换" : "保存"), state));
+  };
+  const secrets = h("section", {}, h("h2", {}, "凭据"),
+    h("p", { class: "muted" }, "应用需要的账号密钥。只保存在 Chrona 本机，不会显示、不进入对话或模型；替换会覆盖整份凭据。"),
+    view.secrets?.length ? h("ul", { class: "plain" }, view.secrets.map(secret => h("li", {},
+      h("strong", {}, secret.name), " ", h("span", { class: "muted" }, `${secret.configured ? `已设置 · ${when(secret.updatedAt)}` : "未设置"}${secret.modules.length ? ` · 用于 ${secret.modules.join("、")}` : ""}`), " ",
+      secret.configured && h("button", { onclick: act(`/secrets/${secret.name}/remove`, null, `删除凭据 ${secret.name}？`) }, "删除"),
+      secretForm(secret)))) : h("p", { class: "muted" }, "没有应用需要凭据。"));
   const activeGrants = view.grants.filter(g => !g.revokedAt && !(g.once && g.consumedAt) && !(g.expiresAt && Date.parse(g.expiresAt) <= Date.now()));
   const live = view.schedules.filter(s => s.status === "active" || s.status === "paused");
   main.replaceChildren(
@@ -392,6 +410,7 @@ async function settings() {
     h("section", {}, h("h2", {}, "构建设置"), usage,
       h("p", { class: "muted" }, "每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。"),
       h("p", { class: "muted" }, "修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。"), buildForm),
+    secrets,
     h("section", {}, h("h2", {}, "日程"),
       live.length ? h("ul", { class: "plain" }, live.map(s => h("li", {}, s.label ?? s.mode, " ", h("span", { class: "muted" }, s.status === "paused" ? "已暂停" : s.nextAt ? when(s.nextAt) : ""), " ",
         s.status === "active" ? h("button", { onclick: act(`/schedules/${s.id}`, { status: "paused" }) }, "暂停") : h("button", { onclick: act(`/schedules/${s.id}`, { status: "active" }) }, "恢复"),

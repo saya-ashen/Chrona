@@ -17,6 +17,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
   stub("modules.revise-build", args => ({ status: "build_revised", sessionId: args.session })),
   stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
+  stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })),
   stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
   stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
@@ -59,7 +60,13 @@ try {
   await post("/api/web/sessions/b1/revise-build", { requirements: "保留原文件" });
   assert.deepEqual(calls.at(-1), ["modules.revise-build", { session: "b1", requirements: "保留原文件" }]);
   // Settings and Provider questions go to their system interfaces (v2-9).
-  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [] });
+  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [], secrets: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }] });
+  // Credentials (v2-16): written through, never echoed; not reachable through the generic call route.
+  assert.deepEqual(await (await post("/api/web/secrets/okx_demo", { value: { apiKey: "k" } })).json(), { name: "okx_demo", configured: true });
+  assert.deepEqual(calls.at(-1), ["secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k" }) }]);
+  await post("/api/web/secrets/okx_demo/remove", {});
+  assert.deepEqual(calls.at(-1), ["secrets.remove", { name: "okx_demo" }]);
+  assert.equal((await post("/api/web/call", { target: "secrets.set", args: {} })).status, 404);
   await post("/api/web/settings", { notifications: { dailyCap: 3 } });
   assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
   await post("/api/web/settings", { builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } });

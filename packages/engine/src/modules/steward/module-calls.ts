@@ -30,7 +30,18 @@ export class CallError extends Error {
 /** `unrecorded`: tools called only synchronously whose arguments and results are never stored (credentials, model prompts and completions). */
 /** A system tool may validate with a full schema (`input`) instead of scalar parameters: system modules are Chrona's own code. */
 export type SystemTool = Tool & { input?: z.ZodType; output?: z.ZodType; documentation?: string; examples?: Json[] };
-export type SystemModule = { name: string; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"]; deadline?: number }, tool: string, args: Record<string, unknown>): Promise<Json> };
+/** `call`: the async call being delivered (absent for sync calls). */
+export type SystemModule = { name: string; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"]; deadline?: number; call?: { id: string } }, tool: string, args: Record<string, unknown>): Promise<Json> };
+/**
+ * Thrown by a system tool that waits for the user (v2-16 `approvals.request`): the async call stays `waiting`, untouched
+ * by leases and retries, until `settleWaiting` gives its result, which goes back to the caller as a `call_result`.
+ */
+export class AwaitUser extends Error {
+  constructor(readonly output: Json) { super("Waiting for the user"); }
+}
+export function settleWaiting(db: Db, callId: string, output: Json, now: Date) {
+  return db.moduleInvocation.updateMany({ where: { id: callId, mode: "async", status: "waiting" }, data: { status: "succeeded", output: output as Prisma.InputJsonValue, finishedAt: now } });
+}
 const systemModules = new Map<string, SystemModule>();
 export function registerSystemModule(module: SystemModule) { systemModules.set(module.name, module); }
 /** System modules and their tools, for catalogs (v2-13: the Provider reaches those visible to it). */
@@ -267,9 +278,12 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }
   if (resolved.system) {
     try {
-      const output = await resolved.system.handle({ ports, workspaceId: row.workspaceId, caller }, resolved.tool.name, args);
+      const output = await resolved.system.handle({ ports, workspaceId: row.workspaceId, caller, call: { id: row.id } }, resolved.tool.name, args);
       return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
-    } catch (error) { const failure = systemError(error); return settle({ status: "failed", error: `${failure.code}: ${failure.message}`.slice(0, 2000), finishedAt: ports.now() }); }
+    } catch (error) {
+      if (error instanceof AwaitUser) return settle({ status: "waiting", output: error.output as Prisma.InputJsonValue, error: null });
+      const failure = systemError(error); return settle({ status: "failed", error: `${failure.code}: ${failure.message}`.slice(0, 2000), finishedAt: ports.now() });
+    }
   }
   const path = Array.isArray(row.chain) ? row.chain.filter((name): name is string => typeof name === "string") : [];
   return deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail });

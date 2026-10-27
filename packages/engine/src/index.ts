@@ -2,6 +2,7 @@ export { createChat } from "./modules/steward/chat";
 export type { ChatInput } from "./modules/steward/chat";
 // The CLI writes binding codes in the built-in qq module's state format.
 export { createQqBotState } from "./modules/steward/builtin/qq/bot";
+export { createSecrets } from "./modules/steward/secrets";
 export { createStewardService, createTools, StewardError } from "./modules/steward";
 export { moduleSupervisor } from "./modules/steward/module-supervisor";
 export { createModuleChannel } from "./modules/steward/module-channel";

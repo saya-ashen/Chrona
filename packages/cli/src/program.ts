@@ -4,7 +4,7 @@ import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-b
 import cliPackage from "../package.json" with { type: "json" };
 import { getChronaDataDir } from "./start-server.js";
 import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
-import { runAdmin } from "./admin";
+import { removeSecret, runAdmin, setSecret } from "./admin";
 import { migrateAffairs, recordAffairBackup } from "./migrate-affairs.js";
 
 export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
@@ -65,6 +65,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   admin.command("rollback <module> <hash-or-builtin>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await runAdmin("rollback", [module, hash]); });
   admin.command("disable <module>").description("Pause a module").action(async (module: string) => { await runAdmin("disable", [module]); });
   for (const command of ["approve", "reject"] as const) admin.command(`${command} <approvalId>`).description(`${command} a pending approval`).action(async (id: string) => { await runAdmin(command, [id]); });
+  admin.command("secret-set <name>").description("Save a module credential from a JSON object on stdin (never echoed)").action(async (name: string) => { await setSecret(name, await Bun.stdin.text()); });
+  admin.command("secret-remove <name>").description("Delete a saved module credential").action(async (name: string) => { await removeSecret(name); });
   const qq = program.command("qq").description("Chrona QQ bot local administration");
   qq.command("bind-code").description("Create a one-time owner binding code (only its hash is stored)")
     .requiredOption("--workspace <id>", "Workspace the bound QQ owner acts in")

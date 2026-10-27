@@ -73,7 +73,7 @@ async function assertManual(f: Awaited<ReturnType<typeof fixture>>) {
   return version;
 }
 
-test.each(["no grant", "once grant", "new effect", "migration", "network", "probe failure", "activation failure"])("requires ordinary approval: %s", async kind => {
+test.each(["no grant", "once grant", "new effect", "migration", "network", "probe failure", "activation failure", "secrets"])("requires ordinary approval: %s", async kind => {
   const f = await fixture();
   await configureManualCase(f, kind);
   const version = await assertManual(f);
@@ -85,6 +85,7 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
   if (kind === "once grant") await f.db.grant.update({ where: { id: f.grantId }, data: { revokedAt: null, once: true } });
   if (kind === "new effect") f.manifest.effects.push("wake_provider");
   if (kind === "network") f.manifest.effects.push("network");
+  if (kind === "secrets") f.manifest.secrets = ["okx_demo"];
   if (kind === "migration") {
     const live = join(f.dataDir, "platform/data", f.first.moduleId);
     await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "state");

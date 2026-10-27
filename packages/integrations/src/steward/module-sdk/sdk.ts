@@ -9,7 +9,7 @@ export type Trigger = { kind: "schedule"; id: string; firedAt: string }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
 type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
-export type CallState = { callId: string; status: "queued" | "running" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
+export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number };
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<Trigger["kind"], Handler>();
@@ -99,7 +99,10 @@ export const chrona = {
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result) as T),
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
-  /** A credential listed in the manifest's `secrets` (entry modules): a routed call to `secrets.get`. Never log or store it. */
+  /**
+   * A credential listed in the manifest's `secrets` (v2-16: any module; the user saves it in Settings): a routed call to
+   * `secrets.get`, `unavailable` until saved. Never log, store or return it.
+   */
   secret: (params: { name: string }) => chrona.call<{ value: Record<string, string> }>("secrets.get", params),
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
   serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),

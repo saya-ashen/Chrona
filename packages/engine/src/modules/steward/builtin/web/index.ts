@@ -50,9 +50,9 @@ async function getSessions() {
   return lists.flat().sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
 }
 async function getSettings() {
-  // Settings page (v2-9): settings, grant rules, preferences and schedules in one read.
-  const [settings, grants, preferences, schedules] = await Promise.all([call("settings.get"), call("settings.grants"), call("settings.preferences"), call("schedules.list")]);
-  return { settings, grants, preferences, schedules };
+  // Settings page (v2-9): settings, grant rules, preferences, schedules and credentials (v2-16, names only) in one read.
+  const [settings, grants, preferences, schedules, secrets] = await Promise.all([call("settings.get"), call("settings.grants"), call("settings.preferences"), call("schedules.list"), call("secrets.list")]);
+  return { settings, grants, preferences, schedules, secrets };
 }
 async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (path[0] !== "sessions") return NO_ROUTE;
@@ -71,6 +71,13 @@ async function settingsRoute({ request, path, body }: ApiContext): Promise<ApiRe
   if (request.method === "POST" && path[0] === "schedules" && path.length === 2) return call("schedules.update", { schedule: path[1], status: body.status });
   return NO_ROUTE;
 }
+/** A credential the user typed goes straight to the kernel (v2-16); the page never reads one back. */
+async function secretRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
+  if (request.method !== "POST" || path[0] !== "secrets") return NO_ROUTE;
+  if (path.length === 2) return call("secrets.set", { name: path[1], value: JSON.stringify(body.value) });
+  if (path[2] === "remove" && path.length === 3) return call("secrets.remove", { name: path[1] });
+  return NO_ROUTE;
+}
 async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (request.method === "POST" && path[0] === "interactions" && path[2] === "answer" && path.length === 3) return call("chat.answer", { interaction: path[1], answer: JSON.stringify(body) });
   if (request.method === "POST" && path[0] === "runs" && path[2] === "cancel" && path.length === 3) return call("chat.cancel", { run: path[1] });
@@ -80,7 +87,7 @@ async function moduleRoute({ request, path }: ApiContext): Promise<ApiResult> {
   if (request.method === "GET" && path[0] === "modules" && path[2] === "diagnostics" && path.length === 3) return call("modules.diagnostics", { module: path[1] });
   return NO_ROUTE;
 }
-const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, runRoute, moduleRoute];
+const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute];
 
 async function api(request: Request, path: string[]) {
   const url = new URL(request.url), body = request.method === "POST" ? await request.json() as Args : {};
@@ -110,7 +117,7 @@ async function api(request: Request, path: string[]) {
 function moduleCall(body: Args) {
   // Conversations, approvals and app records have their own routes above.
   const target = String(body.target);
-  if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules|settings|schedules)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
+  if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
   return chrona.call(target, (body.args ?? {}) as Args);
 }
 async function fileResponse(request: Request) {

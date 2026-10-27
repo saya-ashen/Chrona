@@ -2,18 +2,18 @@ import { z } from "zod";
 import { APPROVAL_SCOPES, APPROVAL_STATUSES, attachmentSchema, buildSettingsSchema, modulesToolInputSchemas, RUN_LIMITS, isEntryModule, providerAnswerSchema, DELIVERY_CHANNELS, moduleManifestSchema, SESSION_SOURCES, SESSION_STATUSES } from "@chrona/contracts/steward";
 import { createChat, readChatFile } from "./chat";
 import { createSessions } from "./sessions";
-import { createApprovals } from "./approvals";
+import { createApprovals, isModuleRequest } from "./approvals";
 import { createModules } from "./modules";
 import { workspaceToday } from "./today";
 import { completeForModule } from "./module-model";
 import { createRuns, createRunSession } from "./runs";
 import { createProviderControl } from "./provider-channel";
 import { createSettings } from "./settings";
-import { createGrants } from "./grants";
+import { createGrants, effectivePolicyIn } from "./grants";
 import { createPreferences } from "./preferences";
 import { createSchedules } from "./schedules";
 import { createNotificationsView, forwardSettings } from "./notify-user";
-import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "./module-calls";
+import { admitted, AwaitUser, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "./module-calls";
 import { controlBuild, declaredModules, requestFiles, startBuild } from "./module-build-session";
 import { requestGroup } from "./module-group";
 import { interfaceReference, checkoutBuiltinReference } from "./module-reference";
@@ -21,6 +21,7 @@ import { moduleDiagnosticsOutputSchema, MODULE_DIAGNOSTICS_DOCUMENTATION, module
 import { buildQueue, buildQueueText } from "./build-queue";
 import { sessionTranscript } from "./transcript";
 import { parseInput } from "./errors";
+import { createSecrets } from "./secrets";
 import { storedAttachments } from "./store";
 import type { StewardPorts } from "./ports";
 
@@ -151,14 +152,39 @@ const chat: SystemModule = {
 };
 
 /** `approvals`: the user's decisions, for entry modules (QQ buttons and text commands). */
+/** v2-16: one approval per async call (redeliveries find it); the call waits until the user decides. */
+async function moduleRequest(ports: StewardPorts, workspaceId: string, module: Extract<Caller, { kind: "module" }>, call: { id: string } | undefined, args: Record<string, unknown>) {
+  if (!call) throw new CallError("invalid", "approvals.request waits for the user: call it with mode async and reply: true");
+  const decision = await effectivePolicyIn(ports.db, workspaceId, "modify_external", { moduleId: module.moduleId }, ports.now());
+  if (decision.mode === "never") throw new CallError("forbidden", decision.reason);
+  const rows = await ports.db.approval.findMany({ where: { workspaceId, moduleId: module.moduleId, action: "modify_external" }, orderBy: { createdAt: "desc" }, take: 200 });
+  const existing = rows.find(row => isModuleRequest(row.payload) && row.payload.call === call.id);
+  const approval = existing ?? await ports.db.approval.findUniqueOrThrow({ where: { id: (await createApprovals({ db: ports.db, workspaceId, now: ports.now }).create({
+    action: "modify_external", moduleId: module.moduleId, title: `${module.module}：${String(args.title)}`.slice(0, 200),
+    detail: String(args.detail ?? "").slice(0, 4000), preview: String(args.preview ?? "").slice(0, 20_000), payload: { kind: "module_request", hash: module.hash, call: call.id },
+  })).id } });
+  if (approval.status === "approved" || approval.status === "denied") return { approval: approval.id, decision: approval.status };
+  if (approval.status !== "open") throw new CallError("failed", `Request ${approval.status}`);
+  throw new AwaitUser({ approval: approval.id, status: "open" });
+}
+async function moduleRequestStatus(ports: StewardPorts, workspaceId: string, module: Extract<Caller, { kind: "module" }>, id: string) {
+  const row = await ports.db.approval.findFirst({ where: { workspaceId, id, moduleId: module.moduleId } });
+  if (!row || !isModuleRequest(row.payload)) throw new CallError("not_found", "Request not found");
+  return { approval: row.id, status: row.status, hash: row.payload.hash, resolvedAt: row.resolvedAt?.toISOString() ?? null };
+}
 const approvals: SystemModule = {
   name: "approvals",
   tools: [
     tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { idempotent: true }),
     tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: [...APPROVAL_SCOPES] } }, ["approval", "decision"]),
+    tool("request", "Ask the user to decide something this module is about to do (v2-16). Call asynchronously with reply: the call waits, and its call_result carries { approval, decision: approved | denied }. Approved once, never standing.",
+      { title: text("What the user decides, e.g. 开始模拟实验"), detail: text("Why, and what follows"), preview: text("Exactly what will be done") }, ["title"], { idempotent: true }),
+    tool("status", "A request this module made: { status, hash, resolvedAt }.", { approval: text() }, ["approval"], { idempotent: true }),
   ],
-  async handle({ ports, workspaceId, caller }, name, args) {
+  async handle({ ports, workspaceId, caller, call }, name, args) {
     const module = entry(caller), modules = createModules(ports, workspaceId);
+    if (name === "request") return moduleRequest(ports, workspaceId, module, call, args);
+    if (name === "status") return moduleRequestStatus(ports, workspaceId, module, String(args.approval));
     const service = createApprovals({ db: ports.db, workspaceId, now: ports.now }, async action => {
       const payload = action.payload;
       if (payload && typeof payload === "object" && !Array.isArray(payload) && (payload.kind === "activate_module" || payload.kind === "activate_modules")) await modules.onApproved(action);
@@ -387,20 +413,63 @@ const ai: SystemModule = {
   },
 };
 
-/** `secrets` (v2-10): a credential the calling entry module lists in `secrets`; never logged or stored in call records. */
+/**
+ * `secrets` (v2-10, v2-16): `get` reads a credential the calling module lists in `secrets`; entry modules (the page)
+ * save, remove and list them for the user. Values are never logged, stored in call records or returned by `list`.
+ */
+const SECRET_NAME = /^[a-z][a-z0-9_]{1,40}$/;
+async function declaredSecrets(db: StewardPorts["db"], workspaceId: string) {
+  const declared = new Map<string, string[]>();
+  for (const module of await db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, select: { id: true, name: true, activeHash: true } })) {
+    const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+    for (const secret of moduleManifestSchema.safeParse(version?.manifest).data?.secrets ?? []) declared.set(secret, [...declared.get(secret) ?? [], module.name]);
+  }
+  return declared;
+}
+function secretValue(raw: unknown) {
+  const value = parsed(raw, "value");
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length || Object.keys(value).length > 20
+    || !Object.entries(value).every(([key, field]) => /^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(key) && typeof field === "string" && field.length > 0 && field.length <= 8192)) {
+    throw new CallError("invalid", "value must be a JSON object of 1-20 non-empty string fields");
+  }
+  return value as Record<string, string>;
+}
 const secrets: SystemModule = {
   name: "secrets",
-  unrecorded: ["get"],
-  tools: [tool("get", "A credential this entry module lists in its manifest's secrets.", { name: text() }, ["name"], { idempotent: true })],
-  async handle({ ports, caller }, name, args) {
-    const module = entry(caller), manifest = await callerManifest(ports.db, module), secret = String(args.name);
-    if (name !== "get") throw new CallError("not_found", `secrets.${name} not found`);
-    if (!manifest || !isEntryModule(manifest) || !manifest.secrets.includes(secret)) throw new CallError("forbidden", "Secret not declared");
-    const value = await ports.secrets?.(secret).catch(() => null);
-    if (!value) throw new CallError("unavailable", "Secret not configured");
-    return { value };
+  unrecorded: ["get", "set"],
+  tools: [
+    tool("get", "A credential this module lists in its manifest's secrets.", { name: text() }, ["name"], { idempotent: true }),
+    tool("set", "Save a credential the user entered (entry modules): value is a JSON object of string fields. Replaces any saved value; never returned.", { name: text(), value: text("JSON object of strings") }, ["name", "value"]),
+    tool("remove", "Delete a saved credential (entry modules).", { name: text() }, ["name"]),
+    tool("list", "Saved credentials (name, update time) and the active modules declaring each (entry modules); never values.", {}, [], { idempotent: true }),
+  ],
+  async handle({ ports, workspaceId, caller }, name, args) {
+    const module = entry(caller), manifest = await callerManifest(ports.db, module), store = createSecrets(ports.dataDir);
+    if (name === "get") return readSecret(ports, store, manifest, String(args.name));
+    if (name !== "set" && name !== "remove" && name !== "list") throw new CallError("not_found", `secrets.${name} not found`);
+    if (!manifest || !isEntryModule(manifest)) throw new CallError("forbidden", "Only an entry module may manage credentials");
+    return manageSecrets(ports, workspaceId, store, name, args);
   },
 };
+async function readSecret(ports: StewardPorts, store: ReturnType<typeof createSecrets>, manifest: Awaited<ReturnType<typeof callerManifest>>, secret: string) {
+  if (!manifest || !manifest.secrets.includes(secret) || (secret === "qq_bot" && !isEntryModule(manifest))) throw new CallError("forbidden", "Secret not declared");
+  // qq_bot comes from the service environment; the others are saved by the user.
+  const value = await (secret === "qq_bot" ? ports.secrets?.(secret) : store.read(secret))?.catch(() => null);
+  if (!value) throw new CallError("unavailable", "Secret not configured");
+  return json({ value });
+}
+async function manageSecrets(ports: StewardPorts, workspaceId: string, store: ReturnType<typeof createSecrets>, name: "set" | "remove" | "list", args: Record<string, unknown>) {
+  if (name === "list") {
+    const saved = new Map((await store.list()).map(row => [row.name, row.updatedAt])), declared = await declaredSecrets(ports.db, workspaceId);
+    return json([...new Set([...saved.keys(), ...declared.keys()])].filter(secret => secret !== "qq_bot").sort()
+      .map(secret => ({ name: secret, configured: saved.has(secret), updatedAt: saved.get(secret) ?? null, modules: declared.get(secret) ?? [] })));
+  }
+  const secret = String(args.name);
+  if (!SECRET_NAME.test(secret) || secret === "qq_bot") throw new CallError("invalid", "Invalid credential name");
+  if (name === "remove") { await store.remove(secret); return json({ name: secret, configured: false }); }
+  await store.write(secret, secretValue(args.value));
+  return json({ name: secret, configured: true });
+}
 
 let registered = false;
 /** Called by the service: Chrona's system modules become routable call targets. */

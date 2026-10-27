@@ -10,7 +10,7 @@ export type OnApproved = (action: ApprovedAction) => Promise<void>;
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   provider?: ProviderAdapter;
-  /** Kernel-held credentials for modules declaring them in `secrets` (e.g. qq_bot: { appId, clientSecret }). */
+  /** Credentials from the service environment (qq_bot: { appId, clientSecret }); others are saved under `<dataDir>/secrets` (v2-16). */
   secrets?(name: string): Promise<Record<string, string> | null>;
   /** v2-6 dependency installer: lockfile libraries and host system programs, into a staging module directory. */
   packages?: {

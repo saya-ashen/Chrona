@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
@@ -7,7 +7,7 @@ import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
-import { runAdmin } from "./admin";
+import { removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
 
 const dbs: PrismaClient[] = [];
@@ -26,7 +26,7 @@ async function fixture() {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
 });
 test("admin reads while runtime locked but refuses writes; approval audit source is cli", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
@@ -60,5 +60,19 @@ test("admin rollback activates entry modules directly, supports builtin, and dis
     await runAdmin("disable", [f.module.name], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ status: "paused" });
     expect(await f.db.audit.findFirst({ where: { kind: "module_disabled" } })).toMatchObject({ actorKey: "user", details: { source: "cli" } });
+  } finally { log.mockRestore(); }
+});
+
+test("secret-set saves a module credential from stdin as a private file and never prints it", async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), "chrona-admin-secret-")), log = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await expect(setSecret("okx_demo", "not json", { dataDir })).rejects.toThrow("JSON object");
+    await expect(setSecret("qq_bot", '{"a":"b"}', { dataDir })).rejects.toThrow("Invalid credential name");
+    await setSecret("okx_demo", JSON.stringify({ apiKey: "k-secret" }), { dataDir });
+    expect(statSync(join(dataDir, "secrets", "okx_demo.json")).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(join(dataDir, "secrets", "okx_demo.json"), "utf8"))).toEqual({ apiKey: "k-secret" });
+    expect(JSON.stringify(log.mock.calls)).not.toContain("k-secret");
+    await removeSecret("okx_demo", { dataDir });
+    expect(existsSync(join(dataDir, "secrets", "okx_demo.json"))).toBe(false);
   } finally { log.mockRestore(); }
 });

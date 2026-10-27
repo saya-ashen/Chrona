@@ -44,7 +44,8 @@ async function capabilitiesUnchanged(context: ModuleContext, { module, active, v
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
   // Without isolation any code change can do anything the Chrona user can: every version needs the user.
-  if (!context.ports.sandbox?.isolated || isEntryModule(manifest)) return false;
+  // A credential (v2-16) is the user's to hand over: such versions always ask.
+  if (!context.ports.sandbox?.isolated || isEntryModule(manifest) || manifest.secrets.length) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
   const current = moduleManifestSchema.parse(active.manifest);
