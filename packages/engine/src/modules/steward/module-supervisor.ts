@@ -125,7 +125,7 @@ class ModuleSupervisor {
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const httpDir = instance.manifest.listen ? join(instance.dir, "http") : undefined;
     if (httpDir) await mkdir(httpDir, { mode: 0o700 });
-    const process = sandbox.startModule!({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network") });
+    const process = sandbox.startModule!({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), ...(instance.manifest.limits ? { memoryMb: instance.manifest.limits.virtualMemoryMb } : {}) });
     instance.process = process;
     // Install exit observers before yielding after startModule returns.
     return this.connect(instance, process);

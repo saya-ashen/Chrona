@@ -107,8 +107,9 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
   }
   return {
     health: { available, isolated },
-    startModule({ codeDir, dataDir: moduleData, contentDir, httpDir, env, entry, socketPath, network = false }: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean }) {
-      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir, httpDir, socketPath, env }, entry, network);
+    startModule({ codeDir, dataDir: moduleData, contentDir, httpDir, env, entry, socketPath, network = false, memoryMb: startMemoryMb = memoryMb }: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean; memoryMb?: number }) {
+      limits(startMemoryMb);
+      const child = spawnModule({ codeDir, dataDir: moduleData, contentDir, httpDir, socketPath, env }, entry, network, startMemoryMb);
       child.stdin!.end();
       child.stdout!.resume();
       let errors = Buffer.alloc(0), line = "", dropping = false;
@@ -133,7 +134,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
         child.once("error", reject);
         child.once("close", (code, signal) => resolve({ code, signal }));
       });
-      return { pid: child.pid!, exited, stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: () => kill(child), limits: { virtualMemoryMb: memoryMb } };
+      return { pid: child.pid!, exited, stderr: () => errors.toString("utf8") + (dropping ? "[oversized stderr line omitted]" : line ? "[incomplete stderr line omitted]" : ""), kill: () => kill(child), limits: { virtualMemoryMb: startMemoryMb } };
     },
     /** One-shot run with JSON on stdin: author tests and data migrations. */
     async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes, memoryMb: runMemoryMb = memoryMb }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number }): Promise<ScriptSandboxResult> {

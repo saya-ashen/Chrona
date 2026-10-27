@@ -296,7 +296,29 @@ async function systemApp(name, opened) {
         : h("p", { class: "muted" }, "还没有工作记录。")) : "",
     recent.length ? h("section", {}, h("h2", {}, "活动"), h("ul", { class: "plain" }, recent.slice(0, 10).map(activityItem)),
       h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(name)}` }, "查看全部活动"))) : "",
+    name === "memory" ? await memoryPanel() : "",
     h("section", {}, h("h2", {}, "提供的工具"), h("ul", { class: "plain" }, meta.tools.map(tool => h("li", {}, h("code", {}, `${meta.name}.${tool.name}`), " ", h("span", { class: "muted" }, `${who(tool)}可调用 · ${tool.description}`))))));
+}
+// v2-21: what memory is doing, and the user's own search with deletion.
+async function memoryPanel() {
+  let state = null;
+  try { state = await web("/memory"); } catch { /* the search still works or shows its error */ }
+  const results = h("ul", { class: "plain" }), note = h("p", { class: "muted", role: "status" });
+  const search = async event => {
+    event.preventDefault();
+    note.textContent = "检索中……"; results.replaceChildren();
+    try {
+      const { items } = await web(`/memory?query=${encodeURIComponent(event.target.elements.query.value)}`);
+      note.textContent = items.length ? "" : "没有找到。只用全文检索时请换关键词试试。";
+      results.append(...items.map(item => h("li", {}, item.content, " ", h("span", { class: "muted" }, item.at ? when(item.at) : ""), " ", h("button", { type: "button", onclick: async click => {
+        if (!confirm("删除这条记忆？")) return;
+        try { await web("/memory/forget", { method: "POST", body: { id: item.id } }); click.target.closest("li").remove(); } catch (error) { note.textContent = error.message; }
+      } }, "删除"))));
+    } catch (error) { note.textContent = error.message; }
+  };
+  return h("section", {}, h("h2", {}, "记忆"),
+    h("p", { class: "muted" }, state ? `${state.provider ? `提供者 ${state.provider}${state.available ? "" : "（不可用）"}` : "未启用"} · 自动检索${state.autoRecall ? "开" : "关"} · 自动写入${state.autoRetain ? "开" : "关"} · 24 小时内写入 ${state.last24h.retained}、检索 ${state.last24h.recalled}、删除 ${state.last24h.forgotten}` : "状态读取失败"),
+    h("form", { onsubmit: search }, h("div", { class: "row" }, h("input", { name: "query", required: true, placeholder: "关键词" }), h("button", { class: "primary" }, "检索"))), note, results);
 }
 // A line about a conversation links to its process: a build has its own page, other work opens in its system app.
 function processLink(item) {
@@ -476,6 +498,23 @@ async function settings() {
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
   // Module models (v2-17): tiers (model + thinking level), call limits, per-module daily caps and today's use.
   const models = modelForm(view.settings, reload);
+  // Memory (v2-21): which app provides it; the built-in one downloads its packages only when chosen.
+  const memory = view.settings.memory ?? { provider: null, autoRecall: true, autoRetain: true }, memoryStatus = h("span", { class: "muted", role: "status" });
+  const memoryForm = h("form", { onsubmit: async event => {
+    event.preventDefault();
+    const f = event.target.elements, provider = f.memoryProvider.value === "other" ? f.memoryOther.value.trim() : f.memoryProvider.value;
+    memoryStatus.textContent = "正在保存……";
+    try { await web("/settings", { method: "POST", body: { memory: { provider: provider || null, autoRecall: f.autoRecall.checked, autoRetain: f.autoRetain.checked } } }); memoryStatus.textContent = "已保存。"; }
+    catch (error) { memoryStatus.textContent = error.message; }
+  } },
+    field("记忆提供者", h("select", { name: "memoryProvider" },
+      h("option", { value: "", selected: !memory.provider }, "不启用"),
+      h("option", { value: "memory-local", selected: memory.provider === "memory-local" }, "内置（memory-local，启用时下载约 262 MB）"),
+      h("option", { value: "other", selected: !!memory.provider && memory.provider !== "memory-local" }, "其他应用（适配模块）"))),
+    field("其他应用名", h("input", { name: "memoryOther", value: memory.provider && memory.provider !== "memory-local" ? memory.provider : "", placeholder: "如 memory-hindsight" })),
+    field("对话开始时自动检索", h("input", { name: "autoRecall", type: "checkbox", checked: memory.autoRecall, style: "width:auto" })),
+    field("每 4 条消息自动写入", h("input", { name: "autoRetain", type: "checkbox", checked: memory.autoRetain, style: "width:auto" })),
+    h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存记忆设置"), memoryStatus));
   // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
   const secretForm = secret => {
     const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
@@ -502,6 +541,7 @@ async function settings() {
       h("p", { class: "muted" }, "每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。"),
       h("p", { class: "muted" }, "修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。"), buildForm),
     models,
+    h("section", {}, h("h2", {}, "记忆"), h("p", { class: "muted" }, "对话内容会写入你选的记忆系统；检索到的记忆只作参考数据。外部系统由 Chrona 构建适配应用接入。"), memoryForm),
     secrets,
     h("section", {}, h("h2", {}, "日程"),
       live.length ? h("ul", { class: "plain" }, live.map(s => h("li", {}, s.label ?? s.mode, " ", h("span", { class: "muted" }, s.status === "paused" ? "已暂停" : s.nextAt ? when(s.nextAt) : ""), " ",

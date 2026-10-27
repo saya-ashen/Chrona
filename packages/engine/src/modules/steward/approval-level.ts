@@ -26,6 +26,7 @@ export function addedCapabilities(previous: Manifest | null, next: Manifest) {
     ...next.uses.filter(target => !had(m => m.uses, target)).map(target => target === "*" ? "调用你能用的所有工具" : `调用 ${target}`),
     ...next.secrets.filter(name => !had(m => m.secrets, name)).map(name => `读取凭据 ${name}`),
     ...next.packages.filter(name => !had(m => m.packages, name)).map(name => `系统程序 ${name}`),
+    ...(next.limits && next.limits.virtualMemoryMb > (previous?.limits?.virtualMemoryMb ?? 1024) ? [`内存地址空间上限 ${next.limits.virtualMemoryMb} MB`] : []),
     ...listenPaths(next).filter(path => !previous || !listenPaths(previous).includes(path)).map(path => `网页入口 ${path}`),
     ...next.tools.filter(tool => tool.visibility.includes("modules") && !previous?.tools.find(old => old.name === tool.name)?.visibility.includes("modules")).map(tool => `供其他模块调用 ${tool.name}`),
   ];

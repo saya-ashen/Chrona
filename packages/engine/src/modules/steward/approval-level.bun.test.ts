@@ -16,9 +16,14 @@ test.each([
   ["a call", { uses: ["files.read"] }, ["调用 files.read"]],
   ["a credential", { secrets: ["okx_demo"] }, ["读取凭据 okx_demo"]],
   ["a program", { packages: ["ffmpeg"] }, ["系统程序 ffmpeg"]],
+  ["a higher memory cap", { limits: { virtualMemoryMb: 4096 } }, ["内存地址空间上限 4096 MB"]],
   ["a tool for modules", { tools: [{ name: "price", description: "p", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] } }] }, ["供其他模块调用 price"]],
 ] as const)("added capabilities: %s", (_, part, added) => {
   expect(addedCapabilities(manifest(), manifest(part))).toEqual([...added]);
+});
+test("a memory cap is bounded, and keeping the same cap adds nothing", () => {
+  expect(moduleManifestSchema.safeParse({ name: "prices", entry: "index.ts", tests: ["test.ts"], limits: { virtualMemoryMb: 16384 } }).success).toBe(false);
+  expect(addedCapabilities(manifest({ limits: { virtualMemoryMb: 4096 } }), manifest({ limits: { virtualMemoryMb: 4096 } }))).toEqual([]);
 });
 
 /** One module with an active version and a candidate; the level comes only from these facts. */

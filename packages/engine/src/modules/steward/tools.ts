@@ -21,6 +21,7 @@ import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { BUILD_MODULE_TOOLS } from "./module-reference";
 import { REFLECT_TOOLS } from "./reflection";
+import { MEMORY_TOOLS, memoryProvider } from "./memory";
 
 type ToolName = keyof typeof schemas;
 type Claim = Awaited<ReturnType<typeof authenticateRun>> & { index: number };
@@ -174,7 +175,9 @@ export function createTools(ports: StewardPorts) {
     const { run, session } = await authenticateRun(db, token, now());
     if (session?.source === "build") return [{ name: "chrona_reply", inputSchema: z.toJSONSchema(schemas.chrona_reply) }, ...(await moduleToolCatalog(ports, run)).filter(tool => BUILD_TOOLS.includes(tool.name))];
     if (session?.source === "reflect") return (await moduleToolCatalog(ports, run)).filter(tool => REFLECT_TOOLS.includes(tool.name));
-    // request-group only means something inside a build conversation (v2-15), suggest inside a reflection (v2-19).
-    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...(await moduleToolCatalog(ports, run)).filter(tool => tool.name !== "m_modules_request_group" && !REFLECT_TOOLS.includes(tool.name))];
+    // request-group only means something inside a build conversation (v2-15), suggest inside a reflection (v2-19),
+    // memory once there is a provider (v2-21).
+    const hidden = [...REFLECT_TOOLS, ...(await memoryProvider(ports, run.workspaceId) ? [] : MEMORY_TOOLS)];
+    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...(await moduleToolCatalog(ports, run)).filter(tool => tool.name !== "m_modules_request_group" && !hidden.includes(tool.name))];
   }, call };
 }

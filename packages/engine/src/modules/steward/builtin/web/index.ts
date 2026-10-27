@@ -108,6 +108,9 @@ async function api(request: Request, path: string[]) {
     "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
     // v2-20: Chrona's own modules, read-only; with ?module=, also the conversations it works in.
+    // v2-21: the user's own memory search and deletion, through the memory system module.
+    "GET /memory": () => call(url.searchParams.get("query") ? "memory.recall" : "memory.status", url.searchParams.get("query") ? { query: url.searchParams.get("query") } : {}),
+    "POST /memory/forget": () => call("memory.forget", { id: body.id }),
     "GET /system-apps": () => call("modules.system", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}) }),
     "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined }),
     "POST /call": () => moduleCall(body),

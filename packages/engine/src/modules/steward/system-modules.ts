@@ -24,6 +24,7 @@ import { parseInput } from "./errors";
 import { createSecrets } from "./secrets";
 import { listActivity } from "./activity";
 import { reflection } from "./reflection";
+import { memory } from "./memory";
 import { systemApps } from "./system-apps";
 import { audit } from "./audit";
 import { addedCapabilities } from "./approval-level";
@@ -542,4 +543,5 @@ export function registerSystemModules() {
   registerSystemModule(secrets);
   registerSystemModule(activity);
   registerSystemModule(reflection);
+  registerSystemModule(memory);
 }

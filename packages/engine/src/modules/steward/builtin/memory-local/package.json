@@ -1,0 +1,5 @@
+{
+  "name": "memory-local",
+  "private": true,
+  "dependencies": { "@oh-my-pi/pi-mnemopi": "18.13.1" }
+}

@@ -14,6 +14,7 @@ import { announceApprovals, moveLegacyNotifications } from "./notify-user";
 import { reviewApprovals, reviewsSettled } from "./approval-review";
 import { weeklyHabits } from "./approval-habits";
 import { REFLECT_TOOLS, startReflection } from "./reflection";
+import { autoRetain, memoryInput } from "./memory";
 import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
@@ -77,7 +78,9 @@ export function createTick(ports: StewardPorts) {
         const agenda = await ports.db.schedule.findMany({ where: { workspaceId, originSessionId: run.sessionId, status: "active" }, take: 50 });
         const contextMessages = messages.map(m => ({ ...m, attachments: storedAttachments(m.attachments) }));
         const inbound = await runInbound(ports, workspaceId, run, messages);
-        const catalog = (await moduleToolCatalog(ports, run)).filter(tool => !REFLECT_TOOLS.includes(tool.name)), toolsets = moduleToolsets(catalog);
+        // v2-21: memory tools and instructions only with a provider; a conversation's first run gets what was recalled.
+        const memory = await memoryInput(ports, workspaceId, run.session, messages);
+        const catalog = (await moduleToolCatalog(ports, run)).filter(tool => !REFLECT_TOOLS.includes(tool.name) && !memory.hidden.includes(tool.name)), toolsets = moduleToolsets(catalog);
         const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name);
         const hostPaths = await focusedHostPaths(ports, workspaceId, run.session?.focus, now);
         // The only directory mounted into runs: the conversations' files, read-only (v2-8).
@@ -86,7 +89,7 @@ export function createTick(ports: StewardPorts) {
         // What Chrona is made of right now, so the model can change the module behind any behaviour without a hard-coded list.
         const { self, via } = await moduleContext(ports, workspaceId, now, inbound?.channel);
         const timezone = notificationSettings(workspace.settings).timezone;
-        const prompt = `${STEWARD_PROMPT}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
+        const prompt = `${STEWARD_PROMPT}${memory.text}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
         return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content };
       }
       async function launch() {
@@ -108,7 +111,9 @@ export function createTick(ports: StewardPorts) {
               handle = ports.provider.start({ runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId, prompt, images: chatImages(inbound?.attachments ?? []), deadline: run.deadlineAt, events: channel.events, extraTools, searchTools, hostPaths, content });
             } catch (error) { await channel.close(); throw error; }
             gate.attach(handle);
-            void gate.handle.done.finally(async () => { await channel.close(); }).then(outcome => runs.finish(run.id, outcome), () => runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" })).catch(async () => {
+            void gate.handle.done.finally(async () => { await channel.close(); }).then(outcome => runs.finish(run.id, outcome), () => runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }))
+              // v2-21: what the conversation said since the last retain goes to memory (never throws).
+              .then(() => autoRetain(ports, workspaceId, run.sessionId)).catch(async () => {
               try { await audit(ports.db, { workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
             });
           } catch {

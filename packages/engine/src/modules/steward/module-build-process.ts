@@ -40,7 +40,7 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
       return buildCallResult(call, manifest, seen);
     } });
     const { contentDir, httpDir } = await createBuildDirs(data, dir, manifest);
-    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false });
+    process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false, ...(manifest.limits ? { memoryMb: manifest.limits.virtualMemoryMb } : {}) });
     const exited = process.exited.then(() => { throw new Error("Module process exited"); });
     void exited.catch(() => {});
     return await run(async event => {

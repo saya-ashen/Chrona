@@ -7,6 +7,7 @@ import type { StewardPorts } from "./ports";
 import { moduleContext } from "./module-context";
 import { proposeBuiltin } from "./module-proposal";
 import { buildPending } from "./module-build";
+import { memorySettings } from "./settings";
 
 /** Store copies keep the store's read-only modes; the private copy must be removable. */
 async function writable(dir: string) {
@@ -34,6 +35,12 @@ async function preserveCustomization(ports: StewardPorts, workspaceId: string, n
   });
 }
 /** Release resources, never Provider-controlled directories. Repeated starts are idempotent. */
+// v2-21: the built-in memory provider is downloaded (its packages) only once the owner chooses it.
+const OPTIONAL = ["memory-local"];
+async function notChosen(ports: StewardPorts, workspaceId: string) {
+  const chosen = memorySettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).provider;
+  return (name: string) => OPTIONAL.includes(name) && chosen !== name;
+}
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
@@ -43,7 +50,9 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
     await cp(resolve(ports.moduleBuiltinResources), root, { recursive: true });
     await writable(root);
     const entries = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory() && !entry.isSymbolicLink());
+    const skipped = await notChosen(ports, workspaceId);
     for (const entry of entries) {
+      if (skipped(entry.name)) continue;
       if (await preserveCustomization(ports, workspaceId, entry.name)) continue;
       const result = await proposeBuiltin(context, root, entry.name);
       if (result.status === "rejected") throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);

@@ -163,6 +163,8 @@ export const moduleManifestSchema = z.object({
   model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
+  /** v2-21: a higher address-space cap (ulimit -v) than the default, for runtimes that reserve much more than they use; shown on the approval. */
+  limits: z.object({ virtualMemoryMb: z.number().int().min(1024).max(8192) }).strict().optional(),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
   tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
 }).strict().superRefine((manifest, ctx) => {
@@ -265,7 +267,7 @@ export function grantedUses(manifest: { effects: readonly string[]; uses?: reado
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "reflection"] as const;
+export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "reflection", "memory"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [
@@ -412,9 +414,12 @@ export const buildSettingsSchema = z.object({
 }).strict();
 /** v2-19: whether Chrona reflects on what changed and starts builds on its own (default on). */
 export const reflectionSettingsSchema = z.object({ enabled: z.boolean() }).strict();
+/** v2-21: which module provides memory (null: none), and whether conversations recall at their start and retain as they go. */
+export const memorySettingsSchema = z.object({ provider: slug.nullable(), autoRecall: z.boolean(), autoRetain: z.boolean() }).strict();
 export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
   reflection: reflectionSettingsSchema,
+  memory: memorySettingsSchema,
   builds: buildSettingsSchema,
   buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
   /** v2-17: today's module model calls (local day), per module. */
@@ -455,7 +460,7 @@ export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]),
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), reflection: reflectionSettingsSchema.optional() }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), reflection: reflectionSettingsSchema.optional(), memory: memorySettingsSchema.partial().optional() }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**

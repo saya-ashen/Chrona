@@ -53,6 +53,24 @@ sandboxTest("trusted author-test memory overrides stay bounded and do not change
     await expect(sandbox.runModule({ codeDir, dataDir, entry: "test.sh", input: {}, memoryMb: 0 })).rejects.toThrow("Invalid sandbox limit");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+// v2-21: a module's manifest may raise its own address-space cap; the default stays for everyone else.
+sandboxTest("a long-running module gets the memory cap it declared", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-start-memory-"));
+  const channel = await createModuleChannel(join(root, "s"), { onCall: async call => ({ id: call.id, result: { output: null } }) });
+  const lines: string[] = [];
+  const write = spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write);
+  let handle: ReturnType<typeof sandbox.startModule> | undefined;
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data");
+    await mkdir(codeDir); await mkdir(dataDir);
+    await writeFile(join(codeDir, "index.sh"), "ulimit -v >&2");
+    handle = createScriptSandbox({ dataDir: root }).startModule({ codeDir, dataDir, entry: "index.sh", socketPath: join(root, "s"), memoryMb: 4096 });
+    expect(await handle.exited).toEqual({ code: 0, signal: null });
+    expect(handle.limits).toEqual({ virtualMemoryMb: 4096 });
+    expect(lines.join("")).toContain("4194304");
+    expect(() => createScriptSandbox({ dataDir: root }).startModule({ codeDir, dataDir, entry: "index.sh", socketPath: join(root, "s"), memoryMb: 0 })).toThrow("Invalid sandbox limit");
+  } finally { write.mockRestore(); handle?.kill(); await channel.close(); await rm(root, { recursive: true, force: true }); }
+});
 sandboxTest("long-running SDK module exchanges events and calls, stays isolated, and can be killed", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-module-channel-"));
   const codeDir = join(root, "code"), dataDir = join(root, "data"), secret = join(root, "secret");
