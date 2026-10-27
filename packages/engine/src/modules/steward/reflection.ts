@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
 import { isEntryModule, moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
@@ -7,7 +9,7 @@ import { createRuns, createRunSession } from "./runs";
 import { startBuild } from "./module-build-session";
 import { moduleIncidents } from "./module-diagnostics";
 import { notifyUser } from "./notify-user";
-import { CallError, type Caller } from "./module-calls";
+import { CallError, type Caller, type Json, type SystemModule } from "./module-calls";
 
 /**
  * v2-19: when something worth a look changed (an app went live or updated, an app failed), Chrona reflects once in a
@@ -23,6 +25,7 @@ Decide whether an app clearly needs an improvement the user would want. Doing no
 Judgments:
 - Page for an app: a non-entry app went live or changed meaningfully, its state or actions are something the user would want to see or operate, and the web app shows no page for it (check web's description and each app's contributes). Suggest one build with modules ["web"] (add the app itself only if it must expose something new), goal describing the page.
 - Repeated failures: one app failed several times recently with a clear cause. Suggest a fix build of that app; put the error evidence in the goal.
+- Recent builds show what was already built or tried (goal, what the build reported, outcome): do not start one that a live, building or waiting build already covers; a build that expired or was rejected may be retried only if the facts clearly changed.
 - Never repeat a key listed in suggestions within 30 days; if the user rejected a similar change, do not suggest it again unless the facts clearly changed.
 Each suggestion is m_reflection_suggest {key: "<kind>:<module>", title (Chinese, short), why (Chinese, one or two sentences for the user), build: {name|modules, goal, examples, intent:{changes, preserves}}}. The goal must be self-contained (the build cannot read this prompt). Starting a build changes nothing by itself: its result is levelled and reviewed; only low-risk results go live without the user.
 When done, stop. Do not write a reply.`;
@@ -65,8 +68,8 @@ async function activeModules(ports: StewardPorts, workspaceId: string, now: Date
   }
   return out;
 }
-/** What became of a suggestion's build: still building, live, waiting for or rejected by the user, or ended without a version. */
-async function outcome(db: Db, workspaceId: string, item: Suggested, at: Date) {
+/** What became of a build: still building, live, waiting for or rejected by the user, expired, or ended without a version. */
+async function outcome(db: Db, workspaceId: string, item: { sessionId: string }, at: Date) {
   if (await db.run.count({ where: { workspaceId, sessionId: item.sessionId, status: { in: ["queued", "running"] } } })) return "building";
   const submissions = (await db.audit.findMany({ where: { workspaceId, kind: "module_submission", createdAt: { gte: at } }, select: { subjectId: true, details: true } }))
     .filter(row => (row.details as { sessionId?: unknown } | null)?.sessionId === item.sessionId);
@@ -77,6 +80,18 @@ async function outcome(db: Db, workspaceId: string, item: Suggested, at: Date) {
   const approvals = (await db.approval.findMany({ where: { workspaceId, action: "activate_module", createdAt: { gte: at } }, orderBy: { createdAt: "desc" }, select: { status: true, payload: true } }))
     .filter(row => hashes.some(hash => JSON.stringify(row.payload).includes(hash)));
   return approvals[0] ? ({ open: "waiting_for_user", denied: "rejected_by_user" } as Record<string, string>)[approvals[0].status] ?? approvals[0].status : "not_activated";
+}
+/** The last 60 days of builds, whoever asked: so a reflection knows what pages and fixes already exist or were tried. */
+async function recentBuilds(ports: StewardPorts, workspaceId: string, now: Date) {
+  const { db } = ports;
+  const sessions = await db.session.findMany({ where: { workspaceId, source: "build", createdAt: { gte: new Date(now.getTime() - 60 * 24 * HOUR) } }, orderBy: { createdAt: "desc" }, take: 30 });
+  return Promise.all(sessions.map(async session => {
+    // The request the build was given (module-build-session writes it into the build's directory).
+    const request = await readFile(join(ports.dataDir, "sessions", session.id, "request.json"), "utf8").then(text => JSON.parse(text) as { name?: string; modules?: string[]; goal?: string }, () => null);
+    const report = await db.message.findFirst({ where: { workspaceId, sessionId: session.id, direction: "out" }, orderBy: [{ at: "desc" }, { id: "desc" }], select: { text: true } });
+    return { at: session.createdAt.toISOString(), modules: request?.modules ?? (request?.name ? [request.name] : []), goal: request?.goal?.slice(0, 400) ?? session.title,
+      report: report?.text.slice(0, 400) ?? null, outcome: await outcome(db, workspaceId, { sessionId: session.id }, session.createdAt) };
+  }));
 }
 async function suggestions(db: Db, workspaceId: string, now: Date, days: number) {
   const rows = await db.audit.findMany({ where: { workspaceId, kind: "reflection_suggested", createdAt: { gte: new Date(now.getTime() - days * 24 * HOUR) } }, orderBy: { createdAt: "desc" }, take: 50 });
@@ -98,7 +113,7 @@ export async function startReflection(ports: StewardPorts, workspaceId: string) 
   const signals = await signalsSince(db, workspaceId, last?.createdAt ?? new Date(now.getTime() - 7 * 24 * HOUR), names);
   if (!signals.length) return null;
   const past = await Promise.all((await suggestions(db, workspaceId, now, 60)).map(async ({ row, item }) => ({ key: item.key, title: item.title, at: row.createdAt.toISOString(), outcome: await outcome(db, workspaceId, item, row.createdAt) })));
-  const facts = { now: now.toISOString(), signals, modules: modules.map(({ id: _id, ...module }) => module), suggestions: past };
+  const facts = { now: now.toISOString(), signals, modules: modules.map(({ id: _id, ...module }) => module), builds: await recentBuilds(ports, workspaceId, now), suggestions: past };
   return db.$transaction(async tx => {
     const session = await createRunSession(tx, workspaceId, "reflect", now);
     await tx.session.update({ where: { id: session.id }, data: { title: "Chrona 反思" } });
@@ -127,3 +142,15 @@ export async function suggest(ports: StewardPorts, workspaceId: string, caller: 
     body: `${input.why}\n构建出的版本照常分级：低风险经复核后自动上线，其余会请你批准。不需要的话，可以在网页上停止这次构建。` });
   return { key: input.key, ...build };
 }
+
+/** `reflection` (v2-19): the one tool a reflection conversation has; every other caller is refused by the handler. */
+export const reflection: SystemModule = {
+  name: "reflection",
+  description: "反思：应用上线或出错且无法自动恢复时，Chrona 判断是否需要改进并开始构建；构建结果照常分级。",
+  sessions: "reflect",
+  tools: [{ name: "suggest", description: reflectionSuggestSchema.description!, parameters: { type: "object", properties: {}, required: [] }, visibility: ["provider"], idempotent: false, input: reflectionSuggestSchema }],
+  async handle({ ports, workspaceId, caller }, name, args) {
+    if (name !== "suggest") throw new CallError("not_found", `reflection.${name} not found`);
+    return JSON.parse(JSON.stringify(await suggest(ports, workspaceId, caller, args))) as Json;
+  },
+};

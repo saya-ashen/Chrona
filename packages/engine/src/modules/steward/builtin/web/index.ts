@@ -107,6 +107,8 @@ async function api(request: Request, path: string[]) {
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
+    // v2-20: Chrona's own modules, read-only; with ?module=, also the conversations it works in.
+    "GET /system-apps": () => call("modules.system", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}) }),
     "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined }),
     "POST /call": () => moduleCall(body),
   };

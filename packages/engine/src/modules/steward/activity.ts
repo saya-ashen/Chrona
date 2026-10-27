@@ -14,7 +14,8 @@ const SIGNALS: Record<string, string> = { module_activate: "上线", module_auto
 const short = (hash: unknown) => typeof hash === "string" ? hash.slice(0, 8) : "?";
 type Row = { id: string; kind: string; subjectId: string | null; actorKey: string; details: unknown; createdAt: Date };
 type Names = { modules: Map<string, string>; versions: Map<string, { module: string; hash: string }>; approvals: Map<string, { title: string; level: string; module: string | null }> };
-export type Activity = { id: string; at: string; kind: string; module: string | null; text: string };
+/** `session` (v2-20): the conversation whose process this line is about (a reflection, or the build it started). */
+export type Activity = { id: string; at: string; kind: string; module: string | null; text: string; session?: { id: string; source: "reflect" | "build" } };
 
 const REVIEWS: Record<string, string> = { passed: "通过", escalated: "提高了风险等级" };
 function decisionText(details: Record<string, unknown>, title: string) {
@@ -56,14 +57,16 @@ function otherText(row: Row, details: Record<string, unknown>) {
   if (row.kind === "secret_set" || row.kind === "secret_removed") return `你${row.kind === "secret_set" ? "设置" : "删除"}了凭据 ${String(details.name)}`;
   return `生成本周审批习惯建议（${Array.isArray(details.suggestions) ? details.suggestions.length : 0} 条）`;
 }
-/** v2-19: why Chrona reflected, and what it started building. */
+/** v2-19: why Chrona reflected, and what it started building; v2-20: the reflection app's lines, linked to their process. */
 function reflectionText(row: Row, details: Record<string, unknown>) {
+  const source = row.kind === "reflection_started" ? "reflect" as const : "build" as const;
+  const line = (text: string) => ({ module: "reflection", text, ...(row.subjectId ? { session: { id: row.subjectId, source } } : {}) });
   if (row.kind === "reflection_started") {
     const signals = Array.isArray(details.signals) ? details.signals as { kind?: unknown; module?: unknown }[] : [];
-    return { module: null, text: `Chrona 反思了一次（${signals.slice(0, 3).map(signal => `${String(signal.module)} ${SIGNALS[String(signal.kind)] ?? ""}`).join("、")}${signals.length > 3 ? " 等" : ""}）` };
+    return line(`Chrona 反思了一次（${signals.slice(0, 3).map(signal => `${String(signal.module)} ${SIGNALS[String(signal.kind)] ?? ""}`).join("、")}${signals.length > 3 ? " 等" : ""}）`);
   }
   const modules = Array.isArray(details.modules) ? details.modules.map(String) : [];
-  return { module: modules[0] ?? null, text: `Chrona 开始构建「${String(details.title)}」：${String(details.why)}` };
+  return line(`Chrona 开始构建「${String(details.title)}」（${modules.join("、")}）：${String(details.why)}`);
 }
 const otherLine = (row: Row, details: Record<string, unknown>) => row.kind.startsWith("reflection_") ? reflectionText(row, details) : { module: null, text: otherText(row, details) };
 function describe(row: Row, names: Names): Activity | null {

@@ -276,10 +276,36 @@ function diagnosticPanel(meta) {
   return h("section", { class: "diagnostics" }, h("h2", {}, "故障与恢复"), h("p", { class: "muted" }, "只读记录，不调用模型，不重放失败操作。"), refresh, body);
 }
 async function apps() {
-  const items = await web("/modules");
+  const [items, system] = await Promise.all([web("/modules"), web("/system-apps").catch(() => [])]);
   main.replaceChildren(h("section", {}, h("h2", {}, "应用"),
     h("ul", { class: "plain" }, items.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ",
-      h("span", { class: "muted" }, `${runtimeText(app)} · ${app.incident ? `${faultText(app.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))));
+      h("span", { class: "muted" }, `${runtimeText(app)} · ${app.incident ? `${faultText(app.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))),
+    // v2-20: Chrona's own modules: shown, never built, updated or paused.
+    system.length ? h("section", {}, h("h2", {}, "系统"), h("p", { class: "muted" }, "Chrona 自身的一部分，随 Chrona 版本更新，只能查看。"),
+      h("ul", { class: "plain" }, system.map(app => h("li", {}, h("a", { href: `/apps/system/${app.name}` }, app.name), " ", h("span", { class: "muted" }, app.description))))) : "");
+}
+async function systemApp(name, opened) {
+  const meta = await web(`/system-apps?module=${encodeURIComponent(name)}`);
+  let recent = [];
+  try { recent = (await web(`/activity?module=${encodeURIComponent(name)}`)).items; } catch { /* the rest still shows */ }
+  const who = tool => tool.callers ? `仅 ${tool.callers.join("、")}` : tool.visibility.includes("provider") ? "Chrona" : "声明了它的应用";
+  main.replaceChildren(
+    h("section", {}, h("h2", {}, `${meta.name} · 系统`), h("p", {}, meta.description), h("p", { class: "muted" }, "Chrona 自身的一部分：不能构建、更新或停用，随 Chrona 版本更新。")),
+    meta.sessions ? h("section", {}, h("h2", {}, "最近的工作"),
+      meta.work.length ? h("ul", { class: "plain" }, meta.work.map(session => h("li", { id: `session-${session.id}` }, when(session.createdAt), " · ", session.status === "active" ? "进行中" : "已结束", " ", transcript(session.id, session.id === opened))))
+        : h("p", { class: "muted" }, "还没有工作记录。")) : "",
+    recent.length ? h("section", {}, h("h2", {}, "活动"), h("ul", { class: "plain" }, recent.slice(0, 10).map(activityItem)),
+      h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(name)}` }, "查看全部活动"))) : "",
+    h("section", {}, h("h2", {}, "提供的工具"), h("ul", { class: "plain" }, meta.tools.map(tool => h("li", {}, h("code", {}, `${meta.name}.${tool.name}`), " ", h("span", { class: "muted" }, `${who(tool)}可调用 · ${tool.description}`))))));
+}
+// A line about a conversation links to its process: a build has its own page, other work opens in its system app.
+function processLink(item) {
+  if (!item.session) return null;
+  const href = item.session.source === "build" ? `/sessions/${item.session.id}` : `/apps/system/${encodeURIComponent(item.module)}?session=${encodeURIComponent(item.session.id)}`;
+  return h("span", {}, " · ", h("a", { href }, "查看过程"));
+}
+function activityItem(item) {
+  return h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.text, processLink(item));
 }
 // The generic app page: what Chrona recorded (versions, runs) and the tools the app offers the user.
 async function app(appId) {
@@ -317,7 +343,8 @@ async function activity(params) {
   const load = async () => {
     const query = new URLSearchParams({ ...(module ? { module } : {}), ...(before ? { before } : {}) });
     const page = await web(`/activity?${query}`);
-    items.append(...page.items.map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.module && !module ? h("a", { href: `/activity?module=${encodeURIComponent(item.module)}` }, item.module) : null, item.module && !module ? " · " : null, item.text)));
+    items.append(...page.items.map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.module && !module ? h("a", { href: `/activity?module=${encodeURIComponent(item.module)}` }, item.module) : null, item.module && !module ? " · " : null, item.text,
+      processLink(item))));
     before = page.before; more.hidden = !before;
     if (!items.children.length) items.replaceWith(h("p", { class: "muted" }, "还没有活动。"));
   };
@@ -541,6 +568,7 @@ async function route() {
     else if (parts[0] === "sessions" && parts[1]) await chat(parts[1]);
     else if (parts[0] === "files") await files(url.searchParams);
     else if (parts[0] === "settings") await settings();
+    else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemApp(decodeURIComponent(parts[2]), url.searchParams.get("session"));
     else if (parts[0] === "apps" && parts[1]) await app(parts[1]);
     else if (parts[0] === "apps") await apps();
     else if (parts[0] === "activity") await activity(url.searchParams);

@@ -12,6 +12,7 @@ import { notices } from "./test-notices";
 import { moduleSupervisor } from "./module-supervisor";
 import { REFLECT_PROMPT, startReflection } from "./reflection";
 import { listActivity } from "./activity";
+import { systemApps } from "./system-apps";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -75,15 +76,24 @@ test("an app going live starts one reflection that sees the facts, may only sugg
   expect(build.originSessionId).toBe(reflect.id);
   expect(reflect.status).toBe("ended");
   expect(await notices(f.db, { title: "Chrona 开始构建：为 okx-trader 加操作页" })).toHaveLength(1);
-  expect((await listActivity(f.ports, f.workspaceId, {})).items.map(item => item.text)).toEqual(expect.arrayContaining([
-    "Chrona 反思了一次（okx-trader 上线）", "Chrona 开始构建「为 okx-trader 加操作页」：它刚上线，web 里还没有它的页面。"]));
+  // v2-20: the reflection app's lines link to their process: the reflection itself, and the build it started.
+  expect((await listActivity(f.ports, f.workspaceId, { module: "reflection" })).items).toMatchObject([
+    { text: "Chrona 开始构建「为 okx-trader 加操作页」（okx-page）：它刚上线，web 里还没有它的页面。", session: { id: build.id, source: "build" } },
+    { text: "Chrona 反思了一次（okx-trader 上线）", session: { id: reflect.id, source: "reflect" } }]);
+  const app = await systemApps(f.ports, f.workspaceId, "reflection") as { sessions: string; tools: { name: string; callers: null }[]; work: { id: string; status: string }[] };
+  expect(app).toMatchObject({ sessions: "reflect", tools: [{ name: "suggest" }], work: [{ id: reflect.id, status: "ended" }] });
+  expect((await systemApps(f.ports, f.workspaceId) as { name: string; description: string }[]).every(item => item.description)).toBe(true);
   // Six hours apart, and only for a new signal.
   expect(await startReflection(f.ports, f.workspaceId)).toBeNull();
   f.advance(HOUR);
   await f.signal("module_runtime_incident");
   expect(await startReflection(f.ports, f.workspaceId)).toBeNull();
   f.advance(6 * HOUR);
-  expect(await startReflection(f.ports, f.workspaceId)).not.toBeNull();
+  // The next reflection sees what was built, whoever asked for it, and what it started before.
+  const next = await startReflection(f.ports, f.workspaceId);
+  expect(next?.prompt).toContain('"builds":[{');
+  expect(next?.prompt).toContain('"modules":["okx-page"],"goal":"A page that shows okx-trader.status"');
+  expect(next?.prompt).toContain('"suggestions":[{"key":"web-page:okx-trader"');
 });
 
 test("no reflection without a signal, when turned off, or for built-in and entry apps changing", async () => {

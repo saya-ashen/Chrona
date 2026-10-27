@@ -129,7 +129,7 @@ test("who may manage modules: the Provider in its own directory; the user may ch
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner sees diagnostics, check, rollback and build controls, never propose, checkout or build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // An ordinary module cannot reach them even if it lists them.
