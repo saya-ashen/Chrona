@@ -9,6 +9,7 @@ import { notifyUser } from "./notify-user";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
 import { tryAutoActivate } from "./module-auto";
+import { recordGroupReview } from "./module-group";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { readModuleFiles, codeDifference, continuityPreview, insertCodeDiff } from "./module-preview";
@@ -50,9 +51,9 @@ async function reviewPreview(context: ModuleContext, review: Review, active: Awa
   const prefix = reviewPrefix(manifest, report, diff);
   const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
-  let preview: string | null = null;
-  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, await codeDifference(store, module.activeHash, files), hash);
-  return { active, manifest, hash, preview };
+  let preview: string | null = null, codeDiff = "";
+  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = await codeDifference(store, module.activeHash, files), hash);
+  return { active, manifest, hash, preview, parts: { prefix, suffix, codeDiff } };
 }
 const SUPERSEDED = "Superseded by newer candidate ";
 const superseded = (report: unknown) => (report as BuildReport | null)?.errors?.[0]?.startsWith(SUPERSEDED) === true;
@@ -69,7 +70,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   // A custom version may have become active while the built-in candidate was testing.
   if (version.source === "builtin" && active && active.source !== "builtin") return { moduleId: module.id, hash, status: "pending_review", report };
-  const { manifest, preview } = await reviewPreview(context, review, active);
+  const { manifest, preview, parts } = await reviewPreview(context, review, active);
   if (preview === null) {
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected" } });
     return { moduleId: module.id, hash, status: "rejected", report };
@@ -78,6 +79,8 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   await supersedeCandidates(context, module.id, hash);
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`,
     detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
+  if (await recordGroupReview(context, version, { ...parts, detail: card.detail, needsMigration: review.needsMigration })) return { moduleId: module.id, hash, status: "pending_review", report };
   const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
   if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
   const approval = await createApprovals(context).create(card);

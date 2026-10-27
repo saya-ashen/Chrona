@@ -9,7 +9,7 @@ import { checkoutModule } from "./module-files";
 import { readModuleFiles } from "./module-preview";
 import { StewardError } from "./errors";
 
-export const BUILD_MODULE_TOOLS = ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference"];
+export const BUILD_MODULE_TOOLS = ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_request_group"];
 
 /** Appended at claim time, including continuations created before these tools existed. */
 export const BUILD_REFERENCE_PROMPT = `Development references: m_modules_reference is available in this build. Call it without target to discover interface names, then with {target:"<module>.<tool>"} for the exact input schema, admission rules and declared output schema/examples. This reads metadata only; it never executes the target or returns business data. A null outputSchema means undeclared: do not invent fields from an empty response. For a built-in app, m_modules_checkout {module,source:"builtin",dir:<fresh directory>} retrieves the reference shipped with this running release, even if customization kept it out of the version store. Compare it with a fresh default checkout of the active custom version; merge the requested feature, never replace customization. Built-in and stored hashes are distinct provenance, not approval. If a required reference is unavailable, report the exact target/file to the originating conversation for supplementation and manual continuation; do not expand permissions, fabricate a contract or start paid retries.`;

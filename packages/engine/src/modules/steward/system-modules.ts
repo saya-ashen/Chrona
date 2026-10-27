@@ -14,7 +14,8 @@ import { createPreferences } from "./preferences";
 import { createSchedules } from "./schedules";
 import { createNotificationsView, forwardSettings } from "./notify-user";
 import { admitted, CallError, registerSystemModule, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "./module-calls";
-import { controlBuild, requestFiles, startBuild } from "./module-build-session";
+import { controlBuild, declaredModules, requestFiles, startBuild } from "./module-build-session";
+import { requestGroup } from "./module-group";
 import { interfaceReference, checkoutBuiltinReference } from "./module-reference";
 import { moduleDiagnosticsOutputSchema, MODULE_DIAGNOSTICS_DOCUMENTATION, moduleDiagnosticsExamples } from "./module-diagnostics";
 import { buildQueue, buildQueueText } from "./build-queue";
@@ -160,7 +161,7 @@ const approvals: SystemModule = {
     const module = entry(caller), modules = createModules(ports, workspaceId);
     const service = createApprovals({ db: ports.db, workspaceId, now: ports.now }, async action => {
       const payload = action.payload;
-      if (payload && typeof payload === "object" && !Array.isArray(payload) && payload.kind === "activate_module") await modules.onApproved(action);
+      if (payload && typeof payload === "object" && !Array.isArray(payload) && (payload.kind === "activate_module" || payload.kind === "activate_modules")) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
     if (name === "list") return json(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"));
@@ -203,21 +204,29 @@ async function workspaceTool(ports: StewardPorts, workspaceId: string, caller: C
   const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId } });
   if (!run) throw new CallError("not_found", "Run not found");
   if (name === "checkout") return checkoutSource(ports, workspaceId, run.cwd, args);
-  if (name === "propose") {
-    const api = createModules(ports, workspaceId);
-    const submitted = await ports.db.audit.count({ where: { workspaceId, kind: "module_submission", actorKey: `provider:${run.id}` } });
-    // Snapshot at claim time: owner edits must not change an already running build's budget.
-    const claimed = run.lane === "build" ? await ports.db.audit.findFirst({ where: { workspaceId, kind: "run_claimed", subjectId: run.id } }) : null;
-    const snapshot = z.object({ builds: buildSettingsSchema }).safeParse(claimed?.details);
-    const limit = snapshot.success ? snapshot.data.builds.maxSubmissions : RUN_LIMITS.maxBuildSubmissionsPerRun;
-    if (submitted >= limit) throw new CallError("failed", "Submission limit for this run reached");
-    const input = args as z.output<typeof modulesToolInputSchemas.propose>;
-    const proposal = await api.propose({ dir: input.dir, intent: input.intent, root: run.cwd }, run.lane === "build" ? "build" : "provider");
-    // Who submitted (run, conversation): for reports now and for callbacks later.
-    await ports.db.audit.create({ data: { workspaceId, actorKey: `provider:${run.id}`, kind: "module_submission", subjectId: proposal.moduleId, details: { hash: proposal.hash, runId: run.id, sessionId: run.sessionId } } });
-    return proposal;
+  if (name === "request-group") {
+    if (run.lane !== "build") throw new CallError("forbidden", "Only a build conversation asks for a group approval");
+    return requestGroup(ports, workspaceId, run.sessionId, (args as z.output<(typeof modulesToolInputSchemas)["request-group"]>).versions);
   }
+  if (name === "propose") return proposeFromRun(ports, workspaceId, run, args);
   return startBuild(ports, workspaceId, run.id, args as z.output<typeof modulesToolInputSchemas.build>);
+}
+/** `modules.propose` from the calling run's directory, within its submission budget (and, for a build, its declared modules). */
+async function proposeFromRun(ports: StewardPorts, workspaceId: string, run: { id: string; lane: string; sessionId: string | null; cwd: string }, args: Record<string, unknown>) {
+  const api = createModules(ports, workspaceId);
+  const submitted = await ports.db.audit.count({ where: { workspaceId, kind: "module_submission", actorKey: `provider:${run.id}` } });
+  // Snapshot at claim time: owner edits must not change an already running build's budget.
+  const claimed = run.lane === "build" ? await ports.db.audit.findFirst({ where: { workspaceId, kind: "run_claimed", subjectId: run.id } }) : null;
+  const snapshot = z.object({ builds: buildSettingsSchema }).safeParse(claimed?.details);
+  // v2-15: a build submits only what it was asked to change; several modules get the budget once per module.
+  const declared = run.lane === "build" && run.sessionId ? await declaredModules(ports.db, workspaceId, run.sessionId) : null;
+  const limit = (snapshot.success ? snapshot.data.builds.maxSubmissions : RUN_LIMITS.maxBuildSubmissionsPerRun) * (declared?.length ?? 1);
+  if (submitted >= limit) throw new CallError("failed", "Submission limit for this run reached");
+  const input = args as z.output<typeof modulesToolInputSchemas.propose>;
+  const proposal = await api.propose({ dir: input.dir, intent: input.intent, root: run.cwd, ...(declared ? { allowed: declared } : {}) }, run.lane === "build" ? "build" : "provider");
+  // Who submitted (run, conversation): for reports now and for callbacks later.
+  await ports.db.audit.create({ data: { workspaceId, actorKey: `provider:${run.id}`, kind: "module_submission", subjectId: proposal.moduleId, details: { hash: proposal.hash, runId: run.id, sessionId: run.sessionId } } });
+  return proposal;
 }
 /** `modules.contributions` (v2-14): what active modules declared for the calling module, in `contributes.<its name>`. */
 async function contributions(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>, section: string) {
@@ -281,6 +290,7 @@ const modules: SystemModule = {
     tool("propose", modulesToolInputSchemas.propose.description!, {}, [], provider(modulesToolInputSchemas.propose)),
     tool("rollback", modulesToolInputSchemas.rollback.description!, {}, [], provider(modulesToolInputSchemas.rollback, { visibility: ["provider", "owner"] })),
     tool("build", modulesToolInputSchemas.build.description!, {}, [], provider(modulesToolInputSchemas.build)),
+    tool("request-group", modulesToolInputSchemas["request-group"].description!, {}, [], provider(modulesToolInputSchemas["request-group"])),
     ...(["stop-build", "revise-build"] as const).map(name => tool(name, modulesToolInputSchemas[name].description!, {}, [], provider(modulesToolInputSchemas[name], { visibility: ["provider", "owner"], callers: ["web", "mcp"] }))),
   ],
   async handle({ ports, workspaceId, caller, deadline }, name, args) {
@@ -294,7 +304,7 @@ const modules: SystemModule = {
     if (["stop-build", "revise-build"].includes(name)) return json(await buildControl(ports, workspaceId, caller, name, args));
     if (name === "check") return json(await checkVersion(ports, workspaceId, args as z.output<typeof modulesToolInputSchemas.check>, deadline));
     if (name === "rollback") return json(await api.rollback((await moduleNamed(ports.db, workspaceId, args.module)).id, String(args.hash)));
-    if (["checkout", "propose", "build"].includes(name)) return json(await workspaceTool(ports, workspaceId, caller, name, args));
+    if (["checkout", "propose", "build", "request-group"].includes(name)) return json(await workspaceTool(ports, workspaceId, caller, name, args));
     if (caller.kind !== "module") throw new CallError("forbidden", "Only a module may call this");
     if (name === "contributions") return json(await contributions(ports, workspaceId, caller, String(args.section)));
     if (name !== "tools") throw new CallError("not_found", `modules.${name} not found`);

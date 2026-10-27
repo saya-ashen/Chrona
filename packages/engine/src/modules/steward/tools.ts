@@ -167,6 +167,7 @@ export function createTools(ports: StewardPorts) {
   return { catalog: async (token: string) => {
     const { run, session } = await authenticateRun(db, token, now());
     if (session?.source === "build") return [{ name: "chrona_reply", inputSchema: z.toJSONSchema(schemas.chrona_reply) }, ...(await moduleToolCatalog(ports, run)).filter(tool => BUILD_TOOLS.includes(tool.name))];
-    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...await moduleToolCatalog(ports, run)];
+    // request-group only means something inside a build conversation (v2-15).
+    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...(await moduleToolCatalog(ports, run)).filter(tool => tool.name !== "m_modules_request_group")];
   }, call };
 }

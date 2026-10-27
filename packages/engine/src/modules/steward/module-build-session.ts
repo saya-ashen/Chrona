@@ -32,6 +32,15 @@ Call keys are idempotency keys: derive them from the triggering event (ev.item.e
 Tests import { startModule, paths } from "chrona/testing", start the entry with startModule("index.ts"), send events shaped as { trigger: { kind, id, firedAt, ... }, now, params }, inspect replies and calls, and always stop the module in finally. Tests must not use the network: Chrona runs them offline, even for network-capable modules; use fixtures/stubs. Read node_modules/chrona/sdk.ts and node_modules/chrona/testing.ts for the exact API. chrona/run-tests.sh runs every module.json test with bun in the module directory against these same helpers. For a module that serves pages (listen), run bun --no-install node_modules/chrona/preview.ts <moduledir> [fixtures.json] in the background: it serves the module on the http://127.0.0.1 URL it prints, answering routed calls from fixtures.json ({ "<module>.<tool>": output }). If you have browser_screenshot, look at its pages at 1440x900, 1024x768 and 390x844 and fix what looks wrong before submitting; stop the preview when done. This local runner is not a security sandbox; Chrona also validates capabilities, trial-starts handlers, checks event-derived keys, and checks data migration/continuity before review. Module format:\n`;
 
 type Request = z.output<typeof modulesToolInputSchemas.build>;
+/** The modules a build request covers (v2-15: `modules`, else the one `name`). */
+const requestModules = (request: Request) => request.modules ?? [request.name!];
+/** What the build conversation was asked to change, recorded by the kernel when it was admitted (never read from its directory). */
+export async function declaredModules(db: StewardPorts["db"], workspaceId: string, sessionId: string): Promise<string[] | null> {
+  const row = await db.audit.findFirst({ where: { workspaceId, kind: "build_request", subjectId: sessionId } });
+  const details = z.object({ name: z.string(), modules: z.array(z.string()).optional() }).safeParse(row?.details);
+  return details.success ? details.data.modules ?? [details.data.name] : null;
+}
+const GROUP_PROMPT = `This build covers several modules (request.json modules), activated together after one approval. Write each in its own subdirectory named after it; current/<module>/ holds each existing module's active version when the request was queued. When one module calls another with new arguments, change the callee's tool definition and its tests in the same build. Submit each with m_modules_propose and check it; when every declared module has a passing candidate (pending_review), call m_modules_request_group {versions: [{module, hash}, ...]} once and report its approval. Modules not declared cannot be submitted from this build.\n`;
 
 type ReferenceFile = { name: string; bytes: Uint8Array };
 /** Resolve every required reference before admitting a new build; never silently omit one. */
@@ -57,10 +66,12 @@ async function prepareBuild(ports: StewardPorts, workspaceId: string, cwd: strin
   await writeBuildHelpers(cwd, ports.moduleSdk!);
   const visible = { ...request, files: await copyRequestFiles(cwd, refs) };
   await writeFile(join(cwd, "request.json"), JSON.stringify(visible, null, 2));
-  const module = await ports.db.module.findFirst({ where: { workspaceId, name: request.name } });
-  if (module?.activeHash) {
+  const names = requestModules(request);
+  for (const name of names) {
+    const module = await ports.db.module.findFirst({ where: { workspaceId, name } });
+    if (!module?.activeHash) continue;
     for (const file of await readModuleFiles(join(ports.dataDir, "platform", "store", module.activeHash), "Unsafe module store file")) {
-      const target = join(cwd, "current", file.path);
+      const target = join(cwd, "current", ...(names.length > 1 ? [name] : []), file.path);
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, file.bytes);
     }
@@ -69,7 +80,7 @@ async function prepareBuild(ports: StewardPorts, workspaceId: string, cwd: strin
   const ui = (await ports.db.preference.findMany({ where: { workspaceId, topic: "ui" }, orderBy: { createdAt: "asc" }, select: { text: true } })).map(row => row.text);
   const modelSettings = moduleModelSettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
   const tiers = modelSettings ? `${JSON.stringify(modelSettings.models)} (limits: maxCalls <= ${modelSettings.maxCallsPerEvent}, maxOutputTokens <= ${modelSettings.maxOutputTokens})` : "none (the model effect is unavailable)";
-  return `${BUILD_PROMPT.replace("${BACKEND}", backend)}${modulesToolInputSchemas.propose.description}\nConfigured model tiers: ${tiers}\nmodule.json JSON Schema:\n${MANIFEST_SCHEMA}\n\nRequest (data):\n${JSON.stringify(visible)}${ui.length ? `\nThe owner's page preferences (data; follow them for anything the user sees):\n${JSON.stringify(ui)}` : ""}`;
+  return `${BUILD_PROMPT.replace("${BACKEND}", backend)}${names.length > 1 ? GROUP_PROMPT : ""}${modulesToolInputSchemas.propose.description}\nConfigured model tiers: ${tiers}\nmodule.json JSON Schema:\n${MANIFEST_SCHEMA}\n\nRequest (data):\n${JSON.stringify(visible)}${ui.length ? `\nThe owner's page preferences (data; follow them for anything the user sees):\n${JSON.stringify(ui)}` : ""}`;
 }
 
 /**
@@ -94,9 +105,10 @@ async function start(ports: StewardPorts, workspaceId: string, runId: string, re
     const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
     if (!(await buildUsage(tx, workspaceId, settings, now)).remaining) throw new StewardError("conflict", "Daily module build budget reached; change the limit in Settings > Builds");
     const created = await createRunSession(tx, workspaceId, "build", now, { originSessionId: run.session!.id });
-    const receipt = { subjectId: created.id, details: { originSessionId: run.session!.id, name: request.name } };
+    const names = requestModules(request);
+    const receipt = { subjectId: created.id, details: { originSessionId: run.session!.id, name: names[0]!, ...(request.modules ? { modules: names } : {}) } };
     await tx.audit.upsert({ where: { id: requestKey }, update: receipt, create: { ...receipt, id: requestKey, workspaceId, actorKey: `provider:${runId}`, kind: "build_request" } });
-    return tx.session.update({ where: { id: created.id }, data: { title: `构建模块 ${request.name}` } });
+    return tx.session.update({ where: { id: created.id }, data: { title: `构建模块 ${names.join("、")}` } });
   });
   try {
     const cwd = join(ports.dataDir, "sessions", session.id);

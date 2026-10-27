@@ -68,13 +68,17 @@ async function writeStaging(staging: string, files: { path: string; bytes: Uint8
     await writeFile(target, file.bytes, { mode: 0o444 });
   }
 }
-async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[]): Promise<Proposal & { retained?: boolean }> {
+function assertDeclared(name: string, allowed?: string[]) {
+  if (allowed && !allowed.includes(name)) throw new StewardError("forbidden", `This build may submit only ${allowed.join(", ")}`);
+}
+async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[], allowed?: string[]): Promise<Proposal & { retained?: boolean }> {
   const { db } = context, { hash, report, versionId } = submission;
   await writeStaging(staging, files);
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
   if (manifest.name === "rescue") throw new StewardError("forbidden", "The rescue console is immutable");
+  assertDeclared(manifest.name, allowed);
   const module = await proposedModule(context, manifest, submission.source);
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
@@ -88,7 +92,8 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   return { moduleId: module.id, hash, status: "building", report, retained: true };
 }
 /** Proposals are read only from an explicitly supplied build or session directory. */
-export async function propose(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string }, source: ModuleSource): Promise<Proposal> {
+/** `allowed`: a build conversation submits only the modules it was asked to change (v2-15). */
+export async function propose(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[] }, source: ModuleSource): Promise<Proposal> {
   if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
   return submitProposal(context, input, source);
 }
@@ -96,7 +101,7 @@ export async function propose(context: ModuleContext, input: { dir: string; inte
 export async function proposeBuiltin(context: ModuleContext, root: string, dir: string) {
   return submitProposal(context, { root, dir, intent: { changes: ["Chrona built-in release"], preserves: [] } }, "builtin");
 }
-async function submitProposal(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string }, source: ModuleSource | "builtin"): Promise<Proposal> {
+async function submitProposal(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[] }, source: ModuleSource | "builtin"): Promise<Proposal> {
   const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
   const files = await snapshotModule(input.root, input.dir);
@@ -107,7 +112,7 @@ async function submitProposal(context: ModuleContext, input: { dir: string; inte
   let retained = false;
   await mkdir(staging, { recursive: true });
   try {
-    const result = await submitStaging(context, { hash, report, versionId, intent, source }, staging, files);
+    const result = await submitStaging(context, { hash, report, versionId, intent, source }, staging, files, input.allowed);
     retained = result.retained ?? false;
     const { retained: _retained, ...proposal } = result;
     return proposal;

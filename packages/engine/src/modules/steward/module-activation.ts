@@ -5,10 +5,11 @@ import { createApprovals } from "./approvals";
 import type { ApprovedAction } from "./ports";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { StewardError } from "./errors";
-import { assertBuiltinUpgrade, expireModuleApprovals, requireModule, type ModuleContext } from "./module-context";
+import { assertBuiltinUpgrade, expireModuleApprovals, isGroupPayload, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
+import { activateGroupIn } from "./module-group";
 
 type ActivationAction = Omit<ApprovedAction, "grantId"> & { grantId: string | null };
 
@@ -59,6 +60,7 @@ export async function activateApprovedIn(context: ModuleContext, tx: Prisma.Tran
   return prepareApproved(context, tx, action, { moduleId, hash, restore });
 }
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
+  if (isGroupPayload(action.payload)) { await context.db.$transaction(tx => activateGroupIn(context, tx, action)); return; }
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
   const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);

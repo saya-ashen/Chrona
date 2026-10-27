@@ -35,15 +35,23 @@ export async function announceApprovals(ports: StewardPorts, workspaceId: string
 }
 /**
  * Chat shows the decision, not the review: a module version keeps its capabilities and intended changes,
- * and the manifest/code diff, tests and hash stay on the page. Other approvals (e.g. data restores) keep their full text.
+ * and the manifest/code diff, tests and hash stay on the page. A group (v2-15) lists each module the same way.
+ * Other approvals (e.g. data restores) keep their full text.
  */
 export function approvalNoticeBody(row: { action: string; detail: string | null; preview: string | null }) {
-  const lines = row.preview?.split("\n") ?? [], diffAt = lines.findIndex(line => line.startsWith("--- active"));
-  if (row.action !== "activate_module" || diffAt < 0) return [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500);
+  const full = () => [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500);
+  if (row.action !== "activate_module" || !row.preview) return full();
+  const sections = row.preview.startsWith("【") ? row.preview.split(/\n\n(?=【[^】\n]+】\n)/) : [row.preview];
+  const summaries = sections.map(section => moduleSummary(section.split("\n")));
+  if (summaries.some(summary => summary === null)) return full();
+  return [row.detail, ...summaries, "完整差异、测试结果和 hash 请在网页「待你决定」中查看。"].filter(Boolean).join("\n\n").slice(0, 1500);
+}
+function moduleSummary(lines: string[]) {
+  const diffAt = lines.findIndex(line => line.startsWith("--- active"));
+  if (diffAt < 0) return null;
   let changes: string[] = [];
   try { changes = z.object({ changes: z.string().array() }).parse(JSON.parse(lines.find(line => line.startsWith("意图："))?.slice(3) ?? "")).changes; } catch { /* no readable intent: the page has it */ }
-  return [row.detail, lines.slice(0, diffAt).join("\n"), changes.length ? `改动：\n${changes.map(change => `• ${change}`).join("\n")}` : null, "完整差异、测试结果和 hash 请在网页「待你决定」中查看。"]
-    .filter(Boolean).join("\n\n").slice(0, 1500);
+  return [lines.slice(0, diffAt).join("\n"), changes.length ? `改动：\n${changes.map(change => `• ${change}`).join("\n")}` : null].filter(Boolean).join("\n");
 }
 /** Forwards the user's notification settings (kept in the workspace, where the page edits them) to the notify module. */
 export function forwardSettings(tx: Db, ports: StewardPorts, workspaceId: string, settings: NotificationSettings, at: Date) {

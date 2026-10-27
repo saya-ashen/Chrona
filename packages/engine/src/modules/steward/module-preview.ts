@@ -72,8 +72,8 @@ export function continuityPreview(continuity: ContinuityReport, needsMigration: 
   const effects = JSON.stringify(continuity.effects ?? []), effectLimit = 6000;
   return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n按当前数据新版本会产生的 effects：\n${effects.length > effectLimit ? effects.slice(0, effectLimit) + "\n…effects 过长，已截断；完整列表见构建报告" : effects}\n`;
 }
-export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string) {
-  const available = 20_000 - (prefix.length + suffix.length);
+export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string, limit = 20_000) {
+  const available = limit - (prefix.length + suffix.length);
   if (codeDiff.length <= available) return prefix + codeDiff + suffix;
   const marker = `…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${hash}`;
   // Leave mandatory review text intact, even when it leaves no room for the marker.

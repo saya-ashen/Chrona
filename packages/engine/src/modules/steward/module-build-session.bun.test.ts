@@ -16,6 +16,7 @@ import { notices } from "./test-notices";
 import { liveRuns } from "./runs";
 import { moduleSupervisor } from "./module-supervisor";
 import * as chatFiles from "./chat";
+import { approvalNoticeBody } from "./notify-user";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -93,8 +94,8 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
 
   let report: { status?: string; report?: unknown } = {};
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference"] });
-    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose", "m_modules_reference"]);
+    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_request_group"] });
+    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose", "m_modules_reference", "m_modules_request_group"]);
     await expect(call("chrona_schedule", {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(call("m_modules_build", request)).rejects.toMatchObject({ code: "forbidden" });
     await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
@@ -471,4 +472,71 @@ test("a build discovers its own contracts and release reference, merges a fixtur
   expect((await f.db.module.findUniqueOrThrow({ where: { id: web.id } })).activeHash).toBe(hash);
   expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: web.id, hash: submitted!.hash } } })).status).toBe("pending_review");
   expect(JSON.parse(await readFile(join(f.dataDir, "sessions", started.sessionId, "request.json"), "utf8")).files).toEqual([]);
+});
+
+/** v2-15: a build of two modules; the Provider submits both and asks for one approval. */
+async function groupBuild(f: Awaited<ReturnType<typeof fixture>>) {
+  const write = async (cwd: string, name: string) => {
+    await mkdir(join(cwd, name), { recursive: true });
+    await writeFile(join(cwd, name, "module.json"), JSON.stringify({ ...manifest, name }));
+    await writeFile(join(cwd, name, "index.ts"), 'import { on } from "chrona"; on("schedule", async () => ({}));');
+    await writeFile(join(cwd, name, "test.ts"), "process.exit(0)");
+  };
+  await expect(f.call("m_modules_build", { ...request, modules: ["mail-sort"] })).rejects.toMatchObject({ code: "invalid" });
+  const started = await f.call("m_modules_build", { goal: request.goal, intent, modules: ["mail-sort", "mail-tag"] }) as { sessionId: string };
+  expect(await f.db.session.findUniqueOrThrow({ where: { id: started.sessionId } })).toMatchObject({ title: "构建模块 mail-sort、mail-tag" });
+  let group: { approvalId?: string } = {};
+  const hashes: Record<string, string> = {};
+  f.onRun(async (input, call) => {
+    expect(input.prompt).toContain("m_modules_request_group");
+    await write(input.cwd, "other-app");
+    await expect(call("m_modules_propose", { dir: "other-app", intent })).rejects.toMatchObject({ code: "forbidden" });
+    for (const name of ["mail-sort", "mail-tag"]) {
+      await write(input.cwd, name);
+      hashes[name] = (await call("m_modules_propose", { dir: name, intent }) as { hash: string }).hash;
+    }
+    await createModules(f.ports, f.workspaceId).buildPending();
+    for (const name of ["mail-sort", "mail-tag"]) expect(await call("m_modules_check", { module: name, hash: hashes[name] })).toMatchObject({ status: "pending_review" });
+    // Neither waits on its own card: the group gets one.
+    expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
+    await expect(call("m_modules_request_group", { versions: [{ module: "mail-sort", hash: hashes["mail-sort"] }, { module: "other-app", hash: hashes["mail-sort"] }] })).rejects.toMatchObject({ code: "invalid" });
+    group = await call("m_modules_request_group", { versions: ["mail-sort", "mail-tag"].map(module => ({ module, hash: hashes[module] })) }) as typeof group;
+    await call("chrona_reply", { text: "两个模块待你一起批准" });
+  });
+  await f.step();
+  expect(await f.db.module.count({ where: { name: "other-app" } })).toBe(0);
+  const approval = await f.db.approval.findUniqueOrThrow({ where: { id: group.approvalId! } });
+  return { approval, hashes };
+}
+
+test("a build of several modules submits only those and asks for one approval that activates them together", async () => {
+  const f = await fixture(), { approval, hashes } = await groupBuild(f);
+  expect(approval).toMatchObject({ action: "activate_module", moduleId: null, status: "open", title: "一起启用模块 mail-sort、mail-tag" });
+  expect(approval.preview).toContain("【mail-sort】"); expect(approval.preview).toContain("【mail-tag】");
+  const body = approvalNoticeBody(approval);
+  expect(body).toContain("【mail-tag】"); expect(body).toContain("改动：\n• Sort shop mail without the model"); expect(body).not.toContain("--- active");
+  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "always" })).rejects.toMatchObject({ code: "invalid" });
+  const generations = await f.db.generation.count();
+  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  for (const name of ["mail-sort", "mail-tag"]) expect(await f.db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ activeHash: hashes[name], status: "active" });
+  expect(await f.db.generation.count()).toBe(generations + 1);
+});
+
+test("a group activates all or nothing, and a new candidate of a member expires the group approval", async () => {
+  const f = await fixture(), { approval, hashes } = await groupBuild(f);
+  const tag = await f.db.module.findFirstOrThrow({ where: { name: "mail-tag" } });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: tag.id, hash: hashes["mail-tag"]! } }, data: { status: "rejected" } });
+  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" })).rejects.toMatchObject({ code: "conflict" });
+  expect((await f.db.module.findMany({ where: { name: { in: ["mail-sort", "mail-tag"] } } })).map(row => row.activeHash)).toEqual([null, null]);
+});
+
+test("a new candidate of one member expires the group approval", async () => {
+  const f = await fixture(), { approval } = await groupBuild(f);
+  await mkdir(join(f.requester.cwd, "mail-tag"), { recursive: true });
+  await writeFile(join(f.requester.cwd, "mail-tag", "module.json"), JSON.stringify({ ...manifest, name: "mail-tag" }));
+  await writeFile(join(f.requester.cwd, "mail-tag", "index.ts"), 'import { on } from "chrona"; on("schedule", async () => ({ changed: true }));');
+  await writeFile(join(f.requester.cwd, "mail-tag", "test.ts"), "process.exit(0)");
+  await f.call("m_modules_propose", { dir: "mail-tag", intent });
+  await createModules(f.ports, f.workspaceId).buildPending();
+  expect((await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).status).toBe("expired");
 });

@@ -16,6 +16,9 @@ export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; ke
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };
 export type ModuleSource = "provider" | "user" | "build";
 export const json = (value: unknown) => value as Prisma.InputJsonValue;
+/** v2-15: one `activate_module` approval that activates a build's modules together (module-group). */
+export const groupPayloadSchema = z.object({ kind: z.literal("activate_modules"), versions: z.array(z.object({ moduleId: z.string(), hash: z.string() }).strict()).min(2).max(4) }).strict();
+export const isGroupPayload = (payload: unknown) => !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "activate_modules";
 export function moduleContext(ports: StewardPorts, workspaceId: string) {
   const platform = join(ports.dataDir, "platform");
   return { ports, workspaceId, db: ports.db, now: ports.now, platform, store: join(platform, "store") };
@@ -41,6 +44,9 @@ export async function assertBuiltinUpgrade(tx: Prisma.TransactionClient, workspa
 export async function expireModuleApprovals(context: ModuleContext, moduleId: string) {
   const { db, workspaceId, ports } = context;
   const open = await db.approval.findMany({ where: { workspaceId, action: "activate_module", status: "open" } });
-  const ids = open.filter(row => { const payload = row.payload; return payload && typeof payload === "object" && !Array.isArray(payload) && payload.moduleId === moduleId; }).map(row => row.id);
+  // v2-15: a group approval (versions[]) expires with any of its modules.
+  const covers = (payload: Prisma.JsonValue) => !!payload && typeof payload === "object" && !Array.isArray(payload)
+    && (payload.moduleId === moduleId || (Array.isArray(payload.versions) && payload.versions.some(entry => !!entry && typeof entry === "object" && !Array.isArray(entry) && entry.moduleId === moduleId)));
+  const ids = open.filter(row => covers(row.payload)).map(row => row.id);
   await db.approval.updateMany({ where: { id: { in: ids }, status: "open" }, data: { status: "expired", resolvedAt: ports.now() } });
 }

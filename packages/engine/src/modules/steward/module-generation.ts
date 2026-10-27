@@ -16,6 +16,20 @@ async function replaceModuleSchedules(tx: Prisma.TransactionClient, { workspaceI
   }
 }
 export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, reason: "activate" | "rollback") {
+  await switchActiveIn(context, tx, moduleId, hash);
+  const generation = await recordGeneration(context, tx, reason);
+  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash, generationId: generation.id } });
+  return generation;
+}
+/** One generation for the current active hashes; a group activation (v2-15) records it once after switching all its modules. */
+export async function recordGeneration(context: ModuleContext, tx: Prisma.TransactionClient, reason: "activate" | "rollback") {
+  const { workspaceId } = context;
+  const modules = await tx.module.findMany({ where: { workspaceId }, orderBy: { id: "asc" } });
+  const previous = await tx.generation.findFirst({ where: { workspaceId }, orderBy: { seq: "desc" } });
+  return tx.generation.create({ data: { workspaceId, seq: (previous?.seq ?? 0) + 1, modules: Object.fromEntries(modules.map(row => [row.id, row.activeHash])), reason, createdAt: context.ports.now() } });
+}
+/** Makes an approved version the active one (listen paths, schedules), without recording a generation. */
+export async function switchActiveIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
   const { workspaceId, ports } = context;
   await requireModule(context, tx, moduleId);
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
@@ -29,11 +43,6 @@ export async function activateIn(context: ModuleContext, tx: Prisma.TransactionC
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
   await replaceModuleSchedules(tx, { workspaceId, moduleId, manifest, now, zone });
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active" } });
-  const modules = await tx.module.findMany({ where: { workspaceId }, orderBy: { id: "asc" } });
-  const previous = await tx.generation.findFirst({ where: { workspaceId }, orderBy: { seq: "desc" } });
-  const generation = await tx.generation.create({ data: { workspaceId, seq: (previous?.seq ?? 0) + 1, modules: Object.fromEntries(modules.map(row => [row.id, row.activeHash])), reason, createdAt: now } });
-  await audit(tx, { workspaceId, actor: "chrona", kind: `module_${reason}`, subjectId: moduleId, details: { hash, generationId: generation.id } });
-  return generation;
 }
 export async function startMigration(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, schema: { from: number | null; to: number }) {
   const { from, to } = schema;

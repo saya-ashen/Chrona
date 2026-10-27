@@ -29,7 +29,7 @@ export function createStewardService(inputPorts: StewardPorts) {
     const modules = createModules(ports, workspaceId);
     const approvals = createApprovals(ctx, async action => {
       const payload = action.payload;
-      if (payload && typeof payload === "object" && !Array.isArray(payload) && payload.kind === "activate_module") await modules.onApproved(action);
+      if (payload && typeof payload === "object" && !Array.isArray(payload) && (payload.kind === "activate_module" || payload.kind === "activate_modules")) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
     const notifications = createNotificationsView(ports, workspaceId);
