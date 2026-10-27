@@ -13,6 +13,7 @@ import { chatFilesDir, chatImages, migrateConversationFiles } from "./chat";
 import { announceApprovals, moveLegacyNotifications } from "./notify-user";
 import { reviewApprovals, reviewsSettled } from "./approval-review";
 import { weeklyHabits } from "./approval-habits";
+import { REFLECT_TOOLS, startReflection } from "./reflection";
 import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
@@ -49,6 +50,13 @@ async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date
   }
   return { self, via };
 }
+/** Build (v2-13) and reflection (v2-19) runs: their whole instruction was written when they were queued; only their own tools. */
+function closedInput(run: ClaimedRun, sessionId: string | null) {
+  const base = { inbound: null, searchTools: false, sessionId, hostPaths: [], content: [] };
+  if (run.session?.source === "build") return { ...base, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, extraTools: BUILD_MODULE_TOOLS };
+  if (run.session?.source === "reflect") return { ...base, prompt: run.prompt, extraTools: REFLECT_TOOLS };
+  return null;
+}
 export function createTick(ports: StewardPorts) {
   const builds = new Map<string, Promise<void>>(), buildFailures = new Set<string>();
   function startBuild(workspaceId: string, now: Date) {
@@ -62,14 +70,14 @@ export function createTick(ports: StewardPorts) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
         const sessionId = run.session?.providerSessionId ?? null;
-        // A build conversation (v2-13): its whole instruction was written when it started; only the module tools it may use.
-        if (run.session?.source === "build") return { prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, inbound: null, extraTools: BUILD_MODULE_TOOLS, searchTools: false, sessionId, hostPaths: [], content: [] };
+        const closed = closedInput(run, sessionId);
+        if (closed) return closed;
         const messages = run.sessionId ? (await ports.db.message.findMany({ where: { workspaceId, sessionId: run.sessionId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 20 })).reverse() : [];
         const preferences = await ports.db.preference.findMany({ where: { workspaceId }, select: { text: true } });
         const agenda = await ports.db.schedule.findMany({ where: { workspaceId, originSessionId: run.sessionId, status: "active" }, take: 50 });
         const contextMessages = messages.map(m => ({ ...m, attachments: storedAttachments(m.attachments) }));
         const inbound = await runInbound(ports, workspaceId, run, messages);
-        const catalog = await moduleToolCatalog(ports, run), toolsets = moduleToolsets(catalog);
+        const catalog = (await moduleToolCatalog(ports, run)).filter(tool => !REFLECT_TOOLS.includes(tool.name)), toolsets = moduleToolsets(catalog);
         const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name);
         const hostPaths = await focusedHostPaths(ports, workspaceId, run.session?.focus, now);
         // The only directory mounted into runs: the conversations' files, read-only (v2-8).
@@ -116,6 +124,7 @@ export function createTick(ports: StewardPorts) {
         ["legacy-notifications", () => moveLegacyNotifications(ports, workspaceId)],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); await cancelLegacyBuilds(ports, workspaceId); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
+        ["reflect", () => startReflection(ports, workspaceId)],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); await runs.endIdleBuilds(now); }],
         // v2-17: new approvals are reviewed beside the tick; their notices wait for the review.
         ["reviews", async () => { void reviewApprovals(ports, workspaceId).catch(() => {}); }],

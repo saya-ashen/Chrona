@@ -436,7 +436,7 @@ async function settings() {
     const f = event.target.elements, button = event.target.querySelector("button[type=submit]");
     savingBuilds = true; button.disabled = true; buildStatus.textContent = "正在保存……";
     try {
-      const saved = await web("/settings", { method: "POST", body: { builds: { dailyLimit: Number(f.buildDailyLimit.value), timeoutMinutes: Number(f.buildTimeoutMinutes.value), maxSubmissions: Number(f.buildMaxSubmissions.value) } } });
+      const saved = await web("/settings", { method: "POST", body: { builds: { dailyLimit: Number(f.buildDailyLimit.value), timeoutMinutes: Number(f.buildTimeoutMinutes.value), maxSubmissions: Number(f.buildMaxSubmissions.value) }, reflection: { enabled: f.reflection.checked } } });
       showBuildUsage(saved); buildStatus.textContent = "已保存，下次构建生效；当前构建不受影响。";
     } catch (error) { buildStatus.textContent = error.message; }
     finally { savingBuilds = false; button.disabled = false; }
@@ -444,6 +444,8 @@ async function settings() {
     field("每日新建构建上限", h("input", { name: "buildDailyLimit", type: "number", min: 0, max: 200, step: 1, required: true, value: builds.dailyLimit })),
     field("单轮构建时限（分钟）", h("input", { name: "buildTimeoutMinutes", type: "number", min: 5, max: 120, step: 1, required: true, value: builds.timeoutMinutes })),
     field("每轮候选提交上限", h("input", { name: "buildMaxSubmissions", type: "number", min: 1, max: 20, step: 1, required: true, value: builds.maxSubmissions })),
+    // Reflection (v2-19): Chrona starts builds on its own; what they produce is still levelled and reviewed.
+    field("主动反思", h("label", { class: "muted" }, h("input", { name: "reflection", type: "checkbox", checked: view.settings.reflection?.enabled !== false, style: "width:auto" }), " 应用上线或出错后，Chrona 自己判断是否需要改进并开始构建（低风险结果自动上线，其余请你批准）")),
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
   // Module models (v2-17): tiers (model + thinking level), call limits, per-module daily caps and today's use.
   const models = modelForm(view.settings, reload);

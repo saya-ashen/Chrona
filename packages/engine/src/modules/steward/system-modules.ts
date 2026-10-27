@@ -23,6 +23,7 @@ import { sessionTranscript } from "./transcript";
 import { parseInput } from "./errors";
 import { createSecrets } from "./secrets";
 import { listActivity } from "./activity";
+import { reflectionSuggestSchema, suggest } from "./reflection";
 import { audit } from "./audit";
 import { addedCapabilities } from "./approval-level";
 import { storedAttachments } from "./store";
@@ -366,6 +367,16 @@ const modules: SystemModule = {
   },
 };
 
+/** `reflection` (v2-19): the one tool a reflection conversation has; every other caller is refused by the handler. */
+const reflection: SystemModule = {
+  name: "reflection",
+  tools: [tool("suggest", reflectionSuggestSchema.description!, {}, [], provider(reflectionSuggestSchema))],
+  async handle({ ports, workspaceId, caller }, name, args) {
+    if (name !== "suggest") throw new CallError("not_found", `reflection.${name} not found`);
+    return json(await suggest(ports, workspaceId, caller, args));
+  },
+};
+
 async function handleSettings(ports: StewardPorts, workspaceId: string, name: string, args: Record<string, unknown>) {
   const ctx = { db: ports.db, workspaceId, now: ports.now }, notifications = createNotificationsView(ports, workspaceId);
   const service = createSettings(ctx, { status: notifications.status, forward: (tx, value, at) => forwardSettings(tx, ports, workspaceId, value, at) });
@@ -384,7 +395,7 @@ const settings: SystemModule = {
   name: "settings",
   tools: [
     tool("get", "Owner settings: notifications, moduleModel, build limits and today's build usage.", {}, [], { idempotent: true }),
-    tool("update", "Change owner notification, model or build settings. Build edits apply to the next run.", { settings: text('JSON {"notifications"?: {...}, "moduleModel"?: {"models": {tier: {"model", "thinking"?: off..max}}, "maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "timeoutMs", "moduleDailyCalls"?: {module: n}} | null, "builds"?: {"dailyLimit"?: 0..200, "timeoutMinutes"?: 5..120, "maxSubmissions"?: 1..20}}') }, ["settings"], { idempotent: true }),
+    tool("update", "Change owner notification, model or build settings. Build edits apply to the next run.", { settings: text('JSON {"notifications"?: {...}, "moduleModel"?: {"models": {tier: {"model", "thinking"?: off..max}}, "maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "timeoutMs", "moduleDailyCalls"?: {module: n}} | null, "builds"?: {"dailyLimit"?: 0..200, "timeoutMinutes"?: 5..120, "maxSubmissions"?: 1..20}, "reflection"?: {"enabled": boolean}}') }, ["settings"], { idempotent: true }),
     tool("grants", "Grant rules (what Chrona may do without asking), active first.", {}, [], { idempotent: true }),
     tool("revoke-grant", "Revoke a grant rule.", { grant: text() }, ["grant"], { idempotent: true }),
     tool("preferences", "What Chrona remembers about the user.", {}, [], { idempotent: true }),
@@ -529,4 +540,5 @@ export function registerSystemModules() {
   registerSystemModule(ai);
   registerSystemModule(secrets);
   registerSystemModule(activity);
+  registerSystemModule(reflection);
 }

@@ -9,7 +9,7 @@ type McpTool = { name: string; description: string; inputSchema: Args; run(args:
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
 const tools: McpTool[] = [
   { name: "chrona_today", description: "What needs the user now: waiting approvals and questions, running work, today's agenda.", inputSchema: schema(), run: () => call("chat.today") },
-  { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module", "build"] }, status: { type: "string", enum: ["active", "ended"] } }),
+  { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module", "build", "reflect"] }, status: { type: "string", enum: ["active", "ended"] } }),
     run: ({ source, status }) => call("chat.sessions", { source, status }) },
   { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: ({ sessionId }) => call("chat.session", { session: sessionId }) },
   { name: "chrona_session_update", description: "Rename or end a conversation.", inputSchema: schema({ sessionId: str(), title: str(), status: { type: "string", enum: ["ended"] } }, ["sessionId"]),

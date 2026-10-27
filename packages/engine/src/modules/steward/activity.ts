@@ -6,10 +6,11 @@ import type { StewardPorts } from "./ports";
  */
 const KINDS = ["approval_created", "approval_review", "approval_resolved", "module_build_started", "module_submission", "module_build_settled", "module_build_rejection",
   "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident",
-  "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "approval_habits"] as const;
+  "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "approval_habits", "reflection_started", "reflection_suggested"] as const;
 const LEVELS: Record<string, string> = { green: "低风险", yellow: "注意", red: "高风险" };
 const SOURCES: Record<string, string> = { web: "网页", qq: "QQ", mcp: "MCP", cli: "命令行", rescue: "救援控制台", entry: "其他应用" };
-const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建" };
+const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建", reflection: "主动反思" };
+const SIGNALS: Record<string, string> = { module_activate: "上线", module_auto_activated: "自动更新", module_runtime_incident: "出错" };
 const short = (hash: unknown) => typeof hash === "string" ? hash.slice(0, 8) : "?";
 type Row = { id: string; kind: string; subjectId: string | null; actorKey: string; details: unknown; createdAt: Date };
 type Names = { modules: Map<string, string>; versions: Map<string, { module: string; hash: string }>; approvals: Map<string, { title: string; level: string; module: string | null }> };
@@ -55,6 +56,16 @@ function otherText(row: Row, details: Record<string, unknown>) {
   if (row.kind === "secret_set" || row.kind === "secret_removed") return `你${row.kind === "secret_set" ? "设置" : "删除"}了凭据 ${String(details.name)}`;
   return `生成本周审批习惯建议（${Array.isArray(details.suggestions) ? details.suggestions.length : 0} 条）`;
 }
+/** v2-19: why Chrona reflected, and what it started building. */
+function reflectionText(row: Row, details: Record<string, unknown>) {
+  if (row.kind === "reflection_started") {
+    const signals = Array.isArray(details.signals) ? details.signals as { kind?: unknown; module?: unknown }[] : [];
+    return { module: null, text: `Chrona 反思了一次（${signals.slice(0, 3).map(signal => `${String(signal.module)} ${SIGNALS[String(signal.kind)] ?? ""}`).join("、")}${signals.length > 3 ? " 等" : ""}）` };
+  }
+  const modules = Array.isArray(details.modules) ? details.modules.map(String) : [];
+  return { module: modules[0] ?? null, text: `Chrona 开始构建「${String(details.title)}」：${String(details.why)}` };
+}
+const otherLine = (row: Row, details: Record<string, unknown>) => row.kind.startsWith("reflection_") ? reflectionText(row, details) : { module: null, text: otherText(row, details) };
 function describe(row: Row, names: Names): Activity | null {
   const details = (row.details && typeof row.details === "object" ? row.details : {}) as Record<string, unknown>;
   // Chrona's one-time grant for a green update is part of the auto-update line, not a decision of the user's.
@@ -65,7 +76,7 @@ function describe(row: Row, names: Names): Activity | null {
     return { ...base, module: approval?.module ?? null, text: approvalText(row, details, names) };
   }
   if (row.kind.startsWith("module_") || row.kind === "admin_rollback") return { ...base, ...moduleText(row, details, names) };
-  return { ...base, module: null, text: otherText(row, details) };
+  return { ...base, ...otherLine(row, details) };
 }
 async function namesFor(db: StewardPorts["db"], workspaceId: string, rows: Row[]): Promise<Names> {
   const ids = [...new Set(rows.flatMap(row => row.subjectId ? [row.subjectId] : []))];

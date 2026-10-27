@@ -166,20 +166,21 @@ class ChatService {
         const caller = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_caller", subjectId: existing.id } });
         if (caller) return { inbound: existing, ...callerSchema.parse(caller.details) };
       }
-      // Build conversations (v2-13) run only what modules.build gave them; their result comes back to the origin conversation.
-      const buildRefused = () => new StewardError("forbidden", "A module build conversation does not take messages");
+      // Build (v2-13) and reflection (v2-19) conversations run only what Chrona gave them; nobody talks into them.
+      const closed = (source: string) => source === "build" || source === "reflect";
+      const buildRefused = () => new StewardError("forbidden", "A module build or reflection conversation does not take messages");
       const session = await db.$transaction(async tx => {
         if (input.sessionId) {
           const row = await tx.session.findFirst({ where: { id: input.sessionId, workspaceId: input.workspaceId, status: "active" } });
           if (!row) throw new StewardError("not_found", "Active session not found");
-          if (row.source === "build") throw buildRefused();
+          if (closed(row.source)) throw buildRefused();
           return row;
         }
         const key = input.key ?? `web:${randomUUID()}`;
         const row = await tx.session.findFirst({ where: { workspaceId: input.workspaceId, key, status: "active" } });
         const prefix = key.split(":")[0];
         const source = SESSION_SOURCES.find(source => source === prefix) ?? "web";
-        if ((row?.source ?? source) === "build") throw buildRefused();
+        if (closed(row?.source ?? source)) throw buildRefused();
         return row ?? tx.session.create({ data: { workspaceId: input.workspaceId, key, source, createdAt: ports.now(), lastActivityAt: ports.now() } });
       });
       if (entryModuleId && session.entryModuleId !== entryModuleId) await db.session.update({ where: { id: session.id }, data: { entryModuleId } });

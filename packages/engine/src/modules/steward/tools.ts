@@ -20,6 +20,7 @@ import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { BUILD_MODULE_TOOLS } from "./module-reference";
+import { REFLECT_TOOLS } from "./reflection";
 
 type ToolName = keyof typeof schemas;
 type Claim = Awaited<ReturnType<typeof authenticateRun>> & { index: number };
@@ -127,6 +128,8 @@ const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unk
 /** No provider-supplied workspace IDs: all ownership comes from the capability. */
 /** A build conversation (v2-13) writes and submits one module: it reports back and nothing else (no user data, no other apps). */
 const BUILD_TOOLS = ["chrona_reply", ...BUILD_MODULE_TOOLS];
+/** A reflection (v2-19) only reads the facts in its prompt and may start builds through reflection.suggest. */
+const ONLY: Partial<Record<string, string[]>> = { build: BUILD_TOOLS, reflect: REFLECT_TOOLS };
 export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
   /** `timeoutSeconds` (v2-13): how long the caller waits; tools that wait stop by then, and never past the run's deadline. */
@@ -149,7 +152,8 @@ export function createTools(ports: StewardPorts) {
     const deadline = Math.min(now().getTime() + timeoutSeconds * 1000, run.deadlineAt!.getTime());
     let ok = false;
     try {
-      if (claim.session?.source === "build" && !BUILD_TOOLS.includes(name)) throw new StewardError("forbidden", "A build conversation may only reply and use module tools");
+      const only = claim.session ? ONLY[claim.session.source] : undefined;
+      if (only && !only.includes(name)) throw new StewardError("forbidden", `A ${claim.session!.source} conversation may only use ${only.join(", ")}`);
       if (name.startsWith("m_")) {
         const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline }, name, raw);
         ok = true; return result;
@@ -169,7 +173,8 @@ export function createTools(ports: StewardPorts) {
   return { catalog: async (token: string) => {
     const { run, session } = await authenticateRun(db, token, now());
     if (session?.source === "build") return [{ name: "chrona_reply", inputSchema: z.toJSONSchema(schemas.chrona_reply) }, ...(await moduleToolCatalog(ports, run)).filter(tool => BUILD_TOOLS.includes(tool.name))];
-    // request-group only means something inside a build conversation (v2-15).
-    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...(await moduleToolCatalog(ports, run)).filter(tool => tool.name !== "m_modules_request_group")];
+    if (session?.source === "reflect") return (await moduleToolCatalog(ports, run)).filter(tool => REFLECT_TOOLS.includes(tool.name));
+    // request-group only means something inside a build conversation (v2-15), suggest inside a reflection (v2-19).
+    return [...CHRONA_TOOLS.map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...(await moduleToolCatalog(ports, run)).filter(tool => tool.name !== "m_modules_request_group" && !REFLECT_TOOLS.includes(tool.name))];
   }, call };
 }

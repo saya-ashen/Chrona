@@ -148,7 +148,7 @@ class RunService {
   /** A wake or module conversation ends with its work: nothing queued and no approval it asked for still open (its decision resumes it). */
   private async endIfDone(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
     const session = run.session, { workspaceId } = this;
-    if (!session || !["wake", "module"].includes(session.source)) return;
+    if (!session || !["wake", "module", "reflect"].includes(session.source)) return;
     if (await tx.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
     const open = await tx.approval.findMany({ where: { workspaceId, status: "open" }, select: { payload: true } });
     if (open.some(row => (row.payload as { sessionId?: unknown } | null)?.sessionId === session.id)) return;
