@@ -12,6 +12,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
+  stub("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
   stub("modules.tools", () => [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
   stub("planning.get", () => ({ plan: 1 })),
@@ -47,6 +48,8 @@ try {
   assert.deepEqual(await (await get("/api/web/today")).json(), { approvals: [] });
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
+  assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
+  assert.deepEqual(calls.at(-1), ["activity.list", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
   assert.deepEqual(await (await get("/api/web/modules/a1/permissions")).json(), { module: "a1", capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] });
   assert.deepEqual(await (await post("/api/web/chat", { text: "hi", session: "s1" })).json(), { sessionId: "s1", messageId: "m1" });
   assert.deepEqual(calls.at(-1), ["chat.send", { key: "web:k1", text: "hi", channel: "in_app" }]);

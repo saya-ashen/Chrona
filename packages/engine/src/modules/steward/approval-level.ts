@@ -32,17 +32,26 @@ export function addedCapabilities(previous: Manifest | null, next: Manifest) {
 }
 
 /** One module version being activated (or a data restore). */
+async function manifestOf(tx: Db, moduleId: string, hash: string | null) {
+  if (!hash) return null;
+  return moduleManifestSchema.safeParse((await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }))?.manifest).data ?? null;
+}
+/** A schema change migrates only data that exists; without a data directory to look at, assume there is some. */
+async function migratesData(dataDir: string | undefined, module: { id: string; dataSchema: number | null }, manifest: Manifest) {
+  if (manifest.data.schema === module.dataSchema) return false;
+  return !dataDir || !await dataEmpty(join(dataDir, "platform", "data", module.id));
+}
+/** Code that runs unisolated, acts as the user, moves data, or holds a credential it can send out. */
+const isRed = (isolated: boolean, manifest: Manifest, restore: boolean, migrates: boolean) =>
+  !isolated || isEntryModule(manifest) || restore || migrates || (manifest.secrets.length > 0 && manifest.effects.includes("network"));
 async function assessVersion(tx: Db, { isolated, dataDir }: Facts, target: { moduleId: string; hash: string; restore?: unknown }) {
   const module = await tx.module.findUnique({ where: { id: target.moduleId } });
-  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: target.moduleId, hash: target.hash } } });
-  const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+  const manifest = module ? await manifestOf(tx, module.id, target.hash) : null;
   if (!module || !manifest) return { name: module?.name ?? "?", fresh: false, level: "red" as Level, added: [], reversible: false };
-  const active = module.activeHash ? moduleManifestSchema.safeParse((await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }))?.manifest).data ?? null : null;
-  const added = addedCapabilities(active, manifest);
-  // A schema change migrates only data that exists; without a data directory to look at, assume there is some.
-  const migrates = !!active && manifest.data.schema !== module.dataSchema && !(dataDir && await dataEmpty(join(dataDir, "platform", "data", module.id)));
-  const red = !isolated || isEntryModule(manifest) || !!target.restore || migrates || (manifest.secrets.length > 0 && manifest.effects.includes("network"));
-  return { name: module.name, fresh: !active, level: (red ? "red" : added.length || !active ? "yellow" : "green") as Level, added, reversible: !target.restore && !migrates };
+  const active = await manifestOf(tx, module.id, module.activeHash), restore = !!target.restore;
+  const added = addedCapabilities(active, manifest), migrates = !!active && await migratesData(dataDir, module, manifest);
+  const level: Level = isRed(isolated, manifest, restore, migrates) ? "red" : added.length || !active ? "yellow" : "green";
+  return { name: module.name, fresh: !active, level, added, reversible: !restore && !migrates };
 }
 function activationTargets(payload: unknown): { moduleId: string; hash: string; restore?: unknown }[] {
   const value = payload as { kind?: string; moduleId?: string; hash?: string; restore?: unknown; versions?: { moduleId: string; hash: string }[] } | null;

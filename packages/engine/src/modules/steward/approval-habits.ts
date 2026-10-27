@@ -17,25 +17,32 @@ const WEEK_MS = 7 * 24 * 3600_000;
 const LABELS: Partial<Record<string, string>> = { schedule: "设置日程", modify_external: "修改外部系统", read_source: "读取来源", connect_source: "接入来源", notify_user: "通知你" };
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); return sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)]! : 0; };
 
-export function suggestHabits(decisions: Decision[], now: Date): Suggestion[] {
-  const recent = decisions.filter(row => now.getTime() - row.createdAt.getTime() <= WEEK_MS);
-  const suggestions: Suggestion[] = [];
-  // Chrona's own (Provider) requests of one yellow kind, always approved: offer to stop asking.
+/** Chrona's own (Provider) requests of one yellow kind, always approved: offer to stop asking. */
+function stopAsking(recent: Decision[]): Suggestion[] {
   const provider = recent.filter(row => !row.moduleId && row.level === "yellow" && row.kind !== "module_request" && row.kind !== "grant_suggestion" && row.status !== "open");
-  for (const action of new Set(provider.map(row => row.action))) {
+  return [...new Set(provider.map(row => row.action))].flatMap(action => {
     const rows = provider.filter(row => row.action === action);
-    if (rows.length >= 5 && rows.every(row => row.status === "approved")) {
-      suggestions.push({ kind: "stop_asking", action: action as Action, approved: rows.length, text: `「${LABELS[action] ?? action}」这周你批准了 ${rows.length} 次、没有拒绝过，以后可以不再问你。` });
-    }
-  }
-  const red = recent.filter(row => row.level === "red" && row.status === "approved" && row.resolvedAt).map(row => (row.resolvedAt!.getTime() - row.createdAt.getTime()) / 1000);
-  if (red.length >= 3 && median(red) < 10) suggestions.push({ kind: "read_red", count: red.length, medianSeconds: Math.round(median(red)), text: `这周 ${red.length} 张高风险审批，你一般 ${Math.round(median(red))} 秒内就批准了；高风险的请先展开详情看一眼。` });
+    return rows.length >= 5 && rows.every(row => row.status === "approved")
+      ? [{ kind: "stop_asking" as const, action: action as Action, approved: rows.length, text: `「${LABELS[action] ?? action}」这周你批准了 ${rows.length} 次、没有拒绝过，以后可以不再问你。` }] : [];
+  });
+}
+function readRed(recent: Decision[]): Suggestion[] {
+  const seconds = recent.filter(row => row.level === "red" && row.status === "approved" && row.resolvedAt).map(row => (row.resolvedAt!.getTime() - row.createdAt.getTime()) / 1000);
+  const typical = Math.round(median(seconds));
+  return seconds.length >= 3 && median(seconds) < 10 ? [{ kind: "read_red", count: seconds.length, medianSeconds: typical, text: `这周 ${seconds.length} 张高风险审批，你一般 ${typical} 秒内就批准了；高风险的请先展开详情看一眼。` }] : [];
+}
+function deniedModules(recent: Decision[]): Suggestion[] {
   const denied = new Map<string, Decision[]>();
   for (const row of recent.filter(row => row.action === "activate_module" && row.moduleId && row.status === "denied")) denied.set(row.moduleId!, [...denied.get(row.moduleId!) ?? [], row]);
-  for (const [moduleId, rows] of denied) if (rows.length >= 3) suggestions.push({ kind: "denied_module", moduleId, denied: rows.length, text: `${rows[0]!.moduleName ?? "一个应用"} 的更新这周被你拒绝了 ${rows.length} 次，需要的话可以让 Chrona 停下它的构建或换个做法。` });
+  return [...denied].filter(([, rows]) => rows.length >= 3).map(([moduleId, rows]) => ({ kind: "denied_module" as const, moduleId, denied: rows.length, text: `${rows[0]!.moduleName ?? "一个应用"} 的更新这周被你拒绝了 ${rows.length} 次，需要的话可以让 Chrona 停下它的构建或换个做法。` }));
+}
+function waitingLong(decisions: Decision[], now: Date): Suggestion[] {
   const waiting = decisions.filter(row => row.status === "open" && now.getTime() - row.createdAt.getTime() > 3 * 24 * 3600_000);
-  if (waiting.length) suggestions.push({ kind: "waiting", ids: waiting.map(row => row.id), text: `有 ${waiting.length} 张审批已经等了三天以上：${waiting.slice(0, 3).map(row => row.title).join("、")}${waiting.length > 3 ? " 等" : ""}。` });
-  return suggestions;
+  return waiting.length ? [{ kind: "waiting", ids: waiting.map(row => row.id), text: `有 ${waiting.length} 张审批已经等了三天以上：${waiting.slice(0, 3).map(row => row.title).join("、")}${waiting.length > 3 ? " 等" : ""}。` }] : [];
+}
+export function suggestHabits(decisions: Decision[], now: Date): Suggestion[] {
+  const recent = decisions.filter(row => now.getTime() - row.createdAt.getTime() <= WEEK_MS);
+  return [...stopAsking(recent), ...readRed(recent), ...deniedModules(recent), ...waitingLong(decisions, now)];
 }
 
 /** Due once every seven days (the last run is an audit row); sends one digest notice and opens one approval per stop-asking suggestion. */

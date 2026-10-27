@@ -22,6 +22,8 @@ import { buildQueue, buildQueueText } from "./build-queue";
 import { sessionTranscript } from "./transcript";
 import { parseInput } from "./errors";
 import { createSecrets } from "./secrets";
+import { listActivity } from "./activity";
+import { audit } from "./audit";
 import { addedCapabilities } from "./approval-level";
 import { storedAttachments } from "./store";
 import type { StewardPorts } from "./ports";
@@ -492,10 +494,27 @@ async function manageSecrets(ports: StewardPorts, workspaceId: string, store: Re
   }
   const secret = String(args.name);
   if (!SECRET_NAME.test(secret) || secret === "qq_bot") throw new CallError("invalid", "Invalid credential name");
-  if (name === "remove") { await store.remove(secret); return json({ name: secret, configured: false }); }
+  if (name === "remove") {
+    await store.remove(secret);
+    await audit(ports.db, { workspaceId, actor: "user", kind: "secret_removed", subjectId: null, details: { name: secret } });
+    return json({ name: secret, configured: false });
+  }
   await store.write(secret, secretValue(args.value));
+  // The name only: the value never reaches audits, call records or logs.
+  await audit(ports.db, { workspaceId, actor: "user", kind: "secret_set", subjectId: null, details: { name: secret } });
   return json({ name: secret, configured: true });
 }
+
+/** `activity` (v2-18): the user-facing audit trail in plain sentences, for the page and the owner's agents only. */
+const activity: SystemModule = {
+  name: "activity",
+  tools: [tool("list", "What Chrona did, newest first: approvals (created, reviewed, decided), module checks, activations, auto-updates, rollbacks and faults, grants, settings and credential changes (names only). module: one app; before: an earlier page.",
+    { module: text("Module name"), before: text("ISO time from the previous page"), limit: { type: "number" } }, [], { idempotent: true, visibility: ["modules", "owner"], callers: ["web", "mcp"] })],
+  async handle({ ports, workspaceId }, name, args) {
+    if (name !== "list") throw new CallError("not_found", `activity.${name} not found`);
+    return json(await listActivity(ports, workspaceId, { ...(args.module ? { module: String(args.module) } : {}), ...(args.before ? { before: String(args.before) } : {}), ...(args.limit ? { limit: Number(args.limit) } : {}) }));
+  },
+};
 
 let registered = false;
 /** Called by the service: Chrona's system modules become routable call targets. */
@@ -509,4 +528,5 @@ export function registerSystemModules() {
   registerSystemModule(schedules);
   registerSystemModule(ai);
   registerSystemModule(secrets);
+  registerSystemModule(activity);
 }

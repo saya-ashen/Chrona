@@ -42,3 +42,4 @@ details > summary { cursor: pointer; font-weight: 600; margin: .6rem 0 .3rem; }
 .level.yellow { background: #fef3c7; color: #92400e; }
 .level.red { background: #fee2e2; color: #991b1b; }
 li.approval.red { border-left: 4px solid #dc2626; padding-left: .6rem; }
+.ok { color: #166534; font-weight: 600; }

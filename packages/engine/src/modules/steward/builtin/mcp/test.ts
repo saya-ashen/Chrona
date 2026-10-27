@@ -12,6 +12,8 @@ const module = await startModule("index.ts", { stubs: {
     routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }] })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
     routed("planning.get", args => ({ plan: args.id })),
     routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.diagnostics", args => [{ module: args.module, incidents: [] }]),
+    routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
+    routed("modules.permissions", args => ({ module: args.module, capabilities: [] })),
   ]),
 } });
 async function rpc(method: string, params: unknown = {}, id: number | null = 1) {
@@ -33,6 +35,9 @@ try {
   assert.ok(["chrona_chat", "chrona_module_tools", "chrona_module_call", "chrona_module_diagnostics"].every(name => names.includes(name)));
   assert.deepEqual(await json("chrona_module_diagnostics", { module: "web" }), [{ module: "web", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "web" }]);
+  assert.equal((await json("chrona_activity", { module: "web" })).items[0].text, "web 已切换到版本 5caef53c");
+  assert.deepEqual(await json("chrona_module_permissions", { module: "web" }), { module: "web", capabilities: [] });
+  assert.deepEqual(calls.at(-1), ["modules.permissions", { module: "web" }]);
   // Conversations, approvals and app records are routed calls with the system modules' argument names.
   calls.length = 0;
   await tool("chrona_chat", { text: "hi" });

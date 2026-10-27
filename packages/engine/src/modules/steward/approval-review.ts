@@ -36,8 +36,7 @@ async function reviewBudget(ports: StewardPorts, workspaceId: string) {
   const timezone = notificationSettings(workspace.settings).timezone, now = ports.now(), day = localDayKey(now, timezone);
   const used = (await ports.db.audit.findMany({ where: { workspaceId, kind: "approval_review", createdAt: { gte: new Date(now.getTime() - 48 * 3600_000) } }, select: { createdAt: true } }))
     .filter(row => localDayKey(row.createdAt, timezone) === day).length;
-  const target = settings.models[tier];
-  return target === undefined || used >= (settings.review?.dailyCalls ?? 30) ? null : { ...tierTarget(target), timeoutMs: settings.timeoutMs };
+  return !Object.hasOwn(settings.models, tier) || used >= (settings.review?.dailyCalls ?? 30) ? null : { ...tierTarget(settings.models[tier]!), timeoutMs: settings.timeoutMs };
 }
 async function callReviewer(ports: StewardPorts, workspaceId: string, row: Row, brief: Brief) {
   const budget = await reviewBudget(ports, workspaceId);

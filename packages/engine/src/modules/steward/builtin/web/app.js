@@ -65,9 +65,21 @@ function login(message) {
 // ------------------------------------------------------------------ today --
 const LEVELS = { green: "低风险", yellow: "注意", red: "高风险" };
 function approvalItem(approval, after) {
-  const decide = (decision, scope = "once") => async () => {
-    try { await web(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } }); after(); }
-    catch (error) { alert(error.message); }
+  // v2-18: say what happened in place of the card (and which version now runs), then refresh.
+  const result = h("div", { role: "status" });
+  const decide = (decision, scope = "once") => async event => {
+    const item = event.target.closest("li");
+    for (const button of item.querySelectorAll("button")) button.disabled = true;
+    try {
+      const resolved = await web(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } });
+      const app = approval.moduleId ? (await web("/modules")).find(module => module.id === approval.moduleId) : null;
+      const running = app && decision === "approve" ? ` · ${app.name} 当前版本 ${String(app.activeHash ?? "").slice(0, 8)}` : "";
+      item.replaceChildren(h("div", { class: "ok" }, `${resolved.status === "denied" ? "已拒绝" : "已批准"}：${approval.title}${running}`));
+      setTimeout(after, 4000);
+    } catch (error) {
+      result.textContent = `未处理：${error.message}`;
+      for (const button of item.querySelectorAll("button")) button.disabled = false;
+    }
   };
   // v2-17: the level and short brief first; the full review (detail, diff, tests) stays folded.
   const level = approval.level ?? "yellow", brief = approval.brief;
@@ -78,7 +90,7 @@ function approvalItem(approval, after) {
     brief && brief.reversible !== null ? h("div", { class: "muted" }, brief.reversible ? "可以一键回滚。" : "无法撤回。") : null,
     brief?.reviewed === "unavailable" ? h("div", { class: "muted" }, "未经 AI 复核。") : null,
     (approval.preview || (brief && approval.detail)) && h("details", {}, h("summary", {}, "详情"), brief && approval.detail ? h("p", {}, approval.detail) : null, approval.preview ? h("pre", {}, approval.preview) : null),
-    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, level === "red" ? "确认批准" : "批准"), h("button", { onclick: decide("deny") }, "拒绝")));
+    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, level === "red" ? "确认批准" : "批准"), h("button", { onclick: decide("deny") }, "拒绝")), result);
 }
 // A question a running Provider asked; unanswered questions expire and the run goes on without the answer.
 function interactionItem(interaction, after) {
@@ -276,6 +288,7 @@ async function app(appId) {
   const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
   main.replaceChildren(
     h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `配置：${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}${meta.description ? ` · ${meta.description}` : ""}`),
+      await currentVersion(meta),
       meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : ""),
     diagnosticPanel(meta),
     await permissionsPanel(meta),
@@ -286,6 +299,33 @@ async function app(appId) {
     h("section", {}, h("h2", {}, "版本"),
       h("ul", { class: "plain" }, meta.versions.slice(0, 5).map(version => h("li", {}, when(version.createdAt), " · ", version.hash.slice(0, 8), " · ", version.hash === meta.activeHash ? "当前" : version.status,
         version.errors ? h("div", { class: "error" }, version.errors.join("；")) : "")))));
+}
+// v2-18: which version runs, since when and how it got there, from the activity trail.
+async function currentVersion(meta) {
+  let recent = [];
+  try { recent = (await web(`/activity?module=${encodeURIComponent(meta.name)}`)).items; } catch { /* the version line still shows */ }
+  const switched = recent.find(item => ["module_activate", "module_auto_activated", "module_rollback", "admin_rollback"].includes(item.kind));
+  return h("div", {},
+    h("p", {}, h("strong", {}, `当前版本 ${String(meta.activeHash ?? "无").slice(0, 8)}`), switched ? h("span", { class: "muted" }, ` · ${when(switched.at)} · ${switched.text}`) : null),
+    recent.length > 1 ? h("ul", { class: "plain" }, recent.filter(item => item !== switched).slice(0, 5).map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.text))) : null,
+    h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(meta.name)}` }, "查看全部活动")));
+}
+// ---------------------------------------------------------------- activity --
+async function activity(params) {
+  const module = params.get("module") ?? "", items = h("ul", { class: "plain" }), more = h("button", { type: "button", hidden: true }, "更早的");
+  let before = null;
+  const load = async () => {
+    const query = new URLSearchParams({ ...(module ? { module } : {}), ...(before ? { before } : {}) });
+    const page = await web(`/activity?${query}`);
+    items.append(...page.items.map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.module && !module ? h("a", { href: `/activity?module=${encodeURIComponent(item.module)}` }, item.module) : null, item.module && !module ? " · " : null, item.text)));
+    before = page.before; more.hidden = !before;
+    if (!items.children.length) items.replaceWith(h("p", { class: "muted" }, "还没有活动。"));
+  };
+  more.addEventListener("click", () => load().catch(error => alert(error.message)));
+  main.replaceChildren(h("section", {}, h("h2", {}, module ? `活动 · ${module}` : "活动"),
+    h("p", { class: "muted" }, "Chrona 做过的事：审批与你的决定、AI 复核、应用的检查、启用、自动更新、回滚和故障、授权、设置与凭据的改动（只记名称）。"),
+    module ? h("p", {}, h("a", { href: "/activity" }, "看全部应用")) : null, items, more));
+  await load();
 }
 // v2-17: one app's permissions and use in one place; each is still changed where it lives (settings, grants).
 async function permissionsPanel(meta) {
@@ -501,6 +541,7 @@ async function route() {
     else if (parts[0] === "settings") await settings();
     else if (parts[0] === "apps" && parts[1]) await app(parts[1]);
     else if (parts[0] === "apps") await apps();
+    else if (parts[0] === "activity") await activity(url.searchParams);
     else await today();
   } catch (error) {
     if (error instanceof Unauthorized) login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);

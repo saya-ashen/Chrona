@@ -57,6 +57,9 @@ test("any module may declare a credential the user saves on the page; values nev
   await expect(page.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "undeclared" });
   // Neither the value written nor the value read is kept in call records.
   expect(JSON.stringify(await f.db.moduleInvocation.findMany())).not.toContain("k-secret");
+  // v2-18: the change shows in the activity trail by name only.
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "secret_set" } })).toMatchObject({ actorKey: "user", details: { name: "okx_demo" } });
+  expect(JSON.stringify(await f.db.audit.findMany())).not.toContain("k-secret");
 
   await page.call("secrets.remove", { name: "okx_demo" });
   await expect(trader.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "unavailable" });

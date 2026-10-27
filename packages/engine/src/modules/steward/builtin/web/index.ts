@@ -104,6 +104,8 @@ async function api(request: Request, path: string[]) {
     "GET /settings": () => getSettings(),
     "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),
     "GET /runs": () => call("chat.runs"),
+    // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
+    "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
     "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined }),
     "POST /call": () => moduleCall(body),
