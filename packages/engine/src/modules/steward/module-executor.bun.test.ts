@@ -43,7 +43,7 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   expect(proposal.status).toBe("building");
   await service.modules.buildPending();
   const approval = await db.approval.findFirstOrThrow({ where: { status: "open" } });
-  await service.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  await service.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
   const schedule = await db.schedule.findFirstOrThrow({ where: { moduleId: proposal.moduleId, status: "active" } });
   const moduleId = proposal.moduleId!;
   async function fire(delay = 0) {

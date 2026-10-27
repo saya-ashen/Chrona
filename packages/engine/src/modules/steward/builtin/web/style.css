@@ -16,7 +16,7 @@ ul.plain li:first-child { border-top: 0; }
 .error { color: #d33; }
 button { font: inherit; padding: .3rem .8rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-textarea, input { font: inherit; width: 100%; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+textarea, input, select { font: inherit; width: 100%; padding: .5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 textarea.editor { min-height: 60vh; font-family: ui-monospace, monospace; font-size: 13px; }
 pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); padding: .5rem; border-radius: 6px; max-height: 20rem; overflow: auto; }
 .chat { display: grid; grid-template-columns: 14rem 1fr; gap: 1rem; }
@@ -32,3 +32,13 @@ details > summary { cursor: pointer; font-weight: 600; margin: .6rem 0 .3rem; }
 .transcript { max-height: 60vh; overflow: auto; }
 .transcript p { margin: .3rem 0; }
 .diagnostics { overflow-wrap: anywhere; }
+/* v2-17 settings: one line per model tier (name, model, thinking) and per module cap. */
+.fields { display: grid; grid-template-columns: minmax(6rem, 1fr) minmax(10rem, 3fr) minmax(7rem, 1fr); gap: .5rem; margin-bottom: .5rem; }
+.fields.pair { grid-template-columns: minmax(10rem, 3fr) minmax(6rem, 1fr); }
+@media (max-width: 480px) { .fields, .fields.pair { grid-template-columns: 1fr; } }
+/* v2-17 approval levels: the color carries the risk; the words say it too. */
+.level { display: inline-block; padding: 0 .4rem; border-radius: 4px; font-size: .85em; font-weight: 600; }
+.level.green { background: #dcfce7; color: #166534; }
+.level.yellow { background: #fef3c7; color: #92400e; }
+.level.red { background: #fee2e2; color: #991b1b; }
+li.approval.red { border-left: 4px solid #dc2626; padding-left: .6rem; }

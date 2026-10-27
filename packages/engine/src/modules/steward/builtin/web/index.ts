@@ -85,6 +85,7 @@ async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult>
 }
 async function moduleRoute({ request, path }: ApiContext): Promise<ApiResult> {
   if (request.method === "GET" && path[0] === "modules" && path[2] === "diagnostics" && path.length === 3) return call("modules.diagnostics", { module: path[1] });
+  if (request.method === "GET" && path[0] === "modules" && path[2] === "permissions" && path.length === 3) return call("modules.permissions", { module: path[1] });
   return NO_ROUTE;
 }
 const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute];

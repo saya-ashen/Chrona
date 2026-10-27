@@ -23,3 +23,12 @@ test.each(Object.keys(MODE_STRICTNESS) as Grant["mode"][])("never cannot loosen 
   expect(decidePolicy("change_credentials", {}, [grant({ action: "change_credentials", mode })], now)).toMatchObject({ mode: "never", grantId: null });
 });
 test("human reason", () => { expect(decidePolicy("send_external_message", {}, [], now).reason).toBe("内置规则：对外发消息需要先问你"); });
+
+test("v2-17: at the same scope a one-time grant beats a standing ask rule, but never still wins", () => {
+  const now = new Date("2026-10-27T00:00:00Z");
+  const grant = (mode: Grant["mode"], once: boolean, id: string = mode): Grant => ({ id, action: "activate_module", mode, scope: { kind: "global" }, once, consumedAt: null, expiresAt: null, createdAt: now.toISOString(), revokedAt: null });
+  expect(decidePolicy("activate_module", {}, [grant("ask", false), grant("preapproved", true)], now)).toMatchObject({ mode: "preapproved", grantId: "preapproved" });
+  expect(decidePolicy("activate_module", {}, [grant("preapproved", true), grant("ask", false)], now)).toMatchObject({ mode: "preapproved" });
+  expect(decidePolicy("activate_module", {}, [grant("never", false), grant("preapproved", true)], now)).toMatchObject({ mode: "never" });
+  expect(decidePolicy("activate_module", {}, [grant("ask", false), grant("preapproved", false, "standing")], now)).toMatchObject({ mode: "ask" });
+});

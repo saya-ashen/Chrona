@@ -11,6 +11,8 @@ import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
 import { chatFilesDir, chatImages, migrateConversationFiles } from "./chat";
 import { announceApprovals, moveLegacyNotifications } from "./notify-user";
+import { reviewApprovals, reviewsSettled } from "./approval-review";
+import { weeklyHabits } from "./approval-habits";
 import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
@@ -115,7 +117,10 @@ export function createTick(ports: StewardPorts) {
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); await cancelLegacyBuilds(ports, workspaceId); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); await runs.endIdleBuilds(now); }],
+        // v2-17: new approvals are reviewed beside the tick; their notices wait for the review.
+        ["reviews", async () => { void reviewApprovals(ports, workspaceId).catch(() => {}); }],
         ["approvals", () => announceApprovals(ports, workspaceId)],
+        ["habits", () => weeklyHabits(ports, workspaceId)],
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
       ] as const) {
@@ -126,5 +131,5 @@ export function createTick(ports: StewardPorts) {
     }
     return { failures };
   }
-  return Object.assign(tick, { settled: () => Promise.all([...builds.values(), callsSettled(ports)]).then(() => undefined) });
+  return Object.assign(tick, { settled: () => Promise.all([...builds.values(), callsSettled(ports), reviewsSettled(ports)]).then(() => undefined) });
 }

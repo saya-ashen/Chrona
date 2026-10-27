@@ -140,3 +140,22 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   const logs = JSON.stringify(audits);
   expect(logs).not.toContain(prompt); expect(logs).not.toContain(text);
 });
+
+test("v2-17: a tier names a model and thinking level; a module's own daily cap stops only it; usage is per module", async () => {
+  const f = await fixture();
+  const seen: unknown[] = [];
+  f.ports.provider = { ...fakeProvider, async complete(input) { seen.push({ model: input.model, thinking: input.thinking }); return { text, inputTokens: 3, outputTokens: 4 }; } };
+  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { status: async () => null, forward: async () => null });
+  await settings.update({ moduleModel: { ...limits, models: { strong: { model: "fake/exact", thinking: "max" }, fast: "fake/fast:low" }, moduleDailyCalls: { "model-test": 1 } } });
+  expect((await f.call()).result).toMatchObject({ text });
+  expect(seen).toEqual([{ model: "fake/exact", thinking: "max" }]);
+  // Same event allows two calls, but the module's own cap is one a day.
+  expect((await f.call()).error).toEqual({ code: "budget_exceeded" });
+  expect((await settings.get()).modelUsage).toEqual([{ module: "model-test", calls: 1, inputTokens: 3, outputTokens: 4 }]);
+  // Pi's model:level shorthand from before v2-17 is split: Pi reports the bare model id.
+  f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, model: { tier: "fast", maxCalls: 2, maxOutputTokens: 20 } });
+  await settings.update({ moduleModel: { ...limits, models: { fast: "fake/fast:low" } } });
+  f.scope.moduleRunId = (await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "v1", triggerId: "daily", firedAt: f.ports.now(), createdAt: f.ports.now(), exitCode: 0 } })).id;
+  expect((await f.call()).result).toMatchObject({ text });
+  expect(seen.at(-1)).toEqual({ model: "fake/fast", thinking: "low" });
+});

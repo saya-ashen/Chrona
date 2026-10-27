@@ -101,6 +101,8 @@ test.each([false, "user", "provider", "build"] as const)("built-in upgrade prese
 test("legacy built-in replacement approvals are blocked atomically and retired, custom reviews survive", async () => {
   const f = await fixture();
   try {
+    // The custom review must stay a card: since v2-17 a green one would otherwise activate by itself.
+    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
     await f.start(); const builtin = await f.current();
     await f.write(2);
     const modules = createModules(f.ports, f.workspace.id);
@@ -151,6 +153,8 @@ test("a built-in already queued when the user activates a fork cannot create a r
 test("activation rechecks a previously approved builtin card after a fork becomes active", async () => {
   const f = await fixture();
   try {
+    // The fork is activated by hand below: since v2-17 a green build would otherwise activate by itself.
+    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
     await f.start(); const first = await f.current();
     await f.write(2);
     const modules = createModules(f.ports, f.workspace.id);

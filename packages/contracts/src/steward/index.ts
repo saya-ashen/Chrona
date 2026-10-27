@@ -345,11 +345,19 @@ export const messageSchema = z.object({
   attachments: z.array(attachmentSchema).max(10), quotedMessageId: id.nullable(), at: iso,
 }).strict();
 
+/** v2-17: computed by the kernel from facts. green needs no one; yellow asks; red asks on the page only, never as a standing grant. */
+export const APPROVAL_LEVELS = ["green", "yellow", "red"] as const;
+/** The short card: one-sentence headline, what approving adds, and whether it can be undone. `reviewed`: AI review outcome (v2-17 §3). */
+export const approvalBriefSchema = z.object({
+  headline: z.string().max(300), added: z.array(z.string().max(200)).max(20), reversible: z.boolean().nullable(),
+  reviewed: z.enum(["passed", "escalated", "unavailable"]).nullable(), reason: z.string().max(500).nullable(),
+}).strict();
 export const approvalSchema = z.object({
   id, action: z.enum(ACTIONS), moduleId: id.nullable(),
   title: short, detail: z.string().max(4000),
   /** Exactly what will be done, shown to the user (e.g. the email draft). */
   preview: z.string().max(20_000),
+  level: z.enum(APPROVAL_LEVELS), brief: approvalBriefSchema.nullable(),
   status: z.enum(APPROVAL_STATUSES), createdAt: iso, resolvedAt: iso.nullable(),
 }).strict();
 
@@ -375,11 +383,27 @@ export const notificationSchema = z.object({
 
 export const notificationSettingsSchema = z.object({ dailyCap: z.number().int().min(0).max(50), quietHours: z.object({ start: hhmm, end: hhmm }).strict().nullable(), timezone: z.string().min(1).max(80), digestAt: hhmm }).strict();
 /** The exact models modules may call, by tier (L1, user-only). No automatic fallback to another model or tier. */
+/** Pi's thinking levels (`pi --thinking`). */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+const modelId = z.string().trim().min(1).max(200);
+/** v2-17: a tier is a model and a thinking level; a bare model id (before v2-17) uses Pi's default level. */
+export const modelTierTargetSchema = z.union([modelId, z.object({ model: modelId, thinking: z.enum(THINKING_LEVELS).optional() }).strict()]);
+type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+/** A tier's model and thinking level; Pi's `model:level` shorthand in a bare id is split, as Pi reports the model without it. */
+export function tierTarget(value: z.infer<typeof modelTierTargetSchema>): { model: string; thinking?: ThinkingLevel } {
+  if (typeof value !== "string") return value;
+  const at = value.lastIndexOf(":"), level = value.slice(at + 1);
+  return at > 0 && (THINKING_LEVELS as readonly string[]).includes(level) ? { model: value.slice(0, at), thinking: level as ThinkingLevel } : { model: value };
+}
 export const moduleModelSettingsSchema = z.object({
-  models: z.record(modelTier, z.string().trim().min(1).max(200)).refine(models => Object.keys(models).length >= 1 && Object.keys(models).length <= 10, "Configure 1-10 model tiers")
-    .describe("Tier name → exact provider/model id passed to Pi, e.g. { fast: \"openai/gpt-6-luna\", strong: \"openai/gpt-6.1-sol\" }"),
+  models: z.record(modelTier, modelTierTargetSchema).refine(models => Object.keys(models).length >= 1 && Object.keys(models).length <= 10, "Configure 1-10 model tiers")
+    .describe("Tier name → { model: exact provider/model id passed to Pi, thinking?: off..max }, e.g. { fast: { model: \"openai/gpt-6-luna\", thinking: \"low\" }, strong: { model: \"openai/gpt-6.1-sol\", thinking: \"high\" } }"),
   maxCallsPerEvent: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000),
+  /** All modules together per local day; `moduleDailyCalls` caps single modules (v2-17), absent ones only by this. */
   dailyCalls: z.number().int().min(1).max(10_000), timeoutMs: z.number().int().min(5_000).max(600_000),
+  moduleDailyCalls: z.record(slug, z.number().int().min(0).max(10_000)).optional(),
+  /** v2-17: the approval review's own tier and daily calls (default: strong, else the first tier; 30 a day). */
+  review: z.object({ tier: modelTier, dailyCalls: z.number().int().min(0).max(1_000) }).strict().optional(),
 }).strict();
 export const buildSettingsSchema = z.object({
   dailyLimit: z.number().int().min(0).max(200),
@@ -390,6 +414,8 @@ export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
   builds: buildSettingsSchema,
   buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
+  /** v2-17: today's module model calls (local day), per module. */
+  modelUsage: z.array(z.object({ module: z.string(), calls: z.number().int().min(0), inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) }).strict()),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
   moduleModel: moduleModelSettingsSchema.nullable(),
   chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
@@ -519,7 +545,7 @@ export type ProviderAdapter = {
   name: string;
   health(): Promise<{ available: boolean; sandboxed: boolean; error: string | null }>;
   /** One completion with `model`: no tools, session or fallback model (`provider.complete`). Absent: unconfigured. */
-  complete?(input: { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
+  complete?(input: { model: string; thinking?: (typeof THINKING_LEVELS)[number]; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
   /** Starts a run; returns a handle that can receive messages while running. */
   start(input: ProviderRunInput): { inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
 };

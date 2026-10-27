@@ -22,6 +22,8 @@ async function fixture() {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-modules-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test" } });
+  // These tests review every version by hand: since v2-17 a green update would otherwise activate by itself.
+  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" }, createdAt: new Date("2026-10-20T00:00:00Z") } });
   const calls: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0][] = [];
   const forwarded: ApprovedAction[] = [];
   let fail = false;
@@ -57,7 +59,7 @@ async function fixture() {
     const approval = await db.approval.findFirst({ where: { workspaceId: workspace.id, status: "open" } });
     return { ...result, status: version.status, report: version.report, approvalId: approval?.id };
   };
-  const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" });
+  const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" }, "web");
   return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
 
@@ -88,13 +90,12 @@ test("a newer candidate supersedes older pending ones instead of leaving them pe
   expect((await version(newer.hash)).status).toBe("rejected");
 });
 
-test("the chat notice of a module approval keeps capabilities and intent and leaves the diff to the page", async () => {
+test("the chat notice of a module approval is the short card: level, headline, what it adds, undo; the review stays on the page", async () => {
   const f = await fixture(), result = await f.propose();
   const row = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
+  expect(row).toMatchObject({ level: "yellow", brief: { headline: "启用新应用 price-watch", added: ["给你发通知"], reversible: true } });
   const body = approvalNoticeBody(row);
-  expect(body).toContain("联网：否");
-  expect(body).toContain("改动：\n• Track the price");
-  expect(body).toContain("完整差异、测试结果和 hash 请在网页「待你决定」中查看。");
+  expect(body).toBe("启用新应用 price-watch\n新增：给你发通知\n可以一键回滚。\n详情在网页「待你决定」。");
   expect(body).not.toContain("--- active");
   expect(body).not.toContain(result.hash);
   const restore = { action: "activate_module", detail: "恢复旧版本的数据快照", preview: "将恢复 2026-10-20 的数据，此后写入的数据会丢失" };

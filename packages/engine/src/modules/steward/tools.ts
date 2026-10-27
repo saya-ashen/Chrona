@@ -13,6 +13,7 @@ import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { notifyUser } from "./notify-user";
 import { drainCalls } from "./module-calls";
+import { assessApproval } from "./approval-level";
 import { pushReply } from "./chat-replies";
 import { runFile } from "./chat";
 import { consumeOnce, effectivePolicyIn } from "./grants";
@@ -36,7 +37,8 @@ async function gate(ctx: ToolContext, action: Action, target: { moduleId?: strin
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
     if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
     if (decision.mode === "ask") {
-      const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, createdAt: now() } });
+      const assessed = await assessApproval(tx, { isolated: !!ctx.ports.sandbox?.isolated, dataDir: ctx.ports.dataDir }, { action, title: tool, payload });
+      const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, ...assessed, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action } });
       return { approvalId: approval.id, status: "awaiting_approval" };
     }

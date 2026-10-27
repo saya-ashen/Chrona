@@ -256,6 +256,9 @@ model Approval {
   detail String
   preview String
   payload Json
+  /// v2-17: green | yellow | red, computed by the kernel; `brief` is the short card text.
+  level String @default("yellow")
+  brief Json?
   scope String @default("once")
   grantId String?
   status String @default("open")

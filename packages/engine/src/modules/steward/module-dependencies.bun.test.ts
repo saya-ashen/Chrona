@@ -48,7 +48,7 @@ test("lockfile libraries install at build time, never come from the submission, 
   expect(existsSync(join(dataDir, "platform", "store", first.hash, "node_modules", "dep"))).toBe(true);
   const approval = await db.approval.findFirstOrThrow({ where: { status: "open" } });
   expect(approval.preview).toContain("语言库：npm（bun.lock）");
-  await service.approvals.resolve(approval.id, { decision: "approve", scope: "always" });
+  await service.approvals.resolve(approval.id, { decision: "approve", scope: "always" }, "web");
   expect(await service.modules.callTool("m_fmt_shout", { text: "hi" })).toEqual({ result: "HI" });
   // Same code, another library in the lockfile: never automatic, even with an always-grant for this module.
   const extra = join(dataDir, "extra"); await mkdir(extra);

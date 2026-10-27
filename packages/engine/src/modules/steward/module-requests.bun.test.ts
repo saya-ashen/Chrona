@@ -84,8 +84,8 @@ test("approvals.request waits for the user's decision and sends it back; approve
   expect(await call()).toMatchObject({ status: "waiting" });
   expect(await f.db.approval.count()).toBe(1);
 
-  await expect(f.api.approvals.resolve(card.id, { decision: "approve", scope: "always" })).rejects.toMatchObject({ code: "invalid" });
-  await f.api.approvals.resolve(card.id, { decision: "approve", scope: "once" });
+  await expect(f.api.approvals.resolve(card.id, { decision: "approve", scope: "always" }, "web")).rejects.toMatchObject({ code: "invalid" });
+  await f.api.approvals.resolve(card.id, { decision: "approve", scope: "once" }, "web");
   expect(await call()).toMatchObject({ status: "succeeded", output: { approval: card.id, decision: "approved" } });
   expect(await f.db.grant.count()).toBe(0);
   expect((await trader.call("approvals.status", { approval: card.id })).output).toMatchObject({ approval: card.id, status: "approved", hash: "trader-1" });
@@ -94,6 +94,25 @@ test("approvals.request waits for the user's decision and sends it back; approve
   const second = await trader.call("approvals.request", { title: "再开一次" }, { key: "exp-2" });
   await f.settle();
   const next = await f.db.approval.findFirstOrThrow({ where: { status: "open" } });
-  await f.api.approvals.resolve(next.id, { decision: "deny", scope: "once" });
+  await f.api.approvals.resolve(next.id, { decision: "deny", scope: "once" }, "web");
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: String(second.callId) } })).toMatchObject({ status: "succeeded", output: { approval: next.id, decision: "denied" } });
+});
+
+test("v2-17: modules.permissions gathers one app's capabilities, grants, credentials, model use and approvals, for the page only", async () => {
+  const f = await fixture();
+  const trader = await f.moduleNamed("trader", { effects: ["network", "model"], model: { tier: "strong", maxCalls: 1, maxOutputTokens: 100 }, secrets: ["okx_demo"], uses: ["approvals.request"], tools: [{ name: "start", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
+  const web = await f.moduleNamed("web", { uses: ["chat.send", "secrets.set"] });
+  const other = await f.moduleNamed("other", { uses: ["chat.send"] });
+  await f.db.workspace.update({ where: { id: f.w }, data: { settings: { moduleModel: { models: { strong: { model: "fake/m", thinking: "high" } }, maxCallsPerEvent: 1, maxOutputTokens: 100, dailyCalls: 10, timeoutMs: 5000, moduleDailyCalls: { trader: 96 } } } } });
+  await web.call("secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k-secret" }) });
+  const grant = await f.db.grant.create({ data: { workspaceId: f.w, action: "modify_external", mode: "preapproved", scope: { kind: "module", moduleId: trader.module.id } } });
+  await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
+  const view = (await web.call("modules.permissions", { module: "trader" })).output;
+  expect(view).toMatchObject({
+    module: "trader", capabilities: ["联网", "调用模型", "调用 approvals.request", "读取凭据 okx_demo"],
+    secrets: [{ name: "okx_demo", configured: true }], model: { tier: "strong", target: { model: "fake/m", thinking: "high" }, dailyCap: 96, today: { calls: 0 } },
+    grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", level: "yellow", status: "open" }],
+  });
+  expect(JSON.stringify(view)).not.toContain("k-secret");
+  await expect(other.call("modules.permissions", { module: "trader" })).rejects.toMatchObject({ code: expect.stringMatching(/forbidden|undeclared/) });
 });

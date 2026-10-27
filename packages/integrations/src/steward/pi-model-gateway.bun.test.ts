@@ -46,6 +46,11 @@ test("Pi one-shot uses stdin, exact model, isolated args/env and final JSON text
   expect(launch.agentDir).toBe(f.agentDir);
   expect(launch.envKeys).not.toContain("DATABASE_URL");
   expect(launch.envKeys).not.toContain("CHRONA_AGENT_TOKEN");
+  // v2-17: the tier's thinking level goes to Pi as its own flag; the model id stays exact.
+  expect(launch.args).not.toContain("--thinking");
+  await f.gateway.complete({ ...f.input, thinking: "max" });
+  const thinking = JSON.parse(await readFile(f.launch, "utf8"));
+  expect(thinking.args.slice(thinking.args.indexOf("--thinking"), thinking.args.indexOf("--thinking") + 2)).toEqual(["--thinking", "max"]);
 });
 for (const mode of ["exit", "malformed", "error", "wrong-model"]) test(`Pi ${mode} maps to provider_error without private output`, async () => {
   const f = await fixture(mode);

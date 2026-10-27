@@ -24,6 +24,15 @@ function policyReason(action: Action, mode: GrantMode, chosen?: Grant): string {
   const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "module" ? "你为这个模块允许过：" : "你的授权规则：";
   return `${prefix}${labels[action]}${modes[mode]}`;
 }
+/**
+ * Same scope: "never" always wins; then a one-time grant (the user just approved this very thing) over a standing rule;
+ * otherwise the stricter mode.
+ */
+function preferred(grant: Grant, chosen: Grant) {
+  if (grant.mode === "never" || chosen.mode === "never") return grant.mode === "never" && chosen.mode !== "never";
+  if (grant.once !== chosen.once) return grant.once;
+  return MODE_STRICTNESS[grant.mode] > MODE_STRICTNESS[chosen.mode];
+}
 function chooseGrant(action: Action, target: Target, grants: readonly Grant[], now: Date): Grant | undefined {
   let chosen: Grant | undefined;
   let rank = -1;
@@ -31,7 +40,7 @@ function chooseGrant(action: Action, target: Target, grants: readonly Grant[], n
     if (!isUsableGrant(grant, action, now)) continue;
     const next = specificity(grant, target);
     if (next < 0) continue;
-    if (next > rank || (next === rank && chosen && MODE_STRICTNESS[grant.mode] > MODE_STRICTNESS[chosen.mode])) {
+    if (next > rank || (next === rank && chosen && preferred(grant, chosen))) {
       chosen = grant;
       rank = next;
     }

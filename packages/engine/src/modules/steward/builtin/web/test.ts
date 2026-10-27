@@ -12,6 +12,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
+  stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
   stub("modules.tools", () => [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
   stub("planning.get", () => ({ plan: 1 })),
   stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
@@ -46,6 +47,7 @@ try {
   assert.deepEqual(await (await get("/api/web/today")).json(), { approvals: [] });
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
+  assert.deepEqual(await (await get("/api/web/modules/a1/permissions")).json(), { module: "a1", capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] });
   assert.deepEqual(await (await post("/api/web/chat", { text: "hi", session: "s1" })).json(), { sessionId: "s1", messageId: "m1" });
   assert.deepEqual(calls.at(-1), ["chat.send", { key: "web:k1", text: "hi", channel: "in_app" }]);
   await post("/api/web/chat", { text: "new" });

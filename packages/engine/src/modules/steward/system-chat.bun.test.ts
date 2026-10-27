@@ -102,9 +102,13 @@ test("a wake result goes into the original QQ conversation without a separate no
 
 test("approvals through the approvals system module; other modules and Chrona itself cannot speak for the user", async () => {
   const f = await fixture();
-  const approval = await f.api.approvals.create({ action: "change_policy", title: "设置", detail: "审查", preview: "diff", payload: {} });
-  expect(await f.qq.call("approvals.list", {})).toMatchObject([{ id: approval.id, status: "open" }]);
+  const approval = await f.api.approvals.create({ action: "schedule", title: "日程", detail: "审查", preview: "diff", payload: {} });
+  expect(await f.qq.call("approvals.list", {})).toMatchObject([{ id: approval.id, status: "open", level: "yellow" }]);
   expect(await f.qq.call("approvals.resolve", { approval: approval.id, decision: "approve" })).toMatchObject({ id: approval.id, status: "approved" });
+  // v2-17: a red approval (here a settings change) is approved on the page only; chat can still deny it.
+  const policy = await f.api.approvals.create({ action: "change_policy", title: "设置", detail: "审查", preview: "diff", payload: {} });
+  await expect(f.qq.call("approvals.resolve", { approval: policy.id, decision: "approve" })).rejects.toMatchObject({ code: "forbidden" });
+  expect(await f.qq.call("approvals.resolve", { approval: policy.id, decision: "deny" })).toMatchObject({ status: "denied" });
   // A module without these in `uses` is refused; so is a kernel-origin call (entry modules only).
   const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
   const other = await f.db.module.create({ data: { workspaceId: f.w, name: "other", activeHash: "o" } });

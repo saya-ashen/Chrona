@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { inspectPiLaunch, piEnvironment, piLaunchConfig, type PiProviderOptions } from "./pi-launch";
 
-type Input = { model: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number };
+type Input = { model: string; thinking?: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number };
 type Result = { text: string; inputTokens: number | null; outputTokens: number | null };
 type PiMessage = { provider?: string; model: string; stopReason?: string; content?: { type: string; text?: string }[]; usage?: { input?: unknown; output?: unknown } };
 type CompletionState = { child?: ChildProcess; dir?: string; expired: boolean };
@@ -32,7 +32,7 @@ function parseLine(text: string, input: Input, fail: () => void, setResult: (res
   } catch { fail(); }
 }
 function runPiProcess(config: ReturnType<typeof piLaunchConfig>, input: Input, dir: string, state: CompletionState, isExpired: () => boolean): Promise<Result> {
-  const args = ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-approve", "--mode", "json", "--model", input.model];
+  const args = ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-approve", "--mode", "json", "--model", input.model, ...(input.thinking ? ["--thinking", input.thinking] : [])];
   // Pi also accepts file paths here: our own file preserves literal system text,
   // even if that text happens to name a host file. Prompt stdin is documented by Pi CLI.
   if (input.system !== undefined) args.push("--system-prompt", join(dir, "system.txt"));

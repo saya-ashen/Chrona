@@ -63,17 +63,22 @@ function login(message) {
 }
 
 // ------------------------------------------------------------------ today --
+const LEVELS = { green: "低风险", yellow: "注意", red: "高风险" };
 function approvalItem(approval, after) {
   const decide = (decision, scope = "once") => async () => {
     try { await web(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } }); after(); }
     catch (error) { alert(error.message); }
   };
-  return h("li", {},
-    h("div", {}, h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
-    approval.detail && h("div", {}, approval.detail),
-    approval.preview && h("details", {}, h("summary", {}, "详情"), h("pre", {}, approval.preview)),
-    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"),
-      approval.moduleId && approval.action === "activate_module" && h("button", { onclick: decide("approve", "always") }, "始终允许"), h("button", { onclick: decide("deny") }, "拒绝")));
+  // v2-17: the level and short brief first; the full review (detail, diff, tests) stays folded.
+  const level = approval.level ?? "yellow", brief = approval.brief;
+  return h("li", { class: `approval ${level}` },
+    h("div", {}, h("span", { class: `level ${level}` }, LEVELS[level]), " ", h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
+    brief ? h("div", {}, brief.headline) : approval.detail && h("div", {}, approval.detail),
+    brief?.added.length ? h("div", {}, `新增：${brief.added.join("、")}`) : null,
+    brief && brief.reversible !== null ? h("div", { class: "muted" }, brief.reversible ? "可以一键回滚。" : "无法撤回。") : null,
+    brief?.reviewed === "unavailable" ? h("div", { class: "muted" }, "未经 AI 复核。") : null,
+    (approval.preview || (brief && approval.detail)) && h("details", {}, h("summary", {}, "详情"), brief && approval.detail ? h("p", {}, approval.detail) : null, approval.preview ? h("pre", {}, approval.preview) : null),
+    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, level === "red" ? "确认批准" : "批准"), h("button", { onclick: decide("deny") }, "拒绝")));
 }
 // A question a running Provider asked; unanswered questions expire and the run goes on without the answer.
 function interactionItem(interaction, after) {
@@ -273,6 +278,7 @@ async function app(appId) {
     h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `配置：${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}${meta.description ? ` · ${meta.description}` : ""}`),
       meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : ""),
     diagnosticPanel(meta),
+    await permissionsPanel(meta),
     tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : "",
     h("section", {}, h("h2", {}, "最近运行"),
       meta.runs.length ? h("ul", { class: "plain" }, meta.runs.map(run => h("li", {}, when(run.createdAt), " · ", run.triggerId, " · ",
@@ -281,6 +287,23 @@ async function app(appId) {
       h("ul", { class: "plain" }, meta.versions.slice(0, 5).map(version => h("li", {}, when(version.createdAt), " · ", version.hash.slice(0, 8), " · ", version.hash === meta.activeHash ? "当前" : version.status,
         version.errors ? h("div", { class: "error" }, version.errors.join("；")) : "")))));
 }
+// v2-17: one app's permissions and use in one place; each is still changed where it lives (settings, grants).
+async function permissionsPanel(meta) {
+  let view;
+  try { view = await web(`/modules/${meta.id}/permissions`); } catch (error) { return h("section", {}, h("h2", {}, "权限与用量"), h("p", { class: "error" }, error.message)); }
+  const revoke = grant => async () => {
+    if (!confirm("撤销这条授权？")) return;
+    try { await web(`/grants/${grant.id}/revoke`, { method: "POST" }); app(meta.id); } catch (error) { alert(error.message); }
+  };
+  const model = view.model;
+  return h("section", {}, h("h2", {}, "权限与用量"),
+    h("h3", {}, "能做什么"), view.capabilities.length ? h("ul", { class: "plain" }, view.capabilities.map(item => h("li", {}, item))) : h("p", { class: "muted" }, "只在自己的数据里工作，不联网、不调用其他应用。"),
+    view.secrets.length ? [h("h3", {}, "凭据"), h("ul", { class: "plain" }, view.secrets.map(secret => h("li", {}, secret.name, " ", h("span", { class: secret.configured ? "muted" : "error" }, secret.configured ? `已设置${secret.updatedAt ? ` · ${when(secret.updatedAt)}` : ""}` : "未设置"), " ", h("a", { href: "/settings" }, "去设置"))))] : null,
+    model ? [h("h3", {}, "模型"), h("p", {}, `档位 ${model.tier}${model.target ? `（${model.target.model}${model.target.thinking ? ` · ${model.target.thinking}` : ""}）` : "（未配置）"} · 今天 ${model.today.calls} 次${model.dailyCap !== null ? ` / 上限 ${model.dailyCap}` : ""} · 输入 ${model.today.inputTokens} / 输出 ${model.today.outputTokens} token `, h("a", { href: "/settings" }, "调整"))] : null,
+    h("h3", {}, "你给过的授权"), view.grants.length ? h("ul", { class: "plain" }, view.grants.map(grant => h("li", {}, `${grant.action} · ${grant.mode}${grant.once ? " · 一次" : ""}`, " ", h("button", { onclick: revoke(grant) }, "撤销")))) : h("p", { class: "muted" }, "没有。"),
+    h("h3", {}, "最近审批"), view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(item => h("li", {}, h("span", { class: `level ${item.level}` }, LEVELS[item.level] ?? item.level), " ", item.title, " ", h("span", { class: "muted" }, `${STATUS[item.status] ?? item.status} · ${when(item.createdAt)}`)))) : h("p", { class: "muted" }, "没有。"));
+}
+const STATUS = { open: "待决定", approved: "已批准", denied: "已拒绝", expired: "已过期" };
 function toolForm(tool) {
   const properties = Object.entries(tool.inputSchema.properties ?? {}), required = tool.inputSchema.required ?? [];
   const output = h("pre", { hidden: true });
@@ -352,16 +375,13 @@ async function settings() {
   const form = h("form", { onsubmit: async event => {
     event.preventDefault();
     const f = event.target.elements, quiet = f.quietStart.value && f.quietEnd.value ? { start: f.quietStart.value, end: f.quietEnd.value } : null;
-    let moduleModel;
-    try { moduleModel = f.moduleModel.value.trim() ? JSON.parse(f.moduleModel.value) : null; } catch { status.textContent = "模块模型不是有效的 JSON"; return; }
-    try { const saved = await web("/settings", { method: "POST", body: { notifications: { dailyCap: Number(f.dailyCap.value), quietHours: quiet, timezone: f.timezone.value, digestAt: f.digestAt.value }, moduleModel } }); showBuildUsage(saved); status.textContent = "已保存"; }
+    try { const saved = await web("/settings", { method: "POST", body: { notifications: { dailyCap: Number(f.dailyCap.value), quietHours: quiet, timezone: f.timezone.value, digestAt: f.digestAt.value } } }); showBuildUsage(saved); status.textContent = "已保存"; }
     catch (error) { status.textContent = error.message; }
   } },
     field("每天最多主动通知", h("input", { name: "dailyCap", type: "number", min: 0, max: 50, value: n.dailyCap })),
     field("安静时段", h("span", {}, h("input", { name: "quietStart", type: "time", value: n.quietHours?.start ?? "" }), " – ", h("input", { name: "quietEnd", type: "time", value: n.quietHours?.end ?? "" }))),
     field("时区", h("input", { name: "timezone", value: n.timezone })),
     field("汇总时间", h("input", { name: "digestAt", type: "time", value: n.digestAt })),
-    field("模块模型（JSON，空为不允许模块调用模型）", h("textarea", { name: "moduleModel", rows: 6 }, view.settings.moduleModel ? JSON.stringify(view.settings.moduleModel, null, 2) : "")),
     h("div", { class: "row" }, h("button", { class: "primary" }, "保存"), status));
   const builds = view.settings.builds, buildStatus = h("span", { class: "muted", role: "status" }), usage = h("p", { class: "muted" });
   const showBuildUsage = settings => {
@@ -385,6 +405,8 @@ async function settings() {
     field("单轮构建时限（分钟）", h("input", { name: "buildTimeoutMinutes", type: "number", min: 5, max: 120, step: 1, required: true, value: builds.timeoutMinutes })),
     field("每轮候选提交上限", h("input", { name: "buildMaxSubmissions", type: "number", min: 1, max: 20, step: 1, required: true, value: builds.maxSubmissions })),
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
+  // Module models (v2-17): tiers (model + thinking level), call limits, per-module daily caps and today's use.
+  const models = modelForm(view.settings, reload);
   // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
   const secretForm = secret => {
     const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
@@ -410,6 +432,7 @@ async function settings() {
     h("section", {}, h("h2", {}, "构建设置"), usage,
       h("p", { class: "muted" }, "每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。"),
       h("p", { class: "muted" }, "修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。"), buildForm),
+    models,
     secrets,
     h("section", {}, h("h2", {}, "日程"),
       live.length ? h("ul", { class: "plain" }, live.map(s => h("li", {}, s.label ?? s.mode, " ", h("span", { class: "muted" }, s.status === "paused" ? "已暂停" : s.nextAt ? when(s.nextAt) : ""), " ",
@@ -420,6 +443,51 @@ async function settings() {
         h("button", { onclick: act(`/grants/${g.id}/revoke`, null, "撤销这条授权？") }, "撤销")))) : h("p", { class: "muted" }, "没有授权规则。")),
     h("section", {}, h("h2", {}, "Chrona 记得的偏好"),
       view.preferences.length ? h("ul", { class: "plain" }, view.preferences.map(p => h("li", {}, p.text, " ", h("button", { onclick: act(`/preferences/${p.id}/forget`, null, "删除这条偏好？") }, "删除")))) : h("p", { class: "muted" }, "还没有。")));
+}
+
+const THINKING = ["", "off", "minimal", "low", "medium", "high", "xhigh", "max"];
+function modelForm(settings, reload) {
+  const current = settings.moduleModel, state = h("span", { class: "muted", role: "status" });
+  const tiers = h("div", {}), caps = h("div", {});
+  const tierRow = (name = "", target = "") => {
+    const { model = "", thinking = "" } = typeof target === "string" ? { model: target } : target;
+    tiers.append(h("div", { class: "fields" }, h("input", { name: "tier", placeholder: "档位，如 strong", value: name, autocomplete: "off" }), h("input", { name: "model", placeholder: "模型，如 openai/gpt-6.1-sol", value: model, autocomplete: "off" }),
+      h("select", { name: "thinking", "aria-label": "思考等级" }, THINKING.map(level => h("option", { value: level, ...(level === thinking ? { selected: true } : {}) }, level || "默认思考")))));
+  };
+  const capRow = (module = "", calls = "") => caps.append(h("div", { class: "fields pair" }, h("input", { name: "capModule", placeholder: "模块名", value: module, autocomplete: "off" }), h("input", { name: "capCalls", type: "number", min: 0, max: 10000, value: calls, "aria-label": "每日上限" })));
+  for (const [name, target] of Object.entries(current?.models ?? { strong: "" })) tierRow(name, target);
+  for (const [module, calls] of Object.entries(current?.moduleDailyCalls ?? {})) capRow(module, calls);
+  const number = (name, label, value, min, max) => h("label", {}, `${label} `, h("input", { name, type: "number", min, max, step: 1, required: true, value: value ?? "" }));
+  const read = f => {
+    const value = row => row.querySelector.bind(row);
+    const models = Object.fromEntries([...tiers.children].map(row => [value(row)("[name=tier]").value.trim(), value(row)("[name=model]").value.trim(), value(row)("[name=thinking]").value])
+      .filter(([tier, model]) => tier && model).map(([tier, model, thinking]) => [tier, thinking ? { model, thinking } : { model }]));
+    const moduleDailyCalls = Object.fromEntries([...caps.children].map(row => [value(row)("[name=capModule]").value.trim(), value(row)("[name=capCalls]").value]).filter(([module, calls]) => module && calls !== "").map(([module, calls]) => [module, Number(calls)]));
+    const review = f.reviewTier.value.trim() ? { review: { tier: f.reviewTier.value.trim(), dailyCalls: Number(f.reviewDailyCalls.value) } } : {};
+    return { models, maxCallsPerEvent: Number(f.maxCallsPerEvent.value), maxOutputTokens: Number(f.maxOutputTokens.value), dailyCalls: Number(f.dailyCalls.value), timeoutMs: Number(f.timeoutSeconds.value) * 1000, ...(Object.keys(moduleDailyCalls).length ? { moduleDailyCalls } : {}), ...review };
+  };
+  const save = async moduleModel => {
+    try { await web("/settings", { method: "POST", body: { moduleModel } }); state.textContent = "已保存"; reload(); } catch (error) { state.textContent = error.message; }
+  };
+  const form = h("form", { onsubmit: event => {
+    event.preventDefault();
+    const moduleModel = read(event.target.elements);
+    if (!Object.keys(moduleModel.models).length) { state.textContent = "至少配置一个档位"; return; }
+    save(moduleModel);
+  } },
+    h("p", { class: "muted" }, "模块在清单里只写档位名；这里决定每个档位用哪个模型、思考多深。"), tiers,
+    h("div", { class: "row" }, h("button", { type: "button", onclick: () => tierRow() }, "加一个档位")),
+    h("div", { class: "row" }, number("maxCallsPerEvent", "每次事件最多调用", current?.maxCallsPerEvent ?? 3, 1, 20), number("maxOutputTokens", "单次最多输出 token", current?.maxOutputTokens ?? 4000, 1, 32000),
+      number("dailyCalls", "全部模块每天合计", current?.dailyCalls ?? 30, 1, 10000), number("timeoutSeconds", "超时（秒）", (current?.timeoutMs ?? 180000) / 1000, 5, 600)),
+    h("p", { class: "muted" }, "单个模块的每日上限（未列出的只受合计限制；超出只停这个模块）："), caps,
+    h("div", { class: "row" }, h("button", { type: "button", onclick: () => capRow() }, "加一个模块上限")),
+    h("p", { class: "muted" }, "审批复核：新审批先由这个档位独立看一遍，只能提高风险等级，不能替你批准；额度用完时改为直接问你。"),
+    h("div", { class: "row" }, h("label", {}, "复核档位 ", h("input", { name: "reviewTier", placeholder: "默认 strong", value: current?.review?.tier ?? "", autocomplete: "off" })),
+      number("reviewDailyCalls", "复核每天最多", current?.review?.dailyCalls ?? 30, 0, 1000)),
+    h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存模块模型"), current && h("button", { type: "button", onclick: () => { if (confirm("关闭后模块都不能调用模型，确定？")) save(null); } }, "关闭模块模型"), state));
+  const usage = settings.modelUsage ?? [];
+  return h("section", {}, h("h2", {}, "模块模型"), current ? null : h("p", { class: "muted" }, "尚未配置：模块不能调用模型。"), form,
+    h("h3", {}, "今日用量"), usage.length ? h("ul", { class: "plain" }, usage.map(row => h("li", {}, `${row.module}：${row.calls} 次`, " ", h("span", { class: "muted" }, `输入 ${row.inputTokens} / 输出 ${row.outputTokens} token${current?.moduleDailyCalls?.[row.module] !== undefined ? ` · 上限 ${current.moduleDailyCalls[row.module]}` : ""}`)))) : h("p", { class: "muted" }, "今天还没有模块调用模型。"));
 }
 
 // ----------------------------------------------------------------- router --

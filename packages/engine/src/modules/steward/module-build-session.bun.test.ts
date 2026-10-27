@@ -47,6 +47,8 @@ async function fixture() {
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports);
   const workspaceId = (await db.workspace.create({ data: { name: "build" } })).id, api = service.forWorkspace(workspaceId);
+  // Builds here end in review; since v2-17 a green update would otherwise activate by itself.
+  await db.grant.create({ data: { workspaceId, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
   const session = await db.session.create({ data: { workspaceId, key: "web:build", source: "web" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Sort mail" });
   const requester = (await api.runs.claimNext("foreground"))!;
@@ -127,7 +129,7 @@ test("who may manage modules: the Provider in its own directory; the user may ch
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner sees diagnostics, check, rollback and build controls, never propose, checkout or build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // An ordinary module cannot reach them even if it lists them.
@@ -514,10 +516,11 @@ test("a build of several modules submits only those and asks for one approval th
   expect(approval).toMatchObject({ action: "activate_module", moduleId: null, status: "open", title: "一起启用模块 mail-sort、mail-tag" });
   expect(approval.preview).toContain("【mail-sort】"); expect(approval.preview).toContain("【mail-tag】");
   const body = approvalNoticeBody(approval);
-  expect(body).toContain("【mail-tag】"); expect(body).toContain("改动：\n• Sort shop mail without the model"); expect(body).not.toContain("--- active");
-  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "always" })).rejects.toMatchObject({ code: "invalid" });
+  expect(approval).toMatchObject({ level: "yellow", brief: { headline: "启用新应用 mail-sort、mail-tag", reversible: true } });
+  expect(body).toBe("启用新应用 mail-sort、mail-tag\n可以一键回滚。\n详情在网页「待你决定」。"); expect(body).not.toContain("--- active");
+  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "always" }, "web")).rejects.toMatchObject({ code: "invalid" });
   const generations = await f.db.generation.count();
-  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" });
+  await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
   for (const name of ["mail-sort", "mail-tag"]) expect(await f.db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ activeHash: hashes[name], status: "active" });
   expect(await f.db.generation.count()).toBe(generations + 1);
 });
@@ -526,7 +529,7 @@ test("a group activates all or nothing, and a new candidate of a member expires 
   const f = await fixture(), { approval, hashes } = await groupBuild(f);
   const tag = await f.db.module.findFirstOrThrow({ where: { name: "mail-tag" } });
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: tag.id, hash: hashes["mail-tag"]! } }, data: { status: "rejected" } });
-  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" })).rejects.toMatchObject({ code: "conflict" });
+  await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web")).rejects.toMatchObject({ code: "conflict" });
   expect((await f.db.module.findMany({ where: { name: { in: ["mail-sort", "mail-tag"] } } })).map(row => row.activeHash)).toEqual([null, null]);
 });
 

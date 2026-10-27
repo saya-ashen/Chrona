@@ -27,6 +27,21 @@ function validateNotificationSettings(notifications: NotificationSettings, now: 
   try { new Intl.DateTimeFormat("en", { timeZone: notifications.timezone }).format(now); } catch { throw new StewardError("invalid", "Invalid timezone"); }
   for (const time of [notifications.digestAt, notifications.quietHours?.start, notifications.quietHours?.end]) if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new StewardError("invalid", "Invalid time");
 }
+/** v2-17: today's module model calls and tokens (the owner's local day), from the call records and their audits. */
+export async function modelUsage(db: StewardPorts["db"], workspaceId: string, settings: unknown, at: Date) {
+  const timezone = notificationSettings(settings).timezone, day = localDayKey(at, timezone), since = new Date(at.getTime() - 48 * 3600_000);
+  const today = (row: { createdAt: Date }) => localDayKey(row.createdAt, timezone) === day;
+  const calls = (await db.moduleCall.findMany({ where: { module: { workspaceId }, method: "model", status: { not: "rejected" }, createdAt: { gte: since, lte: at } }, select: { id: true, createdAt: true, module: { select: { name: true } } } })).filter(today);
+  const audits = await db.audit.findMany({ where: { workspaceId, kind: "module_model_call", createdAt: { gte: since } }, select: { details: true } });
+  const tokens = new Map(audits.map(row => row.details as { callId?: string; inputTokens?: number | null; outputTokens?: number | null }).filter(details => details.callId).map(details => [details.callId!, details]));
+  const usage = new Map<string, { module: string; calls: number; inputTokens: number; outputTokens: number }>();
+  for (const call of calls) {
+    const row = usage.get(call.module.name) ?? { module: call.module.name, calls: 0, inputTokens: 0, outputTokens: 0 }, spent = tokens.get(call.id);
+    row.calls++; row.inputTokens += spent?.inputTokens ?? 0; row.outputTokens += spent?.outputTokens ?? 0;
+    usage.set(call.module.name, row);
+  }
+  return [...usage.values()].sort((a, b) => a.module.localeCompare(b.module));
+}
 /** `notify` is the notification module: it reports chat readiness and receives the settings it applies. */
 export function createSettings({ db, workspaceId, now }: RecordContext, notify: {
   status(): Promise<{ chat: { channel: "in_app" | "chrona_qqbot"; bound: boolean; sentToday: number } } | null>;
@@ -36,7 +51,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext, notify: 
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
     const status = await notify.status();
-    return { notifications: notificationSettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings), chat: status?.chat ?? { channel: "in_app" as const, bound: false, sentToday: 0 } };
+    return { notifications: notificationSettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings), chat: status?.chat ?? { channel: "in_app" as const, bound: false, sentToday: 0 } };
   }
   return { get, update: async (raw: unknown) => {
     const input = parseInput(updateSettingsSchema, raw);

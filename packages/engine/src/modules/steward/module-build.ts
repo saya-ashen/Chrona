@@ -8,7 +8,6 @@ import { createRuns, createRunSession } from "./runs";
 import { notifyUser } from "./notify-user";
 import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
-import { tryAutoActivate } from "./module-auto";
 import { recordGroupReview } from "./module-group";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
@@ -81,8 +80,7 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
   if (await recordGroupReview(context, version, { ...parts, detail: card.detail, needsMigration: review.needsMigration })) return { moduleId: module.id, hash, status: "pending_review", report };
-  const automatic = version.source === "builtin" ? null : await tryAutoActivate(context, version, report, card);
-  if (automatic) return { moduleId: module.id, hash, status: "approved", approvalId: automatic.id, report };
+  // v2-17: every card is reviewed first; a green one that passes activates by itself (approval-review).
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
