@@ -43,3 +43,10 @@ details > summary { cursor: pointer; font-weight: 600; margin: .6rem 0 .3rem; }
 .level.red { background: #fee2e2; color: #991b1b; }
 li.approval.red { border-left: 4px solid #dc2626; padding-left: .6rem; }
 .ok { color: #166534; font-weight: 600; }
+/* v2-23: an app's page in tabs. */
+nav.tabs { display: flex; gap: .2rem; border-bottom: 1px solid var(--line); margin: .4rem 0 .8rem; overflow-x: auto; }
+nav.tabs a { padding: .4rem .8rem; border-bottom: 2px solid transparent; white-space: nowrap; color: var(--fg); }
+nav.tabs a.selected { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+h3 { font-size: .98rem; margin: .9rem 0 .3rem; }
+label.check { display: block; }
+label.check input { width: auto; margin: 0 .4rem 0 0; vertical-align: middle; }

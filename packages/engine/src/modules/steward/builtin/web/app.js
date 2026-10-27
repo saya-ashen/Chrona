@@ -284,20 +284,48 @@ async function apps() {
     system.length ? h("section", {}, h("h2", {}, "系统"), h("p", { class: "muted" }, "Chrona 自身的一部分，随 Chrona 版本更新，只能查看。"),
       h("ul", { class: "plain" }, system.map(app => h("li", {}, h("a", { href: `/apps/system/${app.name}` }, app.name), " ", h("span", { class: "muted" }, app.description))))) : "");
 }
-async function systemApp(name, opened) {
-  const meta = await web(`/system-apps?module=${encodeURIComponent(name)}`);
-  let recent = [];
-  try { recent = (await web(`/activity?module=${encodeURIComponent(name)}`)).items; } catch { /* the rest still shows */ }
+// v2-23: one page per app, in tabs; everything about an app is here, Settings keeps only what is global.
+const APP_TABS = [["overview", "概览"], ["settings", "设置"], ["permissions", "权限"], ["activity", "活动"], ["versions", "版本"]];
+const SYSTEM_TABS = [["overview", "概览"], ["settings", "设置"], ["tools", "工具"], ["activity", "活动"]];
+function tabs(base, list, current) {
+  return h("nav", { class: "tabs", "aria-label": "应用标签" }, list.map(([key, label]) => h("a", { href: `${base}?tab=${key}`, class: key === current ? "selected" : "", "aria-current": key === current ? "page" : false }, label)));
+}
+async function systemApp(name, opened, tab = "overview") {
+  const view = await web(`/modules/${encodeURIComponent(name)}/overview`), base = `/apps/system/${encodeURIComponent(name)}`;
   const who = tool => tool.callers ? `仅 ${tool.callers.join("、")}` : tool.visibility.includes("provider") ? "Chrona" : "声明了它的应用";
-  main.replaceChildren(
-    h("section", {}, h("h2", {}, `${meta.name} · 系统`), h("p", {}, meta.description), h("p", { class: "muted" }, "Chrona 自身的一部分：不能构建、更新或停用，随 Chrona 版本更新。")),
-    meta.sessions ? h("section", {}, h("h2", {}, "最近的工作"),
-      meta.work.length ? h("ul", { class: "plain" }, meta.work.map(session => h("li", { id: `session-${session.id}` }, when(session.createdAt), " · ", session.status === "active" ? "进行中" : "已结束", " ", transcript(session.id, session.id === opened))))
-        : h("p", { class: "muted" }, "还没有工作记录。")) : "",
-    recent.length ? h("section", {}, h("h2", {}, "活动"), h("ul", { class: "plain" }, recent.slice(0, 10).map(activityItem)),
-      h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(name)}` }, "查看全部活动"))) : "",
-    name === "memory" ? await memoryPanel() : "",
-    h("section", {}, h("h2", {}, "提供的工具"), h("ul", { class: "plain" }, meta.tools.map(tool => h("li", {}, h("code", {}, `${meta.name}.${tool.name}`), " ", h("span", { class: "muted" }, `${who(tool)}可调用 · ${tool.description}`))))));
+  const current = opened ? "overview" : tab;
+  const panels = {
+    overview: async () => [h("p", {}, view.description), name === "memory" ? await memoryPanel() : "",
+      view.sessions ? h("section", {}, h("h2", {}, "最近的工作"), view.work.length ? h("ul", { class: "plain" }, view.work.map(session => h("li", { id: `session-${session.id}` }, when(session.createdAt), " · ", session.status === "active" ? "进行中" : "已结束", " ", transcript(session.id, session.id === opened)))) : h("p", { class: "muted" }, "还没有工作记录。")) : ""],
+    settings: async () => [settingsForm(name, view.settings, () => systemApp(name, null, "settings"))],
+    tools: async () => [h("ul", { class: "plain" }, view.tools.map(tool => h("li", {}, h("code", {}, `${name}.${tool.name}`), " ", h("span", { class: "muted" }, `${who(tool)}可调用 · ${tool.description}`))))],
+    activity: async () => [activityList(view.activity, name)],
+  };
+  main.replaceChildren(h("section", {}, h("h2", {}, `${name} · 系统`), h("p", { class: "muted" }, "Chrona 自身的一部分：不能构建、更新或停用，随 Chrona 版本更新。"), tabs(base, SYSTEM_TABS, current), ...await panels[current in panels ? current : "overview"]()));
+}
+function activityList(items, module) {
+  return h("div", {}, items.length ? h("ul", { class: "plain" }, items.map(activityItem)) : h("p", { class: "muted" }, "还没有活动。"), h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(module)}` }, "查看全部活动")));
+}
+// An app's own settings, as its version declares them; nothing to change says so.
+function settingsForm(module, view, after) {
+  const entries = Object.entries(view.declarations ?? {}), state = h("span", { class: "muted", role: "status" });
+  if (!entries.length) return h("p", { class: "muted" }, "这个应用没有可修改的配置。");
+  const input = ([key, setting]) => {
+    const value = view.values[key];
+    if (setting.type === "boolean") return h("input", { name: key, type: "checkbox", checked: value === true, style: "width:auto" });
+    if (setting.options) return h("select", { name: key }, setting.options.map(option => h("option", { value: option, selected: option === value }, option)));
+    return h("input", { name: key, type: setting.type === "number" ? "number" : "text", value, ...(setting.min !== undefined ? { min: setting.min } : {}), ...(setting.max !== undefined ? { max: setting.max } : {}), ...(setting.maxLength ? { maxlength: setting.maxLength } : {}), step: setting.type === "number" ? "any" : false });
+  };
+  return h("form", { onsubmit: async event => {
+    event.preventDefault();
+    const f = event.target.elements, values = Object.fromEntries(entries.map(([key, setting]) => [key, setting.type === "boolean" ? f[key].checked : setting.type === "number" ? Number(f[key].value) : f[key].value]));
+    state.textContent = "正在保存……";
+    try { await web(`/modules/${encodeURIComponent(module)}/settings`, { method: "POST", body: { values } }); state.textContent = "已保存，下次运行生效。"; after(); }
+    catch (error) { state.textContent = error.message; }
+  } }, ...entries.map(entry => entry[1].type === "boolean"
+    ? h("label", { class: "check" }, input(entry), " ", h("strong", {}, entry[1].label), entry[1].description ? h("div", { class: "muted" }, entry[1].description) : "")
+    : h("label", {}, h("strong", {}, entry[1].label), " ", input(entry), entry[1].description ? h("div", { class: "muted" }, entry[1].description) : "")),
+    h("div", { class: "row" }, h("button", { class: "primary" }, "保存"), state));
 }
 // v2-21: what memory is doing, and the user's own search with deletion.
 async function memoryPanel() {
@@ -329,24 +357,53 @@ function processLink(item) {
 function activityItem(item) {
   return h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.text, processLink(item));
 }
-// The generic app page: what Chrona recorded (versions, runs) and the tools the app offers the user.
-async function app(appId) {
-  const meta = (await web("/modules")).find(a => a.id === appId);
+// The generic app page (v2-23 tabs): what it is and does, its own settings and credentials, permissions, activity, versions.
+async function app(appId, tab = "overview") {
+  const view = await web(`/modules/${encodeURIComponent(appId)}/overview`), meta = view.app;
   if (!meta) throw new Error("没有这个应用");
-  const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
-  main.replaceChildren(
-    h("section", {}, h("h2", {}, meta.name), h("p", { class: "muted" }, `配置：${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}${meta.description ? ` · ${meta.description}` : ""}`),
-      await currentVersion(meta),
-      meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : ""),
-    diagnosticPanel(meta),
-    await permissionsPanel(meta),
-    tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : "",
-    h("section", {}, h("h2", {}, "最近运行"),
-      meta.runs.length ? h("ul", { class: "plain" }, meta.runs.map(run => h("li", {}, when(run.createdAt), " · ", run.triggerId, " · ",
-        run.error ? h("span", { class: "error" }, run.error) : run.exitCode === 0 ? "成功" : `退出码 ${run.exitCode}`))) : h("p", { class: "muted" }, "还没有运行记录。")),
-    h("section", {}, h("h2", {}, "版本"),
-      h("ul", { class: "plain" }, meta.versions.slice(0, 5).map(version => h("li", {}, when(version.createdAt), " · ", version.hash.slice(0, 8), " · ", version.hash === meta.activeHash ? "当前" : version.status,
-        version.errors ? h("div", { class: "error" }, version.errors.join("；")) : "")))));
+  const base = `/apps/${meta.id}`, reload = () => app(appId, tab);
+  const panels = {
+    overview: async () => {
+      const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
+      return [h("p", {}, `${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}`), meta.description ? h("p", {}, meta.description) : "", await currentVersion(meta),
+        meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : "", tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : ""];
+    },
+    settings: async () => [h("h3", {}, "配置"), settingsForm(meta.name, view.settings, reload), ...await credentialsPanel(view.permissions, reload), ...await modelCapPanel(meta.name, view.permissions.model, reload)],
+    permissions: async () => [permissionsPanel(view.permissions, reload)],
+    activity: async () => [activityList(view.activity, meta.name), h("h3", {}, "最近运行"),
+      meta.runs.length ? h("ul", { class: "plain" }, meta.runs.map(run => h("li", {}, when(run.createdAt), " · ", run.triggerId, " · ", run.error ? h("span", { class: "error" }, run.error) : run.exitCode === 0 ? "成功" : `退出码 ${run.exitCode}`))) : h("p", { class: "muted" }, "还没有运行记录。"),
+      diagnosticPanel(meta)],
+    versions: async () => [h("ul", { class: "plain" }, meta.versions.slice(0, 20).map(version => h("li", {}, when(version.createdAt), " · ", version.hash.slice(0, 8), " · ", version.hash === meta.activeHash ? "当前" : version.status,
+      version.errors ? h("div", { class: "error" }, version.errors.join("；")) : "")))],
+  };
+  main.replaceChildren(h("section", {}, h("h2", {}, meta.name), tabs(base, APP_TABS, tab), ...await panels[tab in panels ? tab : "overview"]()));
+}
+// Credentials this app reads; one shared by several apps says so, and saving it here changes it for all of them.
+async function credentialsPanel(permissions, after) {
+  if (!permissions.secrets.length) return [];
+  const all = (await web("/settings")).secrets ?? [];
+  return [h("h3", {}, "凭据"), h("p", { class: "muted" }, "只保存在 Chrona 本机，不会显示、不进入对话或模型；替换会覆盖整份凭据。"),
+    h("ul", { class: "plain" }, permissions.secrets.map(secret => {
+      const shared = (all.find(row => row.name === secret.name)?.modules ?? []).filter(name => name !== permissions.module);
+      return h("li", {}, h("strong", {}, secret.name), " ", h("span", { class: secret.configured ? "muted" : "error" }, secret.configured ? `已设置${secret.updatedAt ? ` · ${when(secret.updatedAt)}` : ""}` : "未设置"),
+        shared.length ? h("span", { class: "muted" }, ` · 与 ${shared.join("、")} 共用`) : "",
+        secret.configured ? h("button", { onclick: async () => { if (!confirm(`删除凭据 ${secret.name}？`)) return; try { await web(`/secrets/${secret.name}/remove`, { method: "POST" }); after(); } catch (error) { alert(error.message); } } }, "删除") : "",
+        secretForm(secret, after));
+    }))];
+}
+// The app's daily model-call cap lives in moduleModel.moduleDailyCalls; only that entry changes here.
+async function modelCapPanel(name, model, after) {
+  if (!model) return [];
+  const state = h("span", { class: "muted", role: "status" });
+  return [h("h3", {}, "模型"), h("p", {}, `档位 ${model.tier}${model.target ? `（${model.target.model}${model.target.thinking ? ` · ${model.target.thinking}` : ""}）` : "（未配置）"} · 今天 ${model.today.calls} 次 · 输入 ${model.today.inputTokens} / 输出 ${model.today.outputTokens} token`),
+    h("form", { onsubmit: async event => {
+      event.preventDefault();
+      const value = event.target.elements.cap.value, settings = (await web("/settings")).settings.moduleModel;
+      if (!settings) { state.textContent = "先在设置里配置模块模型档位。"; return; }
+      const caps = { ...settings.moduleDailyCalls };
+      if (value === "") delete caps[name]; else caps[name] = Number(value);
+      try { await web("/settings", { method: "POST", body: { moduleModel: { ...settings, moduleDailyCalls: caps } } }); state.textContent = "已保存。"; after(); } catch (error) { state.textContent = error.message; }
+    } }, h("label", {}, "每日调用上限（留空为只受全局上限） ", h("input", { name: "cap", type: "number", min: 0, max: 10000, value: model.dailyCap ?? "" })), h("div", { class: "row" }, h("button", { class: "primary" }, "保存"), state))];
 }
 // v2-18: which version runs, since when and how it got there, from the activity trail.
 async function currentVersion(meta) {
@@ -376,19 +433,26 @@ async function activity(params) {
     module ? h("p", {}, h("a", { href: "/activity" }, "看全部应用")) : null, items, more));
   await load();
 }
-// v2-17: one app's permissions and use in one place; each is still changed where it lives (settings, grants).
-async function permissionsPanel(meta) {
-  let view;
-  try { view = await web(`/modules/${meta.id}/permissions`); } catch (error) { return h("section", {}, h("h2", {}, "权限与用量"), h("p", { class: "error" }, error.message)); }
+// Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
+function secretForm(secret, after) {
+  const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
+  const addRow = () => rows.append(h("div", { class: "row" }, h("input", { name: "field", placeholder: "字段名，如 apiKey", autocomplete: "off" }), h("input", { name: "value", type: "password", placeholder: "值", autocomplete: "new-password" })));
+  for (let i = 0; i < 3; i++) addRow();
+  return h("form", { onsubmit: async event => {
+    event.preventDefault();
+    const value = Object.fromEntries([...rows.children].map(row => [row.querySelector("[name=field]").value.trim(), row.querySelector("[name=value]").value]).filter(([field, text]) => field && text));
+    if (!Object.keys(value).length) { state.textContent = "至少填写一个字段"; return; }
+    try { await web(`/secrets/${secret.name}`, { method: "POST", body: { value } }); after(); } catch (error) { state.textContent = error.message; }
+  } }, rows, h("div", { class: "row" }, h("button", { type: "button", onclick: addRow }, "加一个字段"), h("button", { type: "submit", class: "primary" }, secret.configured ? "替换" : "保存"), state));
+}
+// v2-17: what the app can do, the grants you gave it and its recent approvals (credentials and model are on its Settings tab).
+function permissionsPanel(view, after) {
   const revoke = grant => async () => {
     if (!confirm("撤销这条授权？")) return;
-    try { await web(`/grants/${grant.id}/revoke`, { method: "POST" }); app(meta.id); } catch (error) { alert(error.message); }
+    try { await web(`/grants/${grant.id}/revoke`, { method: "POST" }); after(); } catch (error) { alert(error.message); }
   };
-  const model = view.model;
-  return h("section", {}, h("h2", {}, "权限与用量"),
+  return h("div", {},
     h("h3", {}, "能做什么"), view.capabilities.length ? h("ul", { class: "plain" }, view.capabilities.map(item => h("li", {}, item))) : h("p", { class: "muted" }, "只在自己的数据里工作，不联网、不调用其他应用。"),
-    view.secrets.length ? [h("h3", {}, "凭据"), h("ul", { class: "plain" }, view.secrets.map(secret => h("li", {}, secret.name, " ", h("span", { class: secret.configured ? "muted" : "error" }, secret.configured ? `已设置${secret.updatedAt ? ` · ${when(secret.updatedAt)}` : ""}` : "未设置"), " ", h("a", { href: "/settings" }, "去设置"))))] : null,
-    model ? [h("h3", {}, "模型"), h("p", {}, `档位 ${model.tier}${model.target ? `（${model.target.model}${model.target.thinking ? ` · ${model.target.thinking}` : ""}）` : "（未配置）"} · 今天 ${model.today.calls} 次${model.dailyCap !== null ? ` / 上限 ${model.dailyCap}` : ""} · 输入 ${model.today.inputTokens} / 输出 ${model.today.outputTokens} token `, h("a", { href: "/settings" }, "调整"))] : null,
     h("h3", {}, "你给过的授权"), view.grants.length ? h("ul", { class: "plain" }, view.grants.map(grant => h("li", {}, `${grant.action} · ${grant.mode}${grant.once ? " · 一次" : ""}`, " ", h("button", { onclick: revoke(grant) }, "撤销")))) : h("p", { class: "muted" }, "没有。"),
     h("h3", {}, "最近审批"), view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(item => h("li", {}, h("span", { class: `level ${item.level}` }, LEVELS[item.level] ?? item.level), " ", item.title, " ", h("span", { class: "muted" }, `${STATUS[item.status] ?? item.status} · ${when(item.createdAt)}`)))) : h("p", { class: "muted" }, "没有。"));
 }
@@ -485,7 +549,7 @@ async function settings() {
     const f = event.target.elements, button = event.target.querySelector("button[type=submit]");
     savingBuilds = true; button.disabled = true; buildStatus.textContent = "正在保存……";
     try {
-      const saved = await web("/settings", { method: "POST", body: { builds: { dailyLimit: Number(f.buildDailyLimit.value), timeoutMinutes: Number(f.buildTimeoutMinutes.value), maxSubmissions: Number(f.buildMaxSubmissions.value) }, reflection: { enabled: f.reflection.checked } } });
+      const saved = await web("/settings", { method: "POST", body: { builds: { dailyLimit: Number(f.buildDailyLimit.value), timeoutMinutes: Number(f.buildTimeoutMinutes.value), maxSubmissions: Number(f.buildMaxSubmissions.value) } } });
       showBuildUsage(saved); buildStatus.textContent = "已保存，下次构建生效；当前构建不受影响。";
     } catch (error) { buildStatus.textContent = error.message; }
     finally { savingBuilds = false; button.disabled = false; }
@@ -493,46 +557,15 @@ async function settings() {
     field("每日新建构建上限", h("input", { name: "buildDailyLimit", type: "number", min: 0, max: 200, step: 1, required: true, value: builds.dailyLimit })),
     field("单轮构建时限（分钟）", h("input", { name: "buildTimeoutMinutes", type: "number", min: 5, max: 120, step: 1, required: true, value: builds.timeoutMinutes })),
     field("每轮候选提交上限", h("input", { name: "buildMaxSubmissions", type: "number", min: 1, max: 20, step: 1, required: true, value: builds.maxSubmissions })),
-    // Reflection (v2-19): Chrona starts builds on its own; what they produce is still levelled and reviewed.
-    field("主动反思", h("label", { class: "muted" }, h("input", { name: "reflection", type: "checkbox", checked: view.settings.reflection?.enabled !== false, style: "width:auto" }), " 应用上线或出错后，Chrona 自己判断是否需要改进并开始构建（低风险结果自动上线，其余请你批准）")),
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存构建设置"), buildStatus));
   // Module models (v2-17): tiers (model + thinking level), call limits, per-module daily caps and today's use.
   const models = modelForm(view.settings, reload);
-  // Memory (v2-21): which app provides it; the built-in one downloads its packages only when chosen.
-  const memory = view.settings.memory ?? { provider: null, autoRecall: true, autoRetain: true }, memoryStatus = h("span", { class: "muted", role: "status" });
-  const memoryForm = h("form", { onsubmit: async event => {
-    event.preventDefault();
-    const f = event.target.elements, provider = f.memoryProvider.value === "other" ? f.memoryOther.value.trim() : f.memoryProvider.value;
-    memoryStatus.textContent = "正在保存……";
-    try { await web("/settings", { method: "POST", body: { memory: { provider: provider || null, autoRecall: f.autoRecall.checked, autoRetain: f.autoRetain.checked } } }); memoryStatus.textContent = "已保存。"; }
-    catch (error) { memoryStatus.textContent = error.message; }
-  } },
-    field("记忆提供者", h("select", { name: "memoryProvider" },
-      h("option", { value: "", selected: !memory.provider }, "不启用"),
-      h("option", { value: "memory-local", selected: memory.provider === "memory-local" }, "内置（memory-local，启用时下载约 262 MB）"),
-      h("option", { value: "other", selected: !!memory.provider && memory.provider !== "memory-local" }, "其他应用（适配模块）"))),
-    field("其他应用名", h("input", { name: "memoryOther", value: memory.provider && memory.provider !== "memory-local" ? memory.provider : "", placeholder: "如 memory-hindsight" })),
-    field("对话开始时自动检索", h("input", { name: "autoRecall", type: "checkbox", checked: memory.autoRecall, style: "width:auto" })),
-    field("每 4 条消息自动写入", h("input", { name: "autoRetain", type: "checkbox", checked: memory.autoRetain, style: "width:auto" })),
-    h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存记忆设置"), memoryStatus));
-  // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
-  const secretForm = secret => {
-    const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
-    const addRow = () => rows.append(h("div", { class: "row" }, h("input", { name: "field", placeholder: "字段名，如 apiKey", autocomplete: "off" }), h("input", { name: "value", type: "password", placeholder: "值", autocomplete: "new-password" })));
-    for (let i = 0; i < 3; i++) addRow();
-    return h("form", { onsubmit: async event => {
-      event.preventDefault();
-      const value = Object.fromEntries([...rows.children].map(row => [row.querySelector("[name=field]").value.trim(), row.querySelector("[name=value]").value]).filter(([field, text]) => field && text));
-      if (!Object.keys(value).length) { state.textContent = "至少填写一个字段"; return; }
-      try { await web(`/secrets/${secret.name}`, { method: "POST", body: { value } }); reload(); } catch (error) { state.textContent = error.message; }
-    } }, rows, h("div", { class: "row" }, h("button", { type: "button", onclick: addRow }, "加一个字段"), h("button", { type: "submit", class: "primary" }, secret.configured ? "替换" : "保存"), state));
-  };
-  const secrets = h("section", {}, h("h2", {}, "凭据"),
-    h("p", { class: "muted" }, "应用需要的账号密钥。只保存在 Chrona 本机，不会显示、不进入对话或模型；替换会覆盖整份凭据。"),
-    view.secrets?.length ? h("ul", { class: "plain" }, view.secrets.map(secret => h("li", {},
-      h("strong", {}, secret.name), " ", h("span", { class: "muted" }, `${secret.configured ? `已设置 · ${when(secret.updatedAt)}` : "未设置"}${secret.modules.length ? ` · 用于 ${secret.modules.join("、")}` : ""}`), " ",
-      secret.configured && h("button", { onclick: act(`/secrets/${secret.name}/remove`, null, `删除凭据 ${secret.name}？`) }, "删除"),
-      secretForm(secret)))) : h("p", { class: "muted" }, "没有应用需要凭据。"));
+  // v2-23: each app's own settings, credentials and model cap are on its page; this lists where they are.
+  const [modules, system] = await Promise.all([web("/modules"), web("/system-apps").catch(() => [])]);
+  const needs = new Map((view.secrets ?? []).flatMap(secret => secret.modules.map(name => [name, secret.configured])));
+  const perApp = h("section", {}, h("h2", {}, "按应用设置"), h("p", { class: "muted" }, "每个应用自己的配置、凭据和模型上限在它的“设置”标签里。"),
+    h("ul", { class: "plain" }, [...modules.map(m => h("li", {}, h("a", { href: `/apps/${m.id}?tab=settings` }, m.name), needs.has(m.name) && !needs.get(m.name) ? h("span", { class: "error" }, " · 凭据未设置") : "")),
+      ...system.map(m => h("li", {}, h("a", { href: `/apps/system/${m.name}?tab=settings` }, m.name), h("span", { class: "muted" }, " · 系统")))]));
   const activeGrants = view.grants.filter(g => !g.revokedAt && !(g.once && g.consumedAt) && !(g.expiresAt && Date.parse(g.expiresAt) <= Date.now()));
   const live = view.schedules.filter(s => s.status === "active" || s.status === "paused");
   main.replaceChildren(
@@ -541,8 +574,7 @@ async function settings() {
       h("p", { class: "muted" }, "每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。"),
       h("p", { class: "muted" }, "修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。"), buildForm),
     models,
-    h("section", {}, h("h2", {}, "记忆"), h("p", { class: "muted" }, "对话内容会写入你选的记忆系统；检索到的记忆只作参考数据。外部系统由 Chrona 构建适配应用接入。"), memoryForm),
-    secrets,
+    perApp,
     h("section", {}, h("h2", {}, "日程"),
       live.length ? h("ul", { class: "plain" }, live.map(s => h("li", {}, s.label ?? s.mode, " ", h("span", { class: "muted" }, s.status === "paused" ? "已暂停" : s.nextAt ? when(s.nextAt) : ""), " ",
         s.status === "active" ? h("button", { onclick: act(`/schedules/${s.id}`, { status: "paused" }) }, "暂停") : h("button", { onclick: act(`/schedules/${s.id}`, { status: "active" }) }, "恢复"),
@@ -608,8 +640,8 @@ async function route() {
     else if (parts[0] === "sessions" && parts[1]) await chat(parts[1]);
     else if (parts[0] === "files") await files(url.searchParams);
     else if (parts[0] === "settings") await settings();
-    else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemApp(decodeURIComponent(parts[2]), url.searchParams.get("session"));
-    else if (parts[0] === "apps" && parts[1]) await app(parts[1]);
+    else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemApp(decodeURIComponent(parts[2]), url.searchParams.get("session"), url.searchParams.get("tab") ?? "overview");
+    else if (parts[0] === "apps" && parts[1]) await app(parts[1], url.searchParams.get("tab") ?? "overview");
     else if (parts[0] === "apps") await apps();
     else if (parts[0] === "activity") await activity(url.searchParams);
     else await today();

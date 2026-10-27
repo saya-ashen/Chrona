@@ -115,6 +115,38 @@ export const interfaceRefSchema = z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z]
 const listenPath = z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]);
 /** The HTTP paths a module serves (`listen` is one path or several). */
 export const listenPaths = (manifest: { listen?: string | readonly string[] }): string[] => manifest.listen === undefined ? [] : typeof manifest.listen === "string" ? [manifest.listen] : [...manifest.listen];
+/** v2-23: one user-editable setting a module declares: its type, label, default and bounds (shown on the app's Settings tab). */
+export const moduleSettingSchema = z.object({
+  type: z.enum(["number", "string", "boolean"]), label: z.string().trim().min(1).max(60), description: z.string().max(300).optional(),
+  default: z.union([z.number(), z.string().max(2000), z.boolean()]),
+  min: z.number().optional(), max: z.number().optional(), options: z.array(z.string().max(100)).min(1).max(20).optional(), maxLength: z.number().int().min(1).max(2000).optional(),
+}).strict().superRefine((setting, ctx) => { for (const message of settingIssues(setting)) ctx.addIssue({ code: "custom", message }); });
+function settingIssues(setting: { type: string; default: unknown; min?: number; max?: number; options?: string[]; maxLength?: number }) {
+  return [
+    typeof setting.default !== setting.type && "default must match type",
+    setting.type !== "number" && (setting.min !== undefined || setting.max !== undefined) && "min/max are for numbers",
+    setting.type !== "string" && (setting.options || setting.maxLength) && "options/maxLength are for strings",
+    !settingValueValid(setting, setting.default) && "default is outside the declared bounds",
+  ].filter((message): message is string => !!message);
+}
+export type ModuleSetting = z.infer<typeof moduleSettingSchema>;
+/** Whether a value fits a declared setting (type, bounds, options, length). */
+export function settingValueValid(setting: { type: string; min?: number; max?: number; options?: string[]; maxLength?: number }, value: unknown) {
+  if (typeof value !== setting.type) return false;
+  if (typeof value === "number") return Number.isFinite(value) && (setting.min === undefined || value >= setting.min) && (setting.max === undefined || value <= setting.max);
+  if (typeof value === "string") return (!setting.options || setting.options.includes(value)) && value.length <= (setting.maxLength ?? 2000);
+  return true;
+}
+/** The params a module runs with (v2-23): its manifest params, then its settings from the owner's moduleSettings.<name>. */
+export function moduleRuntimeParams(manifest: { name: string; params: Record<string, { value: string | number | boolean }>; settings: Record<string, ModuleSetting> }, settings: unknown) {
+  const stored = ((settings as { moduleSettings?: Record<string, unknown> } | null)?.moduleSettings ?? {})[manifest.name];
+  return { ...Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])), ...effectiveSettings(manifest.settings, stored) };
+}
+/** The values a module runs with: each stored value that still fits its declaration, else the default. */
+export function effectiveSettings(declared: Record<string, ModuleSetting>, stored: unknown) {
+  const values = stored && typeof stored === "object" && !Array.isArray(stored) ? stored as Record<string, unknown> : {};
+  return Object.fromEntries(Object.entries(declared).map(([key, setting]) => [key, settingValueValid(setting, values[key]) ? values[key] as string | number | boolean : setting.default]));
+}
 export const moduleManifestSchema = z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
@@ -163,11 +195,16 @@ export const moduleManifestSchema = z.object({
   model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
+  /** v2-23: what the user may change without a new version; values live in Settings and reach the module as params. */
+  settings: z.record(slug, moduleSettingSchema).default({}).refine(value => Object.keys(value).length <= 20, "At most 20 settings"),
   /** v2-21: a higher address-space cap (ulimit -v) than the default, for runtimes that reserve much more than they use; shown on the approval. */
   limits: z.object({ virtualMemoryMb: z.number().int().min(1024).max(8192) }).strict().optional(),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
   tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
 }).strict().superRefine((manifest, ctx) => {
+  // v2-23: settings and params arrive together in ev.params.
+  for (const key of Object.keys(manifest.settings)) if (Object.hasOwn(manifest.params, key)) ctx.addIssue({ code: "custom", path: ["settings", key], message: "A setting cannot share its name with a param" });
+}).superRefine((manifest, ctx) => {
   for (const [key, param] of Object.entries(manifest.params)) {
     if (typeof param.value !== param.type) ctx.addIssue({ code: "custom", path: ["params", key, "value"], message: "Value must match parameter type" });
   }
@@ -511,7 +548,7 @@ export const modulesToolInputSchemas = {
     .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
     .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the running release's reference even when customization prevented registering that built-in. Returns the exact content hash; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
-    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; activation needs the user\'s hash-bound approval. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with callers:["events"] and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
+    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; activation needs the user\'s hash-bound approval. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with callers:["events"] and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   rollback: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": z.object({ versions: z.array(z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(2).max(4) }).strict()

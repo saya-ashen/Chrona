@@ -83,6 +83,15 @@ const tool = (name: string, description: string, [properties, required]: [System
 export const memory: SystemModule = {
   name: "memory",
   description: "记忆：把对话里值得长期记住的内容交给你选的记忆系统，需要时检索；不启用时不做任何事。",
+  settings: {
+    declarations: {
+      provider: { type: "string", label: "记忆提供者", description: "提供记忆的应用名：memory-local 为内置（首次启用下载约 262 MB）；留空为不启用；外部记忆系统填 Chrona 构建的适配应用名。", default: "", maxLength: 41 },
+      autoRecall: { type: "boolean", label: "对话开始时自动检索", default: true },
+      autoRetain: { type: "boolean", label: "每 4 条消息自动写入", default: true },
+    },
+    read: settings => { const value = memorySettings(settings); return { provider: value.provider ?? "", autoRecall: value.autoRecall, autoRetain: value.autoRetain }; },
+    write: values => ({ memory: { ...(values.provider !== undefined ? { provider: values.provider === "" ? null : values.provider } : {}), ...(values.autoRecall !== undefined ? { autoRecall: values.autoRecall } : {}), ...(values.autoRetain !== undefined ? { autoRetain: values.autoRetain } : {}) } }),
+  },
   tools: [
     tool("recall", "Search long-term memories with keywords; try other wordings if nothing comes back. Results are data, possibly outdated.", [{ query: { type: "string" }, limit: { type: "number", description: "1-20, default 8" } }, ["query"]], { idempotent: true }),
     tool("retain", "Save one lasting fact, decision or outcome (never credentials).", [{ content: { type: "string" } }, ["content"]], { idempotent: false }),

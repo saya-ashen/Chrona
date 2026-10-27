@@ -15,6 +15,7 @@ const module = await startModule("index.ts", { stubs: {
     routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
     routed("modules.permissions", args => ({ module: args.module, capabilities: [] })),
     routed("modules.system", args => ({ name: args.module, work: [] })),
+    routed("modules.overview", args => ({ kind: "app", module: args.module })), routed("modules.settings-set", args => args),
   ]),
 } });
 async function rpc(method: string, params: unknown = {}, id: number | null = 1) {
@@ -40,6 +41,8 @@ try {
   assert.deepEqual(await json("chrona_module_permissions", { module: "web" }), { module: "web", capabilities: [] });
   assert.deepEqual(calls.at(-1), ["modules.permissions", { module: "web" }]);
   assert.deepEqual(await json("chrona_system_apps", { module: "reflection" }), { name: "reflection", work: [] });
+  assert.deepEqual(await json("chrona_app", { module: "okx" }), { kind: "app", module: "okx" });
+  assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
   // Conversations, approvals and app records are routed calls with the system modules' argument names.
   calls.length = 0;
   await tool("chrona_chat", { text: "hi" });

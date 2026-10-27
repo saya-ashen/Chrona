@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type SessionSource } from "@chrona/contracts/steward";
+import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
 import type { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
@@ -34,7 +34,9 @@ export type SystemTool = Tool & { input?: z.ZodType; output?: z.ZodType; documen
  * `call`: the async call being delivered (absent for sync calls). v2-20: `description` and `sessions` (the conversation
  * source a system module does its work in) show it to the user as a read-only app.
  */
-export type SystemModule = { name: string; description: string; sessions?: SessionSource; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"]; deadline?: number; call?: { id: string } }, tool: string, args: Record<string, unknown>): Promise<Json> };
+/** v2-23: settings a system module shows on its app page; values live in the owner's Settings (read/write map them). */
+export type SystemSettings = { declarations: Record<string, ModuleSetting>; read(settings: unknown): Record<string, string | number | boolean>; write(values: Record<string, unknown>): Record<string, unknown> };
+export type SystemModule = { name: string; description: string; sessions?: SessionSource; settings?: SystemSettings; tools: SystemTool[]; unrecorded?: string[]; handle(context: { ports: StewardPorts; workspaceId: string; caller: Caller; run?: CallOrigin["run"]; deadline?: number; call?: { id: string } }, tool: string, args: Record<string, unknown>): Promise<Json> };
 /**
  * Thrown by a system tool that waits for the user (v2-16 `approvals.request`): the async call stays `waiting`, untouched
  * by leases and retries, until `settleWaiting` gives its result, which goes back to the caller as a `call_result`.

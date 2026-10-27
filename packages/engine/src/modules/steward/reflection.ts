@@ -148,6 +148,11 @@ export const reflection: SystemModule = {
   name: "reflection",
   description: "反思：应用上线或出错且无法自动恢复时，Chrona 判断是否需要改进并开始构建；构建结果照常分级。",
   sessions: "reflect",
+  settings: {
+    declarations: { enabled: { type: "boolean", label: "主动反思", description: "应用上线或出错且无法自动恢复时，Chrona 判断是否需要改进并开始构建（低风险结果自动上线，其余请你批准）。", default: true } },
+    read: settings => ({ enabled: reflectionSettings(settings).enabled }),
+    write: values => ({ reflection: { enabled: values.enabled } }),
+  },
   tools: [{ name: "suggest", description: reflectionSuggestSchema.description!, parameters: { type: "object", properties: {}, required: [] }, visibility: ["provider"], idempotent: false, input: reflectionSuggestSchema }],
   async handle({ ports, workspaceId, caller }, name, args) {
     if (name !== "suggest") throw new CallError("not_found", `reflection.${name} not found`);

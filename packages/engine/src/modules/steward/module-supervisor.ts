@@ -1,6 +1,6 @@
 import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { listenPaths, moduleManifestSchema, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
+import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { moduleModelSettings } from "./settings";
 import { registerBuiltins } from "./module-builtin";
@@ -208,14 +208,19 @@ class ModuleSupervisor {
       if (!builtin || !manifest.dynamicSchedules || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires a built-in module declaring dynamicSchedules"), "unavailable");
     } else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
+  /** The owner's settings decide a model module's timeout and every module's params (v2-23 settings). */
+  private async eventLimits(manifest: ModuleManifest, workspaceId: string, requested?: number) {
+    const workspace = manifest.model || Object.keys(manifest.settings).length ? await this.ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } }) : null;
+    const timeoutMs = requested ?? (workspace && manifest.model ? moduleModelSettings(workspace.settings)?.timeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs);
+    return { timeoutMs, params: moduleRuntimeParams(manifest, workspace?.settings) };
+  }
   private async sendEvent(instance: Instance, event: ModuleEvent, workspaceId: string, requested?: number) {
     const { manifest } = instance;
     try { await (instance.start ??= this.startInstance(instance)); }
     catch (error) { throw staged(error, "unavailable"); }
-    const workspace = manifest.model ? await this.ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } }) : null;
-    const timeoutMs = requested ?? (workspace ? moduleModelSettings(workspace.settings)?.timeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs);
+    const { timeoutMs, params } = await this.eventLimits(manifest, workspaceId, requested);
     let reply: Reply;
-    try { reply = await instance.channel!.send({ ...event, params: Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])) }, timeoutMs); }
+    try { reply = await instance.channel!.send({ ...event, params }, timeoutMs); }
     catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
     if ("error" in reply) throw staged(new Error(reply.error), "handler");
     return reply;

@@ -6,7 +6,7 @@ import type { StewardPorts } from "./ports";
  */
 const KINDS = ["approval_created", "approval_review", "approval_resolved", "module_build_started", "module_submission", "module_build_settled", "module_build_rejection",
   "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident",
-  "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "approval_habits", "reflection_started", "reflection_suggested"] as const;
+  "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "approval_habits", "reflection_started", "reflection_suggested", "module_settings_updated"] as const;
 const LEVELS: Record<string, string> = { green: "低风险", yellow: "注意", red: "高风险" };
 const SOURCES: Record<string, string> = { web: "网页", qq: "QQ", mcp: "MCP", cli: "命令行", rescue: "救援控制台", entry: "其他应用" };
 const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建", reflection: "主动反思" };
@@ -47,6 +47,7 @@ function moduleText(row: Row, details: Record<string, unknown>, names: Names) {
     admin_rollback: `你在命令行把 ${name} 回滚到版本 ${hash}`,
     module_migration_started: `${name} 开始迁移数据（${String(details.from)} → ${String(details.to)}）`,
     module_runtime_incident: `${name} 运行出错：${typeof reason === "string" ? reason.slice(0, 120) : "见诊断"}`,
+    module_settings_updated: `你修改了 ${name} 的设置：${Array.isArray(details.keys) ? details.keys.join("、") : ""}`,
   };
   return { text: texts[row.kind]!, module: subject.module };
 }

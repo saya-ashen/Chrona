@@ -83,10 +83,17 @@ async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult>
   if (request.method === "POST" && path[0] === "runs" && path[2] === "cancel" && path.length === 3) return call("chat.cancel", { run: path[1] });
   return NO_ROUTE;
 }
-async function moduleRoute({ request, path }: ApiContext): Promise<ApiResult> {
-  if (request.method === "GET" && path[0] === "modules" && path[2] === "diagnostics" && path.length === 3) return call("modules.diagnostics", { module: path[1] });
-  if (request.method === "GET" && path[0] === "modules" && path[2] === "permissions" && path.length === 3) return call("modules.permissions", { module: path[1] });
-  return NO_ROUTE;
+// /modules/<module>/<view>: read-only views, and (v2-23) one app's page in one read and its own settings.
+const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unknown>> = {
+  "GET diagnostics": module => call("modules.diagnostics", { module }),
+  "GET permissions": module => call("modules.permissions", { module }),
+  "GET overview": module => call("modules.overview", { module }),
+  "POST settings": (module, body) => call("modules.settings-set", { module, values: JSON.stringify(body.values ?? {}) }),
+};
+async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
+  const route = `${request.method} ${path[2]}`;
+  if (path[0] !== "modules" || path.length !== 3 || !Object.hasOwn(MODULE_ROUTES, route)) return NO_ROUTE;
+  return MODULE_ROUTES[route]!(path[1]!, body);
 }
 const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute];
 
