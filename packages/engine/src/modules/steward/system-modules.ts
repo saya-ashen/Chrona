@@ -393,7 +393,7 @@ const settings: SystemModule = {
   description: "设置：通知、模型、构建、反思与授权规则。",
   tools: [
     tool("get", "Owner settings: notifications, moduleModel, build limits and today's build usage.", {}, [], { idempotent: true }),
-    tool("update", "Change owner notification, model or build settings. Build edits apply to the next run.", { settings: text('JSON {"notifications"?: {...}, "moduleModel"?: {"models": {tier: {"model", "thinking"?: off..max}}, "maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "timeoutMs", "moduleDailyCalls"?: {module: n}} | null, "builds"?: {"dailyLimit"?: 0..200, "timeoutMinutes"?: 5..120, "maxSubmissions"?: 1..20}, "reflection"?: {"enabled": boolean}}') }, ["settings"], { idempotent: true }),
+    tool("update", "Change owner notification, model or build settings. Build edits apply to the next run.", { settings: text('JSON {"notifications"?: {...}, "moduleModel"?: {"models": {tier: {"model", "thinking"?: off..max}}, "maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "timeoutMs", "moduleDailyCalls"?: {module: n}} | null, "builds"?: {"dailyLimit"?: 0..200, "timeoutMinutes"?: 5..120, "maxSubmissions"?: 1..20}, "reflection"?: {"enabled": boolean}, "memory"?: {"provider"?: module name | null, "autoRecall"?: boolean, "autoRetain"?: boolean}}') }, ["settings"], { idempotent: true }),
     tool("grants", "Grant rules (what Chrona may do without asking), active first.", {}, [], { idempotent: true }),
     tool("revoke-grant", "Revoke a grant rule.", { grant: text() }, ["grant"], { idempotent: true }),
     tool("preferences", "What Chrona remembers about the user.", {}, [], { idempotent: true }),

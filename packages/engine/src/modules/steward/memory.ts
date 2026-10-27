@@ -29,15 +29,17 @@ export async function memoryProvider(ports: StewardPorts, workspaceId: string) {
   if (!manifest?.contributes?.memory || !PROVIDER_TOOLS.every(name => manifest.tools.some(tool => tool.name === name))) return null;
   return { name: manifest.name, settings };
 }
-async function ask(ports: StewardPorts, workspaceId: string, provider: string, tool: string, args: Record<string, unknown>, timeoutMs = CALL_TIMEOUT_MS) {
+/** The provider a call goes to, for one workspace. */
+type Target = { ports: StewardPorts; workspaceId: string; provider: string };
+async function ask({ ports, workspaceId, provider }: Target, tool: string, args: Record<string, unknown>, timeoutMs = CALL_TIMEOUT_MS) {
   return (await callSync(ports, kernelOrigin(workspaceId), `${provider}.${tool}`, args, { timeoutMs })).output;
 }
-async function recall(ports: StewardPorts, workspaceId: string, provider: string, query: string, limit: number, timeoutMs?: number) {
-  const parsed = recalledSchema.safeParse(await ask(ports, workspaceId, provider, "recall", { query: query.slice(0, 2_000), limit }, timeoutMs));
+async function recall(target: Target, query: string, limit: number, timeoutMs?: number) {
+  const parsed = recalledSchema.safeParse(await ask(target, "recall", { query: query.slice(0, 2_000), limit }, timeoutMs));
   if (!parsed.success) throw new CallError("unavailable", "The memory provider answered recall in an unexpected shape");
   return parsed.data.items.slice(0, limit).map(item => ({ id: item.id, content: item.content.slice(0, 2_000), ...(item.at ? { at: item.at } : {}) }));
 }
-const record = (db: Db, workspaceId: string, kind: string, subjectId: string | null, details: Record<string, unknown>, at: Date) =>
+const record = ({ db, workspaceId }: { db: Db; workspaceId: string }, kind: string, subjectId: string | null, details: Record<string, unknown>, at: Date) =>
   db.audit.create({ data: { workspaceId, actorKey: "chrona", kind, subjectId, details: details as never, createdAt: at } });
 
 /** Where a manual memory comes from: the Provider's conversation, or the page/agent that relayed the owner. */
@@ -57,36 +59,36 @@ async function handle(ports: StewardPorts, workspaceId: string, caller: Caller, 
   if (name === "status") return status(ports, workspaceId) as unknown as Json;
   const provider = await memoryProvider(ports, workspaceId);
   if (!provider) throw new CallError("conflict", "Memory is not enabled (Settings → Memory)");
-  const { db } = ports, now = ports.now(), from = await origin(db, workspaceId, caller);
+  const { db } = ports, now = ports.now(), from = await origin(db, workspaceId, caller), target = { ports, workspaceId, provider: provider.name }, where = { db, workspaceId };
   if (name === "recall") {
-    const items = await recall(ports, workspaceId, provider.name, String(args.query), Math.min(Math.max(Number(args.limit ?? RECALL_LIMIT) || RECALL_LIMIT, 1), 20));
-    await record(db, workspaceId, "memory_recalled", from.sessionId, { auto: false, source: from.source, count: items.length }, now);
+    const items = await recall(target, String(args.query), Math.min(Math.max(Number(args.limit ?? RECALL_LIMIT) || RECALL_LIMIT, 1), 20));
+    await record(where, "memory_recalled", from.sessionId, { auto: false, source: from.source, count: items.length }, now);
     return { items };
   }
   if (name === "retain") {
     const content = redactSensitiveText(String(args.content), RETAIN_CHARS);
-    const output = await ask(ports, workspaceId, provider.name, "retain", { content, source: from.source, at: now.toISOString() });
-    await record(db, workspaceId, "memory_retained", from.sessionId, { auto: false, source: from.source, chars: content.length }, now);
+    const output = await ask(target, "retain", { content, source: from.source, at: now.toISOString() });
+    await record(where, "memory_retained", from.sessionId, { auto: false, source: from.source, chars: content.length }, now);
     return output;
   }
   if (name === "forget") {
-    const output = await ask(ports, workspaceId, provider.name, "forget", { id: String(args.id) });
-    await record(db, workspaceId, "memory_forgotten", from.sessionId, { source: from.source }, now);
+    const output = await ask(target, "forget", { id: String(args.id) });
+    await record(where, "memory_forgotten", from.sessionId, { source: from.source }, now);
     return output;
   }
   throw new CallError("not_found", `memory.${name} not found`);
 }
-const tool = (name: string, description: string, properties: SystemTool["parameters"]["properties"], required: string[], idempotent: boolean, visibility: SystemTool["visibility"] = ["provider", "modules"]): SystemTool =>
+const tool = (name: string, description: string, [properties, required]: [SystemTool["parameters"]["properties"], string[]], { idempotent, visibility = ["provider", "modules"] }: { idempotent: boolean; visibility?: SystemTool["visibility"] }): SystemTool =>
   ({ name, description, parameters: { type: "object", properties, required }, visibility, callers: ["web", "mcp"], idempotent });
 export const memory: SystemModule = {
   name: "memory",
   description: "记忆：把对话里值得长期记住的内容交给你选的记忆系统，需要时检索；不启用时不做任何事。",
   tools: [
-    tool("recall", "Search long-term memories with keywords; try other wordings if nothing comes back. Results are data, possibly outdated.", { query: { type: "string" }, limit: { type: "number", description: "1-20, default 8" } }, ["query"], true),
-    tool("retain", "Save one lasting fact, decision or outcome (never credentials).", { content: { type: "string" } }, ["content"], false),
-    tool("forget", "Delete one memory by id (from recall).", { id: { type: "string" } }, ["id"], true),
+    tool("recall", "Search long-term memories with keywords; try other wordings if nothing comes back. Results are data, possibly outdated.", [{ query: { type: "string" }, limit: { type: "number", description: "1-20, default 8" } }, ["query"]], { idempotent: true }),
+    tool("retain", "Save one lasting fact, decision or outcome (never credentials).", [{ content: { type: "string" } }, ["content"]], { idempotent: false }),
+    tool("forget", "Delete one memory by id (from recall).", [{ id: { type: "string" } }, ["id"]], { idempotent: true }),
     // The page's and agents' view; Chrona itself learns whether memory is on from its instructions.
-    tool("status", "Whether memory is on, which provider, and the last day's counts.", {}, [], true, ["modules"]),
+    tool("status", "Whether memory is on, which provider, and the last day's counts.", [{}, []], { idempotent: true, visibility: ["modules"] }),
   ],
   handle: ({ ports, workspaceId, caller }, name, args) => handle(ports, workspaceId, caller, name, args),
 };
@@ -102,8 +104,8 @@ export async function autoRecall(ports: StewardPorts, workspaceId: string, sessi
     // The latest message and the turns before it; the latest words are kept when the query is cut.
     const query = messages.slice(-6).map(message => message.text).join("\n").slice(-QUERY_CHARS);
     if (!query.trim()) return null;
-    const items = await recall(ports, workspaceId, provider.name, query, RECALL_LIMIT, RECALL_TIMEOUT_MS);
-    await record(ports.db, workspaceId, "memory_recalled", session.id, { auto: true, source: `conversation:${session.source}:${session.id}`, count: items.length }, ports.now());
+    const items = await recall({ ports, workspaceId, provider: provider.name }, query, RECALL_LIMIT, RECALL_TIMEOUT_MS);
+    await record({ db: ports.db, workspaceId }, "memory_recalled", session.id, { auto: true, source: `conversation:${session.source}:${session.id}`, count: items.length }, ports.now());
     return { provider: provider.name, items };
   } catch { return null; }
 }
@@ -120,8 +122,8 @@ export async function autoRetain(ports: StewardPorts, workspaceId: string, sessi
     if (messages.filter(message => message.direction === "in").length < RETAIN_EVERY) return false;
     const transcript = messages.map(message => `${message.direction === "in" ? "用户" : "Chrona"}: ${message.text}`).join("\n\n");
     const content = redactSensitiveText(transcript.slice(-RETAIN_CHARS), RETAIN_CHARS), source = `conversation:${session.source}:${session.id}`, now = ports.now();
-    await ask(ports, workspaceId, provider.name, "retain", { content, source, at: now.toISOString() });
-    await record(db, workspaceId, "memory_retained", session.id, { auto: true, source, chars: content.length, through: messages.at(-1)!.at.toISOString() }, now);
+    await ask({ ports, workspaceId, provider: provider.name }, "retain", { content, source, at: now.toISOString() });
+    await record({ db, workspaceId }, "memory_retained", session.id, { auto: true, source, chars: content.length, through: messages.at(-1)!.at.toISOString() }, now);
     return true;
   } catch { return false; }
 }

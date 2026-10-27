@@ -782,9 +782,8 @@ test("huge code diff truncates with checkout hash while manifest and intent stay
   expect(preview).toContain("=== index.ts (changed) ===");
   expect(preview).toContain(`意图：${JSON.stringify(intent)}`);
   const manifest = (await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.moduleId!, hash: first.hash } } })).manifest;
-  for (const line of JSON.stringify(manifest, null, 2).split("\n")) {
-    expect(preview).toContain(`- ${line}`); expect(preview).toContain(`+ ${line}`);
-  }
+  // v2-22: an unchanged manifest folds to one line; what changes is always shown whole (see module-preview).
+  expect(preview).toContain(`--- active\n+++ proposed\n  …（${JSON.stringify(manifest, null, 2).split("\n").length} 行未变）`);
   expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${second.hash}`)).toBe(true);
 });
 

@@ -41,9 +41,8 @@ on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: {
   // Only the kernel's memory module calls these; the build's smoke start sends a tool event without a caller.
   if (!event.caller) return { result: { ignored: "no caller" } };
   if (event.caller.kind !== "kernel") throw new Error("Only Chrona's memory module may call this");
-  const tool = tools[event.id];
-  if (!tool) throw new Error(`Unknown tool ${event.id}`);
-  return { result: await tool(event.args) };
+  if (!Object.hasOwn(tools, event.id)) throw new Error(`Unknown tool ${event.id}`);
+  return { result: await tools[event.id]!(event.args) };
 });
 // Daily consolidation with mnemopi's own rules (no model calls).
 on("schedule", async () => { (await memory()).sleep(false); return {}; });

@@ -38,6 +38,20 @@ function lineDiff(before: string, after: string): string[] {
   }
   return lines;
 }
+/** Changed lines with `context` unchanged lines around them; longer unchanged runs fold into one line (manifest reviews). */
+export function compactDiff(before: string, after: string, context = 2) {
+  const lines = lineDiff(before, after), keep = lines.map(() => false);
+  lines.forEach((line, index) => { if (!line.startsWith("  ")) for (let near = Math.max(0, index - context); near <= Math.min(lines.length - 1, index + context); near++) keep[near] = true; });
+  const out: string[] = [];
+  for (let index = 0; index < lines.length;) {
+    if (keep[index]) { out.push(lines[index++]!); continue; }
+    let end = index;
+    while (end < lines.length && !keep[end]) end++;
+    out.push(`  …（${end - index} 行未变）`);
+    index = end;
+  }
+  return out;
+}
 // Compiled caches (e.g. .pyc) are not text; diffing their bytes shows as mojibake in approvals.
 function isText(bytes: Buffer) {
   if (bytes.includes(0)) return false;

@@ -11,7 +11,7 @@ import { runTests, checkContinuity } from "./module-continuity";
 import { recordGroupReview } from "./module-group";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
-import { readModuleFiles, codeDifference, continuityPreview, insertCodeDiff } from "./module-preview";
+import { readModuleFiles, codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
   try { return await readModuleFiles(join(context.platform, "staging", version.id), "Unsafe module staging file"); }
@@ -45,7 +45,8 @@ function reviewPrefix(manifest: ReturnType<typeof moduleManifestSchema.parse>, r
 async function reviewPreview(context: ModuleContext, review: Review, active: Awaited<ReturnType<ModuleContext["db"]["moduleVersion"]["findUnique"]>>) {
   const { store } = context, { version, module, report, files, needsMigration } = review, { hash } = version;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  const diff = ["--- active", "+++ proposed", ...JSON.stringify(active?.manifest ?? null, null, 2).split("\n").map(line => `- ${line}`), ...JSON.stringify(manifest, null, 2).split("\n").map(line => `+ ${line}`)].join("\n");
+  // Only what changes (v2-22): two whole manifests could fill an approval, and a group's would not fit one.
+  const diff = ["--- active", "+++ proposed", ...compactDiff(active?.manifest ? JSON.stringify(active.manifest, null, 2) : "", JSON.stringify(manifest, null, 2))].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = reviewPrefix(manifest, report, diff);
   const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
