@@ -42,17 +42,25 @@ async function migratesData(dataDir: string | undefined, module: { id: string; d
   if (manifest.data.schema === module.dataSchema) return false;
   return !dataDir || !await dataEmpty(join(dataDir, "platform", "data", module.id));
 }
-/** Code that runs unisolated, acts as the user, moves data, or holds a credential it can send out. */
-const isRed = (isolated: boolean, manifest: Manifest, restore: boolean, migrates: boolean) =>
-  !isolated || isEntryModule(manifest) || restore || migrates || (manifest.secrets.length > 0 && manifest.effects.includes("network"));
+/**
+ * Code that runs unisolated, moves data, newly acts as the user (a new entry module, or one gaining capabilities), or newly
+ * holds a credential it can send out. An entry module's update that adds nothing is yellow: always asked, never automatic.
+ */
+const canLeak = (manifest: Manifest) => manifest.secrets.length > 0 && manifest.effects.includes("network");
+const newlyLeaks = (previous: Manifest | null, next: Manifest) =>
+  canLeak(next) && !(previous?.effects.includes("network") && next.secrets.every(name => previous.secrets.includes(name)));
+const isRed = (isolated: boolean, previous: Manifest | null, manifest: Manifest, added: string[], movesData: boolean) =>
+  !isolated || movesData || newlyLeaks(previous, manifest) || (isEntryModule(manifest) && (!previous || !isEntryModule(previous) || added.length > 0));
+const levelOf = (isolated: boolean, previous: Manifest | null, manifest: Manifest, added: string[], movesData: boolean): Level =>
+  isRed(isolated, previous, manifest, added, movesData) ? "red" : added.length || !previous || isEntryModule(manifest) ? "yellow" : "green";
 async function assessVersion(tx: Db, { isolated, dataDir }: Facts, target: { moduleId: string; hash: string; restore?: unknown }) {
   const module = await tx.module.findUnique({ where: { id: target.moduleId } });
   const manifest = module ? await manifestOf(tx, module.id, target.hash) : null;
   if (!module || !manifest) return { name: module?.name ?? "?", fresh: false, level: "red" as Level, added: [], reversible: false };
   const active = await manifestOf(tx, module.id, module.activeHash), restore = !!target.restore;
   const added = addedCapabilities(active, manifest), migrates = !!active && await migratesData(dataDir, module, manifest);
-  const level: Level = isRed(isolated, manifest, restore, migrates) ? "red" : added.length || !active ? "yellow" : "green";
-  return { name: module.name, fresh: !active, level, added, reversible: !restore && !migrates };
+  const level = levelOf(isolated, active, manifest, added, restore || migrates);
+  return { name: isEntryModule(manifest) ? `${module.name}（入口模块）` : module.name, fresh: !active, level, added, reversible: !restore && !migrates };
 }
 function activationTargets(payload: unknown): { moduleId: string; hash: string; restore?: unknown }[] {
   const value = payload as { kind?: string; moduleId?: string; hash?: string; restore?: unknown; versions?: { moduleId: string; hash: string }[] } | null;

@@ -27,11 +27,11 @@ test("a memory cap is bounded, and keeping the same cap adds nothing", () => {
 });
 
 /** One module with an active version and a candidate; the level comes only from these facts. */
-async function assess(next: Record<string, unknown>, { isolated = true, fresh = false, schema = 1, restore = false, emptyData = false } = {}) {
+async function assess(next: Record<string, unknown>, { isolated = true, fresh = false, schema = 1, restore = false, emptyData = false, previous = {} as Record<string, unknown> } = {}) {
   const db = testDb(); dbs.push(db);
   const workspace = await db.workspace.create({ data: { name: "level" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "prices", activeHash: fresh ? null : "a", dataSchema: schema } });
-  if (!fresh) await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a", manifest: manifest(), source: "user", intent: {}, report: {}, status: "approved" } });
+  if (!fresh) await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a", manifest: manifest(previous), source: "user", intent: {}, report: {}, status: "approved" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "b", manifest: manifest(next), source: "provider", intent: {}, report: {}, status: "pending_review" } });
   const payload = { kind: "activate_module", moduleId: module.id, hash: "b", ...(restore ? { restore: { schema: 1, snapshotAt: "x" } } : {}) };
   const dataDir = emptyData ? mkdtempSync(join(tmpdir(), "chrona-level-")) : undefined;
@@ -42,8 +42,13 @@ test.each([
   ["new capability", { effects: ["notify_user", "network"] }, {}, "yellow", "更新 prices，能力有增加", true],
   ["new app", {}, { fresh: true }, "yellow", "启用新应用 prices", true],
   ["unisolated sandbox", {}, { isolated: false }, "red", "更新 prices，能力不变", true],
-  ["acts as the user", { uses: ["chat.send"] }, {}, "red", "更新 prices，能力有增加", true],
+  ["acts as the user", { uses: ["chat.send"] }, {}, "red", "更新 prices（入口模块），能力有增加", true],
   ["credential that can leave", { effects: ["notify_user", "network"], secrets: ["okx_demo"] }, {}, "red", "更新 prices，能力有增加", true],
+  ["network added to a credential", { effects: ["notify_user", "network"], secrets: ["okx_demo"] }, { previous: { secrets: ["okx_demo"] } }, "red", "更新 prices，能力有增加", true],
+  ["credential and network kept", { effects: ["notify_user", "network"], secrets: ["okx_demo"] }, { previous: { effects: ["notify_user", "network"], secrets: ["okx_demo"] } }, "green", "更新 prices，能力不变", true],
+  ["entry module, nothing new", { uses: ["chat.send"] }, { previous: { uses: ["chat.send"] } }, "yellow", "更新 prices（入口模块），能力不变", true],
+  ["entry module gains a capability", { uses: ["chat.send", "files.read"] }, { previous: { uses: ["chat.send"] } }, "red", "更新 prices（入口模块），能力有增加", true],
+  ["new entry module", { uses: ["chat.send"] }, { fresh: true }, "red", "启用新应用 prices（入口模块）", true],
   ["data migration", { data: { schema: 2, migrate: "migrate.ts" } }, {}, "red", "更新 prices，能力不变", false],
   ["schema change without data", { data: { schema: 2 } }, { emptyData: true }, "green", "更新 prices，能力不变", true],
   ["data restore", {}, { restore: true }, "red", "回滚 prices 并恢复旧数据，此后写入的数据会丢失", false],
