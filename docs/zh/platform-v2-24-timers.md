@@ -1,6 +1,6 @@
 # v2-24 规格：应用自己的定时与日历
 
-状态：第 1 步内核已实现（2026-10-29），未部署；第 2、3 步待线上构建。用户已确认三步都做。依赖 [v2-3](platform-v2-3-remind-model.md)、[v2-9](platform-v2-9-owner-api.md)、[v2-17](platform-v2-17-approval-levels-model-tiers.md)。
+状态：第 1 步内核已实现并部署（2026-10-29，`fb5dcbc3`）；第 2 步 `calendar` 2f8f1471 与 `web` 9fc35bac 已启用（2026-10-29）；第 3 步待做。用户已确认三步都做。依赖 [v2-3](platform-v2-3-remind-model.md)、[v2-9](platform-v2-9-owner-api.md)、[v2-17](platform-v2-17-approval-levels-model-tiers.md)。
 
 ## 1. 背景
 
