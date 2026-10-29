@@ -109,7 +109,7 @@ export async function moduleOverview(ports: StewardPorts, workspaceId: string, n
 const settingValue = z.union([z.number(), z.string(), z.boolean()]);
 export const moduleSettingsOutputSchema = z.object({ declarations: z.record(z.string(), moduleSettingSchema), values: z.record(z.string(), settingValue) });
 const activitySchema = z.object({ id: z.string(), at: z.string(), kind: z.string(), module: z.string().nullable(), text: z.string(), session: z.object({ id: z.string(), source: z.enum(["reflect", "build"]) }).optional() });
-const permissionsSchema = z.object({
+export const permissionsSchema = z.object({
   module: z.string(), activeHash: z.string().nullable(), capabilities: z.array(z.string()),
   secrets: z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable() })),
   model: z.object({ tier: z.string(), target: z.unknown(), maxCallsPerEvent: z.number().optional(), dailyCap: z.number().nullable(), today: z.object({ calls: z.number(), inputTokens: z.number(), outputTokens: z.number() }).passthrough() }).nullable(),

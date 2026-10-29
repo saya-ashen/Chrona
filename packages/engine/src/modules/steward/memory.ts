@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { memoryRecallOutput, memoryRetainOutput, memoryForgetOutput, memoryStatusOutput } from "./system-outputs";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import type { StewardPorts } from "./ports";
@@ -78,8 +79,8 @@ async function handle(ports: StewardPorts, workspaceId: string, caller: Caller, 
   }
   throw new CallError("not_found", `memory.${name} not found`);
 }
-const tool = (name: string, description: string, [properties, required]: [SystemTool["parameters"]["properties"], string[]], { idempotent, visibility = ["provider", "modules"] }: { idempotent: boolean; visibility?: SystemTool["visibility"] }): SystemTool =>
-  ({ name, description, parameters: { type: "object", properties, required }, visibility, callers: ["web", "mcp"], idempotent });
+const tool = (name: string, description: string, [properties, required]: [SystemTool["parameters"]["properties"], string[]], { idempotent, visibility = ["provider", "modules"], output }: { idempotent: boolean; visibility?: SystemTool["visibility"]; output: z.ZodType }): SystemTool =>
+  ({ name, description, parameters: { type: "object", properties, required }, visibility, callers: ["web", "mcp"], idempotent, output });
 export const memory: SystemModule = {
   name: "memory",
   description: "记忆：把对话里值得长期记住的内容交给你选的记忆系统，需要时检索；不启用时不做任何事。",
@@ -93,11 +94,11 @@ export const memory: SystemModule = {
     write: values => ({ memory: { ...(values.provider !== undefined ? { provider: values.provider === "" ? null : values.provider } : {}), ...(values.autoRecall !== undefined ? { autoRecall: values.autoRecall } : {}), ...(values.autoRetain !== undefined ? { autoRetain: values.autoRetain } : {}) } }),
   },
   tools: [
-    tool("recall", "Search long-term memories with keywords; try other wordings if nothing comes back. Results are data, possibly outdated.", [{ query: { type: "string" }, limit: { type: "number", description: "1-20, default 8" } }, ["query"]], { idempotent: true }),
-    tool("retain", "Save one lasting fact, decision or outcome (never credentials).", [{ content: { type: "string" } }, ["content"]], { idempotent: false }),
-    tool("forget", "Delete one memory by id (from recall).", [{ id: { type: "string" } }, ["id"]], { idempotent: true }),
+    tool("recall", "Search long-term memories with keywords; try other wordings if nothing comes back. Results are data, possibly outdated.", [{ query: { type: "string" }, limit: { type: "number", description: "1-20, default 8" } }, ["query"]], { idempotent: true, output: z.lazy(() => memoryRecallOutput) }),
+    tool("retain", "Save one lasting fact, decision or outcome (never credentials).", [{ content: { type: "string" } }, ["content"]], { idempotent: false, output: z.lazy(() => memoryRetainOutput) }),
+    tool("forget", "Delete one memory by id (from recall).", [{ id: { type: "string" } }, ["id"]], { idempotent: true, output: z.lazy(() => memoryForgetOutput) }),
     // The page's and agents' view; Chrona itself learns whether memory is on from its instructions.
-    tool("status", "Whether memory is on, which provider, and the last day's counts.", [{}, []], { idempotent: true, visibility: ["modules"] }),
+    tool("status", "Whether memory is on, which provider, and the last day's counts.", [{}, []], { idempotent: true, visibility: ["modules"], output: z.lazy(() => memoryStatusOutput) }),
   ],
   handle: ({ ports, workspaceId, caller }, name, args) => handle(ports, workspaceId, caller, name, args),
 };

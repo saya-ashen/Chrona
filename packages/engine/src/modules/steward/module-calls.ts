@@ -113,6 +113,14 @@ function nextPath(origin: CallOrigin) {
   const name = callerName(origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
 }
+/** v2-25: a system tool's output against its declared `output`. A mismatch is Chrona's own bug: logged, never failing the caller (tests fail). */
+export function checkSystemOutput(target: string, tool: SystemTool, output: unknown) {
+  const result = tool.output?.safeParse(output);
+  if (!result || result.success) return;
+  const issues = result.error.issues.slice(0, 5).map(issue => `${issue.path.join(".")}: ${issue.message}`);
+  if (process.env.NODE_ENV === "test") throw new Error(`${target} output does not match its declared output: ${issues.join("; ")}`);
+  console.error(JSON.stringify({ component: "module-calls", event: "call.output_mismatch", target, issues }));
+}
 function validArgs(tool: SystemTool, raw: unknown) {
   try { return tool.input ? parseInput(tool.input, raw) as Record<string, unknown> : validateToolArgs(tool, raw); }
   catch (error) { throw new CallError("invalid", error instanceof StewardError ? error.message : "Invalid call arguments"); }
@@ -145,6 +153,7 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, finish, 
   // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
     const output = await resolved.system!.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run, deadline: origin.deadline }, resolved.tool.name, args);
+    checkSystemOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output);
     await finish({ status: "succeeded", output: (quiet ? {} : output) as Prisma.InputJsonValue });
     return { callId: rowId, output };
   } catch (error) {
@@ -284,6 +293,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   if (resolved.system) {
     try {
       const output = await resolved.system.handle({ ports, workspaceId: row.workspaceId, caller, call: { id: row.id } }, resolved.tool.name, args);
+      checkSystemOutput(target, resolved.tool, output);
       return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
     } catch (error) {
       if (error instanceof AwaitUser) return settle({ status: "waiting", output: error.output as Prisma.InputJsonValue, error: null });

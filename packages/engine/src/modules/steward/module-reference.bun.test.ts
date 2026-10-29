@@ -54,7 +54,8 @@ test("development reference exposes exact contracts, synthetic non-empty example
   expect(reference.examples.map(example => moduleDiagnosticsOutputSchema.parse(example)[0]!.incidents[0]!.status)).toEqual(["retrying", "unresolved", "verifying", "recovered"]);
   expect(reference.documentation).toContain("never replay");
   expect(await f.call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ contractHash: reference.contractHash });
-  expect(await f.call("m_modules_reference", { target: "settings.get" })).toMatchObject({ outputSchema: null, examples: [] });
+  // v2-25: every module-callable system tool declares its output.
+  expect(await f.call("m_modules_reference", { target: "settings.get" })).toMatchObject({ outputSchema: { type: "object" }, examples: [] });
   for (const target of ["modules.overview", "modules.settings-set"]) expect(await f.call("m_modules_reference", { target })).toMatchObject({ outputSchema: expect.any(Object), documentation: expect.stringContaining("not_found"), examples: expect.arrayContaining([expect.anything()]) });
   expect(await f.db.moduleRun.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_runtime_incident" } })).toBe(0);
