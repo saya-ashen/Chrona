@@ -14,7 +14,7 @@ async function fixture(mode = "normal") {
   await writeFile(command, `#!${process.execPath}
 import {appendFileSync,writeFileSync} from 'node:fs';
 const mode=${JSON.stringify(mode)};
-if(process.argv.includes('--version')){if(mode==='slow-version')await Bun.sleep(90);console.log(mode==='bad-version'?'9.9.9':mode==='version-1.3'?'1.3.0':'0.85.0');process.exit(0)}
+if(process.argv.includes('--version')){if(mode==='slow-version')await Bun.sleep(90);console.log(mode==='bad-version'?'9.9.9':mode==='version-1.3'?'1.3.0':mode==='version-1.4'?'1.4.0':'0.85.0');process.exit(0)}
 writeFileSync('launch.json',JSON.stringify({args:process.argv.slice(2),agentDir:process.env.PI_CODING_AGENT_DIR}));
 let streaming=false,compacting=false,queued=0,cycle=0,delayedState=false;
 const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n');
@@ -169,11 +169,12 @@ test("rejects a version mismatch before model work", async () => {
   expect((await f.provider.start(f.input).done).outcome).toBe("unavailable");
   expect(await f.marked("launch.json")).toBe(false);
 });
-test("accepts the default 0.85 pin and explicit 1.3 pin, rejects unsupported pins", async () => {
-  const legacy = await fixture(), modern = await fixture("version-1.3");
+test("accepts the default 0.85 pin and 1.x pins from 1.3, rejects unsupported pins", async () => {
+  const legacy = await fixture(), modern = await fixture("version-1.3"), newer = await fixture("version-1.4");
   expect((await createPiProvider({ ...legacy.options, expectedVersion: undefined }).start(legacy.input).done).outcome).toBe("finished");
   expect((await createPiProvider({ ...modern.options, expectedVersion: "1.3.0" }).start(modern.input).done).outcome).toBe("finished");
-  expect((await createPiProvider({ ...legacy.options, expectedVersion: "9.9.9" }).health()).available).toBe(false);
+  expect((await createPiProvider({ ...newer.options, expectedVersion: "1.4.0" }).start(newer.input).done).outcome).toBe("finished");
+  for (const pin of ["9.9.9", "1.2.0", "2.0.0"]) expect((await createPiProvider({ ...legacy.options, expectedVersion: pin }).health()).available).toBe(false);
 });
 test("expired deadlines never start the Provider", async () => {
   const f = await fixture();

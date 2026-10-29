@@ -74,8 +74,6 @@ prisma/dev.db-wal.*
 /dist/
 dist/
 /packages/cli/dist/
-apps/web/dist/
-apps/web/node_modules/.vite/
 
 # npm pack
 *.tgz

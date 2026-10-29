@@ -40,9 +40,9 @@ chrona backup /absolute/private/path/chrona-backup.db
 chrona doctor
 ```
 
-备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/affairs`，包括 git 历史，以及 `<dataDir>/secrets`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的事务/凭据目录按空目录恢复。拒绝符号链接和特殊文件；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
+备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/platform`、`sessions`、`secrets` 和 `qq-bot`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的数据目录按空目录恢复。拒绝符号链接和特殊文件；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
 
-不要用运行中的裸数据库复制代替一致性备份。QQ 状态（包括数据目录中的 `qq-bot`）、Provider profile（默认 `<dataDir>/providers/pi`，包含其自身认证）及其他自定义目录不在此 tar 中，需单独安全归档。不要公开或将认证写入版本库。
+不要用运行中的裸数据库复制代替一致性备份。Provider profile（默认 `<dataDir>/providers/pi`，包含其自身认证）及其他自定义目录不在此 tar 中，需单独安全归档。不要公开或将认证写入版本库。
 
 恢复前停止服务，确认目标数据库路径，保留现有数据备份：
 
@@ -50,9 +50,9 @@ chrona doctor
 chrona restore /absolute/private/path/chrona-backup.db
 ```
 
-恢复必须同时提供数据库和同名 `.tar`，不会静默退回仅恢复数据库。默认不覆盖已有数据库或事务/凭据目录；`--force` 替换而非合并目录，避免留下旧文件。恢复拒绝不安全路径、链接及非本命令生成的归档格式。只恢复可信来源的备份。
+恢复必须同时提供数据库和同名 `.tar`，不会静默退回仅恢复数据库。默认不覆盖已有数据库或数据目录；`--force` 替换而非合并目录，避免留下旧文件。恢复拒绝不安全路径、链接及非本命令生成的归档格式。只恢复可信来源的备份。
 
-旧数据库恢复副本保留在数据库旁，旧事务/凭据目录保留为数据目录下 `.restore-files-*-prior-affairs` / `-prior-secrets`。普通错误会回滚目录；跨 SQLite 与文件目录的替换不是崩溃原子事务。断电或强制中断后，不要直接重启：保留整个目录，请 owner 检查数据库恢复标记及暂存/旧目录，或在全新目标目录用完整备份对重试。大归档恢复会占用与归档大小相关的内存。
+旧数据库恢复副本保留在数据库旁，旧数据目录保留为数据目录下 `.restore-files-*-prior-platform` / `-prior-sessions` / `-prior-secrets` / `-prior-qq-bot`。普通错误会回滚目录；跨 SQLite 与文件目录的替换不是崩溃原子事务。断电或强制中断后，不要直接重启：保留整个目录，请 owner 检查数据库恢复标记及暂存/旧目录，或在全新目标目录用完整备份对重试。大归档恢复会占用与归档大小相关的内存。
 
 只有明确要替换且已有恢复手段时才使用 `chrona restore /absolute/private/path/chrona-backup.db --force`。恢复后运行 `chrona doctor`，再启动服务并检查页面。建议先在独立目录演练恢复，不要首次在真实数据上试验。
 
@@ -70,9 +70,8 @@ bun run packages/cli/src/index.ts doctor
 
 - 存储：`DATABASE_URL`、`CHRONA_DATA_DIR`；迁移路径覆盖为 `CHRONA_MIGRATIONS_DIR`。
 - API：`HOST`、`PORT`、`API_KEY`、`ALLOWED_ORIGINS`。保持回环监听；不得靠危险覆盖项替代认证。
-- Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
+- Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0` 及以后的 `1.x`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
-- 来源：`CHRONA_CHINO_DASHBOARD_URL` 配置 Chino 适配器；邮箱在设置 → 连接器填写 IMAP/SMTP 配置和密码，凭据保存在 `<dataDir>/secrets`。只读同步、入站去重，SMTP 代发须批准。
 - 模块依赖：有 `nix` 时用 `CHRONA_NIXPKGS`（flake 引用，建议固定为系统 nixpkgs）构建系统程序；没有时只检查主机已安装的程序。语言库只按模块的 `bun.lock` / `uv.lock` 安装，构建时需要能访问 npm / PyPI。
 - QQ：由内置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经 `secret` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
@@ -119,7 +118,7 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 # PI_CODING_AGENT_DIR="$CHRONA_STEWARD_PI_AGENT_DIR" "$CHRONA_STEWARD_PI_COMMAND"
 ```
 
-1. 审查并固定专用可执行文件，不附带 shell 参数。不要直接复用会追加日常扩展/主题/配置的交互式包装器。版本输出须精确匹配配置；当前只接受 `0.85.0` 和 `1.3.0`，两者能力并不等同，不据本机版本推断服务能力。
+1. 审查并固定专用可执行文件，不附带 shell 参数。不要直接复用会追加日常扩展/主题/配置的交互式包装器。版本输出须精确匹配配置；当前只接受 `0.85.0` 和 `1.3.0` 及以后的 `1.x`（1.x 小版本按 semver 视为 RPC 兼容），0.85 与 1.x 能力并不等同，不据本机版本推断服务能力。
 2. profile 须已存在、为绝对规范路径且不经符号链接，位于事务/工作目录之外。Unix 下不得有 group/other 权限（建议 `0700`），并应由服务用户管理。Chrona 不自动创建它、不复制认证。实际传给 Pi 的变量为 `PI_CODING_AGENT_DIR`。该目录仅隔开服务资源与可写状态，不是完整的宿主私密信息读取隔离。
 3. 设置 `CHRONA_STEWARD_AGENT=pi`，检查 Chrona 工具扩展有效；需要网页工具时显式设置已审查的网页扩展。保留关闭资源自动发现及 `--no-approve` 项目信任拒绝。每次启动在提示/注入前查询 `get_commands`，拒绝不属于显式扩展/技能的命令资源。可选资源清单须为 profile 和事务树之外、私有、规范路径的 JSON 文件，入口只接受明确的本地文件及三个已列明的 Pi 1.3 内置扩展；修改后重启，不自动安装或发现资源。配置与原生 MCP 限制见 [Provider 运行说明](provider-runtime.md)。命令检查不覆盖任意包装器代码或仅注入工具的扩展，不能替代入口审查。
 4. 重启后查看设置 → 运行状况及 `/health`。缺命令/profile/扩展、版本不符、未启用或正在停止都可能使 Agent 不可用。健康检查不发送模型请求，也不验证认证、完整工具清单或真实交互链路；命令资源检查发生在具体运行启动时。

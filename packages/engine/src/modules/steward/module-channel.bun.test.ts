@@ -86,3 +86,22 @@ test("channel accepts exactly one connection and rejects invalid outbound events
     expect(() => f.channel.send({ ...event, now: "invalid" })).toThrow();
   } finally { await f.close(); }
 });
+test("drained waits for calls the module is still waiting on, and says whether it waited", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-channel-"));
+  let answer!: () => void;
+  const held = new Promise<void>(resolve => { answer = resolve; });
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { await held; return { id: call.id, result: { output: { ok: true } } }; } });
+  const socket = createConnection(join(root, "channel.sock")), next = lines(socket);
+  try {
+    await channel.ready;
+    expect(await channel.drained()).toBe(false);
+    socket.write(JSON.stringify({ id: "resolve", method: "call", params: { target: "approvals.resolve", args: {} } }) + "\n");
+    await Bun.sleep(20);
+    let done = false;
+    const drained = channel.drained().then(waited => { done = true; return waited; });
+    await Bun.sleep(20); expect(done).toBe(false);
+    answer();
+    expect(await drained).toBe(true);
+    expect(await next()).toEqual({ id: "resolve", result: { output: { ok: true } } });
+  } finally { socket.destroy(); await channel.close(); await rm(root, { recursive: true, force: true }); }
+});

@@ -2,7 +2,7 @@
 
 Project rules and codebase orientation live in [`AGENTS.md`](AGENTS.md) — read
 it first. Product goals: [`docs/zh/steward-goals.md`](docs/zh/steward-goals.md);
-architecture, data model and pages: [`docs/zh/steward-rebuild.md`](docs/zh/steward-rebuild.md).
+architecture: [`docs/zh/platform-v2.md`](docs/zh/platform-v2.md).
 
 ## Agent skills
 

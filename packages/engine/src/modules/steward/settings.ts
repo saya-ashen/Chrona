@@ -1,4 +1,4 @@
-import { DEFAULT_NOTIFICATION_SETTINGS, RUN_LIMITS, buildSettingsSchema, moduleModelSettingsSchema, memorySettingsSchema, notificationSettingsSchema, reflectionSettingsSchema, updateSettingsSchema, type NotificationSettings } from "@chrona/contracts/steward";
+import { DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_SESSION_SETTINGS, RUN_LIMITS, sessionSettingsSchema, buildSettingsSchema, moduleModelSettingsSchema, memorySettingsSchema, notificationSettingsSchema, reflectionSettingsSchema, updateSettingsSchema, type NotificationSettings } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -25,6 +25,10 @@ export function reflectionSettings(settings: unknown) {
 export function memorySettings(settings: unknown) {
   const value = settings as { memory?: unknown } | null;
   return memorySettingsSchema.parse({ provider: null, autoRecall: true, autoRetain: true, ...(value?.memory && typeof value.memory === "object" ? value.memory : {}) });
+}
+export function sessionSettings(settings: unknown) {
+  const value = settings as { sessions?: unknown } | null;
+  return sessionSettingsSchema.parse({ ...DEFAULT_SESSION_SETTINGS, ...(value?.sessions && typeof value.sessions === "object" ? value.sessions : {}) });
 }
 /** Same local-day count for both admission and the owner's settings page. */
 export async function buildUsage(db: Pick<StewardPorts["db"], "session">, workspaceId: string, settings: unknown, at: Date) {
@@ -61,7 +65,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext, notify: 
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
     const status = await notify.status();
-    return { notifications: notificationSettings(row.settings), reflection: reflectionSettings(row.settings), memory: memorySettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings), chat: status?.chat ?? { channel: "in_app" as const, bound: false, sentToday: 0 } };
+    return { notifications: notificationSettings(row.settings), reflection: reflectionSettings(row.settings), memory: memorySettings(row.settings), sessions: sessionSettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings), chat: status?.chat ?? { channel: "in_app" as const, bound: false, sentToday: 0 } };
   }
   return { get, update: async (raw: unknown) => {
     const input = parseInput(updateSettingsSchema, raw);
@@ -71,7 +75,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext, notify: 
       const notifications = notificationSettingsSchema.parse({ ...notificationSettings(row.settings), ...input.notifications });
       validateNotificationSettings(notifications, now());
       const previous = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings : {};
-      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, notifications, builds: buildSettingsSchema.parse({ ...buildSettings(row.settings), ...input.builds }), moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel, reflection: input.reflection ?? reflectionSettings(row.settings), memory: { ...memorySettings(row.settings), ...input.memory } } } });
+      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, notifications, builds: buildSettingsSchema.parse({ ...buildSettings(row.settings), ...input.builds }), moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel, reflection: input.reflection ?? reflectionSettings(row.settings), memory: { ...memorySettings(row.settings), ...input.memory }, sessions: sessionSettingsSchema.parse({ ...sessionSettings(row.settings), ...input.sessions }) } } });
       if (input.notifications) await notify.forward(tx, notifications, now());
       await audit(tx, { workspaceId, kind: "settings_updated", actor: "user", subjectId: workspaceId, details: input });
     });

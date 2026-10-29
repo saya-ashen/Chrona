@@ -1,6 +1,6 @@
 # v2-13 规格：模块管理是 `modules` 的工具，构建是会话
 
-状态：已实现（2026-10-25）；与草案的差异见第 8 节。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-11](platform-v2-11-provider-module.md)；取代 [P4 构建规格](platform-p4-build-spec.md) 的构建运行（lane `build`）。
+状态：已实现（2026-10-25）；与草案的差异见第 8 节。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-11](platform-v2-11-provider-module.md)。
 
 ## 1. 背景
 

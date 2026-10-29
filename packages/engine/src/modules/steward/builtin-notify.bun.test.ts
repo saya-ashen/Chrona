@@ -5,7 +5,7 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { registerBuiltins } from "./module-builtin";
 import { moduleSupervisor } from "./module-supervisor";
 import { callsSettled, drainCalls } from "./module-calls";
-import { createNotificationsView, moveLegacyNotifications, notifyUser } from "./notify-user";
+import { createNotificationsView, moveLegacyNotifications, notificationItems, notifyUser } from "./notify-user";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -67,3 +67,9 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
     expect(await db.moduleInvocation.count({ where: { target: "qq", tool: "deliver", status: "succeeded" } })).toBe(2);
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);
+
+test("the owner's notification list keeps valid items and ignores extra fields from a customized notify module", () => {
+  const item = { id: "n1", moduleId: null, sessionId: null, level: "now", channel: "chrona_qqbot", status: "sent", title: "Hi", body: "Body", link: null, attempts: 1, lastError: null, createdAt: "2026-10-28T00:00:00.000Z", sentAt: null, feedback: null } as const;
+  expect(notificationItems({ items: [{ ...item, format: "markdown" }, { ...item, id: "n2", status: "unknown" }] })).toEqual([item]);
+  expect(notificationItems(null)).toEqual([]);
+});

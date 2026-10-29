@@ -17,7 +17,7 @@ Schedules can wake the Provider, send a fixed reminder without a model call, or 
 
 ## Quick start
 
-Requires **Bun ≥ 1.3.11**, **git**, and a pinned **Pi CLI** with model access configured in a dedicated service profile. The [Provider adapter](packages/integrations/src/steward/pi-provider.ts) uses Pi RPC; its default version pin is **0.85.0**, with **1.3.0** available by explicit selection. Full backups additionally require GNU-compatible `tar`.
+Requires **Bun ≥ 1.3.11**, **git**, and a pinned **Pi CLI** with model access configured in a dedicated service profile. The [Provider adapter](packages/integrations/src/steward/pi-provider.ts) uses Pi RPC; its default version pin is **0.85.0**; an explicit **1.x** pin from **1.3.0** on is also supported. Full backups additionally require GNU-compatible `tar`.
 
 Choose a fresh data directory; do not reuse a pre-rebuild database:
 
@@ -54,7 +54,7 @@ Set these in the server environment, then restart:
 | `ALLOWED_ORIGINS` | Additional permitted browser origins, comma-separated |
 | `CHRONA_STEWARD_AGENT` | `pi` enables the Provider; otherwise disabled |
 | `CHRONA_STEWARD_PI_COMMAND` | Required absolute, reviewed service executable; no PATH fallback or shell arguments |
-| `CHRONA_STEWARD_PI_VERSION` | Exact version pin; default `0.85.0`, also supports explicit `1.3.0` |
+| `CHRONA_STEWARD_PI_VERSION` | Exact version pin; default `0.85.0`, also supports explicit `1.x` from `1.3.0` |
 | `CHRONA_STEWARD_PI_AGENT_DIR` | Existing private canonical profile; default `<dataDir>/providers/pi`; never copied automatically |
 | `CHRONA_STEWARD_PI_RESOURCES_FILE` | Optional private, canonical JSON manifest of reviewed explicit skill/extension entry files and extra tool names; no installation or ambient discovery |
 | `CHRONA_STEWARD_PI_MODEL` | Optional Pi model selection |
@@ -68,7 +68,7 @@ Set these in the server environment, then restart:
 
 Without bubblewrap, Pi's bash tool is disabled; its file tools and explicitly configured web tools remain available. With bubblewrap, the Provider has read-only host mounts, the conversations' attachments read-only (`content/chat`), and a writable session directory plus its dedicated Pi profile, with network access. This is not a confidentiality boundary against all host reads. Chrona does not duplicate Provider web or shell tools. Its separate schedule-job sandbox needs a successful isolation probe; it currently assumes `/nix/store` and never falls back to host execution.
 
-Pi resource auto-discovery and project trust are disabled. An optional reviewed [resource manifest](docs/zh/provider-runtime.md) adds explicit skills/extensions using Pi's own loading mechanism; native MCP requires an explicit `1.3.0` pin. Startup checks command resources before prompting. This is not a full tool manifest or proof that wrappers/extensions are safe: review the executable, extension code and service profile independently. Health checks validate launch configuration/version, not authentication or model success.
+Pi resource auto-discovery and project trust are disabled. An optional reviewed [resource manifest](docs/zh/provider-runtime.md) adds explicit skills/extensions using Pi's own loading mechanism; native MCP requires an explicit `1.x` pin of `1.3.0` or later. Startup checks command resources before prompting. This is not a full tool manifest or proof that wrappers/extensions are safe: review the executable, extension code and service profile independently. Health checks validate launch configuration/version, not authentication or model success.
 
 ### Work progress and Provider questions
 

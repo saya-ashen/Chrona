@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema, moduleRuntimeParams } from "@chrona/contracts/steward";
-import { moduleOverview, setModuleSettings } from "./module-overview";
+import { moduleOverview, moduleOverviewOutputSchema, moduleSettingsOutputSchema, setModuleSettings } from "./module-overview";
 import { registerSystemModules } from "./system-modules";
 import { listActivity } from "./activity";
 import { testDb } from "./test-db";
@@ -55,4 +55,11 @@ test("a system module's settings are its own: reflection's switch and memory's p
   expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "" })).toMatchObject({ values: { provider: "" } });
   await expect(setModuleSettings(f.ports, f.w, "activity", {})).rejects.toThrow("has no settings");
   expect(await moduleOverview(f.ports, f.w, "reflection")).toMatchObject({ kind: "system", name: "reflection", settings: { declarations: { enabled: { type: "boolean" } } } });
+});
+
+test("real overview and settings-set results fit their declared output schemas", async () => {
+  const f = await fixture();
+  moduleSettingsOutputSchema.parse(await setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50 }));
+  moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "okx-trader"));
+  for (const name of ["reflection", "memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
 });

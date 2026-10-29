@@ -71,3 +71,29 @@ test("replies skip notifications the transport already delivered into the sessio
   const result = await chat.handleMessage({ workspaceId, channel: "in_app", text: "Input", key: "qq:dm" });
   expect(result.messages.map(m => m.text)).toEqual(["Reply"]);
 });
+test.each([
+  // idle minutes, context tokens of the last run, rotated
+  [120, 40_000, true],
+  [120, 10_000, false],
+  [10, 40_000, false],
+  [10, 120_000, true],
+  [120, null, false],
+] as const)("a QQ conversation idle %i min with %p context tokens rotates: %p", async (idleMinutes, tokens, rotated) => {
+  const session = await db.session.create({ data: { workspaceId, key: "qq:dm", source: "qq", lastActivityAt: new Date(ports.now().getTime() - idleMinutes * 60_000) } });
+  const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", provider: "pi", prompt: "p", cwd: "/tmp", tokenHash: "h", status: "finished", endedAt: session.lastActivityAt } });
+  if (tokens !== null) await db.audit.create({ data: { id: `provider:${run.id}:00000001`, workspaceId, kind: "provider_event", actorKey: "chrona", subjectId: run.id,
+    details: { type: "usage", value: { scope: "run", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, total: 2, cost: 0, contextTokens: tokens, contextWindow: 272_000 } } } });
+  const next = await send("Next", { key: "qq:dm" });
+  expect(next.sessionId !== session.id).toBe(rotated);
+  expect((await db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe(rotated ? "ended" : "active");
+  expect(await db.audit.count({ where: { kind: "session_rotated", subjectId: session.id } })).toBe(rotated ? 1 : 0);
+});
+test("a conversation with work still queued is not rotated, and owner limits apply", async () => {
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { sessions: { idleMinutes: 5, minContextTokens: 0, maxContextTokens: 100_000 } } } });
+  const session = await db.session.create({ data: { workspaceId, key: "qq:dm", source: "qq", lastActivityAt: new Date(ports.now().getTime() - 30 * 60_000) } });
+  await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "p" });
+  expect((await send("Busy", { key: "qq:dm" })).sessionId).toBe(session.id);
+  await db.run.updateMany({ where: { sessionId: session.id }, data: { status: "finished", endedAt: new Date(ports.now().getTime() - 30 * 60_000) } });
+  await db.session.update({ where: { id: session.id }, data: { lastActivityAt: new Date(ports.now().getTime() - 30 * 60_000) } });
+  expect((await send("Idle", { key: "qq:dm" })).sessionId).not.toBe(session.id);
+});

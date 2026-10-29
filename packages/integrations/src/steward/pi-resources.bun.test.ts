@@ -80,10 +80,13 @@ test("refuses profile/workspace-owned manifests, symlinks and writable extension
     await chmod(f.extension, 0o666); expect(readPiResources(f.file, f.profile).error).not.toBeNull();
   }
 });
-test("native MCP stays in Pi and Pi builtins need the explicit 1.3 pin", () => {
+test("native MCP stays in Pi and Pi builtins need a 1.x pin of 1.3 or later", () => {
   const selected = { skills: [], extensions: ["builtin:mcp"], tools: ["mcp__fixture__ping"] };
   expect(resourceVersionError(selected, "0.85.0")).toContain("1.3.0");
+  expect(resourceVersionError(selected, "1.2.9")).toContain("1.3.0");
+  expect(resourceVersionError(selected, "2.0.0")).toContain("1.3.0");
   expect(resourceVersionError(selected, "1.3.0")).toBeNull();
+  expect(resourceVersionError(selected, "1.4.0")).toBeNull();
   expect(resourceCommand(selected, "extension", "builtin:mcp", [])).toBe(true);
   expect(resourceCommand(selected, "extension", "builtin:codemode", [])).toBe(false);
   // Code execution no longer requires bubblewrap (unsandboxed like Hermes' local backend).

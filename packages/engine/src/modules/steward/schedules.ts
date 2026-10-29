@@ -1,5 +1,5 @@
-import type { Prisma } from "@chrona/db";
-import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, moduleManifestSchema } from "@chrona/contracts/steward";
+import { Prisma } from "@chrona/db/generated/prisma/client";
+import { createScheduleSchema, updateScheduleSchema, scheduleRuleSchema, moduleManifestSchema, moduleScheduleSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
@@ -118,5 +118,45 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     }
     return fired;
   }
-  return { create, update, cancel: (id: string) => update(id, { status: "cancelled" }), list: async (originSessionId?: string) => (await db.schedule.findMany({ where: { workspaceId, ...(originSessionId ? { originSessionId } : {}) }, orderBy: { createdAt: "desc" } })).map(toSchedule), fireDue };
+  return { create, update, cancel: (id: string) => update(id, { status: "cancelled" }), list: async (originSessionId?: string) => (await db.schedule.findMany({ where: { workspaceId, ...(originSessionId ? { originSessionId } : {}) }, orderBy: { createdAt: "desc" } })).map(toSchedule), fireDue, forModule: (moduleId: string, module: string) => moduleTimers(ports, workspaceId, timezone, moduleId, module) };
 }
+export const MODULE_SCHEDULE_LIMIT = 500;
+/**
+ * v2-24: a module's own timers (`text` holds the key, like remind's rows they have no triggerId). The key names one
+ * timer of the module: creating it again replaces its rule and payload; at the time the module receives a schedule
+ * event carrying the payload.
+ */
+function moduleTimers(ports: StewardPorts, workspaceId: string, timezone: () => Promise<string>, moduleId: string, module: string) {
+  const { db } = ports;
+  const own = (key: string) => ({ workspaceId, moduleId, mode: "module", triggerId: null, text: key, payload: { not: Prisma.DbNull }, status: { in: ["active", "paused"] } });
+  return {
+    async create(raw: unknown) {
+      const input = parseInput(moduleScheduleSchema, raw), now = ports.now();
+      let nextAt = nextOccurrence(input.rule, now, await timezone());
+      if (!nextAt && input.rule.kind === "at") nextAt = now;
+      const until = input.until ? new Date(input.until) : null;
+      nextAt = beforeDeadline(nextAt, until);
+      return db.$transaction(async tx => {
+        const current = await tx.schedule.findFirst({ where: own(input.key) });
+        const data = { rule: input.rule, payload: input.payload as Prisma.InputJsonValue, label: input.label, until, nextAt, status: nextAt ? "active" : "done", failures: 0 };
+        if (!current && await tx.schedule.count({ where: { workspaceId, moduleId, payload: { not: Prisma.DbNull }, status: { in: ["active", "paused"] } } }) >= MODULE_SCHEDULE_LIMIT) throw new StewardError("conflict", `A module keeps at most ${MODULE_SCHEDULE_LIMIT} timers; cancel some first`);
+        const row = current
+          ? await tx.schedule.update({ where: { id: current.id }, data })
+          : await tx.schedule.create({ data: { ...data, workspaceId, moduleId, mode: "module", text: input.key, createdBy: "module", createdAt: now } });
+        await audit(tx, { workspaceId, actor: `module:${module}`, kind: current ? "schedule_updated" : "schedule_created", subjectId: row.id, details: { key: input.key } });
+        return toSchedule(row);
+      });
+    },
+    async cancel(key: string) {
+      return db.$transaction(async tx => {
+        const current = await tx.schedule.findFirst({ where: own(key) });
+        if (!current) return { cancelled: false };
+        await tx.schedule.update({ where: { id: current.id }, data: { status: "cancelled", nextAt: null } });
+        await audit(tx, { workspaceId, actor: `module:${module}`, kind: "schedule_updated", subjectId: current.id, details: { key, status: "cancelled" } });
+        return { cancelled: true };
+      });
+    },
+    list: async () => (await db.schedule.findMany({ where: { workspaceId, moduleId, payload: { not: Prisma.DbNull }, status: { in: ["active", "paused"] } }, orderBy: { nextAt: "asc" } })).map(row => ({ key: row.text, ...toSchedule(row), payload: row.payload })),
+  };
+}
+

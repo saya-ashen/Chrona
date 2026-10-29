@@ -294,7 +294,7 @@ class PiRun {
   async abort() { await this.abortWith("failed"); }
 }
 
-/** Pi 0.85.0 and 1.3.0 both expose the session-level agent_settled boundary. */
+/** Pi 0.85.0 and 1.x (1.3.0 or later) all expose the session-level agent_settled boundary. */
 export function createPiProvider(options: PiProviderOptions): ProviderAdapter {
   if (!/^http:\/\/127\.0\.0\.1:\d{1,5}\/api\/steward-agent$/.test(options.agentUrl)) throw new Error("Chrona agent URL must be loopback");
   const config = piLaunchConfig(options);

@@ -204,6 +204,22 @@ test("an idle disconnected channel is detected even when the module process has 
   expect(await f.db.moduleRun.count()).toBe(1);
 });
 
+test("a module terminated with Chrona (SIGTERM) is restarted without an incident", async () => {
+  const f = await fixture({ keepAlive: true });
+  const start = f.ports.sandbox!.startModule!;
+  let starts = 0;
+  f.ports.sandbox!.startModule = input => {
+    starts++;
+    const peer = start(input);
+    return { ...peer, exited: peer.exited.then(() => ({ code: null, signal: "SIGTERM" })) };
+  };
+  await f.supervisor.start();
+  f.processes[0]!.kill();
+  await until(() => f.supervisor.status(f.module.id, "v1", true).state === "backoff");
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toHaveLength(0);
+  expect(await f.db.moduleRun.count()).toBe(0);
+  f.advance(60_000); await until(() => starts === 2);
+});
 test("exit before handshake retains the real signal and stderr rather than the cleanup kill", async () => {
   const f = await fixture({ keepAlive: true });
   f.ports.sandbox!.startModule = () => ({ pid: 999, exited: Promise.resolve({ code: null, signal: "SIGABRT" }), stderr: () => "panic: runtime initialization", limits: { virtualMemoryMb: 512 }, kill() {} });

@@ -45,10 +45,6 @@ llm target="":
 demo target="":
     @if [ -z "{{target}}" ]; then bun run chrona demo; else bun run chrona demo {{target}}; fi
 
-# Show or run plugin commands: just plugin [hermes]
-plugin target="":
-    @if [ -z "{{target}}" ]; then bun run chrona plugin; else bun run chrona plugin {{target}}; fi
-
 # ── Common Aliases ────────────────────────────────────────────
 
 # TypeScript type checking

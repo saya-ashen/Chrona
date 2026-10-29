@@ -17,7 +17,7 @@ const concurrency = Math.max(
 	1,
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"),
 );
-// Every server test, not only the HTTP map walk: the server holds the listen proxy, owner API and rescue console.
+// Every server test, not only the HTTP map walk: the server holds the listen proxy and rescue console.
 const dirs = ["apps/server/src/__tests__/api", "apps/server/src", "apps/server/src/config", "apps/server/src/middleware"];
 const serialFiles = new Set<string>();
 

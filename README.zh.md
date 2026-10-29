@@ -17,7 +17,7 @@
 
 ## 快速开始
 
-需要 **Bun ≥ 1.3.11**、**git** 和固定版本的 **Pi CLI**，模型访问须配置在服务专用 profile 中。[Provider 适配器](packages/integrations/src/steward/pi-provider.ts) 使用 Pi RPC；默认精确固定 **0.85.0**，也可显式选择 **1.3.0**。完整备份还需要 GNU 兼容的 `tar`。
+需要 **Bun ≥ 1.3.11**、**git** 和固定版本的 **Pi CLI**，模型访问须配置在服务专用 profile 中。[Provider 适配器](packages/integrations/src/steward/pi-provider.ts) 使用 Pi RPC；默认精确固定 **0.85.0**，也可显式选择 **1.3.0** 及以后的 **1.x**。完整备份还需要 GNU 兼容的 `tar`。
 
 使用新数据目录，不要复用重构前数据库：
 
@@ -54,7 +54,7 @@ bun run dev
 | `ALLOWED_ORIGINS` | 逗号分隔的额外浏览器来源 |
 | `CHRONA_STEWARD_AGENT` | `pi` 启用 Provider；否则关闭 |
 | `CHRONA_STEWARD_PI_COMMAND` | 必填，已审查的服务专用可执行文件绝对路径；不回退 PATH，不附带 shell 参数 |
-| `CHRONA_STEWARD_PI_VERSION` | 精确版本固定；默认 `0.85.0`，也支持显式选择 `1.3.0` |
+| `CHRONA_STEWARD_PI_VERSION` | 精确版本固定；默认 `0.85.0`，也支持显式选择 `1.3.0` 及以后的 `1.x` |
 | `CHRONA_STEWARD_PI_AGENT_DIR` | 已存在、私有、规范路径的 profile；默认 `<dataDir>/providers/pi`，不自动复制 |
 | `CHRONA_STEWARD_PI_RESOURCES_FILE` | 可选私有规范路径 JSON 清单：审核过的技能/扩展入口文件及额外工具名；不安装、不自动发现 |
 | `CHRONA_STEWARD_PI_MODEL` | 可选 Pi 模型选择 |
@@ -68,7 +68,7 @@ bun run dev
 
 没有 bubblewrap 时关闭 Pi 的 bash 工具，保留文件工具及显式配置的网页工具。启用后，Provider 的宿主挂载只读，对话附件（`content/chat`）只读挂入，会话目录和专用 Pi profile 可写，可联网；这不是阻止所有宿主读取的保密边界。Chrona 不重复提供 Provider 的网页和 shell 工具。独立的调度任务沙箱需通过隔离探测，目前假定 `/nix/store`，失败时不会退回宿主执行。
 
-Pi 关闭资源自动发现及项目信任。可选的[受控资源清单](docs/zh/provider-runtime.md)通过 Pi 原生加载机制显式添加技能/扩展；原生 MCP 须明确固定 `1.3.0`。发送提示前检查命令资源。这不是完整工具清单，也不能证明包装器/扩展安全，仍须独立审查入口、扩展代码和服务 profile。健康检查验证启动配置与版本，不代表认证有效或模型已成功响应。
+Pi 关闭资源自动发现及项目信任。可选的[受控资源清单](docs/zh/provider-runtime.md)通过 Pi 原生加载机制显式添加技能/扩展；原生 MCP 须明确固定 `1.3.0` 及以后的 `1.x`。发送提示前检查命令资源。这不是完整工具清单，也不能证明包装器/扩展安全，仍须独立审查入口、扩展代码和服务 profile。健康检查验证启动配置与版本，不代表认证有效或模型已成功响应。
 
 ### 处理进度与执行端请求
 

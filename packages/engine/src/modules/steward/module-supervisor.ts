@@ -29,6 +29,7 @@ type Instance = {
 };
 const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
 const isClosing = (instance: Instance) => instance.closing;
+const RETIRE_GRACE_MS = 1000;
 const keyOf = (moduleId: string, hash: string) => `${moduleId}:${hash}`;
 function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
 function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
@@ -71,7 +72,9 @@ class ModuleSupervisor {
   }
   private retire(instance: Instance) {
     instance.retiring = true;
-    void instance.queue.finally(() => this.close(instance)).catch(() => {});
+    // A web page approving its own module's version waits on that call: answer it, then give the reply time to reach the browser.
+    const answered = async () => { if (await instance.channel?.drained()) await new Promise(resolve => this.timers.setTimeout(resolve, RETIRE_GRACE_MS)); };
+    void instance.queue.then(answered, answered).finally(() => this.close(instance)).catch(() => {});
   }
   private async failure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> } & Partial<Omit<Instance, "scope">>, error: string, runId?: string, event?: ModuleEvent, delivery?: DeliveryStage) {
     const { ports } = this;
@@ -104,7 +107,9 @@ class ModuleSupervisor {
     if (instance.closing || instance.busy) return;
     instance.busy = true;
     await this.collectExit(instance, reason);
-    try { await this.failure(instance, reason); }
+    // Stopped with Chrona (systemd signals the whole control group) or by the supervisor itself: not a module fault.
+    const stopped = this.stopped || ["SIGTERM", "SIGINT"].includes(instance.exit?.signal ?? "");
+    try { if (!stopped) await this.failure(instance, reason); }
     finally { await this.close(instance); this.restart(instance); instance.busy = false; }
   }
   private async collectExit(instance: Instance, reason: string) {
@@ -191,7 +196,11 @@ class ModuleSupervisor {
     if (instance.start) return;
     instance.busy = true;
     try { await (instance.start = this.startInstance(instance)); }
-    catch (error) { await this.failure(instance, String(error).slice(0, 2000)); this.restart(instance); }
+    catch (error) {
+      // A replaced version closed while starting is not a module fault.
+      if (instance.retiring) return;
+      await this.failure(instance, String(error).slice(0, 2000)); this.restart(instance);
+    }
     finally { await this.finishBusy(instance); }
   }
   async reconcile() {
@@ -205,7 +214,9 @@ class ModuleSupervisor {
     const { trigger } = event, { manifest, moduleId } = instance;
     const dynamic = trigger.kind === "schedule" && trigger.scheduleId !== undefined && trigger.payload !== undefined;
     if (dynamic) {
-      if (!builtin || !manifest.dynamicSchedules || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires a built-in module declaring dynamicSchedules"), "unavailable");
+      // v2-24: the module's own timers (uses schedules.create); remind keeps the Provider's reminders (dynamicSchedules).
+      const allowed = manifest.uses.includes("schedules.create") || (builtin && manifest.dynamicSchedules);
+      if (!allowed || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires uses schedules.create (or a built-in declaring dynamicSchedules)"), "unavailable");
     } else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
   /** The owner's settings decide a model module's timeout and every module's params (v2-23 settings). */

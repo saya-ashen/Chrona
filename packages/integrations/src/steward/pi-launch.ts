@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, symlinkSync
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
-import { readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
+import { modernPi, readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
 export type PiProviderOptions = {
   command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string;
@@ -19,7 +19,6 @@ export type PiLaunchConfig = {
   options: PiProviderOptions; command: string; agentDir: string; version: string;
   extension: string; web: string | null; browserExtension: string | null; bwrap: string | null; resources: PiResources; resourceError: string | null;
 };
-const supportedVersions = new Set(["0.85.0", "1.3.0"]);
 const inside = (parent: string, child: string) => { const path = relative(parent, child); return path === "" || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path); };
 export const profileOverlaps = (profile: string, work: string) => inside(profile, work) || inside(work, profile);
 
@@ -41,7 +40,7 @@ function configurationError(config: PiLaunchConfig): string | null {
   if (!isAbsolute(config.command)) return "Configure an absolute, service-specific Pi executable";
   if (!isAbsolute(config.agentDir) || !privateProfile(config.agentDir)) return "Pi profile must be an existing private canonical directory";
   if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve(config.options.workspaceRoot))) return "Pi profile must be separate from the session workspace";
-  if (!supportedVersions.has(config.version)) return "Unsupported Pi version pin";
+  if (config.version !== "0.85.0" && !modernPi(config.version)) return "Unsupported Pi version pin";
   if (config.resourceError) return config.resourceError;
   const resourceError = resourceVersionError(config.resources, config.version);
   if (resourceError) return resourceError;
@@ -93,7 +92,7 @@ function contentAreas(input: ProviderRunInput) {
   });
 }
 /**
- * Content areas appear at <cwd>/content/<name>: bind mounts under bubblewrap, symlinks otherwise
+ * Read-only chat attachments appear at <cwd>/content/chat: bind mounts under bubblewrap, symlinks otherwise
  * (then read-only areas are not enforced). Stale links go first so a mount never follows one.
  */
 export function prepareContent(input: ProviderRunInput, link: boolean) {

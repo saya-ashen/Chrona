@@ -43,7 +43,7 @@ model Session {
   providerSessionId String?
   /// The entry module (e.g. qq) that brings this conversation's messages and receives its replies.
   entryModuleId String?
-  /// Module names whose content areas runs in this session may write.
+  /// Module names whose tools are directly exposed in this session's catalog.
   focus Json @default(dbgenerated("'[\"files\"]'"))
   lastActivityAt DateTime @default(now())
   createdAt DateTime @default(now())
@@ -182,7 +182,7 @@ model Schedule {
   text String
   moduleId String?
   triggerId String?
-  /// Dynamic module schedules (reminders) carry their data here.
+  /// Dynamic module schedules (remind, v2-24 module timers whose key is `text`) carry their data here.
   payload Json?
   module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   until DateTime?

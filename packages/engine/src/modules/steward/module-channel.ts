@@ -17,6 +17,8 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
   // A process can fail before the caller starts awaiting its connection.
   void ready.catch(() => {});
   const records: string[] = [];
+  // Calls the module is still waiting on; a replaced version is closed only after they are answered.
+  const inflight = new Set<Promise<unknown>>();
   function record(message: string) { records.push(message); if (records.length > 32) records.shift(); }
   function fail(error: Error) { ended(error); disconnected(error); pending?.reject(error); }
   function reply(message: CallReply) {
@@ -32,11 +34,14 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
         reply({ id: value.id, error: { code: "invalid", message: "Invalid module call" } });
       return true;
     }
+    const work = onCall(call.data);
+    inflight.add(work);
     try {
-      const result = moduleCallReplySchema.parse(await onCall(call.data));
+      const result = moduleCallReplySchema.parse(await work);
       if (result.id !== call.data.id) throw new Error("Mismatched call reply");
       reply(result);
     } catch { reply({ id: call.data.id, error: { code: "internal", message: "Module call failed" } }); }
+    finally { inflight.delete(work); }
     return true;
   }
   async function line(text: string) {
@@ -78,6 +83,8 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
     ready, closedWithError,
     connected: () => accepted && !closed && !!socket && !socket.destroyed,
     diagnostics: () => [...records],
+    /** Resolves true when it had to wait for calls the module was still waiting on. */
+    drained: async () => { const waiting = [...inflight]; await Promise.allSettled(waiting); return waiting.length > 0; },
     send(event: ModuleEvent, timeoutMs = 60_000): Promise<EventReply> {
       const message = moduleEventMessageSchema.parse({ id: randomUUID(), event });
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));

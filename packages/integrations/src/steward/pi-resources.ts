@@ -29,8 +29,10 @@ export function readPiResources(file: string | undefined, profile: string, works
     return { resources: { skills: [...new Set(resources.skills)], extensions: [...new Set(resources.extensions)], tools: [...new Set(resources.tools)] }, error: null };
   } catch { return { resources: empty(), error: "Pi resource manifest must be a private canonical JSON file with reviewed external entry files" }; }
 }
+/** Pi 1.x minor releases keep the RPC contract (semver); 1.3.0 is the first with native builtins. */
+export const modernPi = (version: string) => { const m = /^1\.(\d+)\.\d+$/.exec(version); return !!m && Number(m[1]) >= 3; };
 export function resourceVersionError(resources: PiResources, version: string): string | null {
-  if (resources.extensions.some(value => builtins.has(value)) && version !== "1.3.0") return "Native Pi builtins require the explicit 1.3.0 pin";
+  if (resources.extensions.some(value => builtins.has(value)) && !modernPi(version)) return "Native Pi builtins require a Pi 1.x pin of 1.3.0 or later";
   return null;
 }
 export function resourceCommand(resources: PiResources, source: unknown, path: unknown, baseExtensions: string[]): boolean {

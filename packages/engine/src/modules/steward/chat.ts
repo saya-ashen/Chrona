@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { z } from "zod";
-import { attachmentSchema, messageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
+import { attachmentSchema, messageSchema, providerUsageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
@@ -11,6 +11,8 @@ import { parseInput, StewardError } from "./errors";
 import { storedAttachments, toMessage } from "./store";
 import { pushReply } from "./chat-replies";
 import { drainCalls } from "./module-calls";
+import { autoRetain } from "./memory";
+import { sessionSettings } from "./settings";
 
 const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
 const inputSchema = z.object({
@@ -158,6 +160,31 @@ class ChatService {
   private messagePrompt(input: z.output<typeof inputSchema>, quoted: MessageRow | null) {
     return [input.text, ...(quoted ? [`Quoted message (data): ${JSON.stringify(quoted.text)}`] : []), ...(input.attachments.length ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, ref, mime, size }) => ({ name, ref, mime, size })))}`] : [])].join("\n\n");
   }
+  /** The context the session's last finished run ended with (Provider usage), 0 when unknown. */
+  private async contextTokens(workspaceId: string, sessionId: string) {
+    const { db } = this.ports, run = await db.run.findFirst({ where: { workspaceId, sessionId, status: "finished" }, orderBy: [{ endedAt: "desc" }, { id: "desc" }], select: { id: true } });
+    if (!run) return 0;
+    const events = await db.audit.findMany({ where: { workspaceId, kind: "provider_event", subjectId: run.id }, orderBy: { id: "desc" }, take: 400, select: { details: true } });
+    const usage = events.map(row => row.details as { type?: unknown; value?: unknown } | null).find(details => details?.type === "usage");
+    return providerUsageSchema.safeParse(usage?.value).data?.contextTokens ?? 0;
+  }
+  /**
+   * A long QQ/web conversation ends before the next message (as Hermes resets its sessions): once idle past the prompt cache's
+   * life it would be re-read at full price, and past the cap it costs more than starting over. What it said goes to memory
+   * first; the new conversation recalls it at its first run.
+   */
+  private async rotate({ workspaceId, key, sessionId }: { workspaceId: string; key?: string | undefined; sessionId?: string | undefined }) {
+    if (sessionId || !key) return;
+    const { db } = this.ports, now = this.ports.now();
+    const session = await db.session.findFirst({ where: { workspaceId, key, status: "active", source: { in: ["qq", "web"] } } });
+    if (!session || await db.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
+    const limits = sessionSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings), tokens = await this.contextTokens(workspaceId, session.id);
+    const idle = now.getTime() - session.lastActivityAt.getTime() >= limits.idleMinutes * 60_000;
+    if (tokens < limits.maxContextTokens && !(idle && tokens >= limits.minContextTokens)) return;
+    await autoRetain(this.ports, workspaceId, session.id, true);
+    if (!(await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } })).count) return;
+    await audit(db, { workspaceId, actor: "chrona", kind: "session_rotated", subjectId: session.id, details: { tokens, idle } });
+  }
   private async prepare(raw: ChatInput, entryModuleId?: string) {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments), { ports } = this, { db } = ports;
     return serial(input.workspaceId, async () => {
@@ -166,6 +193,7 @@ class ChatService {
         const caller = await db.audit.findFirst({ where: { workspaceId: input.workspaceId, kind: "chat_caller", subjectId: existing.id } });
         if (caller) return { inbound: existing, ...callerSchema.parse(caller.details) };
       }
+      await this.rotate(input);
       // Build (v2-13) and reflection (v2-19) conversations run only what Chrona gave them; nobody talks into them.
       const closed = (source: string) => source === "build" || source === "reflect";
       const buildRefused = () => new StewardError("forbidden", "A module build or reflection conversation does not take messages");

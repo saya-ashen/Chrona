@@ -39,7 +39,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
   return { get, health };
 }
 
-/** The workspace's today view as Chrona sees it: the owner API's /today and the system tool chat.today. */
+/** The workspace's today view as Chrona sees it through the system tool chat.today. */
 export function workspaceToday(ports: StewardPorts, workspaceId: string) {
   return createToday({ db: ports.db, workspaceId, now: ports.now }, {
     async provider() {

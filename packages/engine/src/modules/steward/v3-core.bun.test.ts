@@ -48,12 +48,15 @@ test.each([
   expect((await db.session.findUniqueOrThrow({ where: { id: run.sessionId! } })).status).toBe(expected);
 });
 test.each([
-  [8, false, "ended"],
-  [1, false, "active"],
-  [8, true, "active"],
-] as const)("a build conversation idle %i days (queued run=%p) is %s", async (days, queued, expected) => {
-  const build = await db.session.create({ data: { workspaceId, key: `build:${days}:${queued}`, source: "build", originSessionId: sessionId, lastActivityAt: new Date(ports.now().getTime() - days * 86_400_000) } });
-  if (queued) await createRuns(ports, workspaceId).enqueue({ sessionId: build.id, lane: "build", trigger: "build", label: "build", prompt: "p" });
+  ["build", 8, false, "ended"],
+  ["build", 1, false, "active"],
+  ["build", 8, true, "active"],
+  ["mcp", 2, false, "ended"],
+  ["mcp", 0.5, false, "active"],
+  ["mcp", 2, true, "active"],
+] as const)("a %s conversation idle %d days (queued run=%p) is %s", async (source, days, queued, expected) => {
+  const build = await db.session.create({ data: { workspaceId, key: `${source}:${days}:${queued}`, source, originSessionId: source === "build" ? sessionId : null, lastActivityAt: new Date(ports.now().getTime() - days * 86_400_000) } });
+  if (queued) await createRuns(ports, workspaceId).enqueue({ sessionId: build.id, lane: source === "build" ? "build" : "foreground", trigger: source === "build" ? "build" : "message", label: source, prompt: "p" });
   await createRuns(ports, workspaceId).endIdleBuilds();
   expect((await db.session.findUniqueOrThrow({ where: { id: build.id } })).status).toBe(expected);
 });

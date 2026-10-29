@@ -1,4 +1,6 @@
-import { effectiveSettings, moduleManifestSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
+import { z } from "zod";
+import { effectiveSettings, moduleManifestSchema, moduleSettingSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
+import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
 import type { StewardPorts } from "./ports";
 import { CallError, listSystemModules, type Json } from "./module-calls";
 import { createSecrets } from "./secrets";
@@ -101,4 +103,37 @@ export async function moduleOverview(ports: StewardPorts, workspaceId: string, n
   const [diagnostics] = await api.diagnostics(found.module.name) as unknown[];
   return json({ kind: "app", app, permissions: await modulePermissions(ports, workspaceId, found.module.name), settings: await settingsView(ports, workspaceId, found.module.name),
     diagnostics: diagnostics ?? null, activity: await activity(found.module.name) });
+}
+
+/** Declared outputs for the build reference (v2-23): what a page may rely on from overview and settings-set. */
+const settingValue = z.union([z.number(), z.string(), z.boolean()]);
+export const moduleSettingsOutputSchema = z.object({ declarations: z.record(z.string(), moduleSettingSchema), values: z.record(z.string(), settingValue) });
+const activitySchema = z.object({ id: z.string(), at: z.string(), kind: z.string(), module: z.string().nullable(), text: z.string(), session: z.object({ id: z.string(), source: z.enum(["reflect", "build"]) }).optional() });
+const permissionsSchema = z.object({
+  module: z.string(), activeHash: z.string().nullable(), capabilities: z.array(z.string()),
+  secrets: z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable() })),
+  model: z.object({ tier: z.string(), target: z.unknown(), maxCallsPerEvent: z.number().optional(), dailyCap: z.number().nullable(), today: z.object({ calls: z.number(), inputTokens: z.number(), outputTokens: z.number() }).passthrough() }).nullable(),
+  grants: z.array(z.object({ id: z.string(), action: z.string(), mode: z.string(), once: z.boolean(), createdAt: z.string() })),
+  approvals: z.array(z.object({ id: z.string(), title: z.string(), level: z.string().nullable(), status: z.string(), createdAt: z.string(), resolvedAt: z.string().nullable() })),
+});
+export const moduleOverviewOutputSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("app"), app: z.record(z.string(), z.unknown()).nullable(), permissions: permissionsSchema, settings: moduleSettingsOutputSchema, diagnostics: moduleDiagnosticsOutputSchema.element.nullable(), activity: z.array(activitySchema).max(30) }),
+  z.object({ kind: z.literal("system"), name: z.string(), description: z.string(), sessions: z.string().nullable(),
+    tools: z.array(z.object({ name: z.string(), description: z.string(), callers: z.array(z.string()).nullable(), visibility: z.array(z.string()) })),
+    work: z.array(z.object({ id: z.string(), title: z.string().nullable(), status: z.string(), createdAt: z.string(), endedAt: z.string().nullable() })),
+    settings: moduleSettingsOutputSchema, activity: z.array(activitySchema).max(30) }),
+]);
+export const MODULE_OVERVIEW_DOCUMENTATION = "One read for an app's page. kind \"app\": app is the modules.list item (null if not listed), permissions is modules.permissions, settings the app's declared settings with effective values, diagnostics the modules.diagnostics entry or null, activity the latest 30 activity.list items. kind \"system\": the modules.system entry with its work conversations, settings and activity. settings.values hold the stored value when it still fits the active declaration, else the default; both are {} when nothing is declared. Unknown name yields not_found. Examples are synthetic fixtures, never production data.";
+export const MODULE_SETTINGS_SET_DOCUMENTATION = "values is a JSON object string of setting name to value; a partial object changes only those names. Every name and value is checked against the active version's declarations (system modules: their own) before anything is saved; one bad entry rejects the whole call with invalid (\"Unknown setting X\", \"<label>: value is not allowed\", values not an object, system module without settings). Unknown module or no active version yields not_found. On success returns the settings re-read after saving, same shape as overview.settings; compare it with what was sent. Audited by name only (module_settings_updated).";
+const fixtureSettings = () => moduleSettingsOutputSchema.parse({ declarations: { interval: { type: "number", label: "Interval (minutes)", default: 30, min: 5, max: 1440 }, enabled: { type: "boolean", label: "Enabled", default: true } }, values: { interval: 60, enabled: true } });
+export function moduleSettingsExamples() { return [json(fixtureSettings()), json(moduleSettingsOutputSchema.parse({ declarations: {}, values: {} }))]; }
+export function moduleOverviewExamples() {
+  const at = "2026-01-01T00:00:00.000Z", activity = [{ id: "fixture-activity", at, kind: "module_settings_updated", module: "example", text: "Synthetic: settings changed" }];
+  return [
+    moduleOverviewOutputSchema.parse({ kind: "app", app: { id: "fixture-module", name: "example", status: "active", activeHash: "a".repeat(64) },
+      permissions: { module: "example", activeHash: "a".repeat(64), capabilities: ["Synthetic capability"], secrets: [{ name: "example_token", configured: false, updatedAt: null }], model: null, grants: [], approvals: [] },
+      settings: fixtureSettings(), diagnostics: null, activity }),
+    moduleOverviewOutputSchema.parse({ kind: "system", name: "reflection", description: "Synthetic system module", sessions: "reflect", tools: [{ name: "suggest", description: "Synthetic", callers: null, visibility: ["modules"] }], work: [],
+      settings: { declarations: { enabled: { type: "boolean", label: "Enabled", default: true } }, values: { enabled: true } }, activity: [] }),
+  ].map(json);
 }

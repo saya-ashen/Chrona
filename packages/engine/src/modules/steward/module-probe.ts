@@ -10,7 +10,7 @@ type Manifest = z.output<typeof moduleManifestSchema>;
 function probeTrigger(triggers: readonly Manifest["triggers"][number][]): Manifest["triggers"][number] | undefined {
   return triggers.find(candidate => "schedule" in candidate) ?? triggers[0];
 }
-/** Metamorphic check (docs/zh/platform-p5-spec.md): fires on two different days must not reuse an effect key,
+/** Metamorphic check: fires on two different days must not reuse an effect key,
  * or the executor drops the later effect as a duplicate. A warning, not a rejection: "notify once ever" is legal. */
 export async function probeKeys(context: ModuleContext, staging: string, manifest: Manifest): Promise<KeyProbe> {
   const trigger = probeTrigger(manifest.triggers);

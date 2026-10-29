@@ -8,8 +8,7 @@
 ## Product and development
 
 - [设计目标](zh/steward-goals.md): product authority; goals are not a shipped-feature checklist.
-- [重构方案](zh/steward-rebuild.md): architecture, data model and page design.
-- [Page prototype](prototypes/steward-pages.html): design reference, not the live app.
+- [平台 v2](zh/platform-v2.md): architecture.
 - [Contributing](../CONTRIBUTING.md) and [repository rules](../AGENTS.md): implementation and checks.
 - [Domain agent notes](agents/domain.md) / [issue-tracker agent notes](agents/issue-tracker.md): contributor guidance, not operator instructions.
 

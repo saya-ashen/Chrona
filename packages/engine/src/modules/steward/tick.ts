@@ -116,9 +116,9 @@ export function createTick(ports: StewardPorts) {
               .then(() => autoRetain(ports, workspaceId, run.sessionId)).catch(async () => {
               try { await audit(ports.db, { workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
             });
-          } catch {
+          } catch (error) {
             gate.fail();
-            await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider could not start" });
+            await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` });
           }
         }
       }

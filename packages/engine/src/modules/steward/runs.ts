@@ -12,7 +12,7 @@ import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
 
-const BUILD_IDLE_MS = 7 * 24 * 3600_000;
+const BUILD_IDLE_MS = 7 * 24 * 3600_000, MCP_IDLE_MS = 24 * 3600_000;
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
@@ -119,7 +119,7 @@ class RunService {
       if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return false;
       if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
       if (status === "finished") await this.deliverResult(tx, run, now);
-      await this.followUp(tx, run, status, now);
+      await this.followUp(tx, run, status, now, error);
       if (status === "finished") await this.endIfDone(tx, run, now);
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
       return true;
@@ -154,10 +154,10 @@ class RunService {
     if (open.some(row => (row.payload as { sessionId?: unknown } | null)?.sessionId === session.id)) return;
     await tx.session.update({ where: { id: session.id }, data: { status: "ended", endedAt: now } });
   }
-  /** Build conversations stay open for revisions; one left idle for a week ends (the user can ask for a new build). */
+  /** Build conversations stay open for revisions; one left idle for a week ends (the user can ask for a new build). An owner-MCP conversation idle for a day ends too. */
   async endIdleBuilds(now = this.ports.now()) {
     const { db } = this.ports, { workspaceId } = this;
-    const idle = await db.session.findMany({ where: { workspaceId, source: "build", status: "active", lastActivityAt: { lt: new Date(now.getTime() - BUILD_IDLE_MS) } } });
+    const idle = await db.session.findMany({ where: { workspaceId, status: "active", OR: [{ source: "build", lastActivityAt: { lt: new Date(now.getTime() - BUILD_IDLE_MS) } }, { source: "mcp", lastActivityAt: { lt: new Date(now.getTime() - MCP_IDLE_MS) } }] } });
     for (const session of idle) {
       if (await db.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) continue;
       await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } });
@@ -174,7 +174,7 @@ class RunService {
     await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
     return !!origin.entryModuleId;
   }
-  private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date) {
+  private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
     const { workspaceId, ports } = this;
     if (["failed", "timed_out", "provider_unavailable"].includes(status)) {
       if (run.lane === "build") {
@@ -184,7 +184,7 @@ class RunService {
       const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
-      if (failures === RUN_LIMITS.maxFailures) await notifyUser(tx, ports, workspaceId, { level: "now", title: "处理连续失败", body: "连续三次处理失败，请检查服务状态。", key: `run-failed:${run.id}` });
+      if (failures === RUN_LIMITS.maxFailures) await notifyUser(tx, ports, workspaceId, { level: "now", title: "处理连续失败", body: `连续三次处理失败，请检查服务状态。${error ? `\n最近一次原因：${error.slice(0, 300)}` : ""}`, key: `run-failed:${run.id}` });
       const retry = await tx.run.create({ data: { workspaceId, sessionId: run.sessionId, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
       const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });

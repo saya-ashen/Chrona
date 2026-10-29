@@ -118,8 +118,8 @@ export async function autoRecall(ports: StewardPorts, workspaceId: string, sessi
     return { provider: provider.name, items };
   } catch { return null; }
 }
-/** After a conversation's run: once four more user messages arrived, what was said since the last retain. Never throws. */
-export async function autoRetain(ports: StewardPorts, workspaceId: string, sessionId: string | null) {
+/** After a conversation's run: once four more user messages arrived (any, when it is about to end), what was said since the last retain. Never throws. */
+export async function autoRetain(ports: StewardPorts, workspaceId: string, sessionId: string | null, ending = false) {
   try {
     const { db } = ports, session = sessionId ? await db.session.findFirst({ where: { id: sessionId, workspaceId } }) : null;
     if (!session || !CONVERSATIONS.includes(session.source)) return false;
@@ -128,7 +128,7 @@ export async function autoRetain(ports: StewardPorts, workspaceId: string, sessi
     const retained = await db.audit.findMany({ where: { workspaceId, kind: "memory_retained", subjectId: session.id }, orderBy: { createdAt: "desc" }, take: 50, select: { details: true } });
     const through = retained.map(row => (row.details as { through?: string } | null)?.through).find(Boolean);
     const messages = await db.message.findMany({ where: { workspaceId, sessionId: session.id, ...(through ? { at: { gt: new Date(through) } } : {}) }, orderBy: [{ at: "asc" }, { id: "asc" }], take: 200 });
-    if (messages.filter(message => message.direction === "in").length < RETAIN_EVERY) return false;
+    if (messages.filter(message => message.direction === "in").length < (ending ? 1 : RETAIN_EVERY)) return false;
     const transcript = messages.map(message => `${message.direction === "in" ? "用户" : "Chrona"}: ${message.text}`).join("\n\n");
     const content = redactSensitiveText(transcript.slice(-RETAIN_CHARS), RETAIN_CHARS), source = `conversation:${session.source}:${session.id}`, now = ports.now();
     await ask({ ports, workspaceId, provider: provider.name }, "retain", { content, source, at: now.toISOString() });

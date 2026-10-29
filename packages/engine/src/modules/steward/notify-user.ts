@@ -81,10 +81,13 @@ async function ask(ports: StewardPorts, workspaceId: string, tool: string, args:
   catch { return null; }
 }
 const statusSchema = z.object({ chat: z.object({ channel: z.enum(["in_app", "chrona_qqbot"]), bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
+/** Item by item, ignoring extra fields: a customized notify module must not blank the whole list. */
+export const notificationItems = (output: unknown) => (z.object({ items: z.array(z.unknown()) }).safeParse(output).data?.items ?? [])
+  .flatMap(item => { const parsed = notificationSchema.strip().safeParse(item); return parsed.success ? [parsed.data] : []; });
 /** The owner's view of notifications, answered by the notify module. */
 export function createNotificationsView(ports: StewardPorts, workspaceId: string) {
   return {
-    list: async (limit = 50) => z.object({ items: notificationSchema.array() }).safeParse(await ask(ports, workspaceId, "list", { limit })).data?.items ?? [],
+    list: async (limit = 50) => notificationItems(await ask(ports, workspaceId, "list", { limit })),
     status: async () => statusSchema.safeParse(await ask(ports, workspaceId, "status")).data ?? null,
   };
 }

@@ -29,7 +29,6 @@ function shouldInclude(path: string) {
 		"scripts/portable-elf.bun.test.ts",
 	]);
 	return (standalone.has(path) || retained.some(prefix => path.startsWith(prefix)))
-		&& !/hermes-qq-delivery|reddit-inbox|task-workspace|external-calendar/.test(path)
 		&& !path.split("/").some((segment) => ignoredSegments.has(segment));
 }
 

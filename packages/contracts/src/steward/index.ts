@@ -1,7 +1,7 @@
 /**
  * Chrona shared contract, platform v2. Supervisor-owned.
- * Design: docs/zh/platform-v2.md. Chrona's features are modules (apps); each module may own a
- * content area the user and the Provider read and edit. Conversations with the Provider are
+ * Design: docs/zh/platform-v2.md. Chrona's features are modules (apps) that keep their files private
+ * and interact only through routed calls. Conversations with the Provider are
  * sessions, keyed by the entry that owns them. There are no affairs.
  */
 import { z } from "zod";
@@ -97,7 +97,7 @@ const toolParameterSchema = z.union([
   z.object({ type: z.literal("string"), enum: z.array(z.string().max(100)).min(1).max(20), description: z.string().max(300).optional() }).strict(),
 ]);
 /**
- * Who may call a module tool (an interface): `provider` (m_* tools of runs), `owner` (the user: entry modules with `uses: ["*"]` and the owner API),
+ * Who may call a module tool (an interface): `provider` (m_* tools of runs), `owner` (the user: entry modules with `uses: ["*"]`),
  * `modules` (other modules declaring it in `uses`, routed by Chrona) and `kernel` (Chrona itself).
  */
 export const TOOL_VISIBILITY = ["provider", "owner", "modules", "kernel"] as const;
@@ -348,7 +348,7 @@ export const scheduleSchema = z.object({
   status: z.enum(SCHEDULE_STATUSES), nextAt: iso.nullable(), lastAt: iso.nullable(), lastResult: z.string().max(2000).nullable(),
   /** Short user-facing name shown on pages; `text` of a wake is an internal instruction and is never primary UI. */
   label: z.string().max(80).nullable(),
-  createdBy: z.enum(["user", "chrona"]), createdAt: iso,
+  createdBy: z.enum(["user", "chrona", "module"]), createdAt: iso,
 }).strict();
 
 // ---------------------------------------------------------------- views ----
@@ -453,10 +453,14 @@ export const buildSettingsSchema = z.object({
 export const reflectionSettingsSchema = z.object({ enabled: z.boolean() }).strict();
 /** v2-21: which module provides memory (null: none), and whether conversations recall at their start and retain as they go. */
 export const memorySettingsSchema = z.object({ provider: slug.nullable(), autoRecall: z.boolean(), autoRetain: z.boolean() }).strict();
+/** Rotation of a QQ or web conversation before the next message: idle past the prompt cache's life with at least minContextTokens, or past maxContextTokens. */
+export const sessionSettingsSchema = z.object({ idleMinutes: z.number().int().min(5).max(1440), minContextTokens: z.number().int().min(0).max(1_000_000), maxContextTokens: z.number().int().min(10_000).max(1_000_000) }).strict();
+export const DEFAULT_SESSION_SETTINGS = { idleMinutes: 60, minContextTokens: 30_000, maxContextTokens: 100_000 } as const;
 export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
   reflection: reflectionSettingsSchema,
   memory: memorySettingsSchema,
+  sessions: sessionSettingsSchema,
   builds: buildSettingsSchema,
   buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
   /** v2-17: today's module model calls (local day), per module. */
@@ -494,10 +498,15 @@ export const chatReplySchema = z.object({ runId: id.nullable(), sessionId: id, m
 export const newSessionSchema = z.object({ key: z.string().min(1).max(200) }).strict();
 export const updateSessionSchema = z.object({ title: short.optional(), status: z.literal("ended").optional() }).strict();
 export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
+/** v2-24 `schedules.create`: one timer of the calling module, named by `key`; `payload` comes back in its schedule event. */
+export const moduleScheduleSchema = z.object({
+  key: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/), rule: scheduleRuleSchema, label: z.string().trim().min(1).max(80), until: iso.optional(),
+  payload: z.record(z.string(), z.unknown()).refine(value => JSON.stringify(value).length <= 4000, "payload must be at most 4000 characters of JSON"),
+}).strict();
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), reflection: reflectionSettingsSchema.optional(), memory: memorySettingsSchema.partial().optional() }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), reflection: reflectionSettingsSchema.optional(), memory: memorySettingsSchema.partial().optional(), sessions: sessionSettingsSchema.partial().optional() }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
@@ -523,7 +532,7 @@ export const chronaToolInputSchemas = {
   /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
   chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
   chrona_schedule: createScheduleSchema.extend({ label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on pages, in the user's language, e.g. 准备第2天材料") })
-    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model."),
+    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model; when an app offers reminders or a calendar (see its tools), use that app instead so the user sees and edits them there."),
   chrona_schedules: z.object({}).strict(),
   chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
   /** Full-text search over past sessions' messages; returns matching sessions with snippets. */
@@ -548,7 +557,7 @@ export const modulesToolInputSchemas = {
     .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
     .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the running release's reference even when customization prevented registering that built-in. Returns the exact content hash; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
-    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; activation needs the user\'s hash-bound approval. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with callers:["events"] and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
+    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; activation needs the user\'s hash-bound approval. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),callers?:[module names],idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with callers:["events"] and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   rollback: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": z.object({ versions: z.array(z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(2).max(4) }).strict()

@@ -91,8 +91,9 @@ if (!appId) {
     const binding = await refreshBinding();
     const result = await delivery.send(message);
     if (binding && result.outcome === "accepted" && result.receiptRef) {
-      // Never retry a send that QQ accepted.
-      await relay.recordDelivered([message.title, message.body].filter(Boolean).join("\n\n"), `qq:out:${result.receiptRef.slice(`${DEDICATED_PLATFORM}:`.length)}`).catch(() => log("qq.receipt_store_failed"));
+      // Never retry a send that QQ accepted. A final reply is already in the conversation: only its receipt is new.
+      const externalId = `qq:out:${result.receiptRef.slice(`${DEDICATED_PLATFORM}:`.length)}`, final = /:response:qq-final:[^:]+:([^:]+)$/.exec(message.idempotencyKey)?.[1];
+      await (final ? relay.setExternalId(final, externalId) : relay.recordDelivered([message.title, message.body].filter(Boolean).join("\n\n"), externalId)).catch(() => log("qq.receipt_store_failed"));
     }
     return result;
   };
