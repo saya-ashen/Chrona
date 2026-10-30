@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import "./module-effects";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";

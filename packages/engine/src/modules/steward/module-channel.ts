@@ -7,6 +7,22 @@ type CallReply = ReturnType<typeof moduleCallReplySchema.parse>;
 // Owner calls carry attachments as base64 (20 MiB files); chunks are collected, not re-copied.
 const maxLine = 32 * 1024 * 1024;
 
+/** Newline-delimited lines of at most `maxLine` bytes; past it, `overflow` and stop. */
+function lineSplitter(onLine: (text: string) => void, overflow: () => void) {
+  let parts: Buffer[] = [], size = 0;
+  return (chunk: Buffer) => {
+    let start = 0, end: number;
+    while ((end = chunk.indexOf(10, start)) !== -1) {
+      if (size + end - start > maxLine) { overflow(); return; }
+      const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
+      parts = []; size = 0; start = end + 1;
+      onLine(text);
+    }
+    if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
+    if (size > maxLine) overflow();
+  };
+}
+
 export async function createModuleChannel(socketPath: string, { onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
   let socket: Socket | undefined, accepted = false, closed = false;
   let pending: { id: string; resolve(reply: EventReply): void; reject(error: Error): void } | undefined;
@@ -56,19 +72,8 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
   const server = createServer(client => {
     if (accepted || closed) { client.destroy(); return; }
     accepted = true; socket = client;
-    let parts: Buffer[] = [], size = 0;
     const overflow = () => { record("Module line overflow"); fail(new Error("Module disconnected")); client.destroy(); };
-    client.on("data", (chunk: Buffer) => {
-      let start = 0, end: number;
-      while ((end = chunk.indexOf(10, start)) !== -1) {
-        if (size + end - start > maxLine) { overflow(); return; }
-        const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
-        parts = []; size = 0; start = end + 1;
-        void line(text).catch(() => { record("Module line failed"); });
-      }
-      if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
-      if (size > maxLine) overflow();
-    });
+    client.on("data", lineSplitter(text => { void line(text).catch(() => { record("Module line failed"); }); }, overflow));
     client.on("error", () => fail(new Error("Module connection failed")));
     client.on("close", () => fail(new Error("Module disconnected")));
     connected();

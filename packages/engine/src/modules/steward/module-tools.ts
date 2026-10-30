@@ -1,15 +1,13 @@
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
-import { parseInput, StewardError } from "./errors";
+import { StewardError } from "./errors";
 import { moduleSupervisor } from "./module-supervisor";
 import { audit } from "./audit";
-import { CallError, callSync, listSystemModules, type SystemTool } from "./module-calls";
+import { CallError, callSync, listSystemModules, validateToolArgs, type SystemTool } from "./module-calls";
 
 /** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
 type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" };
-type Manifest = z.infer<typeof moduleManifestSchema>;
-type Tool = Manifest["tools"][number];
 type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: SystemTool[] }; tool: SystemTool; direct: boolean; system?: true };
 /** Chrona's own interfaces visible to the audience (v2-13): always direct, few, and part of how the Provider works. */
 function systemEntries(audience: "provider" | "owner"): Entry[] {
@@ -64,17 +62,6 @@ export function moduleToolsets(catalog: CatalogEntry[]) {
     if (exposure === "deferred") (sets.get(namespace.name) ?? sets.set(namespace.name, { ...namespace, tools: [] }).get(namespace.name)!).tools.push(name);
   }
   return [...sets.values()];
-}
-export function moduleToolShape(tool: Tool) {
-  return Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, property]) => {
-    let schema: z.ZodType = "enum" in property ? z.enum(property.enum) : z[property.type]();
-    if (property.description) schema = schema.describe(property.description);
-    if (!tool.parameters.required.includes(key)) schema = schema.optional();
-    return [key, schema];
-  }));
-}
-export function validateToolArgs(tool: Tool, raw: unknown): Record<string, unknown> {
-  return parseInput(z.object(moduleToolShape(tool)).strict(), raw);
 }
 /** A routed call to a system tool (v2-13): the system module's own admission and validation apply, and the real caller is recorded. */
 async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string; runId: string | null; via?: string | null; deadline?: number }, resolved: Entry, raw: unknown) {

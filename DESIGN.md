@@ -338,7 +338,7 @@ Validate at 1440×900, 1024×768, and 390×844.
 ## 13. Implementation rules
 
 - `DESIGN.md` is the source of truth for project-wide visual decisions.
-- Global theme values are implemented through semantic CSS variables in `apps/web/src/styles/globals.css`.
+- Global theme values are implemented through semantic CSS variables in the web module's stylesheet (built-in: `packages/engine/src/modules/steward/builtin/web/style.css`; its page rules are in that directory's `DESIGN.md`).
 - Feature code uses semantic utilities (`bg-background`, `bg-card`, `text-muted-foreground`, `border-border`, state tokens) rather than literal hex values.
 - shadcn primitives remain the control foundation.
 - Product wrappers add domain meaning, not alternate primitive styles.

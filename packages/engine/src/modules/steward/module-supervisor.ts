@@ -1,14 +1,27 @@
 import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
+import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, type ModuleCall, type moduleCallReplySchema, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
+import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { moduleModelSettings } from "./settings";
 import { registerBuiltins } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
-import { handleModuleCall, pauseFailedModule, type CallScope } from "./module-effects";
 import { diagnosticText, recordModuleFailure, recordModuleRecovery, type ModuleFailureEvidence } from "./module-diagnostics";
 
 type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
+/** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
+export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
+type ModuleEffects = {
+  handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<ReturnType<typeof moduleCallReplySchema.parse>>;
+  pauseFailedModule(tx: Prisma.TransactionClient, ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date }, runId: string): Promise<void>;
+};
+// module-effects routes a module's calls through module-calls, which delivers through this supervisor: it registers here instead of being imported.
+let effects: ModuleEffects | undefined;
+export function registerModuleEffects(value: ModuleEffects) { effects = value; }
+function moduleEffects() {
+  if (!effects) throw new Error("Module effects are not registered: import ./module-effects");
+  return effects;
+}
 /** Where a failed delivery stopped: never reached the module, the module answered with an error, or lost after sending. */
 export type DeliveryStage = "unavailable" | "handler" | "lost";
 function staged(error: unknown, stage: DeliveryStage) {
@@ -88,7 +101,7 @@ class ModuleSupervisor {
     await ports.db.$transaction(async tx => {
       const data = { error: diagnosticText(error, 2000), exitCode: detail.exitCode ?? -1 };
       const run = runId ? await tx.moduleRun.update({ where: { id: runId }, data }) : await tx.moduleRun.create({ data: { moduleId: instance.moduleId, hash: instance.hash, triggerId: execution.triggerId, firedAt: execution.firedAt, ...data, createdAt: now } });
-      await pauseFailedModule(tx, ports, execution, run.id);
+      await moduleEffects().pauseFailedModule(tx, ports, execution, run.id);
       const module = await tx.module.findUnique({ where: { id: instance.moduleId } });
       await recordModuleFailure(tx, { workspaceId: execution.workspaceId, moduleId: instance.moduleId, hash: instance.hash, now,
         retry: !this.stopped && !instance.retiring && !!instance.manifest?.keepAlive && module?.status === "active" && module.activeHash === instance.hash && (this.failures.get(failureKey) ?? 0) < 3,
@@ -124,7 +137,7 @@ class ModuleSupervisor {
     const dataDir = join(ports.dataDir, "platform/data", instance.moduleId);
     await mkdir(dataDir, { recursive: true });
     // Only routed calls cross the channel (v2-10); each waits for its own target, never for the module's other calls.
-    instance.channel = await createModuleChannel(join(instance.dir, "s"), { timers, onCall: call => handleModuleCall(ports, { ...instance.scope }, call) });
+    instance.channel = await createModuleChannel(join(instance.dir, "s"), { timers, onCall: call => moduleEffects().handleModuleCall(ports, { ...instance.scope }, call) });
     if (this.isStopped() || isClosing(instance)) throw new Error("Module supervisor stopped");
     const contentDir = instance.manifest.content ? join(ports.dataDir, "platform/content", instance.moduleId) : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });

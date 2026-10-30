@@ -146,3 +146,7 @@ prisma/migrations/fixtures/*.sqlite-wal
 /.pi-subagents/
 prisma/*.sync-conflict-*.db*
 /outputs
+
+# Local agent working notes, deployment receipts and screenshots
+.agent-artifacts/
+.claude/

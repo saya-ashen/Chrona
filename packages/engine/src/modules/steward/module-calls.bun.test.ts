@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "./module-supervisor";

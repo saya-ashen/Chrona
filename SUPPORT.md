@@ -11,9 +11,9 @@ Chrona is alpha software. Support is best-effort and focused on reproducible bug
 
 ## Before opening an issue
 
-1. Check `README.md`, `docs/en/quick-start.md`, and `docs/en/privacy.md`.
+1. Check `README.md` and `docs/zh/operations.md`.
 2. Run `chrona doctor` for local database, lock, permissions, and bind safety.
-3. In `Settings -> AI Clients`, run the configured client's availability check. Codex, OMP, and Claude Code are the released providers; Hermes remains hidden.
+3. Check Provider health in Settings or with `chrona doctor`. Chrona's Provider is the Pi CLI (see `README.md`).
 4. If running from source, confirm Bun satisfies the version in `package.json`. Packaged releases do not require Bun.
 5. Remove secrets from logs and screenshots.
 

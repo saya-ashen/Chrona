@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
 import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
-import type { z } from "zod";
+import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
-import { validateToolArgs } from "./module-tools";
 import { parseInput, StewardError } from "./errors";
 
 export type Caller = z.infer<typeof callerSchema>;
@@ -112,6 +111,18 @@ function systemError(error: unknown) {
 function nextPath(origin: CallOrigin) {
   const name = callerName(origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
+}
+function moduleToolShape(tool: Tool) {
+  return Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, property]) => {
+    let schema: z.ZodType = "enum" in property ? z.enum(property.enum) : z[property.type]();
+    if (property.description) schema = schema.describe(property.description);
+    if (!tool.parameters.required.includes(key)) schema = schema.optional();
+    return [key, schema];
+  }));
+}
+/** A module tool's scalar arguments against its declared parameters. */
+export function validateToolArgs(tool: Tool, raw: unknown): Record<string, unknown> {
+  return parseInput(z.object(moduleToolShape(tool)).strict(), raw);
 }
 /** v2-25: a system tool's output against its declared `output`. A mismatch is Chrona's own bug: logged, never failing the caller (tests fail). */
 export function checkSystemOutput(target: string, tool: SystemTool, output: unknown) {

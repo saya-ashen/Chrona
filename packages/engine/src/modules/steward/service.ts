@@ -14,6 +14,8 @@ import { createTick } from "./tick";
 import { createChat } from "./chat";
 import { createProviderControl } from "./provider-channel";
 import { registerSystemModules } from "./system-modules";
+// Registers what modules' own calls do with the supervisor (see module-supervisor).
+import "./module-effects";
 /** Authenticated owner boundary. */
 export function createStewardService(inputPorts: StewardPorts) {
   registerSystemModules();
