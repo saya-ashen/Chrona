@@ -10,7 +10,9 @@ export type TestReport = { stdout: string; stderr: string; exitCode: number }[];
 type PreviewEffect = { type: "notify_user"; key: string; level: "now" | "digest"; title: string; body: string } | { type: "wake_provider"; key: string; prompt: string };
 export type ContinuityReport = { status: "passed" | "failed" | "skipped"; reason?: string; fromSchema: number | null; toSchema: number; migrated: boolean; effects?: PreviewEffect[]; migration?: TestReport[number]; output?: TestReport[number] };
 export type KeyProbe = { status: "passed" | "repeated" | "skipped"; reason?: string; keys?: string[] };
-export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; keyProbe?: KeyProbe; migration?: TestReport[number]; errors?: string[];
+/** v2-25: the entry type-checked against the SDK and call contracts before tests. */
+export type TypecheckReport = { status: "passed" | "failed" | "skipped"; reason?: string; errors?: { file: string; line: number; code: number; message: string }[]; total?: number };
+export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; keyProbe?: KeyProbe; migration?: TestReport[number]; errors?: string[]; typecheck?: TypecheckReport;
   /** v2-6: what Chrona installed (lockfile libraries; system programs → store or host paths). */
   dependencies?: { npm: boolean; python: boolean; packages: Record<string, string[]> } };
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };

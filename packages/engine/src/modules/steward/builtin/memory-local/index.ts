@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK at run time.
 import { chrona, on } from "chrona";
 import { join } from "node:path";
 

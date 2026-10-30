@@ -20,6 +20,14 @@ export const buildArtifacts = {
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/calls.d.ts", to: "resources/module-sdk/calls.d.ts", required: true },
+    // v2-25: the module type check runs with Bun, so it ships TypeScript and Bun's types beside it.
+    { from: "packages/integrations/src/steward/module-typecheck/check.ts", to: "resources/module-typecheck/check.ts", required: true },
+    { from: "node_modules/typescript/package.json", to: "resources/module-typecheck/node_modules/typescript/package.json", required: true },
+    { from: "node_modules/typescript/lib", to: "resources/module-typecheck/node_modules/typescript/lib", required: true },
+    { from: "node_modules/@types/bun", to: "resources/module-typecheck/node_modules/@types/bun", required: true },
+    { from: "node_modules/bun-types", to: "resources/module-typecheck/node_modules/bun-types", required: true },
+    { from: "node_modules/@types/node", to: "resources/module-typecheck/node_modules/@types/node", required: true },
   ] satisfies ReleaseResource[],
 } as const;
 

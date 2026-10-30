@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK at run time.
 import { chrona, on } from "chrona";
 import { createEvents, type Caller, type CallResult } from "./events";
 

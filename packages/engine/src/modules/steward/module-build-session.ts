@@ -9,6 +9,7 @@ import { StewardError } from "./errors";
 import { readModuleFiles } from "./module-preview";
 import { checkoutModule } from "./module-files";
 import { writeBuildHelpers } from "./module-build-helpers";
+import { callsDeclaration } from "./module-contracts";
 import { readChatFile, runFile } from "./chat";
 import { createRuns, createRunSession } from "./runs";
 import { notifyUser } from "./notify-user";
@@ -63,7 +64,7 @@ async function copyRequestFiles(cwd: string, refs: ReferenceFile[]) {
 }
 /** Writes the build directory (helpers, request, reference files, the active version) and returns the run's prompt. */
 async function prepareBuild(ports: StewardPorts, workspaceId: string, cwd: string, request: Request, refs: ReferenceFile[]) {
-  await writeBuildHelpers(cwd, ports.moduleSdk!);
+  await writeBuildHelpers(cwd, ports.moduleSdk!, { calls: await callsDeclaration(ports, workspaceId), typecheck: ports.moduleTypecheck });
   const visible = { ...request, files: await copyRequestFiles(cwd, refs) };
   await writeFile(join(cwd, "request.json"), JSON.stringify(visible, null, 2));
   const names = requestModules(request);

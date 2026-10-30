@@ -80,6 +80,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
+  const moduleTypecheck = resourcePath("module-typecheck", "packages/integrations/src/steward/module-typecheck");
   const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
   const sandbox: StewardPorts["sandbox"] = {
     ...scriptSandbox.health,
@@ -89,7 +90,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     secrets: configuredSecret, packages: createModulePackages(),
-    sandbox: options.sandbox ?? sandbox, moduleSdk,
+    sandbox: options.sandbox ?? sandbox, moduleSdk, moduleTypecheck,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },

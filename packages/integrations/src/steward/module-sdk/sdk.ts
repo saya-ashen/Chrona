@@ -1,9 +1,11 @@
 import { createConnection } from "node:net";
 import { randomUUID } from "node:crypto";
+import type { ChronaCalls } from "./calls";
 
 /** Who called a tool, as Chrona recorded it. */
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
-export type Trigger = { kind: "schedule"; id: string; firedAt: string }
+/** `scheduleId` and `payload` are set for timers the module arranged itself (`schedules.create`) and for reminders. */
+export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
   | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
@@ -11,6 +13,17 @@ type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number };
+// v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
+type Contract = keyof ChronaCalls & string;
+type ArgsOf<K extends Contract> = ChronaCalls[K] extends { args: infer A } ? A : never;
+type OutputOf<K extends Contract> = ChronaCalls[K] extends { output: infer O } ? O : never;
+type SyncOptions = CallOptions & { mode?: "sync" };
+type Call = {
+  <K extends Contract>(target: K, ...rest: object extends ArgsOf<K> ? [args?: ArgsOf<K>, options?: SyncOptions] : [args: ArgsOf<K>, options?: SyncOptions]): Promise<OutputOf<K>>;
+  <K extends Contract>(target: K, args: ArgsOf<K>, options: CallOptions & { mode: "async" }): Promise<CallState>;
+  /** A target without a declared contract: the result is unknown unless the caller states what it expects. */
+  <T = unknown, S extends string = string>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
+};
 type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
 const handlers = new Map<Trigger["kind"], Handler>();
 export type ModelResult = { text: string; inputTokens: number | null; outputTokens: number | null };
@@ -95,8 +108,8 @@ export const chrona = {
    * `reply: true` delivers a `call_result` event later. Rejections are ModelError with a code
    * (undeclared, forbidden, not_found, cycle, unknown, failed, unavailable, invalid).
    */
-  call: <T = unknown>(target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}): Promise<T> =>
-    call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result) as T),
+  call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
+    call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
   /**

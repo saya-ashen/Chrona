@@ -19,6 +19,8 @@ export type StewardPorts = {
   };
   /** The `chrona` SDK package directory (sdk.ts, testing.ts) given to module builds. */
   moduleSdk?: string;
+  /** v2-25: the module type check (check.ts, with TypeScript and Bun types beside it); without it builds skip the check. */
+  moduleTypecheck?: string;
   /** Trusted resources from the running release: built-in installation and development-reference checkout, never app data. */
   moduleBuiltinResources?: string;
   chatTimeoutMs?: number;

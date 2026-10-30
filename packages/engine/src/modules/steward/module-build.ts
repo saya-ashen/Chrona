@@ -11,6 +11,7 @@ import { runTests, checkContinuity } from "./module-continuity";
 import { recordGroupReview } from "./module-group";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
+import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { readModuleFiles, codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -113,6 +114,14 @@ async function activateBuiltin(context: ModuleContext, module: Awaited<ReturnTyp
     return true;
   });
 }
+/** v2-25: tests run only on an entry that type-checks against the SDK and call contracts. */
+async function typecheckAndTest(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
+  const typecheck = await typecheckBuild(context, staging, manifest);
+  if (typecheck.status !== "skipped") report.typecheck = typecheck;
+  if (typecheck.status !== "failed") return runTests(context, staging, manifest, report.tests);
+  report.errors = typecheckErrors(typecheck);
+  return false;
+}
 function buildHasErrors(report: BuildReport) { return Boolean(report.errors?.length); }
 async function checkBuildCandidate({ context, module, version, manifest, staging, report }: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; staging: string; report: BuildReport }): Promise<{ passed: boolean; needsMigration: boolean; dependencyFailure: boolean }> {
   const { platform } = context, { hash } = version;
@@ -123,7 +132,7 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
     await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
     return { passed: false, needsMigration: false, dependencyFailure: true };
   }
-  let passed = await runTests(context, staging, manifest, report.tests), needsMigration = false;
+  let passed = await typecheckAndTest(context, staging, manifest, report), needsMigration = false;
   if (passed) {
     const continuity = { status: "skipped" as const, reason: "no data", fromSchema: module.dataSchema, toSchema: manifest.data.schema, migrated: false };
     report.continuity = continuity;

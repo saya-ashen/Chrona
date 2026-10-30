@@ -158,12 +158,20 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/package.json"), "Module SDK package");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "rescue.html"), "Immutable rescue console");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/testing.ts"), "Module test helper");
+  await assertModuleTypecheck(resolve(releaseDir, buildArtifacts.resourcesRoot));
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);
   }
 
   console.log(`✓ Release smoke passed for ${target}`);
+}
+
+/** v2-25: the shipped type check resolves TypeScript and Bun's types on its own and passes a built-in module. */
+async function assertModuleTypecheck(resources: string) {
+  const child = Bun.spawn(["bun", "--no-install", join(resources, "module-typecheck/check.ts"), join(resources, "builtin/remind"), join(resources, "module-sdk")], { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+  if (code !== 0) throw new Error(`Module type check failed (exit ${code}): ${stdout.slice(-500)} ${stderr.slice(-500)}`);
 }
 
 if (import.meta.main) {

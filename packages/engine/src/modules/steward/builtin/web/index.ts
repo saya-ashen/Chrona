@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK package at run time.
 import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

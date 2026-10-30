@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK at this at run time.
 import { on, chrona } from "chrona";
 import { createFiles } from "./files";
 

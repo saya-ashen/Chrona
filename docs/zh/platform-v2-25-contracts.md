@@ -1,6 +1,6 @@
 # v2-25 规格：接口契约（返回结构、类型与运行时校验）
 
-状态：规格已确认（2026-10-29）；第 1 步已实现，未部署；第 2、3 步待做。依赖 [v2-5](platform-v2-5-extensions.md) §3、[v2-13](platform-v2-13-modules-tools.md)、[v2-24](platform-v2-24-timers.md)。
+状态：规格已确认（2026-10-29）；第 1、2 步已实现，未部署；第 3 步待做。依赖 [v2-5](platform-v2-5-extensions.md) §3、[v2-13](platform-v2-13-modules-tools.md)、[v2-24](platform-v2-24-timers.md)。
 
 ## 1. 背景
 
@@ -29,14 +29,13 @@
 
 ## 4. 第 2 步：构建时的类型检查
 
-- 每次构建写入 SDK 时（`writeBuildHelpers`），同时生成 `node_modules/chrona/calls.d.ts`：
-  - `interface ChronaCalls { "<module>.<tool>": { args: …; output: … } }`，覆盖全部系统工具与已启用应用中声明了 `output` 的工具；未声明的应用工具 `output` 为 `unknown`（不是 `any`）。
-  - 类型由契约生成：系统工具 zod → `z.toJSONSchema` → TS 类型文本；应用工具直接从 manifest 的 JSON Schema 转。转换只支持契约允许的子集（object/array/string/number/boolean/null/enum/const/union/record），不认识的结构生成 `unknown`。
-- `sdk.ts` 的 `chrona.call` 增加按目标推断的重载：`call<K extends keyof ChronaCalls>(target: K, args: ChronaCalls[K]["args"]): Promise<ChronaCalls[K]["output"]>`；目标不在表中时返回 `Promise<unknown>`。`chrona.secret/model/notify/events.emit` 等快捷方法改用同一张表。
-- 构建检查在跑 `tests` 之前增加类型检查：内核用 TypeScript 编译器 API（`ts.createProgram`，`strict`、`noEmit`，只读 staging 目录和生成的 `calls.d.ts`）检查候选代码。只解析不执行，不进沙箱也安全；限时 30 秒。有错误则版本 `rejected`，报告 `report.typecheck`（文件、行、信息，截断后进入失败回报）。
-- `typescript` 从 devDependencies 移到 dependencies，随发布包分发。
-- 内置应用去掉 `// @ts-expect-error Chrona supplies the SDK at run time.`，在仓库 `tsconfig` 中把 `chrona` 映射到 `module-sdk/sdk.ts`，由仓库 `typecheck` 覆盖；发布时它们同样经过构建检查。
-- 构建说明（`BUILD_REFERENCE_PROMPT`）补一句：离线测试的 stub 须符合 `ChronaCalls` 中的类型。
+- `calls.d.ts`（`module-contracts.ts` 的 `callsDeclaration`）：`interface ChronaCalls { "<module>.<tool>": { args: …; output: … } }`，覆盖 `visibility` 含 `modules` 或 `owner` 的系统工具与已启用应用的工具；没有声明返回结构的目标 `output` 为 `unknown`（不是 `any`）。类型由契约生成：zod → `z.toJSONSchema` → TS 类型文本，只支持契约用到的子集（object/array/string/number/boolean/null/enum/const/anyOf/allOf/record），其余（如 `$ref`）生成 `unknown`。
+- 构建会话写入 SDK 时（`writeBuildHelpers`）把它写成只读的 `node_modules/chrona/calls.d.ts`，并提供 `chrona/typecheck.sh <moduledir>`。SDK 自带一份空的默认 `calls.d.ts`（运行时只是类型，被擦除）。
+- `sdk.ts` 的 `chrona.call` 按目标推断：有契约的目标参数与结果都有类型（异步调用返回 `CallState`）；参数写错时没有退路可落；没有契约的目标结果为 `unknown`，调用方可写 `call<T>()` 表明预期。给有契约的目标写类型参数会被检查拒绝（代码 90001），因为那等于用猜测覆盖契约。SDK 的 schedule 事件补上 `scheduleId`、`payload`（v2-24 起就会传）。
+- 构建检查在跑 `tests` 之前做类型检查（`module-typecheck.ts`）：用 Bun 在独立进程里运行 `check.ts`（限时 60 秒、虚拟内存 4 GB），以入口为根，跟随它的导入检查（`strict`）；测试文件不检查。`check.ts` 只读文件、不执行模块代码；缺依赖声明文件（TS7016）不算错。有错误则版本 `rejected`，报告 `report.typecheck` 并把前 50 条写进 `report.errors`，构建会话照常读到。入口不是 TypeScript，或类型检查资源不可用时跳过，不记入报告。
+- 发布包随附 `resources/module-typecheck/`：`check.ts`、`typescript`（`package.json` 与 `lib/`）、`@types/bun`、`bun-types`、`@types/node`（约 25 MB，未压缩）。`typescript` 仍是开发依赖，打包时从 `node_modules` 复制。发布冒烟检查用包内资源检查内置 `remind`。
+- 内置应用入口去掉 `// @ts-expect-error Chrona supplies the SDK …`，仓库 `tsconfig` 把 `chrona` 映射到 `module-sdk/sdk.ts`，由仓库 `typecheck` 覆盖（为此修正了 `remind`、`qq` 的事件参数类型）。内置应用的测试文件仍用 `chrona/testing` 的无类型写法，不在这一步。
+- 构建说明（`BUILD_REFERENCE_PROMPT`）写明：契约在 `calls.d.ts`，不给有契约的目标写类型参数，提交前可用 `chrona/typecheck.sh` 自查，离线测试的 stub 须符合这些类型。
 
 ## 5. 第 3 步：应用工具的返回结构与运行时校验
 

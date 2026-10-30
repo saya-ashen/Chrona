@@ -20,9 +20,10 @@
       "@chrona/shared": ["./packages/shared/src/index.ts"], "@chrona/shared/*": ["./packages/shared/src/*"],
       "@chrona/engine": ["./packages/engine/src/index.ts"],
       "@chrona/integrations": ["./packages/integrations/src/index.ts"],
-      "@chrona/integrations/steward": ["./packages/integrations/src/steward/index.ts"]
+      "@chrona/integrations/steward": ["./packages/integrations/src/steward/index.ts"],
+      "chrona": ["./packages/integrations/src/steward/module-sdk/sdk.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts"],
-  "exclude": ["node_modules", "e2e", ".worktrees", "result", "dist", "external-plugins/pi-steward-agent"]
+  "exclude": ["node_modules", "e2e", ".worktrees", "result", "dist", "artifacts", "external-plugins/pi-steward-agent"]
 }

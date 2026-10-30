@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK package at run time.
 import { chrona, on } from "chrona";
 import { createHash } from "node:crypto";
 import { createChronaQqDelivery, createQqBotHandler, createQqBotState, parseApprovalDecision, DEDICATED_PLATFORM, type DeliveryMessage, type DeliveryOutcome, type QqBinding, type QqReplyItem } from "./bot";
@@ -13,8 +12,8 @@ let deliver = async (_message: DeliveryMessage): Promise<DeliveryOutcome> => ({ 
 let started!: () => void;
 const startup = new Promise<void>(resolve => { started = resolve; });
 let reply = async (item: QqReplyItem): Promise<string> => { await startup; return reply(item); };
-on("tool", async (event: { id: string; args: Args }) => {
-  const { args } = event;
+on("tool", async event => {
+  const args = event.args as Args;
   if (event.id === "deliver") {
     return { result: await deliver({ idempotencyKey: String(args.key), title: String(args.title), body: String(args.body), link: typeof args.link === "string" ? args.link : null, recipient: typeof args.recipient === "string" ? args.recipient : null,
       ...(typeof args.approval === "string" ? { approval: { id: args.approval, scoped: args.scoped === true } } : {}) }) };

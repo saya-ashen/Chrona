@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK at run time.
 import { chrona, on } from "chrona";
 import { openStore } from "./store";
 import { createNotify, type Caller, type CallResult } from "./notify";

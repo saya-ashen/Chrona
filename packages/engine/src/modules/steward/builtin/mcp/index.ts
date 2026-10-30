@@ -1,4 +1,3 @@
-// @ts-expect-error Chrona supplies the SDK at this at run time.
 import { chrona } from "chrona";
 
 // Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
