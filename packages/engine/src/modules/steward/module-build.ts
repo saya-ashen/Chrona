@@ -269,7 +269,18 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
       return changed.count > 0;
     });
     if (!claimed) continue;
-    const result = await buildVersion(context, version);
+    let result: Proposal;
+    try { result = await buildVersion(context, version); }
+    catch (error) {
+      if (version.source !== "builtin") throw error;
+      const report: BuildReport = { tests: [], errors: [String(error).slice(0, 4000)] };
+      await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+      result = { moduleId: version.moduleId, hash: version.hash, status: "rejected", report };
+    }
+    if (result.status === "rejected" && version.source === "builtin") {
+      const module = await requireModule(context, db, version.moduleId);
+      console.error(JSON.stringify({ level: "error", component: "module-build", event: "builtin.rejected", module: module.name, hash: version.hash, errors: result.report.errors?.map(error => error.slice(0, 1000)).slice(0, 10) ?? [], tests: result.report.tests.filter(test => test.exitCode !== 0).map(test => ({ exitCode: test.exitCode, stderr: test.stderr.slice(0, 1000) })).slice(0, 10) }));
+    }
     if (result.status === "rejected" && version.source === "provider") await reportFailure(context, version, result);
   }
 }

@@ -55,7 +55,10 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
       if (skipped(entry.name)) continue;
       if (await preserveCustomization(ports, workspaceId, entry.name)) continue;
       const result = await proposeBuiltin(context, root, entry.name);
-      if (result.status === "rejected") throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
+      if (result.status === "rejected") {
+        console.error(JSON.stringify({ level: "error", component: "module-builtin", event: "builtin.rejected", module: entry.name, hash: result.hash, errors: result.report.errors?.map(error => error.slice(0, 1000)).slice(0, 10) ?? [] }));
+        throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
+      }
     }
   } finally { await rm(root, { recursive: true, force: true }); }
   // buildPending takes three versions at a time; built-ins must all be ready before modules start.

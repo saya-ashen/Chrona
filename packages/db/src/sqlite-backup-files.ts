@@ -5,25 +5,30 @@ import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url
 
 export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as const;
 
-function assertRegularTree(path: string): void {
-  const stat = lstatSync(path);
-  if (stat.isDirectory()) {
-    for (const name of readdirSync(path)) assertRegularTree(join(path, name));
-  } else if (!stat.isFile()) {
+// Installed module dependencies are reproducible, and may contain package-manager symlinks.
+const installedDirs = ["node_modules", ".venv", ".chrona"];
+function assertRegularTree(dataDir: string, path: string, files: string[]): void {
+  const stat = lstatSync(join(dataDir, path));
+  const parts = path.split("/");
+  if (stat.isDirectory() && parts.length === 4 && parts[0] === "platform" && parts[1] === "store" && installedDirs.includes(parts[3]!)) return;
+  if (!stat.isDirectory() && !stat.isFile()) {
     throw new Error("Backup refuses symlinks and special files in platform, sessions, secrets or qq-bot.");
   }
+  files.push(path);
+  if (stat.isDirectory()) for (const name of readdirSync(join(dataDir, path))) assertRegularTree(dataDir, `${path}/${name}`, files);
 }
 
 export function backupDataFiles(dataDir: string, archivePath: string): void {
   if (existsSync(archivePath)) throw new Error("Backup archive already exists.");
   const present = backupDataRoots.filter(root => lstatSync(join(dataDir, root), { throwIfNoEntry: false }) !== undefined);
+  const files: string[] = [];
   for (const root of present) {
     if (!lstatSync(join(dataDir, root)).isDirectory()) throw new Error("Backup roots must be directories.");
-    assertRegularTree(join(dataDir, root));
+    assertRegularTree(dataDir, root, files);
   }
   // Reserve a private output before tar opens it, including under a permissive umask.
   writeFileSync(archivePath, "", { flag: "wx", mode: 0o600 });
-  execFileSync("tar", ["--format=ustar", "--hard-dereference", "-cf", resolve(archivePath), "-C", resolve(dataDir), ...(present.length ? present : ["--files-from=/dev/null"])], { stdio: "pipe" });
+  execFileSync("tar", ["--format=ustar", "--hard-dereference", "--no-recursion", "-cf", resolve(archivePath), "-C", resolve(dataDir), "--null", "--files-from=-"], { input: files.length ? `${files.join("\0")}\0` : "", stdio: "pipe" });
   secureGeneratedPrivateFile(archivePath);
 }
 

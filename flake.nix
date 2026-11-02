@@ -37,7 +37,25 @@
     };
   }
   // flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {inherit system;};
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [(final: prev: {
+          bun = prev.bun.overrideAttrs (old: {
+            version = "1.4.2";
+            passthru = old.passthru // {
+              # Bun 1.4 no longer publishes an x86_64-darwin binary.
+              sources = builtins.mapAttrs (platform: source: final.fetchurl {
+                url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-${source.name}.zip";
+                inherit (source) hash;
+              }) {
+                aarch64-darwin = { name = "darwin-aarch64"; hash = "sha256-kJh6OhbX21VtiGrD1VHnttPt8KHPQ6yu1iLoZ2vh0S8="; };
+                aarch64-linux = { name = "linux-aarch64"; hash = "sha256-VDKLvC2cjgyfiSxUTWbFeoO4QTnjSQnl7oF1jxrI/ac="; };
+                x86_64-linux = { name = "linux-x64-baseline"; hash = "sha256-xngEDxT+BEDrg503y9DOTAUaMtpygGrJfeamqra/co8="; };
+              };
+            };
+          });
+        })];
+      };
       playwrightLibs = with pkgs; [
         glib
         nspr

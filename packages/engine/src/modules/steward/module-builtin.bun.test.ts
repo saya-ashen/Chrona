@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { chmod, link, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,6 +54,29 @@ test("built-in fresh registration and second start: validated, tested, active, n
     expect(await f.db.generation.count()).toBe(1);
     expect(f.tests()).toBe(1);
   } finally { await f.close(); }
+});
+
+test.each(["smoke", "exception"])("rejected built-in logs its report and leaves testing immediately: %s", async failure => {
+  const f = await fixture();
+  const log = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    if (failure === "smoke") {
+      f.ports.sandbox = testModuleSandbox(async input => input.entry === "test.ts"
+        ? { status: "succeeded", exitCode: 0, output: "{}", error: null }
+        : { status: "failed", exitCode: 1, output: "", error: "fixture smoke failed" });
+    } else {
+      await writeFile(join(f.code, "package.json"), "{}");
+      await writeFile(join(f.code, "bun.lock"), "{}");
+      f.ports.packages = { backend: "system", install: async () => { throw new Error("fixture installer failed"); } };
+    }
+    await f.start();
+    const version = await f.db.moduleVersion.findFirstOrThrow();
+    expect(version).toMatchObject({ source: "builtin", status: "rejected" });
+    expect(await f.db.moduleVersion.count({ where: { status: "testing" } })).toBe(0);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(log.mock.calls[0]![0] as string)).toMatchObject({ level: "error", component: "module-build", event: "builtin.rejected", module: "sample", hash: version.hash, errors: expect.arrayContaining([expect.stringContaining(failure === "smoke" ? "fixture smoke failed" : "fixture installer failed")]) });
+    expect(await f.db.run.count()).toBe(0);
+  } finally { log.mockRestore(); await f.close(); }
 });
 
 test("built-ins register from a release directory whose files are hard-linked (Nix store optimisation)", async () => {

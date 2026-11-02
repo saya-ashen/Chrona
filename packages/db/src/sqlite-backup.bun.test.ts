@@ -61,6 +61,39 @@ describe("SQLite backup and restore", () => {
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
+  it("omits installed directories only directly under store versions, including their symlinks", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-installed-backup-"));
+    try {
+      const data = join(directory, "data"), db = join(directory, "active.db"), backup = join(directory, "backup.db");
+      createDatabase(db, "saved");
+      for (const name of ["node_modules", ".venv", ".chrona"]) {
+        const installed = join(data, "platform/store/hash", name);
+        mkdirSync(join(installed, ".bin"), { recursive: true });
+        symlinkSync("../package/bin.js", join(installed, ".bin/tool"));
+      }
+      writeFileSync(join(data, "platform/store/hash/bun.lock"), "lockfile");
+      backupSqliteDatabase(`file:${db}`, backup, data);
+      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
+      expect(listing).toContain("platform/store/hash/bun.lock");
+      for (const name of ["node_modules", ".venv", ".chrona"]) expect(listing).not.toContain(name);
+      const restored = join(directory, "restored");
+      restoreSqliteDatabase(`file:${join(directory, "restored.db")}`, backup, { dataDir: restored });
+      expect(readFileSync(join(restored, "platform/store/hash/bun.lock"), "utf8")).toBe("lockfile");
+      for (const name of ["node_modules", ".venv", ".chrona"]) expect(existsSync(join(restored, "platform/store/hash", name))).toBe(false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it.each(["platform/data/app/node_modules/link", "sessions/node_modules/link", "platform/store/hash/src/node_modules/link", "platform/store/node_modules/link", "platform/store/hash/.venv", "platform/store/hash/.chrona", "platform/store/hash/node_modules"])("refuses links outside installed directories (including a linked directory itself): %s", path => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-installed-safety-"));
+    try {
+      const data = join(directory, "data"), db = join(directory, "active.db");
+      createDatabase(db, "saved");
+      mkdirSync(join(data, path, ".."), { recursive: true });
+      symlinkSync(join(directory, "missing"), join(data, path));
+      expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "backup.db"), data)).toThrow("symlinks");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   for (const root of ["platform", "sessions", "secrets", "qq-bot"]) {
     it(`protects ${root} paths and requires force only for non-empty roots`, () => {
       const directory = mkdtempSync(join(tmpdir(), "chrona-root-safety-"));
