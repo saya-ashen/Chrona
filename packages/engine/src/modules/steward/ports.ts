@@ -27,10 +27,16 @@ export type StewardPorts = {
   onQueued?: () => Promise<unknown>;
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
+  /** Owner-selected update review policy. Omitted preserves mandatory AI review. */
+  moduleUpdateReview?: "required" | "checks-only";
+  /** Explicit owner opt-in; rollback still requires a standing module grant and compatible approved prior code. */
+  moduleAutoRollback?: boolean;
   sandbox?: {
-    /** Modules can run (an interpreter exists). */
+    /** Set by the host, never inferred from missing isolation or supplied by a module. */
+    executionMode?: "legacy" | "trusted-local" | "required-isolation";
+    /** Modules can run (an interpreter exists and required isolation is available). */
     available: boolean;
-    /** Modules run inside bubblewrap; otherwise as plain processes of the Chrona user (declared limits are not enforced). */
+    /** Modules run inside bubblewrap; otherwise local OS permissions apply, not manifest isolation. */
     isolated: boolean;
     startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; httpDir?: string; env?: Record<string, string>; entry: string; socketPath: string; network?: boolean; memoryMb?: number }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void; limits?: { virtualMemoryMb: number } };
     runModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;

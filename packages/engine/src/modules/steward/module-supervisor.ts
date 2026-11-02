@@ -1,4 +1,4 @@
-import { mkdtemp, chmod, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, type ModuleCall, type moduleCallReplySchema, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
@@ -7,6 +7,9 @@ import { moduleModelSettings } from "./settings";
 import { registerBuiltins } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
 import { diagnosticText, recordModuleFailure, recordModuleRecovery, type ModuleFailureEvidence } from "./module-diagnostics";
+import { currentModuleEvolution } from "./module-evolution";
+import { moduleContext } from "./module-context";
+import { rollbackFailedStart } from "./module-generation";
 
 type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 /** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
@@ -31,9 +34,9 @@ function staged(error: unknown, stage: DeliveryStage) {
 type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number };
+type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; validateResult?: (result: unknown) => string | null };
 type Instance = {
-  moduleId: string; hash: string; manifest: ModuleManifest; scope: CallScope;
+  moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
   queue: Promise<unknown>; start?: Promise<void>;
   process?: Process; channel?: Awaited<ReturnType<typeof createModuleChannel>>;
   dir?: string; idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
@@ -43,7 +46,7 @@ type Instance = {
 const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
 const isClosing = (instance: Instance) => instance.closing;
 const RETIRE_GRACE_MS = 1000;
-const keyOf = (moduleId: string, hash: string) => `${moduleId}:${hash}`;
+const keyOf = (moduleId: string, hash: string, activationId?: string | null) => activationId === undefined ? `${moduleId}:${hash}` : `${moduleId}:${hash}:${activationId ?? "untracked"}`;
 function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
 function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
   const process = instance.process, exit = instance.exit;
@@ -81,7 +84,8 @@ class ModuleSupervisor {
     await instance.channel?.close();
     await instance.process?.exited.catch(() => {});
     if (instance.dir) await rm(instance.dir, { recursive: true, force: true });
-    if (this.instances.get(keyOf(instance.moduleId, instance.hash)) === instance) this.instances.delete(keyOf(instance.moduleId, instance.hash));
+    const key = keyOf(instance.moduleId, instance.hash, instance.activationId);
+    if (this.instances.get(key) === instance) this.instances.delete(key);
   }
   private retire(instance: Instance) {
     instance.retiring = true;
@@ -89,8 +93,38 @@ class ModuleSupervisor {
     const answered = async () => { if (await instance.channel?.drained()) await new Promise(resolve => this.timers.setTimeout(resolve, RETIRE_GRACE_MS)); };
     void instance.queue.then(answered, answered).finally(() => this.close(instance)).catch(() => {});
   }
+  private async currentFailure(instance: { moduleId: string; hash: string; activationId?: string | null; scope: Pick<CallScope, "workspaceId"> }) {
+    if (!instance.activationId) return true;
+    try { return (await currentModuleEvolution(this.ports.db, instance.scope.workspaceId, instance.moduleId, instance.hash))?.activationId === instance.activationId; }
+    catch (error) {
+      console.error(JSON.stringify({ component: "module-supervisor", event: "stale_failure_check.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) }));
+      return false;
+    }
+  }
+  private async persistFailure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> } & Partial<Omit<Instance, "scope">>, input: { failureKey: string; execution: { workspaceId: string; triggerId: string; firedAt: Date }; detail: ModuleFailureEvidence & { runId: string | null; delivery: DeliveryStage | null }; runId: string | undefined; now: Date }) {
+    const { failureKey, execution, detail, runId, now } = input;
+    let failureRunId = runId ?? "";
+    try { await this.ports.db.$transaction(async tx => {
+      const data = { error: diagnosticText(detail.reason, 2000), exitCode: detail.exitCode ?? -1 };
+      const run = runId ? await tx.moduleRun.update({ where: { id: runId }, data }) : await tx.moduleRun.create({ data: { moduleId: instance.moduleId, hash: instance.hash, triggerId: execution.triggerId, firedAt: execution.firedAt, ...data, createdAt: now } });
+      failureRunId = run.id;
+      const module = await tx.module.findUnique({ where: { id: instance.moduleId } });
+      await recordModuleFailure(tx, { workspaceId: execution.workspaceId, moduleId: instance.moduleId, hash: instance.hash, now,
+        retry: !this.stopped && !instance.retiring && !!instance.manifest?.keepAlive && module?.status === "active" && module.activeHash === instance.hash && (this.failures.get(failureKey) ?? 0) < 3,
+        activationId: instance.activationId, evidence: { ...detail, runId: run.id } });
+    }); } catch (error) {
+      console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) }));
+    }
+    return failureRunId;
+  }
+  private async rollbackFailedStart(instance: { moduleId: string; hash: string; activationId?: string | null; connected?: boolean; failureEvidence?: ModuleFailureEvidence }, workspaceId: string, event: ModuleEvent | undefined, delivery: DeliveryStage | undefined) {
+    if (instance.connected || instance.failureEvidence?.phase !== "start" || (event && delivery !== "unavailable") || !instance.activationId) return false;
+    try { return (await rollbackFailedStart(moduleContext(this.ports, workspaceId), instance.moduleId, instance.hash, instance.activationId)).rolledBack; }
+    catch (error) { console.error(JSON.stringify({ component: "module-supervisor", event: "module.rollback.failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })); return false; }
+  }
   private async failure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> } & Partial<Omit<Instance, "scope">>, error: string, runId?: string, event?: ModuleEvent, delivery?: DeliveryStage) {
     const { ports } = this;
+    if (!await this.currentFailure(instance)) return;
     const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, triggerId: event ? triggerKey(event) : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
     const failureKey = keyOf(instance.moduleId, instance.hash);
     this.failures.set(failureKey, (this.failures.get(failureKey) ?? 0) + 1);
@@ -98,15 +132,9 @@ class ModuleSupervisor {
       triggerId: execution.triggerId, delivery: delivery ?? null };
     // Journal still has attributed evidence if SQLite itself cannot record the incident.
     console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure", moduleId: instance.moduleId, module: instance.manifest?.name, hash: instance.hash, ...detail }));
-    await ports.db.$transaction(async tx => {
-      const data = { error: diagnosticText(error, 2000), exitCode: detail.exitCode ?? -1 };
-      const run = runId ? await tx.moduleRun.update({ where: { id: runId }, data }) : await tx.moduleRun.create({ data: { moduleId: instance.moduleId, hash: instance.hash, triggerId: execution.triggerId, firedAt: execution.firedAt, ...data, createdAt: now } });
-      await moduleEffects().pauseFailedModule(tx, ports, execution, run.id);
-      const module = await tx.module.findUnique({ where: { id: instance.moduleId } });
-      await recordModuleFailure(tx, { workspaceId: execution.workspaceId, moduleId: instance.moduleId, hash: instance.hash, now,
-        retry: !this.stopped && !instance.retiring && !!instance.manifest?.keepAlive && module?.status === "active" && module.activeHash === instance.hash && (this.failures.get(failureKey) ?? 0) < 3,
-        evidence: { ...detail, runId: run.id } });
-    });
+    const failureRunId = await this.persistFailure(instance, { failureKey, execution, detail, runId, now });
+    const rolledBack = await this.rollbackFailedStart(instance, execution.workspaceId, event, delivery);
+    if (!rolledBack && failureRunId) await ports.db.$transaction(tx => moduleEffects().pauseFailedModule(tx, ports, execution, failureRunId)).catch(pauseError => console.error(JSON.stringify({ component: "module-supervisor", event: "module.pause.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(pauseError), 300) })));
   }
   private restart(instance: Instance) {
     if (this.stopped || instance.retiring || !instance.manifest.keepAlive || this.restarts.has(instance.moduleId) || (this.failures.get(keyOf(instance.moduleId, instance.hash)) ?? 0) >= 3) return;
@@ -116,6 +144,13 @@ class ModuleSupervisor {
     }, Math.min(60_000, this.backoffMs * 2 ** Math.max(0, (this.failures.get(keyOf(instance.moduleId, instance.hash)) ?? 1) - 1)));
     this.restarts.set(instance.moduleId, timer);
   }
+  private async restartCurrent(instance: Instance) {
+    const module = await this.ports.db.module.findUnique({ where: { id: instance.moduleId } });
+    if (module?.status === "active" && module.activeHash && module.activeHash !== instance.hash) {
+      this.failures.delete(keyOf(instance.moduleId, instance.hash));
+      await this.ensureActive(instance.moduleId);
+    } else this.restart(instance);
+  }
   private async unexpectedExit(instance: Instance, reason = "Module process exited") {
     if (instance.closing || instance.busy) return;
     instance.busy = true;
@@ -123,7 +158,7 @@ class ModuleSupervisor {
     // Stopped with Chrona (systemd signals the whole control group) or by the supervisor itself: not a module fault.
     const stopped = this.stopped || ["SIGTERM", "SIGINT"].includes(instance.exit?.signal ?? "");
     try { if (!stopped) await this.failure(instance, reason); }
-    finally { await this.close(instance); this.restart(instance); instance.busy = false; }
+    finally { await this.close(instance); await this.restartCurrent(instance); instance.busy = false; }
   }
   private async collectExit(instance: Instance, reason: string) {
     // Socket close can precede the child's exit notification; collect evidence, never replay the event.
@@ -156,7 +191,7 @@ class ModuleSupervisor {
       await Promise.race([instance.channel!.ready, exited, new Promise<never>((_, reject) => { timeout = this.timers.setTimeout(() => reject(new Error("Module start timeout")), RUN_LIMITS.jobTimeoutMs); })]);
     } finally { if (timeout) this.timers.clearTimeout(timeout); }
     instance.connected = true;
-    await recordModuleRecovery(this.ports, instance.scope.workspaceId, instance.moduleId, instance.hash);
+    await recordModuleRecovery(this.ports, { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
     if (instance.exit) throw new Error("Module process exited");
     if (!instance.channel!.connected()) throw new Error("Module disconnected");
     void process.exited.catch(() => {}).then(() => this.unexpectedExit(instance)).catch(() => {});
@@ -174,12 +209,18 @@ class ModuleSupervisor {
       throw error;
     }
   }
-  private async get(moduleId: string, hash: string) {
+  private async getActiveModule(moduleId: string, hash: string) {
     if (this.isStopped()) throw new Error("Module supervisor stopped");
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     if (this.isStopped()) throw new Error("Module supervisor stopped");
     if (module.status !== "active" || module.activeHash !== hash) throw new Error("Module version is not active");
-    const key = keyOf(moduleId, hash), previous = this.current.get(moduleId);
+    return module;
+  }
+  private async get(moduleId: string, hash: string) {
+    const module = await this.getActiveModule(moduleId, hash);
+    const evolution = await currentModuleEvolution(this.ports.db, module.workspaceId, moduleId, hash);
+    const activationId = evolution?.activationId ?? null;
+    const key = keyOf(moduleId, hash, activationId), previous = this.current.get(moduleId);
     if (previous && previous !== key) { const old = this.instances.get(previous); if (old) this.retire(old); }
     this.current.set(moduleId, key);
     let instance = this.instances.get(key);
@@ -190,7 +231,7 @@ class ModuleSupervisor {
       instance = this.instances.get(key);
       if (!instance) {
         const manifest = moduleManifestSchema.parse(version.manifest);
-        instance = { moduleId, hash, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, manifest }, queue: Promise.resolve(), retiring: false, closing: false, busy: false };
+        instance = { moduleId, hash, activationId, manifest, scope: { workspaceId: module.workspaceId, moduleId, hash, manifest }, queue: Promise.resolve(), retiring: false, closing: false, busy: false };
         this.instances.set(key, instance);
       }
     }
@@ -212,7 +253,7 @@ class ModuleSupervisor {
     catch (error) {
       // A replaced version closed while starting is not a module fault.
       if (instance.retiring) return;
-      await this.failure(instance, String(error).slice(0, 2000)); this.restart(instance);
+      await this.failure(instance, String(error).slice(0, 2000)); await this.restartCurrent(instance);
     }
     finally { await this.finishBusy(instance); }
   }
@@ -222,6 +263,47 @@ class ModuleSupervisor {
     const active = new Map(modules.map(module => [module.id, module.activeHash]));
     for (const instance of this.instances.values()) if (active.get(instance.moduleId) !== instance.hash) this.retire(instance);
     for (const module of modules) await this.ensureActive(module.id);
+    void this.announce(modules).catch(error => console.error(JSON.stringify({ level: "error", message: "module activated delivery failed", error: String(error) })));
+  }
+  /**
+   * `activated` reaches each module declaring it once per active version and again when a module it `uses` changes version
+   * (module-dependency-direction §4), so a sleeping app can register with web. Recorded in platform/activated.json;
+   * a delivery that fails is retried on later passes, at most three times per change.
+   */
+  private announced?: Record<string, string>;
+  private announcing = false;
+  private readonly announceAttempts = new Map<string, number>();
+  private readonly manifests = new Map<string, ModuleManifest | null>();
+  private async announce(modules: { id: string; name: string; activeHash: string | null }[]) {
+    if (this.announcing || this.stopped) return;
+    this.announcing = true;
+    const file = join(this.ports.dataDir, "platform", "activated.json");
+    try {
+      this.announced ??= await readFile(file, "utf8").then(text => JSON.parse(text) as Record<string, string>).catch(() => ({}));
+      const hashes = new Map(modules.map(module => [module.name, module.activeHash]));
+      for (const module of modules) {
+        const hash = module.activeHash!, manifest = await this.manifestOf(module.id, hash);
+        if (!manifest?.activated || this.stopped) continue;
+        const uses = [...new Set(manifest.uses.filter(target => target !== "*").map(target => target.split(".")[0]!))].filter(name => name !== module.name && hashes.has(name)).sort();
+        const signature = [hash, ...uses.map(name => `${name}@${hashes.get(name)}`)].join(" ");
+        if (this.announced[module.id] === signature) continue;
+        const now = this.ports.now().toISOString(), attempt = `${module.id} ${signature}`;
+        try { await this.deliver(module.id, hash, { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} }); }
+        catch {
+          const tries = (this.announceAttempts.get(attempt) ?? 0) + 1;
+          this.announceAttempts.set(attempt, tries);
+          if (tries < 3) continue;
+        }
+        this.announced[module.id] = signature;
+        await mkdir(join(this.ports.dataDir, "platform"), { recursive: true });
+        await writeFile(`${file}.tmp`, JSON.stringify(this.announced));
+        await rename(`${file}.tmp`, file);
+      }
+    } finally { this.announcing = false; }
+  }
+  private async manifestOf(moduleId: string, hash: string) {
+    if (!this.manifests.has(hash)) this.manifests.set(hash, moduleManifestSchema.safeParse((await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }))?.manifest).data ?? null);
+    return this.manifests.get(hash)!;
   }
   private async validateTrigger(instance: Instance, event: ModuleEvent, builtin: boolean) {
     const { trigger } = event, { manifest, moduleId } = instance;
@@ -230,7 +312,8 @@ class ModuleSupervisor {
       // v2-24: the module's own timers (uses schedules.create); remind keeps the Provider's reminders (dynamicSchedules).
       const allowed = manifest.uses.includes("schedules.create") || (builtin && manifest.dynamicSchedules);
       if (!allowed || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires uses schedules.create (or a built-in declaring dynamicSchedules)"), "unavailable");
-    } else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+    } else if (trigger.kind === "activated") return;
+    else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
   /** The owner's settings decide a model module's timeout and every module's params (v2-23 settings). */
   private async eventLimits(manifest: ModuleManifest, workspaceId: string, requested?: number) {
@@ -252,17 +335,33 @@ class ModuleSupervisor {
   private async failedDelivery(instance: Instance, event: ModuleEvent, runId: string, error: unknown) {
     if (error instanceof Error) await this.collectExit(instance, error.message);
     try { await this.failure(instance, error instanceof Error ? error.message : String(error), runId, event, (error as { stage?: DeliveryStage }).stage); }
-    finally { await this.close(instance); this.restart(instance); }
+    finally { await this.close(instance); await this.restartCurrent(instance); }
   }
   private async finishEvent(instance: Instance) {
     await this.finishBusy(instance);
     delete instance.scope.moduleRunId; delete instance.scope.eventKey; delete instance.scope.chain; delete instance.scope.path;
     if (!isClosing(instance) && !instance.manifest.keepAlive) instance.idle = this.timers.setTimeout(() => { void instance.queue.then(() => this.close(instance)); }, this.idleMs);
   }
-  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs }: DeliveryOptions): Promise<Reply> {
+  private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; validateResult?: DeliveryOptions["validateResult"] }) {
+    const { instance, event, workspaceId, runId, reply, validateResult } = input;
+    if ("error" in reply) throw staged(new Error(reply.error), "handler");
+    const outputError = validateResult?.(reply.result.result ?? null) ?? null;
+    if (outputError) {
+      await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: outputError.slice(0, 1000) } });
+      return;
+    }
+    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: reply.result } });
+    this.failures.set(keyOf(instance.moduleId, instance.hash), 0);
+    await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event) }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
+  }
+  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult }: DeliveryOptions): Promise<Reply> {
     const { moduleId, hash } = instance;
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
-    if (this.stopped || instance.closing || module.status !== "active") throw staged(new Error("Module is not active"), "unavailable");
+    const evolution = await currentModuleEvolution(this.ports.db, module.workspaceId, moduleId, hash);
+    if (this.stopped || instance.closing || module.status !== "active" || module.activeHash !== hash || (evolution?.activationId ?? null) !== instance.activationId) {
+      await this.close(instance);
+      throw Object.assign(staged(new Error("Module activation changed before event delivery"), "unavailable"), { staleActivation: true });
+    }
     const run = await this.ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: this.ports.now() } });
     instance.busy = true;
     instance.scope.moduleRunId = run.id;
@@ -271,11 +370,10 @@ class ModuleSupervisor {
     try {
       await this.validateTrigger(instance, event, module.builtin);
       const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs);
-      await this.ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 0, output: reply.result } });
-      this.failures.set(keyOf(moduleId, hash), 0);
-      await recordModuleRecovery(this.ports, module.workspaceId, moduleId, hash, triggerKey(event));
+      await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult });
       return reply;
     } catch (error) {
+      if ((error as { staleActivation?: boolean }).staleActivation) throw error;
       await this.failedDelivery(instance, event, run.id, error);
       throw error;
     } finally { await this.finishEvent(instance); }
@@ -292,6 +390,7 @@ class ModuleSupervisor {
       throw staged(error, "unavailable");
     }
     if (instance.idle) this.timers.clearTimeout(instance.idle);
+    if (options.activationId !== undefined && options.activationId !== instance.activationId) throw staged(new Error("Module activation changed before event delivery"), "unavailable");
     const result = instance.queue.then(() => this.deliverEvent(instance, event, options));
     instance.queue = result.catch(() => {});
     return result;
@@ -302,7 +401,8 @@ class ModuleSupervisor {
       const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
       if (!listenPaths(moduleManifestSchema.safeParse(version?.manifest).data ?? {}).includes(path)) continue;
       await this.ensureActive(module.id);
-      const instance = this.instances.get(keyOf(module.id, module.activeHash!));
+      const currentKey = this.current.get(module.id);
+      const instance = currentKey ? this.instances.get(currentKey) : undefined;
       await instance?.start?.catch(() => {});
       return instance?.dir && !instance.closing ? join(instance.dir, "http/s") : null;
     }
@@ -311,8 +411,8 @@ class ModuleSupervisor {
   status(moduleId: string, hash: string | null, keepAlive: boolean) {
     if (!this.started || this.stopped) return { state: "unobserved" as const, pid: null };
     if (this.restarts.has(moduleId)) return { state: "backoff" as const, pid: null };
-    const instance = hash ? this.instances.get(keyOf(moduleId, hash)) : undefined;
-    if (instance && !instance.closing) return { state: instance.connected ? "running" as const : "starting" as const, pid: instance.process?.pid ?? null };
+    const currentKey = this.current.get(moduleId), instance = currentKey ? this.instances.get(currentKey) : undefined;
+    if (instance && instance.hash === hash && !instance.closing) return { state: instance.connected ? "running" as const : "starting" as const, pid: instance.process?.pid ?? null };
     return { state: keepAlive ? "unavailable" as const : "idle" as const, pid: null };
   }
   async start() {

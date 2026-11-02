@@ -8,6 +8,7 @@ import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { callSync } from "./module-calls";
 import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
+import { callsDeclaration } from "./module-contracts";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -46,19 +47,39 @@ async function sources(f: Awaited<ReturnType<typeof fixture>>) {
 test("development reference exposes exact contracts, synthetic non-empty examples and permissions without production calls", async () => {
   const f = await fixture();
   const index = await f.call("m_modules_reference", {});
-  expect(index).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.diagnostics", source: { kind: "system", hash: null } })]));
+  expect(index).toEqual(expect.arrayContaining([{ target: "modules.diagnostics", source: { kind: "system", hash: null }, description: expect.any(String) }]));
+  // The index stays small enough for the Provider's tool result: names and one line each, contracts on request.
+  expect(JSON.stringify(index)).not.toContain("inputSchema");
+  // The Provider's app list keeps the five newest versions and says how many there are.
+  const app = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "prices", activeHash: "v6" } });
+  for (let i = 0; i < 7; i++) await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: `v${i}`, manifest: {}, source: "build", status: "rejected", intent: {}, report: {}, createdAt: new Date(Date.UTC(2026, 9, 1, i)) } });
+  const [prices] = (await f.call("m_modules_list", {}) as { name: string; versions: { hash: string }[]; versionCount: number }[]).filter(item => item.name === "prices");
+  expect([prices!.versions.map(version => version.hash), prices!.versionCount]).toEqual([["v6", "v5", "v4", "v3", "v2"], 7]);
   const result = await f.call("m_modules_reference", { target: "modules.diagnostics" });
   expect(result).toMatchObject({ target: "modules.diagnostics", inputSchema: { type: "object", properties: { module: { type: "string" } } },
     outputSchema: { type: "array" }, admission: { callers: ["web", "mcp"], uses: "modules.diagnostics" }, contractHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
   const reference = result as { examples: unknown[]; documentation: string; contractHash: string };
   expect(reference.examples.map(example => moduleDiagnosticsOutputSchema.parse(example)[0]!.incidents[0]!.status)).toEqual(["retrying", "unresolved", "verifying", "recovered"]);
   expect(reference.documentation).toContain("never replay");
+  expect(reference.documentation).toContain("build_request audit");
   expect(await f.call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ contractHash: reference.contractHash });
   // v2-25: every module-callable system tool declares its output.
-  expect(await f.call("m_modules_reference", { target: "settings.get" })).toMatchObject({ outputSchema: { type: "object" }, examples: [] });
+  expect(await f.call("m_modules_reference", { target: "settings.get" })).toMatchObject({ outputSchema: { type: "object" }, examples: null, sideEffects: null, errors: null, retry: expect.any(String) });
   for (const target of ["modules.overview", "modules.settings-set"]) expect(await f.call("m_modules_reference", { target })).toMatchObject({ outputSchema: expect.any(Object), documentation: expect.stringContaining("not_found"), examples: expect.arrayContaining([expect.anything()]) });
   expect(await f.db.moduleRun.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_runtime_incident" } })).toBe(0);
+});
+
+test("app output references preserve the original JSON Schema and generated call type", async () => {
+  const f = await fixture();
+  const schema = { type: "object", properties: { zeta: { type: "string" }, alpha: { type: "integer" } }, required: ["zeta", "alpha"], additionalProperties: false };
+  const active = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "typed", status: "active", activeHash: "typed-v1" } });
+  const appManifest = moduleManifestSchema.parse({ name: "typed", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["ready", "done"] }, limit: { type: "number" } }, required: ["state"] } } }, required: ["filters"] }, output: schema }] });
+  await f.db.moduleVersion.create({ data: { moduleId: active.id, hash: "typed-v1", manifest: appManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const reference = await f.call("m_modules_reference", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
+  expect(JSON.stringify(reference.outputSchema)).toBe(JSON.stringify(schema));
+  expect(reference.inputSchema.properties.filters.items.additionalProperties).toBe(false);
+  expect(await callsDeclaration(f.ports, f.workspace.id)).toContain('"typed.read": { args: { "filters": Array<{ "state": "ready" | "done"; "limit"?: number }> }; output: { "zeta": string; "alpha": number } }');
 });
 
 test("reference discovery is workspace scoped, declares unknown outputs, and cannot be used by an app or owner", async () => {

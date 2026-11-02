@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
@@ -9,6 +9,7 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createStewardService } from "@chrona/engine";
 import { removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
+import { adminBuild } from "./admin-build";
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -26,8 +27,28 @@ async function fixture() {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["build", "modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
 });
+test("admin build respects the runtime lock and runs no ordinary tick or built-in upgrades", async () => {
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  const file = join(f.options.dataDir, "request.json");
+  writeFileSync(file, JSON.stringify({ name: "web", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } }));
+  const seen: unknown[] = [];
+  const provider = { name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: true, error: null }; }, start(input: unknown) { seen.push(input); return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) }; } };
+  const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
+  try { await expect(adminBuild(file, { ...f.options, provider })).rejects.toThrow("already in use"); }
+  finally { lock.release(); }
+  try {
+    const modules = await f.db.module.count();
+    expect(await adminBuild(file, { ...f.options, provider })).toMatchObject({ status: "finished" });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ model: "openai/gpt-6.1-sol", lane: "build" });
+    expect(await f.db.module.count()).toBe(modules);
+    expect(await f.db.stewardState.count()).toBe(0);
+    const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
+  } finally { log.mockRestore(); }
+});
+
 test("admin reads while runtime locked but refuses writes; approval audit source is cli", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   const approval = await f.api.approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "diff", payload: {} });

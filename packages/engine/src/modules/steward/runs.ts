@@ -11,6 +11,7 @@ import { pushReply } from "./chat-replies";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
+import { assertBuildProvider, buildExecution } from "./build-execution";
 
 const BUILD_IDLE_MS = 7 * 24 * 3600_000, MCP_IDLE_MS = 24 * 3600_000;
 
@@ -28,6 +29,8 @@ export async function authenticateRun(tx: Prisma.TransactionClient, token: strin
   const { session, ...run } = row;
   return { run, session, workspaceId: row.workspaceId };
 }
+/** Consecutive build results that wake their conversation before the user speaks again. */
+const BUILD_WAKES = 5;
 export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null };
 type RunRow = Prisma.RunGetPayload<{ include: { session: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
@@ -74,11 +77,20 @@ class RunService {
     return "ready";
   }
   private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, now: Date, builds: ReturnType<typeof buildSettings> | null) {
+    const execution = lane === "build" ? await buildExecution(tx, run.id) : null;
+    if (execution) {
+      try { assertBuildProvider(this.ports, execution); }
+      catch {
+        await tx.run.update({ where: { id: run.id }, data: { status: "failed", endedAt: now, error: "Authorized build Provider/model pin is unavailable" } });
+        return null;
+      }
+      builds = { ...builds!, timeoutMinutes: execution.timeoutMinutes, maxSubmissions: execution.maxSubmissions };
+    }
     const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (builds ? builds.timeoutMinutes * 60_000 : { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane]));
     const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
     if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;
-    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane, ...(builds ? { builds } : {}) } });
-    return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id };
+    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane, ...(builds ? { builds } : {}), ...(execution ? { execution } : {}) } });
+    return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id, ...(execution ? { model: execution.model } : {}) };
   }
   private async foregroundHasPriority(tx: Prisma.TransactionClient, now: Date) {
     const { workspaceId } = this;
@@ -140,6 +152,7 @@ class RunService {
     const ordered = ids.flatMap(id => replies.filter(reply => reply.id === id));
     if (!ordered.length) return;
     // Pushed into the original conversation (e.g. QQ): the result needs no separate notice there.
+    if (session.originSessionId && session.source === "build") await this.wakeOrigin(tx, run, session.originSessionId, ordered.map(reply => reply.text).join("\n\n"));
     if (session.originSessionId && await this.pushResult(tx, session.originSessionId, ordered, now)) return;
     const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
     await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,
@@ -163,7 +176,7 @@ class RunService {
       await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } });
     }
   }
-  private async pushResult(tx: Prisma.TransactionClient, originSessionId: string, ordered: Awaited<ReturnType<Prisma.TransactionClient["message"]["findMany"]>>, now: Date) {
+  private async pushResult(tx: Prisma.TransactionClient, originSessionId: string, ordered: { text: string; attachments: unknown }[], now: Date) {
     const origin = await tx.session.findFirst({ where: { id: originSessionId, workspaceId: this.workspaceId } });
     if (!origin) throw new StewardError("not_found", "Origin session not found");
     const latest = await tx.message.findFirst({ where: { sessionId: origin.id }, orderBy: [{ at: "desc" }, { id: "desc" }] });
@@ -174,8 +187,37 @@ class RunService {
     await tx.session.update({ where: { id: origin.id }, data: { lastActivityAt: now } });
     return !!origin.entryModuleId;
   }
+  /** The conversation that asked for a build learns how it ended; without this it waits for a reply that never comes. True when its entry delivered it. */
+  private async tellBuildOrigin(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
+    if (!run.session?.originSessionId || !["failed", "timed_out", "provider_unavailable", "cancelled"].includes(status)) return false;
+    const why = { timed_out: "已达到时限", cancelled: "已被取消", provider_unavailable: "模型服务不可用" }[status] ?? "未完成";
+    const text = `构建「${run.session.title ?? run.label ?? "模块"}」结束：${why}${error ? `（${error.slice(0, 200)}）` : ""}。未提交新版本的部分不会自动重试，已有文件保留在构建会话中。`;
+    // A deleted origin falls back to the notice; it never blocks finishing the run (it throws before writing).
+    const told = await this.pushResult(tx, run.session.originSessionId, [{ text, attachments: [] }], now).catch(() => false);
+    await this.wakeOrigin(tx, run, run.session.originSessionId, text).catch(() => {});
+    return told;
+  }
+  /**
+   * The conversation that asked for a build runs once more with its result, so work queued behind the build goes on
+   * without the user asking again. At most BUILD_WAKES in a row without a user message; then it waits for the user.
+   */
+  private async wakeOrigin(tx: Prisma.TransactionClient, run: RunRow, originSessionId: string, result: string) {
+    const { workspaceId } = this;
+    const origin = await tx.session.findFirst({ where: { id: originSessionId, workspaceId, status: "active" } });
+    if (!origin || origin.source === "build" || origin.source === "reflect") return;
+    if (await tx.run.count({ where: { workspaceId, sessionId: origin.id, status: "queued" } })) return;
+    const lastUser = await tx.message.findFirst({ where: { sessionId: origin.id, direction: "in" }, orderBy: [{ at: "desc" }, { id: "desc" }] });
+    // Runs carry Chrona's clock (audits do not): count the wakes since the user last spoke.
+    const wakes = await tx.run.count({ where: { workspaceId, sessionId: origin.id, lane: "foreground", trigger: "build", ...(lastUser ? { createdAt: { gt: lastUser.at } } : {}) } });
+    if (wakes >= BUILD_WAKES) return;
+    const title = run.session?.title ?? run.label ?? "模块";
+    const prompt = `[Chrona] 你发起的构建「${title}」已结束，结果如下（也已显示在本对话中）：\n${result.slice(0, 4000)}\n\n如果本对话里用户交代的任务还有排在它之后、尚未开始的，现在继续下一项；没有就用一句话告诉用户结果，不要再发起构建。`;
+    const woken = await this.enqueue({ sessionId: origin.id, lane: "foreground", trigger: "build", prompt, label: `构建结束：${title}`.slice(0, 120) }, tx);
+    await audit(tx, { workspaceId, actor: "chrona", kind: "build_origin_wake", subjectId: origin.id, details: { buildRunId: run.id, runId: woken.id } });
+  }
   private async followUp(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
     const { workspaceId, ports } = this;
+    if (run.lane === "build" && await this.tellBuildOrigin(tx, run, status, now, error)) return;
     if (["failed", "timed_out", "provider_unavailable"].includes(status)) {
       if (run.lane === "build") {
         await notifyUser(tx, ports, workspaceId, { level: "now", title: "模块构建已暂停", body: `${status === "timed_out" ? "本轮构建已达到时限" : "本轮构建未完成"}，已有文件和过程已保留。请查看构建会话，决定是否修改需求并继续；不会自动重试。`, key: `build-paused:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });

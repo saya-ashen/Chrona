@@ -52,11 +52,55 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
   }
 });
 
+test("runtime validates and wires execution mode and update review policy", async () => {
+  const db = testDb(), keys = ["CHRONA_STEWARD_EXECUTION_MODE", "CHRONA_STEWARD_UPDATE_REVIEW", "CHRONA_STEWARD_AUTO_ROLLBACK"] as const;
+  const previous = keys.map(key => process.env[key]);
+  try {
+    delete process.env.CHRONA_STEWARD_UPDATE_REVIEW;
+    delete process.env.CHRONA_STEWARD_AUTO_ROLLBACK;
+    const defaults = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-default-")), provider: null });
+    try { expect(defaults.ports.moduleUpdateReview).toBe("required"); expect(defaults.ports.moduleAutoRollback).toBe(false); } finally { await defaults.stop(); }
+    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "true";
+    const enabled = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-enabled-")), provider: null });
+    try { expect(enabled.ports.moduleAutoRollback).toBe(true); } finally { await enabled.stop(); }
+    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "false";
+    const disabled = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-disabled-")), provider: null });
+    try { expect(disabled.ports.moduleAutoRollback).toBe(false); } finally { await disabled.stop(); }
+    process.env.CHRONA_STEWARD_EXECUTION_MODE = "trusted-local";
+    process.env.CHRONA_STEWARD_UPDATE_REVIEW = "checks-only";
+    const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-mode-")), provider: null });
+    try {
+      expect(runtime.ports.sandbox?.executionMode).toBe("trusted-local");
+      expect(runtime.ports.moduleUpdateReview).toBe("checks-only");
+    } finally { await runtime.stop(); }
+    process.env.CHRONA_STEWARD_UPDATE_REVIEW = "unexpected";
+    expect(() => createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-invalid-")), provider: null })).toThrow("Invalid CHRONA_STEWARD_UPDATE_REVIEW");
+    process.env.CHRONA_STEWARD_UPDATE_REVIEW = "required";
+    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "unexpected";
+    expect(() => createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-invalid-")), provider: null })).toThrow("Invalid CHRONA_STEWARD_AUTO_ROLLBACK");
+  } finally {
+    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    await db.$disconnect();
+  }
+});
+
+test("unknown execution mode fails closed", async () => {
+  const db = testDb(), previous = process.env.CHRONA_STEWARD_EXECUTION_MODE;
+  try {
+    process.env.CHRONA_STEWARD_EXECUTION_MODE = "unexpected";
+    expect(() => createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-mode-invalid-")), provider: null })).toThrow("Invalid CHRONA_STEWARD_EXECUTION_MODE");
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_STEWARD_EXECUTION_MODE; else process.env.CHRONA_STEWARD_EXECUTION_MODE = previous;
+    await db.$disconnect();
+  }
+});
+
 test("runtime data directory follows explicit setting then database directory", () => {
   expect(stewardDataDir({ CHRONA_DATA_DIR: "/tmp/chrona-data", DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/chrona-data");
   expect(stewardDataDir({ DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/db");
   expect(() => stewardDataDir({ DATABASE_URL: "file::memory:" })).toThrow();
 });
+// Fresh runtime bootstraps and builds built-ins, so this startup test needs more than Bun's 5-second default.
 test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", async () => {
   const db = testDb();
   let interval = 0, cleared = false;
@@ -72,4 +116,4 @@ test("runtime ticks every 30 seconds, wakes immediately and stops cleanly", asyn
     expect((await runtime.health()).moduleSandbox).toBe(false);
     await runtime.stop(); expect(cleared).toBe(true);
   } finally { await runtime.stop(); await db.$disconnect(); }
-});
+}, 30_000);

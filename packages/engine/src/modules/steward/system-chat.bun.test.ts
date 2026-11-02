@@ -109,6 +109,12 @@ test("approvals through the approvals system module; other modules and Chrona it
   const policy = await f.api.approvals.create({ action: "change_policy", title: "设置", detail: "审查", preview: "diff", payload: {} });
   await expect(f.qq.call("approvals.resolve", { approval: policy.id, decision: "approve" })).rejects.toMatchObject({ code: "forbidden" });
   expect(await f.qq.call("approvals.resolve", { approval: policy.id, decision: "deny" })).toMatchObject({ status: "denied" });
+  // Resuming a paused app approved in chat takes effect (it used to be marked approved and do nothing).
+  const app = await f.db.module.create({ data: { workspaceId: f.w, name: "prices", activeHash: "p1", status: "paused" } });
+  await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: "p1", manifest: { name: "prices", entry: "index.ts", tests: ["test.ts"] }, source: "build", intent: {}, report: {}, status: "approved" } });
+  const resume = await f.api.modules.lifecycle("enable", app.id, { reason: "修好了" }, false) as { approvalId: string };
+  await f.qq.call("approvals.resolve", { approval: resume.approvalId, decision: "approve" });
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).status).toBe("active");
   // A module without these in `uses` is refused; so is a kernel-origin call (entry modules only).
   const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
   const other = await f.db.module.create({ data: { workspaceId: f.w, name: "other", activeHash: "o" } });

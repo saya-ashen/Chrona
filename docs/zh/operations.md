@@ -129,6 +129,6 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 
 ## 脚本限制
 
-Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_SANDBOX_BWRAP` 配置 Provider 的 bubblewrap 包装；未配置时 Pi 不隔离运行（含 bash，同 Hermes 的 local 后端），健康状态显示未隔离。Provider 包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
+Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_EXECUTION_MODE` 由 owner 设置，可选 `trusted-local`（明确本地运行，忽略 bwrap 包装）或 `required-isolation`（模块、构建检查和 Provider 都要求可用且探测成功的 bubblewrap；不可用时失败关闭）。未设置/空值保留旧行为，不授予可信本地或自动更新授权；未知非空值拒绝启动。`CHRONA_STEWARD_SANDBOX_BWRAP` 指定 bubblewrap。Provider 隔离包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
 
-同一变量也配置模块沙箱；探测不通过或未配置时，模块以 Chrona 运行用户身份作为普通进程运行（保留超时、内存与输出限制），网络与文件范围不再受限，模块每个新版本都需要批准。以实际执行结果为准，不以模型文字为准。
+`CHRONA_STEWARD_SANDBOX_BWRAP` 也配置模块沙箱。传统未设置执行模式时，探测不通过或未配置会按旧行为以普通进程运行；`required-isolation` 下则拒绝模块启动/检查，不回退。依赖安装器目前仍在宿主执行；该模式下含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选在安装前拒绝，直到提供隔离安装实现；无依赖候选不受此安装限制影响。可信本地与普通本地进程仍受超时、内存与输出限制，但网络与文件范围不再受隔离约束。可信本地只解除“未隔离”单项导致的红级；自动更新仍须当前有效的非一次性模块级授权（auto / notify_after / preapproved），不会自动生成授权。`CHRONA_STEWARD_UPDATE_REVIEW` 默认为 `required`；显式设为 `checks-only` 时，仅符合可信本地、绿色、长期模块授权及全部既有自动更新限制的更新可跳过 AI 复核，审批显示“跳过”及原因，不代表 AI 通过。检查失败、授权不符、非绿色和敏感更新不会绕过复核/审批。未知值拒绝启动。以实际执行结果为准，不以模型文字为准。

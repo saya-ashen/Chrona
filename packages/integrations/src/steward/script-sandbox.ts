@@ -1,4 +1,4 @@
-import { accessSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { accessSync, chmodSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -32,8 +32,11 @@ function language(entry: string): Language {
   if (!/^[A-Za-z0-9_-]+\.(ts|py|sh)$/.test(entry)) throw new Error("Invalid module entry");
   return ({ ".ts": "typescript", ".py": "python", ".sh": "shell" } as const)[extname(entry) as ".ts" | ".py" | ".sh"];
 }
+// Each thread's own glibc arena reserves ~64 MB of address space; under the module's ulimit -v a Bun HTTP module then
+// fails pthread_create and JSC aborts (Thread::create RELEASE_ASSERT). Two arenas keep a Bun module near 740 MB.
+const MALLOC_ARENA_MAX = "2";
 function spawnLocal({ dirs, entry, code, data, content, socket, http, bin, paths, command, memoryLimitMb }: { dirs: ModuleDirs; entry: string; code: string; data: string; content: string | undefined; socket: string | undefined; http: string | undefined; bin: string[]; paths: string[]; command: Command; memoryLimitMb: number }) {
-  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
+  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1", MALLOC_ARENA_MAX };
   const env = { ...extra, PATH: [...bin, process.env.PATH ?? paths.map(dirname).join(":")].join(":"), LANG: "C.UTF-8", ...(process.env.HOME ? { HOME: process.env.HOME } : {}),
     CHRONA_MODULE: code, CHRONA_DATA: data, ...(content ? { CHRONA_CONTENT: content } : {}), ...(socket ? { CHRONA_SOCKET: socket } : {}), ...(http ? { CHRONA_HTTP_SOCKET: join(http, "s") } : {}) };
   const [file, ...args] = command(entry, code, code, memoryLimitMb);
@@ -45,7 +48,7 @@ function spawnIsolated({ dirs, entry, code, data, content, socket, http, bin, pa
     .sort((a, b) => a.split(sep).length - b.split(sep).length);
   // A private root supplies mount points without creating anything on the host; it is frozen read-only before exec.
   const root = readdirSync("/").filter(name => !["module", "data", "content", "chrona", "node_modules", "tmp", "proc", "dev"].includes(name)).flatMap(name => ["--ro-bind", `/${name}`, `/${name}`]);
-  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1" };
+  const extra = { ...Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key))), SHLVL: "1", MALLOC_ARENA_MAX };
   const env = { ...extra, PATH: [...bin, ...paths.map(dirname), "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LANG: "C.UTF-8", CHRONA_MODULE: "/module", CHRONA_DATA: "/data", ...(content ? { CHRONA_CONTENT: "/content" } : {}),
     ...(socket ? { CHRONA_SOCKET: "/chrona/chrona.sock" } : {}), ...(http ? { CHRONA_HTTP_SOCKET: "/chrona/http/s" } : {}) };
   const profile = ["--unshare-all", ...(network ? ["--share-net"] : []), "--die-with-parent", "--new-session", "--tmpfs", "/", ...root,
@@ -56,8 +59,21 @@ function spawnIsolated({ dirs, entry, code, data, content, socket, http, bin, pa
     "--clearenv", ...Object.entries(env).flatMap(([key, value]) => ["--setenv", key, value])];
   return spawn(bwrap, [...profile, "--", ...command(entry, "/module", code, memoryLimitMb)], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
 }
-function createSpawnModule({ isolated, bwrap, dataDir, moduleSdk, paths, command, memoryMb }: { isolated: boolean; bwrap: string | null; dataDir?: string; moduleSdk: string; paths: string[]; command: Command; memoryMb: number }) {
+function isolationUsable(mode: "legacy" | "trusted-local" | "required-isolation", bwrap: string | null, shell: string | null) {
+  return mode !== "trusted-local" && !!(bwrap && shell && spawnSync(bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status === 0);
+}
+function installLocalSdk(dataDir: string | undefined, moduleSdk: string, isolated: boolean, isolationRequired: boolean) {
+  if (isolated || isolationRequired || !dataDir) return;
+  const target = join(resolve(dataDir), "platform", "node_modules", "chrona");
+  // The copy keeps the read-only modes of a Nix-store SDK; make its directory writable again or rm fails on the next start.
+  if (existsSync(target)) chmodSync(target, 0o700);
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(dirname(target), { recursive: true });
+  cpSync(moduleSdk, target, { recursive: true });
+}
+function createSpawnModule({ isolated, isolationRequired, bwrap, dataDir, moduleSdk, paths, command, memoryMb }: { isolated: boolean; isolationRequired: boolean; bwrap: string | null; dataDir?: string; moduleSdk: string; paths: string[]; command: Command; memoryMb: number }) {
   return (dirs: ModuleDirs, entry: string, network: boolean, memoryLimitMb = memoryMb) => {
+    if (isolationRequired && !isolated) throw new Error("要求隔离执行，但 bubblewrap 不可用");
     const code = directory(dirs.codeDir), data = directory(dirs.dataDir), content = dirs.contentDir ? directory(dirs.contentDir) : undefined;
     const socket = dirs.socketPath ? resolve(dirs.socketPath) : undefined;
     if (socket && !statSync(socket).isSocket()) throw new Error("Invalid module socket");
@@ -73,8 +89,8 @@ function createSpawnModule({ isolated, bwrap, dataDir, moduleSdk, paths, command
  * processes of the Chrona user, like Hermes' local backend. Modules find everything through
  * CHRONA_* variables and import the SDK as `chrona`, so the same code runs either way.
  */
-export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
-  bwrapPath?: string; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
+export function createScriptSandbox({ bwrapPath, executionMode = "legacy", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
+  bwrapPath?: string; executionMode?: "legacy" | "trusted-local" | "required-isolation"; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
   /** The `chrona` package directory; packaged binaries pass the shipped copy. */
   moduleSdk?: string;
 }) {
@@ -84,15 +100,11 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
   const shell = interpreters.shell;
   const paths = [...new Set(Object.values(interpreters).filter((p): p is string => !!p))];
   // Probe namespace support too: an installed binary is not necessarily usable.
-  const isolated = !!(bwrap && shell && spawnSync(bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status === 0);
-  const available = !!shell;
+  const isolated = isolationUsable(executionMode, bwrap, shell);
+  const isolationRequired = executionMode === "required-isolation";
+  const available = !!shell && !(isolationRequired && !isolated);
   // Unsandboxed code directories (platform/store, platform/staging) resolve `chrona` from this ancestor.
-  if (!isolated && dataDir) {
-    const target = join(resolve(dataDir), "platform", "node_modules", "chrona");
-    rmSync(target, { recursive: true, force: true });
-    mkdirSync(dirname(target), { recursive: true });
-    cpSync(moduleSdk, target, { recursive: true });
-  }
+  installLocalSdk(dataDir, moduleSdk, isolated, isolationRequired);
   /** v2-6: the module's installed Python environment wins over the host interpreter. */
   const command: Command = (entry, code, host, memoryLimitMb) => {
     const kind = language(entry), venv = kind === "python" && existsSync(join(host, ".venv", "bin", "python"));
@@ -101,7 +113,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     // --no-install: never let Bun fetch an npm package named like a missing import.
     return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryLimitMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install"] : []), join(code, entry)];
   };
-  const spawnModule = createSpawnModule({ isolated, bwrap, dataDir, moduleSdk, paths, command, memoryMb });
+  const spawnModule = createSpawnModule({ isolated, isolationRequired, bwrap, dataDir, moduleSdk, paths, command, memoryMb });
   function kill(child: ReturnType<typeof spawn>) {
     try { if (!isolated && child.pid) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* Already exited. */ }
   }
@@ -140,7 +152,7 @@ export function createScriptSandbox({ bwrapPath, dataDir, timeoutMs = 60_000, ma
     async runModule({ codeDir, dataDir: moduleData, contentDir, entry, input, network = false, timeoutMs: runTimeout = timeoutMs, maxOutputBytes: outputLimit = maxOutputBytes, memoryMb: runMemoryMb = memoryMb }: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number }): Promise<ScriptSandboxResult> {
       limits(runTimeout, outputLimit, runMemoryMb);
       language(entry);
-      if (!available) return { status: "unavailable", output: "", error: "模块运行环境不可用" };
+      if (!available) return { status: "unavailable", output: "", error: isolationRequired ? "要求隔离执行，但 bubblewrap 不可用" : "模块运行环境不可用" };
       const child = spawnModule({ codeDir, dataDir: moduleData, contentDir }, entry, network, runMemoryMb);
       return new Promise(resolve => {
         let output = Buffer.alloc(0), errors = Buffer.alloc(0), timedOut = false;

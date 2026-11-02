@@ -16,14 +16,14 @@ async function fixture() {
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const ports = { db, dataDir: "/not-used-for-read-only-diagnostics", publicUrl: null, now: () => new Date("2026-10-25T14:00:00Z") };
   const fail = (extra: Partial<Parameters<typeof recordModuleFailure>[1]> = {}) => db.$transaction(tx => recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, hash: "v1", now: ports.now(), retry: true, evidence, ...extra }));
-  const recovery = (trigger?: string, hash = "v1") => recordModuleRecovery(ports, workspace.id, module.id, hash, trigger);
+  const recovery = (trigger?: string, hash = "v1") => recordModuleRecovery(ports, { workspaceId: workspace.id, moduleId: module.id, hash, activationId: null, triggerId: trigger });
   const incidents = () => moduleIncidents(db, workspace.id, module.id);
   return { db, workspace, module, ports, fail, recovery, incidents };
 }
 
 test("repeated failures form one durable incident; connection alone and an unrelated event do not verify recovery", async () => {
   const f = await fixture();
-  const first = await f.fail();
+  const first = (await f.fail())!;
   await f.fail(); await f.fail({ retry: false, evidence: { ...evidence, stderr: "", reason: "Module start timeout" } });
   expect(await f.incidents()).toMatchObject([{ id: first.id, failures: 3, status: "unresolved", firstEvidence: { stderr: "panic: Failed to start HTTP Client thread" }, evidence: { reason: "Module start timeout", signal: "SIGABRT", virtualMemoryMb: 512 } }]);
   await f.recovery();
@@ -35,7 +35,7 @@ test("repeated failures form one durable incident; connection alone and an unrel
   const [recovered] = await f.incidents();
   expect(recovered).toMatchObject({ status: "recovered", deliveryUnknown: true, failures: 3, attempts: expect.arrayContaining([expect.objectContaining({ action: "verified" })]) });
   expect(incidentNextAction(recovered)).toContain("不要直接重放");
-  const second = await f.fail();
+  const second = (await f.fail())!;
   expect(second.id).not.toBe(first.id);
   expect(await f.incidents()).toHaveLength(2);
 });

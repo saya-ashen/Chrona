@@ -1,4 +1,5 @@
 import { moduleModelSettings } from "./settings";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -12,6 +13,8 @@ import { recordGroupReview } from "./module-group";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
+import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
+import { moduleToolExampleError } from "./module-calls";
 import { readModuleFiles, codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -26,6 +29,8 @@ async function stagingFiles(context: ModuleContext, version: ModuleVersion, repo
 /** Lockfile libraries and system programs go into the staging copy before anything runs it. */
 async function installDependencies(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string) {
   if (!manifest.packages.length && !existsSync(join(staging, "package.json")) && !existsSync(join(staging, "pyproject.toml"))) return null;
+  // The host installer may execute package build backends; do not cross an explicitly required isolation boundary.
+  if (context.ports.sandbox?.executionMode === "required-isolation") return { errors: ["required-isolation: dependency installation is not isolated yet; builds with language or system packages are unavailable in this mode"], installed: { npm: false, python: false, packages: {} } };
   if (!context.ports.packages) return { errors: ["Dependency installation is not available on this host"], installed: { npm: false, python: false, packages: {} } };
   return context.ports.packages.install({ dir: staging, packages: manifest.packages, gcroot: join(context.platform, "gcroots", hash) });
 }
@@ -43,14 +48,24 @@ function reviewPrefix(manifest: ReturnType<typeof moduleManifestSchema.parse>, r
   const exposed = exposedTools(manifest);
   return `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.map(target => target === "*" ? "所有对你开放的工具（*）" : target).join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}${manifest.limits ? `；内存地址空间上限：${manifest.limits.virtualMemoryMb} MB（默认 1024）` : ""}\n${diff}\n`;
 }
+/** Output schemas and examples describe results, not authority: the review shows their digest, so declaring contracts still fits the preview. */
+export function reviewManifest(value: unknown) {
+  const digest = (part: unknown) => { const text = JSON.stringify(part); return `sha256:${createHash("sha256").update(text).digest("hex").slice(0, 12)}（${text.length} 字符，完整内容见版本）`; };
+  const manifest = value as { tools?: unknown } | null;
+  if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.tools)) return JSON.stringify(value ?? "", null, 2);
+  const tools = manifest.tools.map(tool => tool && typeof tool === "object"
+    ? Object.fromEntries(Object.entries(tool).map(([key, part]) => [key, (key === "output" || key === "examples") && part != null ? digest(part) : part])) : tool);
+  return JSON.stringify({ ...manifest, tools }, null, 2);
+}
 async function reviewPreview(context: ModuleContext, review: Review, active: Awaited<ReturnType<ModuleContext["db"]["moduleVersion"]["findUnique"]>>) {
   const { store } = context, { version, module, report, files, needsMigration } = review, { hash } = version;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
   // Only what changes (v2-22): two whole manifests could fill an approval, and a group's would not fit one.
-  const diff = ["--- active", "+++ proposed", ...compactDiff(active?.manifest ? JSON.stringify(active.manifest, null, 2) : "", JSON.stringify(manifest, null, 2))].join("\n");
+  const diff = ["--- active", "+++ proposed", ...compactDiff(active?.manifest ? reviewManifest(active.manifest) : "", reviewManifest(manifest))].join("\n");
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = reviewPrefix(manifest, report, diff);
-  const suffix = `${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+  const impactPreview = report.outputImpacts?.length ? `依赖这些工具契约的应用需随本次更新一并检查（不会自动修改调用方）：\n${outputImpactSummary(report.outputImpacts).join("\n")}\n` : "";
+  const suffix = `${impactPreview}${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null, codeDiff = "";
   if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = await codeDifference(store, module.activeHash, files), hash);
@@ -73,7 +88,8 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   if (version.source === "builtin" && active && active.source !== "builtin") return { moduleId: module.id, hash, status: "pending_review", report };
   const { manifest, preview, parts } = await reviewPreview(context, review, active);
   if (preview === null) {
-    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected" } });
+    report.errors = ["Review preview exceeds 20000 characters (manifest diff, intent and results); shrink the manifest change or split the update"];
+    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected", report: json(report) } });
     return { moduleId: module.id, hash, status: "rejected", report };
   }
   await expireModuleApprovals(context, module.id);
@@ -86,17 +102,22 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
+async function modelManifestError(context: ModuleContext, manifest: ReturnType<typeof moduleManifestSchema.parse>) {
+  if (!manifest.model) return null;
+  const workspace = await context.db.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } });
+  const limits = moduleModelSettings(workspace.settings);
+  return !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
+    : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
+    : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
+}
 async function validateBuildManifest(context: ModuleContext, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
-  const { db, workspaceId } = context;
+  const { db } = context;
   let error: string | null = null;
-  if (listenPaths(manifest).length && !isEntryModule(manifest)) error = "listen is only for entry modules (web, MCP): expose tools instead; the web module shows them";
-  if (!error && manifest.model) {
-    const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
-    const limits = moduleModelSettings(workspace.settings);
-    error = !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
-      : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
-      : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
-  }
+  const missingOutput = manifest.tools.find(tool => tool.visibility.some(value => value === "owner" || value === "modules") && !tool.output);
+  if (missingOutput) error = `Public tool ${missingOutput.name} must declare an output schema`;
+  if (!error) error = manifest.tools.map(moduleToolExampleError).find((value): value is string => value !== null) ?? null;
+  if (!error && listenPaths(manifest).length && !isEntryModule(manifest)) error = "listen is only for entry modules (web, MCP): expose tools instead; the web module shows them";
+  if (!error) error = await modelManifestError(context, manifest);
   if (!error) return null;
   report.errors = [error];
   await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
@@ -110,7 +131,7 @@ async function activateBuiltin(context: ModuleContext, module: Awaited<ReturnTyp
     if (current.status === "migrating" || (current.activeHash !== null && current.activeHash !== previous?.hash) || needsMigration) return false;
     await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
     await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
-    await activateIn(context, tx, module.id, hash, "activate");
+    await activateIn(context, tx, { moduleId: module.id, hash, reason: "activate" });
     return true;
   });
 }
@@ -151,6 +172,44 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };
 }
+async function checkDependentCallers(context: ModuleContext, manifest: ReturnType<typeof moduleManifestSchema.parse>, impacts: { caller: string; targets: string[] }[], report: BuildReport) {
+  report.dependentChecks = [];
+  const callers = await context.db.module.findMany({ where: { workspaceId: context.workspaceId, name: { in: impacts.map(item => item.caller) }, status: "active", activeHash: { not: null } } });
+  for (const caller of callers) {
+    const active = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.id, hash: caller.activeHash! } } });
+    const source = moduleManifestSchema.safeParse(active?.manifest);
+    if (!source.success) {
+      report.dependentChecks.push({ caller: caller.name, status: "skipped", reason: "active caller manifest unavailable" });
+      continue;
+    }
+    const checked = await typecheckBuild(context, join(context.store, caller.activeHash!), source.data, { moduleName: manifest.name, manifest });
+    report.dependentChecks.push({ caller: caller.name, status: checked.status, ...(checked.reason ? { reason: checked.reason } : {}), ...(checked.errors ? { errors: checked.errors } : {}) });
+    if (checked.status === "failed") return false;
+  }
+  return true;
+}
+async function finishBuild(input: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport; checks: Awaited<ReturnType<typeof checkBuildCandidate>>; files: NonNullable<Awaited<ReturnType<typeof stagingFiles>>> }): Promise<Proposal> {
+  const { context, module, version, manifest, report, checks, files } = input;
+  const { db } = context, { hash } = version;
+  if (checks.dependencyFailure) {
+    await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
+    return { moduleId: module.id, hash, status: "rejected", report };
+  }
+  let { passed } = checks;
+  const { needsMigration } = checks;
+  if (passed) {
+    report.outputImpacts = await moduleOutputImpacts(db, module.workspaceId, module.id, manifest);
+    if (report.outputImpacts.length && !await checkDependentCallers(context, manifest, report.outputImpacts, report)) {
+      passed = false;
+      report.errors = ["An affected caller failed type checking against the candidate contract; update/review caller compatibility before activating this version."];
+    }
+  }
+  const status = passed ? "pending_review" : "rejected";
+  await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
+  if (!passed) return { moduleId: module.id, hash, status, report };
+  if (version.source === "builtin" && !report.outputImpacts?.length && await activateBuiltin(context, module, version, manifest, needsMigration)) return { moduleId: module.id, hash, status: "approved", report };
+  return requestReview(context, { version, module, report, files, needsMigration });
+}
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {
   const { db, platform } = context, { hash } = version;
   const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [] };
@@ -164,17 +223,8 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     const invalidManifest = await validateBuildManifest(context, version, manifest, report);
     if (invalidManifest) return invalidManifest;
     const checks = await checkBuildCandidate({ context, module, version, manifest, staging, report });
-    if (checks.dependencyFailure) {
-      await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
-      return { moduleId: module.id, hash, status: "rejected", report };
-    }
-    const { passed, needsMigration } = checks;
-    const status = passed ? "pending_review" : "rejected";
-    await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
-    if (!passed) return { moduleId: module.id, hash, status, report };
-    if (version.source === "builtin" && await activateBuiltin(context, module, version, manifest, needsMigration)) return { moduleId: module.id, hash, status: "approved", report };
     // requestReview suppresses replacements if a custom version is active.
-    return await requestReview(context, { version, module, report, files, needsMigration });
+    return finishBuild({ context, module, version, manifest, report, checks, files });
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
 async function recoverBuilds(context: ModuleContext, now: Date) {

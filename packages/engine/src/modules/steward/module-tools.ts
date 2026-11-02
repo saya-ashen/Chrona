@@ -1,14 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import type { ModuleTool } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { moduleSupervisor } from "./module-supervisor";
 import { audit } from "./audit";
-import { CallError, callSync, listSystemModules, validateToolArgs, type SystemTool } from "./module-calls";
+import { recordModuleOutputMismatch } from "./module-diagnostics";
+import { currentModuleEvolution } from "./module-evolution";
+import { CallError, callSync, checkModuleOutput, listSystemModules, moduleOutputError, normalizedToolInputSchema, validateToolArgs, type SystemTool } from "./module-calls";
 
 /** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
 type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" };
-type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: SystemTool[] }; tool: SystemTool; direct: boolean; system?: true };
+type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: (SystemTool | ModuleTool)[] }; tool: SystemTool | ModuleTool; direct: boolean; system?: true };
 /** Chrona's own interfaces visible to the audience (v2-13): always direct, few, and part of how the Provider works. */
 function systemEntries(audience: "provider" | "owner"): Entry[] {
   return listSystemModules().flatMap(system => {
@@ -49,10 +53,25 @@ type Resolved = Awaited<ReturnType<typeof moduleTools>>[number];
 function toolset({ module, manifest }: Resolved) {
   return { name: `module_${module.name.replaceAll("-", "_")}`, description: (manifest.description ?? manifest.tools.map(tool => tool.description).join("; ")).slice(0, 500) };
 }
+function catalogInput(tool: SystemTool | ModuleTool) {
+  return "input" in tool && tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool as ModuleTool);
+}
+function catalogOutput(tool: SystemTool | ModuleTool, system: boolean) {
+  return tool.output ? (system ? z.toJSONSchema(tool.output as z.ZodType) : tool.output) : null;
+}
+function catalogEntry(resolved: Resolved) {
+  const { tool } = resolved;
+  return { name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
+    description: tool.description,
+    inputSchema: { ...catalogInput(tool), additionalProperties: false, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` },
+    outputSchema: catalogOutput(tool, !!resolved.system), examples: "examples" in tool ? tool.examples ?? null : null,
+    sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null,
+    idempotent: tool.idempotent,
+    retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically." };
+}
 /** Focused tools are direct; all others are deferred and grouped per module. */
 export async function moduleToolCatalog(ports: StewardPorts, scope: Scope) {
-  return (await moduleTools(ports, scope)).map(resolved => ({ name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
-    inputSchema: { ...(resolved.tool.input ? z.toJSONSchema(resolved.tool.input) : resolved.tool.parameters), additionalProperties: false, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${resolved.tool.description}` } }));
+  return (await moduleTools(ports, scope)).map(catalogEntry);
 }
 type CatalogEntry = Awaited<ReturnType<typeof moduleToolCatalog>>[number];
 /** Deferred tools grouped per module, like a list of MCP servers, so callers know what to search for. */
@@ -75,18 +94,33 @@ async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string
     throw error;
   }
 }
+function eventCaller(caller: { runId: string | null; via?: string | null }) {
+  return caller.runId ? { kind: "provider" as const, runId: caller.runId } : { kind: "owner" as const, via: caller.via ?? null };
+}
+async function recordToolMismatch(ports: StewardPorts, input: { caller: { workspaceId: string }; module: Resolved["module"]; tool: Resolved["tool"]; activationId: string | null; cause: unknown }): Promise<never> {
+  const { caller, module, tool, activationId, cause } = input;
+  const issues = (cause as { diagnosticIssues?: string[] }).diagnosticIssues;
+  if (issues) await recordModuleOutputMismatch(ports.db, { workspaceId: caller.workspaceId, moduleId: module.id, activationId, hash: module.activeHash!, tool: tool.name, callId: randomUUID(), issues, now: ports.now() });
+  throw new StewardError("conflict", (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000));
+}
+async function deliverModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number }, name: string, resolved: Resolved, raw: unknown) {
+  const args = validateToolArgs(resolved.tool as ModuleTool, raw), now = ports.now(), { module, tool } = resolved;
+  const activationId = (await currentModuleEvolution(ports.db, caller.workspaceId, module.id, module.activeHash!))?.activationId ?? null;
+  await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: module.id, details: { tool: name, callerRunId: caller.runId, callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
+  try {
+    const reply = await moduleSupervisor(ports).deliver(module.id, module.activeHash!, { trigger: { id: tool.name, kind: "tool", firedAt: now.toISOString(), args,
+      caller: eventCaller(caller) }, now: now.toISOString(), params: {} }, { activationId, validateResult: output => moduleOutputError(`${module.name}.${tool.name}`, tool as ModuleTool, output) });
+    if ("error" in reply) throw new Error(reply.error);
+    checkModuleOutput(`${module.name}.${tool.name}`, tool as ModuleTool, reply.result.result ?? null);
+    return { result: reply.result.result };
+  } catch (cause) {
+    return await recordToolMismatch(ports, { caller, module, tool, activationId, cause });
+  }
+}
 /** Runs a workspace-owned module tool for a Provider run or the owner (`via`: the entry module that relayed an owner request). */
 export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number }, name: string, raw: unknown) {
   const audience = caller.runId ? "provider" as const : "owner" as const;
   const resolved = (await moduleTools(ports, { ...caller, audience })).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");
-  if (resolved.system) return callSystemTool(ports, caller, resolved, raw);
-  const args = validateToolArgs(resolved.tool, raw), now = ports.now(), { module, tool } = resolved;
-  await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: module.id, details: { tool: name, callerRunId: caller.runId, callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
-  try {
-    const reply = await moduleSupervisor(ports).deliver(module.id, module.activeHash!, { trigger: { id: tool.name, kind: "tool", firedAt: now.toISOString(), args,
-      caller: caller.runId ? { kind: "provider", runId: caller.runId } : { kind: "owner", via: caller.via ?? null } }, now: now.toISOString(), params: {} });
-    if ("error" in reply) throw new Error(reply.error);
-    return { result: reply.result.result };
-  } catch (cause) { throw new StewardError("conflict", (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000)); }
+  return resolved.system ? callSystemTool(ports, caller, resolved, raw) : deliverModuleTool(ports, caller, name, resolved, raw);
 }

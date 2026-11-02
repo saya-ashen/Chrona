@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 // @ts-expect-error Chrona supplies the test kernel at this at run time.
 import { paths, startModule } from "chrona/testing";
 
-const module = await startModule("index.ts");
+const module = await startModule("index.ts", { stubs: { "web.page-set": () => ({ id: "main", catalog: "json-render@0.21.4" }) } });
 const now = "2026-10-22T00:00:00Z";
 async function tool(id: string, args: Record<string, unknown> = {}) {
   const reply = await module.send({ trigger: { kind: "tool", id, firedAt: now, args }, now, params: {} });
@@ -34,6 +34,14 @@ try {
   assert.equal(binary.size, 3); assert.equal(typeof binary.mime, "string"); assert.equal(binary.content, undefined);
   for (let i = 0; i < 25; i++) await tool("write", { path: "versions.txt", content: String(i) });
   assert.equal((await tool("history", { path: "versions.txt" })).versions.length, 20);
-  assert.ok((await tool("list")).entries.some((entry: { name: string }) => entry.name === ".trash"));
+  const root = await tool("list");
+  assert.ok(root.entries.some((entry: { name: string }) => entry.name === ".trash"));
+  assert.equal(root.dir, ""); assert.equal(root.parent, null);
+  await tool("write", { path: "a/b/c.md", content: "# c" });
+  assert.deepEqual(await tool("list", { dir: "a/b" }), { dir: "a/b", parent: "a", entries: [{ name: "c.md", kind: "file", path: "a/b/c.md" }], truncated: false });
   assert.deepEqual(module.calls, []);
+  // On activation the documents page is registered with web.
+  assert.equal((await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
+  const registered = module.calls.find((call: { method: string; params: { target: string } }) => call.params.target === "web.page-set");
+  assert.equal(registered.params.args.id, "main"); assert.equal(registered.params.args.data.doc.tool, "read");
 } finally { await module.stop(); }

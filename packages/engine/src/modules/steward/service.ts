@@ -1,7 +1,7 @@
 import { createSessions } from "./sessions";
 import type { StewardPorts } from "./ports";
 import { createApprovals } from "./approvals";
-import { createModules } from "./modules";
+import { createModules, isModuleApproval } from "./modules";
 import { createTools } from "./tools";
 import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
@@ -30,8 +30,7 @@ export function createStewardService(inputPorts: StewardPorts) {
     const ctx = { db: ports.db, workspaceId, now: ports.now };
     const modules = createModules(ports, workspaceId);
     const approvals = createApprovals(ctx, async action => {
-      const payload = action.payload;
-      if (payload && typeof payload === "object" && !Array.isArray(payload) && (payload.kind === "activate_module" || payload.kind === "activate_modules")) await modules.onApproved(action);
+      if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
     const notifications = createNotificationsView(ports, workspaceId);

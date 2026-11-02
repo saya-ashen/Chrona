@@ -15,7 +15,8 @@ import { notifyUser } from "./notify-user";
 import { drainCalls } from "./module-calls";
 import { assessApproval } from "./approval-level";
 import { pushReply } from "./chat-replies";
-import { runFile } from "./chat";
+import { runFile, storeChatFile } from "./chat";
+import { readContentRef } from "./content";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -39,7 +40,7 @@ async function gate(ctx: ToolContext, action: Action, target: { moduleId?: strin
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
     if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
     if (decision.mode === "ask") {
-      const assessed = await assessApproval(tx, { isolated: !!ctx.ports.sandbox?.isolated, dataDir: ctx.ports.dataDir }, { action, title: tool, payload });
+      const assessed = await assessApproval(tx, { isolated: !!ctx.ports.sandbox?.isolated, dataDir: ctx.ports.dataDir, executionMode: ctx.ports.sandbox?.executionMode ?? "legacy" }, { action, title: tool, payload });
       const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, ...assessed, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action } });
       return { approvalId: approval.id, status: "awaiting_approval" };
@@ -62,7 +63,12 @@ export async function searchSessions(db: StewardPorts["db"], workspaceId: string
     }) }] : [];
   });
 }
-const replyFile = (ctx: ToolContext, path: string) => runFile(ctx.ports, ctx.run.cwd, path);
+/** Working-directory files, received attachments (content/chat/) and app content by reference (content/<module>/<path>, e.g. a generated image). */
+async function replyFile(ctx: ToolContext, path: string) {
+  if (!path.startsWith("content/") || path.startsWith("content/chat/")) return runFile(ctx.ports, ctx.run.cwd, path);
+  const file = await readContentRef(ctx.ports, ctx.workspaceId, path.slice("content/".length), 20 * 1024 * 1024);
+  return storeChatFile(ctx.ports, file.name, file.bytes);
+}
 async function reply(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;
   if (!session || !run.sessionId) throw new StewardError("invalid", "Reply requires a session");

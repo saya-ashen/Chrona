@@ -45,10 +45,13 @@ const tools: McpTool[] = [
   // Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
   { name: "chrona_module_tools", description: "Find module tools (<module>.<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
     inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }), run: ({ query }) => call("modules.tools", { query }) },
+  { name: "chrona_build", description: "Start one user-authorized single-module build. Exact Pi model, timeout and submission cap are bound to this run. Reusing requestKey never resumes or retries it; normal checks and approvals remain.", destructive: true,
+    inputSchema: schema({ name: str("Module name"), goal: str(), intent: { type: "object", properties: { changes: { type: "array", items: { type: "string" } }, preserves: { type: "array", items: { type: "string" } } }, required: ["changes", "preserves"], additionalProperties: false }, requestKey: str("Unique authorization key"), execution: { type: "object", properties: { provider: { const: "pi" }, model: str("Exact provider/model"), timeoutMinutes: { type: "integer", minimum: 1, maximum: 120 }, maxSubmissions: { type: "integer", minimum: 1, maximum: 20 } }, required: ["provider", "model", "timeoutMinutes", "maxSubmissions"], additionalProperties: false } }, ["name", "goal", "intent", "requestKey", "execution"]),
+    run: args => call("modules.build-owner", args) },
   { name: "chrona_module_call", description: "Call a module tool found with chrona_module_tools.", inputSchema: schema({ name: str("<module>.<tool>"), arguments: { type: "object", description: "Arguments matching the tool's input schema" } }, ["name"]),
     run: ({ name, arguments: args }) => {
       // Conversations, approvals and app records have their own tools above (approval resolution is marked destructive there).
-      const buildControl = ["modules.stop-build", "modules.revise-build"].includes(String(name));
+      const buildControl = ["modules.stop-build", "modules.revise-build", "modules.build-owner"].includes(String(name));
       if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(String(name)) || (!buildControl && /^(chat|approvals|modules)\./.test(String(name)))) throw new Error(`not_found: unknown module tool ${String(name)}`);
       return chrona.call(String(name), (args ?? {}) as Args);
     } },

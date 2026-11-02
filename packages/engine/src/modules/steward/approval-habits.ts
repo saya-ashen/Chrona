@@ -19,7 +19,8 @@ const median = (values: number[]) => { const sorted = [...values].sort((a, b) =>
 
 /** Chrona's own (Provider) requests of one yellow kind, always approved: offer to stop asking. */
 function stopAsking(recent: Decision[]): Suggestion[] {
-  const provider = recent.filter(row => !row.moduleId && row.level === "yellow" && row.kind !== "module_request" && row.kind !== "grant_suggestion" && row.status !== "open");
+  // Host paths are approved one directory at a time ("always" keeps that one); a blanket grant would cover every directory.
+  const provider = recent.filter(row => !row.moduleId && row.level === "yellow" && row.action !== "access_host_path" && row.kind !== "module_request" && row.kind !== "grant_suggestion" && row.status !== "open");
   return [...new Set(provider.map(row => row.action))].flatMap(action => {
     const rows = provider.filter(row => row.action === action);
     return rows.length >= 5 && rows.every(row => row.status === "approved")

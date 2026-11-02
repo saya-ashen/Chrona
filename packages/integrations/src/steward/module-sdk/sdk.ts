@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { existsSync, promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createConnection } from "node:net";
 import { randomUUID } from "node:crypto";
 import type { ChronaCalls } from "./calls";
@@ -8,7 +12,9 @@ export type Caller = { kind: "module"; module: string; moduleId: string; hash: s
 export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
   | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
-  | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
+  | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
+  /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
+  | { kind: "activated"; id: "activated"; firedAt: string };
 type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
@@ -48,8 +54,8 @@ const scoped = (key: string) => (current ? `${current}:${key}` : key);
 async function event(message: { id: string; event: { trigger: Trigger; now: string; params: Record<string, string | number | boolean> } }) {
   try {
     const handler = handlers.get(message.event.trigger.kind);
-    // Results of async calls are optional to handle: callStatus reads them too.
-    if (!handler && message.event.trigger.kind === "call_result") { send({ id: message.id, result: {} }); return; }
+    // Results of async calls are optional to handle (callStatus reads them too), and so is `activated`.
+    if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
     current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
@@ -117,6 +123,77 @@ export const chrona = {
    * `secrets.get`, `unavailable` until saved. Never log, store or return it.
    */
   secret: (params: { name: string }) => chrona.call<{ value: Record<string, string> }>("secrets.get", params),
+  /** v2-30 §4: a short-lived OAuth access token the kernel refreshes; `reauthorize` means the user must consent again (`secrets.authorize`). */
+  token: (params: { name: string; provider: "google" | "microsoft"; account?: string }) => chrona.call<{ accessToken: string; expiresAt: string }>("secrets.token", params),
+  /** Runs a tool without a shell, passing credentials only to the child and redacting its output. */
+  exec: async (command: string, args: string[] = [], options: {
+    secretEnv?: Record<string, { secret: string; field: string }>; secretFiles?: Record<string, { secret: string; field: string }>;
+    tokenEnv?: Record<string, { secret: string; provider: "google" | "microsoft"; account?: string }>;
+    env?: Record<string, string>; cwd?: string; stdin?: string; timeoutMs?: number; maxOutputBytes?: number;
+  } = {}): Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string; timedOut: boolean; truncated: boolean }> => {
+    const secrets = new Map<string, Record<string, string>>(), env = { ...process.env, ...options.env };
+    for (const { secret, field } of [...Object.values(options.secretEnv ?? {}), ...Object.values(options.secretFiles ?? {})]) {
+      if (!secrets.has(secret)) secrets.set(secret, (await chrona.secret({ name: secret })).value);
+      if (!Object.hasOwn(secrets.get(secret)!, field)) throw new Error(`Missing secret field: ${secret}.${field}`);
+    }
+    const tokens: Record<string, string> = {};
+    for (const [name, { secret, provider, account }] of Object.entries(options.tokenEnv ?? {})) tokens[name] = (await chrona.token({ name: secret, provider, ...(account ? { account } : {}) })).accessToken;
+    // Only the fields handed to the child are redacted: other fields (a username, a host) may legitimately appear in output.
+    const values = [...new Set([...[...Object.values(options.secretEnv ?? {}), ...Object.values(options.secretFiles ?? {})].map(({ secret, field }) => secrets.get(secret)![field]!), ...Object.values(tokens)])]
+      .filter(Boolean).sort((a, b) => b.length - a.length);
+    const cap = options.maxOutputBytes ?? 1_048_576, slack = Buffer.byteLength(values[0] ?? "");
+    // Output is kept up to cap + the longest value, redacted, then cut to cap, so a value split by the cap cannot leak a prefix.
+    // Replacements can shorten the text below cap, so when the kept bytes were cut, a trailing partial value is dropped too.
+    const redact = (bytes: Buffer, cut: boolean) => {
+      let text = bytes.toString("utf8");
+      for (const value of values) text = text.split(value).join("[redacted]");
+      if (cut) for (const value of values) for (let k = value.length - 1; k > 0; k--) if (text.endsWith(value.slice(0, k))) { text = text.slice(0, -k); break; }
+      const out = Buffer.from(text);
+      return out.length > cap ? out.subarray(0, cap).toString("utf8") : text;
+    };
+    for (const [name, { secret, field }] of Object.entries(options.secretEnv ?? {})) env[name] = secrets.get(secret)![field];
+    Object.assign(env, tokens);
+    let dir: string | undefined;
+    try {
+      const files = Object.entries(options.secretFiles ?? {});
+      if (files.length) {
+        dir = await fs.mkdtemp(join(existsSync("/dev/shm") ? "/dev/shm" : tmpdir(), "chrona-exec-"));
+        await fs.chmod(dir, 0o700);
+        if (((await fs.stat(dir)).mode & 0o777) !== 0o700) throw new Error("Invalid secret directory permissions");
+        for (const [index, [name, { secret, field }]] of files.entries()) {
+          const path = join(dir, String(index));
+          await fs.writeFile(path, secrets.get(secret)![field]!, { mode: 0o600 });
+          if (((await fs.stat(path)).mode & 0o777) !== 0o600) throw new Error("Invalid secret file permissions");
+          env[name] = path;
+        }
+      }
+      return await new Promise((resolve, reject) => {
+        let child: ReturnType<typeof spawn>;
+        try { child = spawn(command, args, { env, cwd: options.cwd, detached: true, stdio: "pipe" }); }
+        catch { reject(new Error("Command failed to start")); return; }
+        const output: Buffer[][] = [[], []], sizes = [0, 0], cut = [false, false];
+        let timedOut = false, truncated = false, failed = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          try { if (child.pid) process.kill(-child.pid, "SIGKILL"); } catch {}
+        }, options.timeoutMs ?? 60_000);
+        for (const [index, stream] of [child.stdout, child.stderr].entries()) stream!.on("data", (chunk: Buffer) => {
+          const remaining = Math.max(0, cap + slack - sizes[index]!);
+          if (sizes[index]! + chunk.length > cap) truncated = true;
+          if (chunk.length > remaining) cut[index] = true;
+          if (remaining) { output[index]!.push(chunk.subarray(0, remaining)); sizes[index]! += Math.min(chunk.length, remaining); }
+        });
+        child.once("error", () => { failed = true; });
+        child.once("close", (code, signal) => {
+          clearTimeout(timer);
+          if (failed) { reject(new Error("Command failed to start")); return; }
+          resolve({ code, signal, stdout: redact(Buffer.concat(output[0]!), cut[0]!), stderr: redact(Buffer.concat(output[1]!), cut[1]!), timedOut, truncated });
+        });
+        child.stdin!.on("error", () => {});
+        child.stdin!.end(options.stdin ?? "");
+      });
+    } finally { if (dir) await fs.rm(dir, { recursive: true, force: true }); }
+  },
   /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
   serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
   /**

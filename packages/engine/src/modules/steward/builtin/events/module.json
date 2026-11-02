@@ -8,15 +8,18 @@
   "uses": ["modules.contributions", "modules.tools"],
   "tools": [
     { "name": "emit", "description": "Emit an event the caller declares in contributes.events.emits; delivered to each subscriber as { event, from, payload }.", "visibility": ["modules"], "idempotent": true,
+      "output": { "type": "object", "properties": { "delivered": { "type": "integer" } }, "required": ["delivered"], "additionalProperties": false },
       "parameters": { "type": "object", "required": ["event", "payload", "key"], "properties": {
         "event": { "type": "string", "description": "The event's own name, without the module name" },
         "payload": { "type": "string", "description": "JSON object matching the declared payload, at most 64 KiB" },
         "key": { "type": "string", "description": "Idempotency key, derived from what happened" } } } },
     { "name": "subscribe", "description": "Deliver <module>.<event> to one of the caller's own tools, which must list \"events\" in callers and take event, from and payload (strings).", "visibility": ["modules"], "idempotent": true,
+      "output": { "type": "object", "properties": { "subscribed": { "type": "boolean" } }, "required": ["subscribed"], "additionalProperties": false },
       "parameters": { "type": "object", "required": ["event", "tool"], "properties": { "event": { "type": "string", "description": "<module>.<event>" }, "tool": { "type": "string", "description": "The caller's own tool" } } } },
     { "name": "unsubscribe", "description": "Stop delivering <module>.<event> to the caller's tool.", "visibility": ["modules"], "idempotent": true,
+      "output": { "type": "object", "properties": { "unsubscribed": { "type": "boolean" } }, "required": ["unsubscribed"], "additionalProperties": false },
       "parameters": { "type": "object", "required": ["event", "tool"], "properties": { "event": { "type": "string" }, "tool": { "type": "string" } } } },
-    { "name": "subscriptions", "description": "The caller's subscriptions.", "visibility": ["modules"], "idempotent": true, "parameters": { "type": "object" } }
+    { "name": "subscriptions", "description": "The caller's subscriptions.", "visibility": ["modules"], "idempotent": true, "output": { "type": "object", "properties": { "subscriptions": { "type": "array", "items": { "type": "object", "properties": { "event": { "type": "string" }, "module": { "type": "string" }, "tool": { "type": "string" } }, "required": ["event", "module", "tool"], "additionalProperties": false } } }, "required": ["subscriptions"], "additionalProperties": false }, "parameters": { "type": "object" } }
   ],
   "data": { "schema": 1 },
   "tests": ["test.ts"]

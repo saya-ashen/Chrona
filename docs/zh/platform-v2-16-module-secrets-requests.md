@@ -13,13 +13,27 @@
 
 ## 2. 凭据
 
-- 清单 `secrets` 对所有模块开放（仍最多 5 个，名称 `^[a-z][a-z0-9_]{1,40}$`）；`qq_bot` 仍只给入口模块，继续来自环境变量。
+- 清单 `secrets` 对所有模块开放（数量不限（2026-11-01 用户决定取消原 5 个上限），名称 `^[a-z][a-z0-9_]{1,40}$`）；`qq_bot` 仍只给入口模块，继续来自环境变量。
 - 其他凭据存于 `<dataDir>/secrets/<name>.json`（`createSecrets`：0600、单链接、非符号链接、≤1 MiB、值均为字符串）。
 - `secrets` 系统模块新增（只有入口模块可调用，须在 `uses` 声明；Provider 不可见）：
   - `secrets.set({ name, value })`：`value` 为 JSON 对象文本（值均为字符串）；参数不进调用记录、审计和日志。不能写 `qq_bot`。
   - `secrets.remove({ name })`。
   - `secrets.list()`：已配置的名称、更新时间，以及哪些已启用模块声明了它；从不返回值。
-- 网页：内置 `web` 的设置页增加“凭据”一栏，按模块列出声明的凭据和是否已配置，可填写（字段名 + 值，输入框为密码类型）、替换、删除；不显示已保存的值。线上运行的是定制 `web`，不随发布替换，需另经模块构建合并。
+- 网页：内置 `web` 的设置页增加“凭据”一栏，按模块列出声明的凭据和是否已配置，按 §2.1 逐字段填写、删除；不显示已保存的值。线上运行的是定制 `web`，不随发布替换，需另经模块构建合并。
+### 2.1 字段声明与按字段保存（2026-11-02）
+
+用户反馈：页面只给“字段名 + 值”空行，要猜字段名；“替换”会冲掉没重新填写的字段。
+
+- 清单 `secrets` 的每项可以是名称，也可以是对象 `{ name, label?, description?, fields?, extraFields?, oauth? }`：
+  - `fields: [{ name, label, description?, optional?, plain? }]`：页面逐个询问的字段；`plain` 为非机密（如 Client ID），用明文输入框。
+  - `extraFields: { label, valueLabel, description? }`：由用户命名的键，例如每个账户 id 一个授权码。
+  - `oauth: { provider, scopes, accounts? }`（v2-30 §4）：页面另外询问 `clientId`/`clientSecret`，并提供“授权”；`accounts` 为真时可授权多个账户。
+  - 只写名称照旧可用，页面列出已保存的字段名并允许按名称添加。
+- `secrets.set({ name, value, merge? })`：`merge` 时只写入给出的字段、保留其余，且不能写内核字段（`refreshToken*`、`scope*`、`oauthManaged`）；页面一律合并。不带 `merge` 仍整体替换（命令行）。
+- `secrets.remove({ name, field? })`：带 `field` 只删一个字段（最后一个字段删完即删除凭据），可用来移除某个账户的密码或 OAuth 授权。
+- `modules.permissions` 的每个凭据带上声明的字段、哪些已保存、用户命名的键、已授权的 OAuth 账户；只有字段名，从不含值。
+- 内核写凭据（OAuth 回调、令牌轮换）与页面合并、删除字段共用同一把按凭据的锁。
+
 - 命令行：`chrona admin secret-set <name>` 从标准输入读 JSON 对象写入（不回显）；`chrona admin secret-remove <name>`。
 - 对话（QQ、网页会话、MCP 会话）不提供设置：消息会进入会话记录和模型上下文。
 - `secrets.get`：模块声明了该名称即可读；未声明 `forbidden`、未配置 `unavailable`；构建和测试期间一律 `unavailable`。

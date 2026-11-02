@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
@@ -7,7 +7,7 @@ import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { modernPi, readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
 export type PiProviderOptions = {
-  command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string;
+  command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string; executionMode?: "legacy" | "trusted-local" | "required-isolation";
   chronaExtension: string; webExtension?: string | null; agentUrl: string; bwrap?: string | null;
   /** The browser tool (v2-12): its extension, and where runs get a browser from; without either runs have no browser tool. */
   browserExtension?: string | null; browsers?: { ensure(): string | null };
@@ -25,10 +25,11 @@ export const profileOverlaps = (profile: string, work: string) => inside(profile
 /** No PATH fallback or inheritance of the interactive user's Pi resource profile. */
 export function piLaunchConfig(options: PiProviderOptions): PiLaunchConfig {
   const selected = readPiResources(options.resourcesFile, options.agentDir ?? "", options.workspaceRoot);
+  const configuredBwrap = options.bwrap ? (options.bwrap.includes("/") ? resolve(options.bwrap) : options.bwrap) : null;
   return { options, command: options.command ?? "", agentDir: options.agentDir ?? "", version: options.expectedVersion ?? "0.85.0", resources: selected.resources, resourceError: selected.error,
     extension: resolve(options.chronaExtension), web: options.webExtension ? resolve(options.webExtension) : null,
     browserExtension: options.browserExtension ? resolve(options.browserExtension) : null,
-    bwrap: options.bwrap ? (options.bwrap.includes("/") ? resolve(options.bwrap) : options.bwrap) : null };
+    bwrap: options.executionMode === "trusted-local" ? null : configuredBwrap };
 }
 function privateProfile(path: string): boolean {
   try {
@@ -71,6 +72,10 @@ export async function inspectPiLaunch(config: PiLaunchConfig): Promise<string | 
   const env = piEnvironment(config), pi = await probe(config.command, env);
   if (!pi.ok) return "Pi binary unavailable";
   if (pi.version !== config.version) return "Pi version does not match the configured pin";
+  if (config.options.executionMode === "required-isolation") {
+    const shell = Bun.which("sh");
+    if (!config.bwrap || !(await probe(config.bwrap, env)).ok || !shell || spawnSync(config.bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status !== 0) return "要求隔离执行，但 bubblewrap 不可用";
+  }
   if (config.bwrap && !(await probe(config.bwrap, env)).ok) return "bubblewrap binary unavailable";
   return null;
 }
@@ -124,7 +129,8 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...CHRONA_TOOLS, ...optional.flatMap(extension => extension.tools), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
     // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
     ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
-  if (config.options.model) args.push("--model", config.options.model);
+  const model = input.model ?? config.options.model;
+  if (model) args.push("--model", model);
   if (!config.bwrap) return args;
   const cwd = resolve(input.cwd);
   // Parent masks precede child masks; all masks precede the explicit resource/workspace mounts.

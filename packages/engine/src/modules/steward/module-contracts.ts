@@ -1,33 +1,42 @@
 import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { references } from "./module-reference";
+import type { ModuleManifest } from "@chrona/contracts/steward";
 
 /** The JSON Schema subset contracts use; anything else becomes `unknown`. */
 type Schema = { type?: string | string[]; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: boolean | Schema;
   items?: Schema; enum?: unknown[]; const?: unknown; anyOf?: Schema[]; oneOf?: Schema[]; allOf?: Schema[] };
 
-export function tsType(schema: Schema | boolean | undefined, depth = 0): string {
-  if (!schema || schema === true || depth > 12) return "unknown";
-  if (schema.const !== undefined) return JSON.stringify(schema.const);
-  if (schema.enum) return schema.enum.map(value => JSON.stringify(value)).join(" | ") || "never";
+function objectType(schema: Schema, depth: number): string {
+  const fields = Object.entries(schema.properties ?? {}).map(([key, value]) => `${JSON.stringify(key)}${schema.required?.includes(key) ? "" : "?"}: ${tsType(value, depth + 1)}`);
+  const extra = schema.additionalProperties;
+  if (extra) fields.push(`[key: string]: ${extra === true ? "unknown" : tsType(extra, depth + 1)}`);
+  return `{ ${fields.join("; ")} }`;
+}
+function compositeType(schema: Schema, depth: number): string | undefined {
   const union = schema.anyOf ?? schema.oneOf;
   if (union) return union.map(part => `(${tsType(part, depth + 1)})`).join(" | ");
   if (schema.allOf) return schema.allOf.map(part => `(${tsType(part, depth + 1)})`).join(" & ");
   if (Array.isArray(schema.type)) return schema.type.map(type => tsType({ ...schema, type }, depth)).join(" | ");
+  return undefined;
+}
+function typedValue(schema: Schema, depth: number): string {
+  if (schema.const !== undefined) return JSON.stringify(schema.const);
+  if (schema.enum) return schema.enum.map(value => JSON.stringify(value)).join(" | ") || "never";
+  const composite = compositeType(schema, depth);
+  if (composite !== undefined) return composite;
   switch (schema.type) {
     case "string": return "string";
     case "number": case "integer": return "number";
     case "boolean": return "boolean";
     case "null": return "null";
     case "array": return `Array<${tsType(schema.items, depth + 1)}>`;
-    case "object": {
-      const fields = Object.entries(schema.properties ?? {}).map(([key, value]) => `${JSON.stringify(key)}${schema.required?.includes(key) ? "" : "?"}: ${tsType(value, depth + 1)}`);
-      const extra = schema.additionalProperties;
-      if (extra) fields.push(`[key: string]: ${extra === true ? "unknown" : tsType(extra, depth + 1)}`);
-      return `{ ${fields.join("; ")} }`;
-    }
+    case "object": return objectType(schema, depth);
     default: return "unknown";
   }
+}
+export function tsType(schema: Schema | boolean | undefined, depth = 0): string {
+  return !schema || schema === true || depth > 12 ? "unknown" : typedValue(schema, depth);
 }
 function jsonSchema(schema: z.ZodType) {
   // A contract that cannot be expressed as JSON Schema is still a contract at run time; the build just sees unknown.
@@ -38,12 +47,19 @@ function jsonSchema(schema: z.ZodType) {
  * v2-25: `calls.d.ts` for a build or check — every target a module may call, with its arguments and result, from the
  * same contracts `m_modules_reference` shows and the router checks. Targets without a declared output give `unknown`.
  */
-export async function callsDeclaration(ports: StewardPorts, workspaceId: string) {
-  const lines = (await references(ports, workspaceId))
+export async function callsDeclaration(ports: StewardPorts, workspaceId: string, candidate?: { moduleName: string; manifest: ModuleManifest }) {
+  let entries = await references(ports, workspaceId);
+  if (candidate) {
+    const prefix = `${candidate.moduleName}.`;
+    entries = entries.filter(entry => !(entry.source.kind === "module" && entry.target.startsWith(prefix)));
+    entries.push(...candidate.manifest.tools.map(tool => ({ target: `${candidate.moduleName}.${tool.name}`, source: { kind: "module" as const, hash: null }, tool })));
+  }
+  const lines = entries
     .filter(({ tool }) => tool.visibility.some(who => who === "modules" || who === "owner"))
-    .map(({ target, tool }) => {
-      const args = tool.input ? tsType(jsonSchema(tool.input)) : tsType(tool.parameters as Schema);
-      return `  ${JSON.stringify(target)}: { args: ${args}; output: ${tool.output ? tsType(jsonSchema(tool.output)) : "unknown"} };`;
+    .map(({ target, source, tool }) => {
+      const args = "input" in tool && tool.input ? tsType(jsonSchema(tool.input)) : tsType(tool.parameters as Schema);
+      const output = source.kind === "module" ? tool.output as Schema | undefined : tool.output ? jsonSchema(tool.output as z.ZodType) : undefined;
+      return `  ${JSON.stringify(target)}: { args: ${args}; output: ${output ? tsType(output) : "unknown"} };`;
     });
   return `// Generated by Chrona for this build (v2-25). Do not edit: \`chrona.call\` takes its argument and result types from here.\nexport interface ChronaCalls {\n${lines.join("\n")}\n}\n`;
 }

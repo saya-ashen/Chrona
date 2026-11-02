@@ -10,7 +10,7 @@ import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 // Provider-visible system module tools, including diagnostics and development references.
-const MODULES_TOOLS = 10;
+const MODULES_TOOLS = 13;
 import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -44,8 +44,9 @@ async function fixture() {
 test("catalog appends focused module tools with schema, meaningful description and their toolset", async () => {
   const f = await fixture(), catalog = await f.service.tools.catalog(f.run.token);
   expect(catalog.slice(0, CHRONA_TOOLS.length).map(tool => tool.name)).toEqual([...CHRONA_TOOLS]);
-  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" },
-    inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" } });
+  expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" }, description: "Find matching mail",
+    inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" }, outputSchema: null, examples: null, sideEffects: null, errors: null,
+    idempotent: false, retry: "Unknown async outcomes are not redelivered automatically." });
 });
 test("unfocused sessions find deferred module tools", async () => {
   const f = await fixture();
@@ -64,7 +65,7 @@ test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
   // Chrona's own tools open to the user (v2-13) come first.
-  expect(tools.map(tool => tool.name)).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build", "m_activity_list", "m_mail_sort_find_mail"]);
+  expect(tools.map(tool => tool.name)).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_list", "m_content_read", "m_mail_sort_find_mail"]);
   expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
@@ -78,6 +79,24 @@ test.each([
   const f = await fixture();
   await expect(f.call(args)).rejects.toMatchObject({ code: "invalid", message: expect.stringContaining(field) });
   expect(f.calls).toEqual([]); expect(await f.db.moduleRun.count()).toBe(0);
+});
+test("native objects and arrays stay structured through validation, Provider schema and module event", async () => {
+  const f = await fixture();
+  const tool = { ...f.tool, parameters: { type: "object" as const, properties: { filters: { type: "array" as const, items: { type: "object" as const,
+    properties: { query: { type: "string" as const, enum: ["open", "closed"] }, tags: { type: "array" as const, items: { type: "string" as const } }, count: { type: "number" as const } }, required: ["query"], additionalProperties: false } }, empty: { type: "object" as const, properties: {}, required: [] } }, required: ["filters"] } };
+  await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, tools: [tool] } } });
+  const schema = (await f.service.tools.catalog(f.run.token)).at(-1)?.inputSchema;
+  expect(schema).toMatchObject({ properties: { filters: { type: "array", items: { type: "object", additionalProperties: false, required: ["query"] } } } });
+  const args = { filters: [{ query: "open", tags: ["priority", "today"], count: 2 }, { query: "closed" }], empty: {} };
+  expect(await f.call(args)).toMatchObject({ result: { found: 3 } });
+  expect(f.calls[0]).toMatchObject({ input: { trigger: { args } } });
+  expect(await f.service.forWorkspace(f.workspaceId).modules.callTool("m_mail_sort_find_mail", args)).toMatchObject({ result: { found: 3 } });
+  expect(f.calls[1]).toMatchObject({ input: { trigger: { args } } });
+  for (const invalid of [null, { filters: "[]" }, { filters: [{ query: "other" }] }, { filters: [{ query: "open", unexpected: true }] }, { filters: [{ query: "open", count: Infinity }] }, { filters: [{ query: "open" }, null] }, {}]) {
+    f.calls.length = 0;
+    await expect(f.call(invalid)).rejects.toMatchObject({ code: "invalid" });
+    expect(f.calls).toEqual([]);
+  }
 });
 test("success returns result, runs sandbox with scoped input and deduplicates shared effects", async () => {
   const f = await fixture(), args = { query: "hello", count: 2, unread: true, folder: "inbox" };

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService } from "./service";
 import { createModules } from "./modules";
+import { reviewManifest } from "./module-build";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
@@ -62,6 +63,25 @@ async function fixture() {
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" }, "web");
   return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
+
+test.each(["package.json", "pyproject.toml", "system", "none"])("required isolation blocks host dependency installation: %s", async kind => {
+  const f = await fixture();
+  f.ports.sandbox!.executionMode = "required-isolation";
+  let installs = 0;
+  f.ports.packages = { backend: "system", async install() { installs++; return { errors: [], installed: { npm: false, python: false, packages: {} } }; } };
+  if (kind === "system") {
+    const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
+    await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...manifest, packages: ["ffmpeg"] }));
+  } else if (kind !== "none") await writeFile(join(f.dir, kind), kind === "package.json" ? "{}" : "[project]\nname = 'fixture'\n");
+  const result = await f.propose();
+  expect(installs).toBe(0);
+  expect(result.status).toBe(kind === "none" ? "pending_review" : "rejected");
+  if (kind !== "none") {
+    expect(result.report).toMatchObject({ errors: [expect.stringContaining("dependency installation is not isolated")] });
+    expect(f.calls).toHaveLength(0);
+    expect(await f.db.approval.count()).toBe(0);
+  }
+});
 
 test("activation schedules the module's schedule triggers", async () => {
   const f = await fixture(), manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
@@ -702,7 +722,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   const f = await fixture(), result = await f.propose();
   expect(result.status).toBe("pending_review");
   expect(result.moduleId).toBeString();
-  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false } });
+  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false }, outputImpacts: [] });
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]!.timeoutMs).toBe(60_000);
   expect(f.calls[0]!.maxOutputBytes).toBe(64 * 1024);
@@ -814,6 +834,10 @@ test("session edits after propose never change store hash/content; checkout make
   expect(await readFile(stored, "utf8")).toBe("console.log(1)");
   await expect(f.service.modules.checkout(result.moduleId!, result.hash, "checkout", f.root)).rejects.toThrow("empty");
   await expect(f.service.modules.checkout(result.moduleId!, result.hash, "../escape", f.root)).rejects.toThrow();
+  // A version rejected before it was stored has a record but no files: say so instead of an internal error.
+  const unstored = "f".repeat(64);
+  await f.db.moduleVersion.create({ data: { moduleId: result.moduleId!, hash: unstored, manifest: {}, source: "build", intent: {}, report: {}, status: "rejected" } });
+  await expect(f.service.modules.checkout(result.moduleId!, unstored, "unstored", f.root)).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining("no stored source") });
 });
 
 test("failing tests reject with public outputs only, no approval, staging cleaned", async () => {
@@ -953,4 +977,62 @@ test("tick starts builds without waiting for them and reports build errors on th
   await tick.settled();
   f.db.moduleVersion.findMany = findMany;
   expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules" });
+});
+
+test("v2-26: Chrona asks to pause an app (yellow, once only); the user resumes it with the schedules pausing stopped", async () => {
+  const f = await fixture(), result = await f.propose();
+  await f.approve(result.approvalId!);
+  const moduleId = result.moduleId!;
+  const request = await f.service.modules.lifecycle("disable", moduleId, { reason: "连续三天抓取失败" }, false);
+  const approvalId = "approvalId" in request ? request.approvalId : undefined;
+  if (!approvalId) throw new Error("expected an approval");
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "activate_module", level: "yellow", brief: { headline: "停用应用 price-watch", reversible: true } });
+  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "always" }, "web")).rejects.toThrow("only be approved once");
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("active");
+  await f.approve(approvalId);
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("paused");
+  expect(await f.db.schedule.findMany({ where: { moduleId, status: { not: "cancelled" } } })).toMatchObject([{ triggerId: "daily", status: "paused", nextAt: null }]);
+  expect(await f.db.grant.count({ where: { action: "activate_module", once: true, consumedAt: null } })).toBe(0);
+  await f.service.modules.lifecycle("enable", moduleId, {}, true);
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("active");
+  expect(await f.db.schedule.findMany({ where: { moduleId, status: { not: "cancelled" } } })).toMatchObject([{ triggerId: "daily", status: "active", nextAt: new Date("2026-10-21T01:00:00Z") }]);
+  expect((await f.db.audit.findMany({ where: { subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: { createdAt: "asc" } })).map(row => row.kind)).toEqual(["module_disabled", "module_enabled"]);
+});
+
+test("v2-26: removing an app is a red approval on the page only; built-ins are refused; data and code are backed up before deletion", async () => {
+  const f = await fixture(), result = await f.propose();
+  await f.approve(result.approvalId!);
+  const moduleId = result.moduleId!, data = join(f.dataDir, "platform", "data", moduleId);
+  await mkdir(data, { recursive: true });
+  await writeFile(join(data, "prices.json"), "[1]");
+  await f.db.module.update({ where: { id: moduleId }, data: { builtin: true } });
+  await expect(f.service.modules.lifecycle("remove", moduleId, { reason: "x" }, true)).rejects.toThrow("内置应用");
+  await f.db.module.update({ where: { id: moduleId }, data: { builtin: false } });
+  const request = await f.service.modules.lifecycle("remove", moduleId, { reason: "三个月没用过" }, false);
+  const approvalId = "approvalId" in request ? request.approvalId : undefined;
+  if (!approvalId) throw new Error("expected an approval");
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "delete_data", moduleId: null, level: "red", brief: { headline: "删除应用 price-watch", reversible: false } });
+  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "once" }, "qq")).rejects.toThrow("网页");
+  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "always" }, "web")).rejects.toThrow("only be approved once");
+  await f.approve(approvalId);
+  expect(await f.db.module.findUnique({ where: { id: moduleId } })).toBeNull();
+  expect(await f.db.schedule.count({ where: { moduleId } })).toBe(0);
+  expect(await stat(data).catch(() => null)).toBeNull();
+  const removed = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: moduleId } });
+  const backup = (removed.details as { backup: string }).backup;
+  expect(await readFile(join(backup, "data", "prices.json"), "utf8")).toBe("[1]");
+  expect(await readFile(join(backup, "code", "module.json"), "utf8")).toContain("price-watch");
+  expect(await f.db.grant.count({ where: { action: "delete_data", once: true, consumedAt: null } })).toBe(0);
+  expect((await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).status).toBe("approved");
+});
+
+test("the review shows output contracts and examples as digests, and every authority field in full", () => {
+  const output = { type: "object", properties: Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`field${i}`, { type: "string" }])) };
+  const tool = { name: "search", description: "Search", visibility: ["owner", "modules"], callers: ["web", "mcp"], parameters: { type: "object", properties: {} }, output, examples: [{ args: {}, result: {} }] };
+  const shown = reviewManifest({ name: "mail", entry: "index.ts", tests: ["test.ts"], effects: ["network"], secrets: ["mail_oauth"], tools: [tool] });
+  expect(shown).toContain('"output": "sha256:');
+  expect(shown).toContain('"examples": "sha256:');
+  expect(shown).not.toContain("field199");
+  for (const kept of ['"mcp"', '"modules"', '"mail_oauth"', '"network"']) expect(shown).toContain(kept);
+  expect(shown.length).toBeLessThan(JSON.stringify(output).length / 2);
 });

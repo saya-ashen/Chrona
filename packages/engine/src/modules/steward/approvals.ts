@@ -31,7 +31,7 @@ const isGrantSuggestion = (payload: unknown): payload is { kind: "grant_suggesti
   !!payload && typeof payload === "object" && (payload as { kind?: unknown }).kind === "grant_suggestion" && typeof (payload as { action?: unknown }).action === "string";
 /** Approving it creates the standing grant it describes, and no other; never for a red kind. */
 async function suggestedGrant(tx: Prisma.TransactionClient, { workspaceId, now }: RecordContext, action: string) {
-  if (!(ACTIONS as readonly string[]).includes(action) || RED_ACTIONS.has(action) || action === "activate_module") throw new StewardError("invalid", "This kind of action cannot be pre-approved");
+  if (!(ACTIONS as readonly string[]).includes(action) || RED_ACTIONS.has(action) || action === "activate_module" || action === "access_host_path") throw new StewardError("invalid", "This kind of action cannot be pre-approved");
   const grant = await tx.grant.create({ data: { workspaceId, action, mode: "preapproved", scope: { kind: "global" }, createdAt: now() } });
   return grant.id;
 }
@@ -40,6 +40,8 @@ async function approve(tx: Prisma.TransactionClient, context: RecordContext, row
   // A group never becomes a standing grant: it is approved once, by the user.
   if (isGroupPayload(row.payload) && scope !== "once") throw new StewardError("invalid", "A group activation can only be approved once");
   if (row.level === "red" && scope !== "once") throw new StewardError("invalid", "A red approval can only be approved once");
+  // A standing activate_module grant from a pause request would let later versions of the app activate unasked.
+  if ((row.payload as { kind?: unknown } | null)?.kind === "module_status" && scope !== "once") throw new StewardError("invalid", "Pausing or resuming an app can only be approved once");
   // A module's request is one decision, never a standing grant that would let it approve itself later.
   if (isModuleRequest(row.payload)) {
     if (scope !== "once") throw new StewardError("invalid", "A module's request can only be approved once");
@@ -75,8 +77,23 @@ async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId:
   if (!moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
   if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
 }
+async function afterResolve<T extends { grantId: string | null; payload: Prisma.JsonValue | null; resumed: boolean; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
+  if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
+  if (result.resumed) await ports!.onQueued?.();
+  if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
+  return result;
+}
+type ApprovalRow = NonNullable<Awaited<ReturnType<Prisma.TransactionClient["approval"]["findFirst"]>>>;
+async function refreshModuleApproval(tx: Prisma.TransactionClient, workspaceId: string, facts: Parameters<typeof assessApproval>[1], row: ApprovalRow): Promise<ApprovalRow> {
+  if (row.action !== "activate_module") return row;
+  const assessed = await assessApproval(tx, facts, { action: row.action, title: row.title, payload: row.payload, level: row.level as "green" | "yellow" | "red" });
+  const prior = row.brief as Record<string, unknown>;
+  const brief = { ...assessed.brief, reviewed: prior.reviewed ?? null, reason: prior.reason ?? null };
+  if (assessed.level === row.level && JSON.stringify(brief) === JSON.stringify(row.brief)) return row;
+  return tx.approval.update({ where: { id: row.id }, data: { level: assessed.level, brief: brief as Prisma.InputJsonValue } });
+}
 export function createApprovals(context: RecordContext & { ports?: StewardPorts }, onApproved?: OnApproved, ports?: StewardPorts) {
-  const { db, workspaceId, now } = context, known = ports ?? context.ports, facts = { isolated: !!known?.sandbox?.isolated, ...(known ? { dataDir: known.dataDir } : {}) };
+  const { db, workspaceId, now } = context, known = ports ?? context.ports, facts = { isolated: !!known?.sandbox?.isolated, ...(known ? { dataDir: known.dataDir } : {}), executionMode: known?.sandbox?.executionMode ?? "legacy" };
   return {
     list: async (status?: "open" | "approved" | "denied" | "expired") => (await db.approval.findMany({ where: { workspaceId, status }, orderBy: { createdAt: "desc" } })).map(toApproval),
     create: (raw: unknown) => db.$transaction(async tx => {
@@ -91,9 +108,10 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
     }),
     resolve: (id: string, raw: unknown, source: "rescue" | "cli" | "web" | "mcp" | "qq" | "entry" = "entry") => db.$transaction(async tx => {
       const input = parseInput(resolveApprovalSchema, raw);
-      const row = await tx.approval.findFirst({ where: { workspaceId, id } });
+      let row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
+      row = await refreshModuleApproval(tx, workspaceId, facts, row);
       const grantId = input.decision === "approve" ? await approve(tx, { db, workspaceId, now }, row, input.scope) : null;
       // Checked after the approval's own rules; the transaction drops any grant made above.
       assertSource(row.level, input.decision, source);
@@ -103,11 +121,6 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: input.decision === "approve" ? "approved" : "denied" }, now());
       const resumed = ports ? await resume(tx, ports, workspaceId, row, input) : false;
       return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, resumed, request: isModuleRequest(row.payload) };
-    }).then(async result => {
-      if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
-      if (result.resumed) await ports!.onQueued?.();
-      if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
-      return result;
-    }),
+    }).then(result => afterResolve(result, id, workspaceId, ports, onApproved)),
   };
 }

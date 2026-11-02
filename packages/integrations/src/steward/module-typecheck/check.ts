@@ -39,7 +39,7 @@ function visit(node: ts.Node, file: ts.SourceFile) {
   if (ts.isCallExpression(node) && node.typeArguments?.length && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "call"
     && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "chrona") {
     const [target] = node.arguments;
-    if (target && ts.isStringLiteralLike(target) && contracts.has(target.text))
+    if (ts.isStringLiteralLike(target) && contracts.has(target.text))
       report(file, node.getStart(file), 90001, `${target.text} has a declared contract: remove the type argument and use the declared result type`);
   }
   ts.forEachChild(node, child => visit(child, file));

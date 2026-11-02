@@ -47,7 +47,26 @@ function providerBrowsers(options: RuntimeOptions) {
     onError: error => createLogger("steward.browser").warn("browser.unavailable", { error }),
   });
 }
-function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) {
+type ExecutionMode = "legacy" | "trusted-local" | "required-isolation";
+function executionMode(env = process.env): ExecutionMode {
+  const configured = env.CHRONA_STEWARD_EXECUTION_MODE?.trim();
+  if (!configured) return "legacy";
+  if (configured === "trusted-local" || configured === "required-isolation") return configured;
+  throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
+}
+function updateReview(env = process.env): "required" | "checks-only" {
+  const configured = env.CHRONA_STEWARD_UPDATE_REVIEW?.trim();
+  if (!configured || configured === "required") return "required";
+  if (configured === "checks-only") return configured;
+  throw new Error("Invalid CHRONA_STEWARD_UPDATE_REVIEW; use required or checks-only");
+}
+function autoRollback(env = process.env): boolean {
+  const configured = env.CHRONA_STEWARD_AUTO_ROLLBACK?.trim();
+  if (!configured || configured === "false") return false;
+  if (configured === "true") return true;
+  throw new Error("Invalid CHRONA_STEWARD_AUTO_ROLLBACK; use true or false");
+}
+function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, mode: ExecutionMode) {
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
@@ -56,7 +75,7 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined) 
     agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
     expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
     resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
-    webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap,
+    webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap, executionMode: mode,
     browserExtension: resourcePath(join("external-plugins", "pi-steward-agent", "browser-tools.ts")),
     browsers: providerBrowsers(options),
     workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
@@ -70,10 +89,11 @@ async function configuredSecret(name: string) {
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const configured = configuredProvider(options, bwrap);
+  const mode = executionMode(), moduleUpdateReview = updateReview(), moduleAutoRollback = autoRollback();
+  const configured = configuredProvider(options, bwrap, mode);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
-  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), start(input) {
+  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), start(input) {
     if (stopping) throw new Error("Runtime stopping");
     const handle = configured.start(input); handles.add(handle);
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});
@@ -81,16 +101,16 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   } } : undefined;
   const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
   const moduleTypecheck = resourcePath("module-typecheck", "packages/integrations/src/steward/module-typecheck");
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
+  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, executionMode: mode, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
   const sandbox: StewardPorts["sandbox"] = {
-    ...scriptSandbox.health,
+    ...scriptSandbox.health, executionMode: mode,
     runModule: input => scriptSandbox.runModule(input),
     startModule: input => scriptSandbox.startModule(input),
   };
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     secrets: configuredSecret, packages: createModulePackages(),
-    sandbox: options.sandbox ?? sandbox, moduleSdk, moduleTypecheck,
+    sandbox: options.sandbox ?? sandbox, moduleUpdateReview, moduleAutoRollback, moduleSdk, moduleTypecheck,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },

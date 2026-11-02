@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_NOTIFICATION_SETTINGS, type ModuleManifest } from "@chrona/contracts/steward";
+import { DEFAULT_NOTIFICATION_SETTINGS, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
@@ -15,7 +15,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 /** The approval review's answer (v2-17 §3); null: the model fails. */
 let reviewAnswer: string | null = '{"escalate":false,"reason":"","summary":"更新 prices 的价格判断，能力不变。"}';
 const reviewPrompts: string[] = [];
-async function fixture(scope: "once" | "always" = "always", network = false) {
+async function fixture(scope: "once" | "always" = "always", network = false, executionMode?: "trusted-local" | "required-isolation", moduleUpdateReview?: "required" | "checks-only") {
   reviewAnswer = '{"escalate":false,"reason":"","summary":"更新 prices 的价格判断，能力不变。"}'; reviewPrompts.length = 0;
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-auto-test-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
@@ -24,20 +24,20 @@ async function fixture(scope: "once" | "always" = "always", network = false) {
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-20T04:00:00Z"), publicUrl: null,
     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start() { throw new Error("no runs"); },
       async complete(input) { reviewPrompts.push(input.prompt); if (reviewAnswer === null) throw new Error("down"); return { text: reviewAnswer, inputTokens: 5, outputTokens: 5 }; } },
-    sandbox: { available: true, isolated: true, async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } } };
+    sandbox: { available: true, isolated: true, ...(executionMode ? { executionMode } : {}), async runModule() { return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; } }, ...(moduleUpdateReview ? { moduleUpdateReview } : {}) };
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "prices");
   await mkdir(dir, { recursive: true });
-  const manifest: ModuleManifest = { dynamicSchedules: false, content: false, secrets: [], packages: [], uses: [], name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, settings: {}, data: { schema: 1 } };
+  const manifest: ModuleManifest = { dynamicSchedules: false, activated: false, content: false, secrets: [], packages: [], uses: [], name: "prices", entry: "index.ts", tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], tools: [], keepAlive: false, effects: network ? ["notify_user", "network"] : ["notify_user"], params: {}, settings: {}, data: { schema: 1 } };
   let revision = 0;
-  const propose = async () => {
+  const propose = async (autoReview = true) => {
     await writeFile(join(dir, "module.json"), JSON.stringify(manifest));
     await writeFile(join(dir, "index.ts"), `entry ${revision++}`); await writeFile(join(dir, "test.ts"), "test");
     if (manifest.data.migrate) await writeFile(join(dir, manifest.data.migrate), "migrate");
     const proposal = await service.modules.propose({ root, dir: "prices", intent: { changes: ["Refactor prices"], preserves: ["Rules"] } }, "user");
     await service.modules.buildPending();
-    await reviewApprovals(ports, workspace.id);
+    if (autoReview) await reviewApprovals(ports, workspace.id);
     return db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: proposal.moduleId!, hash: proposal.hash } } });
   };
   const first = await propose(), card = await db.approval.findFirstOrThrow({ where: { status: "open" } });
@@ -113,7 +113,7 @@ async function configureManualCase(f: Awaited<ReturnType<typeof fixture>>, kind:
 }
 
 test.each(["tests", "smoke"])("failed %s rejects the update despite a module grant", async kind => {
-  const f = await fixture();
+  const f = await fixture("always", false, "trusted-local", "checks-only");
   f.ports.sandbox!.runModule = async input => {
     const failed = kind === "tests" ? input.entry === "test.ts" : input.dataDir.includes("chrona-module-smoke-");
     return { status: failed ? "failed" : "succeeded", exitCode: failed ? 1 : 0, output: '{"effects":[]}', error: failed ? "failed check" : null };
@@ -122,7 +122,98 @@ test.each(["tests", "smoke"])("failed %s rejects the update despite a module gra
   expect(version.status).toBe("rejected");
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: f.first.hash });
   expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "approval_review", details: { path: "$.outcome", equals: "skipped" } } })).toBe(0);
   expect((await notices(f.db)).length).toBe(0);
+});
+
+test("trusted-local checks-only rechecks callers after build and cannot autoactivate a stale green card", async () => {
+  const f = await fixture("always", false, "trusted-local", "checks-only");
+  const output = (type: string) => ({ type: "object", properties: { value: { type } }, required: ["value"], additionalProperties: false });
+  const exposed = { name: "read", description: "read", visibility: ["modules"], idempotent: true, parameters: { type: "object", properties: {}, required: [] }, output: output("string") };
+  f.manifest.tools = [exposed] as never;
+  const active = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: f.first.hash } } });
+  await f.db.moduleVersion.update({ where: { id: active.id }, data: { manifest: f.manifest } });
+  f.manifest.tools[0]!.output = output("integer") as never;
+  const candidate = await f.propose(false);
+  expect(candidate.status).toBe("pending_review");
+  const candidateVersion = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: candidate.hash } } });
+  expect(candidateVersion.report).toMatchObject({ outputImpacts: [] });
+  const caller = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "late-caller", activeHash: "caller-hash" } });
+  await f.db.moduleVersion.create({ data: { moduleId: caller.id, hash: "caller-hash", manifest: moduleManifestSchema.parse({ name: "late-caller", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: [`prices.read`] }), source: "user", status: "approved", intent: {}, report: {} } });
+  await reviewApprovals(f.ports, f.workspace.id);
+  expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.first.moduleId!, hash: candidate.hash } } })).toMatchObject({ status: "pending_review" });
+  expect(await f.db.approval.findFirstOrThrow({ where: { payload: { path: "$.hash", equals: candidate.hash } } })).toMatchObject({ status: "open" });
+  expect(await f.db.audit.count({ where: { kind: "module_auto_activated", subjectId: f.first.moduleId! } })).toBe(0);
+  const approval = await f.db.approval.findFirstOrThrow({ where: { status: "open", payload: { path: "$.hash", equals: candidate.hash } } });
+  const resolved = await f.service.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
+  expect(resolved.approval).toMatchObject({ level: "yellow", brief: { added: [expect.stringContaining("late-caller")] } });
+});
+
+test("trusted-local keeps required review by default, including review failure", async () => {
+  const f = await fixture("always", false, "trusted-local");
+  reviewAnswer = null;
+  const version = await f.propose();
+  expect(version.status).toBe("pending_review");
+  expect(await f.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ level: "green", brief: { reviewed: "unavailable" } });
+});
+
+test("trusted-local checks-only skips AI only after checked update and standing module grant", async () => {
+  const f = await fixture("always", false, "trusted-local", "checks-only");
+  f.ports.sandbox!.isolated = false;
+  const version = await f.propose();
+  expect(version.status).toBe("approved");
+  const approval = await f.db.approval.findFirstOrThrow({ where: { payload: { path: "$.hash", equals: version.hash } } });
+  expect(approval).toMatchObject({ status: "approved", level: "green", brief: { reviewed: "skipped", reason: expect.stringContaining("跳过 AI 复核") } });
+  expect(reviewPrompts).toHaveLength(1); // The initial new-module approval still receives required review.
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "approval_review", subjectId: approval.id } })).toMatchObject({ details: { outcome: "skipped" } });
+});
+
+test("skipped reviews do not spend the model review budget", async () => {
+  const f = await fixture("always", false, "trusted-local", "checks-only");
+  for (let i = 0; i < 6; i++) expect((await f.propose()).status).toBe("approved");
+  expect(reviewPrompts).toHaveLength(1);
+  f.ports.moduleUpdateReview = "required";
+  for (let i = 0; i < 4; i++) expect((await f.propose()).status).toBe("approved");
+  expect(reviewPrompts).toHaveLength(5);
+  expect((await f.propose()).status).toBe("pending_review");
+  expect(await f.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ brief: { reviewed: "unavailable" } });
+});
+
+test.each(["no grant", "revoked", "expired", "once", "ask", "never"])("trusted-local checks-only does not bypass missing or non-standing authorization: %s", async kind => {
+  const f = await fixture("always", false, "trusted-local", "checks-only");
+  if (kind !== "never") await f.service.grants.revoke(f.grantId);
+  if (kind !== "no grant" && kind !== "revoked" && kind !== "never") {
+    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: kind === "ask" ? kind : "preapproved", scope: { kind: "module", moduleId: f.first.moduleId }, once: kind === "once", expiresAt: kind === "expired" ? new Date("2026-10-19T00:00:00Z") : null, createdAt: new Date("2026-10-20T03:00:00Z") } });
+  }
+  const version = await f.propose(kind !== "never");
+  if (kind === "never") {
+    await f.service.grants.revoke(f.grantId);
+    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: "never", scope: { kind: "module", moduleId: f.first.moduleId }, createdAt: new Date("2026-10-20T03:00:00Z") } });
+    await reviewApprovals(f.ports, f.workspace.id);
+  }
+  expect(version.status).toBe("pending_review");
+  expect(await f.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ level: "green", brief: { reviewed: "passed" } });
+  expect(reviewPrompts.length).toBeGreaterThan(1);
+});
+
+test("checks-only remains opt-in and excludes nonlocal and non-green updates", async () => {
+  const nonlocal = await fixture("always", false, "required-isolation", "checks-only");
+  nonlocal.ports.sandbox!.isolated = false;
+  const version = await nonlocal.propose();
+  expect(version.status).toBe("pending_review");
+  expect(await nonlocal.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ level: "red", brief: { reviewed: "passed" } });
+  const nonGreen = await fixture("always", false, "trusted-local", "checks-only");
+  nonGreen.manifest.effects.push("network");
+  const candidate = await nonGreen.propose();
+  expect(candidate.status).toBe("pending_review");
+  expect(await nonGreen.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ level: "yellow", brief: { reviewed: "passed" } });
+  const migration = await fixture("always", false, "trusted-local", "checks-only");
+  await mkdir(join(migration.dataDir, "platform/data", migration.first.moduleId), { recursive: true });
+  await writeFile(join(migration.dataDir, "platform/data", migration.first.moduleId, "state"), "live");
+  migration.manifest.data = { schema: 2, migrate: "migrate.ts" };
+  const migrating = await migration.propose();
+  expect(migrating.status).toBe("pending_review");
+  expect(await migration.db.approval.findFirstOrThrow({ where: { status: "open" } })).toMatchObject({ level: "red", brief: { reviewed: "passed" } });
 });
 
 test.each(["auto", "notify_after"] as const)("explicit %s policy uses its non-once grant", async mode => {

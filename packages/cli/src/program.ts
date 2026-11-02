@@ -45,7 +45,9 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       for (const check of checks) console.log(`[${check.status}] ${check.key}: ${check.message}`);
       if (checks.some((check) => check.status === "error")) process.exitCode = 1;
     });
-  const admin = program.command("admin").description("Local recovery administration (no Provider required)");
+  const admin = program.command("admin").description("Local recovery administration (only build invokes the Provider)");
+  admin.command("build <request-file>").description("Run one explicitly authorized bounded module build while the service is stopped; never activates it")
+    .action(async (file: string) => { const { adminBuild } = await import("./admin-build"); await adminBuild(file); });
   admin.command("modules").description("List modules and versions").action(async () => { await runAdmin("modules"); });
   admin.command("diagnostics [module]").description("Read saved module faults and recovery attempts without starting Chrona").action(async (module?: string) => { await runAdmin("diagnostics", module ? [module] : []); });
   admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await runAdmin("approvals"); });

@@ -4,14 +4,14 @@ import { startModule } from "chrona/testing";
 
 type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
-const moduleTools: { target: string; description: string; inputSchema: Args }[] = [{ target: "files.list", description: "List a document directory.", inputSchema: { type: "object", properties: {}, required: [] } }];
+const moduleTools: { target: string; description: string; inputSchema: Args; outputSchema: Args | null; examples: Args[] | null; sideEffects: string[] | null; errors: Args[] | null; retry: string; idempotent: boolean }[] = [{ target: "files.list", description: "List a document directory.", inputSchema: { type: "object", properties: {}, required: [] }, outputSchema: null, examples: null, sideEffects: null, errors: null, retry: "Unknown async outcomes are not redelivered automatically.", idempotent: false }];
 const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: target })) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
 const module = await startModule("index.ts", { stubs: {
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
     routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }] })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
-    routed("planning.get", args => ({ plan: args.id })),
-    routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.diagnostics", args => [{ module: args.module, incidents: [] }]),
+    routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
+    routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ module: args.module, incidents: [] }]),
     routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
     routed("modules.permissions", args => ({ module: args.module, capabilities: [] })),
     routed("modules.system", args => ({ name: args.module, work: [] })),
@@ -43,6 +43,10 @@ try {
   assert.deepEqual(await json("chrona_system_apps", { module: "reflection" }), { name: "reflection", work: [] });
   assert.deepEqual(await json("chrona_app", { module: "okx" }), { kind: "app", module: "okx" });
   assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
+  const build = { name: "web", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "authorized-once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
+  assert.ok(names.includes("chrona_build"));
+  assert.deepEqual(await json("chrona_build", build), build);
+  assert.deepEqual(calls.at(-1), ["modules.build-owner", build]);
   // Conversations, approvals and app records are routed calls with the system modules' argument names.
   calls.length = 0;
   await tool("chrona_chat", { text: "hi" });
@@ -56,8 +60,17 @@ try {
   await tool("chrona_run_answer", { interactionId: "i1", decision: "cancel", value: 2 });
   assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "cancel" }) }]);
   // A module activated after the client listed its tools is found and callable at once.
-  moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } });
-  assert.deepEqual((await json("chrona_module_tools", { query: "planning" })).map((entry: { target: string }) => entry.target), ["planning.get"]);
+  moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }, outputSchema: null, examples: null, sideEffects: null, errors: null, retry: "Unknown async outcomes are not redelivered automatically.", idempotent: false });
+  moduleTools.push({ target: "planning.search", description: "Search plans", inputSchema: {
+    type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["open", "done"] } }, required: ["state"], additionalProperties: false } } },
+    required: ["filters"], additionalProperties: false
+  }, outputSchema: null, examples: [{ args: { filters: [{ state: "open" }] }, result: { filters: [{ state: "open" }] } }], sideEffects: [], errors: null, retry: "Unknown async outcomes are not redelivered automatically.", idempotent: false });
+  const discovered = await json("chrona_module_tools", { query: "planning" });
+  assert.deepEqual(discovered.map((entry: { target: string }) => entry.target), ["planning.get", "planning.search"]);
+  assert.deepEqual(discovered[1], moduleTools[2]);
+  const filters = [{ state: "open" }];
+  assert.deepEqual(await json("chrona_module_call", { name: "planning.search", arguments: { filters } }), { filters });
+  assert.deepEqual(calls.at(-1), ["planning.search", { filters }]);
   assert.deepEqual(await json("chrona_module_call", { name: "planning.get", arguments: { id: "x" } }), { plan: "x" });
   await json("chrona_module_call", { name: "modules.stop-build", arguments: { session: "b1" } });
   assert.deepEqual(calls.at(-1), ["modules.stop-build", { session: "b1" }]);

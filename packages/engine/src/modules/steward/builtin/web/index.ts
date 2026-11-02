@@ -1,11 +1,12 @@
 import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createPages, type Caller } from "./pages";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
 type Args = Record<string, unknown>;
-const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8" };
+const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/pages.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8" };
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
@@ -36,8 +37,14 @@ function events() {
   });
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }
-on("tool", async (event: { id: string; args: Args }) => {
-  if (event.id !== "reply") throw new Error(`Unknown tool ${event.id}`);
+// Pages apps register (module-dependency-direction §4); `tools` is what this page may call of that app.
+const pages = createPages({ dataDir: chrona.paths.data, tools: async module => {
+  const tools = await call("modules.tools", { query: module }) as { target: string; inputSchema?: { properties?: Record<string, unknown> } }[];
+  return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool.inputSchema ?? {}]));
+} });
+on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
+  // Chrona records the caller of every routed call; only the build's smoke start sends a tool event without one.
+  if (event.id !== "reply") return { result: event.caller || event.id === "catalog" ? await pages.tool(event.id, event.args, event.caller) : { ignored: "no caller" } };
   send(`data: ${JSON.stringify({ type: "reply", ...event.args })}\n\n`);
   // Pages read the conversation when they open, so a reply with no page open is not lost.
   return { result: { pages: streams.size } };
@@ -73,8 +80,11 @@ async function settingsRoute({ request, path, body }: ApiContext): Promise<ApiRe
 /** A credential the user typed goes straight to the kernel (v2-16); the page never reads one back. */
 async function secretRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (request.method !== "POST" || path[0] !== "secrets") return NO_ROUTE;
-  if (path.length === 2) return call("secrets.set", { name: path[1], value: JSON.stringify(body.value) });
-  if (path[2] === "remove" && path.length === 3) return call("secrets.remove", { name: path[1] });
+  // The page saves field by field: what is left blank keeps its saved value (v2-16 §2.1).
+  if (path.length === 2) return call("secrets.set", { name: path[1], value: JSON.stringify(body.value), merge: true });
+  if (path[2] === "remove" && path.length === 3) return call("secrets.remove", { name: path[1], ...(typeof body.field === "string" ? { field: body.field } : {}) });
+  // v2-30 §4: the scopes come from the declaring app's manifest, shown on the page.
+  if (path[2] === "authorize" && path.length === 3) return call("secrets.authorize", { name: path[1], provider: body.provider, scopes: body.scopes, ...(body.account ? { account: body.account } : {}) });
   return NO_ROUTE;
 }
 async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
@@ -94,7 +104,17 @@ async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResu
   if (path[0] !== "modules" || path.length !== 3 || !Object.hasOwn(MODULE_ROUTES, route)) return NO_ROUTE;
   return MODULE_ROUTES[route]!(path[1]!, body);
 }
-const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute];
+async function pageRoute({ request, path }: ApiContext): Promise<ApiResult> {
+  if (request.method !== "GET" || path[0] !== "pages" || path.length !== 3) return NO_ROUTE;
+  const page = await pages.get(path[1]!, path[2]!);
+  if (!page) throw Object.assign(new Error("没有这个页面"), { code: "not_found" });
+  return page;
+}
+async function listPages() {
+  const modules = await call("modules.list") as { name: string; status: string }[];
+  return pages.list(new Set(modules.filter(module => module.status === "active").map(module => module.name)), new Set(modules.map(module => module.name)));
+}
+const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute, pageRoute];
 
 async function api(request: Request, path: string[]) {
   const url = new URL(request.url), body = request.method === "POST" ? await request.json() as Args : {};
@@ -113,6 +133,7 @@ async function api(request: Request, path: string[]) {
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
+    "GET /pages": () => listPages(),
     // v2-20: Chrona's own modules, read-only; with ?module=, also the conversations it works in.
     // v2-21: the user's own memory search and deletion, through the memory system module.
     "GET /memory": () => call(url.searchParams.get("query") ? "memory.recall" : "memory.status", url.searchParams.get("query") ? { query: url.searchParams.get("query") } : {}),

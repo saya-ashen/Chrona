@@ -17,6 +17,10 @@ import { liveRuns } from "./runs";
 import { moduleSupervisor } from "./module-supervisor";
 import * as chatFiles from "./chat";
 import { approvalNoticeBody } from "./notify-user";
+import { startOwnerBuild } from "./owner-build";
+import { runOwnerBuild } from "./owner-build-run";
+import { controlBuild } from "./module-build-session";
+import { recordModuleFailure } from "./module-diagnostics";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -74,8 +78,17 @@ async function fixture() {
   return { db, dataDir, ports, service, api, workspaceId, session, requester, starts, step, writeModule, call, onRun: (next: Run) => { script = next; } };
 }
 
-test("a build is its own conversation: restricted tools, it submits and checks, and its reply comes back to the conversation that asked", async () => {
+test("a build is its own conversation: scoped diagnostics, restricted tools, submission and reply", async () => {
   const f = await fixture();
+  // Keep the synthetic incident from launching an unrelated reflection run in this build-flow test.
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { reflection: { enabled: false } } } });
+  const oldHash = "d".repeat(64), oldModule = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "paused", activeHash: oldHash } });
+  await f.writeModule(join(f.dataDir, "prior"));
+  await cp(join(f.dataDir, "prior", "mail-sort"), join(f.dataDir, "platform", "store", oldHash), { recursive: true });
+  await f.db.moduleVersion.create({ data: { moduleId: oldModule.id, hash: oldHash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  await recordModuleFailure(f.db, { workspaceId: f.workspaceId, moduleId: oldModule.id, hash: oldHash, now: new Date(), retry: false, evidence: {
+    phase: "start", reason: "Synthetic test startup failure", runId: "fixture-run", triggerId: "process", delivery: "unavailable", pid: null, exitCode: 134, signal: "SIGABRT", stderr: "Synthetic failure output", virtualMemoryMb: 512,
+  } });
   await mkdir(f.requester.cwd, { recursive: true });
   await writeFile(join(f.requester.cwd, "mock.png"), "png bytes");
   await f.db.preference.create({ data: { workspaceId: f.workspaceId, text: "卡片紧凑，少用边框", origin: "said", topic: "ui" } });
@@ -89,6 +102,9 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
   expect(queued).toMatchObject({ lane: "build", status: "queued", cwd: join(f.dataDir, "sessions", build.id) });
   for (const text of [request.goal, "卡片紧凑，少用边框", "m_modules_propose", "m_modules_check", "chrona_reply"]) expect(queued.prompt).toContain(text);
   expect(JSON.parse(await readFile(join(queued.cwd, "request.json"), "utf8"))).toMatchObject({ name: "mail-sort", files: ["files/1-mock.png"] });
+  expect(JSON.parse(await readFile(join(queued.cwd, "references/target-diagnostics.json"), "utf8"))).toMatchObject({ evidenceOnly: true, modules: [{ diagnostics: { status: "captured", records: [{ activeHash: oldHash, incidents: [{ evidence: { reason: "Synthetic test startup failure" } }] }] } }] });
+  expect(queued.prompt).toContain("references/target-diagnostics.json");
+  expect(queued.prompt).toContain("evidence only");
   expect(await readFile(join(queued.cwd, "files", "1-mock.png"), "utf8")).toBe("png bytes");
   expect((await stat(join(queued.cwd, "node_modules", "chrona", "sdk.ts"))).mode & 0o222).toBe(0);
   // Nobody can talk into a build conversation.
@@ -96,11 +112,18 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
 
   let report: { status?: string; report?: unknown } = {};
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_request_group"] });
-    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_propose", "m_modules_reference", "m_modules_request_group"]);
+    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_diagnostics", "m_modules_request_group"] });
+    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_diagnostics", "m_modules_propose", "m_modules_reference", "m_modules_request_group"]);
     await expect(call("chrona_schedule", {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(call("m_modules_build", request)).rejects.toMatchObject({ code: "forbidden" });
+    await writeFile(join(input.cwd, "request.json"), JSON.stringify({ name: "other" }));
+    const diagnostic = await call("m_modules_diagnostics", {}) as { module: string; activeHash: string; incidents: { evidence: { reason: string } }[] }[];
+    expect(diagnostic).toMatchObject([{ module: "mail-sort", activeHash: oldHash, configuredStatus: "paused", incidents: [{ evidence: { reason: "Synthetic test startup failure" } }] }]);
+    await expect(call("m_modules_diagnostics", { module: "other" })).rejects.toMatchObject({ code: "forbidden" });
+    const authority = await f.db.audit.findFirstOrThrow({ where: { kind: "build_request", subjectId: build.id } });
+    await f.db.audit.update({ where: { id: authority.id }, data: { details: { name: [] } } });
     await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
+    await f.db.audit.update({ where: { id: authority.id }, data: { details: { originSessionId: f.session.id, name: request.name } } });
     const reference = await call("m_modules_reference", { target: "modules.diagnostics" });
     expect(reference).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array), admission: { callers: ["web", "mcp"] } });
     expect(input.prompt).toContain("Development references");
@@ -114,11 +137,44 @@ test("a build is its own conversation: restricted tools, it submits and checks, 
   await f.step();
   expect(f.starts.map(input => input.lane)).toEqual(["build"]);
   expect(report).toMatchObject({ status: "pending_review", report: { tests: expect.any(Array) } });
-  const version = await f.db.moduleVersion.findFirstOrThrow();
+  const version = await f.db.moduleVersion.findFirstOrThrow({ where: { source: "build" } });
   expect(version).toMatchObject({ source: "build", status: "pending_review" });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_submission" } })).toMatchObject({ details: { hash: version.hash, sessionId: build.id } });
   // The reply went back to the web conversation that asked.
   expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准`]);
+});
+
+test("multi-module build diagnostics require one declared target and accept its id", async () => {
+  const f = await fixture();
+  const targets = await Promise.all(["first-target", "second-target"].map(name => f.db.module.create({ data: { workspaceId: f.workspaceId, name, status: "paused" } })));
+  const outsider = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "outsider", status: "paused" } });
+  const started = await f.call("m_modules_build", { modules: targets.map(module => module.name), goal: "Repair both modules", intent }) as { sessionId: string };
+  const run = (await f.api.runs.claimNext("build"))!;
+  const call = async (args: unknown) => (await f.service.tools.call(run.token, "m_modules_diagnostics", args) as { result: unknown }).result;
+  await expect(call({})).rejects.toMatchObject({ code: "invalid" });
+  await expect(call({ module: outsider.id })).rejects.toMatchObject({ code: "forbidden" });
+  expect(await call({ module: targets[1]!.id })).toMatchObject([{ module: "second-target", moduleId: targets[1]!.id, configuredStatus: "paused" }]);
+  const receipt = await f.db.audit.findFirstOrThrow({ where: { kind: "build_request", subjectId: started.sessionId } });
+  await f.db.audit.update({ where: { id: receipt.id }, data: { details: { name: "first-target", modules: "malformed" } } });
+  await expect(call({ module: "first-target" })).rejects.toMatchObject({ code: "forbidden" });
+});
+
+test("a candidate with a public tool missing output is rejected before tests run", async () => {
+  const f = await fixture();
+  await mkdir(f.requester.cwd, { recursive: true });
+  await f.writeModule(f.requester.cwd);
+  const manifestPath = join(f.requester.cwd, "mail-sort", "module.json");
+  const candidate = JSON.parse(await readFile(manifestPath, "utf8"));
+  candidate.tools = [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] } }];
+  await writeFile(manifestPath, JSON.stringify(candidate));
+  const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { moduleId: string; hash: string };
+  let executed = 0;
+  const run = f.ports.sandbox!.runModule!;
+  f.ports.sandbox!.runModule = async input => { executed++; return run(input); };
+  await createModules(f.ports, f.workspaceId).buildPending();
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: proposal.moduleId, hash: proposal.hash } } });
+  expect(version).toMatchObject({ status: "rejected", report: { errors: ["Public tool read must declare an output schema"] } });
+  expect(executed).toBe(0);
 });
 
 test("who may manage modules: the Provider in its own directory; the user may check and roll back; ordinary modules never", async () => {
@@ -127,15 +183,15 @@ test("who may manage modules: the Provider in its own directory; the user may ch
   await mkdir(f.requester.cwd, { recursive: true });
   await f.writeModule(f.requester.cwd);
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
-  // The owner sees diagnostics, check, rollback and build controls, never propose, checkout or build.
+  // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // An ordinary module cannot reach them even if it lists them.
   const other = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["modules.propose", "modules.build", "*"] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "o" } });
-  for (const target of ["modules.propose", "modules.build", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
+  for (const target of ["modules.propose", "modules.build", "modules.build-owner", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
     expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
   }
 });
@@ -429,10 +485,12 @@ test("a Provider supplements an old build without losing work; missing or owner 
   expect(await readFile(join(old.cwd, saved.files[0]), "utf8")).toBe("supplemental fixture, not production data");
   f.onRun(async (input, call) => {
     expect(input).toMatchObject({ searchTools: false, hostPaths: [], content: [] });
+    expect(input.extraTools).toContain("m_modules_diagnostics");
+    expect(input.prompt).toContain("m_modules_diagnostics");
     expect(input.prompt).toContain(saved.files[0]);
     expect(input.prompt).toContain("Development references");
     expect(await call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ outputSchema: { type: "array" } });
-    await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
+    await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "not_found" });
   });
   await f.step();
   expect(f.starts).toHaveLength(1);
@@ -477,10 +535,11 @@ test("a build discovers its own contracts and release reference, merges a fixtur
 });
 
 /** v2-15: a build of two modules; the Provider submits both and asks for one approval. */
-async function groupBuild(f: Awaited<ReturnType<typeof fixture>>) {
+async function groupBuild(f: Awaited<ReturnType<typeof fixture>>, includeImpact = false) {
   const write = async (cwd: string, name: string) => {
     await mkdir(join(cwd, name), { recursive: true });
-    await writeFile(join(cwd, name, "module.json"), JSON.stringify({ ...manifest, name }));
+    const tools = includeImpact && name === "mail-sort" ? [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] }, output: { type: "object", properties: { value: { type: "integer" } }, required: ["value"], additionalProperties: false } }] : [];
+    await writeFile(join(cwd, name, "module.json"), JSON.stringify({ ...manifest, name, tools }));
     await writeFile(join(cwd, name, "index.ts"), 'import { on } from "chrona"; on("schedule", async () => ({}));');
     await writeFile(join(cwd, name, "test.ts"), "process.exit(0)");
   };
@@ -510,6 +569,22 @@ async function groupBuild(f: Awaited<ReturnType<typeof fixture>>) {
   const approval = await f.db.approval.findUniqueOrThrow({ where: { id: group.approvalId! } });
   return { approval, hashes };
 }
+
+test("group approval preview lists current callers affected by member output changes", async () => {
+  const f = await fixture();
+  const schema = (type: string) => ({ type: "object", properties: { value: { type } }, required: ["value"], additionalProperties: false });
+  const active = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "active", activeHash: "old", dataSchema: 1 } });
+  const oldManifest = moduleManifestSchema.parse({ ...manifest, name: "mail-sort", tools: [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] }, output: schema("string") }] });
+  await f.db.moduleVersion.create({ data: { moduleId: active.id, hash: "old", manifest: oldManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const oldStore = join(f.dataDir, "platform/store/old"); await mkdir(oldStore, { recursive: true });
+  await writeFile(join(oldStore, "index.ts"), 'import { on } from "chrona"; on("tool", () => ({ result: { value: "ok" } }));');
+  await writeFile(join(oldStore, "test.ts"), "export {};");
+  const caller = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-reader", status: "active", activeHash: "reader", dataSchema: 1 } });
+  await f.db.moduleVersion.create({ data: { moduleId: caller.id, hash: "reader", manifest: moduleManifestSchema.parse({ ...manifest, name: "mail-reader", uses: ["mail-sort.read"] }), source: "user", status: "approved", intent: {}, report: {} } });
+  const { approval } = await groupBuild(f, true);
+  expect(approval.level).toBe("yellow");
+  expect(approval.preview).toContain("mail-reader：mail-sort.read");
+});
 
 test("a build of several modules submits only those and asks for one approval that activates them together", async () => {
   const f = await fixture(), { approval, hashes } = await groupBuild(f);
@@ -542,4 +617,67 @@ test("a new candidate of one member expires the group approval", async () => {
   await f.call("m_modules_propose", { dir: "mail-tag", intent });
   await createModules(f.ports, f.workspaceId).buildPending();
   expect((await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).status).toBe("expired");
+});
+
+
+const ownerRequest = { name: "mail-sort", goal: "Only the authorized change", intent, requestKey: "one-user-authorization",
+  execution: { provider: "pi" as const, model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
+async function ownerFixture() {
+  const f = await fixture();
+  f.ports.provider = { ...f.ports.provider!, name: "pi", supportsRunModel: true };
+  return f;
+}
+test("owner builds pin their own limits and model, deduplicate even after completion, and never resume", async () => {
+  const f = await ownerFixture();
+  await expect(f.call("m_modules_build_owner", ownerRequest)).rejects.toThrow();
+  const before = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings;
+  const started = (await f.api.modules.callTool("m_modules_build_owner", ownerRequest)).result as Awaited<ReturnType<typeof startOwnerBuild>>;
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toEqual(before);
+  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: started.runId, duplicate: true });
+  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, goal: "different" })).rejects.toMatchObject({ code: "conflict" });
+  // Global settings change after admission cannot inflate the single-run authorization.
+  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120, dailyLimit: 20, maxSubmissions: 20 } } } });
+  const claimed = (await f.api.runs.claimNext("build"))!;
+  expect(claimed.model).toBe("openai/gpt-6.1-sol");
+  expect(claimed.deadlineAt.getTime() - claimed.startedAt.getTime()).toBe(600_000);
+  expect((await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: claimed.id } })).details).toMatchObject({ builds: { timeoutMinutes: 10, maxSubmissions: 1 } });
+  await f.api.runs.finish(claimed.id, { outcome: "timed_out", sessionId: null, error: "deadline" });
+  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: claimed.id, status: "timed_out", duplicate: true });
+  await expect(controlBuild(f.ports, f.workspaceId, started.sessionId, "continue")).rejects.toMatchObject({ code: "forbidden" });
+  expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
+  expect(before).not.toHaveProperty("builds.timeoutMinutes", 10);
+});
+test("owner build validation rejects host paths, multiple modules, unsupported providers and excess caps without enqueueing", async () => {
+  const f = await ownerFixture();
+  for (const request of [{ ...ownerRequest, files: ["/home/user/private"] }, { ...ownerRequest, modules: ["web", "calendar"] },
+    { ...ownerRequest, execution: { ...ownerRequest.execution, provider: "other" } },
+    { ...ownerRequest, execution: { ...ownerRequest.execution, timeoutMinutes: 121 } }]) await expect(startOwnerBuild(f.ports, f.workspaceId, request)).rejects.toThrow();
+  f.ports.provider = { ...f.ports.provider!, supportsRunModel: false };
+  await expect(startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
+});
+test("a changed Provider cannot claim a bounded owner build with a fallback", async () => {
+  const f = await ownerFixture();
+  const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
+  f.ports.provider = { ...f.ports.provider!, name: "different" };
+  expect(await f.api.runs.claimNext("build")).toBeNull();
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: started.runId } })).toMatchObject({ status: "failed" });
+  expect(f.starts).toHaveLength(0);
+});
+test("offline recovery executes only one bounded build, uses the normal sandbox checks, and does not activate it", async () => {
+  const f = await ownerFixture();
+  await f.api.runs.finish(f.requester.id, { outcome: "finished", sessionId: null, error: null });
+  f.onRun(async (input, call) => {
+    expect(input).toMatchObject({ lane: "build", model: ownerRequest.execution.model, sessionId: null, searchTools: false });
+    await f.writeModule(input.cwd);
+    const version = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
+    expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "pending_review" });
+    await call("chrona_reply", { text: "ready for approval" });
+  });
+  expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ status: "finished" });
+  expect(f.starts).toHaveLength(1);
+  expect(await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } })).toMatchObject({ activeHash: null });
+  expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(1);
+  expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
+  expect(f.starts).toHaveLength(1);
 });

@@ -6,6 +6,7 @@ import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { notices } from "./test-notices";
+import { providerCancelKey } from "./provider-journal";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date;
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
@@ -39,6 +40,46 @@ test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves w
   expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
   expect(await notices(db, { title: "模块构建已暂停" })).toMatchObject([{ sessionId, body: expect.stringContaining("不会自动重试") }]);
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
+});
+test.each(["failed", "cancelled"] as const)("a build that ends %s tells the conversation that asked for it", async outcome => {
+  const runs = createRuns(ports, workspaceId);
+  const build = await db.session.create({ data: { workspaceId, key: "build:images", source: "build", title: "构建模块 image-generation", originSessionId: sessionId } });
+  await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Build it" });
+  const run = (await runs.claimNext("build"))!;
+  if (outcome === "cancelled") await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: run.id, details: {} } });
+  await runs.finish(run.id, { outcome: "failed", sessionId: "provider-context", error: "Connection error." });
+  const [told] = await db.message.findMany({ where: { sessionId, direction: "out" } });
+  expect(told!.text).toContain("构建「构建模块 image-generation」结束：");
+  expect(told!.text).toContain(outcome === "cancelled" ? "已被取消" : "未完成（Connection error.）");
+  // The build is not retried; the conversation that asked for it runs once more with the result.
+  expect(await db.run.findMany({ where: { status: "queued" }, select: { sessionId: true, lane: true, trigger: true } })).toEqual([{ sessionId, lane: "foreground", trigger: "build" }]);
+});
+test("a finished build wakes its conversation with the result, at most five times before the user speaks again", async () => {
+  const runs = createRuns(ports, workspaceId);
+  const finishBuild = async (n: number) => {
+    const build = await db.session.create({ data: { workspaceId, key: `build:b${n}`, source: "build", title: `构建模块 m${n}`, originSessionId: sessionId } });
+    await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Build it" });
+    const run = (await runs.claimNext("build"))!;
+    const reply = await db.message.create({ data: { workspaceId, sessionId: build.id, channel: "in_app", direction: "out", text: `m${n} 已提交审批`, at: time } });
+    await db.audit.create({ data: { workspaceId, kind: "run_reply", actorKey: "chrona", subjectId: run.id, details: { messageId: reply.id } } });
+    await runs.finish(run.id, { outcome: "finished", sessionId: "provider-context", error: null });
+    // The woken turn runs and ends, as the conversation would.
+    const woken = await db.run.findFirst({ where: { sessionId, status: "queued" } });
+    if (woken) await db.run.update({ where: { id: woken.id }, data: { status: "finished" } });
+    return woken;
+  };
+  await db.message.create({ data: { workspaceId, sessionId, channel: "in_app", direction: "in", text: "依次构建", at: time } });
+  time = new Date(time.getTime() + 1000);
+  const first = await finishBuild(1);
+  expect(first).toMatchObject({ lane: "foreground", trigger: "build", label: "构建结束：构建模块 m1" });
+  expect(first!.prompt).toContain("m1 已提交审批");
+  expect((await db.message.findMany({ where: { sessionId, direction: "out" } })).map(m => m.text)).toEqual(["m1 已提交审批"]);
+  for (let n = 2; n <= 5; n++) expect(await finishBuild(n)).not.toBeNull();
+  expect(await finishBuild(6)).toBeNull();
+  time = new Date(time.getTime() + 1000);
+  await db.message.create({ data: { workspaceId, sessionId, channel: "in_app", direction: "in", text: "继续", at: time } });
+  time = new Date(time.getTime() + 1000);
+  expect(await finishBuild(7)).not.toBeNull();
 });
 test("expired lease aborts before finalization and rotates capability", async () => {
   const runs = createRuns(ports, workspaceId);

@@ -16,12 +16,15 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.overview", args => ({ kind: "app", module: args.module })), stub("modules.settings-set", args => args),
   stub("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
-  stub("modules.tools", () => [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
+  stub("modules.tools", args => args.query === "files"
+    ? [{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true }, { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
+    : [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
+  stub("modules.list", () => [{ id: "m-files", name: "files", status: "active" }, { id: "m-p", name: "planning", status: "paused" }]),
   stub("planning.get", () => ({ plan: 1 })),
   stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
   stub("modules.revise-build", args => ({ status: "build_revised", sessionId: args.session })),
   stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
-  stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })),
+  stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
   stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
   stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
@@ -43,6 +46,10 @@ try {
   assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8");
   assert.match(await script.text(), /\/api\/web/);
   assert.equal((await get("/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
+  // Pages apps register are drawn by pages.js, built from src/pages.tsx.
+  const pagesScript = await get("/pages.js");
+  assert.equal(pagesScript.headers.get("content-type"), "text/javascript; charset=utf-8");
+  assert.match(await pagesScript.text(), /Built from src\/pages\.tsx/);
   // Static pages make no calls.
   assert.equal(calls.length, 0);
 
@@ -75,9 +82,14 @@ try {
   assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [], secrets: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }] });
   // Credentials (v2-16): written through, never echoed; not reachable through the generic call route.
   assert.deepEqual(await (await post("/api/web/secrets/okx_demo", { value: { apiKey: "k" } })).json(), { name: "okx_demo", configured: true });
-  assert.deepEqual(calls.at(-1), ["secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k" }) }]);
+  // The page merges: fields it leaves out keep their saved values.
+  assert.deepEqual(calls.at(-1), ["secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k" }), merge: true }]);
   await post("/api/web/secrets/okx_demo/remove", {});
   assert.deepEqual(calls.at(-1), ["secrets.remove", { name: "okx_demo" }]);
+  await post("/api/web/secrets/okx_demo/remove", { field: "apiKey" });
+  assert.deepEqual(calls.at(-1), ["secrets.remove", { name: "okx_demo", field: "apiKey" }]);
+  await post("/api/web/secrets/okx_demo/authorize", { provider: "google", scopes: "s1 s2", account: "work" });
+  assert.deepEqual(calls.at(-1), ["secrets.authorize", { name: "okx_demo", provider: "google", scopes: "s1 s2", account: "work" }]);
   assert.equal((await post("/api/web/call", { target: "secrets.set", args: {} })).status, 404);
   await post("/api/web/settings", { notifications: { dailyCap: 3 } });
   assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
@@ -106,4 +118,29 @@ try {
   while (!chunk.includes("data: ")) chunk += new TextDecoder().decode((await reader.read()).value);
   assert.match(chunk, /"type":"reply"/); assert.match(chunk, /"text":"hello"/);
   await reader.cancel();
+
+  // Apps register pages (module-dependency-direction §4): owned by the recorded caller, checked against the catalog and the app's own tools.
+  const tool = (id: string, args: Args, caller?: unknown) => module.send({ trigger: { kind: "tool", id, firedAt: new Date().toISOString(), args, caller }, now: new Date().toISOString(), params: {} });
+  const files = { kind: "module", module: "files", moduleId: "m-files", hash: "h" }, planning = { kind: "module", module: "planning", moduleId: "m-p", hash: "h" };
+  const spec = { root: "card", elements: {
+    card: { type: "Card", props: { title: "文档" }, children: ["remove"] },
+    remove: { type: "Button", props: { label: "删除" }, children: [], on: { press: { action: "call", params: { tool: "delete", args: { path: { $state: "/selected" } } }, confirm: { title: "删除", message: "移到回收站" } } } },
+  } };
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "文档", spec, data: { list: { tool: "list", args: { path: "" }, refresh: 30 } } }, files)), /json-render@/);
+  // Only the build's smoke start calls without a recorded caller: nothing is stored.
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, undefined)), /no caller/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, { kind: "owner", via: null })), /只有应用/);
+  const wrong = JSON.stringify(await tool("page-set", { id: "bad", title: "x", spec: { root: "b", elements: { b: { type: "Button", props: { label: 1 }, children: [], on: { press: { action: "call", params: { tool: "get" } } } } } } }, files));
+  assert.match(wrong, /props\.label/); assert.match(wrong, /没有工具 get/);
+  // Another app's page with the same id is its own; the page lists only active apps' pages.
+  await tool("page-set", { id: "main", title: "计划", spec: { root: "t", elements: { t: { type: "Text", props: { text: "x" }, children: [] } } } }, planning);
+  assert.deepEqual(await (await get("/api/web/pages")).json(), [{ module: "files", id: "main", title: "文档" }]);
+  const page = await (await get("/api/web/pages/files/main")).json();
+  assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
+  // A source is not read while a required argument is empty (files.delete needs path; list needs nothing).
+  assert.deepEqual(page.needs, { list: [] }); assert.deepEqual(page.keyed, []);
+  assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
+  assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);
+  assert.equal((await get("/api/web/pages/files/main")).status, 404);
+  assert.match(JSON.stringify(await tool("catalog", {}, files)), /"Button"/);
 } finally { await module.stop(); }

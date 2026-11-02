@@ -12,7 +12,7 @@ export type ContinuityReport = { status: "passed" | "failed" | "skipped"; reason
 export type KeyProbe = { status: "passed" | "repeated" | "skipped"; reason?: string; keys?: string[] };
 /** v2-25: the entry type-checked against the SDK and call contracts before tests. */
 export type TypecheckReport = { status: "passed" | "failed" | "skipped"; reason?: string; errors?: { file: string; line: number; code: number; message: string }[]; total?: number };
-export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; keyProbe?: KeyProbe; migration?: TestReport[number]; errors?: string[]; typecheck?: TypecheckReport;
+export type BuildReport = { tests: TestReport; continuity?: ContinuityReport; keyProbe?: KeyProbe; migration?: TestReport[number]; errors?: string[]; typecheck?: TypecheckReport; outputImpacts?: { caller: string; targets: string[] }[]; dependentChecks?: { caller: string; status: "passed" | "failed" | "skipped"; reason?: string; errors?: TypecheckReport["errors"] }[];
   /** v2-6: what Chrona installed (lockfile libraries; system programs → store or host paths). */
   dependencies?: { npm: boolean; python: boolean; packages: Record<string, string[]> } };
 export type Proposal = { moduleId: string | null; hash: string; status: "building" | "testing" | "rejected" | "pending_review" | "approved"; approvalId?: string; report: BuildReport };

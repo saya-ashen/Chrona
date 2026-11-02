@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
-import { callsSettled, enqueueCall, kernelOrigin, runDueCalls } from "./module-calls";
+import { callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool } from "./module-tools";
+import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
 
@@ -42,6 +43,50 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
 }
 const output = (reply: unknown) => (reply as { result: { result: unknown } }).result.result;
 
+test("shipped files capability examples match its input and output contracts", async () => {
+  const raw = JSON.parse(await readFile(new URL("./builtin/files/module.json", import.meta.url), "utf8"));
+  const manifest = moduleManifestSchema.parse(raw);
+  expect(manifest.tools.map(moduleToolExampleError)).toEqual(manifest.tools.map(() => null));
+});
+
+test("routed argument validation rejects non-JSON numbers and preserves open nested object keys", () => {
+  const schema = { name: "input", description: "input", visibility: ["modules"], idempotent: false, parameters: {
+    type: "object" as const, properties: { value: { type: "number" as const }, metadata: { type: "object" as const, properties: {}, required: [], additionalProperties: true } }, required: ["value", "metadata"],
+  } } as Parameters<typeof validateToolArgs>[0];
+  for (const value of [null, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    expect(() => validateToolArgs(schema, { value, metadata: { arbitrary_key: [1, null] } })).toThrow();
+  }
+  expect(validateToolArgs(schema, { value: 1, metadata: { arbitrary_key: [1, null] } })).toEqual({ value: 1, metadata: { arbitrary_key: [1, null] } });
+});
+
+test("declared examples are checked against input and output contracts without invoking a module", () => {
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "search", description: "Search", visibility: ["owner"],
+    parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["open", "closed"] } }, required: ["state"] } } }, required: ["filters"] },
+    output: { type: "object", properties: { count: { type: "integer" } }, required: ["count"], additionalProperties: false },
+    examples: [{ args: { filters: [{ state: "open" }] }, result: { count: 1 } }] }] });
+  const tool = manifest.tools[0]!;
+  expect(moduleToolExampleError(tool)).toBeNull();
+  expect(moduleToolExampleError({ ...tool, examples: [{ args: { filters: [{ state: "invalid" }] } }] })).toContain("arguments are invalid");
+  expect(moduleToolExampleError({ ...tool, examples: [{ args: { filters: [{ state: "open" }] }, result: { count: "one" } }] })).toContain("result does not match output schema");
+});
+
+test("structured native arguments survive sync and async routed delivery", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async event => ({ result: (event.trigger as { args: unknown }).args }) });
+  const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(row.manifest);
+  manifest.tools[0]!.parameters = {
+    type: "object", properties: { filters: { type: "array", items: {
+      type: "object", properties: { states: { type: "array", items: { type: "string", enum: ["open", "closed"] } } }, required: ["states"]
+    } } }, required: ["filters"]
+  };
+  await f.db.moduleVersion.update({ where: { id: row.id }, data: { manifest } });
+  const args = { filters: [{ states: ["open", "closed"] }] }, origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" }, chain: [], path: [] };
+  expect((await callSync(f.ports, origin, "beta.echo", args)).output).toEqual(args);
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: args }, { key: "native-args", reply: false });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", output: args });
+});
+
 test("A calls B through Chrona: B sees the real caller and the call is recorded", async () => {
   const f = await fixture({
     alpha: async (_event, call) => ({ result: await call("call", { target: "beta.echo", args: { text: "hi" } } as never) }),
@@ -50,6 +95,81 @@ test("A calls B through Chrona: B sees the real caller and the call is recorded"
   expect(output(await f.fire())).toMatchObject({ result: { output: { echo: "hi", caller: { kind: "module", module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } } } });
   expect(await f.db.moduleInvocation.findFirstOrThrow()).toMatchObject({ caller: `module:${f.alpha.id}`, callerModuleId: f.alpha.id, target: "beta", tool: "echo", mode: "sync", status: "succeeded", chain: ["alpha"] });
   expect(await f.db.moduleCall.findFirstOrThrow({ where: { moduleId: f.alpha.id } })).toMatchObject({ method: "call", status: "executed" });
+});
+
+test("declared app outputs fail synchronously with callee diagnostics and no lifecycle incident", async () => {
+  const f = await fixture({ alpha: async (_event, call) => ({ result: await call("call", { target: "beta.echo", args: {} } as never) }), beta: async () => ({ result: { wrong: "secret payload" } }) });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.output = { type: "object", properties: { echo: { type: "string" } }, required: ["echo"], additionalProperties: false };
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
+  const result = output(await f.fire());
+  expect(result).toMatchObject({ error: { code: "failed", message: expect.stringContaining("beta.echo: output contract mismatch") } });
+  const call = await f.db.moduleInvocation.findFirstOrThrow({ where: { target: "beta", tool: "echo" } });
+  expect(call.status).toBe("failed");
+  expect(call.error).not.toContain("secret payload");
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_output_mismatch", subjectId: f.beta.id } })).toMatchObject({ details: { hash: "beta-v1", tool: "echo", callId: call.id, issues: ["echo (invalid_type)", "$ (unrecognized_keys)"] } });
+  expect(await f.db.audit.count({ where: { kind: "module_runtime_incident", subjectId: f.beta.id } })).toBe(0);
+});
+
+test("a schema mismatch does not mark a prior callee failure recovered or restart transport", async () => {
+  let wrong = false;
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({ result: wrong ? { wrong: "private" } : { echo: "ok" } }) });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.output = { type: "object", properties: { echo: { type: "string" } }, required: ["echo"], additionalProperties: false };
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
+  expect((await callSync(f.ports, kernelOrigin(f.workspace.id), "beta.echo", {})).output).toEqual({ echo: "ok" });
+  await recordModuleFailure(f.db, { workspaceId: f.workspace.id, moduleId: f.beta.id, hash: "beta-v1", now: f.ports.now(), retry: false,
+    evidence: { phase: "event", reason: "synthetic prior failure", runId: "prior", triggerId: "tool:echo", delivery: "handler", pid: null, exitCode: 1, signal: null, stderr: "", virtualMemoryMb: null } });
+  const before = await moduleIncidents(f.db, f.workspace.id, f.beta.id);
+  wrong = true;
+  await expect(callSync(f.ports, kernelOrigin(f.workspace.id), "beta.echo", {})).rejects.toMatchObject({ code: "failed" });
+  expect(await moduleIncidents(f.db, f.workspace.id, f.beta.id)).toEqual(before);
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(2);
+});
+
+test("async output mismatches fail once, persist a callee diagnostic, and do not become transport-unknown", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({ result: { wrong: "private-value" } }) });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.output = { type: "object", properties: { echo: { type: "string" } }, required: ["echo"], additionalProperties: false };
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "bad-output", reply: false });
+  await runDueCalls(f.ports, f.workspace.id);
+  const call = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } });
+  expect(call).toMatchObject({ status: "failed", attempts: 1, error: expect.stringContaining("output contract mismatch") });
+  expect(JSON.stringify(call)).not.toContain("private-value");
+  expect(call.output).toBeNull();
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_output_mismatch", subjectId: f.beta.id } })).toMatchObject({ details: { hash: "beta-v1", tool: "echo", callId: call.id } });
+  expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: f.beta.id } })).toMatchObject({ exitCode: 1, error: expect.stringContaining("output contract mismatch"), output: null });
+});
+
+test("output mismatch audit persistence failure stays a call failure without transport retry", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({ result: { wrong: "private-value" } }) });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.output = { type: "object", properties: { echo: { type: "string" } }, required: ["echo"], additionalProperties: false };
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
+  const db = f.db as unknown as { $transaction: (callback: (tx: any) => unknown) => unknown };
+  const transaction = db.$transaction.bind(f.db);
+  db.$transaction = callback => transaction((tx: any) => callback(new Proxy(tx, {
+    get(target, property, receiver) {
+      if (property !== "audit") return Reflect.get(target, property, receiver);
+      return new Proxy(target.audit, { get(audit, key, auditReceiver) {
+        if (key !== "create") return Reflect.get(audit, key, auditReceiver);
+        return (args: { data?: { kind?: string } }) => args.data?.kind === "module_output_mismatch"
+          ? Promise.reject(new Error("synthetic diagnostics storage failure")) : audit.create(args);
+      } });
+    },
+  })));
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "bad-output-audit-failure", reply: false });
+  await runDueCalls(f.ports, f.workspace.id);
+  const call = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } });
+  expect(call).toMatchObject({ status: "failed", attempts: 1, error: expect.stringContaining("output contract mismatch") });
+  expect(call.output).toBeNull();
+  expect(await f.db.audit.count({ where: { kind: "module_output_mismatch", subjectId: f.beta.id } })).toBe(0);
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(1);
 });
 
 test("undeclared targets, hidden tools and caller-restricted tools are refused; the owner API cannot reach module-only tools", async () => {

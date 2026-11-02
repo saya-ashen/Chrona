@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { hostPathsFor } from "./grants";
 import { suggestHabits, weeklyHabits, type Decision } from "./approval-habits";
 import { createApprovals } from "./approvals";
 import { decidePolicy } from "@chrona/domain/steward/policy";
@@ -19,6 +20,7 @@ const times = (count: number, part: Partial<Decision>) => Array.from({ length: c
 
 test.each([
   ["five approved Provider requests of one kind", times(5, {}), ["stop_asking"]],
+  ["host paths are approved per directory, never as a kind", times(5, { action: "access_host_path" }), []],
   ["four are not enough", times(4, {}), []],
   ["one denial stops the suggestion", [...times(5, {}), row({ status: "denied" })], []],
   ["older than a week does not count", times(5, { createdAt: ago(24 * 8), resolvedAt: ago(24 * 8, 60) }), []],
@@ -50,5 +52,20 @@ test("the weekly job runs once a week, tells the user in the digest, and a stop-
   expect(await db.grant.count()).toBe(1);
   // A tampered suggestion cannot pre-approve a red kind.
   const forged = await approvals.create({ action: "change_policy", title: "x", detail: "", preview: "", payload: { kind: "grant_suggestion", action: "purchase" } });
+  await expect(approvals.resolve(forged.id, { decision: "approve", scope: "once" }, "web")).rejects.toMatchObject({ code: "invalid" });
+});
+
+test("a host directory approved always (from chat) stays mounted; another directory still asks, and none can be pre-approved as a kind", async () => {
+  const db = testDb(); cleanups.push(() => db.$disconnect());
+  const workspace = await db.workspace.create({ data: { name: "paths" } });
+  const approvals = createApprovals({ db, workspaceId: workspace.id, now: () => now });
+  const ask = (path: string) => approvals.create({ action: "access_host_path", title: `访问 ${path}`, detail: "", preview: "", payload: { kind: "host_path", path } });
+  const kept = await ask("/work/career-ops"), other = await ask("/work/private");
+  expect(kept.level).toBe("yellow");
+  await approvals.resolve(kept.id, { decision: "approve", scope: "always" }, "qq");
+  await approvals.resolve(other.id, { decision: "approve", scope: "once" }, "qq");
+  expect(await hostPathsFor(db, workspace.id, [], now)).toEqual(["/work/career-ops", "/work/private"]);
+  expect(await hostPathsFor(db, workspace.id, [], now)).toEqual(["/work/career-ops"]);
+  const forged = await approvals.create({ action: "change_policy", title: "x", detail: "", preview: "", payload: { kind: "grant_suggestion", action: "access_host_path" } });
   await expect(approvals.resolve(forged.id, { decision: "approve", scope: "once" }, "web")).rejects.toMatchObject({ code: "invalid" });
 });

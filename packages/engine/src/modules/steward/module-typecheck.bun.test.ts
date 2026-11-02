@@ -61,6 +61,13 @@ on("schedule", async event => {
     versions: { create: { hash: "e1", status: "approved", source: "builtin", manifest: moduleManifestSchema.parse({ name: "events", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [],
       tools: [{ name: "emit", description: "Emit", parameters: { type: "object", properties: { event: { type: "string" } }, required: ["event"] }, visibility: ["modules"] }] }), intent: { changes: ["t"] }, report: {} } } } });
   expect(await callsDeclaration(f.ports, f.workspaceId)).toContain('"events.emit": { args: { "event": string }; output: unknown }');
+  await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "typed-app", status: "active", activeHash: "t1",
+    versions: { create: { hash: "t1", status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: "typed-app", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [],
+      tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false } },
+        { name: "legacy", description: "Legacy", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"] }] }), intent: {}, report: {} } } } });
+  const appCalls = await callsDeclaration(f.ports, f.workspaceId);
+  expect(appCalls).toContain('"typed-app.read": { args: {  }; output: { "value": string } }');
+  expect(appCalls).toContain('"typed-app.legacy": { args: {  }; output: unknown }');
   expect(await typecheckBuild(context, f.dir, good)).toEqual({ status: "passed" });
 
   const bad = await moduleWith(f.dir, `import { chrona } from "chrona";
@@ -89,4 +96,19 @@ test("build helpers give the build its calls.d.ts and the same check as chrona/t
   expect(await readFile(join(f.dir, "node_modules/chrona/calls.d.ts"), "utf8")).toContain('"x.y"');
   expect((await stat(join(f.dir, "node_modules/chrona/calls.d.ts"))).mode & 0o777).toBe(0o444);
   expect(await readFile(join(f.dir, "chrona/typecheck.sh"), "utf8")).toContain(join(f.ports.moduleTypecheck!, "check.ts"));
+});
+
+test("affected caller type checks use candidate output contracts without modifying caller source", async () => {
+  const f = await fixture(), context = moduleContext(f.ports, f.workspaceId);
+  const oldOutput = { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false };
+  const candidateOutput = { type: "object", properties: { value: { type: "integer" } }, required: ["value"], additionalProperties: false };
+  await f.ports.db.module.create({ data: { workspaceId: f.workspaceId, name: "target", status: "active", activeHash: "target-old",
+    versions: { create: { hash: "target-old", status: "approved", source: "user", manifest: moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [],
+      tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: oldOutput }] }), intent: {}, report: {} } } } });
+  const caller = await moduleWith(f.dir, `import { chrona } from "chrona";\nconst result = await chrona.call("target.read");\nconst value: string = result.value;\nvoid value;\n`);
+  expect(await typecheckBuild(context, f.dir, caller)).toMatchObject({ status: "passed" });
+  const candidate = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [],
+    tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: {}, required: [] }, visibility: ["modules"], output: candidateOutput }] });
+  expect(await typecheckBuild(context, f.dir, caller, { moduleName: "target", manifest: candidate })).toMatchObject({ status: "failed" });
+  expect(await readFile(join(f.dir, "index.ts"), "utf8")).toContain("const value: string");
 });

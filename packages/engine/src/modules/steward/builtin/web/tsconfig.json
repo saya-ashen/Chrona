@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "es2022", "lib": ["es2022", "dom"], "module": "esnext", "moduleResolution": "bundler", "jsx": "react-jsx", "strict": true, "noEmit": true, "skipLibCheck": true, "types": [] },
+  "include": ["src", "catalog.ts"]
+}

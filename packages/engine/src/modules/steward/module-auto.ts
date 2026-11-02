@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
+import type { StewardPorts } from "./ports";
 import { moduleManifestSchema, isEntryModule } from "@chrona/contracts/steward";
 import { effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
@@ -8,6 +9,7 @@ import { activateApprovedIn } from "./module-activation";
 import { dataEmpty } from "./module-data";
 import { intentSchema, requireModule, type BuildReport, type ModuleContext, type ModuleVersion } from "./module-context";
 import { notifyUser } from "./notify-user";
+import { moduleOutputImpacts } from "./module-output-impact";
 
 type Manifest = ReturnType<typeof moduleManifestSchema.parse>;
 type ReviewCard = { moduleId: string; action: "activate_module"; title: string; detail: string; payload: { kind: "activate_module"; moduleId: string; hash: string }; preview: string };
@@ -43,48 +45,63 @@ async function capabilitiesUnchanged(context: ModuleContext, { module, active, v
 }
 async function eligible(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport) {
   const module = await requireModule(context, tx, version.moduleId), manifest = moduleManifestSchema.parse(version.manifest);
-  // Without isolation any code change can do anything the Chrona user can: every version needs the user.
+  // Trusted-local accepts the owner's OS-user trust boundary; required isolation fails closed when unavailable.
   // A credential (v2-16) is the user's to hand over: such versions always ask.
-  if (!context.ports.sandbox?.isolated || isEntryModule(manifest) || manifest.secrets.length) return false;
+  if ((context.ports.sandbox?.executionMode !== "trusted-local" && !context.ports.sandbox?.isolated) || isEntryModule(manifest) || manifest.secrets.length) return false;
   if (!module.activeHash || module.status === "migrating") return false;
   const active = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
   const current = moduleManifestSchema.parse(active.manifest);
+  if ((await moduleOutputImpacts(tx as unknown as StewardPorts["db"], context.workspaceId, module.id, manifest)).length) return false;
   if (!await capabilitiesUnchanged(context, { module, active, version, current, manifest })) return false;
   return checksPassed(report);
 }
 /**
- * v2-17: a green version (nothing new, undoable) activates by default. The user's standing grant for the module is used
- * when there is one; a rule that says ask (or never) for this module still asks. Otherwise Chrona records a one-time grant.
+ * Legacy isolated updates may mint a one-time grant as before. Trusted-local updates require a current standing module grant;
+ * execution-mode selection alone never authorizes automatic updates.
  */
-async function autoGrant(tx: Prisma.TransactionClient, { workspaceId, now }: ModuleContext, moduleId: string) {
-  const decision = await effectivePolicyIn(tx, workspaceId, "activate_module", { moduleId }, now());
+async function standingAutoGrant(tx: Prisma.TransactionClient, context: ModuleContext, moduleId: string, now: Date) {
+  const decision = await effectivePolicyIn(tx, context.workspaceId, "activate_module", { moduleId }, now);
+  if (!decision.grantId || !["auto", "notify_after", "preapproved"].includes(decision.mode)) return null;
+  const grant = await tx.grant.findUniqueOrThrow({ where: { id: decision.grantId } });
+  const scope = grant.scope as { kind?: string; moduleId?: string };
+  return !grant.once && !grant.revokedAt && (!grant.expiresAt || grant.expiresAt > now) && ["auto", "notify_after", "preapproved"].includes(grant.mode) && scope.kind === "module" && scope.moduleId === moduleId ? grant.id : null;
+}
+async function autoGrant(tx: Prisma.TransactionClient, context: ModuleContext, moduleId: string) {
+  const now = context.now();
+  const standing = await standingAutoGrant(tx, context, moduleId, now);
+  if (standing) return standing;
+  if (context.ports.sandbox?.executionMode === "trusted-local") return null;
+  const decision = await effectivePolicyIn(tx, context.workspaceId, "activate_module", { moduleId }, now);
   if (decision.grantId && !["auto", "notify_after", "preapproved"].includes(decision.mode)) return null;
-  const grant = decision.grantId ? await tx.grant.findUniqueOrThrow({ where: { id: decision.grantId } }) : null;
-  const scope = grant?.scope as { kind?: string; moduleId?: string } | undefined;
-  if (grant && !grant.once && scope?.kind === "module" && scope.moduleId === moduleId) return grant.id;
-  const created = await tx.grant.create({ data: { workspaceId, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId }, once: true, createdAt: now() } });
-  await audit(tx, { workspaceId, actor: "chrona", kind: "grant_created", subjectId: created.id, details: { reason: "green module update", moduleId } });
+  const created = await tx.grant.create({ data: { workspaceId: context.workspaceId, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId }, once: true, createdAt: now } });
+  await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "grant_created", subjectId: created.id, details: { reason: "green module update", moduleId } });
   return created.id;
 }
-async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, version: ModuleVersion, report: BuildReport, card: ReviewCard & { approvalId: string }) {
+async function autoActivateIn(context: ModuleContext, tx: Prisma.TransactionClient, input: { version: ModuleVersion; report: BuildReport; card: ReviewCard & { approvalId: string }; reviewed: "passed" | "skipped" }) {
+  const { version, report, card, reviewed } = input;
   const { approvalId } = card;
   if (!await eligible(context, tx, version, report)) return null;
   const { workspaceId, now } = context;
   const grantId = await autoGrant(tx, context, card.moduleId);
   if (!grantId) return null;
   // The open card (reviewed and passed, v2-17 §3) is approved in place.
-  const approved = await tx.approval.updateMany({ where: { id: approvalId, workspaceId, status: "open", level: "green" }, data: { status: "approved", grantId, resolvedAt: now() } });
+  const row = await tx.approval.findFirst({ where: { id: approvalId, workspaceId, status: "open", level: "green" } });
+  if (!row) return null;
+  const brief = row.brief as Record<string, unknown>;
+  const approved = await tx.approval.updateMany({ where: { id: approvalId, workspaceId, status: "open", level: "green" }, data: { status: "approved", grantId, resolvedAt: now(), brief: { ...brief, reviewed, ...(reviewed === "skipped" ? { reason: "已选择仅检查模式；确定性更新检查通过且存在当前有效的模块长期授权，因此跳过 AI 复核。" } : {}) } } });
   if (!approved.count) return null;
   const approval = await tx.approval.findUniqueOrThrow({ where: { id: approvalId } });
   const migration = await activateApprovedIn(context, tx, { workspaceId, approvalId: approval.id, grantId, payload: approval.payload });
   if (migration) throw new Error("Automatic module activation cannot migrate data");
+  if (reviewed === "skipped") await audit(tx, { workspaceId, actor: "chrona", kind: "approval_review", subjectId: approvalId, details: { outcome: "skipped", reason: "checks-only policy; eligible trusted-local update with standing module grant" } });
   await audit(tx, { workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: version.moduleId, details: { versionId: version.id, hash: version.hash, grantId } });
   return approval;
 }
-export async function tryAutoActivate(context: ModuleContext, version: ModuleVersion, report: BuildReport, card: ReviewCard, approvalId: string) {
+export async function tryAutoActivate(context: ModuleContext, input: { version: ModuleVersion; report: BuildReport; card: ReviewCard; approvalId: string; reviewed?: "passed" | "skipped" }) {
+  const { version, report, card, approvalId, reviewed = "passed" } = input;
   let approval;
   // All activation writes roll back together on failure; the card then stays open for the user.
-  try { approval = await context.db.$transaction(tx => autoActivateIn(context, tx, version, report, { ...card, approvalId })); }
+  try { approval = await context.db.$transaction(tx => autoActivateIn(context, tx, { version, report, card: { ...card, approvalId }, reviewed })); }
   catch { return null; }
   if (!approval) return null;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);

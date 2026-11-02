@@ -72,7 +72,7 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   await moduleSupervisor(steward.ports).start();
   // Every built-in, including qq (unconfigured here), builds, passes its author tests and activates.
   const unfinished = await db.moduleVersion.findMany({ where: { module: { builtin: true, activeHash: null } }, select: { manifest: true, status: true, report: true } });
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["events", "files", "mcp", "notify", "qq", "remind", "web"].map(name => [name, "active", true]));
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["events", "files", "mcp", "mind", "notify", "qq", "remind", "web"].map(name => [name, "active", true]));
   const app = await createServerApp({ steward });
   // The web module serves the page at / (no key needed), while the API it calls stays protected.
   const page = await app.request("/apps/a1?path=README.md");

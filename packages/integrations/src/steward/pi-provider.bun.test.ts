@@ -15,7 +15,7 @@ async function fixture(mode = "normal") {
   await writeFile(command, `#!${process.execPath}
 import { appendFileSync, writeFileSync } from 'node:fs';
 if (process.argv.includes('--version')) {console.log('0.85.0');process.exit(0);}
-writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
+writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),profile:process.env.PI_CODING_AGENT_DIR,hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
 const mode=${JSON.stringify(mode)};
 let streaming=false, queue=0, cycle=0, retried=false;
 const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
@@ -47,9 +47,10 @@ process.stdin.on('data',chunk=>{
      emit({type:'agent_end'});emit({type:'agent_settled'});
     },60);
    }
-   reply(c,{sessionId:'retained-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
+   reply(c,{sessionId:'retained-session',model:{provider:'openai',id:mode==='wrong-model'?'other':'gpt-6.1-sol'},isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
   }
   if(c.type==='get_commands') reply(c,{commands:[]});
+  if(c.type==='set_auto_retry'||c.type==='set_auto_compaction') reply(c);
   if(c.type==='clear_queue') {queue=0;reply(c,{steering:[],followUp:[]});}
   if(c.type==='prompt') {
    reply(c);
@@ -79,6 +80,39 @@ async function until(check: () => Promise<boolean>) {
   throw new Error("fixture did not reach expected state");
 }
 describe("Pi RPC provider", () => {
+  test("an exact build model overrides defaults and is verified before prompting; retries are disabled", async () => {
+    const f = await fixture();
+    await writeFile(join(f.agentDir, "settings.json"), '{"retry":{"enabled":true}}');
+    const provider = createPiProvider({ ...f.options, model: "other/default" });
+    expect((await provider.start({ ...f.input, model: "openai/gpt-6.1-sol", sessionId: null }).done).outcome).toBe("finished");
+    const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+    const args = launch.args;
+    expect(args[args.indexOf("--model") + 1]).toBe("openai/gpt-6.1-sol");
+    expect(launch.profile.startsWith(join(f.agentDir, "build-"))).toBe(true);
+    expect(existsSync(launch.profile)).toBe(false);
+    expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe('{"retry":{"enabled":true}}');
+    const commands = await f.commands();
+    expect(commands.find(c => c.type === "set_auto_retry")).toMatchObject({ enabled: false });
+    expect(commands.findIndex(c => c.type === "set_auto_retry")).toBeLessThan(commands.findIndex(c => c.type === "prompt"));
+  });
+  test("a model mismatch fails closed without sending any prompt or falling back", async () => {
+    const f = await fixture("wrong-model");
+    expect((await f.provider.start({ ...f.input, model: "openai/gpt-6.1-sol" }).done).outcome).toBe("failed");
+    expect((await f.commands()).some(c => c.type === "prompt")).toBe(false);
+  });
+  test("trusted-local ignores configured bubblewrap; required-isolation fails when it cannot isolate", async () => {
+    const f = await fixture();
+    const bwrap = join(f.cwd, "bwrap");
+    await writeFile(bwrap, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo bubblewrap; exit 0; fi\nexit 1\n`, { mode: 0o755 });
+    const local = createPiProvider({ ...f.options, bwrap, executionMode: "trusted-local" });
+    expect((await local.start(f.input).done).outcome).toBe("finished");
+    expect(JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args).not.toContain("--tmpfs");
+    await writeFile(join(f.cwd, "commands.jsonl"), "");
+    const required = createPiProvider({ ...f.options, bwrap, executionMode: "required-isolation" });
+    expect((await required.start(f.input).done).outcome).toBe("unavailable");
+    expect(await readFile(join(f.cwd, "commands.jsonl"), "utf8")).not.toContain('"type":"prompt"');
+    expect((await required.health()).available).toBe(false);
+  });
   test("session, tools, images, cwd and filtered environment", async () => {
     const f = await fixture();
     const before = process.env.CHRONA_DATABASE_SECRET;

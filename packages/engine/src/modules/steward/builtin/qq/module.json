@@ -8,10 +8,12 @@
   "uses": ["chat.send", "chat.attach", "chat.new-session", "chat.file", "chat.delivered", "chat.record", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],
   "tools": [
     { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"], "callers": ["notify"],
+      "output": { "anyOf": [{ "type": "object", "properties": { "outcome": { "const": "accepted" }, "receiptRef": { "type": ["string", "null"] } }, "required": ["outcome", "receiptRef"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "rejected" }, "retryable": { "type": "boolean" }, "error": { "type": "string" } }, "required": ["outcome", "retryable", "error"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "uncertain" }, "error": { "type": "string" } }, "required": ["outcome", "error"], "additionalProperties": false }] },
       "parameters": { "type": "object", "required": ["key", "title", "body"], "properties": {
         "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "link": { "type": "string" },
         "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } },
     { "name": "reply", "description": "A reply in the qq:dm conversation: a passive reply to the message it answers while that window lasts, otherwise through notify.send.", "visibility": ["modules"], "callers": ["chat"],
+      "output": { "type": "object", "properties": { "delivered": { "type": "string" } }, "required": ["delivered"], "additionalProperties": false },
       "parameters": { "type": "object", "required": ["session", "message", "text", "workspace"], "properties": {
         "session": { "type": "string" }, "message": { "type": "string" }, "text": { "type": "string" }, "workspace": { "type": "string" },
         "attachments": { "type": "string", "description": "JSON array of the reply's files, with appId" }, "in-reply-to": { "type": "string" } } } }

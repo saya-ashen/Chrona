@@ -14,7 +14,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
 // A stand-in for the qq module: same interface (qq.deliver for notify, notify.channel readiness), no network, records what it was asked to send.
 const fakeQq = {
   "module.json": JSON.stringify({ name: "qq", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["notify.channel"], tests: ["test.ts"],
-    tools: [{ name: "deliver", description: "Fake QQ delivery", visibility: ["modules"], callers: ["notify"], parameters: { type: "object", required: ["key", "title", "body"], properties: {
+    tools: [{ name: "deliver", description: "Fake QQ delivery", visibility: ["modules"], callers: ["notify"], output: { type: "object", properties: { outcome: { const: "accepted" }, receiptRef: { type: "string" } }, required: ["outcome", "receiptRef"], additionalProperties: false }, parameters: { type: "object", required: ["key", "title", "body"], properties: {
       key: { type: "string" }, title: { type: "string" }, body: { type: "string" }, link: { type: "string" }, recipient: { type: "string" }, approval: { type: "string" }, scoped: { type: "boolean" } } } }] }),
   "index.ts": `// @ts-expect-error SDK at run time
 import { chrona, on } from "chrona";

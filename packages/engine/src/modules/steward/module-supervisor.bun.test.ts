@@ -9,6 +9,8 @@ import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { notices } from "./test-notices";
 import { moduleIncidents } from "./module-diagnostics";
+import { moduleContext } from "./module-context";
+import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -33,6 +35,82 @@ async function fixture({ keepAlive = false, effects = ["notify_user", "wake_prov
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   return { db, module, manifest, ports, supervisor, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
 }
+test.each([false, true] as const)("start failure rolls back once before delivery; rollback target failure does not bounce (oldFails=%s)", async oldFails => {
+  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
+  const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] });
+  for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: { changes: [hash] }, report: { tests: [], continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
+  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId: module.id }, once: false } });
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null, moduleAutoRollback: true,
+    sandbox: { available: true, isolated: true, startModule: (() => {
+      const peer = testModuleProcess(async () => ({}));
+      return input => input.codeDir.endsWith("/v2") || oldFails ? (() => { throw new Error("synthetic start failure"); })() : peer.startModule(input);
+    })() } };
+  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2", generationId: "g-v2" }));
+  const supervisor = createModuleSupervisor(ports);
+  cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  await supervisor.reconcile();
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toMatchObject({ activeHash: "v1", status: "active" });
+  expect((await moduleEvolutionOutcomes(db, workspace.id, module.id)).find(item => item.activationId === outcome.activationId)).toMatchObject({ status: "rolled-back", rollback: { attempted: true, result: "succeeded" } });
+  const current = (await moduleEvolutionOutcomes(db, workspace.id, module.id))[0]!;
+  expect(current).toMatchObject({ candidateHash: "v1", rollback: oldFails ? { result: "blocked", reason: expect.stringContaining("恢复目标不会自动继续回滚") } : { result: "blocked" } });
+  expect(await db.moduleRun.count()).toBe(oldFails ? 2 : 1);
+});
+
+test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger automatic code rollback", async stage => {
+  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-post-delivery-");
+  const workspace = await db.workspace.create({ data: { name: "post-delivery" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [] });
+  for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
+  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId: module.id } } });
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null, moduleAutoRollback: true,
+    sandbox: { available: true, isolated: true, startModule: (() => {
+      const peer = testModuleProcess(async () => {
+        if (stage === "handler") throw new Error("handler failed");
+        peer.processes[0]!.kill(); return {};
+      });
+      return peer.startModule;
+    })() } };
+  const outcome = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: "v1", hash: "v2", generationId: "g-v2" }));
+  const supervisor = createModuleSupervisor(ports);
+  cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  await expect(supervisor.deliver(module.id, "v2", event)).rejects.toMatchObject({ stage });
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toMatchObject({ activeHash: "v2", status: "active" });
+  expect((await moduleEvolutionOutcomes(db, workspace.id, module.id)).find(item => item.activationId === outcome.activationId)).toMatchObject({ status: "failed", rollback: { attempted: false, result: "not-attempted" } });
+});
+
+test("failed recovery diagnostics persistence does not convert a successful delivery into transport failure", async () => {
+  let finish!: () => void; const gate = new Promise<void>(resolve => { finish = resolve; });
+  const f = await fixture({ handler: async () => { await gate; return {}; } });
+  const context = moduleContext(f.ports, f.module.workspaceId);
+  await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1", generationId: "audit-failure-test" }));
+  const delivery = f.deliver(); await until(() => f.processes.length === 1);
+  const rawDb = f.db as unknown as { $transaction: (...args: unknown[]) => unknown };
+  const original = rawDb.$transaction;
+  rawDb.$transaction = () => Promise.reject(new Error("synthetic diagnostic storage failure"));
+  try {
+    finish();
+    await expect(delivery).resolves.toBeTruthy();
+    expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ exitCode: 0 });
+  } finally { rawDb.$transaction = original; }
+});
+
+test("a successful stale callback after same-hash reactivation cannot verify the newer epoch", async () => {
+  let finish!: () => void; const gate = new Promise<void>(resolve => { finish = resolve; });
+  const f = await fixture({ handler: async () => { await gate; return {}; } });
+  const context = moduleContext(f.ports, f.module.workspaceId);
+  const first = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: null, hash: "v1", generationId: "epoch-1" }));
+  await updateModuleEvolution(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, activationId: first.activationId, hash: "v1", status: "failed", now: f.ports.now() });
+  const delivery = f.deliver(); await until(() => f.processes.length === 1);
+  const second = await f.db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "epoch-2" }));
+  finish(); await delivery;
+  const outcomes = await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id);
+  expect(outcomes.find(item => item.activationId === first.activationId)).toMatchObject({ status: "failed", observedCapabilities: [] });
+  expect(outcomes.find(item => item.activationId === second.activationId)).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
+});
+
 test("lazy start, private short socket directory, idle stop and restart", async () => {
   const f = await fixture();
   await f.supervisor.start(); expect(f.processes).toHaveLength(0);
@@ -251,4 +329,31 @@ test("normal lazy idle stop and administrative stop do not produce faults", asyn
   await until(() => f.processes[0]!.socket.destroyed);
   await f.supervisor.stop();
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
+});
+test("activated reaches opted-in modules once per version and again when a module they use changes version", async () => {
+  const db = testDb(), dataDir = await mkdtemp("/tmp/cms-activated-");
+  const workspace = await db.workspace.create({ data: { name: "activated" } });
+  const create = async (name: string, hash: string, extra: Record<string, unknown>) => {
+    const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "go", description: "go", parameters: { type: "object", properties: {}, required: [] } }], ...extra }), source: "user", intent: {}, report: {}, status: "approved" } });
+    return module;
+  };
+  const web = await create("web", "w1", {}), app = await create("app", "a1", { activated: true, uses: ["web.page-set"] }), quiet = await create("quiet", "q1", { uses: ["web.page-set"] });
+  const seen: string[] = [];
+  const peer = testModuleProcess(async (event, _call, input) => { if (event.trigger.kind === "activated") seen.push(input.codeDir.split("/").at(-1)!); return {}; });
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-11-02T12:00:00Z"), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
+  const supervisor = createModuleSupervisor(ports);
+  cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  await supervisor.reconcile(); await until(() => seen.length === 1);
+  await supervisor.reconcile(); await Bun.sleep(50);
+  expect(seen).toEqual(["a1"]);
+  // web changes version: the app that uses it hears again; the module that did not opt in never does.
+  await db.moduleVersion.create({ data: { moduleId: web.id, hash: "w2", manifest: (await db.moduleVersion.findFirstOrThrow({ where: { moduleId: web.id } })).manifest!, source: "user", intent: {}, report: {}, status: "approved" } });
+  await db.module.update({ where: { id: web.id }, data: { activeHash: "w2" } });
+  await supervisor.reconcile(); await until(() => seen.length === 2);
+  expect(seen).toEqual(["a1", "a1"]);
+  const recorded = async () => JSON.parse(await Bun.file(join(dataDir, "platform/activated.json")).text().catch(() => "{}"));
+  await until(async () => (await recorded())[app.id] === "a1 web@w2");
+  expect(await recorded()).toEqual({ [app.id]: "a1 web@w2" });
+  expect(quiet.id).not.toBe(app.id);
 });

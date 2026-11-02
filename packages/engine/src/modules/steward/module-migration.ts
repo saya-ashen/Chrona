@@ -43,7 +43,10 @@ export async function migrateData(context: ModuleContext, prepared: PreparedMigr
     await db.$transaction(async tx => {
       if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved", report: json({ ...version.report as BuildReport, migration: output }) } });
       await tx.module.update({ where: { id: moduleId }, data: { dataSchema: to } });
-      await activateIn(context, tx, moduleId, hash, reason);
+      const dataHandling = restore
+        ? `已恢复 schema ${to} 的快照 ${restore.snapshotAt}；切换前当前数据另存为 before-rollback 快照。`
+        : `已将数据迁移 schema ${String(from)} → ${to}；迁移前数据快照保留。`;
+      await activateIn(context, tx, { moduleId, hash, reason, dataHandling });
     });
   } catch {
     if (moved) {

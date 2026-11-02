@@ -34,8 +34,8 @@ async function reviewBudget(ports: StewardPorts, workspaceId: string) {
   if (!settings || !ports.provider?.complete) return null;
   const tier = settings.review?.tier ?? (Object.hasOwn(settings.models, "strong") ? "strong" : Object.keys(settings.models)[0]!);
   const timezone = notificationSettings(workspace.settings).timezone, now = ports.now(), day = localDayKey(now, timezone);
-  const used = (await ports.db.audit.findMany({ where: { workspaceId, kind: "approval_review", createdAt: { gte: new Date(now.getTime() - 48 * 3600_000) } }, select: { createdAt: true } }))
-    .filter(row => localDayKey(row.createdAt, timezone) === day).length;
+  const used = (await ports.db.audit.findMany({ where: { workspaceId, kind: "approval_review", createdAt: { gte: new Date(now.getTime() - 48 * 3600_000) } }, select: { createdAt: true, details: true } }))
+    .filter(row => (row.details as { outcome?: string } | null)?.outcome !== "skipped" && localDayKey(row.createdAt, timezone) === day).length;
   return !Object.hasOwn(settings.models, tier) || used >= (settings.review?.dailyCalls ?? 30) ? null : { ...tierTarget(settings.models[tier]!), timeoutMs: settings.timeoutMs };
 }
 async function callReviewer(ports: StewardPorts, workspaceId: string, row: Row, brief: Brief) {
@@ -51,16 +51,19 @@ async function callReviewer(ports: StewardPorts, workspaceId: string, row: Row, 
   return answer;
 }
 /** A passed green update of one (non-built-in) module activates as if the user had allowed it; otherwise it stays a card. */
-async function activateGreen(ports: StewardPorts, workspaceId: string, row: Row) {
+async function activateGreen(ports: StewardPorts, workspaceId: string, row: Row, reviewed: "passed" | "skipped" = "passed") {
   const payload = row.payload as { kind?: string; moduleId?: string; hash?: string; restore?: unknown } | null;
   if (row.action !== "activate_module" || payload?.kind !== "activate_module" || !payload.moduleId || !payload.hash || payload.restore) return;
   const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: payload.moduleId, hash: payload.hash } } });
   if (!version || version.source === "builtin" || version.status !== "pending_review" || !moduleManifestSchema.safeParse(version.manifest).success) return;
   const card = { moduleId: payload.moduleId, action: "activate_module" as const, title: row.title, detail: row.detail, preview: row.preview, payload: { kind: "activate_module" as const, moduleId: payload.moduleId, hash: payload.hash } };
-  await tryAutoActivate(moduleContext(ports, workspaceId), version, version.report as BuildReport, card, row.id);
+  return tryAutoActivate(moduleContext(ports, workspaceId), { version, report: version.report as BuildReport, card, approvalId: row.id, reviewed });
 }
-export async function reviewApproval(ports: StewardPorts, workspaceId: string, row: Row) {
-  const brief = approvalBriefSchema.parse(row.brief);
+async function reviewChecksOnly(ports: StewardPorts, workspaceId: string, row: Row, brief: Brief) {
+  if (ports.moduleUpdateReview !== "checks-only" || ports.sandbox?.executionMode !== "trusted-local" || row.level !== "green") return false;
+  return !!await activateGreen(ports, workspaceId, { ...row, brief }, "skipped");
+}
+async function applyReview(ports: StewardPorts, workspaceId: string, row: Row, brief: Brief) {
   const answer = await callReviewer(ports, workspaceId, row, brief);
   const level = answer?.escalate ? raise(row.level) : row.level;
   const reviewed: Brief = answer
@@ -68,6 +71,11 @@ export async function reviewApproval(ports: StewardPorts, workspaceId: string, r
     : { ...brief, reviewed: "unavailable" };
   const changed = await ports.db.approval.updateMany({ where: { id: row.id, status: "open" }, data: { level, brief: reviewed } });
   if (changed.count && answer && !answer.escalate && level === "green") await activateGreen(ports, workspaceId, { ...row, level, brief: reviewed });
+}
+export async function reviewApproval(ports: StewardPorts, workspaceId: string, row: Row) {
+  const brief = approvalBriefSchema.parse(row.brief);
+  if (await reviewChecksOnly(ports, workspaceId, row, brief)) return;
+  await applyReview(ports, workspaceId, row, brief);
 }
 
 const running = new WeakMap<StewardPorts["db"], Promise<void>>();

@@ -15,9 +15,9 @@ export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data:
 const legacy: Partial<Record<string, string>> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
 const current = (target: string) => legacy[target] ?? target;
 type Stub = (params: Record<string, unknown>) => unknown | Promise<unknown>;
-function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: string[] }) {
+function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: (string | { name: string })[] }) {
   const implied: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
-  return [...(manifest.uses ?? []).map(current), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get"] : [])];
+  return [...(manifest.uses ?? []).map(current), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get", "secrets.authorize", "secrets.token"] : [])];
 }
 function findStub(stubs: Record<string, Stub>, target: string) {
   return Object.hasOwn(stubs, target) ? stubs[target] : undefined;
@@ -25,9 +25,10 @@ function findStub(stubs: Record<string, Stub>, target: string) {
 function allowed(target: string, uses: string[], grants: string[]) {
   return uses.includes(target) || uses.includes("*") || grants.includes(target);
 }
-async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: string[] }): Promise<unknown> {
-  if (target === "secrets.get") {
-    const listed = (manifest.secrets ?? []).includes(String(args.name)), stub = findStub(stubs, "secrets.get") ?? findStub(stubs, "secret");
+async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }): Promise<unknown> {
+  if (target === "secrets.get" || target === "secrets.authorize" || target === "secrets.token") {
+    // Entry modules (the page) may authorize any credential; the kernel enforces who.
+    const listed = target === "secrets.authorize" || (manifest.secrets ?? []).some(secret => (typeof secret === "string" ? secret : secret.name) === String(args.name)), stub = findStub(stubs, target) ?? (target === "secrets.get" ? findStub(stubs, "secret") : undefined);
     return listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
   }
   if (target === "provider.complete") {
@@ -37,7 +38,7 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args) ?? null : null } };
 }
-async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { effects: string[]; uses?: string[]; secrets?: string[] }, grants: string[], seen: Set<string>): Promise<unknown> {
+async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] }, grants: string[], seen: Set<string>): Promise<unknown> {
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
   const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
   if (!allowed(target, uses, grants)) return { error: { code: "undeclared", message: `${target} is not in uses` } };
@@ -60,7 +61,7 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { ef
  */
 export async function startModule(entry: string, { stubs: given = {}, grants = [] }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>>; grants?: string[] } = {}) {
   const stubs = Object.fromEntries(Object.entries(given).map(([target, stub]) => [current(target), stub]));
-  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: string[] };
+  const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
   const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>();

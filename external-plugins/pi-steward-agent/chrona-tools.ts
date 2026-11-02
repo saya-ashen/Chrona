@@ -47,7 +47,8 @@ export default async function (pi: BridgeApi) {
         const result = await call(`/tools/${encodeURIComponent(tool.name)}`, args, seconds * 1000 + 5000, signal, seconds) as { ok: boolean; data?: unknown; error?: { code: string; message: string } };
         if (!result.ok) throw new Error(`${result.error?.code ?? "ERROR"}: ${result.error?.message ?? "refused"}`.replaceAll(token, "[redacted]"));
         const text = JSON.stringify(result.data ?? null).replaceAll(token, "[redacted]");
-        return { content: [{ type: "text", text: text.length > 30_000 ? `${text.slice(0, 30_000)}\n[Chrona tool result truncated]` : text }], details: undefined };
+        // A cut JSON reads as the whole answer unless it says what is missing and how to get the rest.
+        return { content: [{ type: "text", text: text.length > 30_000 ? `${text.slice(0, 30_000)}\n[Chrona tool result truncated: showing 30000 of ${text.length} characters. The JSON above is incomplete; narrow the request (a target, module, filter or page) or read large content by reference.]` : text }], details: undefined };
       },
     });
   }

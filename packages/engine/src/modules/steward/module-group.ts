@@ -10,6 +10,7 @@ import { assertBuiltinUpgrade, expireModuleApprovals, groupPayloadSchema, json, 
 import { declaredModules } from "./module-build-session";
 import { dataEmpty } from "./module-data";
 import { recordGeneration, switchActiveIn } from "./module-generation";
+import { recordModuleActivation } from "./module-evolution";
 import { audit } from "./audit";
 import { insertCodeDiff } from "./module-preview";
 
@@ -102,8 +103,12 @@ export async function activateGroupIn(context: ModuleContext, tx: Prisma.Transac
   const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", moduleId: null, grantId: action.grantId } });
   if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
   for (const { moduleId, hash } of payload.versions) await approveMemberIn(context, tx, moduleId, hash, now);
+  const previous = new Map((await tx.module.findMany({ where: { id: { in: payload.versions.map(item => item.moduleId) } }, select: { id: true, activeHash: true } })).map(module => [module.id, module.activeHash]));
   for (const { moduleId, hash } of payload.versions) await switchActiveIn(context, tx, moduleId, hash);
   const generation = await recordGeneration(context, tx, "activate");
-  for (const { moduleId, hash } of payload.versions) await audit(tx, { workspaceId, actor: "chrona", kind: "module_activate", subjectId: moduleId, details: { hash, generationId: generation.id, approvalId: action.approvalId } });
+  for (const { moduleId, hash } of payload.versions) {
+    await recordModuleActivation(context, tx, { moduleId, previousHash: previous.get(moduleId) ?? null, hash, generationId: generation.id });
+    await audit(tx, { workspaceId, actor: "chrona", kind: "module_activate", subjectId: moduleId, details: { hash, generationId: generation.id, approvalId: action.approvalId } });
+  }
   if (action.grantId) await consumeOnce(tx, workspaceId, action.grantId, now);
 }

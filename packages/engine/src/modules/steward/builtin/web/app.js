@@ -89,6 +89,7 @@ function approvalItem(approval, after) {
     brief?.added.length ? h("div", {}, `新增：${brief.added.join("、")}`) : null,
     brief && brief.reversible !== null ? h("div", { class: "muted" }, brief.reversible ? "可以一键回滚。" : "无法撤回。") : null,
     brief?.reviewed === "unavailable" ? h("div", { class: "muted" }, "未经 AI 复核。") : null,
+    brief?.reviewed === "skipped" ? h("div", { class: "muted" }, `按可信本地检查策略跳过 AI 复核：${brief.reason ?? "未提供原因"}`) : null,
     (approval.preview || (brief && approval.detail)) && h("details", {}, h("summary", {}, "详情"), brief && approval.detail ? h("p", {}, approval.detail) : null, approval.preview ? h("pre", {}, approval.preview) : null),
     h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, level === "red" ? "确认批准" : "批准"), h("button", { onclick: decide("deny") }, "拒绝")), result);
 }
@@ -222,33 +223,6 @@ function transcript(sessionId, open) {
 }
 
 // ------------------------------------------------------------------- apps --
-function inline(text) {
-  // Escaped first; then only links, bold and code.
-  const escaped = text.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
-}
-function markdown(file, onToggle) {
-  const root = h("div", { class: "markdown" });
-  let list = null, fence = null;
-  file.content.split("\n").forEach((line, index) => {
-    if (fence) { if (line.startsWith("```")) { root.append(h("pre", {}, fence.join("\n"))); fence = null; } else fence.push(line); return; }
-    if (line.startsWith("```")) { fence = []; list = null; return; }
-    const task = /^\s*[-*] \[( |x|X)\] (.*)$/.exec(line), item = /^\s*[-*] (.*)$/.exec(line), heading = /^(#{1,6}) (.*)$/.exec(line);
-    if (task || item) {
-      if (!list) { list = h("ul"); root.append(list); }
-      const li = h("li", { class: task ? "task" : "" });
-      if (task) li.append(h("input", { type: "checkbox", checked: task[1] !== " ", style: "width:auto", onchange: event => onToggle(index + 1, event.target.checked) }), " ");
-      li.insertAdjacentHTML("beforeend", inline(task ? task[2] : item[1]));
-      list.append(li); return;
-    }
-    list = null;
-    if (heading) { const node = h(`h${Math.min(6, heading[1].length + 1)}`); node.innerHTML = inline(heading[2]); root.append(node); }
-    else if (line.trim()) { const node = h("p"); node.innerHTML = inline(line); root.append(node); }
-  });
-  if (fence) root.append(h("pre", {}, fence.join("\n")));
-  return root;
-}
 const runtimeText = meta => ({ running: "运行中", starting: "启动中", backoff: "等待恢复", idle: "正常休眠（按需启动）", unavailable: "当前不可用", paused: "已暂停", unobserved: "当前进程状态未观测" }[meta.runtime?.state] ?? "当前进程状态未知");
 const faultText = status => ({ retrying: "等待有限恢复", verifying: "连接已恢复，功能待验证", unresolved: "未解决，需要处理", recovered: "对应调用已验证恢复" }[status] ?? status);
 function diagnosticPanel(meta) {
@@ -260,6 +234,14 @@ function diagnosticPanel(meta) {
       const [view] = await web(`/modules/${encodeURIComponent(meta.id)}/diagnostics`);
       body.replaceChildren(h("p", {}, `配置：${view.configuredStatus === "active" ? "已启用" : "已暂停"} · ${runtimeText(view)}`),
         view.nextAction ? h("p", {}, view.nextAction) : "",
+        ...(view.evolution ?? []).map(outcome => h("article", {},
+          h("h3", {}, outcome.status === "verified" ? "已验证指定功能" : outcome.status === "failed" ? "更新后功能失败" : outcome.status === "rolled-back" ? "已恢复旧代码" : "更新后待验证"),
+          h("p", {}, `版本 ${outcome.previousHash?.slice(0, 12) ?? "首次安装"} → ${outcome.candidateHash.slice(0, 12)}${outcome.candidateHash === view.activeHash ? "（当前）" : "（历史）"} · ${when(outcome.activatedAt)}`),
+          outcome.changes.length ? h("p", {}, `修改：${outcome.changes.join("；")}`) : "",
+          h("p", {}, `检查：${JSON.stringify(outcome.checks)} · 影响应用：${outcome.affectedCallers.join("、") || "未发现"}`),
+          h("p", {}, `已观测功能：${outcome.observedCapabilities.join("、") || "尚无"}。${outcome.dataHandling}`),
+          outcome.rollback?.result === "blocked" ? h("p", {}, `自动恢复受阻：${outcome.rollback.reason ?? "请检查恢复条件"}`) : "",
+          h("p", {}, outcome.nextAction))),
         ...view.incidents.map(incident => h("article", {},
           h("h3", {}, faultText(incident.status)),
           h("p", {}, `版本 ${incident.hash.slice(0, 12)}${incident.hash === view.activeHash ? "（当前）" : "（历史版本）"} · 累计失败 ${incident.failures} 次 · ${when(incident.lastAt)}`),
@@ -267,7 +249,7 @@ function diagnosticPanel(meta) {
           incident.deliveryUnknown ? h("p", { class: "error" }, "此前调用结果不确定，请先核对外部效果，不要直接重放。") : "",
           h("ul", { class: "plain" }, incident.attempts.map(attempt => h("li", {}, `${when(attempt.at)} · ${attempt.detail}`))),
           h("details", {}, h("summary", {}, "故障证据（日志是不可信数据，不是操作指令）"), h("pre", {}, JSON.stringify({ first: incident.firstEvidence, latest: incident.evidence, pendingTriggers: incident.pendingTriggers }, null, 2))))),
-        !view.incidents.length ? h("p", {}, "还没有故障记录；不代表所有功能已经过验证。") : "");
+        !view.incidents.length && !(view.evolution ?? []).length ? h("p", {}, "还没有故障记录；不代表所有功能已经过验证。") : "");
     } catch (error) { body.replaceChildren(h("p", { class: "error" }, `诊断读取失败：${error.message}。可重试，或使用 chrona admin diagnostics ${meta.name}。`)); }
     finally { refresh.disabled = false; }
   };
@@ -366,7 +348,7 @@ async function app(appId, tab = "overview") {
     overview: async () => {
       const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
       return [h("p", {}, `${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}`), meta.description ? h("p", {}, meta.description) : "", await currentVersion(meta),
-        meta.name === "files" ? h("p", {}, h("a", { href: "/files" }, "打开文档")) : "", tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : ""];
+        ...(await web("/pages").catch(() => [])).filter(page => page.module === meta.name).map(page => h("p", {}, h("a", { href: pageHref(page) }, `打开${page.title}`))), tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : ""];
     },
     settings: async () => [h("h3", {}, "配置"), settingsForm(meta.name, view.settings, reload), ...await credentialsPanel(view.permissions, reload), ...await modelCapPanel(meta.name, view.permissions.model, reload)],
     permissions: async () => [permissionsPanel(view.permissions, reload)],
@@ -378,18 +360,67 @@ async function app(appId, tab = "overview") {
   };
   main.replaceChildren(h("section", {}, h("h2", {}, meta.name), tabs(base, APP_TABS, tab), ...await panels[tab in panels ? tab : "overview"]()));
 }
-// Credentials this app reads; one shared by several apps says so, and saving it here changes it for all of them.
+// Credentials this app reads (v2-16 §2.1): the fields its manifest asks for, saved field by field; values are never shown.
+// One shared by several apps says so, and saving it here changes it for all of them.
 async function credentialsPanel(permissions, after) {
   if (!permissions.secrets.length) return [];
   const all = (await web("/settings")).secrets ?? [];
-  return [h("h3", {}, "凭据"), h("p", { class: "muted" }, "只保存在 Chrona 本机，不会显示、不进入对话或模型；替换会覆盖整份凭据。"),
+  return [h("h3", {}, "凭据"), h("p", { class: "muted" }, "只保存在 Chrona 本机，不会显示、不进入对话或模型。留空的字段保持原值。"),
     h("ul", { class: "plain" }, permissions.secrets.map(secret => {
       const shared = (all.find(row => row.name === secret.name)?.modules ?? []).filter(name => name !== permissions.module);
-      return h("li", {}, h("strong", {}, secret.name), " ", h("span", { class: secret.configured ? "muted" : "error" }, secret.configured ? `已设置${secret.updatedAt ? ` · ${when(secret.updatedAt)}` : ""}` : "未设置"),
+      return h("li", {}, h("strong", {}, secret.label ?? secret.name), secret.label ? h("span", { class: "muted" }, ` ${secret.name}`) : "", " ",
+        h("span", { class: secret.configured ? "muted" : "error" }, secret.configured ? `已设置${secret.updatedAt ? ` · ${when(secret.updatedAt)}` : ""}` : "未设置"),
         shared.length ? h("span", { class: "muted" }, ` · 与 ${shared.join("、")} 共用`) : "",
-        secret.configured ? h("button", { onclick: async () => { if (!confirm(`删除凭据 ${secret.name}？`)) return; try { await web(`/secrets/${secret.name}/remove`, { method: "POST" }); after(); } catch (error) { alert(error.message); } } }, "删除") : "",
-        secretForm(secret, after));
+        secret.configured && secret.name !== "qq_bot" ? h("button", { onclick: async () => { if (!confirm(`删除整份凭据 ${secret.name}？`)) return; try { await web(`/secrets/${secret.name}/remove`, { method: "POST" }); after(); } catch (error) { alert(error.message); } } }, "全部删除") : "",
+        secret.description ? h("p", { class: "muted" }, secret.description) : "",
+        secret.name === "qq_bot" ? "" : secretForm(secret, after), secret.oauth ? oauthPanel(secret, after) : "");
     }))];
+}
+function removeField(secret, field, after) {
+  return h("button", { type: "button", onclick: async () => { if (!confirm(`删除 ${secret.name} 的 ${field}？`)) return; try { await web(`/secrets/${secret.name}/remove`, { method: "POST", body: { field } }); after(); } catch (error) { alert(error.message); } } }, "删除");
+}
+function secretForm(secret, after) {
+  const rows = h("div", {}), state = h("span", { class: "muted", role: "status" }), named = [];
+  for (const field of secret.fields) {
+    const input = h("input", { name: field.name, type: field.plain ? "text" : "password", autocomplete: field.plain ? "off" : "new-password", placeholder: field.saved ? "已设置，留空不改" : field.optional ? "可选" : "必填" });
+    named.push([field.name, input]);
+    rows.append(h("div", { class: "row" }, h("label", {}, field.label, " ", input), h("span", { class: field.saved || field.optional ? "muted" : "error" }, field.saved ? "已设置" : field.optional ? "可选" : "未设置"),
+      field.saved ? removeField(secret, field.name, after) : "", field.description ? h("span", { class: "muted" }, field.description) : ""));
+  }
+  // User-named keys (one per account) or, without a declaration, any field: listed by name, added in pairs.
+  const extra = secret.extraFields, keys = extra ? extra.saved : secret.savedFields ?? [];
+  if (keys.length) rows.append(h("ul", { class: "plain" }, keys.map(key => h("li", {}, h("code", {}, key), " ", h("span", { class: "muted" }, "已设置"), " ", removeField(secret, key, after)))));
+  const pairs = h("div", {});
+  const addPair = () => pairs.append(h("div", { class: "row" }, h("input", { name: "field", placeholder: extra ? extra.label : "字段名，如 apiKey", autocomplete: "off" }), h("input", { name: "value", type: "password", placeholder: extra ? extra.valueLabel : "值", autocomplete: "new-password" })));
+  if (extra || !secret.fields.length) { if (extra?.description) rows.append(h("p", { class: "muted" }, extra.description)); addPair(); rows.append(pairs); }
+  return h("form", { onsubmit: async event => {
+    event.preventDefault();
+    const value = Object.fromEntries([...named.map(([name, input]) => [name, input.value]),
+      ...[...pairs.children].map(row => [row.querySelector("[name=field]").value.trim(), row.querySelector("[name=value]").value])].filter(([field, text]) => field && text));
+    if (!Object.keys(value).length) { state.textContent = "没有要保存的字段"; return; }
+    const missing = secret.fields.filter(field => !field.optional && !field.saved && !value[field.name]).map(field => field.label);
+    if (missing.length && !confirm(`还缺 ${missing.join("、")}，仍然保存？`)) return;
+    try { await web(`/secrets/${secret.name}`, { method: "POST", body: { value } }); after(); } catch (error) { state.textContent = error.message; }
+  } }, rows, h("div", { class: "row" }, extra || !secret.fields.length ? h("button", { type: "button", onclick: addPair }, extra ? `再加一个${extra.label}` : "加一个字段") : "", h("button", { type: "submit", class: "primary" }, "保存"), state));
+}
+// v2-30 §4: the kernel runs the authorization; the provider's page asks the user to consent, then returns to Chrona.
+function oauthPanel(secret, after) {
+  const state = h("span", { class: "muted", role: "status" }), account = h("input", { placeholder: "账户名，如 work", autocomplete: "off", pattern: "[a-z][a-z0-9_]{0,29}" });
+  const ready = secret.fields.find(field => field.name === "clientId")?.saved;
+  const authorize = who => async () => {
+    try {
+      const { url, redirectUri } = await web(`/secrets/${secret.name}/authorize`, { method: "POST", body: { provider: secret.oauth.provider, scopes: secret.oauth.scopes.join(" "), ...(who ? { account: who } : {}) } });
+      state.replaceChildren(`在应用里登记回调地址 ${redirectUri}，然后 `, h("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, "打开授权页"), "（10 分钟内有效）。完成后刷新本页。");
+      window.open(url, "_blank", "noopener");
+    } catch (error) { state.textContent = error.message; }
+  };
+  const label = who => who || "默认账户";
+  return h("div", {}, h("h4", {}, `授权（${secret.oauth.provider === "google" ? "Google" : "Microsoft"}）`),
+    h("p", { class: "muted" }, `范围：${secret.oauth.scopes.join(" ")}`),
+    secret.oauth.authorized.length ? h("ul", { class: "plain" }, secret.oauth.authorized.map(who => h("li", {}, label(who), " ", h("span", { class: "muted" }, "已授权"), " ",
+      h("button", { type: "button", onclick: authorize(who) }, "重新授权"), " ", removeField(secret, who ? `refreshToken_${who}` : "refreshToken", after)))) : "",
+    ready ? h("div", { class: "row" }, secret.oauth.accounts ? account : "", h("button", { type: "button", class: "primary", onclick: () => authorize(secret.oauth.accounts ? account.value.trim() : "")() }, secret.oauth.accounts ? "授权新账户" : secret.oauth.authorized.length ? "重新授权" : "授权"), state)
+      : h("p", { class: "muted" }, "先保存 Client ID（和 Client secret），再授权。"));
 }
 // The app's daily model-call cap lives in moduleModel.moduleDailyCalls; only that entry changes here.
 async function modelCapPanel(name, model, after) {
@@ -434,17 +465,6 @@ async function activity(params) {
   await load();
 }
 // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
-function secretForm(secret, after) {
-  const rows = h("div", {}), state = h("span", { class: "muted", role: "status" });
-  const addRow = () => rows.append(h("div", { class: "row" }, h("input", { name: "field", placeholder: "字段名，如 apiKey", autocomplete: "off" }), h("input", { name: "value", type: "password", placeholder: "值", autocomplete: "new-password" })));
-  for (let i = 0; i < 3; i++) addRow();
-  return h("form", { onsubmit: async event => {
-    event.preventDefault();
-    const value = Object.fromEntries([...rows.children].map(row => [row.querySelector("[name=field]").value.trim(), row.querySelector("[name=value]").value]).filter(([field, text]) => field && text));
-    if (!Object.keys(value).length) { state.textContent = "至少填写一个字段"; return; }
-    try { await web(`/secrets/${secret.name}`, { method: "POST", body: { value } }); after(); } catch (error) { state.textContent = error.message; }
-  } }, rows, h("div", { class: "row" }, h("button", { type: "button", onclick: addRow }, "加一个字段"), h("button", { type: "submit", class: "primary" }, secret.configured ? "替换" : "保存"), state));
-}
 // v2-17: what the app can do, the grants you gave it and its recent approvals (credentials and model are on its Settings tab).
 function permissionsPanel(view, after) {
   const revoke = grant => async () => {
@@ -479,41 +499,21 @@ function toolForm(tool) {
   } }, h("div", {}, h("strong", {}, tool.target.split(".")[1]), " ", h("span", { class: "muted" }, tool.description)),
     ...properties.map(field), h("div", { class: "row" }, h("button", { class: "primary" }, "执行")), output);
 }
-// ------------------------------------------------------------------ files --
-// The user's documents: a page over the files app's tools (list, read, write).
-async function files(params) {
-  const file = params.get("file"), dir = file ? file.split("/").slice(0, -1).join("/") : params.get("dir") ?? "";
-  const listing = await tool("files.list", dir ? { dir } : {});
-  const up = dir ? dir.split("/").slice(0, -1).join("/") : null, join = name => dir ? `${dir}/${name}` : name;
-  const entries = [...listing.entries].filter(entry => entry.name !== ".trash").sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "directory" ? -1 : 1));
-  const view = h("section", {});
-  main.replaceChildren(h("div", { class: "chat" },
-    h("section", {}, h("h2", {}, dir ? dir : "文档"),
-      h("ul", { class: "plain" }, up !== null ? h("li", {}, h("a", { href: up ? `/files?dir=${encodeURIComponent(up)}` : "/files" }, "← 上一级")) : "",
-        entries.map(entry => h("li", { class: join(entry.name) === file ? "selected" : "" },
-          h("a", { href: entry.kind === "directory" ? `/files?dir=${encodeURIComponent(join(entry.name))}` : `/files?file=${encodeURIComponent(join(entry.name))}` }, entry.kind === "directory" ? `${entry.name}/` : entry.name)))),
-      listing.truncated ? h("p", { class: "muted" }, "列表过长，只显示了一部分。") : ""),
-    view));
-  if (file) await document_(file, view);
+// ------------------------------------------------------------ app pages --
+// Pages apps register (module-dependency-direction §4): drawn by pages.js (React + json-render), loaded only here.
+let unmountPage = null;
+async function registeredPage(module, id) {
+  const page = await web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`);
+  const { mount } = await import("/pages.js");
+  const view = h("div", {});
+  main.replaceChildren(h("h2", {}, page.title), view);
+  unmountPage = mount(view, page, { call: (target, args) => tool(target, args), navigate: path => go(path) });
 }
-async function document_(path, view) {
-  const file = await tool("files.read", { path });
-  if (file.content === undefined) { view.replaceChildren(h("h2", {}, path), h("p", { class: "muted" }, `不是文本文件（${file.mime}，${file.size} 字节）。`)); return; }
-  const reload = () => document_(path, view), status = h("span", { class: "muted" });
-  const save = async content => {
-    try { await tool("files.write", { path, content }); status.textContent = "已保存"; await reload(); }
-    catch (error) { status.textContent = error.message; }
-  };
-  // Ticking a box rewrites that one line; truncated documents are read-only here.
-  const toggle = async (line, checked) => {
-    const lines = file.content.split("\n");
-    lines[line - 1] = lines[line - 1].replace(/\[( |x|X)\]/, checked ? "[x]" : "[ ]");
-    await save(lines.join("\n"));
-  };
-  const editor = h("textarea", { class: "editor" }, file.content);
-  const rendered = /\.md$/i.test(path) ? markdown(file, file.truncated ? () => reload() : toggle) : h("pre", {}, file.content);
-  view.replaceChildren(h("h2", {}, path), file.truncated ? h("p", { class: "muted" }, "文档过长，只显示了开头，不能在这里修改。") : "", rendered,
-    file.truncated ? "" : h("details", {}, h("summary", {}, "编辑"), editor, h("div", { class: "row" }, h("button", { class: "primary", onclick: () => save(editor.value) }, "保存"), status)));
+const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
+async function pageLinks() {
+  const nav = document.querySelector("header nav"), apps = nav.querySelector('a[href="/apps"]');
+  nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
+  for (const page of await web("/pages").catch(() => [])) apps.before(h("a", { href: pageHref(page), "data-page": "" }, page.title));
 }
 
 // --------------------------------------------------------------- settings --
@@ -635,10 +635,11 @@ function modelForm(settings, reload) {
 async function route() {
   const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
   replyListeners.clear();
+  unmountPage?.(); unmountPage = null;
   try {
     if (parts[0] === "chat") await chat(null);
     else if (parts[0] === "sessions" && parts[1]) await chat(parts[1]);
-    else if (parts[0] === "files") await files(url.searchParams);
+    else if (parts[0] === "p" && parts[1] && parts[2]) await registeredPage(decodeURIComponent(parts[1]), decodeURIComponent(parts[2]));
     else if (parts[0] === "settings") await settings();
     else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemApp(decodeURIComponent(parts[2]), url.searchParams.get("session"), url.searchParams.get("tab") ?? "overview");
     else if (parts[0] === "apps" && parts[1]) await app(parts[1], url.searchParams.get("tab") ?? "overview");
@@ -667,6 +668,7 @@ async function start() {
   document.getElementById("logout").hidden = !localStorage.getItem(KEY);
   // Stops on a wrong key; the next start (after login) listens again.
   if (!listening) { listening = true; void listen().finally(() => { listening = false; }); }
+  void pageLinks();
   await route();
 }
 void start();

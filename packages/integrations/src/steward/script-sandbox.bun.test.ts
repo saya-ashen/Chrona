@@ -1,5 +1,5 @@
 import { expect, spyOn, test } from "bun:test";
-import { mkdir, mkdtemp, writeFile, readFile, readlink, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, writeFile, readFile, readlink, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createScriptSandbox } from "./script-sandbox";
@@ -130,6 +130,24 @@ on("tool", () => { throw new Error("handler failed"); });`);
   }
 });
 
+test("execution mode selects trusted local explicitly and required isolation fails closed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-execution-mode-"));
+  const dataDir = join(root, "data"), codeDir = join(root, "code"), unusableBwrap = join(root, "bwrap");
+  try {
+    await mkdir(dataDir); await mkdir(codeDir);
+    await writeFile(join(codeDir, "test.sh"), "printf local");
+    await writeFile(unusableBwrap, "#!/bin/sh\nexit 1", { mode: 0o755 });
+    const local = createScriptSandbox({ dataDir: root, bwrapPath: unusableBwrap, executionMode: "trusted-local" });
+    expect(local.health).toEqual({ available: true, isolated: false });
+    expect(await local.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "local" });
+    const required = createScriptSandbox({ dataDir: root, bwrapPath: unusableBwrap, executionMode: "required-isolation" });
+    expect(required.health).toEqual({ available: false, isolated: false });
+    expect(await required.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "unavailable", error: "要求隔离执行，但 bubblewrap 不可用" });
+    expect(() => required.startModule({ codeDir, dataDir, entry: "test.sh", socketPath: join(root, "module.sock") })).toThrow("要求隔离执行，但 bubblewrap 不可用");
+    expect(await createScriptSandbox({ dataDir: root }).runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "local" });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("default per-process virtual address limit is 1 GiB without requiring namespaces", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-default-memory-"));
   try {
@@ -142,6 +160,19 @@ test("default per-process virtual address limit is 1 GiB without requiring names
     await expect(local.runModule({ codeDir, dataDir, entry: "limit.sh", input: {}, memoryMb: 0 })).rejects.toThrow("Invalid sandbox limit");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("a threaded Bun module stays within the default 1 GiB address limit (glibc arenas capped)", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-module-threads-"));
+  try {
+    const codeDir = join(root, "code"), dataDir = join(root, "data");
+    await mkdir(codeDir); await mkdir(dataDir);
+    // Twelve workers and a full GC start the JSC helper threads that aborted the web module under ulimit -v.
+    await writeFile(join(codeDir, "threads.ts"), `const workers = Array.from({ length: 12 }, () => new Worker(URL.createObjectURL(new Blob(["setInterval(() => {}, 1000)"]))));
+await Bun.sleep(300); Bun.gc(true); console.log(process.env.MALLOC_ARENA_MAX, workers.length); process.exit(0);`);
+    const sandbox = createScriptSandbox({ dataDir: root });
+    for (let run = 0; run < 5; run++) expect(await sandbox.runModule({ codeDir, dataDir, entry: "threads.ts", input: {} })).toMatchObject({ status: "succeeded", output: "2 12\n" });
+  } finally { await rm(root, { recursive: true, force: true }); }
+}, 30_000);
 
 test("long-running stderr is attributed and credentials split across chunks are redacted", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-module-logs-"));
@@ -233,4 +264,14 @@ on("schedule", async () => {
     await channel.close();
     await rm(root, { recursive: true, force: true });
   }
+});
+test("a local start reinstalls a read-only SDK copy left by the previous start", async () => {
+  const root = await mkdtemp(join(tmpdir(), "chrona-sdk-reinstall-"));
+  try {
+    const sdk = join(root, "sdk");
+    await mkdir(sdk); await writeFile(join(sdk, "sdk.ts"), "export {}"); await chmod(join(sdk, "sdk.ts"), 0o444); await chmod(sdk, 0o555);
+    createScriptSandbox({ executionMode: "trusted-local", dataDir: root, moduleSdk: sdk });
+    createScriptSandbox({ executionMode: "trusted-local", dataDir: root, moduleSdk: sdk });
+    expect(await readFile(join(root, "platform/node_modules/chrona/sdk.ts"), "utf8")).toBe("export {}");
+  } finally { await chmod(join(root, "sdk"), 0o755).catch(() => {}); await chmod(join(root, "platform/node_modules/chrona"), 0o755).catch(() => {}); await rm(root, { recursive: true, force: true }); }
 });

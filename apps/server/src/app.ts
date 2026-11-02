@@ -5,6 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
+import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
 import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
@@ -103,6 +104,14 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
   );
 
   mountHealthRoutes(app, steward);
+  // The provider's browser redirect carries no API key: the one-time state from secrets.authorize identifies it (v2-30 §4).
+  app.get(OAUTH_CALLBACK_PATH, async (c) => {
+    const { ok, message } = await completeOAuth(steward.ports, c.req.query());
+    const escaped = message.replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`);
+    c.header("Cache-Control", "no-store");
+    c.header("Referrer-Policy", "no-referrer");
+    return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Chrona</title><p style="font:16px system-ui;margin:3em auto;max-width:30em">${escaped}</p>`, ok ? 200 : 400);
+  });
 
   app.route("/api", api);
   // Paths no kernel route claimed go to the module declaring `listen` for them (v2-4).

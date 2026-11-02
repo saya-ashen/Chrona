@@ -101,17 +101,18 @@ class FilesRuntime {
     }
   }
   private async list(args: ToolArgs) {
-    const dir = this.relative(args.dir ?? "", true), entries: { name: string; kind: string }[] = [];
+    // path and parent let a page browse without joining paths itself.
+    const dir = this.relative(args.dir ?? "", true), entries: { name: string; kind: string; path: string }[] = [];
     let truncated = false;
     for (const name of (await readdir(await this.target(dir))).sort()) {
       // Never expose .git or follow links, including links to other content areas.
       if (name === ".git") continue;
       const info = await lstat(join(this.root, dir, name));
       if (info.isSymbolicLink() || (!info.isFile() && !info.isDirectory()) || (info.isFile() && info.nlink !== 1)) continue;
-      entries.push({ name, kind: info.isDirectory() ? "directory" : "file" });
-      if (!fits({ entries, truncated: false })) { entries.pop(); truncated = true; break; }
+      entries.push({ name, kind: info.isDirectory() ? "directory" : "file", path: dir ? `${dir}/${name}` : name });
+      if (!fits({ dir, parent: dir, entries, truncated: false })) { entries.pop(); truncated = true; break; }
     }
-    return { entries, truncated };
+    return { dir, parent: dir ? dir.split("/").slice(0, -1).join("/") : null, entries, truncated };
   }
   private async read(path: string) {
     const value = await this.bytes(path), mime = Bun.file(join(this.root, path)).type || "application/octet-stream";

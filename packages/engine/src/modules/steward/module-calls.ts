@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
 import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
 import { z } from "zod";
+import { compileModuleOutput } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
+import { recordModuleOutputMismatch } from "./module-diagnostics";
+import { currentModuleEvolution } from "./module-evolution";
 import { parseInput, StewardError } from "./errors";
 
 export type Caller = z.infer<typeof callerSchema>;
@@ -17,7 +20,7 @@ export type Json = z.output<ReturnType<typeof z.json>>;
 export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string }; deadline?: number };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 export type Tool = ModuleManifest["tools"][number];
-export type CallErrorCode = "forbidden" | "not_found" | "conflict" | "cycle" | "invalid" | "unknown" | "failed" | "unavailable";
+export type CallErrorCode = "forbidden" | "not_found" | "conflict" | "cycle" | "invalid" | "unknown" | "failed" | "unavailable" | "reauthorize";
 export class CallError extends Error {
   constructor(public readonly code: CallErrorCode, message: string) { super(message); this.name = "CallError"; }
 }
@@ -28,7 +31,8 @@ export class CallError extends Error {
  */
 /** `unrecorded`: tools called only synchronously whose arguments and results are never stored (credentials, model prompts and completions). */
 /** A system tool may validate with a full schema (`input`) instead of scalar parameters: system modules are Chrona's own code. */
-export type SystemTool = Tool & { input?: z.ZodType; output?: z.ZodType; documentation?: string; examples?: Json[] };
+export type SystemTool = Omit<Tool, "output" | "examples"> & { input?: z.ZodType; output?: z.ZodType; documentation?: string; examples?: Json[]; sideEffects?: string[]; errors?: { code: string; description: string; recovery: string }[] };
+type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "callers" | "idempotent"> & { output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };
 /**
  * `call`: the async call being delivered (absent for sync calls). v2-20: `description` and `sessions` (the conversation
  * source a system module does its work in) show it to the user as a read-only app.
@@ -50,7 +54,7 @@ const systemModules = new Map<string, SystemModule>();
 export function registerSystemModule(module: SystemModule) { systemModules.set(module.name, module); }
 /** System modules and their tools, for catalogs (v2-13: the Provider reaches those visible to it). */
 export const listSystemModules = () => [...systemModules.values()];
-type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: Tool; system?: SystemModule };
+type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
 const MAX_ATTEMPTS = 6;
 const BATCH = 20;
 
@@ -87,7 +91,7 @@ async function resolveTarget(db: Db, workspaceId: string, target: string): Promi
  * A module reaches a `modules` tool it lists in `uses`, or one whose `callers` names it (v2-14: the target grants it);
  * with `uses: ["*"]` it reaches the tools open to the user (v2-8 §3).
  */
-export async function admitted(db: Db, caller: Caller, tool: Tool, target: string) {
+export async function admitted(db: Db, caller: Caller, tool: RoutedTool, target: string) {
   const name = callerName(caller);
   if (!name) return tool.visibility.includes(caller.kind as Tool["visibility"][number]);
   if (tool.callers && !tool.callers.includes(name)) return false;
@@ -112,17 +116,65 @@ function nextPath(origin: CallOrigin) {
   const name = callerName(origin.caller);
   return { chain: name ? [...origin.chain, name] : origin.chain, path: name ? [...origin.path, name] : origin.path };
 }
-function moduleToolShape(tool: Tool) {
-  return Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, property]) => {
-    let schema: z.ZodType = "enum" in property ? z.enum(property.enum) : z[property.type]();
-    if (property.description) schema = schema.describe(property.description);
-    if (!tool.parameters.required.includes(key)) schema = schema.optional();
-    return [key, schema];
-  }));
+function parameterValidator(parameter: import("@chrona/contracts/steward").ModuleToolParameter): z.ZodType {
+  let schema: z.ZodType;
+  switch (parameter.type) {
+    case "string": schema = parameter.enum ? z.enum(parameter.enum as [string, ...string[]]) : z.string(); break;
+    case "number": schema = z.number(); break;
+    case "boolean": schema = z.boolean(); break;
+    case "array": schema = z.array(parameterValidator(parameter.items)); break;
+    case "object": schema = objectValidator(parameter); break;
+  }
+  return parameter.description ? schema.describe(parameter.description) : schema;
 }
-/** A module tool's scalar arguments against its declared parameters. */
+function objectValidator(parameter: Extract<import("@chrona/contracts/steward").ModuleToolParameter, { type: "object" }>): z.ZodType {
+  const properties = Object.fromEntries(Object.entries(parameter.properties).map(([key, value]) => {
+    const schema = parameterValidator(value);
+    return [key, (parameter.required ?? []).includes(key) ? schema : schema.optional()];
+  }));
+  return parameter.additionalProperties ? z.object(properties).catchall(z.unknown()) : z.object(properties).strict();
+}
+/** A module tool's arguments against its declared recursive parameters. */
 export function validateToolArgs(tool: Tool, raw: unknown): Record<string, unknown> {
-  return parseInput(z.object(moduleToolShape(tool)).strict(), raw);
+  const shape = Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, property]) => {
+    const schema = parameterValidator(property);
+    return [key, tool.parameters.required.includes(key) ? schema : schema.optional()];
+  }));
+  const parsed = z.object(shape).strict().safeParse(raw);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.slice(0, 5).map(issue => {
+      const path = issue.path.map(part => String(part).replace(/[^A-Za-z0-9_$-]/g, "?").slice(0, 40)).join(".");
+      const keys = issue.code === "unrecognized_keys" ? issue.keys.slice(0, 5).map(key => key.replace(/[^A-Za-z0-9_$-]/g, "?").slice(0, 40)).join(", ") : "";
+      return `${path || keys || "$"} (${issue.code})`;
+    });
+    throw new StewardError("invalid", `Invalid tool arguments${issues.length ? `: ${issues.join("; ")}` : ""}`.slice(0, 500));
+  }
+  return parsed.data as Record<string, unknown>;
+}
+export function moduleToolExampleError(tool: Tool): string | null {
+  for (const [index, example] of (tool.examples ?? []).entries()) {
+    try { validateToolArgs(tool, example.args); }
+    catch (cause) { return `Tool ${tool.name} example ${index + 1} arguments are invalid: ${cause instanceof Error ? cause.message : "check its input schema"}`; }
+    if (Object.hasOwn(example, "result")) {
+      if (!tool.output) return `Tool ${tool.name} example ${index + 1} declares a result but the tool has no output schema`;
+      const parsed = compileModuleOutput(tool.output).safeParse(example.result);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        const path = issue.path.map(part => String(part).replace(/[^A-Za-z0-9_$-]/g, "?").slice(0, 40)).join(".") || "$";
+        return `Tool ${tool.name} example ${index + 1} result does not match output schema at ${path} (${issue.code})`;
+      }
+    }
+  }
+  return null;
+}
+/** JSON Schema advertised to callers mirrors runtime validation at every object boundary. */
+export function normalizedToolInputSchema(tool: { parameters: Tool["parameters"] }) {
+  const normalize = (parameter: import("@chrona/contracts/steward").ModuleToolParameter): Record<string, unknown> => {
+    if (parameter.type === "array") return { type: "array", ...(parameter.description ? { description: parameter.description } : {}), items: normalize(parameter.items) };
+    if (parameter.type === "object") return { type: "object", ...(parameter.description ? { description: parameter.description } : {}), properties: Object.fromEntries(Object.entries(parameter.properties).map(([key, value]) => [key, normalize(value)])), required: parameter.required ?? [], additionalProperties: parameter.additionalProperties };
+    return { ...parameter };
+  };
+  return { type: "object", properties: Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, value]) => [key, normalize(value)])), required: tool.parameters.required, additionalProperties: false };
 }
 /** v2-25: a system tool's output against its declared `output`. A mismatch is Chrona's own bug: logged, never failing the caller (tests fail). */
 export function checkSystemOutput(target: string, tool: SystemTool, output: unknown) {
@@ -132,8 +184,24 @@ export function checkSystemOutput(target: string, tool: SystemTool, output: unkn
   if (process.env.NODE_ENV === "test") throw new Error(`${target} output does not match its declared output: ${issues.join("; ")}`);
   console.error(JSON.stringify({ component: "module-calls", event: "call.output_mismatch", target, issues }));
 }
-function validArgs(tool: SystemTool, raw: unknown) {
-  try { return tool.input ? parseInput(tool.input, raw) as Record<string, unknown> : validateToolArgs(tool, raw); }
+export function moduleOutputError(target: string, tool: RoutedTool, output: unknown) {
+  try { checkModuleOutput(target, tool, output); return null; }
+  catch (error) { return message(error); }
+}
+export function checkModuleOutput(target: string, tool: RoutedTool, output: unknown) {
+  if (!tool.output) return;
+  const result = compileModuleOutput(tool.output as Record<string, unknown>).safeParse(output);
+  if (result.success) return;
+  const issues = result.error.issues.slice(0, 5).map(issue => {
+    const path = issue.path.map(part => typeof part === "number" ? String(part) : String(part).replace(/[^A-Za-z0-9_$-]/g, "?").slice(0, 40)).join(".").slice(0, 120) || "$";
+    return `${path} (${issue.code})`;
+  });
+  const error = new CallError("failed", `${target}: output contract mismatch${issues.length ? `: ${issues.join("; ")}` : ""}`) as CallError & { diagnosticIssues: string[] };
+  error.diagnosticIssues = issues;
+  throw error;
+}
+function validArgs(tool: RoutedTool, raw: unknown) {
+  try { return (tool as SystemTool).input ? parseInput((tool as SystemTool).input!, raw) as Record<string, unknown> : validateToolArgs(tool as Tool, raw); }
   catch (error) { throw new CallError("invalid", error instanceof StewardError ? error.message : "Invalid call arguments"); }
 }
 function toolEvent(target: Target, args: Record<string, unknown>, now: Date, caller: Caller, call: { id: string; key: string | null; attempt: number; chain: string[] }): ModuleEvent {
@@ -159,12 +227,12 @@ function waitsOn(graph: Map<string, string[]>, from: string, to: string, seen = 
  * Synchronous routed call: waits for the target's reply. Refused when the target is already waiting on this path
  * (the target's events are serial, so it could never answer). Unknown outcomes are reported, never retried.
  */
-type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date };
+type SyncInvocation = { ports: StewardPorts; origin: CallOrigin; resolved: Target; target: string; args: Record<string, unknown>; chain: string[]; path: string[]; now: Date; activationId?: string | null };
 async function invokeSystemSync({ ports, origin, resolved, args, rowId, finish, quiet }: SyncInvocation & { rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown>; quiet: boolean }) {
   // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
     const output = await resolved.system!.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run, deadline: origin.deadline }, resolved.tool.name, args);
-    checkSystemOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output);
+    checkSystemOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool as SystemTool, output);
     await finish({ status: "succeeded", output: (quiet ? {} : output) as Prisma.InputJsonValue });
     return { callId: rowId, output };
   } catch (error) {
@@ -173,9 +241,9 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, finish, 
     throw failure;
   }
 }
-async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
+async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: null, attempt: 1, chain: path }), { chain, path, ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: null, attempt: 1, chain: path }), { chain, path, ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (error) {
     const stage = stageOf(error), code = stage === "unavailable" ? "unavailable" : stage === "handler" ? "failed" : "unknown";
     await finish({ status: code === "unknown" ? "unknown" : "failed", error: message(error) });
@@ -195,7 +263,7 @@ async function addWaitEdge(edges: Map<string, string[]>, name: string | null, ta
   }
   edges.set(name, [...edges.get(name) ?? [], target]);
 }
-async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
+async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   let graph = waiting.get(ports.db);
   if (!graph) { graph = new Map(); waiting.set(ports.db, graph); }
   const name = callerName(origin.caller), edges = graph;
@@ -204,6 +272,13 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
   try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, rowId, finish }); }
   finally { if (name) removeWaitEdge(edges, name, resolved.module.name); }
   const output = "result" in reply ? reply.result.result ?? null : null;
+  try { checkModuleOutput(target, resolved.tool, output); }
+  catch (error) {
+    await finish({ status: "failed", error: message(error) });
+    const issues = (error as { diagnosticIssues?: string[] }).diagnosticIssues;
+    if (issues) await recordModuleOutputMismatch(ports.db, { workspaceId: origin.workspaceId, moduleId: resolved.module.id, activationId, hash: resolved.module.activeHash, tool: resolved.tool.name, callId: rowId, issues, now: ports.now() });
+    throw error;
+  }
   await finish({ status: "succeeded", output: output as Prisma.InputJsonValue });
   return { callId: rowId, output: output as Json };
 }
@@ -216,16 +291,19 @@ async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
   return { resolved, route };
 }
-export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
-  target = currentTarget(target);
+async function invokeSyncCall(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, timeoutMs?: number) {
   const { resolved, route: { chain, path } } = await validateSyncRoute(ports, origin, target);
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = resolved.system?.unrecorded?.includes(resolved.tool.name) ?? false;
   const row = await ports.db.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), callerModuleId: origin.caller.kind === "module" ? origin.caller.moduleId : null, callerHash: origin.caller.kind === "module" ? origin.caller.hash : null,
     target: resolved.module.name, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: randomUUID(), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } });
   const finish = (data: Prisma.ModuleInvocationUpdateInput) => ports.db.moduleInvocation.update({ where: { id: row.id }, data: { ...data, finishedAt: ports.now() } });
-  const invocation = { ports, origin, resolved, target, args, chain, path, now };
+  const activationId = resolved.system ? undefined : (await currentModuleEvolution(ports.db, origin.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
+  const invocation = { ports, origin, resolved, target, args, chain, path, now, ...(activationId !== undefined ? { activationId } : {}) };
   if (resolved.system) return invokeSystemSync({ ...invocation, rowId: row.id, finish, quiet });
   return invokeModuleSync({ ...invocation, timeoutMs, rowId: row.id, finish });
+}
+export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
+  return invokeSyncCall(ports, origin, currentTarget(target), raw, timeoutMs);
 }
 
 /**
@@ -275,8 +353,15 @@ const backoff = (now: Date, attempts: number) => new Date(now.getTime() + Math.m
 
 async function deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail }: { ports: StewardPorts; row: Row; resolved: Target; args: Record<string, unknown>; caller: Caller; path: string[]; now: Date; settle: (data: Prisma.ModuleInvocationUpdateManyMutationInput) => Promise<unknown>; retryOrFail: (error: string) => Promise<unknown> }) {
   try {
-    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path }), { chain: [], path });
+    const activationId = (await currentModuleEvolution(ports.db, row.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
+    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path }), { chain: [], path, activationId, validateResult: output => moduleOutputError(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output) });
     const output = "result" in reply ? reply.result.result ?? null : null;
+    try { checkModuleOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output); }
+    catch (error) {
+      const issues = (error as { diagnosticIssues?: string[] }).diagnosticIssues;
+      if (issues) await recordModuleOutputMismatch(ports.db, { workspaceId: row.workspaceId, moduleId: resolved.module.id, activationId, hash: resolved.module.activeHash, tool: resolved.tool.name, callId: row.id, issues, now: ports.now() });
+      return settle({ status: "failed", error: message(error), finishedAt: ports.now() });
+    }
     return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
   } catch (error) {
     const stage = stageOf(error);
@@ -304,7 +389,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   if (resolved.system) {
     try {
       const output = await resolved.system.handle({ ports, workspaceId: row.workspaceId, caller, call: { id: row.id } }, resolved.tool.name, args);
-      checkSystemOutput(target, resolved.tool, output);
+      checkSystemOutput(target, resolved.tool as SystemTool, output);
       return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
     } catch (error) {
       if (error instanceof AwaitUser) return settle({ status: "waiting", output: error.output as Prisma.InputJsonValue, error: null });

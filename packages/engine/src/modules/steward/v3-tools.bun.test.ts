@@ -61,4 +61,14 @@ test("reply files are copied from the run's directory into chat's store; links o
   await tools.call(run.token, "chrona_reply", { text: "Again", files: [`content/${file!.ref}`] });
   await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["link.txt"] })).rejects.toMatchObject({ code: "forbidden" });
   await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/chat/missing.txt"] })).rejects.toMatchObject({ code: "not_found" });
+  // An app's content by reference (e.g. a generated image): attached without passing through a tool result.
+  const app = await db.module.create({ data: { workspaceId, name: "image-generation", activeHash: "i1" } });
+  await mkdir(join(ports.dataDir, "platform/content", app.id), { recursive: true });
+  await writeFile(join(ports.dataDir, "platform/content", app.id, "cat.png"), "png-bytes");
+  const sent = await tools.call(run.token, "chrona_reply", { text: "图", files: ["content/image-generation/cat.png"] }) as { messageId: string };
+  const [image] = (await db.message.findUniqueOrThrow({ where: { id: sent.messageId } })).attachments as { name: string; ref: string }[];
+  expect([image!.name, await readFile(join(ports.dataDir, "platform/data", image!.ref), "utf8")]).toEqual(["cat.png", "png-bytes"]);
+  await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/image-generation/missing.png"] })).rejects.toMatchObject({ code: "not_found" });
+  await symlink(outside, join(ports.dataDir, "platform/content", app.id, "escape.txt"));
+  await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/image-generation/escape.txt"] })).rejects.toMatchObject({ code: "not_found" });
 });

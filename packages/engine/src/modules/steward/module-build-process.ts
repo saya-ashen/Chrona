@@ -15,7 +15,7 @@ function buildCallResult(call: ModuleCall, manifest: ModuleManifest, seen: Set<s
     return { id: call.id, result: { callId: randomUUID(), status: "queued", duplicate } };
   }
   if (target === "provider.complete") return { id: call.id, result: { output: { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
-  if (target === "secrets.get") return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
+  if (target.startsWith("secrets.")) return { id: call.id, error: { code: "unavailable", message: "No secrets during build" } };
   return { id: call.id, result: { output: null } };
 }
 async function createBuildDirs(data: string, dir: string, manifest: ModuleManifest) {
@@ -60,6 +60,6 @@ export function syntheticEvents(manifest: ModuleManifest, now: string, tools = f
   const params = Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
   return [
     ...manifest.triggers.map(trigger => ({ now, params, trigger: { id: trigger.id, kind: "schedule" as const, firedAt: now } })),
-    ...(tools ? manifest.tools.map(tool => ({ now, params, trigger: { id: tool.name, kind: "tool" as const, firedAt: now, args: Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, value]) => [key, "enum" in value ? value.enum[0] : value.type === "string" ? "build" : value.type === "number" ? 0 : false])) } })) : []),
+    ...(tools ? manifest.tools.map(tool => ({ now, params, trigger: { id: tool.name, kind: "tool" as const, firedAt: now, args: Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, value]) => [key, "enum" in value && value.enum ? value.enum[0] : value.type === "string" ? "build" : value.type === "number" ? 0 : false])) } })) : []),
   ];
 }

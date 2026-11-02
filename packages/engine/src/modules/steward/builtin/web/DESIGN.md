@@ -4,10 +4,10 @@
 
 ## 约束
 
-- 纯 HTML + 原生 DOM + CSS：`index.html`、`app.js`、`style.css`。不引入构建、框架、第三方依赖、外部字体或 CDN（页面要能离线打开）。
+- 外壳与系统页面是纯 HTML + 原生 DOM + CSS：`index.html`、`app.js`、`style.css`。应用登记的页面由 `pages.js`（React + json-render，源码 `src/pages.tsx`，`bun build.ts` 生成并提交）绘制，只在打开这类页面时加载；不引入外部字体或 CDN（页面要能离线打开）。
 - 静态页面不含数据；数据只来自 `/api/web`（带用户的 key）。`index.ts` 只发 `/app.js`、`/style.css` 和 `index.html`，新增静态文件要在那里登记。
 - 中文优先。文案用用户的说法（应用、文档、对话、通知、需要你确认），不用内部名词（run、grant、token、hash、module）。
-- 应用的专门页面在 `app.js` 里按模块名组织；对应模块不存在或工具调用失败时退回通用页面。
+- web 不按模块名写专门页面：应用在 `on("activated")` 里调用 `web.page-set` 登记页面（组件目录见 `catalog.ts`，说明由 `web.catalog` 返回），web 统一绘制；新组件写在 `src/pages.tsx` 并加入 `catalog.ts`，样式只用本文件的语义变量（见 [module-dependency-direction](../../../../../../../docs/zh/module-dependency-direction.md) §4）。
 
 ## 性格
 
