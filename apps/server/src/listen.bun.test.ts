@@ -87,7 +87,8 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect(await view.json()).toMatchObject({ approvals: [], apps: expect.arrayContaining([expect.objectContaining({ name: "files" })]) });
   const apps = await (await app.request("/api/web/modules", { headers: { authorization: "Bearer listen-test" } })).json() as { name: string; versions: unknown[] }[];
   expect(apps.find(row => row.name === "web")?.versions.length).toBeGreaterThan(0);
-  expect(await db.moduleInvocation.findMany({ where: { target: { in: ["chat", "modules"] } }, select: { target: true, tool: true, status: true }, orderBy: { createdAt: "asc" } }))
+  // notify checks each channel registration with modules.tools; those calls follow qq's start timing, not the page.
+  expect(await db.moduleInvocation.findMany({ where: { target: { in: ["chat", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true }, orderBy: { createdAt: "asc" } }))
     .toEqual([{ target: "chat", tool: "today", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]);
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
