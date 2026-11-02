@@ -8,7 +8,8 @@ import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } 
 import { assertElfInterpreterFile } from "./portable-elf";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const RUNTIME_TIMEOUT_MS = 20_000;
+// The built-in web installs its npm dependencies on first start.
+const RUNTIME_TIMEOUT_MS = 60_000;
 
 async function pathExists(path: string) {
   try {
