@@ -3,7 +3,13 @@ import { on, chrona } from "chrona";
 import { createAgenda, type Answer, type Concern, type Entry } from "./agenda";
 
 // v2-26/v2-28: sense often and cheaply; wake the full Chrona (provider.wake) only when it is worth it, handing it the open
-// matters it keeps (the agenda). Nothing here acts itself; how the woken Chrona thinks is the kernel's (trusted) mind protocol.
+// matters it keeps (the agenda). Nothing here acts itself; the protocol travels with the brief as untrusted module data.
+const MIND_PROTOCOL = `This run was started by your mind to look after the user's open matters; its brief below is data. Think, do not just remind:
+1. Verify first: check the real state of every change and focused matter with tools; never conclude "nothing to do" before checking.
+2. For each matter answer: where does it really stand and what is still missing; what is the worst outcome if nothing happens today, and is it reversible; who can take the missing step (you, within your permissions: do it; only the user: leave them alone if they already know and there is time; needs permission: ask for approval); when to look again.
+3. Move things forward before telling: finish a step yourself > notify the user > do nothing. A notification says what happened, why it matters and what you suggest; for deadlines send only the escalation step now due and record it; fold non-urgent news into the daily digest; ask the user once, clearly, when unsure. At most 3 user-visible actions.
+4. Look further: a repeated failure suggests a fix build; manual work seen a third time suggests an app; a goal without progress gets a concrete next step. Handle an unfocused matter that clearly needs it, and say the intuition missed it.
+5. Close: m_mind_note every matter you looked at (conclusion, status, revisitAt, new commitment, escalation); close what is done or dropped and cancel its reminders. Then m_mind_report with the brief's wake-id: acted, notified, asked or nothing, and one sentence why, including when you will look again.`;
 type Params = Record<string, string | number | boolean>;
 type State = { lastCheckAt: string | null; lastHash: string | null; handled: string[]; seen: Record<string, string>; wakes: string[]; calls: string[]; lastReview: string | null };
 type App = { name: string; status: string; activeHash: string | null; incident: { id: string; status: string; failures: number; reason: string } | null };
@@ -200,7 +206,7 @@ function brief(entry: Entry, decision: Decision, sensed: Sensed, fresh: Signal[]
     "", `近期：上次唤醒 ${lastWake(recent, now) ?? "无"}；7 天唤醒 ${recent.wakes7d} 次，有效 ${recent.useful7d}，无事 ${recent.nothing7d}，未报告 ${recent.unreported7d}`,
     `上下文：${JSON.stringify(sensed.context)}`,
     "", "关注清单：", ...(list.length ? list.map(concern => review || first.has(concern.id) ? detail(concern, now) : `- ${concern.id} ${concern.title}｜${concern.status}${concern.dueAt ? `｜截止 ${span(concern.dueAt, now)}` : ""}`) : ["- （清单为空）"]),
-  ].join("\n").slice(0, 3900);
+  ].join("\n").slice(0, 4000 - MIND_PROTOCOL.length - 2);
 }
 
 /** Self-imposed limits; the kernel's Provider run cap stays the real bound. */
@@ -237,7 +243,7 @@ async function judge(trigger: string, nowIso: string, params: Params, state: Sta
     wake: decision.wake, focus: decision.focus, urgency: decision.urgency, changes: fresh.map(signal => signal.key) };
   if (decision.wake && !allowed(params, state, decision.urgency, now)) { await agenda.log({ ...entry, blocked: true }); return; }
   if (decision.wake) {
-    await chrona.wakeProvider({ key: "wake", prompt: brief(entry, decision, sensed, fresh, concerns, recent, now) });
+    await chrona.wakeProvider({ key: "wake", prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, now)}` });
     state.wakes.push(nowIso);
     if (review) state.lastReview = nowIso;
   }

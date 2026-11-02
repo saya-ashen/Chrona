@@ -45,6 +45,9 @@ try {
   assert.equal(wakes().length, 1);
   assert.match(wakes()[0], /price-watch 已更新/);
   assert.match(wakes()[0], /wake-id=w-/);
+  assert.match(wakes()[0], /^This run was started by your mind/);
+  assert.match(wakes()[0], /Verify first:/);
+  assert.match(wakes()[0], /Then m_mind_report/);
   // Nothing changed since: no wake, and the user's toggle stops it entirely.
   await sense(30);
   await sense(45, { enabled: false });
@@ -134,4 +137,14 @@ try {
   await sense(1115, { "intuition-url": "http://127.0.0.1:1/none" });
   assert.equal(wakes().length, 6);
   assert.match(wakes()[5], /来源：rules；主要关注：incident:i3；紧急度：0.80/);
+
+  // A long brief still fits provider.wake's 4000-character limit together with the protocol.
+  apps = Array.from({ length: 30 }, (_, i) => ({ name: `app-${i}`, status: "active", activeHash: "a1", incident: { id: `long-${i}`, status: "unresolved", failures: 5, reason: "x".repeat(200) } }));
+  await sense(1145, { "daily-wakes": 7 });
+  assert.equal(wakes().length, 7);
+  assert.equal(wakes()[6].length, 4000);
+  for (const prompt of wakes()) {
+    assert.ok(prompt.length <= 4000);
+    assert.match(prompt, /^This run was started by your mind/);
+  }
 } finally { await module.stop(); await server.stop(true); }

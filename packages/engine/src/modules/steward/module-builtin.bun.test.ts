@@ -73,8 +73,10 @@ test.each(["smoke", "exception"])("rejected built-in logs its report and leaves 
     const version = await f.db.moduleVersion.findFirstOrThrow();
     expect(version).toMatchObject({ source: "builtin", status: "rejected" });
     expect(await f.db.moduleVersion.count({ where: { status: "testing" } })).toBe(0);
-    expect(log).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(log.mock.calls[0]![0] as string)).toMatchObject({ level: "error", component: "module-build", event: "builtin.rejected", module: "sample", hash: version.hash, errors: expect.arrayContaining([expect.stringContaining(failure === "smoke" ? "fixture smoke failed" : "fixture installer failed")]) });
+    // Other tests' background work can log in the same process: count only this event.
+    const rejected = log.mock.calls.map(call => { try { return JSON.parse(String(call[0])); } catch { return null; } }).filter(entry => entry?.event === "builtin.rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toMatchObject({ level: "error", component: "module-build", event: "builtin.rejected", module: "sample", hash: version.hash, errors: expect.arrayContaining([expect.stringContaining(failure === "smoke" ? "fixture smoke failed" : "fixture installer failed")]) });
     expect(await f.db.run.count()).toBe(0);
   } finally { log.mockRestore(); await f.close(); }
 });

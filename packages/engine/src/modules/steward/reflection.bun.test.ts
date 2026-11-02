@@ -16,6 +16,13 @@ import { systemApps } from "./system-apps";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+test("reflection discovers page entries instead of naming a specific entry", () => {
+  expect(REFLECT_PROMPT).not.toMatch(/\bweb\b/i);
+  expect(REFLECT_PROMPT).toContain("entry apps' descriptions");
+  expect(REFLECT_PROMPT).toContain("register its page");
+  expect(REFLECT_PROMPT).toContain("include the chosen entry app only if those tools need an improvement");
+});
+
 const HOUR = 3600_000;
 const okxManifest = { name: "okx-trader", description: "OKX demo experiments", entry: "index.ts", triggers: [], effects: ["network"], tools: [{ name: "status", description: "Experiment status", parameters: { type: "object", properties: {}, required: [] } }], tests: ["test.ts"] };
 const suggestion = { key: "web-page:okx-trader", title: "为 okx-trader 加操作页", why: "它刚上线，web 里还没有它的页面。",
