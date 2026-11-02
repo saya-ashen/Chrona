@@ -60,6 +60,7 @@ export function createAgenda(dir: string) {
     if (!options.includes(value as T)) throw new Invalid(`${name} must be one of ${options.join(", ")}`);
     return value as T;
   }
+  // eslint-disable-next-line complexity -- Keep partial agenda updates and validation ordered before the single atomic write.
   async function note(args: Args, nowIso: string, caller: Caller) {
     const list = await concerns(), now = Date.parse(nowIso);
     const id = text(args.id, 40), existing = id ? list.find(concern => concern.id === id) : undefined;

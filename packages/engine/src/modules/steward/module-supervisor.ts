@@ -283,7 +283,7 @@ class ModuleSupervisor {
       const hashes = new Map(modules.map(module => [module.name, module.activeHash]));
       for (const module of modules) {
         const hash = module.activeHash!, manifest = await this.manifestOf(module.id, hash);
-        if (!manifest?.activated || this.stopped) continue;
+        if (!manifest?.activated || (this.stopped as boolean)) continue;
         const uses = [...new Set(manifest.uses.filter(target => target !== "*").map(target => target.split(".")[0]!))].filter(name => name !== module.name && hashes.has(name)).sort();
         const signature = [hash, ...uses.map(name => `${name}@${hashes.get(name)}`)].join(" ");
         if (this.announced[module.id] === signature) continue;
@@ -303,7 +303,7 @@ class ModuleSupervisor {
   }
   private async manifestOf(moduleId: string, hash: string) {
     if (!this.manifests.has(hash)) this.manifests.set(hash, moduleManifestSchema.safeParse((await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }))?.manifest).data ?? null);
-    return this.manifests.get(hash)!;
+    return this.manifests.get(hash);
   }
   private async validateTrigger(instance: Instance, event: ModuleEvent, builtin: boolean) {
     const { trigger } = event, { manifest, moduleId } = instance;

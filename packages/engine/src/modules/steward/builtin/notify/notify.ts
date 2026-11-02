@@ -178,6 +178,7 @@ class NotifyRuntime {
     else if (["queued", "folded"].includes(row.status)) this.store.update(row.id, { status: "suppressed" });
     return { withdrawn: !row || ["queued", "folded"].includes(row.status) };
   }
+  // eslint-disable-next-line complexity -- Keep channel ownership, ordering and input checks together before persisting registration.
   private channel(args: Args, caller: Caller) {
     // Build smoke probes have no module caller.
     if (caller.kind !== "module") return { ignored: true };
@@ -196,7 +197,7 @@ class NotifyRuntime {
   }
   private status(now: Date) {
     const settings = this.store.settings(), day = localDayKey(now, settings.timezone);
-    const channels = this.channels(), channel = channels.find(channel => channel.ready) ?? channels[0];
+    const channels = this.channels(), channel = channels.find(channel => channel.ready) ?? (channels[0] as (typeof channels)[number] | undefined);
     const sent = this.store.rows("SELECT * FROM notifications WHERE channel = ? AND responds = 0 AND sent_at >= ?", channel?.name ?? "in_app", now.getTime() - 2 * DAY).filter(row => localDayKey(new Date(row.sent_at!), settings.timezone) === day).length;
     const count = (statuses: string) => (this.store.db.query(`SELECT COUNT(*) AS n FROM notifications WHERE status IN (${statuses})`).get() as { n: number }).n;
     return { chat: { channel: channel?.name ?? "in_app", bound: channel?.ready ?? false, sentToday: sent }, queued: count("'queued', 'sending'"), failed: count("'failed', 'uncertain'") };

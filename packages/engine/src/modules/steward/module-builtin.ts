@@ -41,6 +41,7 @@ async function notChosen(ports: StewardPorts, workspaceId: string) {
   const chosen = memorySettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).provider;
   return (name: string) => OPTIONAL.includes(name) && chosen !== name;
 }
+// eslint-disable-next-line complexity -- Preserve startup ordering, customization protection and temporary-resource cleanup in one lifecycle.
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);

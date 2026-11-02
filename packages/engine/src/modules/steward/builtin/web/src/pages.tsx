@@ -64,7 +64,7 @@ export function Markdown({ props }: Props<{ content: string }>) {
     if (heading) blocks.push(heading[1]!.length < 3 ? <h3 key={i} {...html(heading[2]!)} /> : <h4 key={i} {...html(heading[2]!)} />);
     else if (line.trim()) blocks.push(<p key={i} {...html(line)} />);
   });
-  if (fence) blocks.push(<pre key="end">{(fence as string[]).join("\n")}</pre>);
+  if (fence as string[] | null) blocks.push(<pre key="end">{(fence as string[] | null)!.join("\n")}</pre>);
   return <div className="markdown">{blocks}</div>;
 }
 const gap = (value?: string | null) => ({ none: "0", sm: ".4rem", md: ".6rem", lg: ".9rem", xl: "1.4rem" })[value ?? "md"] ?? ".6rem";
@@ -80,12 +80,12 @@ const { registry } = defineRegistry(catalog, {
     Text: ({ props }: Props<{ text: string; variant?: string | null }>) => <p className={props.variant === "muted" || props.variant === "caption" ? "muted" : undefined} style={{ margin: ".2rem 0", whiteSpace: "pre-wrap" }}>{text(props.text)}</p>,
     Badge: ({ props }: Props<{ text: string; variant?: string | null }>) => <span className={`level ${props.variant === "destructive" ? "red" : props.variant === "secondary" || props.variant === "outline" ? "" : "green"}`}>{props.text}</span>,
     Alert: ({ props }: Props<{ title: string; message?: string | null; type?: string | null }>) => <div role={props.type === "error" ? "alert" : "status"} className={props.type === "error" ? "error" : props.type === "success" ? "ok" : undefined}><strong>{props.title}</strong>{props.message ? <div>{props.message}</div> : null}</div>,
-    Table: ({ props }: Props<{ columns: string[]; rows: unknown[][]; caption?: string | null }>) => <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>{props.caption ? <caption className="muted">{props.caption}</caption> : null}<thead><tr>{(props.columns ?? []).map(column => <th key={column} style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{column}</th>)}</tr></thead><tbody>{(props.rows ?? []).map((row, i) => <tr key={i}>{(Array.isArray(row) ? row : []).map((cell, j) => <td key={j} style={{ borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{text(cell)}</td>)}</tr>)}</tbody></table></div>,
+    Table: ({ props }: Props<{ columns?: string[] | null; rows?: unknown[][] | null; caption?: string | null }>) => <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>{props.caption ? <caption className="muted">{props.caption}</caption> : null}<thead><tr>{(props.columns ?? []).map(column => <th key={column} style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{column}</th>)}</tr></thead><tbody>{(props.rows ?? []).map((row, i) => <tr key={i}>{(Array.isArray(row) ? row : []).map((cell, j) => <td key={j} style={{ borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{text(cell)}</td>)}</tr>)}</tbody></table></div>,
     Button: ({ props, emit }: Props<{ label: string; variant?: string | null; disabled?: boolean | null }>) => <button type="button" className={props.variant === "secondary" ? undefined : props.variant === "danger" ? "danger" : "primary"} disabled={!!props.disabled} onClick={() => emit("press")}>{props.label}</button>,
     Link: ({ props, on }: Props<{ label: string; href: string }>) => <a href={props.href} onClick={event => { const press = on("press"); if (press.bound) { event.preventDefault(); press.emit(); } }}>{props.label}</a>,
     Input: ({ props, bindings }: Props<{ label: string; name: string; value?: string | null }>) => <Field label={props.label}><Bound kind="input" name={props.name} value={props.value} binding={bindings?.value} element={props as Args} /></Field>,
     Textarea: ({ props, bindings }: Props<{ label: string; name: string; value?: string | null }>) => <Field label={props.label}><Bound kind="textarea" name={props.name} value={props.value} binding={bindings?.value} element={props as Args} /></Field>,
-    Select: ({ props, bindings, emit }: Props<{ label: string; name: string; options: unknown[]; value?: string | null; placeholder?: string | null }>) => {
+    Select: ({ props, bindings, emit }: Props<{ label: string; name: string; options?: unknown[] | null; value?: string | null; placeholder?: string | null }>) => {
       const [value, setValue] = useBoundProp<string>(props.value ?? undefined, bindings?.value);
       return <Field label={props.label}><select name={props.name} value={text(value)} onChange={event => { setValue(event.target.value); emit("change"); }}>{props.placeholder ? <option value="">{props.placeholder}</option> : null}{(props.options ?? []).map(option => <option key={text(option)} value={text(option)}>{text(option)}</option>)}</select></Field>;
     },
@@ -114,6 +114,7 @@ export function PageView({ page, deps }: { page: Page; deps: Deps }) {
   useEffect(() => {
     const last = new Map<string, string>(), timers: ReturnType<typeof setInterval>[] = [];
     let stopped = false;
+    // eslint-disable-next-line complexity -- Preserve source deduplication, stale-response checks and feedback ordering in one request lifecycle.
     const read = async (key: string, source: Source, force = false) => {
       const args = (resolve(source.args ?? {}, store) ?? {}) as Args, signature = JSON.stringify(args);
       if (!force && last.get(key) === signature) return;

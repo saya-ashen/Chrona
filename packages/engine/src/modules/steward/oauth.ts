@@ -39,7 +39,7 @@ function account(value: unknown) {
   return value;
 }
 const field = (base: string, account: string | null) => account ? `${base}_${account}` : base;
-const fingerprint = (secret: Record<string, string>, account: string | null) =>
+const fingerprint = (secret: Partial<Record<string, string>>, account: string | null) =>
   createHash("sha256").update(JSON.stringify([secret.clientId, secret.clientSecret ?? "", secret[field("refreshToken", account)]])).digest("hex");
 
 async function post(url: string, body: Record<string, string>, fetcher: typeof fetch) {
@@ -72,6 +72,7 @@ export async function authorizeOAuth(ports: StewardPorts, workspaceId: string, a
 }
 
 /** The provider's redirect back (unauthenticated: the one-time state identifies the request). Returns a sentence for the page. */
+// eslint-disable-next-line complexity -- Keep one-time callback validation and credential race checks in their existing order.
 export async function completeOAuth(ports: StewardPorts, query: Record<string, string | undefined>, fetcher: typeof fetch = fetch) {
   const entry = query.state ? pending.get(query.state) : undefined;
   if (query.state) pending.delete(query.state);
@@ -106,6 +107,7 @@ export async function oauthToken(ports: StewardPorts, args: Record<string, unkno
   refreshing.set(key, work);
   return work;
 }
+// eslint-disable-next-line complexity, max-params -- Keep token rotation, concurrent credential checks and cache updates in one lifecycle.
 async function refresh(ports: StewardPorts, name: string, chosen: OAuthProvider, who: string | null, key: string, fetcher: typeof fetch) {
   const store = createSecrets(ports.dataDir), secret = await store.read(name);
   const refresh = secret?.[field("refreshToken", who)];

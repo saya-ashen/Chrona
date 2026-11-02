@@ -43,16 +43,17 @@ function checkBinding(where: string, binding: unknown, tools: Map<string, Schema
   }
 }
 /** catalog.validate checks only the spec's structure, so components, props and actions are checked here. */
+// eslint-disable-next-line complexity -- Keep app-supplied spec validation and its ordered diagnostics together.
 export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<string, Schema>) {
   const errors: string[] = [], structure = catalog.validate(input.spec);
   if (!structure.success) return [`spec 结构无效：${structure.error?.issues.slice(0, 5).map(issue => `${issue.path.join(".")} ${issue.message}`).join("；")}`];
   const elements = (input.spec as Spec).elements;
   if (Object.keys(elements).length > MAX_ELEMENTS) errors.push(`元素最多 ${MAX_ELEMENTS} 个`);
   for (const [key, element] of Object.entries(elements)) {
-    const definition = definitions[element.type], where = `elements.${key}`;
+    const definition = (definitions as Partial<typeof definitions>)[element.type], where = `elements.${key}`;
     if (!definition) { errors.push(`${where}: 未知组件 ${element.type}`); continue; }
     for (const [name, value] of Object.entries(element.props ?? {})) {
-      const prop = definition.props.shape[name];
+      const prop = (definition.props.shape as Partial<typeof definition.props.shape>)[name];
       if (!prop) errors.push(`${where}.props.${name}: ${element.type} 没有这个属性`);
       else if (!dynamic(value) && !prop.safeParse(value).success) errors.push(`${where}.props.${name}: 值不符合 ${element.type} 的定义`);
     }

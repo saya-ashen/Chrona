@@ -140,6 +140,7 @@ class RunService {
     liveRuns.delete(runId);
     await ports.onRunFinished?.(workspaceId, runId);
   }
+  // eslint-disable-next-line complexity -- Preserve origin wake, entry delivery and notification fallback ordering without duplicate delivery.
   private async deliverResult(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
     const session = run.session;
     if (!session || !["wake", "module", "build"].includes(session.source)) return;

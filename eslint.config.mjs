@@ -177,6 +177,8 @@ const eslintConfig = defineConfig([
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",
+    // Generated browser bundle; lint its src/pages.tsx source instead.
+    "packages/engine/src/modules/steward/builtin/web/pages.js",
     // Generated Playwright HTML report (minified third-party bundles) and the
     // throwaway audit scratch dir are not shipped source — linting them only
     // produced thousands of false positives.

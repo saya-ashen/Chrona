@@ -35,7 +35,7 @@ export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, in
     let done = false;
     const outcome = handle.done.finally(() => { done = true; });
     // The author awaits check results while the same normal sandbox build worker checks its proposals.
-    while (!done) {
+    while (!(done as boolean)) {
       await buildPending(moduleContext(ports, workspaceId), ports.now());
       await Promise.race([outcome, new Promise(resolve => setTimeout(resolve, 100))]);
     }

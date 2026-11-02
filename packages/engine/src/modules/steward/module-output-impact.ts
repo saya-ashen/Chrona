@@ -10,6 +10,7 @@ type Db = StewardPorts["db"];
 export type OutputImpact = { caller: string; targets: string[] };
 
 /** Current active callers whose declared uses point at a changed/removed target contract. */
+// eslint-disable-next-line complexity -- Preserve exact versus wildcard visibility checks and caller-impact ordering for approval safety.
 export async function moduleOutputImpacts(db: Db, workspaceId: string, moduleId: string, nextManifest: ReturnType<typeof moduleManifestSchema.parse>): Promise<OutputImpact[]> {
   const module = await db.module.findUnique({ where: { id: moduleId } });
   if (!module?.activeHash) return [];

@@ -25,6 +25,7 @@ function findStub(stubs: Record<string, Stub>, target: string) {
 function allowed(target: string, uses: string[], grants: string[]) {
   return uses.includes(target) || uses.includes("*") || grants.includes(target);
 }
+// eslint-disable-next-line complexity -- Keep fake-kernel credential authorization and stub fallbacks together to preserve test protocol behavior.
 async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }): Promise<unknown> {
   if (target === "secrets.get" || target === "secrets.authorize" || target === "secrets.token") {
     // Entry modules (the page) may authorize any credential; the kernel enforces who.

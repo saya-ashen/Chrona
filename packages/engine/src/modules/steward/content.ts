@@ -10,6 +10,7 @@ import { StewardError } from "./errors";
 export const CONTENT_READ_MAX_BYTES = 10 * 1024 * 1024;
 
 /** A file in a module's content area (or a chat attachment, `chat/<file>`); the path never leaves that area. */
+// eslint-disable-next-line complexity -- Keep path-containment and byte-limit security checks adjacent to the reads they protect.
 export async function readContentRef(ports: Pick<StewardPorts, "db" | "dataDir">, workspaceId: string, ref: string, maxBytes = CONTENT_READ_MAX_BYTES) {
   if (!contentRefSchema.safeParse(ref).success) throw new StewardError("invalid", "ref must be <module>/<path>");
   const owner = ref.slice(0, ref.indexOf("/")), path = ref.slice(owner.length + 1);

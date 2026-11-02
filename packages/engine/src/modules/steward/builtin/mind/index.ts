@@ -72,6 +72,7 @@ function agendaSignals(concerns: Concern[], now: number): Signal[] {
   });
 }
 function items(module: string, output: unknown): Item[] {
+  // eslint-disable-next-line complexity -- Validate each untrusted attention item together before emitting a usable signal.
   return ((output as { items: unknown[] }).items).slice(0, 20).flatMap(raw => {
     const item = (raw ?? {}) as Record<string, unknown>, at = typeof item.at === "string" && Number.isFinite(Date.parse(item.at)) ? new Date(item.at).toISOString() : undefined;
     const kind = item.kind === "deadline" || item.kind === "anomaly" || item.kind === "pending" ? item.kind : null;
@@ -125,6 +126,7 @@ function ordered(concerns: Concern[], first: Set<string>) {
 }
 const lastWake = (recent: Stats, now: number) => recent.lastWake ? `${span(recent.lastWake.at, now)}: ${recent.lastWake.outcome?.kind ?? "unreported"}` : null;
 /** The System One state (v2-28 §5.1); `minimal` sends no titles at all. */
+// eslint-disable-next-line max-params -- Explicit inputs keep the pure decision-state projection independent of mutable module state.
 function intuitionState(sensed: Sensed, fresh: Signal[], concerns: Concern[], recent: Stats, now: number, minimal: boolean) {
   const listed = ordered(concerns, new Set(fresh.flatMap(signal => signal.concern ? [signal.concern] : []))).slice(0, 12);
   return {
@@ -195,6 +197,7 @@ function detail(concern: Concern, now: number) {
   ].join("\n");
 }
 /** The wake brief (v2-28 §6.1): data for the woken Chrona; the kernel adds how to think about it. Most important first, so clipping drops the tail. */
+// eslint-disable-next-line max-params -- Explicit inputs keep the pure wake-brief formatter independent of mutable module state.
 function brief(entry: Entry, decision: Decision, sensed: Sensed, fresh: Signal[], concerns: Concern[], recent: Stats, now: number) {
   const review = decision.source === "daily", first = new Set([decision.focus, ...fresh.flatMap(signal => signal.concern ? [signal.concern] : [])]);
   const list = ordered(concerns, first);
@@ -227,6 +230,7 @@ async function tick(trigger: string, nowIso: string, params: Params) {
   if (sensed) await judge(trigger, nowIso, params, state, sensed, concerns);
   await agenda.write("state.json", state);
 }
+// eslint-disable-next-line complexity, max-params -- Keep decision logging and wake-budget checks in their existing ordered lifecycle.
 async function judge(trigger: string, nowIso: string, params: Params, state: State, sensed: Sensed, concerns: Concern[]) {
   const now = Date.parse(nowIso), { summary, signals } = sensed;
   state.seen = sensed.seen;

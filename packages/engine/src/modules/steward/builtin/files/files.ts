@@ -100,6 +100,7 @@ class FilesRuntime {
       await this.record(to + path.slice(from.length), at);
     }
   }
+  // eslint-disable-next-line complexity -- Keep link rejection and response-size checks adjacent to directory enumeration.
   private async list(args: ToolArgs) {
     // path and parent let a page browse without joining paths itself.
     const dir = this.relative(args.dir ?? "", true), entries: { name: string; kind: string; path: string }[] = [];

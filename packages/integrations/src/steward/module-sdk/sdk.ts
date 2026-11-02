@@ -126,6 +126,7 @@ export const chrona = {
   /** v2-30 §4: a short-lived OAuth access token the kernel refreshes; `reauthorize` means the user must consent again (`secrets.authorize`). */
   token: (params: { name: string; provider: "google" | "microsoft"; account?: string }) => chrona.call<{ accessToken: string; expiresAt: string }>("secrets.token", params),
   /** Runs a tool without a shell, passing credentials only to the child and redacting its output. */
+  // eslint-disable-next-line complexity -- Keep credential lifetime, child cleanup and redaction in one audited scope.
   exec: async (command: string, args: string[] = [], options: {
     secretEnv?: Record<string, { secret: string; field: string }>; secretFiles?: Record<string, { secret: string; field: string }>;
     tokenEnv?: Record<string, { secret: string; provider: "google" | "microsoft"; account?: string }>;
@@ -175,7 +176,7 @@ export const chrona = {
         let timedOut = false, truncated = false, failed = false;
         const timer = setTimeout(() => {
           timedOut = true;
-          try { if (child.pid) process.kill(-child.pid, "SIGKILL"); } catch {}
+          try { if (child.pid) process.kill(-child.pid, "SIGKILL"); } catch { /* Child may already have exited. */ }
         }, options.timeoutMs ?? 60_000);
         for (const [index, stream] of [child.stdout, child.stderr].entries()) stream!.on("data", (chunk: Buffer) => {
           const remaining = Math.max(0, cap + slack - sizes[index]!);

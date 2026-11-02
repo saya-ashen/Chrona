@@ -21,6 +21,7 @@ async function save(db: Db, workspaceId: string, moduleId: string, outcome: Modu
   await db.audit.create({ data: { workspaceId, actorKey: "chrona", subjectId: moduleId, kind: KIND, details: json(outcome), createdAt } });
 }
 
+// eslint-disable-next-line complexity -- Preserve defensive report projection and activation audit ordering without changing historical outcomes.
 export async function recordModuleActivation(context: ModuleContext, tx: Db, input: { moduleId: string; previousHash: string | null; hash: string; generationId: string; dataHandling?: string; rollback?: ModuleEvolutionOutcome["rollback"] }) {
   const version = await tx.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: input.moduleId, hash: input.hash } } });
   const manifest = moduleManifestSchema.parse(version.manifest), report = version.report && typeof version.report === "object" && !Array.isArray(version.report) ? version.report as Record<string, unknown> : {};
@@ -80,6 +81,7 @@ export async function moduleEvolutionOutcomes(db: Db, workspaceId: string, modul
   return [...found.values()];
 }
 
+// eslint-disable-next-line complexity -- Keep activation-epoch guards and outcome transitions together before writing the audit record.
 export async function updateModuleEvolution(db: Db, input: { workspaceId: string; moduleId: string; activationId: string; hash: string; capability?: string; status?: "failed" | "rolled-back"; expectedCurrentHash?: string; now: Date; nextAction?: string; dataHandling?: string; rollback?: ModuleEvolutionOutcome["rollback"] }) {
   const module = await db.module.findFirst({ where: { workspaceId: input.workspaceId, id: input.moduleId }, select: { activeHash: true, status: true } });
   const currentHash = input.status === "rolled-back" ? input.expectedCurrentHash : input.hash;

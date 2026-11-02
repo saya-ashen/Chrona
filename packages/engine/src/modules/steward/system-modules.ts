@@ -496,6 +496,7 @@ const secrets: SystemModule = {
     tool("token", "A short-lived OAuth access token for a credential this module declares, refreshed by the kernel; error reauthorize when the user must authorize again. Never log, store or return it.",
       { name: text(), provider: text("google | microsoft"), account: text("Optional account key") }, ["name", "provider"], { idempotent: true, output: z.lazy(() => outputs.secretTokenOutput) }),
   ],
+  // eslint-disable-next-line complexity -- Keep credential authorization branches together before dispatching to secret storage or OAuth.
   async handle({ ports, workspaceId, caller }, name, args) {
     const module = entry(caller), manifest = await callerManifest(ports.db, module), store = createSecrets(ports.dataDir);
     if (name === "get") return readSecret(ports, store, manifest, String(args.name));
@@ -548,6 +549,7 @@ async function manageSecrets(ports: StewardPorts, workspaceId: string, store: Re
     // The page saves field by field (v2-16 §2.1): fields left blank keep their saved values; kernel fields are not typed.
     if (Object.keys(value).some(kernelField)) throw new CallError("invalid", "refreshToken, scope and oauthManaged are written by Chrona: authorize instead");
     await locked(secret, async () => {
+      // eslint-disable-next-line max-lines -- Keep system interface registration together; splitting credential routing is outside this behavior-preserving lint cleanup.
       const merged = { ...await store.read(secret), ...value };
       if (Object.keys(merged).length > 50) throw new CallError("invalid", "A credential holds at most 50 fields");
       await store.write(secret, merged);

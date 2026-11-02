@@ -12,7 +12,7 @@ const parameter: z.ZodType<ModuleToolParameter> = z.lazy(() => z.union([
   z.object({ type: z.enum(["number", "boolean"]), description }).strict(),
   z.object({ type: z.literal("array"), description, items: parameter }).strict(),
   z.object({ type: z.literal("object"), description, properties: z.record(z.string().min(1).max(100), parameter), required: z.array(z.string().min(1).max(100)).default([]), additionalProperties: z.boolean().default(false) }).strict()
-    .refine(value => !value.required || value.required.every(key => Object.hasOwn(value.properties, key)), "Required fields must be declared in properties"),
+    .refine(value => value.required.every(key => Object.hasOwn(value.properties, key)), "Required fields must be declared in properties"),
 ]));
 
 /** Bound recursive input before parsing so malformed deeply nested manifests fail normally. */
