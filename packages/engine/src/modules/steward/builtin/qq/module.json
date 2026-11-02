@@ -3,6 +3,7 @@
   "description": "Chrona's private QQ bot: owner binding, the qq:dm conversation (through chat), approval buttons, and the QQ channel for the notify module.",
   "entry": "index.ts",
   "keepAlive": true,
+  "activated": true,
   "secrets": ["qq_bot"],
   "triggers": [],
   "uses": ["chat.send", "chat.attach", "chat.new-session", "chat.file", "chat.delivered", "chat.record", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],

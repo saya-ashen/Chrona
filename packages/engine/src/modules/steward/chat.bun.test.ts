@@ -11,6 +11,8 @@ beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "chat" } })).id;
   ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-chat-")), now: () => new Date("2026-10-15T04:00:00Z"), publicUrl: null, chatTimeoutMs: 1 };
   chat = createChat(ports, async () => {});
+  const entry = await db.module.create({ data: { workspaceId, name: "qq", status: "active", activeHash: "h" } });
+  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "qq", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
 const send = (text: string, extra: Partial<Parameters<typeof chat.handleMessage>[0]> = {}) => chat.handleMessage({ workspaceId, channel: "in_app", text, ...extra });
@@ -87,6 +89,15 @@ test.each([
   expect(next.sessionId !== session.id).toBe(rotated);
   expect((await db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe(rotated ? "ended" : "active");
   expect(await db.audit.count({ where: { kind: "session_rotated", subjectId: session.id } })).toBe(rotated ? 1 : 0);
+});
+test.each([true, false])("rotation uses an unfamiliar entry's manifest (entry=%p)", async entry => {
+  const module = await db.module.create({ data: { workspaceId, name: "transport", activeHash: "h" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {},
+    manifest: { name: "transport", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: entry ? ["chat.send"] : ["notify.send"], tests: ["test.ts"] } } });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { sessions: { idleMinutes: 5, minContextTokens: 0, maxContextTokens: 100_000 } } } });
+  const session = await db.session.create({ data: { workspaceId, key: "transport:dm", source: "web", entryModuleId: module.id,
+    lastActivityAt: new Date(ports.now().getTime() - 30 * 60_000) } });
+  expect((await send("Next", { key: "transport:dm" })).sessionId !== session.id).toBe(entry);
 });
 test("a conversation with work still queued is not rotated, and owner limits apply", async () => {
   await db.workspace.update({ where: { id: workspaceId }, data: { settings: { sessions: { idleMinutes: 5, minContextTokens: 0, maxContextTokens: 100_000 } } } });

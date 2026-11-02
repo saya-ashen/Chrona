@@ -5,6 +5,7 @@ import { notificationSettings } from "./settings";
 import { toApproval, toSession } from "./store";
 import { createApps } from "./apps";
 import { createNotificationsView } from "./notify-user";
+import { entryConversations } from "./memory";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 /** `notifications` is answered by the notify module; when it cannot answer the view shows none. */
 export type HealthPorts = { provider(): Promise<Health["provider"]>; moduleSandbox(): boolean;
@@ -24,12 +25,12 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
       dueSchedules, queuedNotifications: notifications?.queued ?? 0, failedNotifications: notifications?.failed ?? 0, lastTickAt: state?.lastTickAt?.toISOString() ?? null };
   }
   async function get(): Promise<TodayView> {
-    const at = now(), week = 7 * 86400000;
+    const at = now(), week = 7 * 86400000, conversations = await entryConversations(db, workspaceId);
     const [approvals, schedules, notifications, sessions, applications, status] = await Promise.all([
       db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" } }),
       db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + week) } }, orderBy: { nextAt: "asc" }, take: 50 }),
       ports.notifications.list(20),
-      db.session.findMany({ where: { workspaceId, source: { in: ["web", "qq", "mcp"] } }, include: { runs: { where: { status: "running" }, select: { id: true }, take: 1 } }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }], take: 20 }),
+      db.session.findMany({ where: { workspaceId, ...conversations }, include: { runs: { where: { status: "running" }, select: { id: true }, take: 1 } }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }], take: 20 }),
       apps(), health(),
     ]);
     return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), updates: notifications, apps: applications,

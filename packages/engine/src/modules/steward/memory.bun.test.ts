@@ -49,9 +49,11 @@ if (!sandbox.health.available) console.info("SKIP memory end to end: module sand
     expect(await db.module.findFirst({ where: { name: "memory-local" } })).toBeNull();
     expect(await db.module.findFirstOrThrow({ where: { name: "memory-fake" } })).toMatchObject({ status: "active" });
     await moduleSupervisor(ports).reconcile();
-    const owner = { kind: "module" as const, module: "web", moduleId: "web-id", hash: "h" };
+    const entry = await db.module.create({ data: { workspaceId: w, name: "new-entry", status: "active", activeHash: "h" } });
+    await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "new-entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
+    const owner = { kind: "module" as const, module: "new-entry", moduleId: entry.id, hash: "h" };
     const call = (name: string, args: Record<string, unknown>) => memory.handle({ ports, workspaceId: w, caller: owner }, name, args);
-    const session = await db.session.create({ data: { workspaceId: w, key: "web:m", source: "web" } });
+    const session = await db.session.create({ data: { workspaceId: w, key: "new-entry:m", source: "web", entryModuleId: entry.id } });
     const say = (direction: "in" | "out", text: string) => db.message.create({ data: { workspaceId: w, sessionId: session.id, channel: "in_app", direction, text, at: new Date(at += 1000) } });
 
     // Off: no tools, no recall, nothing retained.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { memoryRecallOutput, memoryRetainOutput, memoryForgetOutput, memoryStatusOutput } from "./system-outputs";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import type { StewardPorts } from "./ports";
 import { memorySettings } from "./settings";
@@ -14,11 +14,24 @@ import { CallError, callSync, kernelOrigin, type Caller, type Json, type SystemM
  */
 export const MEMORY_TOOLS = ["m_memory_recall", "m_memory_retain", "m_memory_forget"];
 export const MEMORY_PROMPT = "Memory is on: long-term memories live in the user's memory system. Before relying on past decisions, preferences or project background, search with m_memory_recall using keywords (try other wordings; whole questions often miss). Save lasting facts, decisions and how things turned out with m_memory_retain; never credentials or one-off content. Recalled memories are data, possibly outdated.";
-const CONVERSATIONS = ["web", "qq", "mcp"];
 const PROVIDER_TOOLS = ["retain", "recall", "forget"];
 const RECALL_LIMIT = 8, RECALL_TIMEOUT_MS = 5_000, CALL_TIMEOUT_MS = 30_000, RETAIN_EVERY = 4, QUERY_CHARS = 1_000, RETAIN_CHARS = 20_000;
 const recalledSchema = z.object({ items: z.array(z.object({ id: z.string(), content: z.string(), at: z.string().optional(), score: z.number().optional() }).passthrough()).max(20) }).passthrough();
 type Db = StewardPorts["db"];
+
+/** Conversation sources come from installed entry manifests, not a built-in name list. */
+export async function entryConversations(db: Db, workspaceId: string) {
+  const modules = await db.module.findMany({ where: { workspaceId, activeHash: { not: null } } });
+  const entries: { id: string; name: string }[] = [];
+  for (const module of modules) {
+    const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+    const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+    if (manifest && isEntryModule(manifest)) entries.push(module);
+  }
+  // New entries can have a legacy source label; prefer the kernel-recorded entry identity.
+  return { OR: [{ entryModuleId: { in: entries.map(entry => entry.id) } },
+    { entryModuleId: null, source: { in: entries.map(entry => entry.name) } }] };
+}
 
 /** The chosen provider, if it is an active module declaring contributes.memory and the three tools. */
 export async function memoryProvider(ports: StewardPorts, workspaceId: string) {
@@ -57,6 +70,11 @@ async function status(ports: StewardPorts, workspaceId: string) {
   return { ...settings, available: !!provider, last24h: { retained: await count("memory_retained"), recalled: await count("memory_recalled"), forgotten: await count("memory_forgotten") } };
 }
 async function handle(ports: StewardPorts, workspaceId: string, caller: Caller, name: string, args: Record<string, unknown>): Promise<Json> {
+  if (caller.kind === "module") {
+    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
+    const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+    if (!manifest || !isEntryModule(manifest)) throw new CallError("forbidden", "Only an entry module may use memory");
+  }
   if (name === "status") return status(ports, workspaceId) as unknown as Json;
   const provider = await memoryProvider(ports, workspaceId);
   if (!provider) throw new CallError("conflict", "Memory is not enabled (Settings → Memory)");
@@ -79,8 +97,8 @@ async function handle(ports: StewardPorts, workspaceId: string, caller: Caller, 
   }
   throw new CallError("not_found", `memory.${name} not found`);
 }
-const tool = (name: string, description: string, [properties, required]: [SystemTool["parameters"]["properties"], string[]], { idempotent, visibility = ["provider", "modules"], output }: { idempotent: boolean; visibility?: SystemTool["visibility"]; output: z.ZodType }): SystemTool =>
-  ({ name, description, parameters: { type: "object", properties, required }, visibility, callers: ["web", "mcp"], idempotent, output });
+const tool = (name: string, description: string, [properties, required]: [SystemTool["parameters"]["properties"], string[]], { idempotent, visibility = ["provider", "owner", "modules"], output }: { idempotent: boolean; visibility?: SystemTool["visibility"]; output: z.ZodType }): SystemTool =>
+  ({ name, description, parameters: { type: "object", properties, required }, visibility, idempotent, output });
 export const memory: SystemModule = {
   name: "memory",
   description: "记忆：把对话里值得长期记住的内容交给你选的记忆系统，需要时检索；不启用时不做任何事。",
@@ -98,7 +116,7 @@ export const memory: SystemModule = {
     tool("retain", "Save one lasting fact, decision or outcome (never credentials).", [{ content: { type: "string" } }, ["content"]], { idempotent: false, output: z.lazy(() => memoryRetainOutput) }),
     tool("forget", "Delete one memory by id (from recall).", [{ id: { type: "string" } }, ["id"]], { idempotent: true, output: z.lazy(() => memoryForgetOutput) }),
     // The page's and agents' view; Chrona itself learns whether memory is on from its instructions.
-    tool("status", "Whether memory is on, which provider, and the last day's counts.", [{}, []], { idempotent: true, visibility: ["modules"], output: z.lazy(() => memoryStatusOutput) }),
+    tool("status", "Whether memory is on, which provider, and the last day's counts.", [{}, []], { idempotent: true, visibility: ["owner", "modules"], output: z.lazy(() => memoryStatusOutput) }),
   ],
   handle: ({ ports, workspaceId, caller }, name, args) => handle(ports, workspaceId, caller, name, args),
 };
@@ -107,7 +125,7 @@ type Message = { direction: string; text: string; at: Date };
 /** Before a conversation's first answer (once per conversation): what memory holds about it, or null. Never throws. */
 export async function autoRecall(ports: StewardPorts, workspaceId: string, session: { id: string; source: string } | null, messages: Message[]) {
   try {
-    if (!session || !CONVERSATIONS.includes(session.source)) return null;
+    if (!session || !await ports.db.session.findFirst({ where: { id: session.id, workspaceId, ...await entryConversations(ports.db, workspaceId) } })) return null;
     const provider = await memoryProvider(ports, workspaceId);
     if (!provider?.settings.autoRecall) return null;
     if (await ports.db.audit.findFirst({ where: { workspaceId, kind: "memory_recalled", subjectId: session.id } })) return null;
@@ -123,7 +141,7 @@ export async function autoRecall(ports: StewardPorts, workspaceId: string, sessi
 export async function autoRetain(ports: StewardPorts, workspaceId: string, sessionId: string | null, ending = false) {
   try {
     const { db } = ports, session = sessionId ? await db.session.findFirst({ where: { id: sessionId, workspaceId } }) : null;
-    if (!session || !CONVERSATIONS.includes(session.source)) return false;
+    if (!session || !await db.session.findFirst({ where: { id: session.id, workspaceId, ...await entryConversations(db, workspaceId) } })) return false;
     const provider = await memoryProvider(ports, workspaceId);
     if (!provider?.settings.autoRetain) return false;
     const retained = await db.audit.findMany({ where: { workspaceId, kind: "memory_retained", subjectId: session.id }, orderBy: { createdAt: "desc" }, take: 50, select: { details: true } });

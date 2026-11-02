@@ -26,17 +26,24 @@ on("tool", async event => {
   }
   throw new Error(`Unknown tool ${event.id}`);
 });
-// Readiness goes to the notify module, which picks the channel; the time orders reports that arrive late.
+// Re-register on activation too: notify may have started or changed after this entry.
+let channelReady = false;
+on("activated", async () => { await reportReady(channelReady); return {}; });
+// The timestamp orders readiness reports that arrive late.
 async function reportReady(ready: boolean) {
+  channelReady = ready;
   const at = new Date().toISOString();
-  try { await chrona.call("notify.channel", { channel: "chrona_qqbot", ready, at }, { mode: "async", key: `ready:${at}:${ready}` }); return true; }
-  catch { log("qq.channel_report_failed"); return false; }
+  try {
+    const reply = await chrona.call("notify.channel", { channel: "chrona_qqbot", tool: "deliver", ready, at });
+    if (reply && typeof reply === "object" && "error" in reply) throw new Error("Channel registration rejected");
+    return true;
+  } catch { log("qq.channel_report_failed"); return false; }
 }
 const credentials = async () => (await chrona.secret({ name: "qq_bot" })).value as { appId?: string; clientSecret?: string };
 const appId = await credentials().then(value => /^\d{5,20}$/.test(value.appId ?? "") && value.clientSecret ? value.appId! : null, () => null);
 
 if (!appId) {
-  // Not configured: stay up so Chrona keeps routing notifications to the web; replies stay readable on the page.
+  // Not configured: stay up and report unavailable; notifications wait, replies remain readable on the page.
   log("qq.unconfigured");
   await reportReady(false);
   deliver = async () => ({ outcome: "rejected", retryable: false, error: "QQ bot is not configured" });

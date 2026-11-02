@@ -12,7 +12,7 @@ type Ports = {
 };
 type Args = Record<string, unknown>;
 type ImportedArgs = Args & { idempotencyKey: string; title: string };
-const QQ = "chrona_qqbot";
+type Channel = { module: string; moduleId: string; tool: string; ready: boolean; at: number };
 const text = (value: unknown) => typeof value === "string" && value.length ? value : null;
 const iso = (ms: number | null) => ms === null ? null : new Date(ms).toISOString();
 const DAY = 86_400_000;
@@ -28,10 +28,15 @@ class NotifyRuntime {
     this.callPort = call;
     this.statusPort = status;
   }
-  /** The notification module's logic: budget, channel choice, delivery through `qq.deliver`, receipts. */
-  private channelReady(name: string) {
-    const value = this.store.get(`channel:${name}`);
-    return value ? (JSON.parse(value) as { ready: boolean }).ready : false;
+  /** Old readiness-only records are not registrations: wait for their owner to register again. */
+  private channels() {
+    return (this.store.db.query("SELECT key, value FROM kv WHERE key LIKE 'channel:%' ORDER BY key").all() as { key: string; value: string }[])
+      .map(row => ({ name: row.key.slice(8), ...JSON.parse(row.value) as Channel }))
+      .filter(channel => channel.module && channel.moduleId && channel.tool);
+  }
+  private channelFor(row: Row) {
+    const channels = this.channels();
+    return row.channel !== "in_app" ? channels.find(channel => channel.name === row.channel) : channels.find(channel => channel.ready);
   }
   private view(row: Row) {
     return { id: row.id, moduleId: row.module_id, sessionId: row.session_id, level: row.level, channel: row.channel, status: row.status === "sending" ? "queued" : row.status,
@@ -72,11 +77,13 @@ class NotifyRuntime {
       last_error: outcome.outcome === "accepted" ? null : outcome.error.slice(0, 500), next_attempt_at: next === "queued" ? now.getTime() + retryDelayMs(attempts) : null });
   }
   private async dispatch(row: Row, attempts: number, now: Date) {
+    const channel = this.channelFor(row);
+    if (!channel?.ready) return;
     const args: Args = { key: row.key, title: row.title, body: row.body, ...(row.link ? { link: row.link } : {}), ...(row.recipient ? { recipient: row.recipient } : {}),
       ...(row.approval_id ? { approval: row.approval_id, scoped: row.scoped === 1 } : {}) };
     try {
       // Async with the attempt in the key: a repeat after a crash returns the same call instead of sending twice.
-      const reply = await this.callPort("qq.deliver", args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true });
+      const reply = await this.callPort(`${channel.module}.${channel.tool}`, args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true });
       this.store.update(row.id, { call_id: reply.callId });
       if (["succeeded", "failed", "unknown"].includes(reply.status)) this.result({ ...reply, status: reply.status as CallResult["status"] }, now);
     } catch (error) {
@@ -94,10 +101,11 @@ class NotifyRuntime {
     for (const row of this.store.rows("SELECT * FROM notifications WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY created_at, id LIMIT 50", now.getTime())) {
       if (this.digestBlocked(row, settings, now)) continue;
       const attempts = row.attempts + 1;
-      // The channel is chosen when sending: an unready chat channel falls back to the web.
-      if (row.web || !this.channelReady(QQ)) { this.deliverInApp(row, attempts, now); continue; }
-      this.store.update(row.id, { channel: QQ, status: "sending", attempts, call_id: null, call_at: now.getTime() });
-      await this.dispatch(row, attempts, now);
+      // The channel is chosen when sending: no registered, ready channel falls back to the web.
+      const channel = this.channelFor(row);
+      if (row.web || !channel?.ready) { this.deliverInApp(row, attempts, now); continue; }
+      this.store.update(row.id, { channel: channel.name, status: "sending", attempts, call_id: null, call_at: now.getTime() });
+      await this.dispatch({ ...row, channel: channel.name }, attempts, now);
     }
   }
   /** A channel module's answer (or the kernel's verdict when it never answered). */
@@ -170,11 +178,16 @@ class NotifyRuntime {
     else if (["queued", "folded"].includes(row.status)) this.store.update(row.id, { status: "suppressed" });
     return { withdrawn: !row || ["queued", "folded"].includes(row.status) };
   }
-  private channel(args: Args) {
-    const at = Date.parse(String(args.at)), previous = this.store.get(`channel:${String(args.channel)}`);
+  private channel(args: Args, caller: Caller) {
+    // Build smoke probes have no module caller.
+    if (caller.kind !== "module") return { ignored: true };
+    const name = text(args.channel), tool = text(args.tool), at = Date.parse(String(args.at));
+    if (!name || name === "in_app" || !/^[a-z][a-z0-9_-]{0,63}$/.test(name) || !tool || !/^[a-z][a-z0-9-]{0,63}$/.test(tool)) return { error: "invalid", message: "channel and local delivery tool are required" };
     if (!Number.isFinite(at)) return { error: "invalid", message: "at must be a time" };
-    if (previous && (JSON.parse(previous) as { at: number }).at > at) return { ignored: true };
-    this.store.set(`channel:${String(args.channel)}`, JSON.stringify({ ready: args.ready === true, at }));
+    const value = this.store.get(`channel:${name}`), previous = value ? JSON.parse(value) as Partial<Channel> : null;
+    if (previous?.moduleId && previous.moduleId !== caller.moduleId) return { error: "forbidden", message: "Channel belongs to another module" };
+    if (previous?.moduleId && previous.at! > at) return { ignored: true };
+    this.store.set(`channel:${name}`, JSON.stringify({ module: caller.module, moduleId: caller.moduleId, tool, ready: args.ready === true, at } satisfies Channel));
     return { ready: args.ready === true };
   }
   private list(args: Args) {
@@ -183,9 +196,10 @@ class NotifyRuntime {
   }
   private status(now: Date) {
     const settings = this.store.settings(), day = localDayKey(now, settings.timezone);
-    const sent = this.store.rows("SELECT * FROM notifications WHERE channel = ? AND responds = 0 AND sent_at >= ?", QQ, now.getTime() - 2 * DAY).filter(row => localDayKey(new Date(row.sent_at!), settings.timezone) === day).length;
+    const channels = this.channels(), channel = channels.find(channel => channel.ready) ?? channels[0];
+    const sent = this.store.rows("SELECT * FROM notifications WHERE channel = ? AND responds = 0 AND sent_at >= ?", channel?.name ?? "in_app", now.getTime() - 2 * DAY).filter(row => localDayKey(new Date(row.sent_at!), settings.timezone) === day).length;
     const count = (statuses: string) => (this.store.db.query(`SELECT COUNT(*) AS n FROM notifications WHERE status IN (${statuses})`).get() as { n: number }).n;
-    return { chat: { channel: this.store.get(`channel:${QQ}`) ? QQ : "in_app", bound: this.channelReady(QQ), sentToday: sent }, queued: count("'queued', 'sending'"), failed: count("'failed', 'uncertain'") };
+    return { chat: { channel: channel?.name ?? "in_app", bound: channel?.ready ?? false, sentToday: sent }, queued: count("'queued', 'sending'"), failed: count("'failed', 'uncertain'") };
   }
   private feedback(args: Args) {
     const row = this.store.byId(String(args.id));
@@ -203,7 +217,7 @@ class NotifyRuntime {
   /** One routed tool call. Business errors are results, never throws: a throw counts as a module failure. */
   handle(tool: string, args: Args, caller: Caller, now: Date) {
     const handlers: Record<string, () => unknown> = {
-      send: () => this.send(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args), list: () => this.list(args),
+      send: () => this.send(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args, caller), list: () => this.list(args),
       status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
     };
     if (!Object.hasOwn(handlers, tool)) throw new Error(`Unknown tool ${tool}`);
@@ -212,7 +226,7 @@ class NotifyRuntime {
   async tick(now: Date) { await this.recover(now); this.digest(now); await this.deliverDue(now); }
 }
 
-/** The notification module's logic: budget, channel choice, delivery through `qq.deliver`, receipts. */
+/** Budget, registered channel callbacks and delivery receipts. */
 export function createNotify(ports: Ports) {
   const runtime = new NotifyRuntime(ports);
   return { handle: runtime.handle.bind(runtime), result: runtime.result.bind(runtime), tick: runtime.tick.bind(runtime) };

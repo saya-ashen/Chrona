@@ -80,10 +80,14 @@ async function ask(ports: StewardPorts, workspaceId: string, tool: string, args:
   try { return (await callSync(ports, kernelOrigin(workspaceId), `${NOTIFY}.${tool}`, args, { timeoutMs: 10_000 })).output; }
   catch { return null; }
 }
-const statusSchema = z.object({ chat: z.object({ channel: z.enum(["in_app", "chrona_qqbot"]), bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
+// The shared owner view still uses a legacy channel enum. Keep new-channel notices visible there;
+// notify's own list/status retain the actual registered channel name.
+const viewChannel = z.string().transform(channel => notificationSchema.shape.channel.safeParse(channel).data ?? "in_app");
+const viewNotification = notificationSchema.extend({ channel: viewChannel }).strip();
+const statusSchema = z.object({ chat: z.object({ channel: viewChannel, bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
 /** Item by item, ignoring extra fields: a customized notify module must not blank the whole list. */
 export const notificationItems = (output: unknown) => (z.object({ items: z.array(z.unknown()) }).safeParse(output).data?.items ?? [])
-  .flatMap(item => { const parsed = notificationSchema.strip().safeParse(item); return parsed.success ? [parsed.data] : []; });
+  .flatMap(item => { const parsed = viewNotification.safeParse(item); return parsed.success ? [parsed.data] : []; });
 /** The owner's view of notifications, answered by the notify module. */
 export function createNotificationsView(ports: StewardPorts, workspaceId: string) {
   return {

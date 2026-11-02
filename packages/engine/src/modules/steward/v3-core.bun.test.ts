@@ -70,6 +70,9 @@ test("schedules validate origin workspace and list by origin", async () => {
   expect(await schedules.fireDue()).toBe(0);
 });
 test("today projects sessions and agenda without leaking wake instructions", async () => {
+  // Today lists conversations of entry modules, recognized by manifest.
+  const web = await db.module.create({ data: { workspaceId, name: "web", activeHash: "h" } });
+  await db.moduleVersion.create({ data: { moduleId: web.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "web", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
   await createSchedules(ports, workspaceId).create(sessionId, { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "PRIVATE INSTRUCTION", label: "User label" });
   const today = createToday({ db, workspaceId, now: ports.now }, { provider: async () => ({ name: "fixture", available: true, sandboxed: true, lastError: null }), moduleSandbox: () => false,
     notifications: { list: async () => [], status: async () => null } });

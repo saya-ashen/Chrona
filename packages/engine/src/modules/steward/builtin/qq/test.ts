@@ -14,6 +14,10 @@ try {
   // Credentials are a routed call too (secrets.get, v2-10).
   assert.deepEqual(module.calls.map((call: { params: { target: string } }) => call.params.target), ["secrets.get", "notify.channel"]);
   assert.equal(module.calls[1].params.target, "notify.channel");
-  assert.equal(module.calls[1].params.mode, "async");
-  assert.equal(module.calls[1].params.args.ready, false);
+  assert.equal(module.calls[1].params.mode, "sync");
+  assert.deepEqual(module.calls[1].params.args, { channel: "chrona_qqbot", tool: "deliver", ready: false, at: module.calls[1].params.args.at });
+  await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
+  assert.equal(module.calls[2].params.target, "notify.channel");
+  assert.equal(module.calls[2].params.args.tool, "deliver");
+  assert.equal(module.calls[2].params.args.ready, false);
 } finally { await module.stop(); }

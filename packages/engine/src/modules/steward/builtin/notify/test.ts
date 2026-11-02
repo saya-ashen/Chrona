@@ -3,7 +3,8 @@ import { strict as assert } from "node:assert";
 import { startModule } from "chrona/testing";
 
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
-const module = await startModule("index.ts");
+// The registered channel grants its delivery tool to notify via callers: [notify].
+const module = await startModule("index.ts", { grants: ["qq.deliver"], stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
 const kernel = { kind: "kernel" };
 // A fixed daytime clock (12:00 in the default Asia/Shanghai zone): the wall clock would fall in quiet hours at night and fold.
 let clock = Date.parse("2026-10-21T04:00:00.000Z");
@@ -16,14 +17,15 @@ try {
   const first = await tool("send", { key: "k1", level: "now", title: "Hello", body: "World" });
   assert.equal(first.result.result.duplicate, false);
   assert.equal((await tool("send", { key: "k1", level: "now", title: "Hello", body: "World" })).result.result.duplicate, true);
-  // The channel is chosen when sending: wait until it went to the web before qq reports ready.
+  // The channel is chosen when sending: wait until it went to the web before qq registers.
   let list: { title: string; status: string; channel: string }[] = [];
   for (let i = 0; i < 200 && list[0]?.status !== "sent"; i++) { list = (await tool("list", { limit: 10 })).result.result.items; await new Promise(resolve => setTimeout(resolve, 10)); }
   assert.deepEqual(list.map(item => [item.status, item.channel]), [["sent", "in_app"]]);
 
   // Once qq reports ready, a send goes out as an async qq.deliver call, and its result settles the receipt.
   const qq = { kind: "module", module: "qq", moduleId: "qq-id", hash: "h" };
-  assert.deepEqual((await tool("channel", { channel: "chrona_qqbot", ready: true, at: now() }, qq)).result.result, { ready: true });
+  assert.equal((await tool("channel", { channel: "other", tool: "missing", ready: true, at: now() }, qq)).result.result.error, "forbidden");
+  assert.deepEqual((await tool("channel", { channel: "chrona_qqbot", tool: "deliver", ready: true, at: now() }, qq)).result.result, { ready: true });
   await tool("send", { key: "k2", level: "now", title: "Ping", body: "Body", responds: true });
   await until(() => deliveries().length === 1);
   const call = deliveries()[0]!;

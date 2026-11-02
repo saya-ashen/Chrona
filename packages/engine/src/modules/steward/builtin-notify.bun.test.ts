@@ -8,6 +8,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { callsSettled, drainCalls } from "./module-calls";
 import { createNotificationsView, moveLegacyNotifications, notificationItems, notifyUser } from "./notify-user";
 import { testDb } from "./test-db";
+import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
 
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
@@ -21,7 +22,7 @@ import { chrona, on } from "chrona";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 on("tool", async event => { appendFileSync(join(chrona.paths.data, "sent.jsonl"), JSON.stringify({ args: event.args, caller: event.caller }) + "\\n"); return { result: { outcome: "accepted", receiptRef: "chrona_qq:fake-" + event.args.key } }; });
-const report = async () => { try { await chrona.call("notify.channel", { channel: "chrona_qqbot", ready: true, at: new Date().toISOString() }, { mode: "async", key: "ready:" + Date.now() }); } catch { setTimeout(report, 500); } };
+const report = async () => { try { await chrona.call("notify.channel", { channel: "chrona_qqbot", tool: "deliver", ready: true, at: new Date().toISOString() }, { mode: "async", key: "ready:" + Date.now() }); } catch { setTimeout(report, 500); } };
 void report();
 `,
   "test.ts": "// Fake module: the end-to-end test is its check.\n",
@@ -29,6 +30,7 @@ void report();
 
 if (!sandbox.health.available) console.info("SKIP notify end to end: module sandbox unavailable");
 (sandbox.health.available ? test : test.skip)("Chrona → notify.send → notify module → qq.deliver (fake exit) → receipt; legacy rows are copied and delivered", async () => {
+  registerSystemModules();
   const dataDir = await mkdtemp("/tmp/chrona-notify-e2e-"), resources = join(dataDir, "builtin");
   await mkdir(join(resources, "qq"), { recursive: true });
   await cp(resolve(import.meta.dirname, "builtin/notify"), join(resources, "notify"), { recursive: true });
@@ -72,5 +74,6 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
 test("the owner's notification list keeps valid items and ignores extra fields from a customized notify module", () => {
   const item = { id: "n1", moduleId: null, sessionId: null, level: "now", channel: "chrona_qqbot", status: "sent", title: "Hi", body: "Body", link: null, attempts: 1, lastError: null, createdAt: "2026-10-28T00:00:00.000Z", sentAt: null, feedback: null } as const;
   expect(notificationItems({ items: [{ ...item, format: "markdown" }, { ...item, id: "n2", status: "unknown" }] })).toEqual([item]);
+  expect(notificationItems({ items: [{ ...item, channel: "new-channel" }] })).toEqual([{ ...item, channel: "in_app" }]);
   expect(notificationItems(null)).toEqual([]);
 });

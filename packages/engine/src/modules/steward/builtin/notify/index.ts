@@ -19,6 +19,16 @@ async function tick() {
   finally { busy = false; }
 }
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller; now: string }) => {
+  if (event.id === "channel" && event.caller?.kind === "module") {
+    const target = `${event.caller.module}.${String(event.args.tool)}`;
+    try {
+      // Discovery enforces the existing callers/uses rules; registration grants no permission.
+      const output = await chrona.call("modules.tools", { query: target });
+      if (!Array.isArray(output) || !output.some(tool => tool && typeof tool === "object" && "target" in tool && tool.target === target)) {
+        return { result: { error: "forbidden", message: "Delivery tool must belong to the caller and grant notify access" } };
+      }
+    } catch { return { result: { error: "unavailable", message: "Could not check delivery tool; register again" } }; }
+  }
   const result = notify.handle(event.id, event.args, event.caller ?? { kind: "kernel" }, new Date(event.now));
   if (["send", "channel", "retry"].includes(event.id)) setTimeout(() => void tick(), 0);
   return { result };

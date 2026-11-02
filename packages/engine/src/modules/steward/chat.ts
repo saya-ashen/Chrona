@@ -11,7 +11,7 @@ import { parseInput, StewardError } from "./errors";
 import { storedAttachments, toMessage } from "./store";
 import { pushReply } from "./chat-replies";
 import { drainCalls } from "./module-calls";
-import { autoRetain } from "./memory";
+import { autoRetain, entryConversations } from "./memory";
 import { sessionSettings } from "./settings";
 
 const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
@@ -169,14 +169,14 @@ class ChatService {
     return providerUsageSchema.safeParse(usage?.value).data?.contextTokens ?? 0;
   }
   /**
-   * A long QQ/web conversation ends before the next message (as Hermes resets its sessions): once idle past the prompt cache's
+   * A long entry conversation ends before the next message (as Hermes resets its sessions): once idle past the prompt cache's
    * life it would be re-read at full price, and past the cap it costs more than starting over. What it said goes to memory
    * first; the new conversation recalls it at its first run.
    */
   private async rotate({ workspaceId, key, sessionId }: { workspaceId: string; key?: string | undefined; sessionId?: string | undefined }) {
     if (sessionId || !key) return;
     const { db } = this.ports, now = this.ports.now();
-    const session = await db.session.findFirst({ where: { workspaceId, key, status: "active", source: { in: ["qq", "web"] } } });
+    const session = await db.session.findFirst({ where: { workspaceId, key, status: "active", ...await entryConversations(db, workspaceId) } });
     if (!session || await db.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
     const limits = sessionSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings), tokens = await this.contextTokens(workspaceId, session.id);
     const idle = now.getTime() - session.lastActivityAt.getTime() >= limits.idleMinutes * 60_000;
