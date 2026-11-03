@@ -1,6 +1,6 @@
 /**
  * Chrona shared contract, platform v2. Supervisor-owned.
- * Design: docs/zh/platform-v2.md. Chrona's features are modules (apps) that keep their files private
+ * Design: docs/zh/architecture.md. Chrona's features are modules (apps) that keep their files private
  * and interact only through routed calls. Conversations with the Provider are
  * sessions, keyed by the entry that owns them. There are no affairs.
  */

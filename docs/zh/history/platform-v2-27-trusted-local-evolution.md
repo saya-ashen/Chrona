@@ -58,7 +58,7 @@ Chrona 是用户与 Agent 共用的、可随需求演化的本地超级软件工
 
 清单差异继续用于解释依赖、接口和影响，但不能把所有内部声明变动等同于实际权限扩大。入口功能、真实外部动作等具体分级在实施时逐项核对，不笼统取消现有保护。
 
-更新审批策略已由 [security-simplification.md §3.1](security-simplification.md) 取代：构建检查全部通过即自动启用并事后通知；迁移已有数据、新增凭据与删除应用才问用户。不再使用 AI 复核、审批分级或长期模块启用授权。
+更新审批策略已由 [security-simplification.md §3.1](../security-simplification.md) 取代：构建检查全部通过即自动启用并事后通知；迁移已有数据、新增凭据与删除应用才问用户。不再使用 AI 复核、审批分级或长期模块启用授权。
 
 ## 4. P1：完成应用接口契约
 
@@ -75,7 +75,7 @@ Chrona 是用户与 Agent 共用的、可随需求演化的本地超级软件工
 
 ## 5. P1：从构建成功到更新后可用
 
-复用版本、检查、快照、迁移、回滚、supervisor 和[故障恢复](module-recovery.md)，不重建发布系统。
+复用版本、检查、快照、迁移、回滚、supervisor 和[故障恢复](../module-recovery.md)，不重建发布系统。
 
 - **更新前**：根据已声明的调用关系与接口差异，列出受影响应用并运行可用的相关检查；不能把只测试候选自身称为验证全部依赖。
 - **更新后**：区分已构建、已激活、已验证可用；进程启动或 socket 重连不等于功能恢复。
@@ -96,7 +96,7 @@ Chrona 是用户与 Agent 共用的、可随需求演化的本地超级软件工
 
 现有 `reference`、`overview`、Provider catalog 与 owner MCP `modules.tools` 使用活动 manifest 同一份参数、输出和描述性元数据；不新增插件商店或能力注册中心。工具可以声明最多 3 个调用示例、8 个副作用说明和 8 个常见错误／恢复方法；构建阶段用同一输入、输出契约检查示例，不执行工具。未声明元数据显示为未提供（null），不推断“无副作用”。
 
-`idempotent` 仍是唯一既有重试权限；展示的重试说明直接由该标记推导，不新增自动重试。可见工具列表按 audience 与 visibility 筛选；模块可调用 `modules` 工具，`uses: ["*"]` 额外到达 `owner` 工具，其他 `uses` 仅作契约（[安全机制简化 §3.2](security-simplification.md)）；自描述信息不改变受众。迁移示例：新工具可接收 `{ filters: [{ state: "open" }] }` 这样的原生值；旧工具若声明 `query: string`，`{"query":"{\"state\":\"open\"}"}` 仍是字符串，不会自动转成对象。
+`idempotent` 仍是唯一既有重试权限；展示的重试说明直接由该标记推导，不新增自动重试。可见工具列表按 audience 与 visibility 筛选；模块可调用 `modules` 工具，`uses: ["*"]` 额外到达 `owner` 工具，其他 `uses` 仅作契约（[安全机制简化 §3.2](../security-simplification.md)）；自描述信息不改变受众。迁移示例：新工具可接收 `{ filters: [{ state: "open" }] }` 这样的原生值；旧工具若声明 `query: string`，`{"query":"{\"state\":\"open\"}"}` 仍是字符串，不会自动转成对象。
 
 ## 7. 实施顺序与验收
 

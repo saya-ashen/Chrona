@@ -2,7 +2,7 @@
 
 状态：已实现（2026-10-24，`platform-v2` 分支，未部署）。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由。
 
-> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：`uses` 是契约；任何模块可调用 `modules` 可见工具。
+> 当前模块调用规则见 [安全机制简化 §3.2](../security-simplification.md)：`uses` 是契约；任何模块可调用 `modules` 可见工具。
 
 ## 1. 目标
 

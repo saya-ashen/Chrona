@@ -132,7 +132,7 @@ systemd、桌面通知、Docker socket 等需要绑定特定 socket 或设备，
 
 ### 9.1 接口与权限
 
-> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：模块可见工具面向任何模块，`uses` 不作运行时准入。
+> 当前模块调用规则见 [安全机制简化 §3.2](../security-simplification.md)：模块可见工具面向任何模块，`uses` 不作运行时准入。
 - 模块工具就是接口。每个工具声明 `visibility`（`provider`、`owner`、`modules`、`kernel`，默认 `provider`+`owner`，与此前行为相同）和 `idempotent`（默认 false）。
 - 调用方在清单 `uses: ["<module>.<tool>"]` 中声明（本文原名 `calls`），随版本审批；审批卡显示“调用其他模块 / 供其他模块调用”。新增 `uses` 或接口可见范围变宽视为新能力，不自动启用。
 - 被调用方决定谁能调用：内核在路由时按可见性判断受众。owner API（含 MCP）只能到达 `owner` 可见的工具，入口模块名作为 `via` 记录在审计里，不授予任何权限；Provider 只能到达 `provider` 可见的工具。

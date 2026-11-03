@@ -13,7 +13,7 @@ v2-26 的心智是无状态的唤醒器：每次只拿一张快照问“要不�
 - 没有决策日志：直觉打了多少分、为什么没叫醒、叫醒后有没有用，都无法评估。
 - “同一主题 30 天内不重复”与截止类事项的正常升级（提前、前一天、最后关头）冲突。
 
-[steward-goals](steward-goals.md) §6 要求的是“持续跟进未结束的事……判断什么时候继续做、什么时候问用户、什么时候保持安静”。这需要心智**持有未完成的事**，而不只是看快照。
+[steward-goals](../steward-goals.md) §6 要求的是“持续跟进未结束的事……判断什么时候继续做、什么时候问用户、什么时候保持安静”。这需要心智**持有未完成的事**，而不只是看快照。
 
 ## 2. 原则
 
@@ -82,7 +82,7 @@ v2-26 的心智是无状态的唤醒器：每次只拿一张快照问“要不�
 ```
 
 - 工具无必填参数、无副作用，返回 `{ "items": [{ "id", "kind", "title", "at"? }] }`：`id` 为稳定标识（字母、数字、`_.-`，≤60），`kind` 为 `deadline`（须带 `at`）· `anomaly`（应用自身发现的异常）· `pending`（等用户处理的事），`title` ≤120 字；最多 20 条，只放此刻值得心智知道的。
-- 心智每次感知调用 `modules.contributions({ section: "mind" })`，并行调用声明的工具（最多 10 个应用，各 10 秒超时）；失败或格式不符的应用列入上下文 `attentionUnavailable`，不阻塞感知。心智的 `uses` 只增加 `modules.contributions`；目标对模块可见即可调用，不要求 `uses` 列出目标（[安全机制简化 §3.2](security-simplification.md)）。
+- 心智每次感知调用 `modules.contributions({ section: "mind" })`，并行调用声明的工具（最多 10 个应用，各 10 秒超时）；失败或格式不符的应用列入上下文 `attentionUnavailable`，不阻塞感知。心智的 `uses` 只增加 `modules.contributions`；目标对模块可见即可调用，不要求 `uses` 列出目标（[安全机制简化 §3.2](../security-simplification.md)）。
 - 信号：`deadline` 按 §4 的档位得出 `app:<应用>:<id>:<档>`（`<24h`、`<6h`、`<1h`、`overdue`）；`anomaly`、`pending` 为 `app:<应用>:<id>`。规则兜底时 `<6h`、`<1h`、`overdue` 与关注清单的截止同样紧急。
 - 上下文 `attention` 列出全部事项（`应用 · 类别 · 标题 · 时间`），随直觉 state 与简报发送；`minimal` 只发数量。事项标题来自应用，属于不可信数据。
 

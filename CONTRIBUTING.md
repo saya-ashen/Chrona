@@ -1,6 +1,6 @@
 # Contributing to Chrona
 
-Read [AGENTS.md](AGENTS.md), [product goals](docs/zh/steward-goals.md) and [architecture](docs/zh/platform-v2.md) first. Chrona is a single-owner personal steward: natural-language input, ongoing care and usable results. Explain the user problem, permission boundary, failure behavior and verification in each change.
+Read [AGENTS.md](AGENTS.md), [product goals](docs/zh/steward-goals.md) and [architecture](docs/zh/architecture.md) first. Chrona is a single-owner personal steward: natural-language input, ongoing care and usable results. Explain the user problem, permission boundary, failure behavior and verification in each change.
 
 ## Setup
 

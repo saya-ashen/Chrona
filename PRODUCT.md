@@ -10,7 +10,7 @@ Chrona is for people who want a personal steward that looks after ongoing matter
 
 ## Product Purpose
 
-Chrona is a local-first personal steward: a kernel that runs approved apps (modules) and a Provider that talks with the user, builds and changes those apps, and works through their tools. Goals: [steward goals](docs/zh/steward-goals.md); architecture: [platform v2](docs/zh/platform-v2.md).
+Chrona is a local-first personal steward: a kernel that runs approved apps (modules) and a Provider that talks with the user, builds and changes those apps, and works through their tools. Goals: [steward goals](docs/zh/steward-goals.md); architecture: [current architecture](docs/zh/architecture.md).
 
 ## Brand Personality
 

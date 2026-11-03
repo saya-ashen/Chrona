@@ -2,7 +2,7 @@
 
 状态：已实现（2026-10-27），未部署；用户已确认范围。依赖 [v2-14](platform-v2-14-contributions-events.md)、[v2-16](platform-v2-16-module-secrets-requests.md)、[v2-20](platform-v2-20-system-apps.md)。验证记录见 `.agent-artifacts/v2-21-spike/notes.md`。
 
-> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：删除点名调用名单；`kernel` 可见工具仍只接受内核调用。
+> 当前模块调用规则见 [安全机制简化 §3.2](../security-simplification.md)：删除点名调用名单；`kernel` 可见工具仍只接受内核调用。
 
 ## 1. 背景与原则
 

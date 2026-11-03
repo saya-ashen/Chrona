@@ -8,7 +8,10 @@
 ## Product and development
 
 - [设计目标](zh/steward-goals.md): product authority; goals are not a shipped-feature checklist.
-- [平台 v2](zh/platform-v2.md): architecture.
+- [当前架构](zh/architecture.md): implementation map, trust model and module lifecycle.
+- [安全机制简化](zh/security-simplification.md) / [模块依赖方向](zh/module-dependency-direction.md): current rules and registration patterns.
+- [Provider 运行](zh/provider-runtime.md) / [模块恢复](zh/module-recovery.md) / [Owner 单次受控构建](zh/owner-bounded-builds.md): focused runtime references.
+- [历史设计索引](zh/history/README.md): superseded staged specifications, not current instructions.
 - [Contributing](../CONTRIBUTING.md) and [repository rules](../AGENTS.md): implementation and checks.
 - [Domain agent notes](agents/domain.md) / [issue-tracker agent notes](agents/issue-tracker.md): contributor guidance, not operator instructions.
 

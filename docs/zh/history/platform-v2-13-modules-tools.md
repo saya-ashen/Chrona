@@ -2,7 +2,7 @@
 
 状态：已实现（2026-10-25）；与草案的差异见第 8 节。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-11](platform-v2-11-provider-module.md)。
 
-> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：模块可调用 `modules` 可见工具，`uses` 是契约，`*` 额外到达 `owner` 工具。
+> 当前模块调用规则见 [安全机制简化 §3.2](../security-simplification.md)：模块可调用 `modules` 可见工具，`uses` 是契约，`*` 额外到达 `owner` 工具。
 
 ## 1. 背景
 

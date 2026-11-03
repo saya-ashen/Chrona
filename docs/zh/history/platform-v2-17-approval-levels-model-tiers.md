@@ -1,6 +1,6 @@
 # v2-17 规格：审批分级、AI 复核与模型档位
 
-状态：审批分级、AI 复核与审批习惯已由 [security-simplification.md §3.1](security-simplification.md) 取代；下述相关内容仅为历史记录，模型档位部分仍有效。依赖 [v2-13](platform-v2-13-modules-tools.md)、[v2-16](platform-v2-16-module-secrets-requests.md)。
+状态：审批分级、AI 复核与审批习惯已由 [security-simplification.md §3.1](../security-simplification.md) 取代；下述相关内容仅为历史记录，模型档位部分仍有效。依赖 [v2-13](platform-v2-13-modules-tools.md)、[v2-16](platform-v2-16-module-secrets-requests.md)。
 
 
 ## 1. 背景

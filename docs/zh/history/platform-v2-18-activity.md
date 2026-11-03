@@ -8,7 +8,7 @@
 
 ## 2. 内核
 
-- 新系统模块 `activity`，工具 `activity.list({ module?, before?, limit? })`：只读，对模块和 owner 可见，Provider 不可见；当前准入规则见 [安全机制简化 §3.2](security-simplification.md)。
+- 新系统模块 `activity`，工具 `activity.list({ module?, before?, limit? })`：只读，对模块和 owner 可见，Provider 不可见；当前准入规则见 [安全机制简化 §3.2](../security-simplification.md)。
 - 内核从审计表挑出与用户相关的记录，并由内核写成中文句子（模块只能显示，不能改写或伪造）：审批生成、AI 复核结果、你的决定与渠道；候选版本提交、检查完成/失败；启用、自动更新、回滚、数据迁移、运行故障；你新增或撤销的授权（Chrona 为低风险更新生成的一次性授权不单列）；设置改了哪一项；凭据设置/删除（只记名称）；每周审批习惯。
 - 按时间倒序；`before` 翻页；`module` 只看一个应用。
 - `secrets.set`/`secrets.remove` 写审计 `secret_set`/`secret_removed`，只含名称。命令行 `chrona admin secret-set` 不经数据库，暂不进活动记录。

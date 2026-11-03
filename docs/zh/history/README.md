@@ -1,0 +1,36 @@
+# 历史设计记录
+
+本目录保存 Chrona 按阶段形成的平台设计、讨论与当时的实现记录，不是当前功能或部署状态说明。文中的计划、验收结果和“当前”均属于记录形成时的上下文；与[当前架构](../architecture.md)冲突时，以当前架构为准。保留原文以便追溯，仅修正归档后的链接；当前执行、依赖和操作规则分别见[安全机制简化](../security-simplification.md)、[模块依赖方向](../module-dependency-direction.md)和[运维说明](../operations.md)。
+
+## 文件索引
+
+- [platform-v2.md](platform-v2.md)
+- [platform-v2-1-runtime.md](platform-v2-1-runtime.md)
+- [platform-v2-2-sessions-content.md](platform-v2-2-sessions-content.md)
+- [platform-v2-3-remind-model.md](platform-v2-3-remind-model.md)
+- [platform-v2-4-entries-rescue.md](platform-v2-4-entries-rescue.md)
+- [platform-v2-5-extensions.md](platform-v2-5-extensions.md)
+- [platform-v2-6-packages.md](platform-v2-6-packages.md)
+- [platform-v2-7-system-modules.md](platform-v2-7-system-modules.md)
+- [platform-v2-8-calls-only.md](platform-v2-8-calls-only.md)
+- [platform-v2-9-owner-api.md](platform-v2-9-owner-api.md)
+- [platform-v2-10-ai-calls.md](platform-v2-10-ai-calls.md)
+- [platform-v2-11-provider-module.md](platform-v2-11-provider-module.md)
+- [platform-v2-12-provider-browser.md](platform-v2-12-provider-browser.md)
+- [platform-v2-13-modules-tools.md](platform-v2-13-modules-tools.md)
+- [platform-v2-14-contributions-events.md](platform-v2-14-contributions-events.md)
+- [platform-v2-15-multi-module-builds.md](platform-v2-15-multi-module-builds.md)
+- [platform-v2-16-module-secrets-requests.md](platform-v2-16-module-secrets-requests.md)
+- [platform-v2-17-approval-levels-model-tiers.md](platform-v2-17-approval-levels-model-tiers.md)
+- [platform-v2-18-activity.md](platform-v2-18-activity.md)
+- [platform-v2-19-reflection.md](platform-v2-19-reflection.md)
+- [platform-v2-20-system-apps.md](platform-v2-20-system-apps.md)
+- [platform-v2-21-memory.md](platform-v2-21-memory.md)
+- [platform-v2-23-app-pages.md](platform-v2-23-app-pages.md)
+- [platform-v2-24-timers.md](platform-v2-24-timers.md)
+- [platform-v2-25-contracts.md](platform-v2-25-contracts.md)
+- [platform-v2-26-mind.md](platform-v2-26-mind.md)
+- [platform-v2-27-trusted-local-evolution.md](platform-v2-27-trusted-local-evolution.md)
+- [platform-v2-28-mind-agenda.md](platform-v2-28-mind-agenda.md)
+- [platform-v2-29-content-refs.md](platform-v2-29-content-refs.md)
+- [platform-v2-30-secrets-for-tools.md](platform-v2-30-secrets-for-tools.md)

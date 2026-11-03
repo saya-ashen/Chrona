@@ -2,7 +2,7 @@
 
 状态：用户已确认（2026-10-24）。§11 第 1 步（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）、第 2 步（`listen` 多路径、web 改为路由调用、`chat.today`、回复推送）与第 3 步（删除内容区对外暴露、连接器与 `owner` 能力）已实现；第 4 步的行为在 v2-8 之前已存在（见 §9）。`planning` 自带的 `/api/planning` 页面要等它重建后才去掉（§8 末）。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
 
-> 当前准入以 [安全机制简化 §3.2](security-simplification.md) 为准：`uses` 仅作契约，`*` 仍可调用 `owner` 工具。
+> 当前准入以 [安全机制简化 §3.2](../security-simplification.md) 为准：`uses` 仅作契约，`*` 仍可调用 `owner` 工具。
 
 ## 1. 目标
 

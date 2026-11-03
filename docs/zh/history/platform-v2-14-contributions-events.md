@@ -2,7 +2,7 @@
 
 状态：已实现（2026-10-25）；与草案的差异见第 6 节。依赖 [v2-13](platform-v2-13-modules-tools.md)。
 
-> 模块调用准入已按 [安全机制简化 §3.2](security-simplification.md) 简化；以下回调只要求属于订阅者并对模块可见。
+> 模块调用准入已按 [安全机制简化 §3.2](../security-simplification.md) 简化；以下回调只要求属于订阅者并对模块可见。
 
 ## 1. 原则
 
