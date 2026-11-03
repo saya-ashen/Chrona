@@ -33,7 +33,7 @@ test("output contract impact is canonical, notices exact dependencies and remove
   expect(await moduleOutputImpacts(f.db, f.workspace.id, f.app.id, removedAndChanged)).toEqual([{ caller: "exact", targets: ["target.read", "target.gone"] }]);
 });
 
-test("wildcard is impacted only for owner-visible targets, and callers are recomputed from current active versions", async () => {
+test("wildcard is impacted only for owner-visible targets, and consumers are recomputed from current active versions", async () => {
   const f = await fixture();
   const next = manifest("target", [tool("read", output("integer"), ["owner"])]);
   expect(await moduleOutputImpacts(f.db, f.workspace.id, f.app.id, next)).toEqual([]);

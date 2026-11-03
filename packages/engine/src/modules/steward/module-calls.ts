@@ -26,13 +26,13 @@ export class CallError extends Error {
 }
 /**
  * A system module: part of Chrona, in-process. Its tools are declared like a module's and reached by the same routed
- * calls (visibility, callers, uses, recorded caller, async queue); its code is Chrona's, so it is never proposed,
+ * calls (visibility, recorded caller, async queue); its code is Chrona's, so it is never proposed,
  * built, sandboxed or paused, and its name is reserved.
  */
 /** `unrecorded`: tools called only synchronously whose arguments and results are never stored (credentials, model prompts and completions). */
 /** A system tool may validate with a full schema (`input`) instead of scalar parameters: system modules are Chrona's own code. */
 export type SystemTool = Omit<Tool, "output" | "examples"> & { input?: z.ZodType; output?: z.ZodType; documentation?: string; examples?: Json[]; sideEffects?: string[]; errors?: { code: string; description: string; recovery: string }[] };
-type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "callers" | "idempotent"> & { output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };
+type RoutedTool = Pick<Tool, "name" | "description" | "parameters" | "visibility" | "idempotent"> & { output?: unknown; examples?: unknown; sideEffects?: unknown; errors?: unknown };
 /**
  * `call`: the async call being delivered (absent for sync calls). v2-20: `description` and `sessions` (the conversation
  * source a system module does its work in) show it to the user as a read-only app.
@@ -86,25 +86,14 @@ async function resolveTarget(db: Db, workspaceId: string, target: string): Promi
   if (!manifest || !tool) return new CallError("not_found", `Tool ${target} not found`);
   return { module: { ...module, activeHash: module.activeHash }, tool };
 }
-/**
- * The target decides who may reach it: its visibility, and for modules (system ones too) its `callers` list.
- * A module reaches a `modules` tool it lists in `uses`, or one whose `callers` names it (v2-14: the target grants it);
- * with `uses: ["*"]` it reaches the tools open to the user (v2-8 §3).
- */
-export async function admitted(db: Db, caller: Caller, tool: RoutedTool, target: string) {
-  const name = callerName(caller);
-  if (!name) return tool.visibility.includes(caller.kind as Tool["visibility"][number]);
-  if (tool.callers && !tool.callers.includes(name)) return false;
-  if (caller.kind !== "module") return tool.visibility.includes("modules");
+/** Visibility defines the audience; `uses` is a contract, except `*` also reaches owner tools. */
+export async function admitted(db: Db, caller: Caller, tool: RoutedTool) {
+  if (!callerName(caller)) return tool.visibility.includes(caller.kind as Tool["visibility"][number]);
+  if (tool.visibility.includes("modules")) return true;
+  if (caller.kind !== "module" || !tool.visibility.includes("owner")) return false;
   const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } });
-  const manifest = moduleManifestSchema.safeParse(version?.manifest).data, uses = manifest ? grantedUses(manifest) : [];
-  // Past the check above, a `callers` list names this caller.
-  return ((uses.includes(target) || !!tool.callers) && tool.visibility.includes("modules")) || (uses.includes("*") && tool.visibility.includes("owner"));
-}
-/** v2-14: whether `target` names `module` in its `callers` (and is open to modules), so the caller need not list it in `uses`. */
-export async function callerGranted(db: Db, workspaceId: string, target: string, module: string) {
-  const resolved = await resolveTarget(db, workspaceId, currentTarget(target)).catch(() => null);
-  return !!resolved && !(resolved instanceof CallError) && !!resolved.tool.callers?.includes(module) && resolved.tool.visibility.includes("modules");
+  const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+  return !!manifest && grantedUses(manifest).includes("*");
 }
 /** A system module's errors as call errors: its own refusals keep their code. */
 function systemError(error: unknown) {
@@ -167,7 +156,7 @@ export function moduleToolExampleError(tool: Tool): string | null {
   }
   return null;
 }
-/** JSON Schema advertised to callers mirrors runtime validation at every object boundary. */
+/** JSON Schema advertised to consumers mirrors runtime validation at every object boundary. */
 export function normalizedToolInputSchema(tool: { parameters: Tool["parameters"] }) {
   const normalize = (parameter: import("@chrona/contracts/steward").ModuleToolParameter): Record<string, unknown> => {
     if (parameter.type === "array") return { type: "array", ...(parameter.description ? { description: parameter.description } : {}), items: normalize(parameter.items) };
@@ -285,7 +274,7 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
 async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target: string) {
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
   if (resolved instanceof CallError) throw resolved;
-  if (!await admitted(ports.db, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  if (!await admitted(ports.db, origin.caller, resolved.tool)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   const route = nextPath(origin);
   if (route.chain.includes(resolved.module.name)) throw new CallError("cycle", `${target}: ${resolved.module.name} is waiting on this call path (${route.chain.join(" → ")})`);
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
@@ -316,7 +305,7 @@ async function resolveEnqueueTarget(tx: Db, origin: CallOrigin, target: string, 
   const resolved = await resolveTarget(tx, origin.workspaceId, target);
   if (resolved instanceof CallError) {
     if (origin.caller.kind !== "kernel" && origin.caller.kind !== "system" && !(lenient && (resolved.code === "unavailable" || resolved.code === "not_found"))) throw resolved;
-  } else if (!await admitted(tx, origin.caller, resolved.tool, target)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  } else if (!await admitted(tx, origin.caller, resolved.tool)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
   return resolved;
 }
@@ -382,7 +371,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
   const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
   const caller = originOf(row, callerModule);
-  if (!await admitted(db, caller, resolved.tool, target)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
+  if (!await admitted(db, caller, resolved.tool)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
   let args;
   try { args = validArgs(resolved.tool, row.args); }
   catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }

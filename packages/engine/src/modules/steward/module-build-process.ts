@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { currentTarget, grantedUses, moduleCallReplySchema, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { currentTarget, moduleCallReplySchema, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { createModuleChannel } from "./module-channel";
 
-function buildCallResult(call: ModuleCall, manifest: ModuleManifest, seen: Set<string>): ReturnType<typeof moduleCallReplySchema.parse> {
+function buildCallResult(call: ModuleCall, seen: Set<string>): ReturnType<typeof moduleCallReplySchema.parse> {
   if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
-  const target = currentTarget(call.params.target), uses = grantedUses(manifest);
-  if (!uses.includes(target) && !uses.includes("*")) return { id: call.id, error: { code: "undeclared", message: `${target} is not in uses` } };
+  const target = currentTarget(call.params.target);
   if (call.params.mode === "async") {
     const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
     seen.add(key);
@@ -37,7 +36,7 @@ export async function withBuildProcess<T>(context: ModuleContext, staging: strin
     channel = await createModuleChannel(join(dir, "s"), { onCall: async call => {
       calls.push(call);
       // Routed calls are answered, never routed: a build reaches no other module, no credential and no model.
-      return buildCallResult(call, manifest, seen);
+      return buildCallResult(call, seen);
     } });
     const { contentDir, httpDir } = await createBuildDirs(data, dir, manifest);
     process = context.ports.sandbox.startModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), entry: manifest.entry, socketPath: join(dir, "s"), network: false, ...(manifest.limits ? { memoryMb: manifest.limits.virtualMemoryMb } : {}) });

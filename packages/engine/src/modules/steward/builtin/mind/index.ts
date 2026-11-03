@@ -80,7 +80,7 @@ function items(module: string, output: unknown): Item[] {
     return [{ module, id: item.id, kind, title: clip(item.title.trim(), 120), ...(at ? { at } : {}) }];
   });
 }
-/** v2-28 §4.1: apps opt in with contributes.mind.attention, a tool that names mind among its callers; a slow or broken app never blocks sensing. */
+/** v2-28 §4.1: apps opt in with contributes.mind.attention, a tool visible to modules; a slow or broken app never blocks sensing. */
 async function attention() {
   const declared = await chrona.call("modules.contributions", { section: "mind" }).catch(() => []) as { module: string; value: unknown }[];
   const sources = (Array.isArray(declared) ? declared : []).flatMap(({ module, value }) => {

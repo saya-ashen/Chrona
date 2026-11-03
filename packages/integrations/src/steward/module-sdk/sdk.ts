@@ -108,11 +108,11 @@ export const paths = {
 export const chrona = {
   paths,
   /**
-   * Calls another module's tool through Chrona (`target` = "<module>.<tool>", listed in the manifest's `uses`).
+   * Calls another module's tool through Chrona (`target` = "<module>.<tool>"); `uses` declares its contract, not runtime admission.
    * sync (default): resolves to the tool's result; a timeout or crash after delivery rejects with code "unknown".
    * async: needs a `key` (a repeat returns the same call) and resolves at once to { callId, status };
    * `reply: true` delivers a `call_result` event later. Rejections are ModelError with a code
-   * (undeclared, forbidden, not_found, cycle, unknown, failed, unavailable, invalid).
+   * (forbidden, not_found, cycle, unknown, failed, unavailable, invalid).
    */
   call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,

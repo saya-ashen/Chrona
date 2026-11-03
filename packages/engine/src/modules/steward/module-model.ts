@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { grantedUses, THINKING_LEVELS, tierTarget } from "@chrona/contracts/steward";
+import { THINKING_LEVELS, tierTarget } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import type { CallScope } from "./module-supervisor";
@@ -20,7 +20,7 @@ function overDaily(settings: NonNullable<ReturnType<typeof moduleModelSettings>>
   return todays.length >= settings.dailyCalls || (own !== undefined && todays.filter(row => row.moduleId === scope.moduleId).length >= own);
 }
 async function completionBudgetError({ tx, ports, scope, params, workspace, settings, now }: { tx: Prisma.TransactionClient; ports: StewardPorts; scope: CallScope; params: ModelParams; workspace: { settings: unknown }; settings: ReturnType<typeof moduleModelSettings>; now: Date }): Promise<ModelError | null> {
-  if (!grantedUses(scope.manifest).includes("provider.complete") || !scope.manifest.model) return "undeclared";
+  if (!scope.manifest.model) return "undeclared";
   if (!settings || !Object.hasOwn(settings.models, scope.manifest.model.tier) || !ports.provider?.complete) return "unconfigured";
   const eventCalls = scope.moduleRunId ? await tx.moduleCall.count({ where: { moduleRunId: scope.moduleRunId, method: "model" } }) : Infinity;
   const timezone = notificationSettings(workspace.settings).timezone, day = localDayKey(now, timezone);

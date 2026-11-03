@@ -11,7 +11,7 @@ import type { StewardPorts } from "./ports";
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 
-test("content.read: a module that declared it reads another app's content by reference; others are refused; sizes and paths are bounded", async () => {
+test("content.read: any module reads app content by reference; sizes and paths are bounded", async () => {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-content-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const w = (await db.workspace.create({ data: { name: "content" } })).id;
@@ -29,8 +29,8 @@ test("content.read: a module that declared it reads another app's content by ref
   };
   expect(await caller("mcp", ["content.read"], "image-generation/cat.png")).toMatchObject({ result: { output: {
     ref: "image-generation/cat.png", name: "cat.png", mime: "image/png", bytes: 9, base64: Buffer.from("png-bytes").toString("base64"), sha256: expect.stringMatching(/^[a-f0-9]{64}$/) } } });
-  // Not declared in `uses` (so never approved): refused, even for an entry module.
-  expect(await caller("web", [], "image-generation/cat.png")).toMatchObject({ error: { code: "undeclared" } });
+  // Visibility admits the call even without a uses contract.
+  expect(await caller("web", [], "image-generation/cat.png")).toMatchObject({ result: { output: { name: "cat.png", bytes: 9 } } });
   expect(await caller("mcp", ["content.read"], "image-generation/big.png")).toMatchObject({ error: { code: "invalid" } });
   expect(await caller("mcp", ["content.read"], "image-generation/../../secret")).toMatchObject({ error: { code: "invalid" } });
   expect(await caller("mcp", ["content.read"], "nobody/cat.png")).toMatchObject({ error: { code: "not_found" } });

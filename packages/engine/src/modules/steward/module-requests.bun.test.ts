@@ -54,7 +54,7 @@ test("any module may declare a credential the user saves on the page; values nev
   const list = (await page.call("secrets.list", {})).output;
   expect(list).toEqual([{ name: "okx_demo", configured: true, updatedAt: expect.any(String), modules: ["trader"] }]);
   expect((await trader.call("secrets.get", { name: "okx_demo" })).output).toEqual({ value: { apiKey: "k-secret", passphrase: "p" } });
-  await expect(page.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "undeclared" });
+  await expect(page.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "forbidden" });
   // Neither the value written nor the value read is kept in call records.
   expect(JSON.stringify(await f.db.moduleInvocation.findMany())).not.toContain("k-secret");
   // v2-18: the change shows in the activity trail by name only.
@@ -101,7 +101,7 @@ test("approvals.request waits for the user's decision and sends it back; approve
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: String(second.callId) } })).toMatchObject({ status: "succeeded", output: { approval: next.id, decision: "denied" } });
 });
 
-test("v2-17: modules.permissions gathers one app's capabilities, grants, credentials, model use and approvals, for the page only", async () => {
+test("v2-17: modules.permissions gathers one app's capabilities, grants, credentials, model use and approvals, visible to modules", async () => {
   const f = await fixture();
   const trader = await f.moduleNamed("trader", { effects: ["network", "model"], model: { tier: "strong", maxCalls: 1, maxOutputTokens: 100 }, secrets: ["okx_demo"], uses: ["approvals.request"], tools: [{ name: "start", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
   const web = await f.moduleNamed("web", { uses: ["chat.send", "secrets.set"] });
@@ -117,5 +117,5 @@ test("v2-17: modules.permissions gathers one app's capabilities, grants, credent
     grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", status: "open" }],
   });
   expect(JSON.stringify(view)).not.toContain("k-secret");
-  await expect(other.call("modules.permissions", { module: "trader" })).rejects.toMatchObject({ code: expect.stringMatching(/forbidden|undeclared/) });
+  expect((await other.call("modules.permissions", { module: "trader" })).output).toEqual(view);
 });

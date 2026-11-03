@@ -94,7 +94,7 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
       const message = moduleEventMessageSchema.parse({ id: randomUUID(), event });
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));
       const run = queue.then(() => new Promise<EventReply>((resolve, reject) => {
-        // `written` tells callers whether the module may have seen the event (and acted on it).
+        // `written` tells consumers whether the module may have seen the event (and acted on it).
         let expired = false, written = false;
         const fail = (error: Error) => reject(Object.assign(error, { written }));
         const timer = timers.setTimeout(() => { expired = true; pending = undefined; fail(new Error("Module event timeout")); }, timeoutMs);

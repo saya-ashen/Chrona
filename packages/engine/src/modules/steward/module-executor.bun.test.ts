@@ -70,12 +70,12 @@ test("approved module fires through notification budget without a Provider Run; 
   expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
 });
 
-test("undeclared wake_provider is dropped and recorded without creating a Run", async () => {
+test("provider.wake runs without a uses declaration and records the call", async () => {
   const f = await fixture();
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake] }), error: null });
   await f.fire();
-  expect(await f.db.run.count()).toBe(0);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", key: "provider.wake", status: "rejected", error: "undeclared" });
+  expect(await f.db.run.count()).toBe(1);
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "executed", error: null });
 });
 
 test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {

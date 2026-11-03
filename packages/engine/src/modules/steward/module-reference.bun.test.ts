@@ -57,7 +57,7 @@ test("development reference exposes exact contracts, synthetic non-empty example
   expect([prices!.versions.map(version => version.hash), prices!.versionCount]).toEqual([["v6", "v5", "v4", "v3", "v2"], 7]);
   const result = await f.call("m_modules_reference", { target: "modules.diagnostics" });
   expect(result).toMatchObject({ target: "modules.diagnostics", inputSchema: { type: "object", properties: { module: { type: "string" } } },
-    outputSchema: { type: "array" }, admission: { callers: ["web", "mcp"], uses: "modules.diagnostics" }, contractHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    outputSchema: { type: "array" }, admission: { visibility: ["modules", "provider", "owner"], uses: "modules.diagnostics" }, contractHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
   const reference = result as { examples: unknown[]; documentation: string; contractHash: string };
   expect(reference.examples.map(example => moduleDiagnosticsOutputSchema.parse(example)[0]!.incidents[0]!.status)).toEqual(["retrying", "unresolved", "verifying", "recovered"]);
   expect(reference.documentation).toContain("never replay");

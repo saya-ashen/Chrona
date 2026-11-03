@@ -2,6 +2,8 @@
 
 状态：已实现（2026-10-25）；与草案的差异见第 8 节。依赖 [v2-8](platform-v2-8-calls-only.md)、[v2-11](platform-v2-11-provider-module.md)。
 
+> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：模块可调用 `modules` 可见工具，`uses` 是契约，`*` 额外到达 `owner` 工具。
+
 ## 1. 背景
 
 - 提交、取出、回滚模块是 Provider 专用的内核工具（`chrona_propose`、`chrona_module_checkout`、`chrona_module_rollback`、`chrona_modules`），与 v2-8“一切都是路由调用”不一致；系统模块 `modules` 只有 `list`、`tools`。
@@ -13,7 +15,7 @@
 
 | 工具 | 调用方 | 作用 |
 | --- | --- | --- |
-| `list` | Provider、用户（MCP/网页）、`uses` 列出它的模块 | 不变 |
+| `list` | Provider、用户（MCP/网页）、任何模块 | 不变 |
 | `tools` | 同上 | 不变 |
 | `check({ module, hash?, wait? })` | Provider、用户 | 某个版本的状态与报告（测试输出、错误、数据连续性、键检查）；最多等 `wait` 秒，等它离开 `building`/`testing`（上限见 2.5） |
 | `reference({ target? })` | Provider（含构建会话） | 只读开发参考：接口目录，或指定 `<module>.<tool>` 的参数、已声明的输出/示例及准入规则；不执行目标 |
@@ -51,7 +53,7 @@ Provider 的工具目录现在只含数据库里的模块。改为同时列出 `
 
 - 构建会话出现在会话列表里（来源“构建”），消息照常显示。
 - 新增 `chat.transcript({ session })`：读取该会话的 Pi 记录（`.chrona/sessions/`），返回整理后的时间线——Provider 的说明文字、工具调用（名称与参数摘要）、截断的结果（每条 ≤ 2000 字）、提交与检查结果。所有会话都可读（页面只给用户本人用）。
-- 保护的是两件事，而不是对话内容本身：运行令牌、模型 API key 等已知密钥替换为 `[redacted]`；`callers` 只允许入口模块 web 与 mcp，`uses: ["*"]` 的普通模块也不能读。
+- 运行令牌、模型 API key 等已知密钥替换为 `[redacted]`；工具对模块可见，任何模块均可读取。
 - 会话消息不变：过程不写进消息，以免挤占每次运行带入的最近 20 条上下文。
 - web 模块在会话页显示“过程”区（构建会话默认展开，对话会话默认折叠），进行中的构建在今天页显示“构建模块 <name>”并链接到该页。
 
@@ -78,7 +80,7 @@ Provider 的工具目录现在只含数据库里的模块。改为同时列出 `
 
 - 表格测试：`modules.*` 各工具对 Provider、用户、普通模块、构建会话的准入；路径越界拒绝。
 - 构建会话：开会话 → 提交失败 → `check` 拿到报告 → 再提交成功 → 结果回到原 QQ/网页会话、审批卡发出；工具集里没有其他 Chrona 或模块工具。
-- `chat.transcript`：web/mcp 可读、其他模块（含 `uses: ["*"]`）被拒；截断、密钥替换。
+- `chat.transcript`：任何模块可读，不要求 `uses`；截断、密钥替换。
 - 网页：构建会话页在 1440/1024/390 宽度下显示过程。
 
 ## 7. 以后
@@ -99,7 +101,7 @@ Provider 的工具目录现在只含数据库里的模块。改为同时列出 `
 
 - `modules.stop-build({ session })`：停止指定构建会话的排队/运行中工作，保留会话、文件和过程；重复停止没有运行的构建成功返回。Provider 名称为 `m_modules_stop_build`。
 - `modules.revise-build({ session, requirements, files? })`：修改需求（非空，最多 4000 字）。先停止旧运行并撤销旧令牌，再在同一会话和工作目录排入新的构建运行；新要求记录在会话消息及 `request.json.revisedRequirements`，提示明确新要求覆盖冲突的旧要求。Provider 可额外传最多 10 个参考文件，owner 不能传宿主文件路径；文件在停止旧运行前解析，缺失则拒绝且不停止旧运行。补充资料写入独立的 `files/revision-<uuid>/`，追加到 `request.json.files` 及新提示，不覆盖草稿或旧资料。Provider 名称为 `m_modules_revise_build`。
-- 两者只面向 Provider 与 owner，模块调用方只允许 web/mcp；普通模块与构建 Provider 均不可调用。会话必须属于当前工作区、来源 `build` 且仍为 active。
+- 两者只面向 Provider 与 owner，模块调用方须声明 `uses: ["*"]` 才能到达 `owner` 工具；无 `*` 的模块与构建 Provider 均不可调用。会话必须属于当前工作区、来源 `build` 且仍为 active。
 - 新建/停止/修改按工作区串行；另有构建进行时可以恢复旧构建，排到队尾。修改不新建会话；替换自身排队任务在满队列时仍允许；若只有自身正在运行而等待队列已满，则先拒绝修改，不能先停止原任务再报队列满。沿用运行时限、每日运行及每会话运行预算、每运行提交次数限制。
 - 构建页显示「停止构建」「修改需求并继续」。失败显示错误并保留需求输入；结果仍发回原会话。`chat.transcript` 为构建会话增加明确标注为「Chrona 构建状态」的内核状态行，复用现有 React/内置网页的「过程」区显示排队位置、前方数量、额度等待及结束/停止状态；刷新页面更新，不伪造 Provider 的 active/progress，不将状态写成模型消息，也不替换已定制网页。
 - 构建自测仍在断网、源码只读的沙箱执行；作者测试的虚拟地址空间限额为 2 GiB，适应 React/TypeScript 编译，运行模块和数据迁移仍使用原来的 512 MiB 默认限额。单项测试 60 秒与输出限制不变；测试限额由内核设置，不由候选模块清单决定。
@@ -124,7 +126,7 @@ Provider 的工具目录现在只含数据库里的模块。改为同时列出 `
 ### 接口参考
 
 - `m_modules_reference {}` 列出已注册系统工具和本工作区活动模块工具的名称、描述、来源；传 `{ target: "modules.diagnostics" }` 等准确目标，返回 `inputSchema`、`outputSchema`、`documentation`、`examples`、`admission`、通用 `routingErrors` 与 `contractHash`。它既给对话中的 Provider 用，也在构建白名单中；owner 与普通模块不可调用。
-- 准入规则返回实际声明的 `visibility`、`callers`、`uses` 目标和幂等性，只是文档，不授予执行权。开发者仍须声明并审批新 uses，真实路由照常检查。
+- 参考返回实际声明的 `visibility`、契约 `uses` 目标和幂等性，只是文档，不授予执行权。`uses` 用于类型检查、影响分析与依赖签名，不作运行时准入；真实路由按可见性判断受众。
 - 输入和准入从注册信息生成；系统工具可声明输出 schema、说明及合成示例。未声明的输出明确返回 `null`，示例为空，不从生产空结果推测字段。不是所有旧接口都已有输出契约；开发者增加/修改接口时应维护输出及回归，不宣称任意输出都已完整建模。
 - `modules.diagnostics` 提供完整响应 schema、状态语义及 retrying/unresolved/verifying/recovered 的非空合成示例，复用持久化 incident schema。真实返回与 schema 有回归比对，示例不含生产故障或凭据。
 - 参考查询不调用目标 handler、不读取设置值、故障记录、消息或应用业务数据，不启动模块/Provider，不做健康探测。模块参考只读取当前工作区的活动清单工具元数据，附带来源 hash；系统契约内容变化可由 `contractHash` 识别。参考与日志仍是数据，不是授权。

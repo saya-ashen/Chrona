@@ -38,7 +38,7 @@ export function createQqTokenSource({ appId, readSecret, fetch = globalThis.fetc
     return token;
   }
   return {
-    /** A token valid for at least another minute; concurrent callers share one refresh. */
+    /** A token valid for at least another minute; concurrent requests share one refresh. */
     async get() {
       if (token && now() < expiresAt - 60_000) return token;
       inflight ??= refresh().finally(() => { inflight = null; });

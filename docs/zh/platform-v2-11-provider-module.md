@@ -20,4 +20,4 @@ v2-10 之后模块已经只通过路由调用使用 AI（`ai.complete`、`ai.wak
 
 ## 4. 兼容
 
-已批准的模块版本按内容哈希绑定，其 `uses` 和代码中的 `ai.complete` / `ai.wake` 继续有效：`currentTarget` 把它们映射到 `provider.*`，用于 `grantedUses`、模块调用检查、路由（含升级前已排队的调用）、构建内核与测试内核。所有模块重建后删除这个映射，与 v2-10 的旧声明一起收尾。
+已批准的模块版本按内容哈希绑定，其 `uses` 和代码中的 `ai.complete` / `ai.wake` 继续有效：`currentTarget` 把它们映射到 `provider.*`，用于 `grantedUses` 的契约分析、路由目标解析（含升级前已排队的调用）、构建内核与测试内核；`uses` 不再作运行时准入，见 [安全机制简化 §3.2](security-simplification.md)。所有模块重建后删除这个映射，与 v2-10 的旧声明一起收尾。

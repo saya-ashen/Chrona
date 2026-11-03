@@ -2,6 +2,8 @@
 
 状态：已实现（2026-10-27），未部署；用户已确认范围。依赖 [v2-14](platform-v2-14-contributions-events.md)、[v2-16](platform-v2-16-module-secrets-requests.md)、[v2-20](platform-v2-20-system-apps.md)。验证记录见 `.agent-artifacts/v2-21-spike/notes.md`。
 
+> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：删除点名调用名单；`kernel` 可见工具仍只接受内核调用。
+
 ## 1. 背景与原则
 
 Chrona 现在只有一张平铺的 `preferences` 表。用户不想再维护一套记忆系统，也可能想接入自己正在用的（Hindsight、Mem0 OpenMemory、Basic Memory 等）。调研结论：记忆系统没有统一标准，主流系统都提供“存、搜、删”三类操作，只是名称和接入方式不同（MCP、HTTP、SDK）。
@@ -14,7 +16,7 @@ Chrona 现在只有一张平铺的 `preferences` 表。用户不想再维护一�
 
 ## 2. 记忆接口
 
-提供者模块在 manifest 声明 `contributes: { memory: { interface: 1 } }`，并提供三个工具（`callers: ["memory"]`，只给内核的 memory 系统模块调用）：
+提供者模块在 manifest 声明 `contributes: { memory: { interface: 1 } }`，并提供三个工具（`visibility: ["kernel"]`，由内核的 memory 接口转发调用）：
 
 | 工具 | 输入 | 输出 |
 |---|---|---|
@@ -26,7 +28,7 @@ Chrona 现在只有一张平铺的 `preferences` 表。用户不想再维护一�
 
 - 设置 `memory = { provider: 模块名 | null }`，默认 `null`。只接受声明了 `contributes.memory` 且三个工具齐全的活动模块。
 - 工具（转发给提供者）：
-  - `memory.recall({ query, limit? })`、`memory.retain({ content })`、`memory.forget({ id })`：Chrona（Provider）可用，在对话中以 `m_memory_*` 出现（未启用时不出现）；网页与 MCP 也可用（`callers: ["web", "mcp"]`）。写入内容先经敏感信息清理。
+  - `memory.recall({ query, limit? })`、`memory.retain({ content })`、`memory.forget({ id })`：Chrona（Provider）可用，在对话中以 `m_memory_*` 出现（未启用时不出现）；网页与 MCP 也可用（按工具的 `visibility` 判断受众）。写入内容先经敏感信息清理。
   - `memory.status()`：当前设置、是否可用、24 小时内写入/检索/删除次数；仅网页与 MCP。
   - 提供者工具 `visibility: ["kernel"]`，只有内核能调用；外部适配模块同样如此。
   - `retain` 由内核补上 `source`（哪类会话、会话 id）与时间，模型不能伪造来源。

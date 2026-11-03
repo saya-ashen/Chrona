@@ -114,11 +114,11 @@ test("approvals through the approvals system module; other modules and Chrona it
   await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: "p1", manifest: { name: "prices", entry: "index.ts", tests: ["test.ts"] }, source: "build", intent: {}, report: {}, status: "approved" } });
   expect(await f.api.modules.lifecycle("enable", app.id, { reason: "修好了" }, false)).toMatchObject({ status: "active" });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).status).toBe("active");
-  // A module without these in `uses` is refused; so is a kernel-origin call (entry modules only).
+  // Listing approvals is module-visible without uses; kernel origins are not in its audience.
   const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
   const other = await f.db.module.create({ data: { workspaceId: f.w, name: "other", activeHash: "o" } });
   const reply = await handleModuleCall(f.ports, { workspaceId: f.w, moduleId: other.id, hash: "o", manifest }, { id: "1", method: "call", params: { target: "approvals.list", args: {}, mode: "sync", reply: false } });
-  expect(reply).toMatchObject({ error: { code: "undeclared" } });
+  expect(reply).toMatchObject({ result: { output: [] } });
   await expect(callSync(f.ports, kernelOrigin(f.w), "chat.send", { key: "qq:dm", text: "x", channel: "chrona_qqbot" })).rejects.toMatchObject({ code: "forbidden" });
   // Declaring them makes a module an entry module (never activated automatically); system names are reserved.
   expect(moduleManifestSchema.parse({ ...manifest, uses: ["chat.send"] })).toMatchObject({ uses: ["chat.send"] });
@@ -230,8 +230,8 @@ test("settings, grants, preferences and schedules are system interfaces for entr
   const schedule = await createSchedules(f.ports, f.w).create(origin.id, { mode: "wake", rule: { kind: "daily", time: "09:00" }, text: "check", label: "Check" });
   expect(await web.call("schedules.list", {})).toMatchObject([{ id: schedule.id, status: "active" }]);
   expect(await web.call("schedules.update", { schedule: schedule.id, status: "paused" })).toMatchObject({ status: "paused" });
-  // QQ does not list them, so it cannot change settings.
-  await expect(f.qq.call("settings.update", { settings: "{}" })).rejects.toMatchObject({ code: "undeclared" });
+  // QQ is an entry module; omitted uses entries no longer block module-visible calls.
+  expect(await f.qq.call("settings.update", { settings: "{}" })).toBeDefined();
 });
 
 test("the earliest web replies (attachments with path, no ref) still read: name kept, no file", async () => {

@@ -267,7 +267,7 @@ function tabs(base, list, current) {
 }
 async function systemApp(name, opened, tab = "overview") {
   const view = await web(`/modules/${encodeURIComponent(name)}/overview`), base = `/apps/system/${encodeURIComponent(name)}`;
-  const who = tool => tool.callers ? `仅 ${tool.callers.join("、")}` : tool.visibility.includes("provider") ? "Chrona" : "声明了它的应用";
+  const who = tool => tool.visibility.includes("provider") ? "Chrona" : tool.visibility.includes("modules") ? "其他应用" : "用户入口";
   const current = opened ? "overview" : tab;
   const panels = {
     overview: async () => [h("p", {}, view.description), name === "memory" ? await memoryPanel() : "",

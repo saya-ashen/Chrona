@@ -117,8 +117,8 @@ class ChatService {
     const { db } = this.ports;
     const run = await db.run.findUniqueOrThrow({ where: { id: runId } });
     if (["failed", "provider_unavailable"].includes(run.status)) {
-      const callers = await db.audit.findMany({ where: { workspaceId, kind: "chat_caller" }, orderBy: { createdAt: "asc" } });
-      for (const caller of callers) {
+      const origins = await db.audit.findMany({ where: { workspaceId, kind: "chat_caller" }, orderBy: { createdAt: "asc" } });
+      for (const caller of origins) {
         const saved = callerSchema.safeParse(caller.details);
         if (!saved.success || saved.data.runId !== runId) continue;
         const inbound = caller.subjectId ? await db.message.findUnique({ where: { id: caller.subjectId } }) : null;
@@ -249,7 +249,7 @@ class ChatService {
       return { runId, sessionId: inbound.sessionId, messages: rows.map(toMessage) };
     });
   }
-  /** Trusted transport bytes only; paths are generated, never supplied by callers. */
+  /** Trusted transport bytes only; paths are generated, never supplied by consumers. */
   async intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
     if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
     const attachments: NonNullable<ChatInput["attachments"]> = [];

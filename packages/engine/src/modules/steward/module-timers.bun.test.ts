@@ -64,15 +64,15 @@ test("a module arranges, replaces, lists and cancels its own timers; each fires 
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "schedule_created" } })).toMatchObject({ actorKey: "module:calendar" });
 });
 
-test("timers stay the module's own: undeclared callers are refused, keys are per module, bad input is invalid", async () => {
+test("timers stay the module's own without uses admission: keys are per module, bad input is invalid", async () => {
   const f = await fixture();
   const calendar = await f.app("calendar", TIMERS), other = await f.app("other", TIMERS), plain = await f.app("plain", []);
   await calendar.call("schedules.create", timer("shared", "calendar's"));
-  await expect(plain.call("schedules.create", timer("x", "nope"))).rejects.toMatchObject({ code: "undeclared" });
+  await plain.call("schedules.create", timer("x", "no uses contract"));
   expect(await other.call("schedules.cancel", { key: "shared" })).toEqual({ cancelled: false });
   await other.call("schedules.create", timer("shared", "other's"));
   expect(await calendar.call("schedules.mine", {})).toMatchObject([{ payload: { text: "calendar's" } }]);
-  expect(await f.db.schedule.count({ where: { status: "active" } })).toBe(2);
+  expect(await f.db.schedule.count({ where: { status: "active" } })).toBe(3);
   await expect(calendar.call("schedules.create", { ...timer("big", "x"), payload: JSON.stringify({ text: "x".repeat(4001) }) })).rejects.toMatchObject({ code: "invalid" });
   await expect(calendar.call("schedules.create", { ...timer("bad", "x"), rule: "{" })).rejects.toMatchObject({ code: "invalid" });
   await expect(calendar.call("schedules.create", { ...timer("fast", "x"), rule: JSON.stringify({ kind: "every", minutes: 1 }) })).rejects.toMatchObject({ code: "invalid" });
@@ -87,7 +87,7 @@ test("a module keeps at most the limit of timers; replacing an existing key stil
   expect(await calendar.call("schedules.create", timer("k0", "replaced"))).toMatchObject({ label: "replaced" });
 });
 
-test("a version that drops schedules.create ends the module's timers; one that keeps it keeps them", async () => {
+test("timers survive activation even when the new version drops the schedules.create contract", async () => {
   const f = await fixture();
   const calendar = await f.app("calendar", TIMERS);
   await calendar.call("schedules.create", timer("keep", "x", "2026-11-01T00:00:00.000Z"));
@@ -96,5 +96,6 @@ test("a version that drops schedules.create ends the module's timers; one that k
   expect(await f.db.schedule.findFirstOrThrow({ where: { text: "keep" } })).toMatchObject({ status: "active" });
   await f.app("calendar", [], "calendar-3");
   await f.api.modules.activate(calendar.module.id, "calendar-3", "activate");
-  expect(await f.db.schedule.findFirstOrThrow({ where: { text: "keep" } })).toMatchObject({ status: "cancelled", nextAt: null });
+  expect(await f.db.schedule.findFirstOrThrow({ where: { text: "keep" } })).toMatchObject({ status: "active" });
+  expect(await f.api.schedules.fireDue(new Date("2026-11-01T00:00:00.000Z"))).toBe(1);
 });

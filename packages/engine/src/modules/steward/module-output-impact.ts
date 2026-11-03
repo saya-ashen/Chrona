@@ -9,7 +9,7 @@ const canonical = (value: unknown): string => {
 type Db = StewardPorts["db"];
 export type OutputImpact = { caller: string; targets: string[] };
 
-/** Current active callers whose declared uses point at a changed/removed target contract. */
+/** Current active consumers whose declared uses point at a changed/removed target contract. */
 // eslint-disable-next-line complexity -- Preserve exact versus wildcard visibility checks and caller-impact ordering for approval safety.
 export async function moduleOutputImpacts(db: Db, workspaceId: string, moduleId: string, nextManifest: ReturnType<typeof moduleManifestSchema.parse>): Promise<OutputImpact[]> {
   const module = await db.module.findUnique({ where: { id: moduleId } });
@@ -29,9 +29,9 @@ export async function moduleOutputImpacts(db: Db, workspaceId: string, moduleId:
   for (const [name, next] of nextTools) if (!oldTools.has(name) && (next.visibility.includes("modules") || next.visibility.includes("owner")))
     changed.set(`${module.name}.${name}`, { exact: next.visibility.includes("modules"), wildcard: next.visibility.includes("owner") });
   if (!changed.size) return [];
-  const callers = await db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null }, id: { not: moduleId } }, orderBy: { name: "asc" } });
+  const consumers = await db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null }, id: { not: moduleId } }, orderBy: { name: "asc" } });
   const impacts: OutputImpact[] = [];
-  for (const caller of callers) {
+  for (const caller of consumers) {
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.id, hash: caller.activeHash! } } });
     const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
     if (!manifest) continue;

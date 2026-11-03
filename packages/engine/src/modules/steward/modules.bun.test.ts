@@ -1104,11 +1104,11 @@ test("removing an app asks once from any entry; built-ins are refused; data and 
 
 test("the review shows output contracts and examples as digests, and every authority field in full", () => {
   const output = { type: "object", properties: Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`field${i}`, { type: "string" }])) };
-  const tool = { name: "search", description: "Search", visibility: ["owner", "modules"], callers: ["web", "mcp"], parameters: { type: "object", properties: {} }, output, examples: [{ args: {}, result: {} }] };
+  const tool = { name: "search", description: "Search", visibility: ["owner", "modules"], parameters: { type: "object", properties: {} }, output, examples: [{ args: {}, result: {} }] };
   const shown = reviewManifest({ name: "mail", entry: "index.ts", tests: ["test.ts"], effects: ["network"], secrets: ["mail_oauth"], tools: [tool] });
   expect(shown).toContain('"output": "sha256:');
   expect(shown).toContain('"examples": "sha256:');
   expect(shown).not.toContain("field199");
-  for (const kept of ['"mcp"', '"modules"', '"mail_oauth"', '"network"']) expect(shown).toContain(kept);
+  for (const kept of ['"owner"', '"modules"', '"mail_oauth"', '"network"']) expect(shown).toContain(kept);
   expect(shown.length).toBeLessThan(JSON.stringify(output).length / 2);
 });

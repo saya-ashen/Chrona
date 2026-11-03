@@ -165,7 +165,7 @@ try {
   process.env.CHRONA_DATA = sdkDir;
   let mod: Awaited<ReturnType<typeof startModule>> | undefined;
   try {
-    const start = () => startModule("index.ts", { grants: ["qq.deliver"], stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
+    const start = () => startModule("index.ts", { stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
     mod = await start();
     let n = 0;
     const tool = (id: string, args: Record<string, unknown>) => mod!.send({ trigger: { kind: "tool", id, args, firedAt: new Date(noon.getTime() + n++ * 1000).toISOString(), caller: id === "channel" ? channelOwner : kernel }, now: noon.toISOString(), params: {} });

@@ -190,7 +190,7 @@ test("version switch drains old event while new events use the new process; stop
   await until(() => f.processes[0]!.socket.destroyed);
   await f.supervisor.stop(); expect(f.processes.every(process => process.socket.destroyed)).toBe(true);
 });
-test("events are serial and calls carry event-scoped dedupe; undeclared calls recorded", async () => {
+test("events are serial and calls without uses are executed and recorded", async () => {
   let active = 0, maximum = 0;
   const f = await fixture({ effects: [], handler: async (_event, call) => {
     maximum = Math.max(maximum, ++active);
@@ -199,12 +199,12 @@ test("events are serial and calls carry event-scoped dedupe; undeclared calls re
   } });
   const replies = await Promise.all([f.deliver(), f.deliver()]);
   expect(maximum).toBe(1); expect(f.processes).toHaveLength(1);
-  expect(replies[0]).toMatchObject({ result: { result: { error: { code: "undeclared" } } } });
+  expect(replies[0]).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
   expect(await f.db.moduleCall.findMany()).toHaveLength(2);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "rejected", error: "undeclared", moduleRunId: expect.any(String) });
+  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "executed", error: null, moduleRunId: expect.any(String) });
 });
 test("duplicate keys return duplicate and a different event does not swallow the next notification", async () => {
-  // The deprecated notify_user effect stands for notify.send (grantedUses), so this older manifest still may call it.
+  // The deprecated notify_user effect remains a notify.send contract for this older manifest.
   // Keys scoped to the event, as the SDK shorthands send them.
   const f = await fixture({ handler: async (event, call) => ({ result: await call("call", { target: "notify.send", args: { key: `${event.trigger.firedAt}:key`, level: "now", title: "Title", body: "Body" }, mode: "async", key: `${event.trigger.firedAt}:key` } as never) }) });
   expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });

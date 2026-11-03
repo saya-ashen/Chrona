@@ -5,7 +5,7 @@ import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/stewar
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
-import { callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
+import { admitted, callSync, callsSettled, enqueueCall, kernelOrigin, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
 import { callModuleTool } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
@@ -25,7 +25,7 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
     alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }],
       uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong")] },
     beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], uses: ["alpha.pong"],
-      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { callers: ["gamma"] }), tool("hidden", { visibility: ["provider", "owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("granted", { callers: ["alpha"] })],
+      tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
       contributes: { alpha: { hello: "from beta" }, gamma: { secret: true } } },
   };
   const modules: Record<string, { id: string }> = {};
@@ -85,6 +85,31 @@ test("structured native arguments survive sync and async routed delivery", async
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: args }, { key: "native-args", reply: false });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", output: args });
+});
+
+test("visibility admission is independent of target contracts; only uses star reaches owner-only tools", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } } });
+  for (const uses of [[], ["beta.hidden"], ["*"]]) {
+    const manifest = moduleManifestSchema.parse({ ...row.manifest as object, uses });
+    await f.db.moduleVersion.update({ where: { id: row.id }, data: { manifest } });
+    const moduleCaller = { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" };
+    for (const [caller, visibility, expected] of [
+      [moduleCaller, ["modules"], true],
+      [moduleCaller, ["owner"], uses.includes("*")],
+      [moduleCaller, ["provider"], false],
+      [moduleCaller, ["kernel"], false],
+      [{ kind: "system", module: "chat" }, ["modules"], true],
+      [{ kind: "system", module: "chat" }, ["owner"], false],
+      [{ kind: "owner", via: null }, ["owner"], true],
+      [{ kind: "owner", via: null }, ["modules"], false],
+      [{ kind: "provider", runId: "test" }, ["provider"], true],
+      [{ kind: "kernel" }, ["kernel"], true],
+    ] as const) {
+      const targetTool = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], tools: [tool("echo", { visibility })] }).tools[0]!;
+      expect(await admitted(f.db, caller, targetTool)).toBe(expected);
+    }
+  }
 });
 
 test("A calls B through Chrona: B sees the real caller and the call is recorded", async () => {
@@ -172,17 +197,17 @@ test("output mismatch audit persistence failure stays a call failure without tra
   expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(1);
 });
 
-test("undeclared targets, hidden tools and caller-restricted tools are refused; the owner API cannot reach module-only tools", async () => {
+test("unknown targets and hidden tools are refused; owner requests cannot reach module-only tools", async () => {
   const replies: unknown[] = [];
   const f = await fixture({
     alpha: async (_event, call) => {
-      for (const target of ["beta.private", "beta.hidden", "beta.unlisted"]) replies.push(await call("call", { target, args: {} } as never));
+      for (const target of ["beta.private", "beta.hidden", "beta.missing"]) replies.push(await call("call", { target, args: {} } as never));
       return {};
     },
     beta: async () => { throw new Error("must not be reached"); },
   });
   await f.fire();
-  expect(replies).toMatchObject([{ error: { code: "forbidden" } }, { error: { code: "forbidden" } }, { error: { code: "undeclared" } }]);
+  expect(replies).toMatchObject([{ error: { code: "forbidden" } }, { error: { code: "forbidden" } }, { error: { code: "not_found" } }]);
   expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(0);
   // Owner requests reach only owner-visible tools: beta.echo is for modules and Chrona.
   await expect(callModuleTool(f.ports, { workspaceId: f.workspace.id, runId: null, via: "mcp" }, "m_beta_echo", { text: "x" })).rejects.toMatchObject({ code: "not_found" });
@@ -280,7 +305,7 @@ test("delivery outcomes: never-delivered retries, lost after sending is unknown,
   expect(seen).toEqual(["again"]);
 });
 
-test("uses \"*\" reaches the tools open to the user, never modules-only tools it does not list or past callers", async () => {
+test("uses \"*\" reaches owner and modules tools but not kernel-only tools", async () => {
   registerSystemModules();
   const f = await fixture({
     alpha: async (_event, call) => {
@@ -294,16 +319,16 @@ test("uses \"*\" reaches the tools open to the user, never modules-only tools it
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } }, data: { manifest: alpha } });
   const results = output(await f.fire()) as Record<string, { result?: { output: unknown }; error?: { code: string } }>;
   expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
-  expect(results["beta.echo"]).toMatchObject({ error: { code: "forbidden" } });
+  expect(results["beta.echo"]).toMatchObject({ result: { output: { tool: "echo" } } });
   expect(results["beta.private"]).toMatchObject({ error: { code: "forbidden" } });
-  // modules.tools lists exactly what the caller may reach: beta.granted names alpha in callers (v2-14).
-  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target)).toEqual(["beta.hidden", "beta.granted"]);
+  // Discovery uses the same visibility rule, independent of declared target contracts.
+  expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target).filter(target => target.startsWith("beta."))).toEqual(["beta.echo", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "beta.unlisted"]);
 });
 
-test("v2-14: a tool that names its caller in callers needs no uses entry; contributions reach only the module they address", async () => {
+test("a module can call a modules-visible tool absent from uses; contributions remain scoped to their recipient", async () => {
   const f = await fixture({
     alpha: async (event, call) => {
-      const target = (event.trigger as { id: string }).id === "daily" ? "beta.granted" : "";
+      const target = (event.trigger as { id: string }).id === "daily" ? "beta.unlisted" : "";
       return { result: { granted: await call("call", { target, args: { text: "hi" } } as never),
         mine: await call("call", { target: "modules.contributions", args: { section: "alpha" } } as never),
         theirs: await call("call", { target: "modules.contributions", args: { section: "gamma" } } as never) } };

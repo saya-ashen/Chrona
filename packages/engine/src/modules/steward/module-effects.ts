@@ -1,8 +1,8 @@
 import type { Prisma } from "@chrona/db";
-import { currentTarget, grantedUses, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
+import { currentTarget, NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { registerModuleEffects, type CallScope } from "./module-supervisor";
-import { callerGranted, CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
+import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
 import { notifyUser } from "./notify-user";
 export type { CallScope } from "./module-supervisor";
 
@@ -17,18 +17,10 @@ const failed = (id: string, error: unknown): Reply => error instanceof CallError
   ? { id, error: { code: error.code, message: error.message.slice(0, 500) } }
   : { id, error: { code: "internal", message: "Module call failed" } };
 
-/**
- * Routed calls: the target must be granted (`uses`, deprecated declarations, or `*`); Chrona records the real caller and
- * refuses waits on itself.
- */
+/** Routed calls: the router checks visibility, records the real caller and refuses waits on itself. */
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
   const { args, mode, key, reply, timeoutMs } = call.params, target = currentTarget(call.params.target), now = ports.now();
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
-  const uses = grantedUses(scope.manifest);
-  if (!uses.includes(target) && !uses.includes("*") && !await callerGranted(ports.db, scope.workspaceId, target, scope.manifest.name)) {
-    await ports.db.moduleCall.create({ data: { ...record, key: target, status: "rejected", error: "undeclared" } });
-    return { id: call.id, error: { code: "undeclared", message: `${target} is not in the manifest's uses` } };
-  }
   try {
     if (mode === "sync") {
       const result = await callSync(ports, originOf(scope), target, args, timeoutMs ? { timeoutMs } : {});
@@ -47,7 +39,7 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
   }
 }
 
-/** The module channel carries only routed calls (v2-10): every capability is an interface in `uses` (see grantedUses). */
+/** The module channel carries only routed calls (v2-10). */
 export async function handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<Reply> {
   if (call.method === "call") return routedCall(ports, scope, call);
   try { return { id: call.id, result: await callStatus(ports, originOf(scope), call.params.callId) as Extract<Reply, { result: unknown }>["result"] }; }

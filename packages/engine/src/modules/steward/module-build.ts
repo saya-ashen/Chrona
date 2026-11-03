@@ -44,7 +44,7 @@ async function installBuild(context: ModuleContext, staging: string, hash: strin
 }
 type Review = { version: ModuleVersion; module: Awaited<ReturnType<typeof requireModule>>; report: BuildReport; files: { path: string; bytes: Buffer }[]; needsMigration: boolean };
 function exposedTools(manifest: ReturnType<typeof moduleManifestSchema.parse>) {
-  return manifest.tools.filter(tool => tool.visibility.some(value => value === "modules" || value === "kernel")).map(tool => `${tool.name}${tool.callers ? `（仅 ${tool.callers.join("、")}）` : ""}`);
+  return manifest.tools.filter(tool => tool.visibility.some(value => value === "modules" || value === "kernel")).map(tool => tool.name);
 }
 function reviewPrefix(manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport, diff: string) {
   const libraries = [report.dependencies?.npm && "npm（bun.lock）", report.dependencies?.python && "Python（uv.lock）"].filter(Boolean).join("、") || "无";
@@ -204,16 +204,16 @@ async function customized(db: ModuleContext["db"], module: { id: string; activeH
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   return !!active && active.source !== "builtin";
 }
-async function callersBlock(context: ModuleContext, { module, version, manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
+async function consumersBlock(context: ModuleContext, { module, version, manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
   if (!report.outputImpacts?.length || await checkDependentCallers(context, manifest, report.outputImpacts, report)) return false;
   // A customized module's release built-in is switched to only by an explicit `admin rollback`, usually together with
-  // its customized callers (which may never type-check): the checks stay in the report, but do not reject it.
+  // its customized consumers (which may never type-check): the checks stay in the report, but do not reject it.
   return !(version.source === "builtin" && await customized(context.db, module));
 }
 async function checkDependentCallers(context: ModuleContext, manifest: ReturnType<typeof moduleManifestSchema.parse>, impacts: { caller: string; targets: string[] }[], report: BuildReport) {
   report.dependentChecks = [];
-  const callers = await context.db.module.findMany({ where: { workspaceId: context.workspaceId, name: { in: impacts.map(item => item.caller) }, status: "active", activeHash: { not: null } } });
-  for (const caller of callers) {
+  const consumers = await context.db.module.findMany({ where: { workspaceId: context.workspaceId, name: { in: impacts.map(item => item.caller) }, status: "active", activeHash: { not: null } } });
+  for (const caller of consumers) {
     const active = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.id, hash: caller.activeHash! } } });
     const source = moduleManifestSchema.safeParse(active?.manifest);
     if (!source.success) {
@@ -237,7 +237,7 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
   const { needsMigration } = checks;
   if (passed) {
     report.outputImpacts = await moduleOutputImpacts(db, module.workspaceId, module.id, manifest);
-    if (await callersBlock(context, { module, version, manifest, report })) {
+    if (await consumersBlock(context, { module, version, manifest, report })) {
       passed = false;
       report.errors = ["An affected caller failed type checking against the candidate contract; update/review caller compatibility before activating this version."];
     }

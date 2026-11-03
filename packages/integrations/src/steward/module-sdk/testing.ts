@@ -10,20 +10,12 @@ type Event = { trigger: Trigger; now: string; params: Record<string, string | nu
 type Reply = { id: string; result?: { result?: unknown }; error?: string };
 /** The directories the module under test sees (same variables as `chrona.paths`). */
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
-/** What the manifest may call, as Chrona computes it: `uses` plus what deprecated declarations stand for. */
 // v2-10 names of the provider tools; Chrona maps them the same way (currentTarget).
 const legacy: Partial<Record<string, string>> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
 const current = (target: string) => legacy[target] ?? target;
 type Stub = (params: Record<string, unknown>) => unknown | Promise<unknown>;
-function granted(manifest: { effects?: string[]; uses?: string[]; secrets?: (string | { name: string })[] }) {
-  const implied: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
-  return [...(manifest.uses ?? []).map(current), ...(manifest.effects ?? []).flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? ["secrets.get", "secrets.authorize", "secrets.token"] : [])];
-}
 function findStub(stubs: Record<string, Stub>, target: string) {
   return Object.hasOwn(stubs, target) ? stubs[target] : undefined;
-}
-function allowed(target: string, uses: string[], grants: string[]) {
-  return uses.includes(target) || uses.includes("*") || grants.includes(target);
 }
 // eslint-disable-next-line complexity -- Keep fake-kernel credential authorization and stub fallbacks together to preserve test protocol behavior.
 async function effectReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }): Promise<unknown> {
@@ -39,10 +31,9 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args) ?? null : null } };
 }
-async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] }, grants: string[], seen: Set<string>): Promise<unknown> {
+async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, seen: Set<string>): Promise<unknown> {
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
-  const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>, uses = granted(manifest);
-  if (!allowed(target, uses, grants)) return { error: { code: "undeclared", message: `${target} is not in uses` } };
+  const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>;
   if (call.params.mode === "async") {
     // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
     const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
@@ -53,14 +44,10 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { ef
 }
 /**
  * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`, and the SDK
- * shorthands notify, wakeProvider, model, secret) to a granted target answer from `stubs["<module>.<tool>"]` (sync: its
+ * shorthands notify, wakeProvider, model, secret) answer from `stubs["<module>.<tool>"]` (sync: its
  * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
  */
-/**
- * `grants`: targets whose tools name this module in `callers` (v2-14), so it may call them without listing them in `uses`
- * (e.g. the events module delivering to a subscriber).
- */
-export async function startModule(entry: string, { stubs: given = {}, grants = [] }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>>; grants?: string[] } = {}) {
+export async function startModule(entry: string, { stubs: given = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const stubs = Object.fromEntries(Object.entries(given).map(([target, stub]) => [current(target), stub]));
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const dir = await mkdtemp("/tmp/ct-");
@@ -83,7 +70,7 @@ export async function startModule(entry: string, { stubs: given = {}, grants = [
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const reply = await callReply(call, stubs, manifest, grants, seen);
+      const reply = await callReply(call, stubs, manifest, seen);
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
       return;
     }

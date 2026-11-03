@@ -22,7 +22,7 @@ on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: C
   if (event.id === "channel" && event.caller?.kind === "module") {
     const target = `${event.caller.module}.${String(event.args.tool)}`;
     try {
-      // Discovery enforces the existing callers/uses rules; registration grants no permission.
+      // Discovery checks modules visibility; registration does not change the tool's audience.
       const output = await chrona.call("modules.tools", { query: target });
       if (!Array.isArray(output) || !output.some(tool => tool && typeof tool === "object" && "target" in tool && tool.target === target)) {
         return { result: { error: "forbidden", message: "Delivery tool must belong to the caller and grant notify access" } };

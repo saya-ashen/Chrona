@@ -78,11 +78,11 @@ v2-26 的心智是无状态的唤醒器：每次只拿一张快照问“要不�
 
 ```json
 "contributes": { "mind": { "attention": "attention" } },
-"tools": [{ "name": "attention", "visibility": ["provider", "owner", "modules"], "callers": ["mind"], "sideEffects": [], ... }]
+"tools": [{ "name": "attention", "visibility": ["provider", "owner", "modules"], "sideEffects": [], ... }]
 ```
 
 - 工具无必填参数、无副作用，返回 `{ "items": [{ "id", "kind", "title", "at"? }] }`：`id` 为稳定标识（字母、数字、`_.-`，≤60），`kind` 为 `deadline`（须带 `at`）· `anomaly`（应用自身发现的异常）· `pending`（等用户处理的事），`title` ≤120 字；最多 20 条，只放此刻值得心智知道的。
-- 心智每次感知调用 `modules.contributions({ section: "mind" })`，并行调用声明的工具（最多 10 个应用，各 10 秒超时）；失败或格式不符的应用列入上下文 `attentionUnavailable`，不阻塞感知。心智的 `uses` 只增加 `modules.contributions`；能否调用由应用的 `callers` 决定。
+- 心智每次感知调用 `modules.contributions({ section: "mind" })`，并行调用声明的工具（最多 10 个应用，各 10 秒超时）；失败或格式不符的应用列入上下文 `attentionUnavailable`，不阻塞感知。心智的 `uses` 只增加 `modules.contributions`；目标对模块可见即可调用，不要求 `uses` 列出目标（[安全机制简化 §3.2](security-simplification.md)）。
 - 信号：`deadline` 按 §4 的档位得出 `app:<应用>:<id>:<档>`（`<24h`、`<6h`、`<1h`、`overdue`）；`anomaly`、`pending` 为 `app:<应用>:<id>`。规则兜底时 `<6h`、`<1h`、`overdue` 与关注清单的截止同样紧急。
 - 上下文 `attention` 列出全部事项（`应用 · 类别 · 标题 · 时间`），随直觉 state 与简报发送；`minimal` 只发数量。事项标题来自应用，属于不可信数据。
 

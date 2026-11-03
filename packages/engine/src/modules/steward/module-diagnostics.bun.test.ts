@@ -92,17 +92,16 @@ test("offline diagnostics survive new service objects, are read-only and workspa
   expect(await createModules(f.ports, other.id).diagnostics()).toEqual([]);
 });
 
-test("detailed diagnostics admit Provider, owner and web/mcp, but not arbitrary modules even with uses star", async () => {
+test("detailed diagnostics admit Provider, owner and every module without a uses entry", async () => {
   const f = await fixture(); registerSystemModules();
   await f.fail();
   for (const name of ["web", "mcp", "other"]) {
     const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: name } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["*"] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: [] });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "user", status: "approved", report: {}, intent: {} } });
     const origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, moduleId: module.id, module: name, hash: name }, chain: [], path: [] };
     const request = callSync(f.ports, origin, "modules.diagnostics", { module: "example" });
-    if (name === "other") await expect(request).rejects.toMatchObject({ code: "forbidden" });
-    else expect((await request).output).toMatchObject([{ module: "example", incidents: [{ failures: 1 }] }]);
+    expect((await request).output).toMatchObject([{ module: "example", incidents: [{ failures: 1 }] }]);
   }
   for (const caller of [{ kind: "owner" as const, via: null }, { kind: "provider" as const, runId: "test-run" }]) {
     expect((await callSync(f.ports, { workspaceId: f.workspace.id, caller, chain: [], path: [] }, "modules.diagnostics", {})).output).toBeArray();

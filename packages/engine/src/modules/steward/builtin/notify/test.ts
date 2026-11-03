@@ -3,8 +3,8 @@ import { strict as assert } from "node:assert";
 import { startModule } from "chrona/testing";
 
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
-// The registered channel grants its delivery tool to notify via callers: [notify].
-const module = await startModule("index.ts", { grants: ["qq.deliver"], stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
+// The registered channel exposes its delivery tool to modules.
+const module = await startModule("index.ts", { stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
 const kernel = { kind: "kernel" };
 // A fixed daytime clock (12:00 in the default Asia/Shanghai zone): the wall clock would fall in quiet hours at night and fold.
 let clock = Date.parse("2026-10-21T04:00:00.000Z");

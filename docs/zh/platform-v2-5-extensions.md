@@ -129,9 +129,11 @@ systemd、桌面通知、Docker socket 等需要绑定特定 socket 或设备，
 ## 9. 实现说明：跨模块调用与通知模块（2026-10-24）
 
 ### 9.1 接口与权限
-- 模块工具就是接口。每个工具声明 `visibility`（`provider`、`owner`、`modules`、`kernel`，默认 `provider`+`owner`，与此前行为相同）、可选的 `callers`（`modules` 可见时只允许这些模块调用）和 `idempotent`（默认 false）。
+
+> 当前模块调用规则见 [安全机制简化 §3.2](security-simplification.md)：模块可见工具面向任何模块，`uses` 不作运行时准入。
+- 模块工具就是接口。每个工具声明 `visibility`（`provider`、`owner`、`modules`、`kernel`，默认 `provider`+`owner`，与此前行为相同）和 `idempotent`（默认 false）。
 - 调用方在清单 `uses: ["<module>.<tool>"]` 中声明（本文原名 `calls`），随版本审批；审批卡显示“调用其他模块 / 供其他模块调用”。新增 `uses` 或接口可见范围变宽视为新能力，不自动启用。
-- 被调用方决定谁能调用：内核在路由时检查可见性和 `callers`。owner API（含 MCP）只能到达 `owner` 可见的工具，入口模块名作为 `via` 记录在审计里，不授予任何权限；Provider 只能到达 `provider` 可见的工具。
+- 被调用方决定谁能调用：内核在路由时按可见性判断受众。owner API（含 MCP）只能到达 `owner` 可见的工具，入口模块名作为 `via` 记录在审计里，不授予任何权限；Provider 只能到达 `provider` 可见的工具。
 
 ### 9.2 调用
 - `chrona.call(target, args, { mode, key, reply, timeoutMs })`，经模块自己的 socket 进入内核，由 supervisor 投递为目标的 `tool` 事件。事件带内核记录的 `caller`（`module`/`provider`/`owner`/`kernel`）和 `call`（id、key、attempt、chain）。
@@ -140,7 +142,7 @@ systemd、桌面通知、Docker socket 等需要绑定特定 socket 或设备，
 - 异步调用不形成等待，A→B→A 可以通过异步完成；需要同步回调的设计应改为异步。
 
 ### 9.3 通知模块
-- 内核不再含通知业务。内置 `notify` 模块负责预算（日上限、静默时段、负反馈降级、回复不计入）、摘要、出口与接收人选择（发送时判断聊天出口是否就绪，否则留在网页），并通过 `qq.deliver`（`callers: ["notify"]`）异步投递；结果未知记为 `uncertain`，从不自动重发。
+- 内核不再含通知业务。内置 `notify` 模块负责预算（日上限、静默时段、负反馈降级、回复不计入）、摘要、出口与接收人选择（发送时判断聊天出口是否就绪，否则留在网页），并通过 `qq.deliver`（对模块可见）异步投递；结果未知记为 `uncertain`，从不自动重发。
 - Chrona 自己要告诉用户的事（运行结果、审批、模块失败等）就是一次对 `notify.send` 的异步路由调用；Today、健康、设置和 `/notifications` 路由向 `notify` 同步查询，`notify` 不可用时显示为空。
 - `chrona.notify(...)` 是兼容别名（`notify_user` 能力 → 对 `notify.send` 的异步调用），只为此前写成的模块保留；新模块用 `uses: ["notify.send"]`。没有活动版本调用它后删除。
 - 旧 `Notification` 表不删除：新版本第一次 tick 时把各工作区的旧行与通知设置一次性复制给 `notify`（与标记同一事务）；持有发送租约的 queued 行导入为 `uncertain`。

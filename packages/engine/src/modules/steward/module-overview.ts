@@ -106,7 +106,7 @@ export async function moduleOverview(ports: StewardPorts, workspaceId: string, n
     return json({ kind: "system", ...app, tools: system.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: "input" in tool && tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool),
       outputSchema: tool.output ? z.toJSONSchema(tool.output as z.ZodType) : null, examples: "examples" in tool ? tool.examples ?? null : null,
       sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null, idempotent: tool.idempotent,
-      retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", callers: tool.callers ?? null, visibility: tool.visibility })),
+      retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", visibility: tool.visibility })),
       settings: await settingsView(ports, workspaceId, name), activity: await activity(name) });
   }
   const api = createModules(ports, workspaceId), found = await activeManifest(ports, workspaceId, name);
@@ -115,7 +115,7 @@ export async function moduleOverview(ports: StewardPorts, workspaceId: string, n
   const [diagnostics] = await api.diagnostics(found.module.name) as unknown[];
   return json({ kind: "app", app, tools: (found.manifest?.tools ?? []).filter(tool => tool.visibility.includes("owner") || tool.visibility.includes("modules")).map(tool => ({ name: tool.name, description: tool.description,
     inputSchema: normalizedToolInputSchema(tool), outputSchema: tool.output ?? null, examples: tool.examples ?? null, sideEffects: tool.sideEffects ?? null, errors: tool.errors ?? null,
-    idempotent: tool.idempotent, retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", callers: tool.callers ?? null, visibility: tool.visibility })),
+    idempotent: tool.idempotent, retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", visibility: tool.visibility })),
     permissions: await modulePermissions(ports, workspaceId, found.module.name), settings: await settingsView(ports, workspaceId, found.module.name), diagnostics: diagnostics ?? null, activity: await activity(found.module.name) });
 }
 
@@ -126,7 +126,7 @@ const activitySchema = z.object({ id: z.string(), at: z.string(), kind: z.string
 const overviewToolSchema = z.object({ name: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(),
   examples: z.array(z.json()).nullable(),
   sideEffects: z.array(z.string()).nullable(), errors: z.array(z.object({ code: z.string(), description: z.string(), recovery: z.string() })).nullable(),
-  idempotent: z.boolean(), retry: z.string(), callers: z.array(z.string()).nullable(), visibility: z.array(z.string()) });
+  idempotent: z.boolean(), retry: z.string(), visibility: z.array(z.string()) });
 export const permissionsSchema = z.object({
   module: z.string(), activeHash: z.string().nullable(), capabilities: z.array(z.string()),
   secrets: z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable() }).extend(secretViewSchema.shape)),
@@ -152,7 +152,7 @@ export function moduleOverviewExamples() {
       tools: [], permissions: { module: "example", activeHash: "a".repeat(64), capabilities: ["Synthetic capability"], secrets: [{ name: "example_token", configured: false, updatedAt: null, label: "Example API key", description: null, fields: [{ name: "apiKey", label: "API key", description: null, optional: false, plain: false, saved: false }], extraFields: null, savedFields: null, oauth: null }], model: null, grants: [], approvals: [] },
       settings: fixtureSettings(), diagnostics: null, activity }),
     moduleOverviewOutputSchema.parse({ kind: "system", name: "reflection", description: "Synthetic system module", sessions: "reflect", tools: [{ name: "suggest", description: "Synthetic", inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false }, outputSchema: null, examples: null, sideEffects: null, errors: null,
-      idempotent: false, retry: "Unknown async outcomes are not redelivered automatically.", callers: null, visibility: ["modules"] }], work: [],
+      idempotent: false, retry: "Unknown async outcomes are not redelivered automatically.", visibility: ["modules"] }], work: [],
       settings: { declarations: { enabled: { type: "boolean", label: "Enabled", default: true } }, values: { enabled: true } }, activity: [] }),
   ].map(json);
 }

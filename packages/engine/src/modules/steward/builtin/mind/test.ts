@@ -17,7 +17,7 @@ const server = Bun.serve({ port: 0, hostname: "127.0.0.1", async fetch(request) 
   return Response.json({ model: "jev-test", answers: intuition });
 } });
 const url = `http://127.0.0.1:${server.port}/v1/systemone`;
-const module = await startModule("index.ts", { grants: ["calendar.attention"], stubs: {
+const module = await startModule("index.ts", { stubs: {
   "chat.today": () => today, "chat.runs": () => [], "modules.list": () => apps, "secrets.get": () => ({ value: { key: "k1" } }),
   "modules.contributions": () => contributions, "calendar.attention": () => calendar,
 } });
@@ -119,7 +119,7 @@ try {
   assert.deepEqual([closed.status, closed.userSignals.at(-1).text], ["dropped", "放弃了"]);
 
   // Apps hand over what deserves attention (v2-28 §4.1): a deadline within 6 hours wakes by rules, malformed items are
-  // dropped, and an app whose tool does not name mind among its callers is listed as unavailable without blocking sensing.
+  // dropped, and an app whose tool is not visible to modules is listed as unavailable without blocking sensing.
   contributions = [{ module: "calendar", hash: "c1", value: { attention: "attention" } }, { module: "planning", hash: "p1", value: { attention: "attention" } }];
   calendar = { items: [{ id: "m1", kind: "deadline", title: "组会", at: at(1340) }, { id: "bad id", kind: "pending", title: "x" }, { id: "p2", kind: "deadline", title: "无时间" }] };
   await sense(1040);

@@ -309,10 +309,10 @@ class ModuleSupervisor {
     const { trigger } = event, { manifest, moduleId } = instance;
     const dynamic = trigger.kind === "schedule" && trigger.scheduleId !== undefined && trigger.payload !== undefined;
     if (dynamic) {
-      // v2-24: the module's own timers (uses schedules.create).
-      if (!manifest.uses.includes("schedules.create") || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires uses schedules.create"), "unavailable");
-    } else if (trigger.kind === "activated") return;
-    else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+      // v2-24: only the module's own timers deliver schedule events.
+      if (!await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires its own timer"), "unavailable");
+    } else if (trigger.kind === "activated" || trigger.kind === "call_result") return;
+    else if (trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
   /** The owner's settings decide a model module's timeout and every module's params (v2-23 settings). */
   private async eventLimits(manifest: ModuleManifest, workspaceId: string, requested?: number) {
@@ -433,7 +433,7 @@ class ModuleSupervisor {
 
 export function createModuleSupervisor(ports: StewardPorts, { timers = globalThis, idleMs = 10 * 60_000, backoffMs = 1000 }: Options = {}) {
   const runtime = new ModuleSupervisor(ports, timers, idleMs, backoffMs);
-  // Preserve the closure API: callers may extract methods without a receiver.
+  // Preserve the closure API: consumers may extract methods without a receiver.
   return { deliver: runtime.deliver.bind(runtime), reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
     status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime) };
 }

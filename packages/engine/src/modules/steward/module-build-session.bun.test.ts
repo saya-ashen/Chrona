@@ -123,7 +123,7 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
     await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
     await f.db.audit.update({ where: { id: authority.id }, data: { details: { originSessionId: f.session.id, name: request.name } } });
     const reference = await call("m_modules_reference", { target: "modules.diagnostics" });
-    expect(reference).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array), admission: { callers: ["web", "mcp"] } });
+    expect(reference).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array), admission: { visibility: ["modules", "provider", "owner"] } });
     expect(input.prompt).toContain("Development references");
     await f.writeModule(input.cwd);
     const proposal = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string; status: string };
@@ -175,7 +175,7 @@ test("a candidate with a public tool missing output is rejected before tests run
   expect(executed).toBe(0);
 });
 
-test("who may manage modules: the Provider in its own directory; the user may check and roll back; ordinary modules never", async () => {
+test("module management: Provider tools stay private; owner-only tools require uses star", async () => {
   const f = await fixture();
   await expect(f.call("m_modules_checkout", { module: "mail-sort", dir: "../escape" })).rejects.toThrow();
   await mkdir(f.requester.cwd, { recursive: true });
@@ -186,10 +186,11 @@ test("who may manage modules: the Provider in its own directory; the user may ch
   expect(owner).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
-  // An ordinary module cannot reach them even if it lists them.
-  const other = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["modules.propose", "modules.build", "*"] });
+  // Explicit targets in uses do not grant access to Provider or owner-only tools.
+  const other = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["modules.propose", "modules.build", "modules.stop-build", "modules.revise-build"] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "o" } });
-  for (const target of ["modules.propose", "modules.build", "modules.build-owner", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "o", manifest: other, source: "user", intent: {}, report: {}, status: "approved" } });
+  for (const target of ["modules.propose", "modules.build", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
     expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
   }
 });
@@ -246,10 +247,10 @@ test("revision waits for abort before reusing the directory; abort failure never
   expect(await f.db.run.count({ where: { sessionId, status: "queued" } })).toBe(1);
 });
 
-test("owner MCP discovers the build control schemas, but ordinary modules cannot discover them", async () => {
+test("uses star discovers owner build controls, while ordinary modules cannot discover owner-only tools", async () => {
   const f = await fixture();
   for (const name of ["mcp", "ordinary"]) {
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["modules.tools", "*"] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: name === "mcp" ? ["*"] : [] });
     const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: name } });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "builtin", intent: {}, report: {}, status: "approved" } });
     const answer = await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: name, manifest }, { id: "find", method: "call", params: { target: "modules.tools", args: { query: "build" }, mode: "sync", reply: false } });
@@ -309,7 +310,7 @@ test("check waits while a version is checked, but never past the caller's timeou
   expect(Date.now() - started).toBeGreaterThanOrEqual(1500);
 });
 
-test("transcripts: the Provider's text, tool calls and clipped results, credentials redacted; only web and mcp may read them", async () => {
+test("transcripts: the Provider's text, tool calls and clipped results, credentials redacted; visible to modules", async () => {
   const f = await fixture(), secret = "sk-live-1234567890abcdefXYZ";
   process.env.CHRONA_TEST_API_KEY = "very-secret-value";
   cleanups.push(async () => { delete process.env.CHRONA_TEST_API_KEY; });
@@ -340,7 +341,7 @@ test("transcripts: the Provider's text, tool calls and clipped results, credenti
     return handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: row.id, hash: name, manifest: manifestOf }, { id: "t", method: "call", params: { target: "chat.transcript", args: { session: f.session.id }, mode: "sync", reply: false } });
   };
   expect(await reader("web", ["chat.transcript"])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
-  expect(await reader("snoop", ["chat.transcript", "*"])).toMatchObject({ error: { code: "forbidden" } });
+  expect(await reader("snoop", [])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
 });
 
 test("upgrade: builds from the old build lane (no conversation) are cancelled once and the user is told", async () => {
@@ -568,7 +569,7 @@ async function groupBuild(f: Awaited<ReturnType<typeof fixture>>, includeImpact 
   return { approval, hashes };
 }
 
-test("group approval preview lists current callers affected by member output changes", async () => {
+test("group approval preview lists current consumers affected by member output changes", async () => {
   const f = await fixture();
   const schema = (type: string) => ({ type: "object", properties: { value: { type } }, required: ["value"], additionalProperties: false });
   const active = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "active", activeHash: "old", dataSchema: 1 } });

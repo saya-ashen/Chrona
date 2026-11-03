@@ -40,7 +40,7 @@ function referenceContract(target: string, { tool, source }: Reference) {
   return { target, source, description: tool.description, inputSchema: inputSchema(tool), outputSchema: outputSchema(source, tool),
     documentation: "documentation" in tool ? tool.documentation ?? null : null, examples: "examples" in tool ? tool.examples ?? null : null,
     sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null,
-    retry: retryDescription(tool.idempotent), admission: { visibility: tool.visibility, callers: tool.callers ?? null, uses: target, idempotent: tool.idempotent },
+    retry: retryDescription(tool.idempotent), admission: { visibility: tool.visibility, uses: target, idempotent: tool.idempotent },
     routingErrors: ["forbidden", "not_found", "conflict", "cycle", "invalid", "unknown", "failed", "unavailable"] };
 }
 /** Code metadata only: never call a handler, inspect settings, read incidents or start a module. */

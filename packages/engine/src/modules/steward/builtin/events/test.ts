@@ -4,8 +4,8 @@ import { startModule } from "chrona/testing";
 
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
 const declared = [{ module: "planning", hash: "p1", value: { emits: [{ name: "updated", description: "A plan changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" }, rev: { type: "integer" } } } }] } }];
-// beta.on-plan names events in its callers, so the kernel lets events reach it (modules.tools lists it); beta.private does not.
-const module = await startModule("index.ts", { grants: ["beta.on-plan"], stubs: {
+// beta.on-plan is visible to modules (modules.tools lists it); beta.private is not.
+const module = await startModule("index.ts", { stubs: {
   "modules.contributions": () => declared,
   "modules.tools": (args: { query?: string }) => (args.query === "beta.on-plan" ? [{ target: "beta.on-plan" }] : []),
 } });

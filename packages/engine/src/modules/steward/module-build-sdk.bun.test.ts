@@ -30,8 +30,7 @@ on('schedule', async ev => {
   const params = { key: 'daily:' + ev.firedAt, level: 'now', title: 'Build', body: completion.text };
   await chrona.notify(params);
   if ((await chrona.notify(params)).status !== 'duplicate') throw new Error('dedup missing');
-  try { await chrona.wakeProvider({ key: 'no', prompt: 'No execution' }); throw new Error('accepted undeclared'); }
-  catch (error) { if (error.code !== 'undeclared') throw error; }
+  if ((await chrona.wakeProvider({ key: 'no', prompt: 'No execution' })).status !== 'executed') throw new Error('missing stub reply');
 });
 on('tool', () => ({ result: 'tool answered' }));
 `);

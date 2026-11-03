@@ -87,7 +87,7 @@ test("an app going live starts one reflection that sees the facts, may only sugg
   expect((await listActivity(f.ports, f.workspaceId, { module: "reflection" })).items).toMatchObject([
     { text: "Chrona 开始构建「为 okx-trader 加操作页」（okx-page）：它刚上线，web 里还没有它的页面。", session: { id: build.id, source: "build" } },
     { text: "Chrona 反思了一次（okx-trader 上线）", session: { id: reflect.id, source: "reflect" } }]);
-  const app = await systemApps(f.ports, f.workspaceId, "reflection") as { sessions: string; tools: { name: string; callers: null }[]; work: { id: string; status: string }[] };
+  const app = await systemApps(f.ports, f.workspaceId, "reflection") as { sessions: string; tools: { name: string }[]; work: { id: string; status: string }[] };
   expect(app).toMatchObject({ sessions: "reflect", tools: [{ name: "suggest" }], work: [{ id: reflect.id, status: "ended" }] });
   expect((await systemApps(f.ports, f.workspaceId) as { name: string; description: string }[]).every(item => item.description)).toBe(true);
   // Six hours apart, and only for a new signal.

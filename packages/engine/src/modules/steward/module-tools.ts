@@ -74,7 +74,7 @@ export async function moduleToolCatalog(ports: StewardPorts, scope: Scope) {
   return (await moduleTools(ports, scope)).map(catalogEntry);
 }
 type CatalogEntry = Awaited<ReturnType<typeof moduleToolCatalog>>[number];
-/** Deferred tools grouped per module, like a list of MCP servers, so callers know what to search for. */
+/** Deferred tools grouped per module, like a list of MCP servers, so consumers know what to search for. */
 export function moduleToolsets(catalog: CatalogEntry[]) {
   const sets = new Map<string, CatalogEntry["namespace"] & { tools: string[] }>();
   for (const { name, exposure, namespace } of catalog) {

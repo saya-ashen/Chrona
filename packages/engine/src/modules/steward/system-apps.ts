@@ -9,7 +9,7 @@ export async function systemApps(ports: StewardPorts, workspaceId: string, name?
       outputSchema: tool.output ? z.toJSONSchema(tool.output as z.ZodType) : null, examples: "examples" in tool ? tool.examples ?? null : null,
       sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null,
       idempotent: tool.idempotent, retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.",
-      callers: tool.callers ?? null, visibility: tool.visibility })) }));
+      visibility: tool.visibility })) }));
   if (name === undefined) return apps;
   const app = apps.find(item => item.name === name);
   if (!app) throw new CallError("not_found", "System module not found");

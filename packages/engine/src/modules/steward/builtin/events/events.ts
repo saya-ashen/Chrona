@@ -10,7 +10,7 @@ type Ports = {
   dataDir: string;
   /** `modules.contributions` for section `events`. */
   contributions(): Promise<{ module: string; value: unknown }[]>;
-  /** `modules.tools`: the targets this module may call (subscriber tools that name `events` in `callers`). */
+  /** `modules.tools`: targets visible to modules. */
   reachable(query: string): Promise<string[]>;
   call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean }): Promise<{ callId: string }>;
 };
@@ -49,7 +49,7 @@ function check(schema: Schema | undefined, value: unknown) {
 
 /**
  * The `events` built-in module (v2-14): modules declare events in `contributes.events.emits`, others subscribe one of their
- * own tools (which names `events` in `callers`), and an emit is delivered to each subscriber as an async routed call.
+ * own tools (visible to modules), and an emit is delivered to each subscriber as an async routed call.
  * Who emits and who subscribes is the caller Chrona recorded, never what the arguments claim.
  */
 export function createEvents(ports: Ports) {
@@ -71,7 +71,7 @@ export function createEvents(ports: Ports) {
     const event = String(args.event ?? ""), tool = String(args.tool ?? "");
     if (!await declared(event)) throw fail("not_found", `No module declares the event ${event}`);
     const target = `${module}.${tool}`;
-    if (!(await ports.reachable(target)).includes(target)) throw fail("forbidden", `${target} must be your own tool and list "events" in callers`);
+    if (!(await ports.reachable(target)).includes(target)) throw fail("forbidden", `${target} must be your own tool and visible to modules`);
     const row = { event, module, tool };
     if (!store.rows().some(other => same(other, row))) store.save([...store.rows(), row]);
     return { subscribed: true };

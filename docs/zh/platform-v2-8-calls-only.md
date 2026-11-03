@@ -2,9 +2,11 @@
 
 状态：用户已确认（2026-10-24）。§11 第 1 步（`*` 授权、系统模块 `modules`、`chat` 会话接口、MCP 改为路由调用）、第 2 步（`listen` 多路径、web 改为路由调用、`chat.today`、回复推送）与第 3 步（删除内容区对外暴露、连接器与 `owner` 能力）已实现；第 4 步的行为在 v2-8 之前已存在（见 §9）。`planning` 自带的 `/api/planning` 页面要等它重建后才去掉（§8 末）。依赖 [v2-5 §9](platform-v2-5-extensions.md) 的模块路由与 [v2-7](platform-v2-7-system-modules.md) 的系统模块。修改 [v2-2](platform-v2-2-sessions-content.md) 的内容区、[v2-4](platform-v2-4-entries-rescue.md) 的 web / MCP 设计与 v2-7 §3“web 页面和 owner MCP 走用户的 HTTP 请求，不变”。
 
+> 当前准入以 [安全机制简化 §3.2](security-simplification.md) 为准：`uses` 仅作契约，`*` 仍可调用 `owner` 工具。
+
 ## 1. 目标
 
-- **模块之间只有一种交互方式：经内核路由的调用**（`uses` + `chrona.call`，被调方的 `visibility` / `callers` 决定谁能调用，内核记录真实调用者）。唯一例外是救援控制台与 `chrona admin`：它们是内核自带的应急入口，不是模块。
+- **模块之间只有一种交互方式：经内核路由的调用**（`chrona.call`，被调方的 `visibility` 定义工具受众，内核记录真实调用者）。唯一例外是救援控制台与 `chrona admin`：它们是内核自带的应急入口，不是模块。
 - **模块只对外开放查询和操作工具，不负责展示。** 怎么展示、放哪些按钮由 web 模块决定；某个模块需要在网页上有专门页面时，由 AI 修改 web 模块。
 - web 与 owner MCP 成为普通入口模块（和 `qq` 一样），不再使用 owner API；`owner` 能力随之删除。
 - 对话里的 Provider 读写模块数据也只用模块工具；内容区概念删除。
@@ -15,7 +17,7 @@
 
 | 谁 → 谁 | 方式 |
 |---|---|
-| 模块 → 模块（含 web、MCP、qq） | 路由调用，按被调方 `visibility` / `callers` 与调用方 `uses` 检查 |
+| 模块 → 模块（含 web、MCP、qq） | 路由调用，按被调方 `visibility` 判断受众；`uses` 保留为契约 |
 | 模块 → 内核掌握的事实（会话、审批、模块与运行记录） | 路由调用**系统模块**（`chat`、`approvals`、`modules`） |
 | Provider → 模块 | 模块工具（`m_<module>_<tool>`，`visibility` 含 `provider`） |
 | 浏览器 / MCP 客户端 → 入口模块 | HTTP（`listen`），内核先验 API key，再去掉凭据转发 |
@@ -28,9 +30,9 @@
 - `uses` 可以写 `"*"`：可调用**所有对用户开放的工具**，不必逐个列出。用于 web、MCP 这类“把所有模块的功能摆给用户”的入口：它们的版本通过审批时，以后生成的模块还不存在。
 - **入口模块**（取代 v2-7 的判定）：声明 `owner`、`listen: "/"`、`*`，或在 `uses` 中列出任何 `chat.*` / `approvals.*` 接口的模块。入口模块的每个版本都需要用户批准，不自动启用。所以声明 `*` 的模块必然是入口模块。
 - 可见性判断（`module-calls.ts` `admitted`）：
-  - 调用方在 `uses` 中列出了目标，且目标 `visibility` 含 `modules` → 允许（现有规则）；
-  - 调用方声明了 `*`，且目标 `visibility` 含 `owner` → 允许（入口模块代表用户调用）。`*` 不覆盖只对模块开放、未列出的接口（如 `chat.send`）。
-  - 两种情况都不越过 `callers`：只给特定模块的接口（如 `qq.deliver` 只给 `notify`）仍然只给它们。
+  - 目标 `visibility` 含 `modules` → 任何模块均可调用，不要求 `uses` 列出目标；
+  - 调用方声明了 `*`，且目标 `visibility` 含 `owner` → 允许（入口模块代表用户调用）；
+  - 系统模块调用方只到达 `modules` 工具；没有模块名的调用方按自身 kind 对应的可见性判断。
 - `owner` 可见性的含义变为“用户可以经入口模块（web、MCP）或救援控制台调用”。模块工具默认 `["provider", "owner"]` 不变。
 - 每次调用照常检查、记录真实调用者（`web`、`mcp`）。
 
@@ -71,7 +73,7 @@
 - 服务端：`/api/web/*` 把页面操作翻译成路由调用；`uses`：`chat.send`、`chat.session`、`chat.sessions`、`chat.messages`、`chat.today`、`approvals.resolve`、`modules.list`、`modules.tools`、`*`。`/api/web/call` 调用模块工具，不接受系统模块（它们有专门的路由）。
 - **通用页面**：对没有专门页面的模块，列出它的运行记录（来自 `modules.list`）和对用户开放的工具（来自 `modules.tools`），按参数结构生成表单与按钮；会改变状态的工具点击后先确认。新模块一启用就能在网页上用。
 - **专门页面**：模块需要更好的展示时，由 AI 修改 web 模块（构建、测试、用户批准启用，与其他模块相同）。web 代码中按模块名组织专门页面；对应模块不存在或工具调用失败时退回通用页面。
-- 对话：`chat.send` 发消息；web 提供 `reply` 工具（`callers: ["chat"]`）接收回复推送（v2-7 §4），经 SSE（`GET /api/web/events`，浏览器用 `fetch` 读以便带上密钥，每 5 秒心跳）推给打开的页面，取代等待 `/chat` 返回。没有页面打开时回复不丢：页面打开时读会话。网页会话因此有入口模块，后台结果推回网页对话，不再另发通知。
+- 对话：`chat.send` 发消息；web 提供 `reply` 工具（`visibility: ["modules"]`）接收回复推送（v2-7 §4），经 SSE（`GET /api/web/events`，浏览器用 `fetch` 读以便带上密钥，每 5 秒心跳）推给打开的页面，取代等待 `/chat` 返回。没有页面打开时回复不丢：页面打开时读会话。网页会话因此有入口模块，后台结果推回网页对话，不再另发通知。
 - 今天：`chat.today`。
 - 文档：“文档”页经 `files.list` / `files.read` / `files.write` 浏览、阅读（Markdown 渲染、勾选框）和修改用户的文档；`files.read` 截断的长文档只读。附件经 `GET /api/web/file`（`chat.file`）以下载方式提供，不作为本站页面渲染。
 
@@ -134,7 +136,7 @@
 ## 12. 验收
 
 1. MCP 客户端经 `chrona_module_tools` / `chrona_module_call` 调用一个在其连接之后才启用的模块工具；调用者记为 `mcp`。
-2. 未声明 `*` 的模块调用 `owner` 可见的工具被拒；声明 `*` 的模块不能越过 `callers`（调用 `qq.deliver` 被拒）。
+2. 未声明 `*` 的模块调用仅 `owner` 可见的工具被拒；任何模块均可调用 `modules` 可见的工具，即使目标未列入 `uses`。
 3. 网页显示 `github-trending-daily` 的运行记录（来自 `modules.list`），并通过通用页面调用它的 `run_now`；调用者记为 `web`。
 4. 网页发消息后回复经 `web.reply` 推送到浏览器；后台结果推回网页对话且不另发通知。
 5. 删除内容区后：Provider 回复附件经 `chat` 附件送达 QQ 与网页；`files` 文档与历史完整；内核中不再有连接器代码与表。
