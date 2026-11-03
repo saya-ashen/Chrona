@@ -14,7 +14,9 @@ export function qqReplyText(message: { text: string; attachments: Attachment[] }
 const isReplyImage = (file: Attachment | undefined) => Boolean(file?.ref && ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime) && file.size <= 5 * 1024 * 1024);
 
 /** `call` is sync (resolves to the tool's result); `notify` is an async call to notify.send. */
-export function createRelay({ call, notify, publicUrl, download }: { call: Call; notify: (args: Record<string, unknown>) => Promise<unknown>; publicUrl: string | null; download: Download }) {
+/** What the QQ module asks notify.send for: a final reply to the bound owner. */
+export type FinalNotice = { key: string; level: "now"; title: string; body: string; recipient: string; responds: true; session?: string };
+export function createRelay({ call, notify, publicUrl, download }: { call: Call; notify: (args: FinalNotice) => Promise<unknown>; publicUrl: string | null; download: Download }) {
   const send: QqChatPort["send"] = async input => {
     // QQ keeps one conversation; `/new` ends it and the next message starts a fresh one.
     if (input.text.trim() === "/new" && !input.attachments?.length) {

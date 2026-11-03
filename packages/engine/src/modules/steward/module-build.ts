@@ -177,6 +177,16 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };
 }
+async function customized(db: ModuleContext["db"], module: { id: string; activeHash: string | null }) {
+  const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
+  return !!active && active.source !== "builtin";
+}
+async function callersBlock(context: ModuleContext, { module, version, manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
+  if (!report.outputImpacts?.length || await checkDependentCallers(context, manifest, report.outputImpacts, report)) return false;
+  // A customized module's release built-in is switched to only by an explicit `admin rollback`, usually together with
+  // its customized callers (which may never type-check): the checks stay in the report, but do not reject it.
+  return !(version.source === "builtin" && await customized(context.db, module));
+}
 async function checkDependentCallers(context: ModuleContext, manifest: ReturnType<typeof moduleManifestSchema.parse>, impacts: { caller: string; targets: string[] }[], report: BuildReport) {
   report.dependentChecks = [];
   const callers = await context.db.module.findMany({ where: { workspaceId: context.workspaceId, name: { in: impacts.map(item => item.caller) }, status: "active", activeHash: { not: null } } });
@@ -204,7 +214,7 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
   const { needsMigration } = checks;
   if (passed) {
     report.outputImpacts = await moduleOutputImpacts(db, module.workspaceId, module.id, manifest);
-    if (report.outputImpacts.length && !await checkDependentCallers(context, manifest, report.outputImpacts, report)) {
+    if (await callersBlock(context, { module, version, manifest, report })) {
       passed = false;
       report.errors = ["An affected caller failed type checking against the candidate contract; update/review caller compatibility before activating this version."];
     }
