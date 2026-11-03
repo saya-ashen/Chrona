@@ -21,7 +21,7 @@
 现在 `send_external_message`、`modify_external` 等动作由内核工具执行并经策略层。模块化以后执行者变成模块工具：
 
 - 工具可声明 `"action": "send_external_message"`。
-- 任何调用方（Provider、owner MCP、其他模块）调用这类工具时，内核先按策略层判定：`auto` 直接执行；`ask` 生成审批，**批准绑定工具名、模块版本 hash 与参数**，批准后由内核以相同参数调用；`never` 拒绝。
+- 任何调用方（Provider、owner MCP、其他模块）调用这类工具时，内核先按策略层判定：`allow` 直接执行；`ask` 生成审批，**批准绑定工具名、模块版本 hash 与参数**，批准后由内核以相同参数调用。
 - 后台调用遇到 `ask` 时挂入待答复入口，调用方得到 `pending_approval`，不阻塞。
 - 模块经 `network` 直接发出的请求无法由内核逐次拦截。因此声明 `network` 的模块，所有对外写行为都应通过声明了 `action` 的工具暴露；这一点写入构建通道提示词，并作为审查卡片的检查项。根本限制要靠 P5 的按主机放行网络。
 

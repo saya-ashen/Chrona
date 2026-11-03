@@ -49,7 +49,9 @@ Rules that follow from the goals:
 - Current Provider: Pi RPC. Chrona tools are listed in `chronaToolInputSchemas` (contract).
   Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):
-  auto · notify_after · preapproved · ask · never; grants are global or per module.
+  allow · ask; grants are global or per module. At the same scope, once grants beat standing rules,
+  otherwise ask beats allow. Runtime approvals leave once or standing allow grants; module activation and removal
+  use the approval id and payload directly, without creating or checking grants.
   External text can never grant anything.
 - Notifications go through the `notify` module (`builtin/notify`, budget in `budget.ts`): now / digest / web, daily cap,
   quiet hours. Channel adapters (e.g. `qq.deliver`) are module-visible tools; notification delivery is orchestrated by `notify`. Do not add notification

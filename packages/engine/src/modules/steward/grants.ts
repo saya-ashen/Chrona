@@ -1,5 +1,5 @@
 import type { Prisma } from "@chrona/db";
-import { createGrantSchema, DEFAULT_POLICY, type Action } from "@chrona/contracts/steward";
+import { createGrantSchema, type Action } from "@chrona/contracts/steward";
 import { decidePolicy } from "@chrona/domain/steward/policy";
 import type { StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -28,7 +28,6 @@ export function createGrants({ db, workspaceId, now }: RecordContext) {
     },
     create: (raw: unknown) => db.$transaction(async tx => {
       const input = parseInput(createGrantSchema, raw), scope = input.scope;
-      if (DEFAULT_POLICY[input.action] === "never" && input.mode !== "never") throw new StewardError("forbidden", "Built-in never cannot be loosened");
       if (scope.kind === "module" && !await tx.module.findFirst({ where: { workspaceId, id: scope.moduleId } })) throw new StewardError("not_found", "Module not found");
       const row = await tx.grant.create({ data: { ...input, workspaceId, createdAt: now(), expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } });
       await audit(tx, { workspaceId, kind: "grant_created", actor: "user", subjectId: row.id, details: input });

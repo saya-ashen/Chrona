@@ -36,7 +36,6 @@ async function gate(ctx: ToolContext, action: Action, target: { moduleId?: strin
   const { db, workspaceId, now, tool } = ctx;
   return db.$transaction(async tx => {
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
-    if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
     if (decision.mode === "ask") {
       const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action } });
@@ -108,16 +107,12 @@ async function cancelSchedule(ctx: ToolContext, raw: unknown) {
 }
 async function requestApproval(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_request_approval, raw);
-  const decision = await effectivePolicyIn(ctx.db, ctx.workspaceId, input.action, {}, ctx.now());
-  if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
   return ctx.approvals.create({ ...input, payload: { tool: ctx.tool, ...input, ...resumeIn(ctx) } });
 }
 async function requestPathAccess(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_request_path_access, raw), expanded = input.path.replace(/^~(?=\/|$)/, homedir());
   if (!isAbsolute(expanded)) throw new StewardError("invalid", "Path must be absolute");
   const path = await realpath(expanded).catch(() => { throw new StewardError("not_found", "Path does not exist"); });
-  const decision = await effectivePolicyIn(ctx.db, ctx.workspaceId, "access_host_path", {}, ctx.now());
-  if (decision.mode === "never") throw new StewardError("forbidden", decision.reason);
   return ctx.approvals.create({ action: "access_host_path", title: `访问 ${path}`.slice(0, 200), detail: input.reason, preview: `批准后，后续运行可以读写：\n${path}`, payload: { tool: ctx.tool, kind: "host_path", path, ...resumeIn(ctx) } });
 }
 const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unknown>> = {

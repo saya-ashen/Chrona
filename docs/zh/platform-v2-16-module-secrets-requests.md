@@ -47,7 +47,7 @@
   - 内核为调用模块创建一张审批：`action` 为 `modify_external`，`moduleId` 为调用模块，`payload` 为 `{ kind: "module_request", hash, call }`（`hash` 为调用时的版本，`call` 为这次异步调用）。同一调用重复投递只建一张（异步调用本身按 `key` 幂等）。
   - 调用进入 `waiting` 状态，直到用户决定；不会被租约回收或重试。
   - 用户批准或拒绝后，调用变为 `succeeded`，输出 `{ approval, decision: "approved" | "denied" }`，经现有 `call_result` 事件推回源模块（当前启用的版本）。
-  - 策略对 `modify_external` 为 `never` 时直接失败（`forbidden`）。
+  - 显式请求始终等待用户决定，不由长期授权代替本次审批。
 - `approvals.status({ approval })`：只能查本模块发起的审批，返回 `{ status, hash, resolvedAt }`，用于重启后补查。
 - 只能“本次”批准：以 `always` 批准会被拒绝，且批准不产生任何授权（grant）。QQ 与内置网页对这类审批不显示“始终允许”。
 - 通知沿用现有审批通知（标题“需要你批准：<模块名>：<title>”）。

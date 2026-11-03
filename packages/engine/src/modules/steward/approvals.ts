@@ -1,12 +1,11 @@
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward";
-import { decidePolicy } from "@chrona/domain/steward/policy";
 import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
-import { toApproval, toGrant } from "./store";
+import { toApproval } from "./store";
 import { assertBuiltinUpgrade, groupPayloadSchema, isGroupPayload } from "./module-context";
 import { createRuns } from "./runs";
 import { drainCalls, settleWaiting } from "./module-calls";
@@ -14,9 +13,7 @@ const inputSchema = approvalSchema.pick({ action: true, title: true, detail: tru
 async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
   const { workspaceId, now } = context;
   const action = toApproval(row).action;
-  const grant = await tx.grant.create({ data: { workspaceId, action, mode: "preapproved", scope: row.moduleId ? { kind: "module", moduleId: row.moduleId } : { kind: "global" }, once: scope === "once", createdAt: now() } });
-  const decision = decidePolicy(action, row.moduleId ? { moduleId: row.moduleId } : {}, (await tx.grant.findMany({ where: { workspaceId, action } })).map(toGrant), now());
-  if (decision.mode === "never" || decision.mode === "ask") throw new StewardError("forbidden", "Policy does not allow this approval");
+  const grant = await tx.grant.create({ data: { workspaceId, action, mode: "allow", scope: row.moduleId ? { kind: "module", moduleId: row.moduleId } : { kind: "global" }, once: scope === "once", createdAt: now() } });
   return grant.id;
 }
 /** The grant an approval leaves, if any. */
@@ -27,7 +24,11 @@ async function approve(tx: Prisma.TransactionClient, context: RecordContext, row
     if (scope !== "once") throw new StewardError("invalid", "A module's request can only be approved once");
     return null;
   }
-  if (row.action === "activate_module") await assertBuiltinUpgrade(tx, context.workspaceId, row.moduleId, row.payload);
+  if (row.action === "activate_module") {
+    await assertBuiltinUpgrade(tx, context.workspaceId, row.moduleId, row.payload);
+    return null;
+  }
+  if ((row.payload as { kind?: unknown } | null)?.kind === "module_remove") return null;
   return grantApproval(tx, context, row, scope);
 }
 /** A run that asked does not wait: the decision continues its conversation as a new run, which retries under the new grant. */
@@ -56,8 +57,8 @@ async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId:
   if (!moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
   if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
 }
-async function afterResolve<T extends { grantId: string | null; payload: Prisma.JsonValue | null; resumed: boolean; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
-  if (onApproved && result.grantId && result.payload !== null) await onApproved({ workspaceId, approvalId: id, grantId: result.grantId, payload: result.payload });
+async function afterResolve<T extends { payload: Prisma.JsonValue | null; resumed: boolean; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
+  if (onApproved && !result.request && result.payload !== null) await onApproved({ workspaceId, approvalId: id, payload: result.payload });
   if (result.resumed) await ports!.onQueued?.();
   if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
   return result;

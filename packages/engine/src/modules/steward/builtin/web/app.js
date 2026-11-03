@@ -466,7 +466,7 @@ function permissionsPanel(view, after) {
   };
   return h("div", {},
     h("h3", {}, "能做什么"), view.capabilities.length ? h("ul", { class: "plain" }, view.capabilities.map(item => h("li", {}, item))) : h("p", { class: "muted" }, "只在自己的数据里工作，不联网、不调用其他应用。"),
-    h("h3", {}, "你给过的授权"), view.grants.length ? h("ul", { class: "plain" }, view.grants.map(grant => h("li", {}, `${grant.action} · ${grant.mode}${grant.once ? " · 一次" : ""}`, " ", h("button", { onclick: revoke(grant) }, "撤销")))) : h("p", { class: "muted" }, "没有。"),
+    h("h3", {}, "你给过的授权"), view.grants.length ? h("ul", { class: "plain" }, view.grants.map(grant => h("li", {}, `${grant.action} · ${{ allow: "允许", ask: "先问我" }[grant.mode]}${grant.once ? " · 一次" : ""}`, " ", h("button", { onclick: revoke(grant) }, "撤销")))) : h("p", { class: "muted" }, "没有。"),
     h("h3", {}, "最近审批"), view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(item => h("li", {}, item.title, " ", h("span", { class: "muted" }, `${STATUS[item.status] ?? item.status} · ${when(item.createdAt)}`)))) : h("p", { class: "muted" }, "没有。"));
 }
 const STATUS = { open: "待决定", approved: "已批准", denied: "已拒绝", expired: "已过期" };
@@ -573,7 +573,7 @@ async function settings() {
         s.status === "active" ? h("button", { onclick: act(`/schedules/${s.id}`, { status: "paused" }) }, "暂停") : h("button", { onclick: act(`/schedules/${s.id}`, { status: "active" }) }, "恢复"),
         h("button", { onclick: act(`/schedules/${s.id}`, { status: "cancelled" }, "取消这个日程？") }, "取消")))) : h("p", { class: "muted" }, "没有日程。")),
     h("section", {}, h("h2", {}, "授权规则"),
-      activeGrants.length ? h("ul", { class: "plain" }, activeGrants.map(g => h("li", {}, `${g.action} · ${g.mode}`, " ", h("span", { class: "muted" }, g.scope.kind === "module" ? "仅一个应用" : "全部"), " ",
+      activeGrants.length ? h("ul", { class: "plain" }, activeGrants.map(g => h("li", {}, `${g.action} · ${{ allow: "允许", ask: "先问我" }[g.mode]}`, " ", h("span", { class: "muted" }, g.scope.kind === "module" ? "仅一个应用" : "全部"), " ",
         h("button", { onclick: act(`/grants/${g.id}/revoke`, null, "撤销这条授权？") }, "撤销")))) : h("p", { class: "muted" }, "没有授权规则。")),
     h("section", {}, h("h2", {}, "Chrona 记得的偏好"),
       view.preferences.length ? h("ul", { class: "plain" }, view.preferences.map(p => h("li", {}, p.text, " ", h("button", { onclick: act(`/preferences/${p.id}/forget`, null, "删除这条偏好？") }, "删除")))) : h("p", { class: "muted" }, "还没有。")));

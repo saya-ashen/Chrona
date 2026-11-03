@@ -191,9 +191,10 @@ test("activation rechecks a previously approved builtin card after a fork become
     const modules = createModules(f.ports, f.workspace.id);
     const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["Fork"] } }, "build");
     await modules.buildPending();
-    await expect(onApproved(context, { workspaceId: f.workspace.id, approvalId: approval.id, grantId: approved.grantId!, payload: approved.payload! })).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("内置版本不能") });
+    await expect(onApproved(context, { workspaceId: f.workspace.id, approvalId: approval.id, payload: approved.payload! })).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("内置版本不能") });
     expect((await f.current()).activeHash).toBe(fork.hash);
-    expect((await f.db.grant.findUniqueOrThrow({ where: { id: approved.grantId! } })).consumedAt).toBeNull();
+    expect(approved.grantId).toBeNull();
+    expect(await f.db.grant.count()).toBe(0);
   } finally { await f.close(); }
 });
 

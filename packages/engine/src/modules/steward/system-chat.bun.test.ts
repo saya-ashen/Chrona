@@ -198,7 +198,7 @@ test("settings, grants, preferences and schedules are system interfaces for entr
   await web.call("settings.update", { settings: JSON.stringify({ notifications: { dailyCap: before.notifications.dailyCap + 1 } }) });
   expect(await web.call("settings.get", {})).toMatchObject({ notifications: { dailyCap: before.notifications.dailyCap + 1 } });
   await expect(web.call("settings.update", { settings: "{" })).rejects.toMatchObject({ code: "invalid" });
-  const grant = await f.api.grants.create({ action: "schedule", mode: "auto", scope: { kind: "global" } });
+  const grant = await f.api.grants.create({ action: "schedule", mode: "allow", scope: { kind: "global" } });
   expect(await web.call("settings.grants", {})).toMatchObject([{ id: grant.id }]);
   await web.call("settings.revoke-grant", { grant: grant.id });
   expect((await f.db.grant.findUniqueOrThrow({ where: { id: grant.id } })).revokedAt).not.toBeNull();

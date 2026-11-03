@@ -44,11 +44,12 @@ export const ACTIONS = [
   /** Owner-level policy changes (grants, budgets, moduleModel, notification settings) requested through an entry module. */
   "change_policy",
 ] as const;
-export const GRANT_MODES = ["auto", "notify_after", "preapproved", "ask", "never"] as const;
+/** An action either runs (`allow`) or asks the user first (`ask`); an approval "always" leaves an `allow` grant (security-simplification §4). */
+export const GRANT_MODES = ["allow", "ask"] as const;
 export const DEFAULT_POLICY = {
-  notify_user: "auto", schedule: "auto", activate_module: "ask", read_source: "auto",
+  notify_user: "allow", schedule: "allow", activate_module: "ask", read_source: "allow",
   connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
-  share_third_party: "ask", purchase: "ask", change_credentials: "never", access_host_path: "ask", change_policy: "ask",
+  share_third_party: "ask", purchase: "ask", change_credentials: "ask", access_host_path: "ask", change_policy: "ask",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
 
 export const NOTIFY_LEVELS = ["now", "digest", "web"] as const;

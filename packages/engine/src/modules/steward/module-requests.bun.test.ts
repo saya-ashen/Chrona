@@ -108,13 +108,13 @@ test("v2-17: modules.permissions gathers one app's capabilities, grants, credent
   const other = await f.moduleNamed("other", { uses: ["chat.send"] });
   await f.db.workspace.update({ where: { id: f.w }, data: { settings: { moduleModel: { models: { strong: { model: "fake/m", thinking: "high" } }, maxCallsPerEvent: 1, maxOutputTokens: 100, dailyCalls: 10, timeoutMs: 5000, moduleDailyCalls: { trader: 96 } } } } });
   await web.call("secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k-secret" }) });
-  const grant = await f.db.grant.create({ data: { workspaceId: f.w, action: "modify_external", mode: "preapproved", scope: { kind: "module", moduleId: trader.module.id } } });
+  const grant = await f.db.grant.create({ data: { workspaceId: f.w, action: "modify_external", mode: "allow", scope: { kind: "module", moduleId: trader.module.id } } });
   await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
   const view = (await web.call("modules.permissions", { module: "trader" })).output;
   expect(view).toMatchObject({
     module: "trader", capabilities: ["联网", "调用 provider.complete", "调用 approvals.request", "读取凭据 okx_demo"],
     secrets: [{ name: "okx_demo", configured: true }], model: { tier: "strong", target: { model: "fake/m", thinking: "high" }, dailyCap: 96, today: { calls: 0 } },
-    grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", status: "open" }],
+    grants: [{ id: grant.id, action: "modify_external", mode: "allow" }], approvals: [{ title: "trader：开始", status: "open" }],
   });
   expect(JSON.stringify(view)).not.toContain("k-secret");
   expect((await other.call("modules.permissions", { module: "trader" })).output).toEqual(view);

@@ -3,7 +3,6 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { effectivePolicyIn } from "./grants";
 import { parseInput, StewardError } from "./errors";
 import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
 import { snapshotModule } from "./module-files";
@@ -24,13 +23,6 @@ async function queueVersion(context: ModuleContext, submission: Submission) {
     }
     return row;
   });
-}
-async function permittedProposal(context: ModuleContext, moduleId: string) {
-  let permitted = true;
-  for (const action of ["activate_module", "notify_user"] as const) {
-    if ((await effectivePolicyIn(context.db, context.workspaceId, action, { moduleId }, context.ports.now())).mode === "never") permitted = false;
-  }
-  return permitted;
 }
 function hasMigration(manifest: Manifest, files: { path: string }[]) {
   return !manifest.data.migrate || files.some(file => file.path === manifest.data.migrate);
@@ -54,8 +46,8 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
   // Schema issue paths and messages come from the contract, so the Provider can fix its manifest.
   return parsed.success ? { manifest: parsed.data } : { errors: manifestIssues(parsed.error.issues).slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
 }
-function submissionErrors(manifest: Manifest, permitted: boolean, hasEntry: boolean, hasMigrate: boolean) {
-  return [...(permitted ? [] : ["policy: module activation or notifications are set to never"]), ...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
+function submissionErrors(manifest: Manifest, hasEntry: boolean, hasMigrate: boolean) {
+  return [...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
 }
 function proposedModule(context: ModuleContext, manifest: Manifest, source: Submission["source"]) {
   const { db, workspaceId, ports } = context;
@@ -83,9 +75,8 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);
-  const permitted = await permittedProposal(context, module.id);
-  if (existing?.status === "approved") return { moduleId: module.id, hash, status: permitted ? "approved" : "rejected", report: existing.report as BuildReport };
-  if (!permitted || !hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, permitted, hasEntry, hasMigrate) } };
+  if (existing?.status === "approved") return { moduleId: module.id, hash, status: "approved", report: existing.report as BuildReport };
+  if (!hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, hasEntry, hasMigrate) } };
   if (existing && ["building", "testing", "pending_review"].includes(existing.status)) return { moduleId: module.id, hash, status: existing.status as Proposal["status"], report: existing.report as BuildReport };
   const queued = await queueVersion(context, { ...submission, moduleId: module.id, manifest });
   if (queued.id !== versionId) return { moduleId: module.id, hash, status: queued.status as Proposal["status"], report: queued.report as BuildReport };

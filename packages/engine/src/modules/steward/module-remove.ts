@@ -6,15 +6,14 @@ import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "./audit";
 import { createApprovals } from "./approvals";
 import { StewardError } from "./errors";
-import { consumeOnce } from "./grants";
 import { requireModule, type ModuleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
 
 /**
- * v2-26: removing an app deletes its records, data, files, grants and settings. Always a red `delete_data` approval
- * (approved once, on the page), never bound to the module row (which the removal deletes); a backup is kept first.
+ * Removing an app deletes its records, data, files, grants and settings after a once-only `delete_data` approval.
+ * It is never bound to the module row (which the removal deletes); a backup is kept first.
  */
 export const moduleRemovePayloadSchema = z.object({ kind: z.literal("module_remove"), moduleId: z.string(), hash: z.string(), name: z.string() }).strict();
 type Db = Prisma.TransactionClient | ModuleContext["db"];
@@ -48,9 +47,8 @@ const exists = (path: string) => stat(path).then(() => true, () => false);
 export async function removeApproved(context: ModuleContext, action: ApprovedAction) {
   const { workspaceId, ports, platform } = context, { moduleId, hash, name } = moduleRemovePayloadSchema.parse(action.payload);
   await context.db.$transaction(async tx => {
-    const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "delete_data", status: "approved", grantId: action.grantId } });
+    const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "delete_data", status: "approved" } });
     if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Removal approval does not match");
-    await consumeOnce(tx, workspaceId, action.grantId, ports.now());
     const module = await requireModule(context, tx, moduleId);
     if (module.activeHash !== hash) throw new StewardError("conflict", "应用已更新，请重新申请");
     await assertRemovable(tx, module);

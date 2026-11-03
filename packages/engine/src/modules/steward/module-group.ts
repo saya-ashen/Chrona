@@ -5,7 +5,6 @@ import { moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import type { ApprovedAction, StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { createApprovals } from "./approvals";
-import { consumeOnce } from "./grants";
 import { assertBuiltinUpgrade, expireModuleApprovals, groupPayloadSchema, json, moduleContext, requireModule, type ModuleContext, type ModuleVersion } from "./module-context";
 import { declaredModules } from "./module-build-session";
 import { dataEmpty } from "./module-data";
@@ -119,8 +118,8 @@ async function approveMemberIn(context: ModuleContext, tx: Prisma.TransactionCli
 }
 /** Activates every version of an approved group in the caller's transaction: all or none, one generation. */
 export async function activateGroupIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction) {
-  const { workspaceId, ports } = context, payload = groupPayloadSchema.parse(action.payload), now = ports.now();
-  const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", moduleId: null, grantId: action.grantId } });
+  const { workspaceId } = context, payload = groupPayloadSchema.parse(action.payload);
+  const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", moduleId: null } });
   if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
   for (const { moduleId, hash } of payload.versions) await approveMemberIn(context, tx, moduleId, hash);
   const previous = new Map((await tx.module.findMany({ where: { id: { in: payload.versions.map(item => item.moduleId) } }, select: { id: true, activeHash: true } })).map(module => [module.id, module.activeHash]));
@@ -130,5 +129,4 @@ export async function activateGroupIn(context: ModuleContext, tx: Prisma.Transac
     await recordModuleActivation(context, tx, { moduleId, previousHash: previous.get(moduleId) ?? null, hash, generationId: generation.id });
     await audit(tx, { workspaceId, actor: "chrona", kind: "module_activate", subjectId: moduleId, details: { hash, generationId: generation.id, approvalId: action.approvalId } });
   }
-  if (action.grantId) await consumeOnce(tx, workspaceId, action.grantId, now);
 }

@@ -1,13 +1,12 @@
 import { DEFAULT_POLICY, type Action, type Grant, type GrantMode, type PolicyDecision } from "@chrona/contracts/steward";
 
-export const MODE_STRICTNESS = { auto: 0, notify_after: 1, preapproved: 2, ask: 3, never: 4 } as const satisfies Record<GrantMode, number>;
 type Target = { moduleId?: string };
 const labels: Record<Action, string> = {
   change_policy: "修改权限与设置", read_source: "读取来源", notify_user: "通知你", schedule: "设置调度",
   activate_module: "启用模块", send_external_message: "对外发消息", modify_external: "修改外部系统", purchase: "购买",
   delete_data: "删除数据", connect_source: "接入来源", share_third_party: "向第三方分享", change_credentials: "修改凭据", access_host_path: "访问本机目录",
 };
-const modes: Record<GrantMode, string> = { auto: "可以直接做", notify_after: "做完告诉你", preapproved: "按授权执行", ask: "需要先问你", never: "留给你处理" };
+const modes: Record<GrantMode, string> = { allow: "允许", ask: "需要先问你" };
 function specificity(grant: Grant, target: Target): number {
   const scope = grant.scope;
   switch (scope.kind) {
@@ -24,14 +23,10 @@ function policyReason(action: Action, mode: GrantMode, chosen?: Grant): string {
   const prefix = !chosen ? "内置规则：" : chosen.scope.kind === "module" ? "你为这个模块允许过：" : "你的授权规则：";
   return `${prefix}${labels[action]}${modes[mode]}`;
 }
-/**
- * Same scope: "never" always wins; then a one-time grant (the user just approved this very thing) over a standing rule;
- * otherwise the stricter mode.
- */
+/** Same scope: a one-time grant beats a standing rule; otherwise ask beats allow. */
 function preferred(grant: Grant, chosen: Grant) {
-  if (grant.mode === "never" || chosen.mode === "never") return grant.mode === "never" && chosen.mode !== "never";
   if (grant.once !== chosen.once) return grant.once;
-  return MODE_STRICTNESS[grant.mode] > MODE_STRICTNESS[chosen.mode];
+  return grant.mode === "ask" && chosen.mode === "allow";
 }
 function chooseGrant(action: Action, target: Target, grants: readonly Grant[], now: Date): Grant | undefined {
   let chosen: Grant | undefined;
@@ -49,8 +44,7 @@ function chooseGrant(action: Action, target: Target, grants: readonly Grant[], n
 }
 export function decidePolicy(action: Action, target: Target, grants: readonly Grant[], now: Date): PolicyDecision {
   const fallback: GrantMode = DEFAULT_POLICY[action];
-  const chosen = fallback === "never" ? undefined : chooseGrant(action, target, grants, now);
-  const selected: GrantMode = chosen?.mode ?? fallback;
-  const mode = selected === "preapproved" && !chosen ? "ask" : selected;
+  const chosen = chooseGrant(action, target, grants, now);
+  const mode = chosen?.mode ?? fallback;
   return { action, mode, grantId: chosen?.id ?? null, reason: policyReason(action, mode, chosen) };
 }

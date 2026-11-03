@@ -3,7 +3,6 @@ import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import type { ApprovedAction } from "./ports";
-import { consumeOnce, effectivePolicyIn } from "./grants";
 import { StewardError } from "./errors";
 import { assertBuiltinUpgrade, expireModuleApprovals, isGroupPayload, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
@@ -12,29 +11,22 @@ import { migrateData } from "./module-migration";
 import { activateGroupIn } from "./module-group";
 import { moduleRemovePayloadSchema, removeApproved } from "./module-remove";
 
-type ActivationAction = Omit<ApprovedAction, "grantId"> & { grantId: string | null };
-
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
   if (value === undefined) return;
   if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.schema !== "number" || !Number.isInteger(value.schema) || value.schema < 1 || typeof value.snapshotAt !== "string") throw new StewardError("invalid", "Invalid module restore approval");
   return { schema: value.schema, snapshotAt: value.snapshotAt };
 }
-async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, moduleId: string) {
-  const { workspaceId, ports } = context;
-  const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", moduleId, grantId: action.grantId } });
+async function checkApproval(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, moduleId: string) {
+  const { workspaceId } = context;
+  const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "activate_module", status: "approved", moduleId } });
   if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
-  for (const action of ["activate_module", "notify_user"] as const) {
-    const decision = await effectivePolicyIn(tx, workspaceId, action, { moduleId }, ports.now());
-    if (decision.mode === "never" || (action === "activate_module" && decision.mode === "ask")) throw new StewardError("forbidden", "Policy no longer allows module activation");
-  }
-  if (action.grantId) await consumeOnce(tx, workspaceId, action.grantId, ports.now());
 }
 async function approvedVersion(tx: Prisma.TransactionClient, moduleId: string, hash: string, restore?: Restore) {
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== (restore ? "approved" : "pending_review")) throw new StewardError("conflict", restore ? "Module version is not approved" : "Module version is not pending review");
   return version;
 }
-async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction, target: { moduleId: string; hash: string; restore?: Restore }) {
+async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction, target: { moduleId: string; hash: string; restore?: Restore }) {
   const { moduleId, hash, restore } = target;
   const module = await requireModule(context, tx, moduleId);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
@@ -53,7 +45,7 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   await activateIn(context, tx, { moduleId, hash, reason: "activate" });
   return null;
 }
-export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ActivationAction) {
+export async function activateApprovedIn(context: ModuleContext, tx: Prisma.TransactionClient, action: ApprovedAction) {
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");

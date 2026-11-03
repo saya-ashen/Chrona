@@ -838,7 +838,7 @@ test("approval switches schedules atomically, proposals keep old schedules, roll
     [1, "activate", { [first.moduleId!]: first.hash }], [2, "activate", { [first.moduleId!]: second.hash }], [3, "rollback", { [first.moduleId!]: first.hash }],
   ]);
   expect(f.forwarded).toEqual([]);
-  expect(await f.db.grant.count({ where: { action: "activate_module", once: true, consumedAt: { not: null } } })).toBe(2);
+  expect(await f.db.grant.count({ where: { action: "activate_module" } })).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_rollback" } })).toBe(1);
 });
 
@@ -960,12 +960,13 @@ test.each(["symlink", "git", "bytes", "files"])("reject unsafe module contents: 
   expect(await f.db.module.count()).toBe(0);
 });
 
-test.each(["activate_module", "notify_user"] as const)("never policy for %s rejects before sandbox", async action => {
+test.each(["activate_module", "notify_user"] as const)("ask policy for %s does not gate module activation", async action => {
   const f = await fixture();
-  await f.service.grants.create({ action, mode: "never", scope: { kind: "global" } });
-  expect((await f.propose()).status).toBe("rejected");
-  expect(f.calls).toEqual([]);
-  expect(await f.db.approval.count()).toBe(0);
+  await f.service.grants.create({ action, mode: "ask", scope: { kind: "global" } });
+  const proposal = await f.propose();
+  await f.approve(proposal.approvalId!);
+  expect((await f.service.modules.list())[0]!.activeHash).toBe(proposal.hash);
+  expect(await f.db.grant.count()).toBe(1);
 });
 
 test("all tests run independently even after a failure; declared network never enables build networking", async () => {
@@ -1098,8 +1099,8 @@ test("removing an app asks once from any entry; built-ins are refused; data and 
   const backup = (removed.details as { backup: string }).backup;
   expect(await readFile(join(backup, "data", "prices.json"), "utf8")).toBe("[1]");
   expect(await readFile(join(backup, "code", "module.json"), "utf8")).toContain("price-watch");
-  expect(await f.db.grant.count({ where: { action: "delete_data", once: true, consumedAt: null } })).toBe(0);
-  expect((await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).status).toBe("approved");
+  expect(await f.db.grant.count({ where: { action: "delete_data" } })).toBe(0);
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ status: "approved", grantId: null });
 });
 
 test("the review shows output contracts and examples as digests, and every authority field in full", () => {
