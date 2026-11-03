@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Offline author test: drives the untyped fake kernel and fetch stubs. */
 import { strict as assert } from "node:assert";
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { paths } from "chrona/testing";

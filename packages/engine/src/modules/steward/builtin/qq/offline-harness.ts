@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Offline author test: drives the untyped fake kernel and fetch stubs. */
 // Offline integration entry used only by regression-test.ts. Never the production entry.
 import { appendFile } from "node:fs/promises";
 import { join } from "node:path";

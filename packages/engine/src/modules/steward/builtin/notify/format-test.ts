@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Offline author test: drives the untyped fake kernel and fetch stubs. */
 import { strict as assert } from "node:assert";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";

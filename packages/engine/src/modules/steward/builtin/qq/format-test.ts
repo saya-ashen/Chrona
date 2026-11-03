@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Offline author test: drives the untyped fake kernel and fetch stubs. */
 import { strict as assert } from "node:assert";
 import { sendQqC2c, qqButtons, type QqTokenSource } from "./official";
 import { createChronaQqDelivery, escapeQqTitle, markdownAppLink, type DeliveryMessage } from "./bot";
