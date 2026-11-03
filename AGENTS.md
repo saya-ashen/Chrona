@@ -32,8 +32,8 @@ Rules that follow from the goals:
 - How a need is handled is decided by the agent from context, never by keyword routing to
   hard-coded templates. The choice is visible and correctable.
 - Providers own file, shell, web and session tools; runs reach app data only through module tools (`m_<module>_<tool>`) and see the
-  conversations' attachments read-only under `content/chat/` in their cwd; files to send are written in the cwd and attached by path. Execution mode is owner-selected (v2-27): unset preserves legacy behavior, including manual approval for unisolated versions;
-  `CHRONA_STEWARD_EXECUTION_MODE=trusted-local` runs locally; `required-isolation` fails closed without usable bwrap and currently
+  conversations' attachments read-only under `content/chat/` in their cwd; files to send are written in the cwd and attached by path. Execution mode is owner-selected (v2-27): unset or empty defaults to `trusted-local`;
+  `CHRONA_STEWARD_EXECUTION_MODE=trusted-local` runs locally even when bwrap is installed; `required-isolation` fails closed without usable bwrap and currently
   rejects candidates needing host dependency installation. A version whose checks pass activates automatically; only data migrations,
   new credentials and app removal ask the user (docs/zh/security-simplification.md).
   Local OS permissions are not constrained by manifest declarations; never describe routed permissions as malicious-code isolation. Chrona supplies scheduling, events, sessions, credentials,

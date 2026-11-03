@@ -100,13 +100,15 @@ describe("Pi RPC provider", () => {
     expect((await f.provider.start({ ...f.input, model: "openai/gpt-6.1-sol" }).done).outcome).toBe("failed");
     expect((await f.commands()).some(c => c.type === "prompt")).toBe(false);
   });
-  test("trusted-local ignores configured bubblewrap; required-isolation fails when it cannot isolate", async () => {
+  test("default and explicit trusted-local ignore bubblewrap; required-isolation fails when it cannot isolate", async () => {
     const f = await fixture();
     const bwrap = join(f.cwd, "bwrap");
     await writeFile(bwrap, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo bubblewrap; exit 0; fi\nexit 1\n`, { mode: 0o755 });
-    const local = createPiProvider({ ...f.options, bwrap, executionMode: "trusted-local" });
-    expect((await local.start(f.input).done).outcome).toBe("finished");
-    expect(JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args).not.toContain("--tmpfs");
+    for (const executionMode of [undefined, "trusted-local"] as const) {
+      const local = createPiProvider({ ...f.options, bwrap, executionMode });
+      expect((await local.start(f.input).done).outcome).toBe("finished");
+      expect(JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args).not.toContain("--tmpfs");
+    }
     await writeFile(join(f.cwd, "commands.jsonl"), "");
     const required = createPiProvider({ ...f.options, bwrap, executionMode: "required-isolation" });
     expect((await required.start(f.input).done).outcome).toBe("unavailable");
@@ -193,8 +195,8 @@ describe("Pi RPC provider", () => {
     const f = await fixture();
     await mkdir(f.input.sessionDir, { recursive: true });
     const bwrap = join(f.cwd, "bwrap");
-    await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
-    const provider = createPiProvider({ ...f.options, bwrap, workspaceRoot: rootRun ? f.cwd : undefined, webExtension: join(f.cwd, "web.ts") });
+    await writeFile(bwrap, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';\nif(process.argv.includes('--version')||process.argv.includes('--unshare-all'))process.exit(0);\nconst a=process.argv.slice(2);writeFileSync('bwrap.json',JSON.stringify(a));const p=Bun.spawn(a.slice(a.indexOf('--')+1),{stdin:'inherit',stdout:'inherit',stderr:'inherit'});process.exit(await p.exited);\n`, { mode: 0o755 });
+    const provider = createPiProvider({ ...f.options, bwrap, executionMode: "required-isolation", workspaceRoot: rootRun ? f.cwd : undefined, webExtension: join(f.cwd, "web.ts") });
     expect((await provider.start(f.input).done).outcome).toBe("finished");
     const args = JSON.parse(await readFile(join(f.cwd, "bwrap.json"), "utf8"));
     expect(args).toContain("--die-with-parent"); expect(args).toContain("--ro-bind"); expect(args).toContain("--tmpfs"); expect(args).not.toContain("--unshare-net");
@@ -215,7 +217,7 @@ test.skipIf(!realBwrap)("real bwrap: content areas appear under content/, writab
   await mkdir(f.input.sessionDir, { recursive: true });
   const files = join(f.cwd, "content-files"), notes = join(f.cwd, "content-notes");
   await mkdir(files); await mkdir(notes); await writeFile(join(files, "a.md"), "hi\n");
-  const config = piLaunchConfig({ ...f.options, bwrap: realBwrap! });
+  const config = piLaunchConfig({ ...f.options, bwrap: realBwrap!, executionMode: "required-isolation" });
   const input = { ...f.input, content: [{ name: "files", dir: files, writable: false }, { name: "notes", dir: notes, writable: true }] };
   prepareContent(input, false);
   const args = piArguments(config, input, "p");

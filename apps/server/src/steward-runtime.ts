@@ -46,10 +46,10 @@ function providerBrowsers(options: RuntimeOptions) {
     onError: error => createLogger("steward.browser").warn("browser.unavailable", { error }),
   });
 }
-type ExecutionMode = "legacy" | "trusted-local" | "required-isolation";
+type ExecutionMode = "trusted-local" | "required-isolation";
 function executionMode(env = process.env): ExecutionMode {
   const configured = env.CHRONA_STEWARD_EXECUTION_MODE?.trim();
-  if (!configured) return "legacy";
+  if (!configured) return "trusted-local";
   if (configured === "trusted-local" || configured === "required-isolation") return configured;
   throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
 }

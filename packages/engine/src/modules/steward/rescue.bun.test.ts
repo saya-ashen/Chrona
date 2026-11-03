@@ -10,7 +10,7 @@ async function fixture() {
   const approvals = createApprovals({ db, workspaceId: workspace.id, now: () => new Date() });
   return { db, workspace, approvals };
 }
-test.each(["entry", "web", "mcp", "qq", "rescue", "cli"] as const)("entry-module and policy approvals resolve from any source: %s", async source => {
+test.each(["entry", "web", "mcp", "qq", "rescue", "cli", "custom-entry"] as const)("entry-module and policy approvals resolve from any source: %s", async source => {
   const { db, workspace, approvals } = await fixture();
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "entry" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a".repeat(64), manifest: { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] }, intent: {}, source: "user", report: {}, status: "pending_review" } });

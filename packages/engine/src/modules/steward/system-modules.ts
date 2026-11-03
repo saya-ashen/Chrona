@@ -216,7 +216,7 @@ const approvals: SystemModule = {
       else await ports.onApproved?.(action);
     }, ports);
     if (name === "list") return json(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"));
-    const source = module.module === "qq" || module.module === "mcp" || module.module === "web" ? module.module : "entry";
+    const source = module.module;
     if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: args.scope ?? "once" }, source)).approval);
     throw new CallError("not_found", `approvals.${name} not found`);
   },

@@ -32,7 +32,7 @@ Chrona 是用户与 Agent 共用的、可随需求演化的本地超级软件工
 - 配置为 `CHRONA_STEWARD_EXECUTION_MODE=trusted-local` 时，模块、构建检查和 Provider 明确本地执行，即使已安装 bwrap 也不包装隔离。
 - 配置为 `CHRONA_STEWARD_EXECUTION_MODE=required-isolation` 时，模块与 Provider 仅在 bwrap 可用且隔离探测成功后执行；否则失败关闭，不回退本地。
 - 当前依赖安装器仍是宿主执行，Python 构建后端可能执行包代码。因此该模式下，提交含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选会在安装前拒绝；无依赖候选可继续隔离检查。尚未实现隔离依赖安装，不能通过自动降级绕过此限制。可信本地与旧配置的依赖安装行为不变。
-- 未设置或为空时保留既有执行行为；未知非空值拒绝启动。未设置不构成可信本地授权，也不扩大旧自动更新授权。
+- 未设置或为空时默认 `trusted-local`，模块、构建检查和 Provider 本地执行，即使已安装 bwrap 也不包装隔离；未知非空值拒绝启动。
 - 模式由服务 owner 环境配置控制，不由模块或 Provider 请求选择。隔离本身不能替代本地执行边界说明。
 - 升级不得自动扩大旧授权；可信本地不会因选择执行模式而生成更新授权。检查失败、缺少长期授权或策略拒绝时不会自动激活。
 

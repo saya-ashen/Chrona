@@ -4,6 +4,7 @@ import { testDb } from "./test-db";
 import { entryConversations, memory } from "./memory";
 import { createToday } from "./today";
 import type { StewardPorts } from "./ports";
+import { startOwnerBuildAsCaller } from "./owner-build";
 
 test("conversation views and memory admission recognize entry manifests, not built-in names", async () => {
   const db = testDb(), workspaceId = (await db.workspace.create({ data: { name: "entries" } })).id;
@@ -27,7 +28,11 @@ test("conversation views and memory admission recognize entry manifests, not bui
       const result = memory.handle({ ports, workspaceId, caller: { kind: "module", module: name, moduleId: module.id, hash: "h" } }, "status", {});
       if (entry) expect(await result).toMatchObject({ available: false });
       else await expect(result).rejects.toMatchObject({ code: "forbidden" });
+      // Invalid build input reaches validation only for entries, irrespective of their names.
+      const build = startOwnerBuildAsCaller(ports, workspaceId, { kind: "module", module: name, moduleId: module.id, hash: "h" }, {});
+      await expect(build).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
     }
+    await expect(startOwnerBuildAsCaller(ports, workspaceId, { kind: "owner", via: null }, {})).rejects.toMatchObject({ name: "ZodError" });
     await db.session.create({ data: { workspaceId, key: "old", source: "web" } });
     await db.session.create({ data: { workspaceId, key: "build", source: "build" } });
     expect((await db.session.findMany({ where: { workspaceId, ...await entryConversations(db, workspaceId) } })).map(row => row.id).sort()).toEqual(included.sort());

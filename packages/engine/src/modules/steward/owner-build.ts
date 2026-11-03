@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { modulesToolInputSchemas } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { buildSettings } from "./settings";
@@ -25,8 +25,12 @@ export async function buildControl(ports: StewardPorts, workspaceId: string, cal
   return controlBuild(ports, workspaceId, input.session, input.requirements, await requestFiles(ports, run.cwd, input.files));
 }
 
-export function startOwnerBuildAsCaller(ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown) {
-  if (caller.kind !== "owner" && !(caller.kind === "module" && ["mcp", "web"].includes(caller.module))) throw new StewardError("forbidden", "Only the owner entry may start a bounded build");
+export async function startOwnerBuildAsCaller(ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown) {
+  if (caller.kind !== "owner") {
+    const version = caller.kind === "module" ? await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.moduleId, hash: caller.hash } } }) : null;
+    const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+    if (!manifest || !isEntryModule(manifest)) throw new StewardError("forbidden", "Only the owner entry may start a bounded build");
+  }
   return startOwnerBuild(ports, workspaceId, raw);
 }
 

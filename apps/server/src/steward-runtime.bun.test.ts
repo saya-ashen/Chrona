@@ -57,8 +57,12 @@ test("runtime validates and wires execution mode and automatic rollback", async 
   const previous = keys.map(key => process.env[key]);
   try {
     delete process.env.CHRONA_STEWARD_AUTO_ROLLBACK;
+    delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
     const defaults = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-default-")), provider: null });
-    try { expect(defaults.ports.moduleAutoRollback).toBe(false); } finally { await defaults.stop(); }
+    try {
+      expect(defaults.ports.moduleAutoRollback).toBe(false);
+      expect(defaults.ports.sandbox?.executionMode).toBe("trusted-local");
+    } finally { await defaults.stop(); }
     process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "true";
     const enabled = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-enabled-")), provider: null });
     try { expect(enabled.ports.moduleAutoRollback).toBe(true); } finally { await enabled.stop(); }

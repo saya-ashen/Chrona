@@ -7,7 +7,7 @@ import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { modernPi, readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
 
 export type PiProviderOptions = {
-  command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string; executionMode?: "legacy" | "trusted-local" | "required-isolation";
+  command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string; executionMode?: "trusted-local" | "required-isolation";
   chronaExtension: string; webExtension?: string | null; agentUrl: string; bwrap?: string | null;
   /** The browser tool (v2-12): its extension, and where runs get a browser from; without either runs have no browser tool. */
   browserExtension?: string | null; browsers?: { ensure(): string | null };
@@ -29,7 +29,7 @@ export function piLaunchConfig(options: PiProviderOptions): PiLaunchConfig {
   return { options, command: options.command ?? "", agentDir: options.agentDir ?? "", version: options.expectedVersion ?? "0.85.0", resources: selected.resources, resourceError: selected.error,
     extension: resolve(options.chronaExtension), web: options.webExtension ? resolve(options.webExtension) : null,
     browserExtension: options.browserExtension ? resolve(options.browserExtension) : null,
-    bwrap: options.executionMode === "trusted-local" ? null : configuredBwrap };
+    bwrap: options.executionMode === "required-isolation" ? configuredBwrap : null };
 }
 function privateProfile(path: string): boolean {
   try {
@@ -76,7 +76,6 @@ export async function inspectPiLaunch(config: PiLaunchConfig): Promise<string | 
     const shell = Bun.which("sh");
     if (!config.bwrap || !(await probe(config.bwrap, env)).ok || !shell || spawnSync(config.bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status !== 0) return "要求隔离执行，但 bubblewrap 不可用";
   }
-  if (config.bwrap && !(await probe(config.bwrap, env)).ok) return "bubblewrap binary unavailable";
   return null;
 }
 const both = (p: string) => { const path = resolve(p); return existsSync(path) ? [path, realpathSync(path)] : [path]; };

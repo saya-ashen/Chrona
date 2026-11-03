@@ -6,7 +6,7 @@ import { createScriptSandbox } from "./script-sandbox";
 import { createModuleChannel } from "@chrona/engine";
 import { createServer } from "node:net";
 const bwrapPath = Bun.which("bwrap") ?? undefined;
-const sandbox = createScriptSandbox({ bwrapPath });
+const sandbox = createScriptSandbox({ bwrapPath, executionMode: "required-isolation" });
 if (!sandbox.health.isolated) console.warn("SKIP script sandbox integration tests: bubblewrap missing or namespaces unavailable");
 const sandboxTest = sandbox.health.isolated ? test : test.skip;
 sandboxTest("module code is read-only, data writable, JSON stdin, clear environment and network off by default", async () => {
@@ -16,7 +16,7 @@ sandboxTest("module code is read-only, data writable, JSON stdin, clear environm
     await mkdir(codeDir); await mkdir(dataDir); await writeFile(secret, "synthetic secret");
     const network = await readlink("/proc/self/ns/net");
     await writeFile(join(codeDir, "test.py"), `import os,json,sys\nassert os.getcwd() == '/module'\nassert 'HOME' not in os.environ\nassert json.load(sys.stdin)['value'] == 42\nassert os.readlink('/proc/self/ns/net') != ${JSON.stringify(network)}\nassert os.listdir(${JSON.stringify(homedir())}) == []\nassert not os.path.exists(${JSON.stringify(secret)})\ntry:\n open('/module/test.py', 'w')\n raise AssertionError('module writable')\nexcept OSError: pass\nopen('/data/result', 'w').write('ok')\nprint('isolated')`);
-    const moduleSandbox = createScriptSandbox({ bwrapPath, dataDir: root });
+    const moduleSandbox = createScriptSandbox({ bwrapPath, executionMode: "required-isolation", dataDir: root });
     expect(await moduleSandbox.runModule({ codeDir, dataDir, entry: "test.py", input: { value: 42 } })).toMatchObject({ status: "succeeded", exitCode: 0, output: "isolated\n" });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
     await writeFile(join(codeDir, "test.py"), `import os\nassert os.readlink('/proc/self/ns/net') == ${JSON.stringify(network)}\nprint('shared')`);
@@ -111,7 +111,7 @@ on("schedule", async ev => {
   return { handled: true, result: reply.status };
 });
 on("tool", () => { throw new Error("handler failed"); });`);
-    handle = createScriptSandbox({ bwrapPath, dataDir: root }).startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "channel.sock") });
+    handle = createScriptSandbox({ bwrapPath, executionMode: "required-isolation", dataDir: root }).startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "channel.sock") });
     await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
     const now = "2026-10-22T09:00:00.000Z";
     expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "executed" } });
@@ -130,7 +130,7 @@ on("tool", () => { throw new Error("handler failed"); });`);
   }
 });
 
-test("execution mode selects trusted local explicitly and required isolation fails closed", async () => {
+test("execution mode defaults to trusted local and required isolation fails closed", async () => {
   const root = await mkdtemp(join(tmpdir(), "chrona-execution-mode-"));
   const dataDir = join(root, "data"), codeDir = join(root, "code"), unusableBwrap = join(root, "bwrap");
   try {
@@ -144,7 +144,9 @@ test("execution mode selects trusted local explicitly and required isolation fai
     expect(required.health).toEqual({ available: false, isolated: false });
     expect(await required.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "unavailable", error: "要求隔离执行，但 bubblewrap 不可用" });
     expect(() => required.startModule({ codeDir, dataDir, entry: "test.sh", socketPath: join(root, "module.sock") })).toThrow("要求隔离执行，但 bubblewrap 不可用");
-    expect(await createScriptSandbox({ dataDir: root }).runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "local" });
+    const defaultLocal = createScriptSandbox({ dataDir: root, bwrapPath: unusableBwrap });
+    expect(defaultLocal.health).toEqual({ available: true, isolated: false });
+    expect(await defaultLocal.runModule({ codeDir, dataDir, entry: "test.sh", input: {} })).toMatchObject({ status: "succeeded", output: "local" });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

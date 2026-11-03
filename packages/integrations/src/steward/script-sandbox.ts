@@ -59,8 +59,8 @@ function spawnIsolated({ dirs, entry, code, data, content, socket, http, bin, pa
     "--clearenv", ...Object.entries(env).flatMap(([key, value]) => ["--setenv", key, value])];
   return spawn(bwrap, [...profile, "--", ...command(entry, "/module", code, memoryLimitMb)], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
 }
-function isolationUsable(mode: "legacy" | "trusted-local" | "required-isolation", bwrap: string | null, shell: string | null) {
-  return mode !== "trusted-local" && !!(bwrap && shell && spawnSync(bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status === 0);
+function isolationUsable(mode: "trusted-local" | "required-isolation", bwrap: string | null, shell: string | null) {
+  return mode === "required-isolation" && !!(bwrap && shell && spawnSync(bwrap, ["--unshare-all", "--die-with-parent", "--ro-bind", "/", "/", "--", shell, "-c", "exit 0"], { env: {}, timeout: 3000, stdio: "ignore" }).status === 0);
 }
 function installLocalSdk(dataDir: string | undefined, moduleSdk: string, isolated: boolean, isolationRequired: boolean) {
   if (isolated || isolationRequired || !dataDir) return;
@@ -85,12 +85,12 @@ function createSpawnModule({ isolated, isolationRequired, bwrap, dataDir, module
   };
 }
 /**
- * Runs module processes inside bubblewrap when it is usable (isolated), otherwise as plain child
- * processes of the Chrona user, like Hermes' local backend. Modules find everything through
+ * Runs module processes locally by default; required-isolation uses bubblewrap and fails closed
+ * when isolation is unavailable. Modules find everything through
  * CHRONA_* variables and import the SDK as `chrona`, so the same code runs either way.
  */
-export function createScriptSandbox({ bwrapPath, executionMode = "legacy", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
-  bwrapPath?: string; executionMode?: "legacy" | "trusted-local" | "required-isolation"; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
+export function createScriptSandbox({ bwrapPath, executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, memoryMb = 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)) }: {
+  bwrapPath?: string; executionMode?: "trusted-local" | "required-isolation"; dataDir?: string; timeoutMs?: number; maxOutputBytes?: number; memoryMb?: number;
   /** The `chrona` package directory; packaged binaries pass the shipped copy. */
   moduleSdk?: string;
 }) {

@@ -31,7 +31,7 @@ export type StewardPorts = {
   moduleAutoRollback?: boolean;
   sandbox?: {
     /** Set by the host, never inferred from missing isolation or supplied by a module. */
-    executionMode?: "legacy" | "trusted-local" | "required-isolation";
+    executionMode?: "trusted-local" | "required-isolation";
     /** Modules can run (an interpreter exists and required isolation is available). */
     available: boolean;
     /** Modules run inside bubblewrap; otherwise local OS permissions apply, not manifest isolation. */

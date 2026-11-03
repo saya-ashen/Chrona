@@ -75,7 +75,7 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
       return toApproval(row);
     }),
-    resolve: (id: string, raw: unknown, source: "rescue" | "cli" | "web" | "mcp" | "qq" | "entry" = "entry") => db.$transaction(async tx => {
+    resolve: (id: string, raw: unknown, source: string = "entry") => db.$transaction(async tx => {
       const input = parseInput(resolveApprovalSchema, raw);
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
