@@ -27,11 +27,15 @@ async function submittedBy(db: StewardPorts["db"], workspaceId: string, version:
   const found = rows.map(row => row.details as { hash?: unknown; sessionId?: unknown } | null).find(details => details?.hash === version.hash && typeof details.sessionId === "string");
   return found ? String(found.sessionId) : null;
 }
-/** When the version belongs to a build that declared several modules, keep its review for the group approval and say so. */
-export async function recordGroupReview(context: ModuleContext, version: ModuleVersion, review: z.input<typeof reviewSchema>) {
+/** Group candidates must never acquire a standalone approval, even if recording their review failed. */
+export async function isGroupCandidate(context: ModuleContext, version: ModuleVersion) {
   if (version.source !== "build") return false;
   const sessionId = await submittedBy(context.db, context.workspaceId, version);
-  if (!sessionId || ((await declaredModules(context.db, context.workspaceId, sessionId))?.length ?? 0) < 2) return false;
+  return !!sessionId && ((await declaredModules(context.db, context.workspaceId, sessionId))?.length ?? 0) >= 2;
+}
+/** When the version belongs to a build that declared several modules, keep its review for the group approval and say so. */
+export async function recordGroupReview(context: ModuleContext, version: ModuleVersion, review: z.input<typeof reviewSchema>) {
+  if (!await isGroupCandidate(context, version)) return false;
   const row = { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_review", subjectId: version.id, details: json(review) };
   await context.db.audit.upsert({ where: { id: reviewKey(version.id) }, update: { details: row.details }, create: { ...row, id: reviewKey(version.id) } });
   return true;

@@ -1,11 +1,12 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService } from "./service";
 import { createModules } from "./modules";
-import { reviewManifest } from "./module-build";
+import { buildPending, reviewManifest } from "./module-build";
+import { moduleContext } from "./module-context";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
@@ -81,6 +82,53 @@ test.each(["package.json", "pyproject.toml", "system", "none"])("required isolat
     expect(f.calls).toHaveLength(0);
     expect(await f.db.approval.count()).toBe(0);
   }
+});
+
+test("a failed approval transaction leaves a pending version that the next build cycle repairs once", async () => {
+  const f = await fixture(), proposal = await f.submit(), context = moduleContext(f.ports, f.workspace.id);
+  const error = new Error("approval transaction failed");
+  context.now = () => { throw error; };
+  await expect(buildPending(context)).rejects.toThrow(error.message);
+  expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: proposal.moduleId!, hash: proposal.hash } } })).status).toBe("pending_review");
+  expect(await f.db.approval.count()).toBe(0);
+  context.now = f.ports.now;
+  await Promise.all([buildPending(context), buildPending(context)]);
+  expect(await f.db.approval.count()).toBe(1);
+  expect(await f.db.approval.findFirst()).toMatchObject({ action: "activate_module", payload: { hash: proposal.hash }, status: "open" });
+  await buildPending(context);
+  expect(await f.db.approval.count()).toBe(1);
+});
+
+test("review recovery logs a bounded redacted error and continues building other modules", async () => {
+  const f = await fixture(), context = moduleContext(f.ports, f.workspace.id);
+  await f.submit();
+  context.now = () => { throw new Error("approval failed"); };
+  await expect(buildPending(context)).rejects.toThrow("approval failed");
+  const manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ ...manifest, name: "price-watch-other" }));
+  const other = await f.submit();
+  let failures = 0;
+  context.now = () => { if (failures++ === 0) throw new TypeError(`token=private-test-value ${"x".repeat(1000)}`); return f.ports.now(); };
+  const log = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    await buildPending(context);
+    expect(await f.db.approval.count()).toBe(1);
+    expect(await f.db.approval.findFirst()).toMatchObject({ payload: { hash: other.hash } });
+    const diagnostic = JSON.parse(String(log.mock.calls[0]![0]));
+    expect(diagnostic).toMatchObject({ event: "review.recovery_failed", name: "TypeError" });
+    expect(diagnostic.message).toContain("[Redacted]");
+    expect(diagnostic.message).not.toContain("private-test-value");
+    expect(diagnostic.message.length).toBeLessThan(450);
+    expect(diagnostic.stack).toBeUndefined();
+  } finally { log.mockRestore(); }
+});
+
+test.each(["open", "expired", "approved", "denied"])("review recovery never recreates a version with an existing %s approval", async status => {
+  const f = await fixture(), proposal = await f.propose();
+  await f.db.approval.updateMany({ data: { status } });
+  await f.service.modules.buildPending();
+  expect(await f.db.approval.count()).toBe(1);
+  expect(await f.db.approval.findFirst()).toMatchObject({ status, payload: { hash: proposal.hash } });
 });
 
 test("activation schedules the module's schedule triggers", async () => {
@@ -976,7 +1024,7 @@ test("tick starts builds without waiting for them and reports build errors on th
   await tick();
   await tick.settled();
   f.db.moduleVersion.findMany = findMany;
-  expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules" });
+  expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules", error: expect.any(Error) });
 });
 
 test("v2-26: Chrona asks to pause an app (yellow, once only); the user resumes it with the schedules pausing stopped", async () => {

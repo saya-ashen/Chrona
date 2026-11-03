@@ -7,9 +7,11 @@ import { isEntryModule, listenPaths, moduleManifestSchema } from "@chrona/contra
 import { createApprovals } from "./approvals";
 import { createRuns, createRunSession } from "./runs";
 import { notifyUser } from "./notify-user";
-import { intentSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
+import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
-import { recordGroupReview } from "./module-group";
+import { isGroupCandidate, recordGroupReview } from "./module-group";
+import { dataEmpty } from "./module-data";
+import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
@@ -224,7 +226,7 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     if (invalidManifest) return invalidManifest;
     const checks = await checkBuildCandidate({ context, module, version, manifest, staging, report });
     // requestReview suppresses replacements if a custom version is active.
-    return finishBuild({ context, module, version, manifest, report, checks, files });
+    return await finishBuild({ context, module, version, manifest, report, checks, files });
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
 async function recoverBuilds(context: ModuleContext, now: Date) {
@@ -258,9 +260,50 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
     });
   }
 }
+function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
+  const single = payload as { hash?: unknown } | null;
+  return single?.hash === version.hash || groupPayloadSchema.safeParse(payload).data?.versions.some(member => member.moduleId === version.moduleId && member.hash === version.hash) === true;
+}
+async function recoverReview(context: ModuleContext, version: ModuleVersion) {
+  const { db, workspaceId } = context;
+  const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId, source: { not: "builtin" } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  if (latest?.id !== version.id || latest.status !== "pending_review" || await isGroupCandidate(context, version)) return;
+  const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
+  if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
+  const module = await requireModule(context, db, version.moduleId);
+  if (module.activeHash === version.hash) return;
+  const report = version.report as BuildReport | null;
+  if (!report?.continuity) return;
+  const files = await readModuleFiles(join(context.store, version.hash), "Unsafe module store file");
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  const needsMigration = module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id));
+  await requestReview(context, { version, module, report, files, needsMigration });
+}
+const recoveringReviews = new WeakMap<ModuleContext["db"], Set<string>>();
+/** Repair only never-created standalone reviews; a resolved/expired card is a deliberate decision, not a retry. */
+async function recoverReviews(context: ModuleContext) {
+  const { db, workspaceId } = context;
+  let running = recoveringReviews.get(db);
+  if (!running) { running = new Set(); recoveringReviews.set(db, running); }
+  if (running.has(workspaceId)) return;
+  running.add(workspaceId);
+  try {
+    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, source: { not: "builtin" }, status: "pending_review" } });
+    for (const version of candidates) {
+      try {
+        await recoverReview(context, version);
+      } catch (error) {
+        console.error(JSON.stringify({ level: "error", component: "module-build", event: "review.recovery_failed", versionId: version.id,
+          name: redactSensitiveText(error instanceof Error ? error.name : typeof error),
+          message: redactSensitiveText(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error") }));
+      }
+    }
+  } finally { running.delete(workspaceId); }
+}
 export async function buildPending(context: ModuleContext, now = context.ports.now()) {
   const { db, workspaceId } = context;
   await recoverBuilds(context, now);
+  await recoverReviews(context);
   const pending = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: "building" }, orderBy: { createdAt: "asc" }, take: 3 });
   for (const version of pending) {
     const claimed = await db.$transaction(async tx => {

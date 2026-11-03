@@ -5,6 +5,7 @@ import { recoverInterruptedSqliteRestore } from "@chrona/db/sqlite-backup";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { secureGeneratedSqliteSidecars } from "@chrona/db/sqlite-url";
 import { createLogger } from "@chrona/logging";
+import { redactSensitiveText } from "@chrona/logging/redaction";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
 const log = createLogger("apps.server");
@@ -25,7 +26,11 @@ async function loadApplicationGraph(databaseUrl: string, port: number) {
   await ensureDefaultWorkspace(db);
   secureGeneratedSqliteSidecars(databaseUrl);
   const { createStewardRuntime } = await import("./steward-runtime");
-  const steward = createStewardRuntime(db, { port, onError: () => log.error("steward tick failed", { code: "STEWARD_TICK_FAILED" }) });
+  const steward = createStewardRuntime(db, { port, onError: error => log.error("steward tick failed", {
+    code: "STEWARD_TICK_FAILED",
+    name: redactSensitiveText(error instanceof Error ? error.name : typeof error),
+    message: redactSensitiveText(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error"),
+  }) });
   return { createServerApp, steward };
 }
 

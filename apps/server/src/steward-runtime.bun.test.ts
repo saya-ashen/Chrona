@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -93,6 +93,19 @@ test("unknown execution mode fails closed", async () => {
     if (previous === undefined) delete process.env.CHRONA_STEWARD_EXECUTION_MODE; else process.env.CHRONA_STEWARD_EXECUTION_MODE = previous;
     await db.$disconnect();
   }
+});
+
+test("runtime forwards thrown and stage failures to onError", async () => {
+  const db = testDb(), errors: unknown[] = [], error = new TypeError("approval failed");
+  const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-runtime-error-")), provider: null, onError: value => { errors.push(value); } });
+  const tick = spyOn(runtime.service, "tick");
+  try {
+    tick.mockRejectedValueOnce(error);
+    await runtime.tickOnce();
+    tick.mockResolvedValueOnce({ failures: [{ workspaceId: "w", stage: "modules", error }] });
+    await runtime.tickOnce();
+    expect(errors).toEqual([error, error]);
+  } finally { tick.mockRestore(); await runtime.stop(); await db.$disconnect(); }
 });
 
 test("runtime data directory follows explicit setting then database directory", () => {

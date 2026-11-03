@@ -59,13 +59,13 @@ function closedInput(run: ClaimedRun, sessionId: string | null) {
   return null;
 }
 export function createTick(ports: StewardPorts) {
-  const builds = new Map<string, Promise<void>>(), buildFailures = new Set<string>();
+  const builds = new Map<string, Promise<void>>(), buildFailures = new Map<string, unknown>();
   function startBuild(workspaceId: string, now: Date) {
     if (builds.has(workspaceId)) return;
-    builds.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, () => { buildFailures.add(workspaceId); }).finally(() => { builds.delete(workspaceId); }));
+    builds.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, error => { buildFailures.set(workspaceId, error); }).finally(() => { builds.delete(workspaceId); }));
   }
   async function tick(now = ports.now()) {
-    const failures: { workspaceId: string; stage: string }[] = [...buildFailures].map(workspaceId => ({ workspaceId, stage: "modules" }));
+    const failures: { workspaceId: string; stage: string; error: unknown }[] = [...buildFailures].map(([workspaceId, error]) => ({ workspaceId, stage: "modules", error }));
     buildFailures.clear();
     for (const workspace of await ports.db.workspace.findMany()) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
@@ -138,10 +138,10 @@ export function createTick(ports: StewardPorts) {
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
       ] as const) {
-        try { await action(); } catch { failures.push({ workspaceId, stage }); }
+        try { await action(); } catch (error) { failures.push({ workspaceId, stage, error }); }
       }
       try { await ports.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt: now }, update: { lastTickAt: now } }); }
-      catch { failures.push({ workspaceId, stage: "lastTickAt" }); }
+      catch (error) { failures.push({ workspaceId, stage: "lastTickAt", error }); }
     }
     return { failures };
   }

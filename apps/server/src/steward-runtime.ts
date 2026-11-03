@@ -34,7 +34,7 @@ function resourcePath(relative: string, source = relative): string {
   return packaged.find((path) => existsSync(path)) ?? fileURLToPath(new URL(`../../../${source}`, import.meta.url));
 }
 type RuntimeOptions = {
-  now?: () => Date; onError?: () => void; port?: number; provider?: ProviderAdapter | null;
+  now?: () => Date; onError?: (error: unknown) => void; port?: number; provider?: ProviderAdapter | null;
   dataDir?: string; tickSeconds?: number; chatTimeoutMs?: number;
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
@@ -126,8 +126,8 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     running = (async () => {
       while (canTick()) {
         pending = false;
-        try { if ((await service.tick()).failures.length) options.onError?.(); }
-        catch { options.onError?.(); }
+        try { for (const failure of (await service.tick()).failures) options.onError?.(failure.error); }
+        catch (error) { options.onError?.(error); }
       }
     })().finally(() => { running = undefined; });
     return running;
@@ -148,7 +148,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
       rescue ??= startRescueListener(ports, service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
-      void moduleSupervisor(ports).start().then(() => migrateQqState(db, ports.dataDir)).catch(() => options.onError?.());
+      void moduleSupervisor(ports).start().then(() => migrateQqState(db, ports.dataDir)).catch(error => options.onError?.(error));
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
       wake();
