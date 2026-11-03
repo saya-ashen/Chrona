@@ -53,12 +53,6 @@ function executionMode(env = process.env): ExecutionMode {
   if (configured === "trusted-local" || configured === "required-isolation") return configured;
   throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
 }
-function autoRollback(env = process.env): boolean {
-  const configured = env.CHRONA_STEWARD_AUTO_ROLLBACK?.trim();
-  if (!configured || configured === "false") return false;
-  if (configured === "true") return true;
-  throw new Error("Invalid CHRONA_STEWARD_AUTO_ROLLBACK; use true or false");
-}
 function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, mode: ExecutionMode) {
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
@@ -82,7 +76,7 @@ async function configuredSecret(name: string) {
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const mode = executionMode(), moduleAutoRollback = autoRollback();
+  const mode = executionMode();
   const configured = configuredProvider(options, bwrap, mode);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
@@ -103,7 +97,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     secrets: configuredSecret, packages: createModulePackages(),
-    sandbox: options.sandbox ?? sandbox, moduleAutoRollback, moduleSdk, moduleTypecheck,
+    sandbox: options.sandbox ?? sandbox, moduleSdk, moduleTypecheck,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },

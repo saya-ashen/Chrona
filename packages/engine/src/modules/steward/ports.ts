@@ -27,8 +27,6 @@ export type StewardPorts = {
   onQueued?: () => Promise<unknown>;
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
-  /** Explicit owner opt-in; rollback still requires a standing module grant and compatible approved prior code. */
-  moduleAutoRollback?: boolean;
   sandbox?: {
     /** Set by the host, never inferred from missing isolation or supplied by a module. */
     executionMode?: "trusted-local" | "required-isolation";

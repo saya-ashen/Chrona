@@ -132,3 +132,5 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_EXECUTION_MODE` 由 owner 设置，可选 `trusted-local`（明确本地运行，忽略 bwrap 包装）或 `required-isolation`（模块、构建检查和 Provider 都要求可用且探测成功的 bubblewrap；不可用时失败关闭）。未设置/空值默认 `trusted-local`，即使已安装 bwrap 也不包装隔离；未知非空值拒绝启动。`CHRONA_STEWARD_SANDBOX_BWRAP` 指定 bubblewrap。Provider 隔离包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
 
 `CHRONA_STEWARD_SANDBOX_BWRAP` 也配置模块沙箱。默认 `trusted-local` 以本地进程运行，不使用 bubblewrap；`required-isolation` 下探测不通过或未配置则拒绝模块启动/检查，不回退。依赖安装器目前仍在宿主执行；该模式下含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选在安装前拒绝，直到提供隔离安装实现；无依赖候选不受此安装限制影响。可信本地进程仍受超时、内存与输出限制，但网络与文件范围不再受隔离约束。构建检查全部通过的版本自动启用并事后通知，不再使用审批分级、AI 复核或长期模块启用授权。仅迁移已有数据、恢复旧数据快照、新增凭据与删除应用需要用户决定；运行时对外动作审批保留，所有入口均可批准或拒绝。以实际执行结果为准，不以模型文字为准。
+
+新激活的模块版本若在任何事件投递前启动失败，Chrona 自动切回前一已批准版本一次，无需开关或长期授权，入口/网络模块也适用。候选与目标均须已批准且 manifest 有效，模块仍为当前 active 激活与 hash、尚无已验证能力；数据 schema 必须与前版及当前数据一致，且无迁移/恢复记录、非分组激活、无动态或变化的日程。不满足条件时按[模块故障诊断与恢复](module-recovery.md)人工处理。自动回滚保留当前数据和兼容静态日程，不重建日程、不重放工作；恢复目标不会继续自动回滚。

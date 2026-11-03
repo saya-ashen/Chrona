@@ -40,9 +40,12 @@ Rules that follow from the goals:
   approvals, run budgets and routed calls; notification budget and delivery are the built-in `notify` module. The kernel holds no
   notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module submitted via `modules.propose` (the Provider's `m_modules_propose`), built and checked in the Chrona sandbox
-  (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated through an `activate_module`
-  approval bound to its content hash (or automatically, if the user allowed it for that module and the update adds no
-  capability and no migration), stored under `<dataDir>/platform` (hidden from Providers), and rolled back by hash.
+  (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated automatically when checks pass
+  (data migrations and new credentials still ask the user), stored under `<dataDir>/platform` (hidden from Providers), and rolled back by hash.
+  A newly activated version that fails to start before any event is delivered automatically switches back once to the previous approved version,
+  including entry/network modules, without opt-in or a standing grant. Both manifests must be valid and approved; data schema must be unchanged,
+  with no migration/restore, group activation or changed/dynamic schedules. The module must still be active at that activation/hash and unverified;
+  restored code never automatically rolls back again. Current data and compatible schedules are preserved; work is not replayed.
 - Current Provider: Pi RPC. Chrona tools are listed in `chronaToolInputSchemas` (contract).
   Prose does not schedule or deliver; these actions require successful tool calls.
 - Permissions are decided by the deterministic policy layer (`packages/domain/src/steward/policy.ts`):

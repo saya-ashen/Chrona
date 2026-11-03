@@ -52,30 +52,20 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
   }
 });
 
-test("runtime validates and wires execution mode and automatic rollback", async () => {
-  const db = testDb(), keys = ["CHRONA_STEWARD_EXECUTION_MODE", "CHRONA_STEWARD_AUTO_ROLLBACK"] as const;
+test("runtime wires default and explicit execution mode", async () => {
+  const db = testDb(), keys = ["CHRONA_STEWARD_EXECUTION_MODE"] as const;
   const previous = keys.map(key => process.env[key]);
   try {
-    delete process.env.CHRONA_STEWARD_AUTO_ROLLBACK;
     delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
     const defaults = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-default-")), provider: null });
     try {
-      expect(defaults.ports.moduleAutoRollback).toBe(false);
       expect(defaults.ports.sandbox?.executionMode).toBe("trusted-local");
     } finally { await defaults.stop(); }
-    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "true";
-    const enabled = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-enabled-")), provider: null });
-    try { expect(enabled.ports.moduleAutoRollback).toBe(true); } finally { await enabled.stop(); }
-    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "false";
-    const disabled = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-disabled-")), provider: null });
-    try { expect(disabled.ports.moduleAutoRollback).toBe(false); } finally { await disabled.stop(); }
     process.env.CHRONA_STEWARD_EXECUTION_MODE = "trusted-local";
     const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-review-mode-")), provider: null });
     try {
       expect(runtime.ports.sandbox?.executionMode).toBe("trusted-local");
     } finally { await runtime.stop(); }
-    process.env.CHRONA_STEWARD_AUTO_ROLLBACK = "unexpected";
-    expect(() => createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-rollback-invalid-")), provider: null })).toThrow("Invalid CHRONA_STEWARD_AUTO_ROLLBACK");
   } finally {
     keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     await db.$disconnect();

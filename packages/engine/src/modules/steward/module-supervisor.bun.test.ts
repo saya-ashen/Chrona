@@ -39,10 +39,9 @@ test.each([false, true] as const)("start failure rolls back once before delivery
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], listen: "/api/example", effects: ["network"] });
   for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: { changes: [hash] }, report: { tests: [], continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
-  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId: module.id }, once: false } });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null, moduleAutoRollback: true,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, startModule: (() => {
       const peer = testModuleProcess(async () => ({}));
       return input => input.codeDir.endsWith("/v2") || oldFails ? (() => { throw new Error("synthetic start failure"); })() : peer.startModule(input);
@@ -64,8 +63,7 @@ test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
   const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [] });
   for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
-  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "preapproved", scope: { kind: "module", moduleId: module.id } } });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null, moduleAutoRollback: true,
+  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, startModule: (() => {
       const peer = testModuleProcess(async () => {
         if (stage === "handler") throw new Error("handler failed");
