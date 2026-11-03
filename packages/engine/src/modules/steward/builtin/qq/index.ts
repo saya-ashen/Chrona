@@ -1,7 +1,7 @@
 import { chrona, on } from "chrona";
 import { createHash } from "node:crypto";
 import { createChronaQqDelivery, createQqBotHandler, createQqBotState, parseApprovalDecision, DEDICATED_PLATFORM, type DeliveryMessage, type DeliveryOutcome, type QqBinding, type QqReplyItem } from "./bot";
-import { ackQqInteraction, createQqGateway, createQqTokenSource, downloadQqAttachment, sendQqC2c, uploadQqImage, type QqLog } from "./official";
+import { ackQqInteraction, createQqGateway, createQqTokenSource, downloadQqAttachment, sendQqC2c, uploadQqImage, validateQqFormat, type QqLog } from "./official";
 import { createRelay } from "./relay";
 
 const log: QqLog = (event, fields = {}) => console.error(JSON.stringify({ component: "qq-bot", event, ...fields }));
@@ -15,7 +15,9 @@ let reply = async (item: QqReplyItem): Promise<string> => { await startup; retur
 on("tool", async event => {
   const args = event.args as Args;
   if (event.id === "deliver") {
-    return { result: await deliver({ idempotencyKey: String(args.key), title: String(args.title), body: String(args.body), link: typeof args.link === "string" ? args.link : null, recipient: typeof args.recipient === "string" ? args.recipient : null,
+    const invalid = validateQqFormat(args.format);
+    if (invalid) return { result: invalid };
+    return { result: await deliver({ idempotencyKey: String(args.key), format: args.format as DeliveryMessage["format"], title: String(args.title), body: String(args.body), link: typeof args.link === "string" ? args.link : null, recipient: typeof args.recipient === "string" ? args.recipient : null,
       ...(typeof args.approval === "string" ? { approval: { id: args.approval, scoped: args.scoped === true } } : {}) }) };
   }
   if (event.id === "reply") {
@@ -90,7 +92,7 @@ if (!appId) {
       // A button click is the owner's decision only when the bound owner clicked it.
       await ackQqInteraction({ tokens, id: interaction.id }).catch(() => log("qq.interaction_ack_failed"));
       const binding = await refreshBinding(), decision = parseApprovalDecision({ button: interaction.data });
-      log("qq.approval_click", { result: decision && binding?.openid === interaction.openid ? await relay.resolveApproval(binding, decision).catch(() => "failed") : "ignored" });
+      log("qq.approval_click", { result: decision && binding?.openid === interaction.openid ? await relay.resolveApproval(binding, decision, text => relay.enqueueFinal(`approval:${interaction.id}`, text, `${DEDICATED_PLATFORM}:${binding.openid}`)).catch(() => "failed") : "ignored" });
     })(); },
   });
   deliver = async message => {

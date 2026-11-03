@@ -16,7 +16,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
 const fakeQq = {
   "module.json": JSON.stringify({ name: "qq", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["notify.channel"], tests: ["test.ts"],
     tools: [{ name: "deliver", description: "Fake QQ delivery", visibility: ["modules"], callers: ["notify"], output: { type: "object", properties: { outcome: { const: "accepted" }, receiptRef: { type: "string" } }, required: ["outcome", "receiptRef"], additionalProperties: false }, parameters: { type: "object", required: ["key", "title", "body"], properties: {
-      key: { type: "string" }, title: { type: "string" }, body: { type: "string" }, link: { type: "string" }, recipient: { type: "string" }, approval: { type: "string" }, scoped: { type: "boolean" } } } }] }),
+      key: { type: "string" }, title: { type: "string" }, body: { type: "string" }, format: { type: "string", enum: ["text", "markdown"] }, link: { type: "string" }, recipient: { type: "string" }, approval: { type: "string" }, scoped: { type: "boolean" } } } }] }),
   "index.ts": `// @ts-expect-error SDK at run time
 import { chrona, on } from "chrona";
 import { appendFileSync } from "node:fs";
@@ -66,6 +66,7 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
     const lines = (await readFile(join(dataDir, "platform/data", qq.id, "sent.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
     // Each notice reached the exit exactly once, from the notify module (the real caller), never the leased legacy row.
     expect(lines.map(line => line.args.title).sort()).toEqual(["Build finished", "Old pending"]);
+    expect(lines.every(line => line.args.format === "text")).toBe(true);
     expect(lines.every(line => line.caller.kind === "module" && line.caller.module === "notify")).toBe(true);
     expect(await db.moduleInvocation.count({ where: { target: "qq", tool: "deliver", status: "succeeded" } })).toBe(2);
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }

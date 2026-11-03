@@ -1,5 +1,5 @@
 import { composeDigest, deliveryStatus, foldedBeforeDigest, isDigestDue, localDayKey, RESPONSE_KEY_PREFIX, retryDelayMs, routeNotification, validSettings, type DeliveryOutcome, type Level, type Settings } from "./budget";
-import type { Row, Store } from "./store";
+import type { Format, Row, Store } from "./store";
 
 // Built-in modules run standalone: these mirror Chrona's contract (caller, call replies).
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
@@ -16,6 +16,17 @@ type Channel = { module: string; moduleId: string; tool: string; ready: boolean;
 const text = (value: unknown) => typeof value === "string" && value.length ? value : null;
 const iso = (ms: number | null) => ms === null ? null : new Date(ms).toISOString();
 const DAY = 86_400_000;
+// Only omission defaults to text; explicit unknown formats never downgrade.
+function formatOf(value: unknown): Format | null {
+  return value === undefined ? "text" : value === "text" || value === "markdown" ? value : null;
+}
+function formatError(args: Args) {
+  const format = formatOf(args.format);
+  if (!format) return { error: "invalid", message: "format must be text or markdown" };
+  if (format === "markdown" && (String(args.body ?? "").length > 4000 || String(args.title ?? "").length > 200))
+    return { error: "invalid", message: "Markdown exceeds storage limit (body 4000, title 200 UTF-16 code units); send a complete shorter message" };
+  return null;
+}
 
 class NotifyRuntime {
   private readonly store: Store;
@@ -40,7 +51,7 @@ class NotifyRuntime {
   }
   private view(row: Row) {
     return { id: row.id, moduleId: row.module_id, sessionId: row.session_id, level: row.level, channel: row.channel, status: row.status === "sending" ? "queued" : row.status,
-      title: row.title, body: row.body, link: row.link, attempts: row.attempts, lastError: row.last_error, createdAt: iso(row.created_at)!, sentAt: iso(row.sent_at), feedback: row.feedback };
+      title: row.title, body: row.body, format: row.format, link: row.link, attempts: row.attempts, lastError: row.last_error, createdAt: iso(row.created_at)!, sentAt: iso(row.sent_at), feedback: row.feedback };
   }
   private sentToday(now: Date, settings: Settings) {
     const day = localDayKey(now, settings.timezone);
@@ -60,6 +71,8 @@ class NotifyRuntime {
     return { requested, route: routeNotification(level, { ...settings, now, urgent: args.urgent === true, sentToday: this.sentToday(now, settings), responds }) };
   }
   private send(args: Args, caller: Caller, now: Date) {
+    const invalid = formatError(args);
+    if (invalid) return invalid;
     // A module's keys are its own: another module cannot pre-empt or suppress them.
     const key = this.sendKey(args, caller), existing = this.store.byKey(key);
     if (existing) return { id: existing.id, status: this.view(existing).status, duplicate: true };
@@ -67,7 +80,7 @@ class NotifyRuntime {
     const settings = this.store.settings(), { requested, route } = this.requestedLevel(args, moduleId, responds, settings, now), session = text(args.session);
     const row = this.store.insert({ key, module_id: moduleId, app, session_id: session, approval_id: trusted ? text(args.approval) : null, scoped: args.scoped === true ? 1 : 0,
       level: requested, web: route === "web" ? 1 : 0, responds: responds ? 1 : 0, status: route === "fold" ? "folded" : "queued",
-      title: String(args.title).slice(0, 200), body: String(args.body).slice(0, 4000), recipient: text(args.recipient),
+      title: String(args.title).slice(0, 200), body: String(args.body).slice(0, 4000), format: formatOf(args.format)!, recipient: text(args.recipient),
       link: session ? `${this.base}/sessions/${session}` : moduleId ? `${this.base}/apps/${moduleId}` : null, created_at: now.getTime() });
     return { id: row.id, status: this.view(row).status, duplicate: false };
   }
@@ -79,7 +92,7 @@ class NotifyRuntime {
   private async dispatch(row: Row, attempts: number, now: Date) {
     const channel = this.channelFor(row);
     if (!channel?.ready) return;
-    const args: Args = { key: row.key, title: row.title, body: row.body, ...(row.link ? { link: row.link } : {}), ...(row.recipient ? { recipient: row.recipient } : {}),
+    const args: Args = { key: row.key, title: row.title, body: row.body, format: row.format, ...(row.link ? { link: row.link } : {}), ...(row.recipient ? { recipient: row.recipient } : {}),
       ...(row.approval_id ? { approval: row.approval_id, scoped: row.scoped === 1 } : {}) };
     try {
       // Async with the attempt in the key: a repeat after a crash returns the same call instead of sending twice.
@@ -133,7 +146,8 @@ class NotifyRuntime {
     const composed = composeDigest(due.map(row => ({ title: row.title, body: row.body, moduleTitle: row.app })), { dayLabel: localDayKey(now, settings.timezone) });
     if (!composed) return;
     const row = this.store.insert({ key, module_id: null, app: null, session_id: null, approval_id: null, scoped: 0, level: "now", web: 0, responds: 0, status: "queued",
-      title: composed.title, body: composed.body.slice(0, 2000), recipient: null, link: `${this.base}/today`, created_at: now.getTime() });
+      // Digests are newly composed text, even when source records contain Markdown.
+      title: composed.title, body: composed.body.slice(0, 2000), format: "text", recipient: null, link: `${this.base}/today`, created_at: now.getTime() });
     for (const folded of due) this.store.update(folded.id, { digest_id: row.id });
   }
   private configure(args: Args) {
@@ -150,7 +164,7 @@ class NotifyRuntime {
     const time = (value: unknown) => typeof value === "string" ? Date.parse(value) : null;
     this.store.insert({ id: String(raw.id), key: raw.idempotencyKey, module_id: text(raw.moduleId), app: text(raw.app), session_id: text(raw.sessionId), approval_id: text(raw.approvalId), scoped: raw.moduleId && raw.approvalId ? 1 : 0,
       level: raw.level as Level, web: raw.level === "web" ? 1 : 0, responds: raw.idempotencyKey.startsWith(RESPONSE_KEY_PREFIX) ? 1 : 0, channel: String(raw.channel ?? "in_app"),
-      status: leased ? "uncertain" : String(raw.status), title: raw.title, body: String(raw.body ?? ""), recipient: text(raw.recipient), link: text(raw.link),
+      status: leased ? "uncertain" : String(raw.status), title: raw.title, body: String(raw.body ?? ""), format: formatOf(raw.format)!, recipient: text(raw.recipient), link: text(raw.link),
       created_at: time(raw.createdAt) ?? Date.now(), attempts: Number(raw.attempts ?? 0), last_error: leased ? "Delivery lease held when notifications moved to the notify module; receipt unknown" : text(raw.lastError),
       sent_at: time(raw.sentAt), receipt_ref: text(raw.receiptRef), feedback: text(raw.feedback), next_attempt_at: time(raw.nextAttemptAt) });
   }
@@ -167,6 +181,9 @@ class NotifyRuntime {
     let rows: unknown;
     try { rows = JSON.parse(String(args.rows)); } catch { return { error: "invalid", message: "rows must be a JSON array" }; }
     if (!Array.isArray(rows)) return { error: "invalid", message: "rows must be a JSON array" };
+    // Validate the entire eligible batch before writing, including duplicate keys.
+    const invalid = (rows as unknown[]).map(item => item && typeof item === "object" && typeof (item as Args).idempotencyKey === "string" && typeof (item as Args).title === "string" ? formatError(item as Args) : null).find(Boolean);
+    if (invalid) return invalid;
     let imported = 0;
     for (const item of rows) if (item && typeof item === "object" && this.importRow(item as Record<string, unknown>)) imported++;
     return { imported };

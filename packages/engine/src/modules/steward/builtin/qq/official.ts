@@ -71,11 +71,22 @@ export async function uploadQqImage({ tokens, openid, bytes, fetch = globalThis.
   } catch { return null; }
 }
 
+export const invalidQqMessage = (reason: string): QqSendOutcome & { outcome: "rejected" } => ({ outcome: "rejected", retryable: false, error: `invalid: ${reason}` });
+export function validateQqFormat(format: unknown) {
+  return format === undefined || format === "text" || format === "markdown" ? null : invalidQqMessage("format must be text or markdown");
+}
+
 /** One C2C send. Never retried here once a request may have reached QQ. */
-export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1, mediaFileInfo, keyboard }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number; mediaFileInfo?: string; keyboard?: QqKeyboard }): Promise<QqSendOutcome> {
+// eslint-disable-next-line complexity -- Validation before any token or network use keeps every refusal side-effect free.
+export async function sendQqC2c({ tokens, fetch = globalThis.fetch, openid, content, replyTo, msgSeq = 1, mediaFileInfo, keyboard, format }: { tokens: QqTokenSource; fetch?: Fetch; openid: string; content: string; replyTo?: string | null; msgSeq?: number; mediaFileInfo?: string; keyboard?: QqKeyboard; format?: "text" | "markdown" }): Promise<QqSendOutcome> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(openid)) return { outcome: "rejected", retryable: false, error: "Invalid recipient" };
-  // Buttons ride on a markdown message (msg_type 2).
-  const message = keyboard ? { markdown: { content: content.slice(0, 2000) }, msg_type: 2, keyboard } : { content: content.slice(0, 2000), msg_type: mediaFileInfo ? 7 : 0, ...(mediaFileInfo ? { media: { file_info: mediaFileInfo } } : {}) };
+  const invalid = validateQqFormat(format);
+  if (invalid) return invalid;
+  if (format === "markdown" && mediaFileInfo !== undefined) return invalidQqMessage("markdown cannot be combined with media");
+  const markdown = format === "markdown" || Boolean(keyboard);
+  if (markdown && content.length > 2000) return invalidQqMessage("markdown exceeds 2000 UTF-16 code units");
+  // Legacy keyboard+media keeps keyboard precedence; explicit Markdown+media is refused.
+  const message = markdown ? { markdown: { content }, msg_type: 2, ...(keyboard ? { keyboard } : {}) } : { content: content.slice(0, 2000), msg_type: mediaFileInfo ? 7 : 0, ...(mediaFileInfo ? { media: { file_info: mediaFileInfo } } : {}) };
   const body = JSON.stringify({ ...message, msg_seq: msgSeq, ...(replyTo ? { msg_id: replyTo } : {}) });
   const post = async (): Promise<QqSendOutcome | { status: 401 }> => {
     let token: string;

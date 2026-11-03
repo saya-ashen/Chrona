@@ -1,11 +1,11 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { qqButtons, sendQqC2c, type QqC2cMessage, type QqKeyboard, type QqLog, type QqSendOutcome, type QqTokenSource } from "./official";
+import { invalidQqMessage, validateQqFormat, qqButtons, sendQqC2c, type QqC2cMessage, type QqKeyboard, type QqLog, type QqSendOutcome, type QqTokenSource } from "./official";
 
 // Built-in modules run standalone: these mirror Chrona's contract (REF_ALPHABET, the deliver event and its outcome).
 const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; approval?: { id: string; scoped: boolean } };
+export type DeliveryMessage = { idempotencyKey: string; title: string; body: string; link: string | null; recipient: string | null; format?: "text" | "markdown"; approval?: { id: string; scoped: boolean } };
 export type DeliveryOutcome = { outcome: "accepted"; receiptRef: string | null } | { outcome: "rejected"; retryable: boolean; error: string } | { outcome: "uncertain"; error: string };
 
 export const DEDICATED_PLATFORM = "chrona_qq";
@@ -203,10 +203,21 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     deliverReply: (item: QqReplyItem) => { const next = queue.then(() => deliverReply(item)); queue = next.then(() => {}, () => {}); return next; }, drain: () => queue };
 }
 
-/** A bot without markdown/button permission is refused before delivery: the text fallback still works. */
+// Titles are plain metadata, not caller-authored Markdown. Keep them on one line.
+export const escapeQqTitle = (title: string) => title.replace(/\p{Cc}/gu, " ").replace(/[\\`*_{}[\]()<>#+.!|~-]/g, "\\$&");
+export function markdownAppLink(link: string | null, publicUrl?: string | null): string | null {
+  if (!link) return null;
+  if (/[\p{Cc} \\]/u.test(link) || link.startsWith("//")) throw new Error("invalid link");
+  const url = link.startsWith("/") ? new URL(link, publicUrl ?? undefined) : new URL(link);
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new Error("invalid link");
+  return `[打开 Chrona](${url.href.replace(/[()<>`]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)})`;
+}
+
+/** Legacy text approvals retain their button-permission fallback; explicit Markdown never downgrades. */
 async function sendWithButtons(plain: (content: string) => Promise<QqSendOutcome>, text: string, approval: DeliveryMessage["approval"], withButtons: (content: string, keyboard: QqKeyboard) => Promise<QqSendOutcome>) {
   if (!approval) return plain(text);
   const content = `${text}\n\n${approvalHint(approval.id, approval.scoped)}`;
+  if (content.length > 2000) return invalidQqMessage("markdown exceeds 2000 UTF-16 code units");
   const result = await withButtons(content, approvalButtons(approval.id, approval.scoped));
   return result.outcome === "rejected" && !result.retryable ? plain(content) : result;
 }
@@ -215,7 +226,17 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
   tokens: QqTokenSource; allowedRecipients: () => ReadonlySet<string>; publicUrl?: string | null; fetch?: (input: string, init?: RequestInit) => Promise<Response>; send?: typeof sendQqC2c; perMinute?: number; now?: () => number;
 }) {
   const sent = new Map<string, number[]>();
+  // eslint-disable-next-line complexity -- Format, link and length checks must all precede rate quota and the network.
   return { channel: DEDICATED_CHANNEL, async send(message: DeliveryMessage): Promise<DeliveryOutcome> {
+    const invalid = validateQqFormat(message.format);
+    if (invalid) return invalid;
+    const markdown = message.format === "markdown" || Boolean(message.approval);
+    let link: string | null | undefined;
+    try { link = markdown ? markdownAppLink(message.link, publicUrl) : message.link?.startsWith("/") && publicUrl ? `${publicUrl.replace(/\/$/, "")}${message.link}` : message.link; }
+    catch { return invalidQqMessage("unsafe or unresolved application link"); }
+    const text = [markdown ? escapeQqTitle(message.title) : message.title, message.body, link].filter(Boolean).join("\n\n");
+    const content = message.approval ? `${text}\n\n${approvalHint(message.approval.id, message.approval.scoped)}` : text;
+    if (markdown && content.length > 2000) return invalidQqMessage("markdown exceeds 2000 UTF-16 code units");
     const allowed = allowedRecipients();
     const recipient = message.recipient ?? (allowed.size === 1 ? [...allowed][0]! : "");
     const openid = recipient.startsWith(`${DEDICATED_PLATFORM}:`) ? recipient.slice(DEDICATED_PLATFORM.length + 1) : "";
@@ -223,9 +244,10 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
     const at = now(), window = (sent.get(recipient) ?? []).filter(t => at - t < 60_000);
     if (window.length >= perMinute) return { outcome: "rejected", retryable: true, error: "Local QQ rate limit" };
     sent.set(recipient, [...window, at]);
-    const link = message.link?.startsWith("/") && publicUrl ? `${publicUrl.replace(/\/$/, "")}${message.link}` : message.link;
-    const result = await sendWithButtons(content => send({ tokens, fetch, openid, content }), [message.title, message.body, link].filter(Boolean).join("\n\n"), message.approval,
-      (content, keyboard) => send({ tokens, fetch, openid, content, keyboard }));
+    const result = message.format === "markdown"
+      ? await send({ tokens, fetch, openid, content, format: message.format, ...(message.approval ? { keyboard: approvalButtons(message.approval.id, message.approval.scoped) } : {}) })
+      : await sendWithButtons(content => send({ tokens, fetch, openid, content, format: message.format }), text, message.approval,
+        (content, keyboard) => send({ tokens, fetch, openid, content, keyboard, format: message.format }));
     return result.outcome === "accepted" ? { outcome: "accepted", receiptRef: `${DEDICATED_PLATFORM}:${result.messageId}` } : result;
   } };
 }

@@ -11,7 +11,7 @@
     { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"], "callers": ["notify"],
       "output": { "anyOf": [{ "type": "object", "properties": { "outcome": { "const": "accepted" }, "receiptRef": { "type": ["string", "null"] } }, "required": ["outcome", "receiptRef"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "rejected" }, "retryable": { "type": "boolean" }, "error": { "type": "string" } }, "required": ["outcome", "retryable", "error"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "uncertain" }, "error": { "type": "string" } }, "required": ["outcome", "error"], "additionalProperties": false }] },
       "parameters": { "type": "object", "required": ["key", "title", "body"], "properties": {
-        "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "link": { "type": "string" },
+        "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "format": { "type": "string", "enum": ["text", "markdown"], "description": "Explicit message format; omitted means text." }, "link": { "type": "string" },
         "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } },
     { "name": "reply", "description": "A reply in the qq:dm conversation: a passive reply to the message it answers while that window lasts, otherwise through notify.send.", "visibility": ["modules"], "callers": ["chat"],
       "output": { "type": "object", "properties": { "delivered": { "type": "string" } }, "required": ["delivered"], "additionalProperties": false },
@@ -21,5 +21,5 @@
   ],
   "effects": ["network"],
   "data": { "schema": 1 },
-  "tests": ["test.ts"]
+  "tests": ["test.ts", "format-test.ts", "regression-test.ts", "approval-test.ts"]
 }
