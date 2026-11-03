@@ -1,6 +1,6 @@
 # 模块依赖方向审查
 
-状态：2026-11-02 审查记录，问题清单已与用户确认；未修改代码。先以 web 为范例解决（见第 4 节），再按同一模式处理其他项。
+状态：2026-11-02 审查记录，问题清单已与用户确认。2026-11-03：第 1–5 项已实现（0.9.x 部署），第 6 项按用户选定方向经构建会话处理中。
 
 ## 1. 原则
 
@@ -25,15 +25,15 @@
 | # | 位置 | 现状 | 方向 |
 | --- | --- | --- | --- |
 | 1 | web → 各应用 | 定制版 web 内置 OKX、planning、Trending、gmail、bookmarks、calendar、mail 专页，硬编码如 `okx-ai-trader.list/get/audit` 与字段投影；与这些应用多次联合构建 | 应用向 web 登记页面，web 统一渲染（第 4 节） |
-| 2 | notify → qq | `builtin/notify/notify.ts` 硬编码 `QQ = "chrona_qqbot"`、`callPort("qq.deliver")`；manifest `uses: qq.deliver`，`channel` 的 `callers: [qq]` | 渠道调用 `notify.channel` 登记自己的投递工具，notify 只回调已登记渠道。状态：内置 notify/qq 已实现按真实调用方幂等登记并校验回调权限，兼容 `chrona_qqbot` 旧队列；无已登记且就绪的渠道时照旧退到网页（in_app）；memory 工具改为 `visibility: owner` 并在调用时校验入口 manifest（未部署）。 |
-| 3 | 内核 → 入口名单 | `today.ts`、`memory.ts`、`chat.ts` 写死 `["web","qq","mcp"]`；`owner-build.ts` 只允许 `mcp`、`web`；`approvals.ts` `RED_SOURCES` 含 `web`；memory 系统工具 `callers: ["web","mcp"]` | 用已有的 `isEntryModule(manifest)` 判断入口，不按名字。状态：today、会话轮换与 memory 已改用入口 manifest 和会话入口归属；`approvals` 红色审批及 `owner-build` 名单保留为安全边界，不扩权（未部署）。 |
-| 4 | 内核 → remind / mind / web | `schedules.ts`、`module-builtin.ts` 特判 `remind`；`tick.ts` 只给名为 `mind` 的模块附加 `MIND_PROTOCOL`；`chat.ts` 回填 `web` 会话；reflection prompt 点名 web | remind 改用 v2-24 通用定时器（先确认提醒数据迁移）；协议由 mind 在 `provider.wake` 时自带；删除迁移残留。状态：内置 mind 自带协议正文，沿用不可信模块数据通道，内核不再按名附加系统协议；reflection 按入口描述选择页面登记目标，不再点名 web；chat 回填保留，因 0015 迁移只新增空的 entryModuleId，旧会话仍依赖回填恢复回复路由；remind 未处理（未部署）。 |
+| 2 | notify → qq | `builtin/notify/notify.ts` 硬编码 `QQ = "chrona_qqbot"`、`callPort("qq.deliver")`；manifest `uses: qq.deliver`，`channel` 的 `callers: [qq]` | 渠道调用 `notify.channel` 登记自己的投递工具，notify 只回调已登记渠道。状态：内置 notify/qq 已实现按真实调用方幂等登记并校验回调权限，兼容 `chrona_qqbot` 旧队列；无已登记且就绪的渠道时照旧退到网页（in_app）。线上定制版 notify/qq 的功能（Markdown 格式、schema 2、QQ 高风险审批提示）已并入内置版，用 `chrona admin rollback <m> builtin` 替换定制版；为此定制模块在发版时也构建当前内置版并标为已批准、不启用。 |
+| 3 | 内核 → 入口名单 | `today.ts`、`memory.ts`、`chat.ts` 写死 `["web","qq","mcp"]`；`owner-build.ts` 只允许 `mcp`、`web`；`approvals.ts` `RED_SOURCES` 含 `web`；memory 系统工具 `callers: ["web","mcp"]` | 用已有的 `isEntryModule(manifest)` 判断入口，不按名字。状态：today、会话轮换与 memory 已改用入口 manifest 和会话入口归属；`approvals` 红色审批及 `owner-build` 名单保留为安全边界，不扩权。 |
+| 4 | 内核 → remind / mind / web | `schedules.ts`、`module-builtin.ts` 特判 `remind`；`tick.ts` 只给名为 `mind` 的模块附加 `MIND_PROTOCOL`；`chat.ts` 回填 `web` 会话；reflection prompt 点名 web | remind 改用 v2-24 通用定时器（先确认提醒数据迁移）；协议由 mind 在 `provider.wake` 时自带；删除迁移残留。状态：内置 mind 自带协议正文，沿用不可信模块数据通道，内核不再按名附加系统协议；reflection 按入口描述选择页面登记目标，不再点名 web；chat 回填保留，因 0015 迁移只新增空的 entryModuleId，旧会话仍依赖回填恢复回复路由。remind 改为普通应用：提供 `create/list/cancel` 工具、用 v2-24 模块定时器（`schedules.create`），Agent 用 `m_remind_create`；`chrona_schedule` 只剩 `wake`；0018 迁移把已有提醒的 `text` 改为计时键 `legacy-<id>`（提醒文字仍在 payload）；内核删除 remind 特判与回填，`dynamicSchedules` 仅为解析旧 manifest 保留、不再生效。 |
 
 ### 2.2 方向正确，但以名单写死调用方
 
 | # | 现状 | 问题 | 方向 |
 | --- | --- | --- | --- |
-| 5 | 应用工具 `callers` 写成"仅 web、mcp"（mail、calendar）或"仅 web"（gmail、bookmarks） | 应用须列举入口；gmail、bookmarks 的工具 MCP 与 Agent 用不了，违背"用户与 Agent 用同一套功能"；新增入口要改所有应用 | 用 `visibility: owner` 表示所有用户入口可调用 |
+| 5 | 应用工具 `callers` 写成"仅 web、mcp"（mail、calendar）或"仅 web"（gmail、bookmarks） | 应用须列举入口；gmail、bookmarks 的工具 MCP 与 Agent 用不了，违背"用户与 Agent 用同一套功能"；新增入口要改所有应用 | 用 `visibility: owner` 表示所有用户入口可调用。状态：随第 1 项迁移完成；2026-11-03 线上仅 bookmarks 仍有 `callers:[web]`，其迁移构建进行中 |
 
 ### 2.3 正确范例（保留、推广）
 
@@ -46,7 +46,7 @@
 
 | # | 现状 | 待定 |
 | --- | --- | --- |
-| 6 | `calendar → planning.get` | 日历更基础，倾向 planning 写入 calendar 或 calendar 订阅 `planning.updated`；由用户决定 |
+| 6 | `calendar → planning.get` | 用户选定：planning 经 events 发出 `planning.updated`，calendar 订阅并在本地保存计划标题，删除 `uses: planning.get`（构建会话） |
 
 ## 3. 处理顺序
 

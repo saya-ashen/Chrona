@@ -23,14 +23,16 @@ async function fixture(migrated = false) {
     const migrationsDir = join(dataDir, "migrations"), databaseUrl = `file:${join(dataDir, "test.db")}`;
     await mkdir(migrationsDir);
     const source = resolve("prisma/migrations");
-    for (const name of (await readdir(source)).filter(name => /^\d/.test(name) && name < "0011")) await cp(join(source, name), join(migrationsDir, name), { recursive: true });
+    for (const name of (await readdir(source)).filter(name => /^\d/.test(name) && name < "0018")) await cp(join(source, name), join(migrationsDir, name), { recursive: true });
     ensureSqliteDatabase({ databaseUrl, migrationsDir });
     const sqlite = new Database(join(dataDir, "test.db"));
     try {
+      // A reminder as chrona_schedule mode remind stored it: owned by the built-in remind module, its text in text and payload.
       sqlite.run('INSERT INTO "Workspace" (id, name, updatedAt) VALUES (?, ?, CURRENT_TIMESTAMP)', ["w", "Migration"]);
-      sqlite.run('INSERT INTO "Schedule" (id, workspaceId, mode, rule, text, label, createdBy, nextAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', ["00000000-0000-0000-0000-000000000001", "w", "remind", JSON.stringify({ kind: "at", at: now.toISOString() }), "Migrated reminder", "Old label", "user", now.toISOString().replace("Z", "+00:00")]);
+      sqlite.run('INSERT INTO "Module" (id, workspaceId, name, builtin) VALUES (?, ?, ?, 1)', ["remind-id", "w", "remind"]);
+      sqlite.run('INSERT INTO "Schedule" (id, workspaceId, mode, rule, text, label, createdBy, nextAt, moduleId, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ["00000000-0000-0000-0000-000000000001", "w", "module", JSON.stringify({ kind: "at", at: now.toISOString() }), "Migrated reminder", "Old label", "user", now.toISOString().replace("Z", "+00:00"), "remind-id", JSON.stringify({ text: "Migrated reminder" })]);
     } finally { sqlite.close(); }
-    for (const name of (await readdir(source)).filter(name => /^\d/.test(name) && name >= "0011")) await cp(join(source, name), join(migrationsDir, name), { recursive: true });
+    for (const name of (await readdir(source)).filter(name => /^\d/.test(name) && name >= "0018")) await cp(join(source, name), join(migrationsDir, name), { recursive: true });
     ensureSqliteDatabase({ databaseUrl, migrationsDir });
     db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
   } else {
@@ -44,30 +46,9 @@ async function fixture(migrated = false) {
   return { db, ports, service, api, async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
 }
 
-test.each([
-  [true, true, true],
-  [true, false, false],
-  [false, true, false],
-  [false, false, false],
-])("dynamic reminder creation: builtin=%s dynamicSchedules=%s allowed=%s", async (builtin, dynamicSchedules, allowed) => {
-  const f = await fixture();
-  try {
-    const module = await f.db.module.create({ data: { workspaceId: "w", name: "remind", builtin, status: "active", activeHash: "fixture" } });
-    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "fixture", source: "builtin", status: "active", intent: "fixture", report: {},
-      manifest: { name: "remind", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, dynamicSchedules, effects: ["notify_user"], params: {}, data: { schema: 1 } } } });
-    const create = () => f.api.schedules.create(undefined, { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "Remember" });
-    if (allowed) {
-      expect(await create()).toMatchObject({ mode: "module", moduleId: module.id });
-    } else {
-      await expect(create()).rejects.toThrow("does not accept dynamic schedules");
-      expect(await f.db.schedule.count()).toBe(0);
-    }
-  } finally { await f.close(); }
-});
-
 if (!sandbox.health.available) console.info("SKIP remind real process: bwrap sandbox unavailable");
 const sandboxTest = sandbox.health.available ? test : test.skip;
-sandboxTest("chrona_schedule reminder runs built-in author tests, not a Provider; dynamic schedules survive reactivation", async () => {
+sandboxTest("m_remind_create reminder runs built-in author tests, not a Provider; its timer survives reactivation", async () => {
   const f = await fixture();
   try {
     await registerBuiltins(f.ports, "w");
@@ -78,8 +59,9 @@ sandboxTest("chrona_schedule reminder runs built-in author tests, not a Provider
     const session = await f.db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
     await f.api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture" });
     const run = (await f.api.runs.claimNext("foreground"))!;
-    const schedule = await f.service.tools.call(run.token, "chrona_schedule", { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "喝水", label: "Drink water" }) as { id: string };
-    expect(await f.db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).toMatchObject({ mode: "module", moduleId: module.id, payload: { text: "喝水" }, label: "Drink water" });
+    await expect(f.service.tools.call(run.token, "chrona_schedule", { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "喝水", label: "Drink water" })).rejects.toThrow();
+    const created = await f.service.tools.call(run.token, "m_remind_create", { rule: JSON.stringify({ kind: "at", at: now.toISOString() }), text: "喝水", label: "Drink water" }) as { result: { key: string } };
+    expect(await f.db.schedule.findFirstOrThrow({ where: { text: created.result.key } })).toMatchObject({ mode: "module", moduleId: module.id, payload: { text: "喝水" }, label: "Drink water" });
     await f.api.runs.finish(run.id, { outcome: "finished", sessionId: null, error: null });
     await f.api.modules.activate(module.id, module.activeHash!, "rollback");
     expect(await f.api.schedules.fireDue()).toBe(1);
@@ -91,14 +73,14 @@ sandboxTest("chrona_schedule reminder runs built-in author tests, not a Provider
   } finally { await f.close(); }
 }, 30_000);
 
-sandboxTest("0011 migrates an old remind row; registration attaches it idempotently and the module fires", async () => {
+sandboxTest("0018 turns a Provider reminder into a remind timer the module lists and fires", async () => {
   const f = await fixture(true);
   try {
-    expect(await f.db.schedule.findFirstOrThrow()).toMatchObject({ mode: "module", moduleId: null, payload: { text: "Migrated reminder" }, label: "Old label" });
-    await registerBuiltins(f.ports, "w");
+    expect(await f.db.schedule.findFirstOrThrow()).toMatchObject({ mode: "module", moduleId: "remind-id", text: "legacy-00000000-0000-0000-0000-000000000001", payload: { text: "Migrated reminder" }, label: "Old label" });
     await registerBuiltins(f.ports, "w");
     const module = await f.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: "w", name: "remind" } } });
-    expect(await f.db.schedule.findFirstOrThrow()).toMatchObject({ moduleId: module.id, status: "active" });
+    expect(module).toMatchObject({ id: "remind-id", status: "active" });
+    expect(await f.api.schedules.forModule(module.id, "remind").list()).toMatchObject([{ key: "legacy-00000000-0000-0000-0000-000000000001", payload: { text: "Migrated reminder" } }]);
     expect(await f.api.schedules.fireDue()).toBe(1);
     expect(await notice(f.db, { moduleId: module.id })).toMatchObject({ title: "提醒", body: "Migrated reminder" });
     expect(await f.db.run.count()).toBe(0);

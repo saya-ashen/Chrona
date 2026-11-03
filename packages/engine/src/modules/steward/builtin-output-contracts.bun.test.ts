@@ -24,7 +24,7 @@ test("every shipped built-in owner/module tool declares a compilable output cont
     "files.delete", "files.history", "files.list", "files.move", "files.read", "files.restore", "files.write",
     "mind.agenda", "mind.decisions", "mind.note", "mind.report",
     "notify.channel", "notify.feedback", "notify.list", "notify.retry", "notify.send",
-    "qq.deliver", "qq.reply", "web.catalog", "web.page-remove", "web.page-set", "web.pages", "web.reply",
+    "qq.deliver", "qq.reply", "remind.cancel", "remind.create", "remind.list", "web.catalog", "web.page-remove", "web.page-set", "web.pages", "web.reply",
   ]);
   for (const [name, tool] of tools) {
     expect(tool.output, `${name} output`).toBeDefined();
@@ -95,9 +95,9 @@ test("QQ and web output contracts accept success, error, empty, and nullable sha
   const fixtures: Record<string, unknown[]> = {
     "notify.send": [{ id: "n1", status: "queued", duplicate: false }, { id: "n1", status: "queued", duplicate: true }],
     "notify.channel": [{ ready: true }, { ignored: true }, { error: "invalid", message: "at must be a time" }],
-    "notify.list": [{ items: [] }, { items: [{ id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "queued", title: "t", body: "b", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: null }] }],
-    "notify.feedback": [{ notification: { id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "sent", title: "t", body: "b", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: "useful" } }, { error: "not_found", message: "Notification not found" }],
-    "notify.retry": [{ notification: { id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "queued", title: "t", body: "b", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: null } }, { error: "conflict", message: "Only failed notifications may be retried" }],
+    "notify.list": [{ items: [] }, { items: [{ id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "queued", title: "t", body: "b", format: "markdown", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: null }] }],
+    "notify.feedback": [{ notification: { id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "sent", title: "t", body: "b", format: "text", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: "useful" } }, { error: "not_found", message: "Notification not found" }],
+    "notify.retry": [{ notification: { id: "n1", moduleId: null, sessionId: null, level: "now", channel: null, status: "queued", title: "t", body: "b", format: "markdown", link: null, attempts: 0, lastError: null, createdAt: "2026-10-22T00:00:00.000Z", sentAt: null, feedback: null } }, { error: "conflict", message: "Only failed notifications may be retried" }],
     "qq.deliver": [{ outcome: "accepted", receiptRef: "chrona_qq:1" }, { outcome: "accepted", receiptRef: null }, { outcome: "rejected", retryable: false, error: "QQ bot is not configured" }, { outcome: "uncertain", error: "unknown receipt" }],
     "qq.reply": [{ delivered: "sent" }, { delivered: "unconfigured" }],
     "web.reply": [{ pages: 0 }, { pages: 2 }],

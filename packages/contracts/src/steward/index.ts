@@ -219,6 +219,7 @@ export const moduleManifestSchema = z.object({
    */
   secrets: z.array(z.union([SECRET_NAME_SCHEMA, secretSpecSchema])).max(50).default([]),
   /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
+  /** Deprecated and ignored: kept so stored remind manifests from before v2-24 timers still parse. */
   dynamicSchedules: z.boolean().default(false),
   /** Required with the `model` effect: a tier the user configured in `moduleModel.models`, bounded by its limits. */
   model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
@@ -535,7 +536,7 @@ export const chatReplySchema = z.object({ runId: id.nullable(), sessionId: id, m
 /** Ends the active session for `key` (QQ `/new`); the next message starts a new one. */
 export const newSessionSchema = z.object({ key: z.string().min(1).max(200) }).strict();
 export const updateSessionSchema = z.object({ title: short.optional(), status: z.literal("ended").optional() }).strict();
-export const createScheduleSchema = z.object({ mode: z.enum(["wake", "remind"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
+export const createScheduleSchema = z.object({ mode: z.enum(["wake"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
 /** v2-24 `schedules.create`: one timer of the calling module, named by `key`; `payload` comes back in its schedule event. */
 export const moduleScheduleSchema = z.object({
   key: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/), rule: scheduleRuleSchema, label: z.string().trim().min(1).max(80), until: iso.optional(),

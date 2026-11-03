@@ -11,7 +11,7 @@ import { json, requireModule, type ModuleContext } from "./module-context";
 async function replaceModuleSchedules(tx: Prisma.TransactionClient, { workspaceId, moduleId, manifest, now, zone }: { workspaceId: string; moduleId: string; manifest: ReturnType<typeof moduleManifestSchema.parse>; now: Date; zone: string }) {
   await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active", payload: { equals: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
   // v2-24: a version that no longer uses schedules.create cannot receive its timers, so they end with it.
-  if (!manifest.uses.includes("schedules.create") && !manifest.dynamicSchedules) await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: { in: ["active", "paused"] }, payload: { not: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
+  if (!manifest.uses.includes("schedules.create")) await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: { in: ["active", "paused"] }, payload: { not: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
   for (const trigger of manifest.triggers) {
     if (!("schedule" in trigger)) continue;
     let nextAt = nextOccurrence(trigger.schedule, now, zone);
@@ -94,7 +94,7 @@ async function automaticRollbackMigrationError(tx: Prisma.TransactionClient, wor
     ? "This activation used migration or restore." : null;
 }
 function automaticRollbackScheduleError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>) {
-  return candidate.uses.includes("schedules.create") || previous.uses.includes("schedules.create") || candidate.dynamicSchedules || previous.dynamicSchedules || staticSchedules(candidate) !== staticSchedules(previous)
+  return candidate.uses.includes("schedules.create") || previous.uses.includes("schedules.create") || staticSchedules(candidate) !== staticSchedules(previous)
     ? "Scheduled behavior changed or uses dynamic timers; automatic rollback will not recreate or replay schedules." : null;
 }
 async function automaticRollbackGroupError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, generationId: string) {

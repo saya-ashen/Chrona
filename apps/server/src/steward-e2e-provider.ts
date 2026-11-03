@@ -27,7 +27,7 @@ export function createStewardE2eProvider(port: number): ProviderAdapter {
           await input.events.usage({ scope: "run", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0, contextTokens: null, contextWindow: null });
           await call("chrona_reply", { text: "四项演示答复已收到，未执行外部动作" });
         } else if (message.includes("规划")) {
-          await call("chrona_schedule", { mode: "remind", rule: { kind: "daily", time: "08:00" }, text: "开始今天的学习", label: "每日学习提醒" });
+          await call("m_remind_create", { rule: JSON.stringify({ kind: "daily", time: "08:00" }), text: "开始今天的学习", label: "每日学习提醒" });
           await call("chrona_reply", { text: "已建好规划" });
         } else await call("chrona_reply", { text: "收到" });
       }

@@ -305,13 +305,12 @@ class ModuleSupervisor {
     if (!this.manifests.has(hash)) this.manifests.set(hash, moduleManifestSchema.safeParse((await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }))?.manifest).data ?? null);
     return this.manifests.get(hash);
   }
-  private async validateTrigger(instance: Instance, event: ModuleEvent, builtin: boolean) {
+  private async validateTrigger(instance: Instance, event: ModuleEvent) {
     const { trigger } = event, { manifest, moduleId } = instance;
     const dynamic = trigger.kind === "schedule" && trigger.scheduleId !== undefined && trigger.payload !== undefined;
     if (dynamic) {
-      // v2-24: the module's own timers (uses schedules.create); remind keeps the Provider's reminders (dynamicSchedules).
-      const allowed = manifest.uses.includes("schedules.create") || (builtin && manifest.dynamicSchedules);
-      if (!allowed || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires uses schedules.create (or a built-in declaring dynamicSchedules)"), "unavailable");
+      // v2-24: the module's own timers (uses schedules.create).
+      if (!manifest.uses.includes("schedules.create") || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires uses schedules.create"), "unavailable");
     } else if (trigger.kind === "activated") return;
     else if (trigger.kind === "call_result" ? !manifest.uses.length : trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
@@ -368,7 +367,7 @@ class ModuleSupervisor {
     instance.scope.eventKey = `${event.trigger.id}:${event.trigger.firedAt}`;
     instance.scope.chain = chain; instance.scope.path = path;
     try {
-      await this.validateTrigger(instance, event, module.builtin);
+      await this.validateTrigger(instance, event);
       const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs);
       await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult });
       return reply;

@@ -87,10 +87,10 @@ describe("module channel contract", () => {
   });
 });
 
-test("public schedule creation accepts only wake/remind and no command; stored module schedules remain readable", () => {
+test("public schedule creation accepts only wake (reminders are the remind module's tools) and no command; stored module schedules remain readable", () => {
   const input = { rule: { kind: "every", minutes: 5 }, text: "Check", label: "Check" };
   for (const mode of ["wake", "remind", "module"]) {
-    const allowed = mode === "wake" || mode === "remind";
+    const allowed = mode === "wake";
     expect(createScheduleSchema.safeParse({ ...input, mode }).success).toBe(allowed);
     expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode }).success).toBe(allowed);
     expect(createScheduleSchema.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
