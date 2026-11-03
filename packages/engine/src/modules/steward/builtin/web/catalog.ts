@@ -12,6 +12,10 @@ const SHADCN = ["Card", "Stack", "Grid", "Separator", "Heading", "Text", "Badge"
 type Definition = { props: z.ZodObject<Record<string, z.ZodType>>; events?: string[]; slots?: string[]; description: string };
 export const components: Record<string, Definition> = {
   ...Object.fromEntries(SHADCN.map(name => [name, (shadcnComponentDefinitions as Record<string, Definition>)[name]!])),
+  Image: { props: z.object({
+    ref: z.string().describe("本应用内容引用 <本应用名>/<path>；可用 $state/$template 绑定"),
+    alt: z.string(), width: z.number().nullable().optional(), height: z.number().nullable().optional(),
+  }), description: "本应用内容区的图片（PNG、JPEG、GIF、WebP）；ref 是 <本应用名>/<path>，可用 $state/$template 绑定，不接受 src URL" },
   Markdown: { props: z.object({ content: z.string() }), description: "Markdown text: headings, lists, tasks, code, bold and links (no HTML)" },
 };
 export const callParams = z.object({

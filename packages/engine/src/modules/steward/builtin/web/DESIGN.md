@@ -9,6 +9,10 @@
 - 中文优先。文案用用户的说法（应用、文档、对话、通知、需要你确认），不用内部名词（run、grant、token、hash、module）。
 - web 不按模块名写专门页面：应用在 `on("activated")` 里调用 `web.page-set` 登记页面（组件目录见 `catalog.ts`，说明由 `web.catalog` 返回），web 统一绘制；新组件写在 `src/pages.tsx` 并加入 `catalog.ts`，样式只用本文件的语义变量（见 [module-dependency-direction](../../../../../../../docs/zh/module-dependency-direction.md) §4）。
 
+### 应用图片
+
+`Image` 只接收本应用内容引用 `ref: "<本应用名>/<path>"`、`alt` 和可选的 `width`/`height`，不接收任意 `src`；`ref` 可用 `$state`/`$template` 绑定。`GET /api/web/pages/<module>/<page>/content?ref=...` 沿用入口认证，仅为已登记页面读取该应用自身的 PNG/JPEG/GIF/WebP。由于入口认证使用 Bearer 请求头，页面复用认证请求取得 Blob 后交给 `<img>`，切换图片或卸载时回收 URL；不把 key 放入 URL。加载中和失败时显示中文提示，图片宽度不超过容器。
+
 ## 性格
 
 安静、清楚、可长时间使用的工作台，不是营销页：不用大面积渐变、装饰插画、超大标题和花哨卡片墙。当前状态和下一步操作永远不含糊。

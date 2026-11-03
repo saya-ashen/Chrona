@@ -165,6 +165,21 @@ async function fileResponse(request: Request) {
     return apiError(error);
   }
 }
+/** Only the registering app's raster images may be displayed on its page. Auth is the /api/* entry's. */
+async function pageContentResponse(request: Request, module: string, id: string) {
+  const imageHeaders = { "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'", "cache-control": "private, no-cache" };
+  try {
+    const page = await pages.get(module, id);
+    if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
+    const ref = new URL(request.url).searchParams.get("ref") ?? "";
+    if (!ref.startsWith(`${page.module}/`)) return new Response("只能读取本应用的图片", { status: 403, headers: imageHeaders });
+    const file = await call("content.read", { ref }) as { base64: string; mime: string };
+    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) return new Response("不支持的图片类型", { status: 403, headers: imageHeaders });
+    return new Response(Buffer.from(file.base64, "base64"), { headers: { ...imageHeaders, "content-type": file.mime } });
+  } catch {
+    return new Response("没有这张图片", { status: 404, headers: imageHeaders });
+  }
+}
 function apiError(error: unknown) {
   const { code = "failed", message = "failed" } = error as { code?: string; message?: string };
   return Response.json({ code, message }, { status: STATUS[code] ?? 502 });
@@ -173,6 +188,7 @@ async function apiResponse(request: Request, path: string[]) {
   const parts = path.join("/");
   if (request.method === "GET" && parts === "events") return events();
   if (request.method === "GET" && parts === "file") return fileResponse(request);
+  if (request.method === "GET" && path.length === 4 && path[0] === "pages" && path[3] === "content") return pageContentResponse(request, path[1]!, path[2]!);
   try { return Response.json(await api(request, path) ?? null); }
   catch (error) { return apiError(error); }
 }

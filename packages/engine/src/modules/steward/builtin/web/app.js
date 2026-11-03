@@ -507,7 +507,7 @@ async function registeredPage(module, id) {
   const { mount } = await import("/pages.js");
   const view = h("div", {});
   main.replaceChildren(h("h2", {}, page.title), view);
-  unmountPage = mount(view, page, { call: (target, args) => tool(target, args), navigate: path => go(path) });
+  unmountPage = mount(view, page, { call: (target, args) => tool(target, args), navigate: path => go(path), content: path => web(path, { raw: true }) });
 }
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
 async function pageLinks() {

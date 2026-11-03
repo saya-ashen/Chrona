@@ -153,7 +153,7 @@ json-render 不提供的部分由 web 实现，只做数据与动作，**不扩�
 开发范围按用户要求只含 web 与试点 files，其他模块未改；验证通过后再逐个迁移。
 
 - **内核 `activated` 事件**（用户选定）：manifest `activated: true` 的模块在每个启用版本收到一次 `on("activated")`，其 `uses` 中的模块换版本时再收到一次（签名 = 自身 hash + 依赖 hash，记于 `platform/activated.json`；投递失败重试至多 3 次）。SDK 对未处理的 `activated` 直接回复，不算故障。用于休眠应用登记页面，也适用于其他需在启用时向通用模块登记的场景。改动：契约事件与 manifest 字段、SDK、`module-supervisor.ts`。
-- **web**：`page-set/page-remove/pages/catalog` 工具（含 output 契约）、`pages.ts` 登记与逐元素校验、`/api/web/pages` 路由；`catalog.ts` 为 shadcn 定义中 web 已实现的 20 个组件加 `Markdown` 与 `call`；`src/pages.tsx` 用 `style.css` 风格实现组件、数据读取（`needs` 为空时跳过、`refresh`、失败按来源清除）、`call`（`keyed` 工具自动 request-key、失败抛出以走 `onError`）；导航与应用详情按登记列出页面；删除写死的 `/files` 文档页。
+- **web**：`page-set/page-remove/pages/catalog` 工具（含 output 契约）、`pages.ts` 登记与逐元素校验、`/api/web/pages` 路由；`catalog.ts` 为 shadcn 定义中 web 已实现的 20 个组件加 `Markdown`、仅以本应用内容引用（支持 `$state`/`$template`）经同源认证路由读取 PNG/JPEG/GIF/WebP 的 `Image` 与 `call`；`src/pages.tsx` 用 `style.css` 风格实现组件、数据读取（`needs` 为空时跳过、`refresh`、失败按来源清除）、`call`（`keyed` 工具自动 request-key、失败抛出以走 `onError`）；导航与应用详情按登记列出页面；删除写死的 `/files` 文档页。
 - **files**：`activated` 时登记文档页（`page.ts`），web 不支持时只记日志；`list` 增加 `dir`、`parent` 与条目 `path`。
 - **发现的 json-render 行为**：action 顶层参数中 `$item` 解析为状态路径，取值用 `$template`；`defineRegistry` 组件拿不到 `element`；确认弹窗为内联白色样式（`style.css` 覆盖）；`catalog.validate` 不查组件/props/action（web 自查）；页面加载时 CSP 报告一次 `script-src` 回退（zod 探测 `new Function`，已被捕获，不影响功能）。
 - **验证**：web、files 模块测试；内核模块类型检查（web、files 入口 0 错误）；`src` tsc；引擎 + 集成 Steward 测试 706 通过、0 失败；全仓 tsc 0 错误；`git diff --check`。只含 web + files 的本地 harness（真实 files 逻辑、真实 page-set）中用 Chromium 实测浏览、Markdown、编辑预览与保存、确认后删除至 .trash、返回上级、`.trash` 隐藏、应用详情链接、今天页；1280 明/暗与 390 移动宽度无横向溢出。

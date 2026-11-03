@@ -1,4 +1,7 @@
 import { strict as assert } from "node:assert";
+import { catalog } from "./catalog";
+import { pageErrors } from "./pages";
+const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
 
@@ -26,6 +29,10 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
   stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
   stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
+  stub("content.read", args => {
+    if (args.ref === "files/missing.png") return null;
+    return { base64: png.toString("base64"), mime: args.ref === "files/no.svg" ? "image/svg+xml" : "image/png", size: png.length, sha256: "fixture" };
+  }),
   stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
 async function get(path: string, init: RequestInit = {}) {
@@ -139,6 +146,33 @@ try {
   assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
   // A source is not read while a required argument is empty (files.delete needs path; list needs nothing).
   assert.deepEqual(page.needs, { list: [] }); assert.deepEqual(page.keyed, []);
+  // Image specs accept literals and bindings, but literals must belong to the registering app.
+  for (const ref of ["files/picture.png", { $state: "/image/ref" }, { $template: "files/${name}.png" }]) {
+    const imageSpec = { root: "image", elements: { image: { type: "Image", props: { ref, alt: "生成的图片", width: 640, height: null }, children: [] } } };
+    assert.equal(catalog.validate(imageSpec).success, true);
+    assert.deepEqual(pageErrors({ spec: imageSpec }, new Map(), "files"), []);
+    assert.match(JSON.stringify(await tool("page-set", { id: "images", title: "图片", spec: imageSpec }, files)), /json-render@/);
+  }
+  const foreignSpec = { root: "image", elements: { image: { type: "Image", props: { ref: "planning/private.png", alt: "越权" }, children: [] } } };
+  assert.match(pageErrors({ spec: foreignSpec }, new Map(), "files").join(), /只能引用本应用/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "bad-image", title: "图片", spec: foreignSpec }, files)), /只能引用本应用/);
+  const imageUrl = "/api/web/pages/files/images/content?ref=";
+  const before = calls.length;
+  for (const ref of ["planning/private.png", "files-other/a.png", ""]) assert.equal((await get(imageUrl + encodeURIComponent(ref))).status, 403);
+  assert.equal(calls.length, before); // Rejected before content.read.
+  assert.equal((await get(imageUrl + "files%2Fno.svg")).status, 403);
+  const missing = await get(imageUrl + "files%2Fmissing.png");
+  assert.equal(missing.status, 404); assert.doesNotMatch(await missing.text(), /private internal/);
+  assert.equal((await get("/api/web/pages/files/absent/content?ref=files%2Fa.png")).status, 404);
+  const image = await get(imageUrl + "files%2Fpicture.png");
+  assert.equal(image.status, 200);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+  assert.equal(image.headers.get("content-type"), "image/png");
+  assert.equal(image.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(image.headers.get("content-security-policy"), "sandbox; default-src 'none'");
+  assert.equal(image.headers.get("cache-control"), "private, no-cache");
+  assert.deepEqual(calls.at(-1), ["content.read", { ref: "files/picture.png" }]);
+  await tool("page-remove", { id: "images" }, files);
   assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
   assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);
   assert.equal((await get("/api/web/pages/files/main")).status, 404);

@@ -1,6 +1,6 @@
 // A page an app registered (module-dependency-direction §4), rendered with json-render in this page's own style.
 // Built into /pages.js and loaded only when such a page opens; data and actions call only the registering app's tools.
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp, type ComponentRenderProps } from "@json-render/react";
 import { createStateStore, type Spec, type StateStore } from "@json-render/core";
@@ -9,7 +9,7 @@ import { catalog } from "../catalog";
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
 export type Page = { module: string; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed?: string[]; needs?: Record<string, string[]> };
-export type Deps = { call: (target: string, args: Args) => Promise<unknown>; navigate: (path: string) => void };
+export type Deps = { call: (target: string, args: Args) => Promise<unknown>; navigate: (path: string) => void; content: (path: string) => Promise<Blob> };
 type Feedback = { failed: boolean; text: string; source?: string } | null;
 
 const record = (value: unknown): value is Args => !!value && typeof value === "object" && !Array.isArray(value);
@@ -67,6 +67,24 @@ export function Markdown({ props }: Props<{ content: string }>) {
   if (fence as string[] | null) blocks.push(<pre key="end">{(fence as string[] | null)!.join("\n")}</pre>);
   return <div className="markdown">{blocks}</div>;
 }
+const ImageContext = createContext<{ page: Page; deps: Deps } | null>(null);
+function Image({ props }: Props<{ ref: string; alt: string; width?: number | null; height?: number | null }>) {
+  const context = useContext(ImageContext)!;
+  const path = `/pages/${encodeURIComponent(context.page.module)}/${encodeURIComponent(context.page.id)}/content?ref=${encodeURIComponent(props.ref)}`;
+  const [image, setImage] = useState<{ path: string; src?: string; failed?: boolean } | null>(null);
+  useEffect(() => {
+    let stopped = false, src: string | undefined;
+    setImage(null);
+    void context.deps.content(path).then(blob => {
+      if (stopped) return;
+      src = URL.createObjectURL(blob);
+      setImage({ path, src });
+    }).catch(() => { if (!stopped) setImage({ path, failed: true }); });
+    return () => { stopped = true; if (src) URL.revokeObjectURL(src); };
+  }, [path, context.deps]);
+  if (image?.path !== path || !image.src || image.failed) return <p role="status" className={image?.failed ? "error" : "muted"}>{image?.failed ? `图片加载失败：${props.alt || "请稍后重新打开页面"}` : "图片加载中……"}</p>;
+  return <img src={image.src} alt={props.alt} width={props.width ?? undefined} height={props.height ?? undefined} style={{ display: "block", maxWidth: "100%", height: "auto", objectFit: "contain", borderRadius: "8px" }} onError={() => setImage({ path, failed: true })} />;
+}
 const gap = (value?: string | null) => ({ none: "0", sm: ".4rem", md: ".6rem", lg: ".9rem", xl: "1.4rem" })[value ?? "md"] ?? ".6rem";
 
 /** Only what this page draws in its own style is offered; the catalog's other components render as a notice. */
@@ -100,6 +118,7 @@ const { registry } = defineRegistry(catalog, {
     },
     Collapsible: ({ props, children }: Props<{ title: string; defaultOpen?: boolean | null }>) => <details open={!!props.defaultOpen}><summary>{props.title}</summary>{children}</details>,
     Markdown,
+    Image,
   } as never,
   actions: { call: async () => {} },
 });
@@ -154,7 +173,7 @@ export function PageView({ page, deps }: { page: Page; deps: Deps }) {
   return <JSONUIProvider registry={registry} store={store} handlers={handlers} navigate={deps.navigate}>
     <div className="registered-page">
       {feedback ? <p role="status" className={feedback.failed ? "error" : "muted"}>{feedback.text}</p> : null}
-      <Renderer spec={page.spec} registry={registry} fallback={fallback} />
+      <ImageContext.Provider value={{ page, deps }}><Renderer spec={page.spec} registry={registry} fallback={fallback} /></ImageContext.Provider>
     </div>
   </JSONUIProvider>;
 }

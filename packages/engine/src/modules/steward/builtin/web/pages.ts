@@ -44,7 +44,7 @@ function checkBinding(where: string, binding: unknown, tools: Map<string, Schema
 }
 /** catalog.validate checks only the spec's structure, so components, props and actions are checked here. */
 // eslint-disable-next-line complexity -- Keep app-supplied spec validation and its ordered diagnostics together.
-export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<string, Schema>) {
+export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<string, Schema>, module: string) {
   const errors: string[] = [], structure = catalog.validate(input.spec);
   if (!structure.success) return [`spec 结构无效：${structure.error?.issues.slice(0, 5).map(issue => `${issue.path.join(".")} ${issue.message}`).join("；")}`];
   const elements = (input.spec as Spec).elements;
@@ -57,6 +57,7 @@ export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<
       if (!prop) errors.push(`${where}.props.${name}: ${element.type} 没有这个属性`);
       else if (!dynamic(value) && !prop.safeParse(value).success) errors.push(`${where}.props.${name}: 值不符合 ${element.type} 的定义`);
     }
+    if (element.type === "Image" && typeof element.props?.ref === "string" && !element.props.ref.startsWith(`${module}/`)) errors.push(`${where}.props.ref: 图片只能引用本应用 ${module}/ 的内容`);
     for (const [event, binding] of Object.entries(element.on ?? {})) {
       if (definition.events && !definition.events.includes(event)) errors.push(`${where}.on.${event}: ${element.type} 没有这个事件`);
       checkBinding(`${where}.on.${event}`, binding, tools, errors);
@@ -95,7 +96,7 @@ export function createPages(deps: Deps) {
     if (typeof id !== "string" || !SLUG.test(id)) throw invalid("id 须为小写字母开头的 slug");
     if (typeof title !== "string" || !title.trim() || title.length > 80) throw invalid("title 须为 1–80 个字符");
     if (JSON.stringify({ spec, data }).length > MAX_BYTES) throw invalid("页面最多 64 KiB");
-    const tools = await deps.tools(module), errors = pageErrors({ spec, data }, tools);
+    const tools = await deps.tools(module), errors = pageErrors({ spec, data }, tools, module);
     if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
     const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
     if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
