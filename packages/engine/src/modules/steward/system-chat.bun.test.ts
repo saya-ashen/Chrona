@@ -103,17 +103,16 @@ test("a wake result goes into the original QQ conversation without a separate no
 test("approvals through the approvals system module; other modules and Chrona itself cannot speak for the user", async () => {
   const f = await fixture();
   const approval = await f.api.approvals.create({ action: "schedule", title: "日程", detail: "审查", preview: "diff", payload: {} });
-  expect(await f.qq.call("approvals.list", {})).toMatchObject([{ id: approval.id, status: "open", level: "yellow" }]);
+  expect(await f.qq.call("approvals.list", {})).toMatchObject([{ id: approval.id, status: "open" }]);
   expect(await f.qq.call("approvals.resolve", { approval: approval.id, decision: "approve" })).toMatchObject({ id: approval.id, status: "approved" });
-  // v2-17: a red approval (here a settings change) is approved on the page only; chat can still deny it.
   const policy = await f.api.approvals.create({ action: "change_policy", title: "设置", detail: "审查", preview: "diff", payload: {} });
-  await expect(f.qq.call("approvals.resolve", { approval: policy.id, decision: "approve" })).rejects.toMatchObject({ code: "forbidden" });
-  expect(await f.qq.call("approvals.resolve", { approval: policy.id, decision: "deny" })).toMatchObject({ status: "denied" });
-  // Resuming a paused app approved in chat takes effect (it used to be marked approved and do nothing).
+  expect(await f.qq.call("approvals.resolve", { approval: policy.id, decision: "approve" })).toMatchObject({ status: "approved" });
+  const external = await f.api.approvals.create({ action: "send_external_message", title: "发送", detail: "确认发送", preview: "正文", payload: {} });
+  expect((await f.api.approvals.resolve(external.id, { decision: "approve", scope: "once" }, "mcp")).approval.status).toBe("approved");
+  // Chrona resumes directly without an approval.
   const app = await f.db.module.create({ data: { workspaceId: f.w, name: "prices", activeHash: "p1", status: "paused" } });
   await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: "p1", manifest: { name: "prices", entry: "index.ts", tests: ["test.ts"] }, source: "build", intent: {}, report: {}, status: "approved" } });
-  const resume = await f.api.modules.lifecycle("enable", app.id, { reason: "修好了" }, false) as { approvalId: string };
-  await f.qq.call("approvals.resolve", { approval: resume.approvalId, decision: "approve" });
+  expect(await f.api.modules.lifecycle("enable", app.id, { reason: "修好了" }, false)).toMatchObject({ status: "active" });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).status).toBe("active");
   // A module without these in `uses` is refused; so is a kernel-origin call (entry modules only).
   const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });

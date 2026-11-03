@@ -44,9 +44,9 @@ async function checkout(context: ModuleContext, moduleId: string, hash: string |
   const files = await readModuleFiles(join(store, selected), "Unsafe module store file");
   await checkoutModule(root, dir, files);
 }
-/** Approvals the module system carries out (activation, groups, pause/resume, removal); every path that resolves approvals must route these here. */
+/** Approvals the module system carries out (activation, groups, removal); every path that resolves approvals must route these here. */
 export const isModuleApproval = (payload: unknown) => !!payload && typeof payload === "object" && !Array.isArray(payload)
-  && ["activate_module", "activate_modules", "module_status", "module_remove"].includes(String((payload as { kind?: unknown }).kind));
+  && ["activate_module", "activate_modules", "module_remove"].includes(String((payload as { kind?: unknown }).kind));
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const context = moduleContext(ports, workspaceId);
   async function reconcile<T>(operation: Promise<T>) {

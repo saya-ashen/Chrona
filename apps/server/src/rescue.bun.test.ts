@@ -41,10 +41,8 @@ test("rescue listener refuses to start without a key", async () => {
   expect(startRescueListener(f.ports, f.service, htmlPath, { CHRONA_RESCUE_PORT: "3199" }, message => logs.push(message))).toBeUndefined();
   expect(logs).toEqual(["Rescue listener not started: RESCUE_KEY is required"]);
 });
-test("rescue approval list shows previews and resolve allows once/always (a red one only once)", async () => {
+test("rescue approval list shows previews and resolve allows once/always", async () => {
   const f = await fixture();
-  const red = await f.service.forWorkspace("ws_default").approvals.create({ action: "change_policy", title: "Settings", detail: "Changes", preview: "diff", payload: {} });
-  expect((await f.request(`/api/approvals/${red.id}/resolve`, { decision: "approve", scope: "always" })).status).toBe(400);
   for (const scope of ["once", "always"]) {
     const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "schedule", title: "Schedule", detail: "Changes", preview: "diff", payload: {} });
     const list = await (await f.request("/api/approvals")).json();
@@ -67,10 +65,10 @@ test("rescue chat uses only session rescue; Provider failure points to chrona ad
   expect((await f.request("/api/chat", { text: "hi", attachments: [] })).status).toBe(400);
 });
 // The mcp module resolves through this same owner HTTP route.
-test("the web page and QQ resolve policy approvals like any other entry; a red one is approved on the page only", async () => {
+test("the web page and QQ resolve policy approvals like any other entry", async () => {
   const f = await fixture();
   const create = (action: "change_policy" | "schedule") => f.service.forWorkspace("ws_default").approvals.create({ action, title: "Settings", detail: "Review", preview: "diff", payload: {} });
-  const viaWeb = await create("change_policy"), viaQq = await create("schedule"), redViaQq = await create("change_policy");
+  const viaWeb = await create("change_policy"), viaQq = await create("change_policy"), deniedViaQq = await create("schedule");
   const web = await builtinEntry(f.ports, "ws_default", "web");
   expect(await web.call("approvals.resolve", { approval: viaWeb.id, decision: "approve" })).toMatchObject({ status: "approved" });
   const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
@@ -78,8 +76,7 @@ test("the web page and QQ resolve policy approvals like any other entry; a red o
   const qq = await qqEntry(f.ports, "ws_default");
   const relay = createRelay({ call: qq.call, notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
   expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
-  expect(await relay.resolveApproval(binding, { ref: redViaQq.id, decision: "approve", scope: "once" })).toContain("请在网页「待你决定」中批准");
-  expect(await relay.resolveApproval(binding, { ref: redViaQq.id, decision: "deny", scope: "once" })).toContain("已拒绝");
+  expect(await relay.resolveApproval(binding, { ref: deniedViaQq.id, decision: "deny", scope: "once" })).toContain("已拒绝");
   expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
 });
 test("rescue HTML is a required release resource", () => {

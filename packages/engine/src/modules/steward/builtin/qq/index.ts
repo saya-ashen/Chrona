@@ -92,7 +92,7 @@ if (!appId) {
       // A button click is the owner's decision only when the bound owner clicked it.
       await ackQqInteraction({ tokens, id: interaction.id }).catch(() => log("qq.interaction_ack_failed"));
       const binding = await refreshBinding(), decision = parseApprovalDecision({ button: interaction.data });
-      log("qq.approval_click", { result: decision && binding?.openid === interaction.openid ? await relay.resolveApproval(binding, decision, text => relay.enqueueFinal(`approval:${interaction.id}`, text, `${DEDICATED_PLATFORM}:${binding.openid}`)).catch(() => "failed") : "ignored" });
+      log("qq.approval_click", { result: decision && binding?.openid === interaction.openid ? await relay.resolveApproval(binding, decision).catch(() => "failed") : "ignored" });
     })(); },
   });
   deliver = async message => {

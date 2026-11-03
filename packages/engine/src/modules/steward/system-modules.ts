@@ -185,7 +185,7 @@ async function moduleRequest(ports: StewardPorts, workspaceId: string, module: E
   const existing = rows.find(row => isModuleRequest(row.payload) && row.payload.call === call.id);
   const approval = existing ?? await ports.db.approval.findUniqueOrThrow({ where: { id: (await createApprovals({ db: ports.db, workspaceId, now: ports.now }).create({
     action: "modify_external", moduleId: module.moduleId, title: `${module.module}：${String(args.title)}`.slice(0, 200),
-    detail: String(args.detail ?? "").slice(0, 4000), preview: String(args.preview ?? "").slice(0, 20_000), payload: { kind: "module_request", hash: module.hash, call: call.id }, ...(args.level === "red" ? { level: "red" as const } : {}),
+    detail: String(args.detail ?? "").slice(0, 4000), preview: String(args.preview ?? "").slice(0, 20_000), payload: { kind: "module_request", hash: module.hash, call: call.id },
   })).id } });
   if (approval.status === "approved" || approval.status === "denied") return { approval: approval.id, decision: approval.status };
   if (approval.status !== "open") throw new CallError("failed", `Request ${approval.status}`);
@@ -203,7 +203,7 @@ const approvals: SystemModule = {
     tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { idempotent: true, output: z.lazy(() => outputs.approvalsListOutput) }),
     tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: [...APPROVAL_SCOPES] } }, ["approval", "decision"], { output: z.lazy(() => outputs.approvalOutput) }),
     tool("request", "Ask the user to decide something this module is about to do (v2-16). Call asynchronously with reply: the call waits, and its call_result carries { approval, decision: approved | denied }. Approved once, never standing.",
-      { title: text("What the user decides, e.g. 开始模拟实验"), detail: text("Why, and what follows"), preview: text("Exactly what will be done"), level: { type: "string", enum: ["yellow", "red"], description: "red for money, data loss or outside effects; the kernel may raise it, never lower it" } }, ["title"], { idempotent: true, output: z.lazy(() => outputs.approvalRequestOutput) }),
+      { title: text("What the user decides, e.g. 开始模拟实验"), detail: text("Why, and what follows"), preview: text("Exactly what will be done") }, ["title"], { idempotent: true, output: z.lazy(() => outputs.approvalRequestOutput) }),
     tool("status", "A request this module made: { status, hash, resolvedAt }.", { approval: text() }, ["approval"], { idempotent: true, output: z.lazy(() => outputs.approvalStatusOutput) }),
   ],
   async handle({ ports, workspaceId, caller, call }, name, args) {

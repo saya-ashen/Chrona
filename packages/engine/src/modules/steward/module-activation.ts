@@ -10,7 +10,6 @@ import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
 import { activateGroupIn } from "./module-group";
-import { moduleStatusPayloadSchema, setStatusIn } from "./module-status";
 import { moduleRemovePayloadSchema, removeApproved } from "./module-remove";
 
 type ActivationAction = Omit<ApprovedAction, "grantId"> & { grantId: string | null };
@@ -64,16 +63,6 @@ export async function activateApprovedIn(context: ModuleContext, tx: Prisma.Tran
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
   if (isGroupPayload(action.payload)) { await context.db.$transaction(tx => activateGroupIn(context, tx, action)); return; }
   if (moduleRemovePayloadSchema.safeParse(action.payload).success) { await removeApproved(context, action); return; }
-  const status = moduleStatusPayloadSchema.safeParse(action.payload);
-  if (status.success) {
-    const { moduleId, hash } = status.data;
-    await context.db.$transaction(async tx => {
-      await checkApproval(context, tx, action, moduleId);
-      if ((await requireModule(context, tx, moduleId)).activeHash !== hash) throw new StewardError("conflict", "应用已更新，请重新申请");
-      await setStatusIn(context, tx, moduleId, status.data.status, "approval");
-    });
-    return;
-  }
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
   if (!prepared) return;
   const payload = action.payload as Prisma.JsonObject, restore = parseRestore(payload.restore);

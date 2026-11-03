@@ -25,7 +25,7 @@ async function rollbackFixture(options: { enabled?: boolean; mode?: "auto" | "no
   await updateModuleEvolution(db, { workspaceId: workspace.id, moduleId: module.id, activationId: activation.activationId, hash: "candidate", status: "failed", now: ports.now() });
   if (options.verified) await updateModuleEvolution(db, { workspaceId: workspace.id, moduleId: module.id, activationId: activation.activationId, hash: "candidate", capability: "tool:read", now: ports.now() });
   if (options.group) {
-    const approval = await db.approval.create({ data: { workspaceId: workspace.id, action: "activate_module", title: "group", detail: "", preview: "", level: "yellow", payload: { kind: "activate_modules", versions: [{ moduleId: module.id, hash: "candidate" }, { moduleId: "other", hash: "other" }] } } });
+    const approval = await db.approval.create({ data: { workspaceId: workspace.id, action: "activate_module", title: "group", detail: "", preview: "", payload: { kind: "activate_modules", versions: [{ moduleId: module.id, hash: "candidate" }, { moduleId: "other", hash: "other" }] } } });
     await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_activate", details: { hash: "candidate", generationId: "gen-candidate", approvalId: approval.id } } });
   }
   if (options.migration) await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_migration_started", details: { hash: "candidate", from: 1, to: 1 } } });

@@ -77,7 +77,7 @@ v2-26 加一个“心智”：频繁、廉价地感知整体情况（直觉）�
 
 | 改动 | 位置 | 级别 |
 |---|---|---|
-| `modules.disable`、`modules.enable` 系统工具（Provider 名 `m_modules_disable`/`m_modules_enable`，入参 `module`、`reason`）。用户（网页/MCP）调用直接生效；Provider 调用创建审批：动作 `activate_module`，载荷 `{ kind: "module_status", moduleId, hash: 当前活动版本, status }`，批准时活动版本已变则拒绝 | `module-status.ts`、`modules.ts`（`lifecycle`）、`module-activation.ts`、`service.ts`、`system-modules.ts`、`system-outputs.ts` | 🟡，只能“仅这次”批准（不留下 `activate_module` 常驻授权）；`approval-level.ts`、`approvals.ts` |
+| `modules.disable`、`modules.enable` 系统工具（Provider 名 `m_modules_disable`/`m_modules_enable`，入参 `module`、`reason`）。用户与 Provider 调用都直接生效（security-simplification §3.1），Provider 的理由记入审计 | `module-status.ts`、`modules.ts`（`lifecycle`）、`module-activation.ts`、`service.ts`、`system-modules.ts`、`system-outputs.ts` | 不再审批 |
 
 停用记录它暂停了哪些定时（审计 `module_disabled.details.schedules`），启用只恢复这些定时并重算下次时间（错过的一次性定时立即触发），用户自己暂停的定时不受影响。`chrona admin disable` 走同一逻辑。
 

@@ -5,7 +5,7 @@ import type { StewardPorts } from "./ports";
 import { CallError, listSystemModules, normalizedToolInputSchema, type Json } from "./module-calls";
 import { createSecrets } from "./secrets";
 import { secretView, secretViewSchema } from "./secret-fields";
-import { addedCapabilities } from "./approval-level";
+import { addedCapabilities } from "./module-capabilities";
 import { createSettings, modelUsage, moduleModelSettings } from "./settings";
 import { createNotificationsView, forwardSettings } from "./notify-user";
 import { createModules } from "./modules";
@@ -35,7 +35,7 @@ export async function modulePermissions(ports: StewardPorts, workspaceId: string
     model: manifest?.model ? await moduleModelView(ports, workspaceId, module.name, manifest.model) : null,
     grants: grants.map(grant => ({ id: grant.id, action: grant.action, mode: grant.mode, once: grant.once, createdAt: grant.createdAt.toISOString() })),
     approvals: (await db.approval.findMany({ where: { workspaceId, moduleId: module.id }, orderBy: { createdAt: "desc" }, take: 10 }))
-      .map(row => ({ id: row.id, title: row.title, level: row.level, status: row.status, createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null })),
+      .map(row => ({ id: row.id, title: row.title, status: row.status, createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null })),
   });
 }
 async function moduleModelView(ports: StewardPorts, workspaceId: string, name: string, model: NonNullable<ReturnType<typeof moduleManifestSchema.parse>["model"]>) {
@@ -132,7 +132,7 @@ export const permissionsSchema = z.object({
   secrets: z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable() }).extend(secretViewSchema.shape)),
   model: z.object({ tier: z.string(), target: z.unknown(), maxCallsPerEvent: z.number().optional(), dailyCap: z.number().nullable(), today: z.object({ calls: z.number(), inputTokens: z.number(), outputTokens: z.number() }).passthrough() }).nullable(),
   grants: z.array(z.object({ id: z.string(), action: z.string(), mode: z.string(), once: z.boolean(), createdAt: z.string() })),
-  approvals: z.array(z.object({ id: z.string(), title: z.string(), level: z.string().nullable(), status: z.string(), createdAt: z.string(), resolvedAt: z.string().nullable() })),
+  approvals: z.array(z.object({ id: z.string(), title: z.string(), status: z.string(), createdAt: z.string(), resolvedAt: z.string().nullable() })),
 });
 export const moduleOverviewOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("app"), app: z.record(z.string(), z.unknown()).nullable(), tools: z.array(overviewToolSchema), permissions: permissionsSchema, settings: moduleSettingsOutputSchema, diagnostics: moduleDiagnosticsOutputSchema.element.nullable(), activity: z.array(activitySchema).max(30) }),

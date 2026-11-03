@@ -20,12 +20,10 @@ import { approvalNoticeBody } from "./notify-user";
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const intent = { changes: ["Track the price"], preserves: ["Keep existing data"] };
-async function fixture() {
+async function fixture(credentials = true) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-modules-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "test" } });
-  // These tests review every version by hand: since v2-17 a green update would otherwise activate by itself.
-  await db.grant.create({ data: { workspaceId: workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" }, createdAt: new Date("2026-10-20T00:00:00Z") } });
   const calls: Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0][] = [];
   const forwarded: ApprovedAction[] = [];
   let fail = false;
@@ -47,7 +45,7 @@ async function fixture() {
   await mkdir(dir, { recursive: true });
   const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
   async function write(value = 1) {
-    await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, params: { threshold: { type: "number", value } } }));
+    await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, ...(credentials ? { secrets: [`credential_${value}`] } : {}), params: { threshold: { type: "number", value } } }));
     await writeFile(join(dir, "index.ts"), `console.log(${value})`);
     await writeFile(join(dir, "test.ts"), "process.exit(0)");
   }
@@ -64,6 +62,34 @@ async function fixture() {
   const approve = (id: string) => service.approvals.resolve(id, { decision: "approve", scope: "once" }, "web");
   return { db, dataDir, workspace, ports, service, root, dir, calls, forwarded, write, submit, propose, approve, fail: (value = true) => { fail = value; } };
 }
+
+test("checks-passing fresh apps and updates activate without a card and send digest notices", async () => {
+  const f = await fixture(false);
+  for (const value of [1, 2]) {
+    await f.write(value);
+    const result = await f.propose();
+    expect(result.status).toBe("approved");
+    expect(result.approvalId).toBeUndefined();
+    expect(await f.db.approval.count()).toBe(0);
+    expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ activeHash: result.hash, status: "active", dataSchema: 1 });
+    const message = (await notices(f.db)).find(item => item.body.includes(result.hash));
+    expect(message).toMatchObject({ level: "digest", title: `应用 price-watch 已自动${value === 1 ? "启用" : "更新"}` });
+    expect(message?.body).toContain("Track the price");
+    expect(message?.body).toContain("回滚");
+  }
+  expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(2);
+});
+
+test("a fresh app and an update adding credentials ask once", async () => {
+  const f = await fixture();
+  const first = await f.propose();
+  expect(first.status).toBe("pending_review");
+  await f.approve(first.approvalId!);
+  await f.write(2);
+  const next = await f.propose();
+  expect(next.status).toBe("pending_review");
+  expect(await f.db.approval.count({ where: { status: "open" } })).toBe(1);
+});
 
 test.each(["package.json", "pyproject.toml", "system", "none"])("required isolation blocks host dependency installation: %s", async kind => {
   const f = await fixture();
@@ -158,21 +184,24 @@ test("a newer candidate supersedes older pending ones instead of leaving them pe
   expect((await version(newer.hash)).status).toBe("rejected");
 });
 
-test("the chat notice of a module approval is the short card: level, headline, what it adds, undo; the review stays on the page", async () => {
+test("the chat notice shows detail and intent; the full diff stays on the page", async () => {
   const f = await fixture(), result = await f.propose();
   const row = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
-  expect(row).toMatchObject({ level: "yellow", brief: { headline: "启用新应用 price-watch", added: ["给你发通知"], reversible: true } });
   const body = approvalNoticeBody(row);
-  expect(body).toBe("启用新应用 price-watch\n新增：给你发通知\n可以一键回滚。\n详情在网页「待你决定」。");
+  expect(body).toContain(row.detail);
+  expect(body).toContain("Track the price");
   expect(body).not.toContain("--- active");
   expect(body).not.toContain(result.hash);
   const restore = { action: "activate_module", detail: "恢复旧版本的数据快照", preview: "将恢复 2026-10-20 的数据，此后写入的数据会丢失" };
   expect(approvalNoticeBody(restore)).toBe("恢复旧版本的数据快照\n\n将恢复 2026-10-20 的数据，此后写入的数据会丢失");
 });
 
-async function dataFixture() {
-  const f = await fixture(), first = await f.propose();
-  await f.approve(first.approvalId!);
+async function dataFixture(credentials = false) {
+  const f = await fixture(credentials), first = await f.propose();
+  if (credentials) await f.approve(first.approvalId!);
+  else expect(first.status).toBe("approved");
+  // Start data tests after setup's activation notice; the auto-activation test covers that notice.
+  await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
   const live = join(f.dataDir, "platform/data", first.moduleId!), original = f.ports.sandbox!.runModule!;
   f.ports.sandbox!.runModule = async input => {
     await mkdir(join(input.dataDir, "nested"));
@@ -359,7 +388,7 @@ test.each(["empty", "missing"])("activation with %s data records schema without 
   await rm(f.live, { recursive: true });
   if (kind === "empty") await mkdir(f.live);
   const result = await f.propose();
-  await f.approve(result.approvalId!);
+  expect(result.status).toBe("approved");
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ activeHash: result.hash, dataSchema: 2, status: "active" });
   expect(f.calls.map(call => call.entry)).toEqual(["test.ts", "test.ts"]);
   expect(await f.db.audit.count({ where: { kind: "module_migration_started" } })).toBe(0);
@@ -444,7 +473,7 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
 });
 
 test("same-schema continuity runs on a disposable copy, previews effects and never executes them", async () => {
-  const f = await dataFixture(), effects = [
+  const f = await dataFixture(true), effects = [
     { type: "notify_user", key: "copy", level: "now", title: "Would notify", body: "Only a preview" },
     { type: "wake_provider", key: "copy", prompt: "Must not run" },
   ];
@@ -543,7 +572,7 @@ test.each(["nonempty", "empty", "missing", "unknown schema"])("schema upgrade wi
     f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   }
   const result = await f.propose();
-  expect(result.status).toBe(kind === "nonempty" ? "rejected" : "pending_review");
+  expect(result.status).toBe(kind === "nonempty" ? "rejected" : "approved");
   expect(result.report).toMatchObject({ continuity: { status: kind === "nonempty" ? "failed" : kind === "unknown schema" ? "passed" : "skipped", migrated: false, toSchema: 2, ...(kind === "nonempty" ? { reason: "schema 升级需要 migrate" } : {}) } });
   if (kind === "nonempty") expect((await f.db.run.findFirstOrThrow()).prompt).toContain("schema 升级需要 migrate");
 });
@@ -559,7 +588,7 @@ test.each([false, true])("schema downgrade rejects even with empty data=%s", asy
 });
 
 test.each(["bytes", "files"])("oversized live data skips continuity visibly: %s", async kind => {
-  const f = await dataFixture();
+  const f = await dataFixture(true);
   if (kind === "bytes") {
     await writeFile(join(f.live, "large"), "");
     await truncate(join(f.live, "large"), 50 * 1024 * 1024 + 1);
@@ -606,7 +635,7 @@ test("test, continuity and schema failures share the same streak and budgeted di
 });
 
 test("large effects preview is explicitly truncated without hiding schema, intent or hash", async () => {
-  const f = await dataFixture();
+  const f = await dataFixture(true);
   const effects = Array.from({ length: 3 }, (_, i) => ({ type: "wake_provider", key: `key-${i}`, prompt: "x".repeat(4000) }));
   f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
   const result = await f.propose();
@@ -822,6 +851,11 @@ test.each(["paused", "cancelled", "active"] as const)("module schedule rejects d
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
 });
 
+/** Code-only updates activate by themselves; a new credential makes the update a card whose preview these tests read. */
+async function addCredential(dir: string) {
+  const manifest = JSON.parse(await readFile(join(dir, "module.json"), "utf8")) as { secrets: string[] };
+  await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, secrets: [...manifest.secrets, "credential_new"] }));
+}
 test("code-only proposals preview sorted added, removed and changed files and name unchanged files", async () => {
   const f = await fixture();
   await writeFile(join(f.dir, "removed.ts"), "old helper");
@@ -829,6 +863,7 @@ test("code-only proposals preview sorted added, removed and changed files and na
   await rm(join(f.dir, "removed.ts"));
   await writeFile(join(f.dir, "added.ts"), "new helper");
   await writeFile(join(f.dir, "index.ts"), "console.log(2)");
+  await addCredential(f.dir);
   const second = await f.propose();
   const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: second.approvalId! } });
   expect(preview).toContain("=== added.ts (added) ===\n+ new helper");
@@ -836,22 +871,21 @@ test("code-only proposals preview sorted added, removed and changed files and na
   expect(preview).toContain("=== removed.ts (removed) ===\n- old helper");
   expect(preview.indexOf("=== added.ts")).toBeLessThan(preview.indexOf("=== index.ts"));
   expect(preview.indexOf("=== index.ts")).toBeLessThan(preview.indexOf("=== removed.ts"));
-  expect(preview).toContain("未变化:\nmodule.json\ntest.ts");
-  expect(preview).not.toContain("=== module.json");
+  expect(preview).toContain("未变化:\ntest.ts");
 });
 
 test("huge code diff truncates with checkout hash while manifest and intent stay complete", async () => {
   const f = await fixture(), first = await f.propose(); await f.approve(first.approvalId!);
   await writeFile(join(f.dir, "index.ts"), "new line\n".repeat(20_000));
+  await addCredential(f.dir);
   const second = await f.propose();
   expect(second.status).toBe("pending_review");
   const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: second.approvalId! } });
   expect(preview.length).toBeLessThanOrEqual(20_000);
   expect(preview).toContain("=== index.ts (changed) ===");
   expect(preview).toContain(`意图：${JSON.stringify(intent)}`);
-  const manifest = (await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.moduleId!, hash: first.hash } } })).manifest;
-  // v2-22: an unchanged manifest folds to one line; what changes is always shown whole (see module-preview).
-  expect(preview).toContain(`--- active\n+++ proposed\n  …（${JSON.stringify(manifest, null, 2).split("\n").length} 行未变）`);
+  // v2-22: what changes in the manifest is always shown whole (see module-preview).
+  expect(preview).toContain('+     "credential_new"');
   expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${second.hash}`)).toBe(true);
 });
 
@@ -1027,17 +1061,13 @@ test("tick starts builds without waiting for them and reports build errors on th
   expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules", error: expect.any(Error) });
 });
 
-test("v2-26: Chrona asks to pause an app (yellow, once only); the user resumes it with the schedules pausing stopped", async () => {
+test("Chrona pauses and resumes an app directly, retaining its schedules and audit trail", async () => {
   const f = await fixture(), result = await f.propose();
   await f.approve(result.approvalId!);
   const moduleId = result.moduleId!;
   const request = await f.service.modules.lifecycle("disable", moduleId, { reason: "连续三天抓取失败" }, false);
-  const approvalId = "approvalId" in request ? request.approvalId : undefined;
-  if (!approvalId) throw new Error("expected an approval");
-  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "activate_module", level: "yellow", brief: { headline: "停用应用 price-watch", reversible: true } });
-  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "always" }, "web")).rejects.toThrow("only be approved once");
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("active");
-  await f.approve(approvalId);
+  expect(request).toMatchObject({ status: "paused" });
+  expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("paused");
   expect(await f.db.schedule.findMany({ where: { moduleId, status: { not: "cancelled" } } })).toMatchObject([{ triggerId: "daily", status: "paused", nextAt: null }]);
   expect(await f.db.grant.count({ where: { action: "activate_module", once: true, consumedAt: null } })).toBe(0);
@@ -1047,7 +1077,7 @@ test("v2-26: Chrona asks to pause an app (yellow, once only); the user resumes i
   expect((await f.db.audit.findMany({ where: { subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: { createdAt: "asc" } })).map(row => row.kind)).toEqual(["module_disabled", "module_enabled"]);
 });
 
-test("v2-26: removing an app is a red approval on the page only; built-ins are refused; data and code are backed up before deletion", async () => {
+test("removing an app asks once from any entry; built-ins are refused; data and code are backed up", async () => {
   const f = await fixture(), result = await f.propose();
   await f.approve(result.approvalId!);
   const moduleId = result.moduleId!, data = join(f.dataDir, "platform", "data", moduleId);
@@ -1059,10 +1089,8 @@ test("v2-26: removing an app is a red approval on the page only; built-ins are r
   const request = await f.service.modules.lifecycle("remove", moduleId, { reason: "三个月没用过" }, false);
   const approvalId = "approvalId" in request ? request.approvalId : undefined;
   if (!approvalId) throw new Error("expected an approval");
-  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "delete_data", moduleId: null, level: "red", brief: { headline: "删除应用 price-watch", reversible: false } });
-  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "once" }, "qq")).rejects.toThrow("网页");
-  await expect(f.service.approvals.resolve(approvalId, { decision: "approve", scope: "always" }, "web")).rejects.toThrow("only be approved once");
-  await f.approve(approvalId);
+  expect(await f.db.approval.findUniqueOrThrow({ where: { id: approvalId } })).toMatchObject({ action: "delete_data", moduleId: null });
+  await f.service.approvals.resolve(approvalId, { decision: "approve", scope: "once" }, "qq");
   expect(await f.db.module.findUnique({ where: { id: moduleId } })).toBeNull();
   expect(await f.db.schedule.count({ where: { moduleId } })).toBe(0);
   expect(await stat(data).catch(() => null)).toBeNull();

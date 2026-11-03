@@ -114,7 +114,7 @@ test("v2-17: modules.permissions gathers one app's capabilities, grants, credent
   expect(view).toMatchObject({
     module: "trader", capabilities: ["联网", "调用模型", "调用 approvals.request", "读取凭据 okx_demo"],
     secrets: [{ name: "okx_demo", configured: true }], model: { tier: "strong", target: { model: "fake/m", thinking: "high" }, dailyCap: 96, today: { calls: 0 } },
-    grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", level: "yellow", status: "open" }],
+    grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", status: "open" }],
   });
   expect(JSON.stringify(view)).not.toContain("k-secret");
   await expect(other.call("modules.permissions", { module: "trader" })).rejects.toMatchObject({ code: expect.stringMatching(/forbidden|undeclared/) });

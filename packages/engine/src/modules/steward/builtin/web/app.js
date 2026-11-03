@@ -63,7 +63,6 @@ function login(message) {
 }
 
 // ------------------------------------------------------------------ today --
-const LEVELS = { green: "低风险", yellow: "注意", red: "高风险" };
 function approvalItem(approval, after) {
   // v2-18: say what happened in place of the card (and which version now runs), then refresh.
   const result = h("div", { role: "status" });
@@ -81,17 +80,11 @@ function approvalItem(approval, after) {
       for (const button of item.querySelectorAll("button")) button.disabled = false;
     }
   };
-  // v2-17: the level and short brief first; the full review (detail, diff, tests) stays folded.
-  const level = approval.level ?? "yellow", brief = approval.brief;
-  return h("li", { class: `approval ${level}` },
-    h("div", {}, h("span", { class: `level ${level}` }, LEVELS[level]), " ", h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
-    brief ? h("div", {}, brief.headline) : approval.detail && h("div", {}, approval.detail),
-    brief?.added.length ? h("div", {}, `新增：${brief.added.join("、")}`) : null,
-    brief && brief.reversible !== null ? h("div", { class: "muted" }, brief.reversible ? "可以一键回滚。" : "无法撤回。") : null,
-    brief?.reviewed === "unavailable" ? h("div", { class: "muted" }, "未经 AI 复核。") : null,
-    brief?.reviewed === "skipped" ? h("div", { class: "muted" }, `按可信本地检查策略跳过 AI 复核：${brief.reason ?? "未提供原因"}`) : null,
-    (approval.preview || (brief && approval.detail)) && h("details", {}, h("summary", {}, "详情"), brief && approval.detail ? h("p", {}, approval.detail) : null, approval.preview ? h("pre", {}, approval.preview) : null),
-    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, level === "red" ? "确认批准" : "批准"), h("button", { onclick: decide("deny") }, "拒绝")), result);
+  return h("li", { class: "approval" },
+    h("div", {}, h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
+    approval.detail && h("div", {}, approval.detail),
+    approval.preview && h("details", {}, h("summary", {}, "详情"), h("pre", {}, approval.preview)),
+    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"), h("button", { onclick: decide("deny") }, "拒绝")), result);
 }
 // A question a running Provider asked; unanswered questions expire and the run goes on without the answer.
 function interactionItem(interaction, after) {
@@ -474,7 +467,7 @@ function permissionsPanel(view, after) {
   return h("div", {},
     h("h3", {}, "能做什么"), view.capabilities.length ? h("ul", { class: "plain" }, view.capabilities.map(item => h("li", {}, item))) : h("p", { class: "muted" }, "只在自己的数据里工作，不联网、不调用其他应用。"),
     h("h3", {}, "你给过的授权"), view.grants.length ? h("ul", { class: "plain" }, view.grants.map(grant => h("li", {}, `${grant.action} · ${grant.mode}${grant.once ? " · 一次" : ""}`, " ", h("button", { onclick: revoke(grant) }, "撤销")))) : h("p", { class: "muted" }, "没有。"),
-    h("h3", {}, "最近审批"), view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(item => h("li", {}, h("span", { class: `level ${item.level}` }, LEVELS[item.level] ?? item.level), " ", item.title, " ", h("span", { class: "muted" }, `${STATUS[item.status] ?? item.status} · ${when(item.createdAt)}`)))) : h("p", { class: "muted" }, "没有。"));
+    h("h3", {}, "最近审批"), view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(item => h("li", {}, item.title, " ", h("span", { class: "muted" }, `${STATUS[item.status] ?? item.status} · ${when(item.createdAt)}`)))) : h("p", { class: "muted" }, "没有。"));
 }
 const STATUS = { open: "待决定", approved: "已批准", denied: "已拒绝", expired: "已过期" };
 function toolForm(tool) {
@@ -604,8 +597,7 @@ function modelForm(settings, reload) {
     const models = Object.fromEntries([...tiers.children].map(row => [value(row)("[name=tier]").value.trim(), value(row)("[name=model]").value.trim(), value(row)("[name=thinking]").value])
       .filter(([tier, model]) => tier && model).map(([tier, model, thinking]) => [tier, thinking ? { model, thinking } : { model }]));
     const moduleDailyCalls = Object.fromEntries([...caps.children].map(row => [value(row)("[name=capModule]").value.trim(), value(row)("[name=capCalls]").value]).filter(([module, calls]) => module && calls !== "").map(([module, calls]) => [module, Number(calls)]));
-    const review = f.reviewTier.value.trim() ? { review: { tier: f.reviewTier.value.trim(), dailyCalls: Number(f.reviewDailyCalls.value) } } : {};
-    return { models, maxCallsPerEvent: Number(f.maxCallsPerEvent.value), maxOutputTokens: Number(f.maxOutputTokens.value), dailyCalls: Number(f.dailyCalls.value), timeoutMs: Number(f.timeoutSeconds.value) * 1000, ...(Object.keys(moduleDailyCalls).length ? { moduleDailyCalls } : {}), ...review };
+    return { models, maxCallsPerEvent: Number(f.maxCallsPerEvent.value), maxOutputTokens: Number(f.maxOutputTokens.value), dailyCalls: Number(f.dailyCalls.value), timeoutMs: Number(f.timeoutSeconds.value) * 1000, ...(Object.keys(moduleDailyCalls).length ? { moduleDailyCalls } : {}) };
   };
   const save = async moduleModel => {
     try { await web("/settings", { method: "POST", body: { moduleModel } }); state.textContent = "已保存"; reload(); } catch (error) { state.textContent = error.message; }
@@ -622,9 +614,6 @@ function modelForm(settings, reload) {
       number("dailyCalls", "全部模块每天合计", current?.dailyCalls ?? 30, 1, 10000), number("timeoutSeconds", "超时（秒）", (current?.timeoutMs ?? 180000) / 1000, 5, 600)),
     h("p", { class: "muted" }, "单个模块的每日上限（未列出的只受合计限制；超出只停这个模块）："), caps,
     h("div", { class: "row" }, h("button", { type: "button", onclick: () => capRow() }, "加一个模块上限")),
-    h("p", { class: "muted" }, "审批复核：新审批先由这个档位独立看一遍，只能提高风险等级，不能替你批准；额度用完时改为直接问你。"),
-    h("div", { class: "row" }, h("label", {}, "复核档位 ", h("input", { name: "reviewTier", placeholder: "默认 strong", value: current?.review?.tier ?? "", autocomplete: "off" })),
-      number("reviewDailyCalls", "复核每天最多", current?.review?.dailyCalls ?? 30, 0, 1000)),
     h("div", { class: "row" }, h("button", { type: "submit", class: "primary" }, "保存模块模型"), current && h("button", { type: "button", onclick: () => { if (confirm("关闭后模块都不能调用模型，确定？")) save(null); } }, "关闭模块模型"), state));
   const usage = settings.modelUsage ?? [];
   return h("section", {}, h("h2", {}, "模块模型"), current ? null : h("p", { class: "muted" }, "尚未配置：模块不能调用模型。"), form,

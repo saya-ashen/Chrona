@@ -27,8 +27,6 @@ export type StewardPorts = {
   onQueued?: () => Promise<unknown>;
   onRunFinished?: (workspaceId: string, runId: string) => Promise<void>;
   onApproved?: OnApproved;
-  /** Owner-selected update review policy. Omitted preserves mandatory AI review. */
-  moduleUpdateReview?: "required" | "checks-only";
   /** Explicit owner opt-in; rollback still requires a standing module grant and compatible approved prior code. */
   moduleAutoRollback?: boolean;
   sandbox?: {

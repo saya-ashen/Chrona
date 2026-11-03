@@ -38,20 +38,12 @@ export function createRelay({ call, notify, publicUrl, download }: { call: Call;
     /** The text QQ shows for a pushed reply: the reply plus links to its files. */
     replyText: (item: Pick<QqReplyItem, "text" | "attachments" | "sessionId">) => qqReplyText(item, publicUrl, item.sessionId),
     /** The bound owner's decision on one open approval, addressed by an id prefix. */
-    async resolveApproval(_binding: QqBinding, decision: ApprovalDecision, onForbidden?: (text: string) => Promise<unknown>) {
+    async resolveApproval(_binding: QqBinding, decision: ApprovalDecision) {
       const open = await call("approvals.list", { status: "open" }) as { id: string; title: string }[];
       const matches = open.filter(approval => approval.id.startsWith(decision.ref));
       if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
       const approval = matches[0]!;
-      try { await call("approvals.resolve", { approval: approval.id, decision: decision.decision, scope: decision.scope }); }
-      catch (error) {
-        // Only an approve forbidden by the kernel means high risk (SDK ModelError.code).
-        if (decision.decision !== "approve" || !error || typeof error !== "object" || !("code" in error) || error.code !== "forbidden") throw error;
-        const text = `【Chrona】这是高风险操作，请在网页「待你决定」中批准；在这里只能拒绝：${approval.title}`;
-        // Buttons have no incoming chat message to answer, so explicitly queue their response.
-        if (onForbidden) await onForbidden(text);
-        return text;
-      }
+      await call("approvals.resolve", { approval: approval.id, decision: decision.decision, scope: decision.scope });
       return `【Chrona】已${decision.decision === "deny" ? "拒绝" : decision.scope === "always" ? "批准（始终允许）" : "批准"}：${approval.title}`;
     },
     /** The first image of a reply, as bytes for a QQ rich-media upload. */

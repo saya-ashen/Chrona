@@ -13,7 +13,7 @@ const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const intent = { changes: ["Format with a library"], preserves: [] };
 
-test("lockfile libraries install at build time, never come from the submission, and changed locks need approval", async () => {
+test("lockfile libraries install at build time, never come from the submission, and checked changes activate automatically", async () => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-deps-");
   const sandbox = createScriptSandbox({ dataDir });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T04:00:00Z"), publicUrl: null,
@@ -42,21 +42,19 @@ test("lockfile libraries install at build time, never come from the submission, 
   expect(Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: dir }).exitCode).toBe(0);
   expect(existsSync(join(dir, "node_modules"))).toBe(true);
   const first = await propose();
-  expect(first.status).toBe("pending_review");
+  expect(first.status).toBe("approved");
   expect(first.report).toMatchObject({ dependencies: { npm: true, python: false, packages: {} } });
   // The submission's own node_modules was not taken: Chrona installed the store copy from the lockfile.
   expect(existsSync(join(dataDir, "platform", "store", first.hash, "node_modules", "dep"))).toBe(true);
-  const approval = await db.approval.findFirstOrThrow({ where: { status: "open" } });
-  expect(approval.preview).toContain("语言库：npm（bun.lock）");
-  await service.approvals.resolve(approval.id, { decision: "approve", scope: "always" }, "web");
+  expect(await db.approval.count()).toBe(0);
   expect(await service.modules.callTool("m_fmt_shout", { text: "hi" })).toEqual({ result: "HI" });
-  // Same code, another library in the lockfile: never automatic, even with an always-grant for this module.
+  // Same code, another checked library in the lockfile also activates automatically.
   const extra = join(dataDir, "extra"); await mkdir(extra);
   await writeFile(join(extra, "package.json"), JSON.stringify({ name: "extra", version: "1.0.0", main: "index.js" }));
   await writeFile(join(extra, "index.js"), "module.exports = {};");
   await writeFile(join(dir, "package.json"), JSON.stringify({ name: "fmt", dependencies: { dep: `file:${dep}`, extra: `file:${extra}` } }));
   expect(Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: dir }).exitCode).toBe(0);
   const second = await propose();
-  expect(second.status).toBe("pending_review");
-  expect(await db.approval.count({ where: { status: "open" } })).toBe(1);
+  expect(second.status).toBe("approved");
+  expect(await db.approval.count()).toBe(0);
 }, 120_000);

@@ -1,10 +1,9 @@
 import type { Prisma } from "@chrona/db";
-import { approvalBriefSchema, NOTIFY_INTERFACE, notificationSchema, type NotificationSettings } from "@chrona/contracts/steward";
+import { NOTIFY_INTERFACE, notificationSchema, type NotificationSettings } from "@chrona/contracts/steward";
 import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { callSync, enqueueCall, kernelOrigin } from "./module-calls";
 import { audit } from "./audit";
-import { awaitingReview } from "./approval-level";
 
 /** What Chrona tells the user. Budget, channel and recipient are decided by the module behind `notify.send`. */
 export type UserNotice = {
@@ -30,10 +29,8 @@ export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string,
 /** Every open approval is announced once, wherever it was created; the user is waiting on it, so no cap or quiet hours. */
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
   for (const row of await ports.db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" }, take: 50 })) {
-    if (awaitingReview(row, ports.now())) continue;
-    // v2-17: no "always" button: green updates already activate by themselves, and anything more is decided each time.
     await notifyUser(ports.db, ports, workspaceId, { ...(row.moduleId ? { module: row.moduleId } : {}), approval: row.id, scoped: false, level: "now", responds: true,
-      title: `${LEVEL_MARK[row.level] ?? ""}需要你批准：${row.title}`, body: approvalNoticeBody(row), key: `approval:${row.id}` });
+      title: `需要你批准：${row.title}`, body: approvalNoticeBody(row), key: `approval:${row.id}` });
   }
 }
 /**
@@ -41,20 +38,7 @@ export async function announceApprovals(ports: StewardPorts, workspaceId: string
  * and the manifest/code diff, tests and hash stay on the page. A group (v2-15) lists each module the same way.
  * Other approvals (e.g. data restores) keep their full text.
  */
-const LEVEL_MARK: Record<string, string> = { green: "🟢 ", yellow: "🟡 ", red: "🔴 " };
-/** v2-17: the short card (headline, what it adds, whether it can be undone); the review stays on the page. */
-function briefBody(level: string, brief: z.infer<typeof approvalBriefSchema>) {
-  return [
-    brief.headline,
-    brief.added.length ? `新增：${brief.added.join("、")}` : null,
-    brief.reversible === true ? "可以一键回滚。" : brief.reversible === false ? "无法撤回。" : null,
-    brief.reviewed === "unavailable" ? "（未经 AI 复核）" : null,
-    level === "red" ? "高风险：请在网页「待你决定」中查看详情并批准；这里只能拒绝。" : "详情在网页「待你决定」。",
-  ].filter(Boolean).join("\n").slice(0, 1500);
-}
-export function approvalNoticeBody(row: { action: string; detail: string | null; preview: string | null; level?: string; brief?: unknown }) {
-  const brief = approvalBriefSchema.safeParse(row.brief);
-  if (brief.success) return briefBody(row.level ?? "yellow", brief.data);
+export function approvalNoticeBody(row: { action: string; detail: string | null; preview: string | null }) {
   const full = () => [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500);
   if (row.action !== "activate_module" || !row.preview) return full();
   const sections = row.preview.startsWith("【") ? row.preview.split(/\n\n(?=【[^】\n]+】\n)/) : [row.preview];

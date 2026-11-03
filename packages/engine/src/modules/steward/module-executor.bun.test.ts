@@ -42,8 +42,9 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   const proposal = await service.modules.propose({ root, dir: "price-watch", intent: { changes: ["Watch prices"], preserves: [] } }, "provider");
   expect(proposal.status).toBe("building");
   await service.modules.buildPending();
-  const approval = await db.approval.findFirstOrThrow({ where: { status: "open" } });
-  await service.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
+  expect(await db.approval.count()).toBe(0);
+  // Start from the module's own notices: its auto-activation digest is covered in modules.bun.test.ts.
+  await db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
   const schedule = await db.schedule.findFirstOrThrow({ where: { moduleId: proposal.moduleId, status: "active" } });
   const moduleId = proposal.moduleId!;
   async function fire(delay = 0) {

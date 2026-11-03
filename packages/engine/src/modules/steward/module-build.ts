@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { isEntryModule, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
+import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { createRuns, createRunSession } from "./runs";
 import { notifyUser } from "./notify-user";
@@ -13,6 +13,7 @@ import { isGroupCandidate, recordGroupReview } from "./module-group";
 import { dataEmpty } from "./module-data";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
+import { audit } from "./audit";
 import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
@@ -83,6 +84,27 @@ async function supersedeCandidates(context: ModuleContext, moduleId: string, has
     await db.moduleVersion.updateMany({ where: { id: row.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...report, errors: [`${SUPERSEDED}${hash}`] }) } });
   }
 }
+/** A release built-in is trusted code; its credentials are still entered by the owner on the app page. */
+function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
+  if (version.source === "builtin") return false;
+  const had = active ? secretNames(moduleManifestSchema.parse(active.manifest)) : [];
+  return secretNames(moduleManifestSchema.parse(version.manifest)).some(name => !had.includes(name));
+}
+/** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
+async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
+  const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
+  await context.db.$transaction(async tx => {
+    const current = await requireModule(context, tx, module.id);
+    if (current.status === "migrating" || current.activeHash !== module.activeHash) throw new Error("Module changed during build; submit again");
+    await expireModuleApprovals(context, module.id, tx);
+    await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
+    await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
+    await activateIn(context, tx, { moduleId: module.id, hash, reason: "activate" });
+    await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash } });
+    if (version.source !== "builtin") await activationNotice(context, tx, version, update);
+  });
+  await supersedeCandidates(context, module.id, hash);
+}
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
@@ -91,7 +113,11 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "approved" } });
     return { moduleId: module.id, hash, status: "approved", report };
   }
-  const { manifest, preview, parts } = await reviewPreview(context, review, active);
+  if (!await isGroupCandidate(context, version) && !review.needsMigration && !addsCredentials(version, active)) {
+    await activateChecked(context, review, !!active);
+    return { moduleId: module.id, hash, status: "approved", report };
+  }
+  const { preview, parts } = await reviewPreview(context, review, active);
   if (preview === null) {
     report.errors = ["Review preview exceeds 20000 characters (manifest diff, intent and results); shrink the manifest change or split the update"];
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected", report: json(report) } });
@@ -99,11 +125,10 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
   }
   await expireModuleApprovals(context, module.id);
   await supersedeCandidates(context, module.id, hash);
-  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${manifest.name}`,
-    detail: context.ports.sandbox?.isolated ? "审查此版本的清单、意图与测试结果" : "审查此版本的清单、意图与测试结果。未隔离运行：模块能访问 Chrona 运行用户的所有文件和网络", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
+  const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${module.name}`,
+    detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
   if (await recordGroupReview(context, version, { ...parts, detail: card.detail, needsMigration: review.needsMigration })) return { moduleId: module.id, hash, status: "pending_review", report };
-  // v2-17: every card is reviewed first; a green one that passes activates by itself (approval-review).
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
@@ -128,17 +153,9 @@ async function validateBuildManifest(context: ModuleContext, version: ModuleVers
   await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
   return { moduleId: version.moduleId, hash: version.hash, status: "rejected" as const, report };
 }
-async function activateBuiltin(context: ModuleContext, module: Awaited<ReturnType<typeof requireModule>>, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, needsMigration: boolean) {
-  const { hash } = version;
-  return context.db.$transaction(async tx => {
-    const current = await requireModule(context, tx, module.id);
-    const previous = await tx.moduleVersion.findFirst({ where: { moduleId: module.id, source: "builtin", id: { not: version.id } }, orderBy: { createdAt: "desc" } });
-    if (current.status === "migrating" || (current.activeHash !== null && current.activeHash !== previous?.hash) || needsMigration) return false;
-    await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
-    await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
-    await activateIn(context, tx, { moduleId: module.id, hash, reason: "activate" });
-    return true;
-  });
+export async function activationNotice(context: ModuleContext, tx: Parameters<typeof notifyUser>[0], version: ModuleVersion, update: boolean) {
+  const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
+  await notifyUser(tx, context.ports, context.workspaceId, { module: version.moduleId, app: manifest.name, level: "digest", title: `应用 ${manifest.name} 已自动${update ? "更新" : "启用"}`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n版本 hash: ${version.hash}\n可在应用历史中回滚`, key: `module-auto-activated:${version.id}` });
 }
 /** v2-25: tests run only on an entry that type-checks against the SDK and call contracts. */
 async function typecheckAndTest(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -147,6 +164,17 @@ async function typecheckAndTest(context: ModuleContext, staging: string, manifes
   if (typecheck.status !== "failed") return runTests(context, staging, manifest, report.tests);
   report.errors = typecheckErrors(typecheck);
   return false;
+}
+/** Versions activate without review, so a failed key probe (repeated effects on a redelivered fire) rejects the build. */
+async function probeAndInstall(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string, report: BuildReport) {
+  const keyProbe = await probeKeys(context, staging, manifest);
+  if (keyProbe.status !== "skipped" || !["no schedule trigger", "no effects on both fires"].includes(keyProbe.reason ?? "")) report.keyProbe = keyProbe;
+  if (report.keyProbe && report.keyProbe.status !== "passed") {
+    report.errors = [keyProbePreview(report.keyProbe).trim()];
+    return false;
+  }
+  await installBuild(context, staging, hash);
+  return true;
 }
 function buildHasErrors(report: BuildReport) { return Boolean(report.errors?.length); }
 async function checkBuildCandidate({ context, module, version, manifest, staging, report }: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; staging: string; report: BuildReport }): Promise<{ passed: boolean; needsMigration: boolean; dependencyFailure: boolean }> {
@@ -167,12 +195,7 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (passed) report.errors = await smokeRun(context, staging, manifest);
   if (buildHasErrors(report)) passed = false; else delete report.errors;
   // Only engine-owned immutable copies are tested, hashed and installed.
-  if (passed) {
-    const keyProbe = await probeKeys(context, staging, manifest);
-    // Keep failed probes visible so they cannot silently permit automatic activation.
-    if (keyProbe.status !== "skipped" || !["no schedule trigger", "no effects on both fires"].includes(keyProbe.reason ?? "")) report.keyProbe = keyProbe;
-    await installBuild(context, staging, hash);
-  }
+  if (passed) passed = await probeAndInstall(context, staging, manifest, hash, report);
   // shortcut: GC roots of approved versions are kept until the version is deleted; nothing deletes versions yet.
   if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };
@@ -222,7 +245,6 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
   const status = passed ? "pending_review" : "rejected";
   await db.moduleVersion.update({ where: { id: version.id }, data: { report: json(report), status } });
   if (!passed) return { moduleId: module.id, hash, status, report };
-  if (version.source === "builtin" && !report.outputImpacts?.length && await activateBuiltin(context, module, version, manifest, needsMigration)) return { moduleId: module.id, hash, status: "approved", report };
   return requestReview(context, { version, module, report, files, needsMigration });
 }
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {

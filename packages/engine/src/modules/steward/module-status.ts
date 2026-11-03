@@ -3,14 +3,12 @@ import type { Prisma } from "@chrona/db";
 import { scheduleRuleSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
-import { createApprovals } from "./approvals";
 import { StewardError } from "./errors";
 import { requireModule, type ModuleContext } from "./module-context";
 import { notificationSettings } from "./settings";
 
-/** v2-26: pausing or resuming an app keeps its data and versions; an approval for it is bound to the active hash. */
+/** Pausing or resuming an app keeps its data and versions. */
 export type ModuleStatus = "paused" | "active";
-export const moduleStatusPayloadSchema = z.object({ kind: z.literal("module_status"), moduleId: z.string(), hash: z.string(), status: z.enum(["paused", "active"]) }).strict();
 
 /** Pausing records which schedules it paused, so resuming restores exactly those (and not ones the user paused). */
 export function setStatusIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, status: ModuleStatus, source: string): Promise<{ moduleId: string; status: ModuleStatus }> {
@@ -43,15 +41,15 @@ async function resumeIn(context: ModuleContext, tx: Prisma.TransactionClient, mo
   return result;
 }
 
-/** The Provider never pauses or resumes an app itself: it asks, and the user decides once (yellow). */
+/** Chrona pauses or resumes directly, recording its reason in the audit. */
 export async function requestStatus(context: ModuleContext, moduleId: string, status: ModuleStatus, reason: string) {
   const module = await requireModule(context, context.db, moduleId);
   if (!module.activeHash) throw new StewardError("conflict", "Module has no active version");
   if (module.status === status) return { moduleId, status };
   if (status === "active" && module.status !== "paused") throw new StewardError("conflict", "Module is not paused");
-  const verb = status === "paused" ? "停用" : "重新启用";
-  const approval = await createApprovals(context).create({ moduleId, action: "activate_module", title: `${verb}应用 ${module.name}`.slice(0, 200), detail: reason.slice(0, 4000),
-    payload: { kind: "module_status", moduleId, hash: module.activeHash, status },
-    preview: status === "paused" ? `${module.name} 将停止运行，它的定时暂停；数据和版本保留，随时可以重新启用。` : `${module.name} 将恢复运行，停用时暂停的定时恢复。` });
-  return { status: "pending_approval" as const, approvalId: approval.id };
+  return context.db.$transaction(async tx => {
+    const result = await setStatusIn(context, tx, moduleId, status, "chrona");
+    await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_status_changed", subjectId: moduleId, details: { status, reason } });
+    return result;
+  });
 }

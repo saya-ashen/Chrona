@@ -54,12 +54,6 @@ function executionMode(env = process.env): ExecutionMode {
   if (configured === "trusted-local" || configured === "required-isolation") return configured;
   throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
 }
-function updateReview(env = process.env): "required" | "checks-only" {
-  const configured = env.CHRONA_STEWARD_UPDATE_REVIEW?.trim();
-  if (!configured || configured === "required") return "required";
-  if (configured === "checks-only") return configured;
-  throw new Error("Invalid CHRONA_STEWARD_UPDATE_REVIEW; use required or checks-only");
-}
 function autoRollback(env = process.env): boolean {
   const configured = env.CHRONA_STEWARD_AUTO_ROLLBACK?.trim();
   if (!configured || configured === "false") return false;
@@ -89,7 +83,7 @@ async function configuredSecret(name: string) {
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const mode = executionMode(), moduleUpdateReview = updateReview(), moduleAutoRollback = autoRollback();
+  const mode = executionMode(), moduleAutoRollback = autoRollback();
   const configured = configuredProvider(options, bwrap, mode);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
@@ -110,7 +104,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
     secrets: configuredSecret, packages: createModulePackages(),
-    sandbox: options.sandbox ?? sandbox, moduleUpdateReview, moduleAutoRollback, moduleSdk, moduleTypecheck,
+    sandbox: options.sandbox ?? sandbox, moduleAutoRollback, moduleSdk, moduleTypecheck,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },

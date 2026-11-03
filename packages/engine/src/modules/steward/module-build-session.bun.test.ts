@@ -51,8 +51,6 @@ async function fixture() {
   ports.sandbox!.startModule = testModuleSandbox(input => ports.sandbox!.runModule!(input)).startModule;
   const service = createStewardService(ports);
   const workspaceId = (await db.workspace.create({ data: { name: "build" } })).id, api = service.forWorkspace(workspaceId);
-  // Builds here end in review; since v2-17 a green update would otherwise activate by itself.
-  await db.grant.create({ data: { workspaceId, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
   const session = await db.session.create({ data: { workspaceId, key: "web:build", source: "web" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Sort mail" });
   const requester = (await api.runs.claimNext("foreground"))!;
@@ -136,9 +134,9 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
   });
   await f.step();
   expect(f.starts.map(input => input.lane)).toEqual(["build"]);
-  expect(report).toMatchObject({ status: "pending_review", report: { tests: expect.any(Array) } });
+  expect(report).toMatchObject({ status: "approved", report: { tests: expect.any(Array) } });
   const version = await f.db.moduleVersion.findFirstOrThrow({ where: { source: "build" } });
-  expect(version).toMatchObject({ source: "build", status: "pending_review" });
+  expect(version).toMatchObject({ source: "build", status: "approved" });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_submission" } })).toMatchObject({ details: { hash: version.hash, sessionId: build.id } });
   // The reply went back to the web conversation that asked.
   expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准`]);
@@ -497,7 +495,7 @@ test("a Provider supplements an old build without losing work; missing or owner 
   expect((await f.api.settings.get()).buildUsage.used).toBe(1);
 });
 
-test("a build discovers its own contracts and release reference, merges a fixture and submits without manual reference attachments or activation", async () => {
+test("a build discovers contracts and release reference, merges a fixture and activates after checks", async () => {
   const f = await fixture(), hash = "b".repeat(64);
   const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
   const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: hash } });
@@ -523,14 +521,14 @@ test("a build discovers its own contracts and release reference, merges a fixtur
     await writeFile(join(input.cwd, "candidate", "app.js"), `${customized}\n${feature}`);
     submitted = await call("m_modules_propose", { dir: "candidate", intent }) as { hash: string };
     await createModules(f.ports, f.workspaceId).buildPending();
-    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "pending_review", active: false });
+    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "approved", active: true });
     await call("chrona_reply", { text: "Fixture merge checked, waiting for approval" });
   });
   await f.step();
   expect(submitted).toBeDefined();
   expect(await readFile(join(f.dataDir, "platform", "store", submitted!.hash, "app.js"), "utf8")).toBe("// custom layout\n// release feature");
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: web.id } })).activeHash).toBe(hash);
-  expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: web.id, hash: submitted!.hash } } })).status).toBe("pending_review");
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: web.id } })).activeHash).toBe(submitted!.hash);
+  expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: web.id, hash: submitted!.hash } } })).status).toBe("approved");
   expect(JSON.parse(await readFile(join(f.dataDir, "sessions", started.sessionId, "request.json"), "utf8")).files).toEqual([]);
 });
 
@@ -539,7 +537,7 @@ async function groupBuild(f: Awaited<ReturnType<typeof fixture>>, includeImpact 
   const write = async (cwd: string, name: string) => {
     await mkdir(join(cwd, name), { recursive: true });
     const tools = includeImpact && name === "mail-sort" ? [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] }, output: { type: "object", properties: { value: { type: "integer" } }, required: ["value"], additionalProperties: false } }] : [];
-    await writeFile(join(cwd, name, "module.json"), JSON.stringify({ ...manifest, name, tools }));
+    await writeFile(join(cwd, name, "module.json"), JSON.stringify({ ...manifest, name, tools, secrets: ["mail_account"] }));
     await writeFile(join(cwd, name, "index.ts"), 'import { on } from "chrona"; on("schedule", async () => ({}));');
     await writeFile(join(cwd, name, "test.ts"), "process.exit(0)");
   };
@@ -582,7 +580,6 @@ test("group approval preview lists current callers affected by member output cha
   const caller = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-reader", status: "active", activeHash: "reader", dataSchema: 1 } });
   await f.db.moduleVersion.create({ data: { moduleId: caller.id, hash: "reader", manifest: moduleManifestSchema.parse({ ...manifest, name: "mail-reader", uses: ["mail-sort.read"] }), source: "user", status: "approved", intent: {}, report: {} } });
   const { approval } = await groupBuild(f, true);
-  expect(approval.level).toBe("yellow");
   expect(approval.preview).toContain("mail-reader：mail-sort.read");
 });
 
@@ -591,8 +588,7 @@ test("a build of several modules submits only those and asks for one approval th
   expect(approval).toMatchObject({ action: "activate_module", moduleId: null, status: "open", title: "一起启用模块 mail-sort、mail-tag" });
   expect(approval.preview).toContain("【mail-sort】"); expect(approval.preview).toContain("【mail-tag】");
   const body = approvalNoticeBody(approval);
-  expect(approval).toMatchObject({ level: "yellow", brief: { headline: "启用新应用 mail-sort、mail-tag", reversible: true } });
-  expect(body).toBe("启用新应用 mail-sort、mail-tag\n可以一键回滚。\n详情在网页「待你决定」。"); expect(body).not.toContain("--- active");
+  expect(body).toContain("这组改动一起启用"); expect(body).not.toContain("--- active");
   await expect(f.api.approvals.resolve(approval.id, { decision: "approve", scope: "always" }, "web")).rejects.toMatchObject({ code: "invalid" });
   const generations = await f.db.generation.count();
   await f.api.approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
@@ -664,20 +660,20 @@ test("a changed Provider cannot claim a bounded owner build with a fallback", as
   expect(await f.db.run.findUniqueOrThrow({ where: { id: started.runId } })).toMatchObject({ status: "failed" });
   expect(f.starts).toHaveLength(0);
 });
-test("offline recovery executes only one bounded build, uses the normal sandbox checks, and does not activate it", async () => {
+test("offline recovery executes one bounded build and activates its checks-passing version", async () => {
   const f = await ownerFixture();
   await f.api.runs.finish(f.requester.id, { outcome: "finished", sessionId: null, error: null });
   f.onRun(async (input, call) => {
     expect(input).toMatchObject({ lane: "build", model: ownerRequest.execution.model, sessionId: null, searchTools: false });
     await f.writeModule(input.cwd);
     const version = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
-    expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "pending_review" });
+    expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "approved" });
     await call("chrona_reply", { text: "ready for approval" });
   });
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ status: "finished" });
   expect(f.starts).toHaveLength(1);
-  expect(await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } })).toMatchObject({ activeHash: null });
-  expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(1);
+  expect(await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } })).toMatchObject({ status: "active" });
+  expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(0);
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
   expect(f.starts).toHaveLength(1);
 });

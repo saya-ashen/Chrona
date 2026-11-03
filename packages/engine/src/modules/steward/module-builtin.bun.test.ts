@@ -126,11 +126,9 @@ test.each([false, "user", "provider", "build"] as const)("built-in upgrade prese
   } finally { await f.close(); }
 });
 
-test("legacy built-in replacement approvals are blocked atomically and retired, custom reviews survive", async () => {
+test("legacy built-in replacement approvals are blocked atomically and retired; restore approvals survive", async () => {
   const f = await fixture();
   try {
-    // The custom review must stay a card: since v2-17 a green one would otherwise activate by itself.
-    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
     await f.start(); const builtin = await f.current();
     await f.write(2);
     const modules = createModules(f.ports, f.workspace.id);
@@ -148,7 +146,7 @@ test("legacy built-in replacement approvals are blocked atomically and retired, 
     await f.start();
     expect((await f.db.approval.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("expired");
     expect((await f.db.approval.findUniqueOrThrow({ where: { id: restore.id } })).status).toBe("open");
-    expect(await f.db.approval.count({ where: { status: "open", id: { not: restore.id } } })).toBe(1);
+    expect(await f.db.approval.count({ where: { status: "open", id: { not: restore.id } } })).toBe(0);
     expect((await f.current()).activeHash).toBe(fork.hash);
     // Explicit owner rollback still works, without copying old data or creating a model run.
     expect(await modules.rollback(builtin.id, builtin.activeHash!)).toMatchObject({ status: "active" });
@@ -181,21 +179,18 @@ test("a built-in already queued when the user activates a fork cannot create a r
 test("activation rechecks a previously approved builtin card after a fork becomes active", async () => {
   const f = await fixture();
   try {
-    // The fork is activated by hand below: since v2-17 a green build would otherwise activate by itself.
-    await f.db.grant.create({ data: { workspaceId: f.workspace.id, action: "activate_module", mode: "ask", scope: { kind: "global" } } });
     await f.start(); const first = await f.current();
-    await f.write(2);
-    const modules = createModules(f.ports, f.workspace.id);
-    const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["Fork"] } }, "build");
-    await modules.buildPending();
     await f.write(3);
     const context = moduleContext(f.ports, f.workspace.id), target = await proposeBuiltin(context, f.root, "sample");
     await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: target.hash } }, data: { status: "pending_review" } });
     const approvals = createApprovals({ ...f.ports, workspaceId: f.workspace.id });
     const approval = await approvals.create({ moduleId: first.id, action: "activate_module", title: "Release", detail: "", preview: "", payload: { kind: "activate_module", moduleId: first.id, hash: target.hash } });
     const approved = await approvals.resolve(approval.id, { decision: "approve", scope: "once" }, "web");
-    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: first.id, hash: fork.hash } }, data: { status: "approved" } });
-    await modules.activate(first.id, fork.hash, "activate");
+    // The fork's checks pass and it activates by itself before the approved release is carried out.
+    await f.write(2);
+    const modules = createModules(f.ports, f.workspace.id);
+    const fork = await modules.propose({ root: f.root, dir: "sample", intent: { changes: ["Fork"] } }, "build");
+    await modules.buildPending();
     await expect(onApproved(context, { workspaceId: f.workspace.id, approvalId: approval.id, grantId: approved.grantId!, payload: approved.payload! })).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("内置版本不能") });
     expect((await f.current()).activeHash).toBe(fork.hash);
     expect((await f.db.grant.findUniqueOrThrow({ where: { id: approved.grantId! } })).consumedAt).toBeNull();

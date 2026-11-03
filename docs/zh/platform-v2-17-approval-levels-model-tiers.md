@@ -1,8 +1,7 @@
 # v2-17 规格：审批分级、AI 复核与模型档位
 
-状态：已实现（2026-10-27），未部署；第 7 节已由用户确认，与草案的差异见第 9 节。依赖 [v2-13](platform-v2-13-modules-tools.md)、[v2-16](platform-v2-16-module-secrets-requests.md)。
+状态：审批分级、AI 复核与审批习惯已由 [security-simplification.md §3.1](security-simplification.md) 取代；下述相关内容仅为历史记录，模型档位部分仍有效。依赖 [v2-13](platform-v2-13-modules-tools.md)、[v2-16](platform-v2-16-module-secrets-requests.md)。
 
-> P0 更新策略接缝已实施，服务默认 `required`。只有 owner 显式选择 trusted-local 与 `checks-only`，且存在有效模块级长期授权、普通绿色更新并通过既有检查，才记录 `reviewed=skipped` 并自动激活；这不是 AI 通过或新授权。代码回滚不等于可以无损恢复旧数据，也不能撤销真实外部效果。
 
 ## 1. 背景
 
