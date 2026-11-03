@@ -177,7 +177,7 @@ export const moduleManifestSchema = z.object({
   description: z.string().min(1).max(300).optional(),
   entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
   triggers: z.array(moduleTriggerSchema).max(10),
-  tools: z.array(moduleToolSchema).max(10).default([]),
+  tools: z.array(moduleToolSchema).max(30).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
   /** Receive on("activated") once per active version and when a module it `uses` changes version (e.g. to call web.page-set). */
