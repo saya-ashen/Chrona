@@ -1,6 +1,6 @@
 # 模块依赖方向审查
 
-状态：2026-11-02 审查记录，问题清单已与用户确认。2026-11-03：第 1–5 项已实现（0.9.x 部署），第 6 项按用户选定方向经构建会话处理中。
+状态：2026-11-02 审查记录，问题清单已与用户确认。2026-11-03：第 1–6 项均已实现并部署。
 
 ## 1. 原则
 
@@ -46,7 +46,7 @@
 
 | # | 现状 | 待定 |
 | --- | --- | --- |
-| 6 | `calendar → planning.get` | 用户选定：planning 经 events 发出 `planning.updated`，calendar 订阅并在本地保存计划标题，删除 `uses: planning.get`（构建会话） |
+| 6 | `calendar → planning.get` | 用户选定：planning 经 events 发出 `planning.updated`，calendar 订阅并在本地保存计划标题，删除 `uses: planning.get`。状态：2026-11-03 已上线（planning、calendar 8ac252bd）；已有计划在下次变更后才有本地标题 |
 
 ## 3. 处理顺序
 
