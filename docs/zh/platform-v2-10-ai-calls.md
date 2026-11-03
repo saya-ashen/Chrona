@@ -14,7 +14,7 @@ v2-8 定下“模块之间只有路由调用”，但模块与内核之间还有
   - `ai.wake`（异步）：以模块输出为不可信数据，在新会话中启动 Provider。
   - `secrets.get`（同步）：入口模块读取清单 `secrets` 中列出的凭据。
 - `ai.complete` 与 `secrets.get` 不记录内容：调用记录里不存参数和返回值（模型的提示与回复、凭据），因此只能同步调用。模型调用的预算记录与审计照旧，同样不含内容。
-- 清单：新模块在 `uses` 中列出 `ai.complete`、`ai.wake`、`notify.send`；`effects` 只保留 `network`。旧声明继续有效（`grantedUses`）：`effects` 的 `model`、`wake_provider`、`notify_user` 分别等于 `ai.complete`、`ai.wake`、`notify.send`，列出 `secrets` 等于 `secrets.get`。所以已启用的模块不用改。
+- 清单：`uses` 列出 `provider.complete`、`provider.wake`、`notify.send`；`effects` 仅含 `network`。存储清单解析时将旧 effects 转成这些 `uses`，丢弃已删除的 `channel`、`dynamicSchedules`；未知 effects 仍拒绝。`grantedUses` 只读取 `uses` 和凭据声明，不再读取 effects。
 - SDK：`chrona.model`、`chrona.wakeProvider`、`chrona.notify`、`chrona.secret` 保留为路由调用的简写。`notify` / `wakeProvider` 的键限定在当前事件（`<事件 id>:<firedAt>:<key>`），与原来内核限定效果键的语义相同；`chrona.call` 的键保持调用方给出的原样。
 - 发往 `notify.send` 的异步调用在 notify 模块暂时不可用（如重建中）时仍先存下，送达时再找目标，与原 `chrona.notify` 相同。
 - 系统模块名 `ai`、`secrets` 保留。
@@ -25,4 +25,4 @@ v2-8 定下“模块之间只有路由调用”，但模块与内核之间还有
 
 ## 4. 之后
 
-旧声明（`effects` 的 `model` / `wake_provider` / `notify_user`）与 SDK 简写在所有模块重建后可以删除，与 v2-8 遗留的兼容字段一起收尾。
+代码、测试 fixture 与内置清单已移除旧声明；仅保留存储清单解析转换及一个契约测试。SDK 简写仍走路由调用。

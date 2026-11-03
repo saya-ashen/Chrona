@@ -25,6 +25,7 @@ Rules that follow from the goals:
   interact (v2-8): a module keeps its files private (`chrona.paths.data`, `chrona.paths.content`) and offers tools; the web module decides how to show
   them (an app that needs its own page gets it by changing the web module). Only entry modules serve HTTP (`listen`). Built-in modules (e.g. `files`)
   ship with Chrona and activate without approval. When the active version is user/AI-modified, releases skip that built-in and never create ordinary replacement approvals. Merge features into the active custom version; discarding customization requires an explicit recovery rollback (e.g. `chrona admin rollback web builtin` to a saved approved built-in), not an update approval.
+- Manifest `effects` only lists `network`; routed interfaces belong in `uses` (`provider.complete` also needs `model`). Manifest `channel` and `dynamicSchedules` are removed; conversation entry comes from `session.entryModuleId`, timers use `schedules.*`.
 - Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); entry modules reach them through the in-process system
   module `chat` (`chat.send`), and replies are pushed to the session's entry module (`<entry>.reply`), never polled; `wake` and module wakes run in
   fresh sessions and report back. Long-term state lives in apps and preferences, not in sessions.

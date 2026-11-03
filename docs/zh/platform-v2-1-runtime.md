@@ -3,6 +3,8 @@
 状态：已实现（2026-10-23）；跨模块调用与通知模块见 [v2-5 §9](platform-v2-5-extensions.md)。总纲见 [platform-v2](platform-v2.md)；是 v2-2 至 v2-5 的前提。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
+当前清单规则覆盖下文旧示例：`effects` 仅含 `network`；模型、唤醒、通知改用 `uses` 的 `provider.complete`（另需 `model`）、`provider.wake`、`notify.send`；清单不再有 `channel` 或 `dynamicSchedules`。
+
 ## 1. 决定
 
 1. **去掉回放与模拟。** P3 的并行模拟（`module-replay.ts`、`report.replay`）删除，范式中的"纯度"不再是设计约束。理由：

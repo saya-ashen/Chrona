@@ -3,6 +3,8 @@
 状态：已实现（2026-10-23，`platform-v2`）；真实模型调用尚未验证（需另行授权）。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
+当前清单规则覆盖下文旧示例：`effects` 仅含 `network`；模型、唤醒、通知改用 `uses` 的 `provider.complete`（另需 `model`）、`provider.wake`、`notify.send`；清单不再有 `channel` 或 `dynamicSchedules`。
+
 ## 1. 问题
 
 落地时有两处把范式收窄了：

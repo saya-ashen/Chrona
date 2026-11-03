@@ -19,7 +19,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "events", activeHash: "sdk" } });
-  const manifest = { name: "events", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
+  const manifest = { name: "events", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `

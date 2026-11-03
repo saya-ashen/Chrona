@@ -23,14 +23,15 @@ test("run context lists current modules, their recent errors and the entry the m
     } } };
   const workspaceId = (await db.workspace.create({ data: { name: "test" } })).id;
   for (const [name, manifest] of [
-    ["chat-entry", { name: "chat-entry", description: "Chat transport", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], channel: "chrona_qqbot", tests: ["test.ts"] }],
-    ["reports", { name: "reports", description: "Daily report", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], effects: ["notify_user"], tests: ["test.ts"] }],
+    ["chat-entry", { name: "chat-entry", description: "Chat transport", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] }],
+    ["reports", { name: "reports", description: "Daily report", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 60 } }], effects: [], uses: ["notify.send"], tests: ["test.ts"] }],
   ] as const) {
     const module = await db.module.create({ data: { workspaceId, name, activeHash: name.padEnd(64, "0"), status: name === "reports" ? "paused" : "active" } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: name.padEnd(64, "0"), manifest, intent: {}, source: "user", report: {}, status: "approved" } });
     if (name === "reports") await db.moduleRun.create({ data: { moduleId: module.id, hash: name.padEnd(64, "0"), triggerId: "daily", firedAt: ports.now(), exitCode: 1, error: "fetch failed", createdAt: ports.now() } });
   }
-  await createChat(ports, async () => {}).submit({ workspaceId, channel: "chrona_qqbot", key: "qq:dm", text: "图片收不到，帮我修" });
+  const entry = await db.module.findFirstOrThrow({ where: { workspaceId, name: "chat-entry" } });
+  await createChat(ports, async () => {}).accept({ workspaceId, channel: "chrona_qqbot", key: "qq:dm", text: "图片收不到，帮我修" }, entry.id);
   const tick = createTick(ports);
   await tick(); await tick.settled();
   const prompt = starts[0]!.prompt;

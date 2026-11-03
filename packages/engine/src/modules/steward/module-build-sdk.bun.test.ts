@@ -15,7 +15,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   try {
     const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: dir });
     const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
-    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "model"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
+    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "provider.complete"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }],
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));

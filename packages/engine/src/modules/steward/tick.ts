@@ -34,7 +34,7 @@ async function runInbound(ports: StewardPorts, workspaceId: string, run: Claimed
   const messageId = z.object({ messageId: z.string() }).safeParse(source?.details).data?.messageId;
   return messageId ? ports.db.message.findFirst({ where: { id: messageId, workspaceId, sessionId: run.sessionId ?? undefined, direction: "in" } }) : messages.findLast(m => m.direction === "in");
 }
-async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date, inboundChannel: string | undefined) {
+async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date, entryModuleId: string | null | undefined) {
   const self: { name: string; description?: string; entry: boolean; status: string; lastError?: { at: string; error: string } }[] = [];
   let via: string | undefined;
   for (const module of await ports.db.module.findMany({ where: { workspaceId, activeHash: { not: null } }, orderBy: { name: "asc" } })) {
@@ -42,7 +42,7 @@ async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date
     const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
     if (!manifest) continue;
     const entry = isEntryModule(manifest);
-    if (inboundChannel !== undefined && manifest.channel === inboundChannel) via = module.name;
+    if (module.id === entryModuleId) via = module.name;
     const failed = await ports.db.moduleRun.findFirst({ where: { moduleId: module.id, error: { not: null }, createdAt: { gte: new Date(now.getTime() - 7 * 86400000) } }, orderBy: { createdAt: "desc" } });
     self.push({ name: module.name, ...(manifest.description ? { description: manifest.description } : {}), entry, status: module.status, ...(failed ? { lastError: { at: failed.createdAt.toISOString(), error: failed.error!.slice(0, 300) } } : {}) });
   }
@@ -84,7 +84,7 @@ export function createTick(ports: StewardPorts) {
         await mkdir(chatFilesDir(ports), { recursive: true });
         const content = [{ name: "chat", dir: chatFilesDir(ports), writable: false }];
         // What Chrona is made of right now, so the model can change the module behind any behaviour without a hard-coded list.
-        const { self, via } = await moduleContext(ports, workspaceId, now, inbound?.channel);
+        const { self, via } = await moduleContext(ports, workspaceId, now, run.session?.entryModuleId);
         const timezone = notificationSettings(workspace.settings).timezone;
         const prompt = `${STEWARD_PROMPT}${memory.text}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
         return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content };

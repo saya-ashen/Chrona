@@ -27,7 +27,7 @@ async function fixture() {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "model", settings: { moduleModel: limits } } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "model-test", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: ["model", "notify_user"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["provider.complete", "notify.send"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   const now = new Date("2026-10-21T04:00:00Z");
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
   let calls = 0;
@@ -53,7 +53,7 @@ test("settings moduleModel defaults null, persists owner updates and disabling",
 for (const kind of ["undeclared", "unconfigured", "tier", "event", "daily", "tokens", "setting-tokens", "setting-calls", "no-event"] as const) test(`handler enforces ${kind}`, async () => {
   const f = await fixture();
   let cap = 20;
-  if (kind === "undeclared") f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, effects: ["notify_user"], model: undefined });
+  if (kind === "undeclared") f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, uses: ["notify.send"], model: undefined });
   if (kind === "unconfigured") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: {} } });
   if (kind === "tier") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, models: { fast: "fake/fast" } } } } });
   if (kind === "event") { await f.call(); await f.call(); }

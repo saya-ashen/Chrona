@@ -35,8 +35,8 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   // Several paths (v2-8): each checked; serving "/" makes it an entry module.
   expect(moduleManifestSchema.safeParse({ ...base, listen: ["/", "/api/web"] }).success).toBe(true);
   for (const listen of [["/", "/api/steward"], ["/api/web", "/api/web"], []]) expect(moduleManifestSchema.safeParse({ ...base, listen }).success).toBe(false);
-  expect(isEntryModule({ effects: [], listen: ["/api/x", "/"] })).toBe(true);
-  expect(isEntryModule({ effects: [], listen: ["/api/x"] })).toBe(false);
+  expect(isEntryModule({ listen: ["/api/x", "/"] })).toBe(true);
+  expect(isEntryModule({ listen: ["/api/x"] })).toBe(false);
 });
 
 (sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which makes routed calls", async () => {

@@ -16,7 +16,7 @@ const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const notify = { type: "notify_user", key: "price", level: "now", title: "Price changed", body: "Check the price" };
 const wake = { type: "wake_provider", key: "review", prompt: "Please review" };
-async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbox"], source = "console.log('{}')") {
+async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: string[]; uses?: string[] } = {}, sandbox?: StewardPorts["sandbox"], source = "console.log('{}')") {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-module-executor-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   let now = new Date("2026-10-20T04:00:00Z");
@@ -36,7 +36,7 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
   const root = join(dataDir, "sessions", "test");
   const dir = join(root, "price-watch");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], effects, params: { threshold: { type: "number", value: 42 } }, tests: ["test.ts"] }));
+  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], effects, uses, params: { threshold: { type: "number", value: 42 } }, tests: ["test.ts"] }));
   await writeFile(join(dir, "index.ts"), source);
   await writeFile(join(dir, "test.ts"), "process.exit(0)");
   const proposal = await service.modules.propose({ root, dir: "price-watch", intent: { changes: ["Watch prices"], preserves: [] } }, "provider");
@@ -56,7 +56,7 @@ async function fixture(effects = ["notify_user"], sandbox?: StewardPorts["sandbo
 }
 
 test("approved module fires through notification budget without a Provider Run; protocol and notify dedupe", async () => {
-  const f = await fixture(["notify_user", "network"]);
+  const f = await fixture({ effects: ["network"] });
   expect(await f.fire(123)).toBe(1);
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]).toEqual({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "daily", kind: "schedule", firedAt: f.schedule.nextAt!.toISOString() }, now: new Date(f.schedule.nextAt!.getTime() + 123).toISOString(), params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
@@ -79,7 +79,7 @@ test("provider.wake runs without a uses declaration and records the call", async
 });
 
 test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {
-  const f = await fixture(["notify_user", "wake_provider"]);
+  const f = await fixture({ uses: ["notify.send", "provider.wake"] });
   f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake, notify, wake] }), error: null });
   await f.fire();
   expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", trigger: "source", prompt: "Module price-watch output (untrusted data):\nPlease review" });
@@ -171,7 +171,7 @@ test("rollback-replaced schedule cannot execute, including stale rows selected b
 
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 (realSandbox.health.available ? test : test.skip)("real SDK module persists its data counter across two scheduled fires", async () => {
-  const f = await fixture(["notify_user"], undefined, `
+  const f = await fixture({}, undefined, `
 import { on, chrona } from 'chrona';
 on('schedule', async () => {
   const file = Bun.file(chrona.paths.data + '/counter');

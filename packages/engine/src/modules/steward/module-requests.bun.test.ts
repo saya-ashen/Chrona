@@ -103,7 +103,7 @@ test("approvals.request waits for the user's decision and sends it back; approve
 
 test("v2-17: modules.permissions gathers one app's capabilities, grants, credentials, model use and approvals, visible to modules", async () => {
   const f = await fixture();
-  const trader = await f.moduleNamed("trader", { effects: ["network", "model"], model: { tier: "strong", maxCalls: 1, maxOutputTokens: 100 }, secrets: ["okx_demo"], uses: ["approvals.request"], tools: [{ name: "start", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
+  const trader = await f.moduleNamed("trader", { effects: ["network"], model: { tier: "strong", maxCalls: 1, maxOutputTokens: 100 }, secrets: ["okx_demo"], uses: ["provider.complete", "approvals.request"], tools: [{ name: "start", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
   const web = await f.moduleNamed("web", { uses: ["chat.send", "secrets.set"] });
   const other = await f.moduleNamed("other", { uses: ["chat.send"] });
   await f.db.workspace.update({ where: { id: f.w }, data: { settings: { moduleModel: { models: { strong: { model: "fake/m", thinking: "high" } }, maxCallsPerEvent: 1, maxOutputTokens: 100, dailyCalls: 10, timeoutMs: 5000, moduleDailyCalls: { trader: 96 } } } } });
@@ -112,7 +112,7 @@ test("v2-17: modules.permissions gathers one app's capabilities, grants, credent
   await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
   const view = (await web.call("modules.permissions", { module: "trader" })).output;
   expect(view).toMatchObject({
-    module: "trader", capabilities: ["联网", "调用模型", "调用 approvals.request", "读取凭据 okx_demo"],
+    module: "trader", capabilities: ["联网", "调用 provider.complete", "调用 approvals.request", "读取凭据 okx_demo"],
     secrets: [{ name: "okx_demo", configured: true }], model: { tier: "strong", target: { model: "fake/m", thinking: "high" }, dailyCap: 96, today: { calls: 0 } },
     grants: [{ id: grant.id, action: "modify_external", mode: "preapproved" }], approvals: [{ title: "trader：开始", status: "open" }],
   });

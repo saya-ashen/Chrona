@@ -33,7 +33,7 @@ async function fixture() {
   const session = await db.session.create({ data: { workspaceId, source: "web", key: "web:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
-  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["notify_user", "wake_provider", "network"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
+  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send", "provider.wake"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
   const run = (await api.runs.claimNext("foreground"))!;

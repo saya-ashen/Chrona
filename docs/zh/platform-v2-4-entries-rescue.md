@@ -3,6 +3,8 @@
 状态：v2-4a（owner API、`listen`）与 v2-4b（救援控制台、`chrona admin`）已在 `platform-v2` 分支实现（2026-10-23）；v2-4c（内置 `mcp` 模块）、v2-4d（内置 `qq` 模块）、v2-4e（内置 `web` 模块，简化版）已实现。总纲见 [platform-v2](platform-v2.md)；依赖 [v2-1](platform-v2-1-runtime.md)、[v2-2](platform-v2-2-sessions-content.md)（会话）与 [v2-3](platform-v2-3-remind-model.md)（内置模块机制）。
 本文件是该部分的契约；实现与本文冲突时以本文为准。
 
+当前清单规则覆盖下文旧示例：`effects` 仅含 `network`，接口声明用 `uses`；清单 `channel` 已删除，通知渠道通过 `notify.channel` 登记，会话入口取 `session.entryModuleId`。
+
 ## 1. 目标
 
 - 网页、QQ、owner MCP 不再是内核代码，而是**内置入口模块**：和其他模块一样可修改、替换、回滚；新入口（Telegram、邮件指令……）也作为模块生长。

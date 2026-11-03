@@ -5,7 +5,7 @@ import { decidePolicy } from "./policy";
 const manifest = {
   name: "price-watch", entry: "index.ts",
   triggers: [{ id: "daily", schedule: { kind: "daily", time: "08:00" } }],
-  effects: ["notify_user", "wake_provider", "network"], tests: ["test.ts"],
+  effects: ["network"], uses: ["notify.send", "provider.wake"], tests: ["test.ts"],
 };
 
 describe("module manifest contract", () => {
@@ -35,7 +35,7 @@ describe("module manifest contract", () => {
   });
   test.each([
     { triggers: [manifest.triggers[0], manifest.triggers[0]] },
-    { effects: ["notify_user", "notify_user"] }, { effects: ["network", "network"] },
+    { effects: ["network", "network"] },
     { effects: ["shell"] }, { effects: Array(4).fill("network") },
     { name: "X" }, { entry: "../index.ts" }, { entry: "folder/index.ts" }, { entry: "index.js" },
     { tests: [] }, { tests: ["../test.ts"] }, { tests: Array(11).fill("test.ts") },
@@ -73,8 +73,13 @@ describe("module channel contract", () => {
   ])("rejects invalid call %j", call => {
     expect(moduleCallSchema.safeParse({ id: "1", ...call }).success).toBe(false);
   });
-  test("deprecated effects and secrets stand for system interfaces", () => {
-    expect(grantedUses({ effects: ["model", "wake_provider", "notify_user", "network"], uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["files.read", "notify.send", "provider.complete", "provider.wake", "secrets.authorize", "secrets.get", "secrets.token"]);
+  test("secrets stand for the secrets interfaces; stored deprecated effects and removed fields parse into uses", () => {
+    expect(grantedUses({ uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["files.read", "secrets.authorize", "secrets.get", "secrets.token"]);
+    const stored = moduleManifestSchema.parse({ name: "old", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: ["model", "wake_provider", "notify_user", "network"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, uses: ["files.read"], channel: "chrona_qqbot", dynamicSchedules: true });
+    expect(stored.effects).toEqual(["network"]);
+    expect(stored).not.toHaveProperty("channel");
+    expect(stored).not.toHaveProperty("dynamicSchedules");
+    expect([...stored.uses].sort()).toEqual(["files.read", "notify.send", "provider.complete", "provider.wake"]);
     // v2-14: contributes is opaque JSON for the module it names, at most 32 KiB.
     const base = { name: "mod", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] };
     expect(moduleManifestSchema.parse({ ...base, contributes: { events: { emits: [{ name: "updated" }] } } }).contributes).toEqual({ events: { emits: [{ name: "updated" }] } });

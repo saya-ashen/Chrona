@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { z } from "zod";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema, slug } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { listSystemModules, normalizedToolInputSchema, type SystemTool, type Tool } from "./module-calls";
 import { checkoutModule } from "./module-files";
@@ -56,7 +56,7 @@ export async function interfaceReference(ports: StewardPorts, workspaceId: strin
 
 /** Only the running release's trusted resources; no fallback to an old registered built-in. */
 export async function checkoutBuiltinReference(ports: StewardPorts, name: string, dir: string, cwd: string) {
-  const module = moduleManifestSchema.shape.name.parse(name);
+  const module = slug.parse(name);
   if (!ports.moduleBuiltinResources) throw new StewardError("not_found", "Built-in release resources are not configured");
   const root = await realpath(ports.moduleBuiltinResources), path = join(root, module);
   const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {

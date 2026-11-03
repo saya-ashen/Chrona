@@ -4,7 +4,7 @@
 
 ## 1. 背景
 
-所有定时都存在 `Schedule` 表、由同一个 `fireDue` 触发，但只有 Provider 能在运行时新建（`chrona_schedule` 的 remind/wake），动态日程又只给声明 `dynamicSchedules` 的内置 `remind`。应用只能用 manifest 里写死的 `triggers`（最短 5 分钟），做不了“这个事件前 10 分钟提醒”。
+所有定时都存在 `Schedule` 表、由同一个 `fireDue` 触发，但只有 Provider 能在运行时新建（`chrona_schedule` 的 remind/wake），动态日程曾只给声明 `dynamicSchedules` 的内置 `remind`（该清单字段现已删除，统一用 `schedules.*`）。应用只能用 manifest 里写死的 `triggers`（最短 5 分钟），做不了“这个事件前 10 分钟提醒”。
 
 ## 2. 内核：应用的定时（第 1 步）
 
@@ -16,7 +16,7 @@
 - 只碰自己的：key 按应用区分，别的应用取消不到；审计记真实调用方 `module:<名称>`，`createdBy` 为 `module`。
 - 每个应用最多 500 个有效或暂停的定时；替换已有 key 不受限。
 - 存储不变、无迁移：`mode: "module"`、`moduleId` 为应用、`payload` 非空、`triggerId` 为空、`text` 存 key。
-- 新版本不再声明 `schedules.create`（且不是声明 `dynamicSchedules` 的内置模块）时，启用即取消它的定时；保留声明的版本更新或回滚时定时保留。应用删除时随应用删除。
+- 新版本不再声明 `schedules.create`时，启用即取消它的定时；保留声明的版本更新或回滚时定时保留。应用删除时随应用删除。
 - 日程页（`schedules.list` / `schedules.update`）照旧列出并可暂停、取消所有定时，包括应用的。
 - 内核规则不扩展：每月、每年、按次数结束等由应用自己算，每次只登记下一次 `at`，触发后再登记下一次。
 - 构建说明（`modules.propose` 与构建会话）写明这组接口；`chrona_schedule` 说明：有提供提醒或日历的应用时用应用。

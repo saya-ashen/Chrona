@@ -22,11 +22,11 @@ function clock() {
   return { timers: { setTimeout: ((fn: () => void, ms: number) => { tasks.set(++id, { at: time + ms, fn }); return id; }) as unknown as typeof setTimeout, clearTimeout: ((id: number) => { tasks.delete(id); }) as unknown as typeof clearTimeout },
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
-async function fixture({ keepAlive = false, effects = ["notify_user", "wake_provider"], handler = async () => ({}) }: { keepAlive?: boolean; effects?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
+async function fixture({ keepAlive = false, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, effects, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, effects: [], uses, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
@@ -192,7 +192,7 @@ test("version switch drains old event while new events use the new process; stop
 });
 test("events are serial and calls without uses are executed and recorded", async () => {
   let active = 0, maximum = 0;
-  const f = await fixture({ effects: [], handler: async (_event, call) => {
+  const f = await fixture({ uses: [], handler: async (_event, call) => {
     maximum = Math.max(maximum, ++active);
     const reply = await call("call", { target: "notify.send", args: { key: "key", level: "now", title: "Title", body: "Body" }, mode: "async", key: "key" } as never);
     await Bun.sleep(5); active--; return { result: reply };
@@ -204,7 +204,6 @@ test("events are serial and calls without uses are executed and recorded", async
   expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "executed", error: null, moduleRunId: expect.any(String) });
 });
 test("duplicate keys return duplicate and a different event does not swallow the next notification", async () => {
-  // The deprecated notify_user effect remains a notify.send contract for this older manifest.
   // Keys scoped to the event, as the SDK shorthands send them.
   const f = await fixture({ handler: async (event, call) => ({ result: await call("call", { target: "notify.send", args: { key: `${event.trigger.firedAt}:key`, level: "now", title: "Title", body: "Body" }, mode: "async", key: `${event.trigger.firedAt}:key` } as never) }) });
   expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });

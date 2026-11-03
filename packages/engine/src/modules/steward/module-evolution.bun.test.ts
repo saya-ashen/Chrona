@@ -11,7 +11,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 
-async function rollbackFixture(options: { enabled?: boolean; mode?: "auto" | "notify_after" | "preapproved" | "ask" | "never"; scope?: "module" | "global"; once?: boolean; expired?: boolean; revoked?: boolean; paused?: boolean; migrating?: boolean; group?: boolean; migration?: boolean; migrated?: boolean; verified?: boolean; firstInstall?: boolean; dataSchema?: number; manifestSchema?: number; previousSchema?: number; entry?: boolean; secret?: boolean; effect?: "network" | "notify_user" | "wake_provider"; scheduled?: boolean; previousScheduled?: boolean; dynamic?: boolean; targetStatus?: "approved" | "pending_review" | "rejected" } = {}) {
+async function rollbackFixture(options: { enabled?: boolean; mode?: "auto" | "notify_after" | "preapproved" | "ask" | "never"; scope?: "module" | "global"; once?: boolean; expired?: boolean; revoked?: boolean; paused?: boolean; migrating?: boolean; group?: boolean; migration?: boolean; migrated?: boolean; verified?: boolean; firstInstall?: boolean; dataSchema?: number; manifestSchema?: number; previousSchema?: number; entry?: boolean; secret?: boolean; effect?: "network"; scheduled?: boolean; previousScheduled?: boolean; dynamic?: boolean; targetStatus?: "approved" | "pending_review" | "rejected" } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-evolution-"); closes.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "app", activeHash: "candidate", status: options.paused ? "paused" : options.migrating ? "migrating" : "active", dataSchema: options.dataSchema ?? 1 } });
@@ -123,7 +123,7 @@ test.each([
   ["global grant", { scope: "global" as const }], ["expired grant", { expired: true }], ["revoked grant", { revoked: true }],
   ["ask policy", { mode: "ask" as const }], ["never policy", { mode: "never" as const }], ["paused", { paused: true }], ["migrating", { migrating: true }],
   ["group activation", { group: true }], ["migration or restore", { migration: true }], ["schema mismatch", { manifestSchema: 2, previousSchema: 1, dataSchema: 2 }],
-  ["entry module", { entry: true }], ["credential module", { secret: true }], ["network effects", { effect: "network" }], ["user notification effects", { effect: "notify_user" }], ["dynamic schedule", { dynamic: true }], ["changed static schedule", { scheduled: true, previousScheduled: false }], ["migration marker", { migrated: true }],
+  ["entry module", { entry: true }], ["credential module", { secret: true }], ["network effects", { effect: "network" }], ["dynamic schedule", { dynamic: true }], ["changed static schedule", { scheduled: true, previousScheduled: false }], ["migration marker", { migrated: true }],
   ["unapproved target", { targetStatus: "pending_review" as const }], ["successful verification", { verified: true }],
 ] as const)("automatic rollback stays blocked for %s", async (_label, options) => {
   const f = await rollbackFixture(options), result = await f.attempt();

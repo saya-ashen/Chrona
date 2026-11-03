@@ -85,15 +85,23 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("weekly"), days: z.array(z.number().int().min(0).max(6)).min(1).max(7), time: hhmm }).strict(),
   z.object({ kind: z.literal("every"), minutes: z.number().int().min(5).max(10080) }).strict(),
 ]);
-/**
- * `network`: the sandbox lets the module reach the network. The others are deprecated (v2-10): they now stand for the
- * system interfaces in `grantedUses`, so versions written before still work; new versions list those in `uses`.
- */
-export const MODULE_EFFECTS = ["notify_user", "wake_provider", "network", "model"] as const;
+/** `network`: the sandbox lets the module reach the network. */
+export const MODULE_EFFECTS = ["network"] as const;
+/** Effects before v2-10 stood for interfaces; stored versions get them as `uses` when parsed. */
+const EFFECT_USES: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
+/** Versions stored before fields were removed (`channel`, `dynamicSchedules`, effects other than `network`) still parse. */
+function withoutRemovedFields(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const { channel: _channel, dynamicSchedules: _dynamicSchedules, ...manifest } = value as Record<string, unknown>;
+  if (!Array.isArray(manifest.effects)) return manifest;
+  const implied = manifest.effects.flatMap(effect => typeof effect === "string" && EFFECT_USES[effect] ? [EFFECT_USES[effect]] : []);
+  const uses = Array.isArray(manifest.uses) ? manifest.uses : [];
+  return { ...manifest, effects: manifest.effects.filter(effect => typeof effect !== "string" || !EFFECT_USES[effect]), ...(implied.length ? { uses: [...new Set([...uses, ...implied])] } : {}) };
+}
 /** Module model tier name (e.g. fast, strong); the user maps tiers to exact models in `moduleModel.models`. */
 export const modelTier = z.string().regex(/^[a-z][a-z0-9-]{1,20}$/);
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
-const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
+export const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
 export const RESERVED_LISTEN_PATHS = ["/api/steward", "/api/workspaces", "/api/health"] as const;
 const moduleTriggerSchema = z.object({ id: slug, schedule: scheduleRuleSchema }).strict();
 const toolParameterSchema = moduleToolParameterSchema;
@@ -175,7 +183,7 @@ export const secretSpecSchema = z.object({
   oauth: z.object({ provider: z.enum(["google", "microsoft"]), scopes: z.array(z.string().min(1).max(200)).min(1).max(20), accounts: z.boolean().optional() }).strict().optional(),
 }).strict();
 export type SecretSpec = z.infer<typeof secretSpecSchema>;
-export const moduleManifestSchema = z.object({
+export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
   description: z.string().min(1).max(300).optional(),
@@ -197,8 +205,6 @@ export const moduleManifestSchema = z.object({
    * Several paths as an array (v2-8: the web page at "/" and its data API under /api/web).
    */
   listen: z.union([listenPath, z.array(listenPath).min(1).max(4)]).optional(),
-  /** Deprecated and ignored: delivery adapters are module tools called by the notification module. Kept so stored versions parse. */
-  channel: z.literal("chrona_qqbot").optional(),
   /**
    * Module tools this module calls through Chrona (`chrona.call`); approved with the version like any capability.
    * `"*"`: every tool open to the user (`owner` visibility), for entry modules that offer all apps to the user (web, MCP).
@@ -222,10 +228,7 @@ export const moduleManifestSchema = z.object({
    * A name alone, or (v2-16 §2.1) the fields the page should ask for: fixed `fields`, `extraFields` for user-named keys (one per account), `oauth` for a kernel-run authorization (v2-30 §4).
    */
   secrets: z.array(z.union([SECRET_NAME_SCHEMA, secretSpecSchema])).max(50).default([]),
-  /** Receives schedules created at runtime with a payload (e.g. reminders); built-in modules only for now. */
-  /** Deprecated and ignored: kept so stored remind manifests from before v2-24 timers still parse. */
-  dynamicSchedules: z.boolean().default(false),
-  /** Required with the `model` effect: a tier the user configured in `moduleModel.models`, bounded by its limits. */
+  /** Required with `uses: provider.complete`: a tier the user configured in `moduleModel.models`, bounded by its limits. */
   model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
@@ -247,14 +250,13 @@ export const moduleManifestSchema = z.object({
     if (ids.has(trigger.id)) ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
     ids.add(trigger.id);
   });
-  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive && !manifest.dynamicSchedules) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool, keepAlive or dynamicSchedules" });
+  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool or keepAlive" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   const names = secretNames(manifest);
   if (new Set(names).size !== names.length) ctx.addIssue({ code: "custom", path: ["secrets"], message: "Secret names must be unique" });
   if (names.includes("qq_bot") && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "qq_bot is only for entry modules (chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
 }).superRefine((manifest, ctx) => {
-  if (manifest.channel && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["channel"], message: "channel requires keepAlive" });
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
@@ -267,7 +269,7 @@ export const moduleManifestSchema = z.object({
     if (new Set(tool.visibility).size !== tool.visibility.length) ctx.addIssue({ code: "custom", path: ["tools", index, "visibility"], message: "Visibility must be unique" });
     for (const key of tool.parameters.required) if (!(key in tool.parameters.properties)) ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
   });
-});
+}));
 export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
 /** Acts as the user, or serves the page holding the user's key: never activated automatically. */
 /** v2-16: any module may ask the user to decide something; these do not make it an entry module. */
@@ -276,7 +278,7 @@ const MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
  * Acts as the user (their conversations, `chat.*`; their approvals, `approvals.*`; every tool open to them, `*`),
  * or serves the page holding the user's key: every version needs the user, never activated automatically.
  */
-export const isEntryModule = (manifest: { effects: readonly string[]; listen?: string | readonly string[]; uses?: readonly string[] }) =>
+export const isEntryModule = (manifest: { listen?: string | readonly string[]; uses?: readonly string[] }) =>
   listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || (target.startsWith("approvals.") && !MODULE_APPROVAL_TOOLS.includes(target)));
 export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
@@ -323,16 +325,12 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 /** `result` answers a tool call. `handled` is ignored (it handed inbound items back before connectors were removed); kept so older modules still answer. */
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
-/**
- * What a module may call: its `uses` (current names), plus what deprecated declarations stand for (v2-10) — `effects` `model`,
- * `wake_provider` and `notify_user` for `provider.complete`, `provider.wake` and `notify.send`, and listed `secrets` for `secrets.get`, `secrets.authorize` and `secrets.token` (v2-30 §4).
- */
 /** The credential names a manifest declares, whichever form each entry takes. */
 export const secretNames = (manifest: { secrets?: readonly (string | { name: string })[] }) => (manifest.secrets ?? []).map(secret => typeof secret === "string" ? secret : secret.name);
 export const SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
-export function grantedUses(manifest: { effects: readonly string[]; uses?: readonly string[]; secrets?: readonly unknown[] }): string[] {
-  const implied = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" } as Record<string, string>;
-  return [...new Set([...(manifest.uses ?? []), ...manifest.effects.flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
+/** What a module calls: its `uses`, plus `secrets.get`, `secrets.authorize` and `secrets.token` when it lists `secrets` (v2-30 §4). */
+export function grantedUses(manifest: { uses?: readonly string[]; secrets?: readonly unknown[] }): string[] {
+  return [...new Set([...(manifest.uses ?? []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
 }
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
@@ -582,7 +580,7 @@ export const modulesToolInputSchemas = {
     .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
     .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the running release's reference even when customization prevented registering that built-in. Returns the exact content hash; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
-    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network (other effects are deprecated); capabilities are uses: notify.send, provider.wake, provider.complete (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
+    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, provider.wake, provider.complete (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). If the user allowed it and modules run sandboxed, updates with no new effects, no migration and passing checks auto-activate.'),
   rollback: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": z.object({ versions: z.array(z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(2).max(4) }).strict()

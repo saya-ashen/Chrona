@@ -43,7 +43,7 @@ async function fixture(credentials = true) {
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "price-watch");
   await mkdir(dir, { recursive: true });
-  const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: ["notify_user"], tests: ["test.ts"] };
+  const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], uses: ["notify.send"], tests: ["test.ts"] };
   async function write(value = 1) {
     await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, ...(credentials ? { secrets: [`credential_${value}`] } : {}), params: { threshold: { type: "number", value } } }));
     await writeFile(join(dir, "index.ts"), `console.log(${value})`);
