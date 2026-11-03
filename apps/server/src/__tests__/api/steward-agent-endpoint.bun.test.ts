@@ -35,7 +35,11 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     expect(await root.json()).toMatchObject({ ok: true });
     await db.session.update({ where: { id: session.id }, data: { source: "build" } });
     const buildCatalog = await (await app.request("http://localhost/catalog", { headers })).json();
-    expect(buildCatalog.tools.map((t: { name: string }) => t.name)).toEqual(["chrona_reply", "m_modules_diagnostics", "m_modules_reference", "m_modules_check", "m_modules_checkout", "m_modules_propose", "m_modules_request_group"]);
+    // A build has the conversation's app tools; of Chrona's own tools only chrona_reply.
+    const buildNames: string[] = buildCatalog.tools.map((t: { name: string }) => t.name);
+    expect(buildNames).toEqual(expect.arrayContaining(["chrona_reply", "m_modules_diagnostics", "m_modules_reference", "m_modules_propose", "m_modules_request_group", "m_modules_list"]));
+    expect(buildNames.filter(name => name.startsWith("chrona_"))).toEqual(["chrona_reply"]);
+    expect((await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" })).status).toBe(403);
     const reference = await app.request("http://localhost/tools/m_modules_reference", { method: "POST", headers, body: JSON.stringify({ target: "modules.diagnostics" }) });
     expect(reference.status).toBe(200);
     expect(await reference.json()).toMatchObject({ ok: true, data: { result: { outputSchema: { type: "array" } } } });

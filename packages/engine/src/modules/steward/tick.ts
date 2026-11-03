@@ -49,10 +49,10 @@ async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date
   }
   return { self, via };
 }
-/** Build (v2-13) and reflection (v2-19) runs: their whole instruction was written when they were queued; only their own tools. */
+/** Build (v2-13) and reflection (v2-19) runs: their whole instruction was written when they were queued. Builds find app tools like a conversation; reflections use only their own. */
 function closedInput(run: ClaimedRun, sessionId: string | null) {
   const base = { inbound: null, searchTools: false, sessionId, hostPaths: [], content: [] };
-  if (run.session?.source === "build") return { ...base, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, extraTools: BUILD_MODULE_TOOLS };
+  if (run.session?.source === "build") return { ...base, searchTools: true, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, extraTools: BUILD_MODULE_TOOLS };
   if (run.session?.source === "reflect") return { ...base, prompt: run.prompt, extraTools: REFLECT_TOOLS };
   return null;
 }

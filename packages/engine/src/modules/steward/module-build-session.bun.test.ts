@@ -111,7 +111,11 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
   let report: { status?: string; report?: unknown } = {};
   f.onRun(async (input, call) => {
     expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_diagnostics", "m_modules_request_group"] });
-    expect((await f.service.tools.catalog(input.token)).map(tool => tool.name).sort()).toEqual(["chrona_reply", "m_modules_check", "m_modules_checkout", "m_modules_diagnostics", "m_modules_propose", "m_modules_reference", "m_modules_request_group"]);
+    expect(input).toMatchObject({ searchTools: true });
+    // App tools as in a conversation; of Chrona's own tools only chrona_reply.
+    const catalog = (await f.service.tools.catalog(input.token)).map(tool => tool.name);
+    expect(catalog).toEqual(expect.arrayContaining(["chrona_reply", "m_modules_propose", "m_modules_request_group", "m_modules_list"]));
+    expect(catalog.filter(name => name.startsWith("chrona_"))).toEqual(["chrona_reply"]);
     await expect(call("chrona_schedule", {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(call("m_modules_build", request)).rejects.toMatchObject({ code: "forbidden" });
     await writeFile(join(input.cwd, "request.json"), JSON.stringify({ name: "other" }));
@@ -483,7 +487,7 @@ test("a Provider supplements an old build without losing work; missing or owner 
   expect(saved.files[0]).toMatch(/^files\/revision-[a-f0-9-]+\/1-interface\.txt$/);
   expect(await readFile(join(old.cwd, saved.files[0]), "utf8")).toBe("supplemental fixture, not production data");
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ searchTools: false, hostPaths: [], content: [] });
+    expect(input).toMatchObject({ searchTools: true, hostPaths: [], content: [] });
     expect(input.extraTools).toContain("m_modules_diagnostics");
     expect(input.prompt).toContain("m_modules_diagnostics");
     expect(input.prompt).toContain(saved.files[0]);
@@ -665,7 +669,7 @@ test("offline recovery executes one bounded build and activates its checks-passi
   const f = await ownerFixture();
   await f.api.runs.finish(f.requester.id, { outcome: "finished", sessionId: null, error: null });
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ lane: "build", model: ownerRequest.execution.model, sessionId: null, searchTools: false });
+    expect(input).toMatchObject({ lane: "build", model: ownerRequest.execution.model, sessionId: null, searchTools: true });
     await f.writeModule(input.cwd);
     const version = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
     expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "approved" });

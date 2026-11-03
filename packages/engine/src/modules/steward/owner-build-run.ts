@@ -30,7 +30,7 @@ export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, in
     await runs.authenticate(run.token);
     handle = ports.provider!.start({ runId: run.id, token: run.token, lane: "build", cwd: run.cwd, sessionDir, sessionId: null,
       model: run.model, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, deadline: run.deadlineAt, events: channel.events,
-      extraTools: BUILD_MODULE_TOOLS, searchTools: false, hostPaths: [], content: [] });
+      extraTools: BUILD_MODULE_TOOLS, searchTools: true, hostPaths: [], content: [] });
     liveRuns.set(run.id, handle);
     let done = false;
     const outcome = handle.done.finally(() => { done = true; });
