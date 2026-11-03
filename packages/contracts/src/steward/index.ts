@@ -324,13 +324,6 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
 /**
- * v2-10 names of the `provider` system module's tools (v2-11). Approved versions are hash-bound, so their `uses` and calls
- * keep these names. shortcut: aliases stay until every module version naming `ai.*` is rebuilt; then delete this map.
- */
-const LEGACY_TARGETS: Record<string, string> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
-/** A call target or `uses` entry under its current name. */
-export const currentTarget = (target: string) => LEGACY_TARGETS[target] ?? target;
-/**
  * What a module may call: its `uses` (current names), plus what deprecated declarations stand for (v2-10) — `effects` `model`,
  * `wake_provider` and `notify_user` for `provider.complete`, `provider.wake` and `notify.send`, and listed `secrets` for `secrets.get`, `secrets.authorize` and `secrets.token` (v2-30 §4).
  */
@@ -339,7 +332,7 @@ export const secretNames = (manifest: { secrets?: readonly (string | { name: str
 export const SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
 export function grantedUses(manifest: { effects: readonly string[]; uses?: readonly string[]; secrets?: readonly unknown[] }): string[] {
   const implied = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" } as Record<string, string>;
-  return [...new Set([...(manifest.uses ?? []).map(currentTarget), ...manifest.effects.flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
+  return [...new Set([...(manifest.uses ?? []), ...manifest.effects.flatMap(effect => implied[effect] ? [implied[effect]] : []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
 }
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, currentTarget, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
+import { createScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -56,7 +56,7 @@ const notify = { key: "price", level: "now", title: "Price changed", body: "New 
 describe("module channel contract", () => {
   test("only routed calls cross the channel (v2-10): notify, wake and model are system interfaces", () => {
     expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "notify.send", args: notify, mode: "async", key: "price" } }).success).toBe(true);
-    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "ai.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "provider.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
     for (const method of ["notify", "wakeProvider", "model", "secret"]) expect(moduleCallSchema.safeParse({ id: "1", method, params: {} }).success).toBe(false);
   });
   test("event replies default result and cap it at 256 KiB serialized", () => {
@@ -80,10 +80,6 @@ describe("module channel contract", () => {
     expect(moduleManifestSchema.parse({ ...base, contributes: { events: { emits: [{ name: "updated" }] } } }).contributes).toEqual({ events: { emits: [{ name: "updated" }] } });
     expect(moduleManifestSchema.safeParse({ ...base, contributes: { events: "x".repeat(33 * 1024) } }).success).toBe(false);
     expect(moduleManifestSchema.safeParse({ ...base, contributes: { "Bad Name": 1 } }).success).toBe(false);
-    // v2-10 names in approved manifests and calls keep working.
-    expect(grantedUses({ effects: [], uses: ["ai.complete", "ai.wake"] })).toEqual(["provider.complete", "provider.wake"]);
-    expect(currentTarget("ai.wake")).toBe("provider.wake");
-    expect(currentTarget("files.read")).toBe("files.read");
   });
 });
 

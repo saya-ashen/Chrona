@@ -10,9 +10,6 @@ type Event = { trigger: Trigger; now: string; params: Record<string, string | nu
 type Reply = { id: string; result?: { result?: unknown }; error?: string };
 /** The directories the module under test sees (same variables as `chrona.paths`). */
 export const paths = { module: process.env.CHRONA_MODULE ?? process.cwd(), data: process.env.CHRONA_DATA ?? "/data", content: process.env.CHRONA_CONTENT ?? "/content" };
-// v2-10 names of the provider tools; Chrona maps them the same way (currentTarget).
-const legacy: Partial<Record<string, string>> = { "ai.complete": "provider.complete", "ai.wake": "provider.wake" };
-const current = (target: string) => legacy[target] ?? target;
 type Stub = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 function findStub(stubs: Record<string, Stub>, target: string) {
   return Object.hasOwn(stubs, target) ? stubs[target] : undefined;
@@ -33,7 +30,7 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
 }
 async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, seen: Set<string>): Promise<unknown> {
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
-  const target = current(String(call.params.target)), args = (call.params.args ?? {}) as Record<string, unknown>;
+  const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
   if (call.params.mode === "async") {
     // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
     const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
@@ -47,8 +44,7 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
  * shorthands notify, wakeProvider, model, secret) answer from `stubs["<module>.<tool>"]` (sync: its
  * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
  */
-export async function startModule(entry: string, { stubs: given = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
-  const stubs = Object.fromEntries(Object.entries(given).map(([target, stub]) => [current(target), stub]));
+export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);

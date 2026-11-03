@@ -39,7 +39,7 @@ test("channel drops malformed lines, validates calls and event replies, then rec
     const result = f.channel.send(event, 1000);
     const message = await f.next() as { id: string };
     f.socket.write(JSON.stringify({ id: message.id, result: { unexpected: true } }) + "\n");
-    f.socket.write(JSON.stringify({ id: "call", method: "call", params: { target: "ai.wake", args: { prompt: "hello" }, mode: "async", key: "key" } }) + "\n");
+    f.socket.write(JSON.stringify({ id: "call", method: "call", params: { target: "provider.wake", args: { prompt: "hello" }, mode: "async", key: "key" } }) + "\n");
     expect(await f.next()).toEqual({ id: "call", result: { callId: "c1", status: "queued" } });
     f.socket.write(JSON.stringify({ id: message.id, result: { handled: true, result: 42 } }) + "\n");
     expect(await result).toEqual({ id: message.id, result: { handled: true, result: 42 } });

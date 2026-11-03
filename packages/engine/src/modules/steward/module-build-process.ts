@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { currentTarget, moduleCallReplySchema, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
+import { moduleCallReplySchema, RUN_LIMITS, type ModuleCall, type ModuleEvent, type ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext } from "./module-context";
 import { createModuleChannel } from "./module-channel";
 
 function buildCallResult(call: ModuleCall, seen: Set<string>): ReturnType<typeof moduleCallReplySchema.parse> {
   if (call.method === "callStatus") return { id: call.id, result: { callId: call.params.callId, status: "queued" } };
-  const target = currentTarget(call.params.target);
+  const target = call.params.target;
   if (call.params.mode === "async") {
     const key = `${target}:${call.params.key}`, duplicate = seen.has(key);
     seen.add(key);

@@ -11,8 +11,6 @@ import { testDb } from "./test-db";
 import { builtinEntry, qqEntry } from "./test-entry";
 import { notices } from "./test-notices";
 import { readFileSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { migrateConversationFiles } from "./chat";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -126,19 +124,19 @@ test("approvals through the approvals system module; other modules and Chrona it
   expect(moduleManifestSchema.safeParse({ ...manifest, secrets: ["qq_bot"] }).success).toBe(false);
 });
 
-test("provider.wake starts the Provider for a module; an approved version still naming ai.wake (v2-10) reaches it too", async () => {
+test("provider.wake starts the Provider for a module", async () => {
   const f = await fixture();
-  for (const [name, target] of [["fresh", "provider.wake"], ["older", "ai.wake"]] as const) {
+  for (const [name, target] of [["fresh", "provider.wake"]] as const) {
     const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: [target] });
     const module = await f.db.module.create({ data: { workspaceId: f.w, name, activeHash: name } });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
     const reply = await handleModuleCall(f.ports, { workspaceId: f.w, moduleId: module.id, hash: name, manifest }, { id: "1", method: "call", params: { target, args: { prompt: `${name} 发现变化` }, mode: "async", key: `${name}:1`, reply: false } });
     expect(reply).toMatchObject({ result: { status: "queued" } });
   }
-  f.behaviors.push({ reply: "看过了" }, { reply: "也看过了" });
+  f.behaviors.push({ reply: "看过了" });
   await f.settle();
-  expect((await f.db.moduleInvocation.findMany({ where: { target: { in: ["provider", "ai"] } } })).map(row => [row.target, row.tool, row.status])).toEqual([["provider", "wake", "succeeded"], ["provider", "wake", "succeeded"]]);
-  expect(f.started.map(input => input.prompt).filter(prompt => prompt.includes("发现变化")).length).toBe(2);
+  expect((await f.db.moduleInvocation.findMany({ where: { target: "provider" } })).map(row => [row.target, row.tool, row.status])).toEqual([["provider", "wake", "succeeded"]]);
+  expect(f.started.map(input => input.prompt).filter(prompt => prompt.includes("发现变化")).length).toBe(1);
 });
 
 test("chat.file and chat.delivered only reach replies in the caller's own conversations", async () => {
@@ -163,24 +161,6 @@ test("the web page is an entry like qq: its conversations push replies to web.re
   await f.settle();
   const pushed = await f.db.moduleInvocation.findMany({ where: { workspaceId: f.w, tool: "reply" }, orderBy: { createdAt: "asc" } });
   expect(pushed.map(row => [row.target, (row.args as { text: string }).text])).toEqual([["qq", "QQ 回答"], ["web", "网页回答"]]);
-});
-
-test("v2-8 migration copies content-area attachments into chat's store and gives web conversations the web entry, once", async () => {
-  const f = await fixture();
-  const files = await f.db.module.create({ data: { workspaceId: f.w, name: "files", builtin: true } });
-  const web = await f.db.module.create({ data: { workspaceId: f.w, name: "web", builtin: true } });
-  await mkdir(join(f.ports.dataDir, "platform/content", files.id, "uploads"), { recursive: true });
-  await writeFile(join(f.ports.dataDir, "platform/content", files.id, "uploads/a.png"), "png");
-  const session = await f.db.session.create({ data: { workspaceId: f.w, key: "web:old", source: "web" } });
-  const message = await f.db.message.create({ data: { workspaceId: f.w, sessionId: session.id, direction: "in", channel: "in_app", text: "old", attachments: [
-    { name: "a.png", ref: "files/uploads/a.png", mime: "image/png", size: 3 }, { name: "gone.txt", ref: "files/gone.txt", mime: "text/plain", size: 1 }] } });
-  expect(await migrateConversationFiles(f.ports, f.w)).toBe(2);
-  const [moved, gone] = (await f.db.message.findUniqueOrThrow({ where: { id: message.id } })).attachments as { ref: string | null }[];
-  expect(moved!.ref).toMatch(/^chat\/[0-9a-f-]{36}-a\.png$/);
-  expect(await readFile(join(f.ports.dataDir, "platform/data", moved!.ref!), "utf8")).toBe("png");
-  expect(gone!.ref).toBeNull();
-  expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ entryModuleId: web.id });
-  expect(await migrateConversationFiles(f.ports, f.w)).toBe(0);
 });
 
 test("an approval decision continues the conversation that asked, in a new run; a closed conversation is not reopened", async () => {

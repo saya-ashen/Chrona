@@ -8,7 +8,7 @@ import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
-import { storedAttachments, toMessage } from "./store";
+import { toMessage } from "./store";
 import { pushReply } from "./chat-replies";
 import { drainCalls } from "./module-calls";
 import { autoRetain, entryConversations } from "./memory";
@@ -59,34 +59,6 @@ export async function readChatFile(ports: Pick<StewardPorts, "dataDir">, ref: st
   const path = join(chatFilesDir(ports), file);
   if (!(await stat(path).catch(() => null))?.isFile()) return null;
   return { bytes: await readFile(path), mime: Bun.file(path).type || "application/octet-stream" };
-}
-const CHAT_FILES_MIGRATED = "chat_files_migrated";
-/**
- * Once per workspace (v2-8): attachments that pointed into app content areas are copied into chat's store, and web
- * conversations get the web module as their entry, so replies reach the page and chat.file serves their files.
- */
-export async function migrateConversationFiles(ports: StewardPorts, workspaceId: string) {
-  const { db } = ports;
-  if (await db.audit.findFirst({ where: { workspaceId, kind: CHAT_FILES_MIGRATED } })) return 0;
-  const modules = new Map((await db.module.findMany({ where: { workspaceId } })).map(module => [module.name, module.id]));
-  let moved = 0;
-  for (const message of await db.message.findMany({ where: { workspaceId }, select: { id: true, attachments: true } })) {
-    const files = storedAttachments(message.attachments);
-    if (!files.some(file => file.ref && !file.ref.startsWith("chat/"))) continue;
-    const next = [];
-    for (const file of files) {
-      if (!file.ref || file.ref.startsWith("chat/")) { next.push(file); continue; }
-      const [app, ...path] = file.ref.split("/"), id = modules.get(app!);
-      const bytes = id ? await readFile(join(ports.dataDir, "platform", "content", id, ...path)).catch(() => null) : null;
-      next.push({ ...file, ref: bytes ? (await storeChatFile(ports, file.name, bytes)).ref : null });
-      moved++;
-    }
-    await db.message.update({ where: { id: message.id }, data: { attachments: next } });
-  }
-  const web = modules.get("web");
-  if (web) await db.session.updateMany({ where: { workspaceId, source: "web", entryModuleId: null }, data: { entryModuleId: web } });
-  await audit(db, { workspaceId, actor: "chrona", kind: CHAT_FILES_MIGRATED, subjectId: workspaceId, details: { moved } });
-  return moved;
 }
 /** Only inline bytes are accepted: attachment paths never authorize host filesystem reads. */
 export function chatImages(attachments: unknown): { mime: string; base64: string }[] {

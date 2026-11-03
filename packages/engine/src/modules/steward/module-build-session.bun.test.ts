@@ -12,7 +12,6 @@ import { testDb } from "./test-db";
 import { createModules } from "./modules";
 import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
-import { notices } from "./test-notices";
 import { liveRuns } from "./runs";
 import { moduleSupervisor } from "./module-supervisor";
 import * as chatFiles from "./chat";
@@ -346,14 +345,6 @@ test("transcripts: the Provider's text, tool calls and clipped results, credenti
   };
   expect(await reader("web", ["chat.transcript"])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
   expect(await reader("snoop", [])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
-});
-
-test("upgrade: builds from the old build lane (no conversation) are cancelled once and the user is told", async () => {
-  const f = await fixture();
-  const legacy = await f.db.run.create({ data: { workspaceId: f.workspaceId, lane: "build", trigger: "build", status: "queued", prompt: "", provider: "fake", tokenHash: "legacy", cwd: join(f.dataDir, "builds", "x"), createdAt: new Date() } });
-  await f.step(); await f.step();
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled" });
-  expect((await notices(f.db, { title: "模块构建已取消" })).length).toBe(1);
 });
 
 test("persistent FIFO survives service recreation and tied clocks; waiting has no model calls or running deadline", async () => {

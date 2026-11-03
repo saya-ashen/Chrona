@@ -12,7 +12,6 @@ import { writeBuildHelpers } from "./module-build-helpers";
 import { callsDeclaration } from "./module-contracts";
 import { readChatFile, runFile } from "./chat";
 import { createRuns, createRunSession } from "./runs";
-import { notifyUser } from "./notify-user";
 import { cancelProviderRun } from "./provider-cancel";
 import { assertBuildQueueSpace, buildQueue } from "./build-queue";
 import type { BuildExecution } from "./build-execution";
@@ -241,12 +240,4 @@ export function controlBuild(ports: StewardPorts, workspaceId: string, sessionId
     const state = (await buildQueue(db, workspaceId)).get(sessionId);
     return { ...state, status: "build_revised", sessionId, runId: run.id };
   });
-}
-
-/** v2-13 upgrade: builds from the old build lane (no conversation) are cancelled once; the user is asked to request them again. */
-export async function cancelLegacyBuilds(ports: StewardPorts, workspaceId: string) {
-  const rows = await ports.db.run.findMany({ where: { workspaceId, lane: "build", sessionId: null, status: { in: ["queued", "running"] } }, select: { id: true } });
-  if (!rows.length) return;
-  await ports.db.run.updateMany({ where: { id: { in: rows.map(row => row.id) } }, data: { status: "cancelled", endedAt: ports.now() } });
-  await notifyUser(ports.db, ports, workspaceId, { level: "digest", title: "模块构建已取消", body: "Chrona 更新后构建改为独立的构建对话，进行中的旧构建已取消；需要的话请重新提出。", key: `legacy-builds:${rows[0]!.id}` });
 }

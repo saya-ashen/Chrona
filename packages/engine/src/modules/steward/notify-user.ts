@@ -3,7 +3,6 @@ import { NOTIFY_INTERFACE, notificationSchema, type NotificationSettings } from 
 import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { callSync, enqueueCall, kernelOrigin } from "./module-calls";
-import { audit } from "./audit";
 
 /** What Chrona tells the user. Budget, channel and recipient are decided by the module behind `notify.send`. */
 export type UserNotice = {
@@ -78,27 +77,4 @@ export function createNotificationsView(ports: StewardPorts, workspaceId: string
     list: async (limit = 50) => notificationItems(await ask(ports, workspaceId, "list", { limit })),
     status: async () => statusSchema.safeParse(await ask(ports, workspaceId, "status")).data ?? null,
   };
-}
-
-const LEGACY = "notifications_moved_to_module";
-/**
- * One-time, non-destructive copy of notifications recorded before the notify module existed (the Notification
- * table is left as it was) plus the current settings. Runs in one transaction with its marker.
- */
-export async function moveLegacyNotifications(ports: StewardPorts, workspaceId: string) {
-  const { db } = ports;
-  if (await db.audit.findFirst({ where: { workspaceId, kind: LEGACY } })) return 0;
-  const rows = await db.notification.findMany({ where: { workspaceId }, include: { module: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
-  const workspace = await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
-  const settings = (workspace.settings as { notifications?: NotificationSettings } | null)?.notifications;
-  return db.$transaction(async tx => {
-    if (await tx.audit.findFirst({ where: { workspaceId, kind: LEGACY } })) return 0;
-    if (settings) await forwardSettings(tx, ports, workspaceId, settings, workspace.updatedAt);
-    for (let start = 0; start < rows.length; start += 100) {
-      const chunk = rows.slice(start, start + 100).map(({ module, ...row }) => ({ ...row, app: module?.name ?? null }));
-      await enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.import`, raw: { rows: JSON.stringify(chunk) } }, { key: `legacy:${start}` });
-    }
-    await audit(tx, { workspaceId, actor: "chrona", kind: LEGACY, subjectId: workspaceId, details: { rows: rows.length, queued: rows.filter(row => row.status === "queued").length } });
-    return rows.length;
-  });
 }

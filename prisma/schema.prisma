@@ -24,7 +24,6 @@ model Workspace {
   approvals Approval[]
   grants Grant[]
   preferences Preference[]
-  notifications Notification[]
   invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
@@ -55,7 +54,6 @@ model Session {
   messages Message[]
   runs Run[]
   schedules Schedule[]
-  notifications Notification[]
   @@index([workspaceId, key, status])
   @@index([workspaceId, source, lastActivityAt])
 }
@@ -76,7 +74,6 @@ model Module {
   schedules Schedule[]
   sessions Session[]
   approvals Approval[]
-  notifications Notification[]
   @@unique([workspaceId, name])
   @@index([workspaceId, status])
 }
@@ -264,7 +261,6 @@ model Approval {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   module Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   grant Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
-  notifications Notification[]
   @@index([workspaceId, status, createdAt])
   @@index([moduleId, status])
 }
@@ -295,41 +291,6 @@ model Preference {
   lastUsedAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, createdAt])
-}
-
-model Notification {
-  id String @id @default(uuid())
-  workspaceId String
-  moduleId String?
-  sessionId String?
-  approvalId String?
-  level String @default("digest")
-  channel String
-  status String @default("queued")
-  title String
-  body String
-  idempotencyKey String
-  recipient String?
-  link String?
-  receiptRef String?
-  attempts Int @default(0)
-  lastError String?
-  nextAttemptAt DateTime?
-  leaseUntil DateTime?
-  leaseToken String?
-  createdAt DateTime @default(now())
-  sentAt DateTime?
-  acknowledgedAt DateTime?
-  feedback String?
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
-  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  approval Approval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
-  @@unique([workspaceId, idempotencyKey])
-  @@index([workspaceId, status, level, nextAttemptAt])
-  @@index([workspaceId, channel, sentAt])
-  @@index([sessionId, createdAt])
-  @@index([approvalId])
 }
 
 model Audit {

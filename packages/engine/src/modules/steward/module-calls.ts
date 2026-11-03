@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { currentTarget, grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
+import { grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
 import { z } from "zod";
 import { compileModuleOutput } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -292,7 +292,7 @@ async function invokeSyncCall(ports: StewardPorts, origin: CallOrigin, target: s
   return invokeModuleSync({ ...invocation, timeoutMs, rowId: row.id, finish });
 }
 export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
-  return invokeSyncCall(ports, origin, currentTarget(target), raw, timeoutMs);
+  return invokeSyncCall(ports, origin, target, raw, timeoutMs);
 }
 
 /**
@@ -309,8 +309,7 @@ async function resolveEnqueueTarget(tx: Db, origin: CallOrigin, target: string, 
   else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
   return resolved;
 }
-export async function enqueueCall({ tx, ports, origin, target: requestedTarget, raw }: { tx: Db; ports: StewardPorts; origin: CallOrigin; target: string; raw: unknown }, { key, reply = false, lenient = false }: { key: string; reply?: boolean; lenient?: boolean }) {
-  const target = currentTarget(requestedTarget);
+export async function enqueueCall({ tx, ports, origin, target, raw }: { tx: Db; ports: StewardPorts; origin: CallOrigin; target: string; raw: unknown }, { key, reply = false, lenient = false }: { key: string; reply?: boolean; lenient?: boolean }) {
   const name = splitTarget(target), caller = callerKey(origin.caller);
   const existing = await tx.moduleInvocation.findUnique({ where: { workspaceId_caller_target_tool_key: { workspaceId: origin.workspaceId, caller, target: name.module, tool: name.tool, key } } });
   if (existing) return { callId: existing.id, status: existing.status as "queued", duplicate: true };
@@ -365,8 +364,7 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   const { db } = ports, now = ports.now();
   const settle = (data: Prisma.ModuleInvocationUpdateManyMutationInput) => db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { leaseToken: null, leaseUntil: null, ...data } });
   const retryOrFail = (error: string) => settle(row.attempts < MAX_ATTEMPTS ? { status: "queued", nextAttemptAt: backoff(now, row.attempts), error } : { status: "failed", error, finishedAt: now });
-  // Rows queued before v2-11 name `ai.*`.
-  const target = currentTarget(`${row.target}.${row.tool}`), resolved = await resolveTarget(db, row.workspaceId, target);
+  const target = `${row.target}.${row.tool}`, resolved = await resolveTarget(db, row.workspaceId, target);
   // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
   if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
   const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;

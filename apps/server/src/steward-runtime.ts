@@ -1,5 +1,4 @@
 import { startRescueListener } from "./rescue";
-import { migrateQqState } from "./qq-state-migration";
 import { readProtectedSecret } from "../../../packages/integrations/src/steward/protected-secret";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -142,7 +141,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
       rescue ??= startRescueListener(ports, service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
-      void moduleSupervisor(ports).start().then(() => migrateQqState(db, ports.dataDir)).catch(error => options.onError?.(error));
+      void moduleSupervisor(ports).start().catch(error => options.onError?.(error));
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
       wake();

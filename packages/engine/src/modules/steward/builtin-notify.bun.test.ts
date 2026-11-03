@@ -6,7 +6,7 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { registerBuiltins } from "./module-builtin";
 import { moduleSupervisor } from "./module-supervisor";
 import { callsSettled, drainCalls } from "./module-calls";
-import { createNotificationsView, moveLegacyNotifications, notificationItems, notifyUser } from "./notify-user";
+import { createNotificationsView, notificationItems, notifyUser } from "./notify-user";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
@@ -29,7 +29,7 @@ void report();
 };
 
 if (!sandbox.health.available) console.info("SKIP notify end to end: module sandbox unavailable");
-(sandbox.health.available ? test : test.skip)("Chrona → notify.send → notify module → qq.deliver (fake exit) → receipt; legacy rows are copied and delivered", async () => {
+(sandbox.health.available ? test : test.skip)("Chrona → notify.send → notify module → qq.deliver (fake exit) → receipt", async () => {
   registerSystemModules();
   const dataDir = await mkdtemp("/tmp/chrona-notify-e2e-"), resources = join(dataDir, "builtin");
   await mkdir(join(resources, "qq"), { recursive: true });
@@ -41,9 +41,6 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
   try {
     // No quiet hours: the test runs on the real clock, at any time of day.
     const workspace = await db.workspace.create({ data: { name: "notify", settings: { notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" } } } }), w = workspace.id;
-    // A row from before the notify module existed, still waiting to be sent, and one whose send lease was held.
-    await db.notification.create({ data: { workspaceId: w, level: "now", channel: "chrona_qqbot", status: "queued", title: "Old pending", body: "From the old outbox", idempotencyKey: "legacy:pending", nextAttemptAt: new Date() } });
-    await db.notification.create({ data: { workspaceId: w, level: "now", channel: "chrona_qqbot", status: "queued", title: "Old leased", body: "Maybe sent", idempotencyKey: "legacy:leased", leaseToken: "t", leaseUntil: new Date() } });
     await registerBuiltins(ports, w);
     for (const name of ["notify", "qq"]) expect(await db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ status: "active", activeHash: expect.any(String) });
     await moduleSupervisor(ports).reconcile();
@@ -53,22 +50,19 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
       throw new Error(`Not reached: ${JSON.stringify(await view.list())}`);
     }
     await until(async () => (await view.status())?.chat.bound === true);
-    expect(await moveLegacyNotifications(ports, w)).toBe(2);
-    expect(await moveLegacyNotifications(ports, w)).toBe(0);
     await notifyUser(db, ports, w, { level: "now", title: "Build finished", body: "All green", key: "e2e:1" });
     await notifyUser(db, ports, w, { level: "now", title: "Build finished", body: "All green", key: "e2e:1" });
     const sent = (title: string) => async () => (await view.list()).some(item => item.title === title && item.status === "sent");
-    await until(sent("Build finished")); await until(sent("Old pending"));
+    await until(sent("Build finished"));
     const items = await view.list();
     expect(items.find(item => item.title === "Build finished")).toMatchObject({ channel: "chrona_qqbot", status: "sent", attempts: 1 });
-    expect(items.find(item => item.title === "Old leased")).toMatchObject({ status: "uncertain" });
     const qq = await db.module.findFirstOrThrow({ where: { name: "qq" } });
     const lines = (await readFile(join(dataDir, "platform/data", qq.id, "sent.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
-    // Each notice reached the exit exactly once, from the notify module (the real caller), never the leased legacy row.
-    expect(lines.map(line => line.args.title).sort()).toEqual(["Build finished", "Old pending"]);
+    // Each notice reached the exit exactly once, from the notify module (the real caller).
+    expect(lines.map(line => line.args.title)).toEqual(["Build finished"]);
     expect(lines.every(line => line.args.format === "text")).toBe(true);
     expect(lines.every(line => line.caller.kind === "module" && line.caller.module === "notify")).toBe(true);
-    expect(await db.moduleInvocation.count({ where: { target: "qq", tool: "deliver", status: "succeeded" } })).toBe(2);
+    expect(await db.moduleInvocation.count({ where: { target: "qq", tool: "deliver", status: "succeeded" } })).toBe(1);
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);
 

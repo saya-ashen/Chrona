@@ -9,15 +9,14 @@ import { createRuns, liveRuns } from "./runs";
 import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
-import { chatFilesDir, chatImages, migrateConversationFiles } from "./chat";
-import { announceApprovals, moveLegacyNotifications } from "./notify-user";
+import { chatFilesDir, chatImages } from "./chat";
+import { announceApprovals } from "./notify-user";
 import { REFLECT_TOOLS, startReflection } from "./reflection";
 import { autoRetain, memoryInput } from "./memory";
 import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
-import { cancelLegacyBuilds } from "./module-build-session";
 import { moduleToolCatalog, moduleToolsets } from "./module-tools";
 import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
 import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
@@ -122,10 +121,7 @@ export function createTick(ports: StewardPorts) {
       }
       for (const [stage, action] of [
         ["builtins", () => registerBuiltins(ports, workspaceId)],
-        ["chat-files", () => migrateConversationFiles(ports, workspaceId)],
-        // Before anything new is announced, so the notify module sees what was already sent.
-        ["legacy-notifications", () => moveLegacyNotifications(ports, workspaceId)],
-        ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); await cancelLegacyBuilds(ports, workspaceId); startBuild(workspaceId, now); }],
+        ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["reflect", () => startReflection(ports, workspaceId)],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); await runs.endIdleBuilds(now); }],

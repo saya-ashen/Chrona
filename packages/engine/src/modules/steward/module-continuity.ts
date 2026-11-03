@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { currentTarget, moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
+import { moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { z } from "zod";
 import { syntheticEvents, withBuildProcess } from "./module-build-process";
 import { copyData, dataEmpty, runOffline } from "./module-data";
@@ -48,7 +48,7 @@ async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: str
         if (call.method !== "call" || call.params.mode !== "async") continue;
         const args = call.params.args as Record<string, string>, key = call.params.key!;
         if (call.params.target === "notify.send") continuity.effects.push({ type: "notify_user", key, level: args.level as "now", title: args.title!, body: args.body! });
-        else if (currentTarget(call.params.target) === "provider.wake") continuity.effects.push({ type: "wake_provider", key, prompt: args.prompt! });
+        else if (call.params.target === "provider.wake") continuity.effects.push({ type: "wake_provider", key, prompt: args.prompt! });
       }
     }
     continuity.status = "passed"; delete continuity.reason;
