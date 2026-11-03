@@ -21,6 +21,7 @@ const RESTORE_MARKER_VERSION = 1;
 export type SqliteBackupResult = {
   sourcePath: string;
   backupPath: string;
+  omitted: string[];
 };
 
 type RestoreMarker = {
@@ -112,8 +113,8 @@ export function backupSqliteDatabase(databaseUrl: string, outputPath: string, da
   try {
     if (dataDir && existsSync(`${backupPath}.tar`)) throw new Error("Backup archive already exists.");
     vacuumInto(sourcePath, backupPath);
-    if (dataDir) backupDataFiles(dataDir, `${backupPath}.tar`);
-    return { sourcePath, backupPath };
+    const omitted = dataDir ? backupDataFiles(dataDir, `${backupPath}.tar`) : [];
+    return { sourcePath, backupPath, omitted };
   } finally {
     lock?.release();
   }
@@ -275,7 +276,7 @@ function restoreWithLock(
   databaseUrl: string,
   inputPath: string,
   options: RestoreOptions,
-): SqliteBackupResult & { recoveryPath: string | null } {
+): Omit<SqliteBackupResult, "omitted"> & { recoveryPath: string | null } {
   const prepared = prepareRestore(lock, databaseUrl, inputPath, options.force);
   const rename = options.rename ?? renameSync;
   try {
@@ -292,7 +293,7 @@ export function restoreSqliteDatabase(
   databaseUrl: string,
   inputPath: string,
   options: RestoreOptions = {},
-): SqliteBackupResult & { recoveryPath: string | null } {
+): Omit<SqliteBackupResult, "omitted"> & { recoveryPath: string | null } {
   if (options.dataDir) assertOutsideDataRoots(options.dataDir, requireFilePath(databaseUrl), resolve(inputPath));
   const lock = acquireSqliteRuntimeLock(databaseUrl);
   try {

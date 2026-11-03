@@ -40,7 +40,7 @@ chrona backup /absolute/private/path/chrona-backup.db
 chrona doctor
 ```
 
-备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/platform`、`sessions`、`secrets` 和 `qq-bot`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的数据目录按空目录恢复。拒绝符号链接和特殊文件；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
+备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/platform`、`sessions`、`secrets` 和 `qq-bot`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的数据目录按空目录恢复。`secrets`、`qq-bot` 中的符号链接和特殊文件会使备份失败；`platform`、`sessions` 中的则不进入归档，并在命令输出中列出（它们指向数据目录外，或可重新生成，如 gcroot、会话的 `content/chat`、依赖安装的 `.bin`）。模块和会话中安装的依赖目录（`node_modules`、`.venv`）与会话里的浏览器临时配置（`.chrome-*`）不备份；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
 
 不要用运行中的裸数据库复制代替一致性备份。Provider profile（默认 `<dataDir>/providers/pi`，包含其自身认证）及其他自定义目录不在此 tar 中，需单独安全归档。不要公开或将认证写入版本库。
 

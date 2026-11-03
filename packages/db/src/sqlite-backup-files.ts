@@ -7,29 +7,42 @@ export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as 
 
 // Installed module dependencies are reproducible, and may contain package-manager symlinks.
 const installedDirs = ["node_modules", ".venv", ".chrona"];
-function assertRegularTree(dataDir: string, path: string, files: string[]): void {
-  const stat = lstatSync(join(dataDir, path));
-  const parts = path.split("/");
-  if (stat.isDirectory() && parts.length === 4 && parts[0] === "platform" && parts[1] === "store" && installedDirs.includes(parts[3]!)) return;
-  if (!stat.isDirectory() && !stat.isFile()) {
-    throw new Error("Backup refuses symlinks and special files in platform, sessions, secrets or qq-bot.");
-  }
-  files.push(path);
-  if (stat.isDirectory()) for (const name of readdirSync(join(dataDir, path))) assertRegularTree(dataDir, `${path}/${name}`, files);
+// Installed module dependencies, and dependencies or browser profiles in session work directories.
+function isReproducibleDirectory(parts: string[]): boolean {
+  if (parts.length === 4 && parts[0] === "platform" && parts[1] === "store") return installedDirs.includes(parts[3]!);
+  if (parts[0] !== "sessions" || parts.length < 2) return false;
+  const name = parts[parts.length - 1]!;
+  return name === "node_modules" || name === ".venv" || name.startsWith(".chrome-");
 }
 
-export function backupDataFiles(dataDir: string, archivePath: string): void {
+// Links and special files cannot be archived. In platform and sessions they point outside the data or are recreated
+// (gcroots, content/chat, package-manager bins), so they are left out and listed; in secrets and qq-bot they refuse.
+function assertRegularTree(dataDir: string, path: string, files: string[], omitted: string[]): void {
+  const stat = lstatSync(join(dataDir, path));
+  const parts = path.split("/");
+  if (stat.isDirectory() && isReproducibleDirectory(parts)) return;
+  if (!stat.isDirectory() && !stat.isFile()) {
+    if (parts[0] === "platform" || parts[0] === "sessions") { omitted.push(path); return; }
+    throw new Error("Backup refuses symlinks and special files in secrets or qq-bot.");
+  }
+  files.push(path);
+  if (stat.isDirectory()) for (const name of readdirSync(join(dataDir, path))) assertRegularTree(dataDir, `${path}/${name}`, files, omitted);
+}
+
+/** Returns the links and special files left out of the archive. */
+export function backupDataFiles(dataDir: string, archivePath: string): string[] {
   if (existsSync(archivePath)) throw new Error("Backup archive already exists.");
   const present = backupDataRoots.filter(root => lstatSync(join(dataDir, root), { throwIfNoEntry: false }) !== undefined);
-  const files: string[] = [];
+  const files: string[] = [], omitted: string[] = [];
   for (const root of present) {
     if (!lstatSync(join(dataDir, root)).isDirectory()) throw new Error("Backup roots must be directories.");
-    assertRegularTree(dataDir, root, files);
+    assertRegularTree(dataDir, root, files, omitted);
   }
   // Reserve a private output before tar opens it, including under a permissive umask.
   writeFileSync(archivePath, "", { flag: "wx", mode: 0o600 });
   execFileSync("tar", ["--format=ustar", "--hard-dereference", "--no-recursion", "-cf", resolve(archivePath), "-C", resolve(dataDir), "--null", "--files-from=-"], { input: files.length ? `${files.join("\0")}\0` : "", stdio: "pipe" });
   secureGeneratedPrivateFile(archivePath);
+  return omitted;
 }
 
 type Entry = { path: string; directory: boolean; executable: boolean; content: Buffer };

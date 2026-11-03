@@ -25,6 +25,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
       const result = backupSqliteDatabase(databaseUrl, resolve(output), getChronaDataDir());
       console.log(`Chrona backup created: ${result.backupPath} + ${result.backupPath}.tar`);
+      if (result.omitted.length) console.error(`Left out ${result.omitted.length} links or special files:\n${result.omitted.slice(0, 20).join("\n")}${result.omitted.length > 20 ? "\n…" : ""}`);
     });
   program.command("restore").description("Restore SQLite and its platform, sessions and secrets tar while the server is stopped")
     .argument("<input>", "Backup database path")

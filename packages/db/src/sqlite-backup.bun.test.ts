@@ -83,7 +83,65 @@ describe("SQLite backup and restore", () => {
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
-  it.each(["platform/data/app/node_modules/link", "sessions/node_modules/link", "platform/store/hash/src/node_modules/link", "platform/store/node_modules/link", "platform/store/hash/.venv", "platform/store/hash/.chrona", "platform/store/hash/node_modules"])("refuses links outside installed directories (including a linked directory itself): %s", path => {
+  it("omits session dependencies and Chrome profiles at any depth, preserving working files", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-session-backup-"));
+    try {
+      const data = join(directory, "data"), db = join(directory, "active.db"), backup = join(directory, "backup.db");
+      createDatabase(db, "saved");
+      const skipped = [
+        "sessions/node_modules",
+        "sessions/session/web/node_modules",
+        "sessions/session/web-latest/node_modules",
+        "sessions/session/.venv",
+        "sessions/session/nested/project/.venv",
+        "sessions/session/.chrome-test",
+        "sessions/session/nested/.chrome-profile",
+      ];
+      for (const path of skipped) {
+        mkdirSync(join(data, path), { recursive: true });
+        symlinkSync("missing", join(data, path, "SingletonLock"));
+      }
+      if (process.platform !== "win32") execFileSync("mkfifo", [join(data, "sessions/session/.chrome-test/SingletonSocket")]);
+      const saved = [
+        "sessions/session/notes.md",
+        "sessions/session/web/package.json",
+        "sessions/session/browser-harness/web-dependencies/package.json",
+        "sessions/session/browser-harness/web-dependencies/keep.txt",
+        "sessions/session/ordinary/.bin/tool",
+        "sessions/session/.chrona/keep.txt",
+        "sessions/session/.chrome-not-a-directory",
+      ];
+      for (const path of saved) {
+        mkdirSync(join(data, path, ".."), { recursive: true });
+        writeFileSync(join(data, path), "saved");
+      }
+      backupSqliteDatabase(`file:${db}`, backup, data);
+      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
+      for (const path of skipped) expect(listing).not.toContain(`${path}/`);
+      for (const path of saved) expect(listing).toContain(path);
+      const restored = join(directory, "restored");
+      restoreSqliteDatabase(`file:${join(directory, "restored.db")}`, backup, { dataDir: restored });
+      for (const path of skipped) expect(existsSync(join(restored, path))).toBe(false);
+      for (const path of saved) expect(readFileSync(join(restored, path), "utf8")).toBe("saved");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("leaves out and reports links in platform and sessions", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-omitted-links-"));
+    try {
+      const data = join(directory, "data"), db = join(directory, "active.db"), backup = join(directory, "backup.db");
+      createDatabase(db, "saved");
+      const links = ["platform/gcroots/hash/himalaya", "sessions/session/content/chat", "sessions/session/web-dev-node_modules/.bin/tsc"];
+      for (const path of links) { mkdirSync(join(data, path, ".."), { recursive: true }); symlinkSync("missing", join(data, path)); }
+      writeFileSync(join(data, "sessions/session/content/note.md"), "saved");
+      expect(backupSqliteDatabase(`file:${db}`, backup, data).omitted.sort()).toEqual([...links].sort());
+      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
+      for (const path of links) expect(listing).not.toContain(path);
+      expect(listing).toContain("sessions/session/content/note.md");
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it.each(["secrets/link", "secrets/nested/link", "qq-bot/link"])("refuses links in credential roots: %s", path => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-installed-safety-"));
     try {
       const data = join(directory, "data"), db = join(directory, "active.db");
@@ -120,11 +178,14 @@ describe("SQLite backup and restore", () => {
         expect(readValue(restoredDb)).toBe("saved");
         const link = join(rootPath, "link");
         symlinkSync(join(directory, "missing"), link);
-        expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "link.db"), data)).toThrow("symlinks");
+        const credentials = root === "secrets" || root === "qq-bot";
+        if (credentials) expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "link.db"), data)).toThrow("symlinks");
+        else expect(backupSqliteDatabase(`file:${db}`, join(directory, "link.db"), data).omitted).toEqual([`${root}/link`]);
         rmSync(link);
         if (process.platform !== "win32") {
           execFileSync("mkfifo", [join(rootPath, "pipe")]);
-          expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "special.db"), data)).toThrow("special files");
+          if (credentials) expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "special.db"), data)).toThrow("special files");
+          else expect(backupSqliteDatabase(`file:${db}`, join(directory, "special.db"), data).omitted).toEqual([`${root}/pipe`]);
           rmSync(join(rootPath, "pipe"));
         }
         rmSync(rootPath, { recursive: true });
@@ -152,7 +213,7 @@ describe("SQLite backup and restore", () => {
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
-  it("refuses live full backups and symlinks; rolls directories back on database replacement failure", () => {
+  it("refuses live full backups, leaves out links; rolls directories back on database replacement failure", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-files-safety-"));
     try {
       const db = join(directory, "active.db");
@@ -171,7 +232,7 @@ describe("SQLite backup and restore", () => {
       })).toThrow("injected failure");
       expect(readFileSync(join(directory, "platform", "README.md"), "utf8")).toBe("current");
       symlinkSync(db, join(directory, "platform", "link"));
-      expect(() => backupSqliteDatabase(`file:${db}`, join(directory, "unsafe.db"), directory)).toThrow("symlinks");
+      expect(backupSqliteDatabase(`file:${db}`, join(directory, "unsafe.db"), directory).omitted).toEqual(["platform/link"]);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
   it("rejects traversal and link archive entries without replacing data", () => {
