@@ -86,3 +86,19 @@ test.each([
   const db = testDb(); dbs.push(db);
   expect(await db.$transaction(tx => assessApproval(tx, { isolated: true }, { action, title: "做一件事", payload: {}, ...(asked ? { level: asked } : {}) }))).toMatchObject({ level, brief: { headline: "做一件事" } });
 });
+
+test("long output contract summaries are shortened to fit the approval brief", async () => {
+  const db = testDb(); dbs.push(db);
+  const workspace = await db.workspace.create({ data: { name: "long impact" } });
+  const target = await db.module.create({ data: { workspaceId: workspace.id, name: "target", activeHash: "a", dataSchema: 1 } });
+  const caller = await db.module.create({ data: { workspaceId: workspace.id, name: "caller", activeHash: "c", dataSchema: 1 } });
+  const names = Array.from({ length: 10 }, (_, index) => `a-rather-long-tool-name-number-${index}`);
+  const tools = (type: string) => names.map(name => ({ name, description: name, visibility: ["modules"], idempotent: true, parameters: { type: "object", properties: {}, required: [] },
+    output: { type: "object", properties: { value: { type } }, required: ["value"] } }));
+  await db.moduleVersion.create({ data: { moduleId: target.id, hash: "a", manifest: manifest({ tools: tools("string") }), source: "user", intent: {}, report: {}, status: "approved" } });
+  await db.moduleVersion.create({ data: { moduleId: target.id, hash: "b", manifest: manifest({ tools: tools("integer") }), source: "provider", intent: {}, report: {}, status: "pending_review" } });
+  await db.moduleVersion.create({ data: { moduleId: caller.id, hash: "c", manifest: manifest({ name: "caller", uses: names.map(name => `target.${name}`) }), source: "user", intent: {}, report: {}, status: "approved" } });
+  const { brief } = await db.$transaction(tx => assessApproval(tx, { isolated: true, executionMode: "trusted-local" }, { action: "activate_module", title: "update", payload: { kind: "activate_module", moduleId: target.id, hash: "b" } }));
+  expect(brief.added.some(item => item.startsWith("调用方依赖契约变化：caller") && item.endsWith("…"))).toBe(true);
+  expect(brief.added.every(item => item.length <= 200)).toBe(true);
+});

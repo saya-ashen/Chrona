@@ -90,7 +90,7 @@ async function assessActivation(tx: Db, facts: Facts, input: { title: string; pa
   const restore = activationTargets(input.payload).some(target => target.restore);
   const verb = versions.every(version => version.fresh) ? "启用新应用" : versions.length > 1 ? "一起启用" : "更新";
   const headline = restore ? `回滚 ${names} 并恢复旧数据，此后写入的数据会丢失` : `${verb} ${names}${verb !== "更新" ? "" : added.length ? "，能力有增加" : "，能力不变"}`;
-  return { level: higher(level, input.level ?? "green"), brief: { ...base, headline: headline.slice(0, 300), added: added.slice(0, 20), reversible: versions.every(version => version.reversible) } };
+  return { level: higher(level, input.level ?? "green"), brief: { ...base, headline: headline.slice(0, 300), added: added.slice(0, 20).map(item => item.length > 200 ? `${item.slice(0, 199)}…` : item), reversible: versions.every(version => version.reversible) } };
 }
 export async function assessApproval(tx: Db, facts: Facts, input: { action: string; title: string; payload: unknown; level?: Level }): Promise<{ level: Level; brief: Brief }> {
   if (input.action === "activate_module") return assessActivation(tx, facts, input);
