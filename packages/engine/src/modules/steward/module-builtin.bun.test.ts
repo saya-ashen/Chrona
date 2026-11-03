@@ -110,12 +110,15 @@ test.each([false, "user", "provider", "build"] as const)("built-in upgrade prese
     const after = await f.current();
     if (source) {
       expect(after.activeHash).toBe(before.activeHash);
-      expect(await f.db.moduleVersion.count({ where: { source: "builtin" } })).toBe(1);
+      // The release's built-in is tested and approved but not activated: only an explicit rollback switches to it.
+      expect(await f.db.moduleVersion.findMany({ where: { source: "builtin" }, select: { status: true } })).toEqual([{ status: "approved" }, { status: "approved" }]);
       expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
       expect((await notices(f.db)).filter(n => n.title.includes("内置"))).toHaveLength(0);
       await f.start();
       expect((await f.current()).activeHash).toBe(before.activeHash);
       expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
+      const release = await f.db.moduleVersion.findFirstOrThrow({ where: { source: "builtin", hash: { not: first.activeHash! } } });
+      expect(await createModules(f.ports, f.workspace.id).rollback(first.id, release.hash)).toMatchObject({ status: "active", activeHash: release.hash });
     } else {
       expect(after.activeHash).not.toBe(before.activeHash);
       expect(await f.db.approval.count()).toBe(0);
@@ -170,7 +173,7 @@ test("a built-in already queued when the user activates a fork cannot create a r
     await modules.buildPending();
     expect((await f.current()).activeHash).toBe(fork.hash);
     expect(await f.db.approval.findMany({ where: { status: "open" } })).toEqual(reviews);
-    expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.id, hash: builtin.hash } } })).toMatchObject({ status: "pending_review" });
+    expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: first.id, hash: builtin.hash } } })).toMatchObject({ status: "approved" });
     expect((await notices(f.db)).filter(n => n.title.includes("内置"))).toHaveLength(0);
   } finally { await f.close(); }
 });

@@ -86,8 +86,11 @@ async function supersedeCandidates(context: ModuleContext, moduleId: string, has
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-  // A custom version may have become active while the built-in candidate was testing.
-  if (version.source === "builtin" && active && active.source !== "builtin") return { moduleId: module.id, hash, status: "pending_review", report };
+  // A customized module keeps its version: the tested built-in stays inactive, for an explicit `admin rollback <m> builtin`.
+  if (version.source === "builtin" && active && active.source !== "builtin") {
+    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "approved" } });
+    return { moduleId: module.id, hash, status: "approved", report };
+  }
   const { manifest, preview, parts } = await reviewPreview(context, review, active);
   if (preview === null) {
     report.errors = ["Review preview exceeds 20000 characters (manifest diff, intent and results); shrink the manifest change or split the update"];

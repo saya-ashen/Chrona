@@ -1,8 +1,6 @@
 import { chmod, cp, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { Prisma } from "@chrona/db/generated/prisma/client";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { moduleContext } from "./module-context";
 import { proposeBuiltin } from "./module-proposal";
@@ -41,7 +39,6 @@ async function notChosen(ports: StewardPorts, workspaceId: string) {
   const chosen = memorySettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).provider;
   return (name: string) => OPTIONAL.includes(name) && chosen !== name;
 }
-// eslint-disable-next-line complexity -- Preserve startup ordering, customization protection and temporary-resource cleanup in one lifecycle.
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
@@ -54,7 +51,8 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
     const skipped = await notChosen(ports, workspaceId);
     for (const entry of entries) {
       if (skipped(entry.name)) continue;
-      if (await preserveCustomization(ports, workspaceId, entry.name)) continue;
+      // A customized module keeps its version; the release's built-in is still built so `admin rollback <m> builtin` can choose it.
+      await preserveCustomization(ports, workspaceId, entry.name);
       const result = await proposeBuiltin(context, root, entry.name);
       if (result.status === "rejected") {
         console.error(JSON.stringify({ level: "error", component: "module-builtin", event: "builtin.rejected", module: entry.name, hash: result.hash, errors: result.report.errors?.map(error => error.slice(0, 1000)).slice(0, 10) ?? [] }));
@@ -64,9 +62,4 @@ export async function registerBuiltins(ports: StewardPorts, workspaceId: string)
   } finally { await rm(root, { recursive: true, force: true }); }
   // buildPending takes three versions at a time; built-ins must all be ready before modules start.
   for (let round = 0; round < 10 && await ports.db.moduleVersion.count({ where: { module: { workspaceId }, status: "building" } }); round++) await buildPending(context);
-  const remind = await ports.db.module.findFirst({ where: { workspaceId, name: "remind", builtin: true } });
-  if (remind?.activeHash) {
-    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: remind.id, hash: remind.activeHash } } });
-    if (version && moduleManifestSchema.parse(version.manifest).dynamicSchedules) await ports.db.schedule.updateMany({ where: { workspaceId, mode: "module", payload: { not: Prisma.DbNull }, moduleId: null }, data: { moduleId: remind.id } });
-  }
 }
