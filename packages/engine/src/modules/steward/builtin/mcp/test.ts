@@ -4,14 +4,17 @@ import { startModule } from "chrona/testing";
 
 type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
+const problems = [{ module: "web", moduleId: "web-id", incidentStatus: "verifying", contractFailures: 0, nextAction: "等待实际调用验证", since: "2026-10-27T04:00:00Z" }];
+const diagnostics = { module: "web", runtime: { state: "connected" }, activation: { observedCapabilities: [] }, consecutiveFailures: 0,
+  incident: { status: "verifying" }, contractFailureCount: 0, open: true, nextAction: "等待实际调用验证", truncated: true, incidents: [], contractFailures: [], evolution: [] };
 const moduleTools: { target: string; description: string; inputSchema: Args; outputSchema: Args | null; examples: Args[] | null; sideEffects: string[] | null; errors: Args[] | null; retry: string; idempotent: boolean }[] = [{ target: "files.list", description: "List a document directory.", inputSchema: { type: "object", properties: {}, required: [] }, outputSchema: null, examples: null, sideEffects: null, errors: null, retry: "Unknown async outcomes are not redelivered automatically.", idempotent: false }];
 const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: target })) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
 const module = await startModule("index.ts", { stubs: {
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
-    routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }] })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
+    routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
     routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
-    routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ module: args.module, incidents: [] }]),
+    routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ ...diagnostics, module: args.module }]),
     routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
     routed("modules.permissions", args => ({ module: args.module, capabilities: [] })),
     routed("modules.system", args => ({ name: args.module, work: [] })),
@@ -35,7 +38,7 @@ try {
   assert.equal((await rpc("notifications/initialized", {}, null)).status, 202);
   const names = (await rpc("tools/list")).body.result.tools.map((entry: { name: string }) => entry.name);
   assert.ok(["chrona_chat", "chrona_module_tools", "chrona_module_call", "chrona_module_diagnostics"].every(name => names.includes(name)));
-  assert.deepEqual(await json("chrona_module_diagnostics", { module: "web" }), [{ module: "web", incidents: [] }]);
+  assert.deepEqual(await json("chrona_module_diagnostics", { module: "web" }), [diagnostics]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "web" }]);
   assert.equal((await json("chrona_activity", { module: "web" })).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(await json("chrona_module_permissions", { module: "web" }), { module: "web", capabilities: [] });
@@ -80,6 +83,7 @@ try {
   assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "m_files_list" })).isError, true);
   // Today and notifications come from chat.today; app content is reached through the apps' own tools.
+  assert.deepEqual((await json("chrona_today")).problems, problems);
   assert.deepEqual(await json("chrona_notifications"), [{ title: "n1" }]);
   assert.ok(!names.some((name: string) => name.startsWith("chrona_content") || name === "chrona_apps"));
   assert.equal((await tool("nope")).isError, true);

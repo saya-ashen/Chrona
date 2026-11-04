@@ -6,11 +6,12 @@ import { toApproval, toSession } from "./store";
 import { createApps } from "./apps";
 import { createNotificationsView } from "./notify-user";
 import { entryConversations } from "./memory";
+import { moduleHealthSummary } from "./modules";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 /** `notifications` is answered by the notify module; when it cannot answer the view shows none. */
 export type HealthPorts = { provider(): Promise<Health["provider"]>; moduleSandbox(): boolean;
   notifications: { list(limit: number): Promise<TodayView["updates"]>; status(): Promise<{ queued: number; failed: number } | null> } };
-export function createToday({ db, workspaceId, now }: RecordContext, ports: HealthPorts, apps: () => Promise<TodayView["apps"]> = async () => []) {
+export function createToday({ db, workspaceId, now }: RecordContext, ports: HealthPorts, apps: () => Promise<TodayView["apps"]> = async () => [], problems: () => Promise<TodayView["problems"]> = async () => []) {
   async function health(): Promise<Health> {
     const at = now(), settings = notificationSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
     const [provider, runs, dueSchedules, notifications, state] = await Promise.all([
@@ -26,18 +27,28 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
   }
   async function get(): Promise<TodayView> {
     const at = now(), week = 7 * 86400000, conversations = await entryConversations(db, workspaceId);
-    const [approvals, schedules, notifications, sessions, applications, status] = await Promise.all([
+    const [approvals, schedules, notifications, sessions, applications, status, issues] = await Promise.all([
       db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" } }),
       db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + week) } }, orderBy: { nextAt: "asc" }, take: 50 }),
       ports.notifications.list(20),
       db.session.findMany({ where: { workspaceId, ...conversations }, include: { runs: { where: { status: "running" }, select: { id: true }, take: 1 } }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }], take: 20 }),
-      apps(), health(),
+      apps(), health(), problems().catch(() => []),
     ]);
-    return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), updates: notifications, apps: applications,
+    return { generatedAt: at.toISOString(), approvals: approvals.map(toApproval), updates: notifications, apps: applications, problems: issues,
       sessions: sessions.map(toSession),
       upcoming: schedules.filter(s => !s.until || s.nextAt! <= s.until).map(s => ({ scheduleId: s.id, mode: s.mode as TodayView["upcoming"][number]["mode"], label: s.label ?? (s.payload !== null ? s.text.slice(0, 300) : null), at: s.nextAt!.toISOString() })), health: status };
   }
   return { get, health };
+}
+
+async function openProblems(ports: StewardPorts, workspaceId: string): Promise<TodayView["problems"]> {
+  const rows = await ports.db.module.findMany({ where: { workspaceId } });
+  const summaries = await Promise.all(rows.map(row => moduleHealthSummary(ports, workspaceId, row)));
+  return summaries.filter(item => item.open).map(item => ({
+    module: item.module, moduleId: item.moduleId,
+    incidentStatus: item.incident?.status === "recovered" ? null : item.incident?.status ?? null,
+    contractFailures: item.contractFailureCount, nextAction: item.nextAction, since: item.incident?.lastAt ?? null,
+  })).sort((a, b) => (b.since ?? "").localeCompare(a.since ?? "")).slice(0, 20);
 }
 
 /** The workspace's today view as Chrona sees it through the system tool chat.today. */
@@ -50,5 +61,5 @@ export function workspaceToday(ports: StewardPorts, workspaceId: string) {
     },
     moduleSandbox: () => ports.sandbox?.isolated ?? false,
     notifications: createNotificationsView(ports, workspaceId),
-  }, createApps(ports, workspaceId).list);
+  }, createApps(ports, workspaceId).list, () => openProblems(ports, workspaceId));
 }

@@ -508,6 +508,9 @@ export const todayViewSchema = z.object({
   /** Recent notifications, newest first. */
   updates: z.array(notificationSchema).max(20),
   apps: z.array(appSchema).max(200),
+  /** Apps whose current activation has an open health problem (the modules.health `open` facts), newest first: a summary and the next step, never logs. */
+  problems: z.array(z.object({ module: slug, moduleId: id, incidentStatus: z.enum(["retrying", "unresolved", "verifying"]).nullable(),
+    contractFailures: z.number().int().min(0), nextAction: z.string().max(500).nullable(), since: iso.nullable() }).strict()).max(20),
   /** Recent user-facing sessions (web, qq, mcp), most recent first. */
   sessions: z.array(sessionSchema).max(20),
   health: healthSchema,

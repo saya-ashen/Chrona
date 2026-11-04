@@ -5,7 +5,7 @@ import type { StewardPorts } from "./ports";
  * reads audits and words them, so a module (the page included) can show the record but never write or reword it.
  */
 const KINDS = ["approval_created", "approval_resolved", "module_build_started", "module_submission", "module_build_settled", "module_build_rejection",
-  "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident",
+  "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident", "module_disabled", "module_enabled",
   "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "reflection_started", "reflection_suggested", "module_settings_updated"] as const;
 const SOURCES: Record<string, string> = { web: "网页", qq: "QQ", mcp: "MCP", cli: "命令行", rescue: "救援控制台", entry: "其他应用" };
 const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建" };
@@ -30,9 +30,31 @@ function subjectModule(row: Row, names: Names) {
   const version = row.subjectId ? names.versions.get(row.subjectId) : undefined;
   return { module: version?.module ?? (row.subjectId ? names.modules.get(row.subjectId) ?? null : null), hash: version?.hash };
 }
+function incidentText(name: string, details: Record<string, unknown>) {
+  const attempts = Array.isArray(details.attempts) ? details.attempts as { action?: string }[] : [];
+  const action = attempts.at(-1)?.action;
+  if (action === "connected") return `${name} 已重新连接，功能待实际调用验证`;
+  if (action === "verified" || details.status === "recovered") {
+    if (details.status === "verifying") return `${name} 部分能力已验证恢复，其余仍待验证`;
+    return `${name} 已验证恢复（未重放失败调用${details.deliveryUnknown ? "；此前有结果未知的调用，请核对外部效果" : ""}）`;
+  }
+  const reason = (details.evidence as { reason?: unknown } | undefined)?.reason;
+  const explanation = typeof reason === "string" ? reason.slice(0, 120) : "见诊断";
+  return details.status === "unresolved"
+    ? `${name} 运行出错 ${String(details.failures)} 次，自动恢复已停止：${explanation}`
+    : `${name} 运行出错（第 ${String(details.failures)} 次），正在有限重启：${explanation}`;
+}
+function statusText(name: string, row: Row, details: Record<string, unknown>) {
+  const paused = row.kind === "module_disabled", action = paused ? "暂停" : "恢复";
+  let text = details.source === "chrona" ? `Chrona ${action}了 ${name}` : details.source === "cli" ? `你在命令行${action}了 ${name}` : `你${action}了 ${name}`;
+  if (details.source === "remove") return `删除前暂停了 ${name}`;
+  if (paused && details.source === "automatic") return `${name} 连续失败 3 次，已自动暂停（关联故障）`;
+  if (paused && details.source === "chrona") text += `：${String(details.reason ?? "见诊断").slice(0, 120)}`;
+  if (!paused && details.unrestoredLegacyPause) text += "；旧的自动暂停没有记录日程，相关日程仍保持暂停";
+  return text;
+}
 function moduleText(row: Row, details: Record<string, unknown>, names: Names) {
   const subject = subjectModule(row, names), name = subject.module ?? "已删除的应用", hash = short(details.hash ?? subject.hash);
-  const reason = (details.evidence as { reason?: unknown } | undefined)?.reason;
   const texts: Record<string, string> = {
     module_build_started: `开始检查 ${name} 的候选版本 ${hash}`,
     module_submission: `${name} 提交了候选版本 ${hash}`,
@@ -40,10 +62,12 @@ function moduleText(row: Row, details: Record<string, unknown>, names: Names) {
     module_build_rejection: `${name} 的候选版本 ${hash} 未通过检查`,
     module_activate: `${name} 已切换到版本 ${hash}`,
     module_auto_activated: `${name} 已自动启用版本 ${hash}`,
-    module_rollback: `${name} 已回滚到版本 ${hash}`,
+    module_rollback: details.automatic === true ? `${name} 新版本启动失败，已自动回滚到 ${hash}` : `${name} 已回滚到版本 ${hash}`,
     admin_rollback: `你在命令行把 ${name} 回滚到版本 ${hash}`,
     module_migration_started: `${name} 开始迁移数据（${String(details.from)} → ${String(details.to)}）`,
-    module_runtime_incident: `${name} 运行出错：${typeof reason === "string" ? reason.slice(0, 120) : "见诊断"}`,
+    module_runtime_incident: incidentText(name, details),
+    module_disabled: statusText(name, row, details),
+    module_enabled: statusText(name, row, details),
     module_settings_updated: `你修改了 ${name} 的设置：${Array.isArray(details.keys) ? details.keys.join("、") : ""}`,
   };
   return { text: texts[row.kind]!, module: subject.module };
@@ -91,19 +115,33 @@ async function namesFor(db: StewardPorts["db"], workspaceId: string, rows: Row[]
     approvals: new Map(approvals.map(approval => [approval.id, { title: approval.title, module: approval.moduleId ? moduleNames.get(approval.moduleId) ?? null : null }])),
   };
 }
+function aggregate(rows: Row[], names: Names) {
+  const lines: Activity[] = [], incidents = new Map<string, { line: Activity; count: number }>();
+  for (const row of rows) {
+    const line = describe(row, names);
+    if (!line) continue;
+    const id = row.kind === "module_runtime_incident" ? (row.details as { id?: unknown } | null)?.id : null;
+    if (typeof id !== "string") { lines.push(line); continue; }
+    const key = `${row.subjectId}:${id}`, previous = incidents.get(key);
+    if (previous) previous.count++;
+    else { incidents.set(key, { line, count: 1 }); lines.push(line); }
+  }
+  for (const { line, count } of incidents.values()) if (count > 1) line.text += `（共 ${count} 次更新）`;
+  return lines;
+}
 const startAt = (before?: string) => { const at = before ? new Date(before) : undefined; return at && !Number.isNaN(at.getTime()) ? at : undefined; };
 /** Newest first; `before` pages back by time; `module` keeps one app's lines. */
 export async function listActivity(ports: StewardPorts, workspaceId: string, { module, before, limit = 50 }: { module?: string; before?: string; limit?: number }) {
-  const { db } = ports, take = Math.min(Math.max(limit, 1), 100), out: Activity[] = [];
-  let cursor = startAt(before);
-  // A module filter is applied after wording, so read in pages until enough lines or no more rows.
-  for (let page = 0; page < 10 && out.length < take; page++) {
-    const rows = await db.audit.findMany({ where: { workspaceId, kind: { in: [...KINDS] }, ...(cursor ? { createdAt: { lt: cursor } } : {}) }, orderBy: { createdAt: "desc" }, take: 200 });
+  const { db } = ports, take = Math.min(Math.max(limit, 1), 100), rows: Row[] = [];
+  let cursor = startAt(before), items: Activity[] = [];
+  // Filter after aggregating the entire bounded scan; counts include all scanned pages.
+  for (let page = 0; page < 10 && items.length < take; page++) {
+    const batch = await db.audit.findMany({ where: { workspaceId, kind: { in: [...KINDS] }, ...(cursor ? { createdAt: { lt: cursor } } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 200 });
+    rows.push(...batch);
     const names = await namesFor(db, workspaceId, rows);
-    const items = rows.map(row => describe(row, names)).filter((item): item is Activity => !!item && (!module || item.module === module));
-    out.push(...items.slice(0, take - out.length));
-    if (rows.length < 200) break;
-    cursor = rows.at(-1)!.createdAt;
+    items = aggregate(rows, names).filter(item => !module || item.module === module).slice(0, take);
+    if (batch.length < 200) break;
+    cursor = batch.at(-1)!.createdAt;
   }
-  return { items: out, before: out.length === take ? out.at(-1)!.at : null };
+  return { items, before: items.length === take ? items.at(-1)!.at : null };
 }
