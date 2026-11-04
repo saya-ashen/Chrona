@@ -67,7 +67,7 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
       if (name === "rollback") return reconcile(rollback(context, moduleId, String(args.hash)));
       if (name === "remove") return requestRemove(context, moduleId, String(args.reason ?? ""));
       const status = name === "disable" ? "paused" : "active";
-      return asUser ? reconcile(ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, "owner"))) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
+      return asUser ? reconcile(ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") }))) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
     },
     list: () => list(context),
     /** Read-only, also usable offline: never starts modules or invokes a model or health tool. */

@@ -4,6 +4,9 @@ import type { StewardPorts } from "./ports";
 import { registerModuleEffects, type CallScope } from "./module-supervisor";
 import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
 import { notifyUser } from "./notify-user";
+import { moduleContext } from "./module-context";
+import { moduleIncidents } from "./module-diagnostics";
+import { pauseIn } from "./module-status";
 export type { CallScope } from "./module-supervisor";
 
 export type ModuleExecution = { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date };
@@ -50,11 +53,11 @@ export async function pauseFailedModule(tx: Prisma.TransactionClient, ports: Ste
   const { moduleId, workspaceId } = execution;
   const recent = await tx.moduleRun.findMany({ where: { moduleId, hash: execution.hash, id: { not: runId } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 2 });
   if (recent.length !== 2 || recent.some(run => !run.error)) return;
-  const paused = await tx.module.updateMany({ where: { id: moduleId, status: "active", activeHash: execution.hash }, data: { status: "paused" } });
-  if (!paused.count) return;
-  await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active" }, data: { status: "paused" } });
-  const module = await tx.module.findUnique({ where: { id: moduleId } });
-  await notifyUser(tx, ports, workspaceId, { module: moduleId, ...(module ? { app: module.name } : {}), level: "now", title: "模块连续失败，已暂停", body: `应用 ${module?.name ?? moduleId} 连续三次失败，已停止自动恢复。请在应用页查看故障详情，或运行 chrona admin diagnostics ${module?.name ?? moduleId}。修复后再启用；此前失败调用不会自动重放。`, key: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` });
+  const module = await tx.module.findFirst({ where: { workspaceId, id: moduleId, status: "active", activeHash: execution.hash } });
+  if (!module) return;
+  const incident = (await moduleIncidents(tx, workspaceId, moduleId)).find(item => item.hash === execution.hash && item.evidence.runId === runId);
+  await pauseIn(moduleContext(ports, workspaceId), tx, moduleId, { source: "automatic", reason: "连续三次失败", incidentId: incident?.id });
+  await notifyUser(tx, ports, workspaceId, { module: moduleId, app: module.name, level: "now", title: "模块连续失败，已暂停", body: `应用 ${module.name} 连续三次失败，已停止自动恢复。请在应用页查看故障详情，或运行 chrona admin diagnostics ${module.name}。修复后再启用；此前失败调用不会自动重放。`, key: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` });
 }
 
 registerModuleEffects({ handleModuleCall, pauseFailedModule });
