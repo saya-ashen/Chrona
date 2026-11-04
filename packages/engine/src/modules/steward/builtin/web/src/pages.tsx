@@ -6,11 +6,13 @@ import { createStateStore, type Spec, type StateStore } from "@json-render/core"
 import { catalog } from "../catalog";
 import { CollapsedText, Time } from "./display";
 import { systemCall, type SystemHost } from "./system/adapter";
-import { SystemContext, systemComponents } from "./system/components";
+import { SystemContext } from "./system/action";
+import { systemComponents } from "./system/components";
 import { todayData, todaySpec } from "./system/today";
 import { loginSpec } from "./system/login";
 import { activityData, activitySpec } from "./system/activity";
 import { appsData, appsSpec } from "./system/apps";
+import { detailData, detailSpec, type DetailRoute } from "./system/detail";
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
@@ -124,6 +126,9 @@ const { registry } = defineRegistry(catalog, {
       return <div className="row"><button type="button" disabled={current <= 1} onClick={() => go(current - 1)}>上一页</button><span className="muted">第 {current} / {props.totalPages} 页</span><button type="button" disabled={current >= props.totalPages} onClick={() => go(current + 1)}>下一页</button></div>;
     },
     Collapsible: ({ props, children }: Props<{ title: string; defaultOpen?: boolean | null }>) => <details open={!!props.defaultOpen}><summary>{props.title}</summary>{children}</details>,
+    TabNav: ({ props }: Props<{ items: { label: string; href: string; current: boolean }[] }>) => <nav className="tabs" aria-label="应用标签">{props.items.map(item => <a key={item.href} href={item.href} className={item.current ? "selected" : undefined} aria-current={item.current ? "page" : undefined}>{item.label}</a>)}</nav>,
+    Article: ({ children }: Props<Record<string, never>>) => <article>{children}</article>,
+    Preformatted: ({ props }: Props<{ text: string }>) => <pre>{props.text}</pre>,
     Markdown,
     Image,
     Time: ({ props }: Props<{ value: string }>) => <Time value={props.value} />,
@@ -207,10 +212,12 @@ export function mount(element: HTMLElement, page: Page, deps: Deps) {
 }
 
 /** The adapter and extra components exist only for system pages mounted here. */
-export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps", host: SystemHost, navigate: Deps["navigate"], message?: string) {
-  const spec = name === "today" ? todaySpec : name === "activity" ? (state: Args) => activitySpec(state, message) : name === "apps" ? appsSpec : () => loginSpec(message);
-  const data = name === "today" ? todayData : name === "activity" ? activityData(message ?? "") : name === "apps" ? appsData : {};
-  const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}) };
+export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app", host: SystemHost, navigate: Deps["navigate"], message?: string) {
+  const route: DetailRoute = name === "app" || name === "system-app" ? JSON.parse(message!) as DetailRoute : { id: "", tab: "overview", session: "" };
+  const specs: Record<string, (state: Args) => Spec> = { today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
+  const sources: Record<string, Page["data"]> = { today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
+  const spec = specs[name]!, data = name === "app" || name === "system-app" ? detailData(route, name === "system-app") : sources[name]!;
+  const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}), ...(name === "app" ? { needs: { tools: ["query"], recent: ["module"] } } : {}) };
   const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };
   const root = createRoot(element);
   root.render(<PageView page={page} deps={deps} system={{ spec }} />);

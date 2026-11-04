@@ -1,5 +1,9 @@
 import { strict as assert } from "node:assert";
-import { runInNewContext } from "node:vm";
+import { builder } from "./src/system/spec";
+import { diagnosticNodes, checksText } from "./src/system/diagnostics";
+import { detailSpec, selectedTab } from "./src/system/detail";
+import { settingValue } from "./src/system/forms";
+import type { Diagnostic } from "./src/system/detail-types";
 import { catalog } from "./catalog";
 import { pageErrors } from "./pages";
 import { systemCall } from "./src/system/adapter";
@@ -50,9 +54,7 @@ async function get(path: string, init: RequestInit = {}) {
 }
 const post = async (path: string, body: unknown) => get(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 // Exercise the shipped render functions with a node-recording h; no browser/DOM dependency.
-async function checkHealthRendering(source: string) {
-  const nodes: unknown[] = [];
-  const h = (tag: string, attrs: Args = {}, ...children: unknown[]) => ({ tag, attrs, children: children.flat(), replaceChildren: (...next: unknown[]) => { nodes.push(next); }, addEventListener: () => {} });
+async function checkHealthRendering() {
   const view = { approvals: [], upcoming: [], updates: [], apps: [], sessions: [], problems: [] as Args[] };
   const health = { configuredStatus: "paused", runtime: { state: "paused" }, activeHash: "same-hash",
     activation: { activationId: "current", hash: "same-hash", status: "verified", observedCapabilities: ["tool:read"] },
@@ -64,40 +66,40 @@ async function checkHealthRendering(source: string) {
       { activationId: "earlier", attribution: "activation" },
       { attribution: "legacy-unattributed" },
     ].map(item => ({ ...item, hash: "same-hash", status: "unresolved", failures: 1, lastAt: "2026-11-04", evidence: { reason: "失败" }, attempts: [], pendingTriggers: [] })) };
-  const code = source.slice(source.indexOf("const runtimeText"), source.indexOf("const APP_TABS"))
-    + ";globalThis.panel = diagnosticPanel;";
-  const context = { h, when: (iso: string) => iso, main: { replaceChildren: (...children: unknown[]) => { nodes.push(children); } },
-    web: async (path: string) => path === "/today" ? view : path === "/runs" ? [] : [health],
-    render: async () => {}, panel: (_meta: Args) => ({}) };
-  runInNewContext(code, context);
   const rendered = () => JSON.stringify(todaySpec({ today: view, runs: [] }));
   assert.doesNotMatch(rendered(), /需要处理的应用/);
-  nodes.length = 0;
   view.problems = ["unresolved", "verifying", "retrying", null].map(incidentStatus => ({ module: "示例应用", moduleId: "app-1", incidentStatus, contractFailures: 4, nextAction: "检查实际效果" }));
   const today = rendered();
   for (const text of ["需要处理的应用（4）", "/apps/app-1", "未解决，需要处理", "连接已恢复，功能待验证", "正在有限恢复", "输出不符合契约 4 次", "检查实际效果"]) assert.ok(today.includes(text), text);
   assert.ok(today.indexOf("需要处理的应用") < today.indexOf("接下来"));
-  nodes.length = 0;
-  context.panel({ id: "app-1", name: "示例应用" });
-  await new Promise(resolve => setTimeout(resolve, 0));
-  const diagnostics = JSON.stringify(nodes);
+  const b = builder();
+  diagnosticNodes(b, { view: health as Diagnostic }, "app-1", "示例应用");
+  const diagnostics = JSON.stringify(b.finish("诊断", []));
   const ordered = ["配置：已暂停", "当前版本 same-hash", "连续失败 2/3", "连接已恢复，功能待验证", "待验证能力：tool:write", "此前调用结果不确定", "输出契约不符 4 次（当前版本）", "检查实际效果", "记录较多，摘要可能不完整", "已采取保护：自动恢复受阻", "历史"];
   for (const [index, text] of ordered.entries()) {
     assert.ok(diagnostics.includes(text), text);
     if (index) assert.ok(diagnostics.indexOf(ordered[index - 1]!) < diagnostics.indexOf(text), text);
   }
   for (const label of ["当前版本 · 版本", "更早的启用 · 版本", "旧记录（归属未知） · 版本", "故障证据", "已观测功能：tool:read"]) assert.ok(diagnostics.includes(label), label);
-  type Node = { tag: string; attrs: Args; children: (Node | string)[] };
-  const incidents = (nodes.at(-1) as Node[]).filter(node => node.tag === "article").slice(-3);
-  assert.deepEqual(incidents.map(node => (node.children[0] as Node).children[0]), ["未解决，需要处理", "更早的启用", "旧记录（归属未知）"]);
-  assert.equal(incidents[0]!.children[1], "");
-  for (const node of incidents.slice(1)) {
-    const status = node.children[1] as Node;
-    assert.equal(status.attrs.class, "muted");
-    assert.deepEqual(status.children, ["该次启用结束时：未解决，需要处理"]);
+  const articles = Object.values(b.finish("", []).elements).filter(node => node.type === "Article").slice(-3);
+  assert.deepEqual(articles.map(node => b.finish("", []).elements[node.children![0]!]!.props.text), ["未解决，需要处理", "更早的启用", "旧记录（归属未知）"]);
+  for (const article of articles.slice(1)) {
+    const status = b.finish("", []).elements[article.children![1]!]!;
+    assert.equal(status.props.variant, "muted");
+    assert.equal(status.props.text, "该次启用结束时：未解决，需要处理");
   }
+  assert.equal(checksText({ tests: { count: 3, failed: 0 } }), "测试 3 项全部通过");
+  assert.equal(checksText({ tests: { count: 3, failed: 1 }, smoke: "passed" }), "测试 3 项，失败 1；smoke: passed");
+  const readable = builder();
+  diagnosticNodes(readable, { view: { ...health, evolution: [{ ...health.evolution[0]!, checks: { tests: { count: 3, failed: 1 } } }] } as Diagnostic }, "app-1", "示例应用");
+  assert.match(JSON.stringify(readable.finish("", [])), /检查：测试 3 项，失败 1/);
+  const failed = builder(); diagnosticNodes(failed, { failure: "offline" }, "app-1", "示例应用");
+  assert.match(JSON.stringify(failed.finish("", [])), /诊断读取失败：offline.*chrona admin diagnostics 示例应用/);
+  const empty = builder(); diagnosticNodes(empty, { view: { ...health, evolution: [], incidents: [] } as Diagnostic }, "app-1", "示例应用");
+  assert.match(JSON.stringify(empty.finish("", [])), /还没有故障记录；不代表所有功能已经过验证/);
+
 }
-async function checkSystemPages() {
+async function checkAdapter() {
   const mapped: unknown[] = [];
   const call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async (...args) => { mapped.push(args); return {}; }, login: async key => { mapped.push(["login", key]); } });
   for (const name of ["today", "runs", "modules"]) await call(`$web.${name}`, {});
@@ -112,9 +114,51 @@ async function checkSystemPages() {
   await call("$web.activity", {});
   await call("$web.activity", { module: "a/b &中", before: "2026-11-04T10:00:00+08:00" });
   assert.deepEqual(mapped, [["/system-apps"], ["/activity?"], ["/activity?module=a%2Fb+%26%E4%B8%AD&before=2026-11-04T10%3A00%3A00%2B08%3A00"]]);
+  mapped.length = 0;
+  for (const name of ["overview", "diagnostics", "transcript"]) await call(`$web.${name}`, { id: "a/b 中" });
+  await call("$web.settings-save", { id: "a/b", values: { on: true, count: 2, text: "x" } });
+  await call("$web.secret-save", { id: "a/b", value: { token: "fake" } });
+  await call("$web.secret-remove", { id: "a/b", field: "token" });
+  await call("$web.secret-remove", { id: "a/b" });
+  await call("$web.authorize", { id: "a/b", value: { provider: "google", scopes: "read", account: "work" } });
+  await call("$web.revoke", { id: "g/1" });
+  await call("$web.call", { target: "app.read", args: { count: 2 } });
+  await call("$web.memory", { query: "a/b 中" });
+  await call("$web.forget", { id: "m/1" });
+  await call("$web.settings", {});
+  await call("$web.settings-update", { settings: { moduleModel: { moduleDailyCalls: { example: 4 } } } });
+  assert.deepEqual(mapped, [
+    ["/modules/a%2Fb%20%E4%B8%AD/overview"], ["/modules/a%2Fb%20%E4%B8%AD/diagnostics"], ["/sessions/a%2Fb%20%E4%B8%AD/transcript"],
+    ["/modules/a%2Fb/settings", { method: "POST", body: { values: { on: true, count: 2, text: "x" } } }],
+    ["/secrets/a%2Fb", { method: "POST", body: { value: { token: "fake" } } }], ["/secrets/a%2Fb/remove", { method: "POST", body: { field: "token" } }], ["/secrets/a%2Fb/remove", { method: "POST", body: {} }],
+    ["/secrets/a%2Fb/authorize", { method: "POST", body: { provider: "google", scopes: "read", account: "work" } }], ["/grants/g%2F1/revoke", { method: "POST", body: {} }],
+    ["/call", { method: "POST", body: { target: "app.read", args: { count: 2 } } }], ["/memory?query=a%2Fb%20%E4%B8%AD"], ["/memory/forget", { method: "POST", body: { id: "m/1" } }], ["/settings"], ["/settings", { method: "POST", body: { moduleModel: { moduleDailyCalls: { example: 4 } } } }],
+  ]);
+  const readMapped: unknown[] = [];
+  const reads = systemCall({ web: async (...args) => { readMapped.push(args); return { items: ["recent"] }; }, tool: async () => ({}), login: async () => {} });
+  await reads("$web.tools", { query: "a/b 中" }); await reads("$web.pages", {});
+  assert.deepEqual(await reads("$web.detail-activity", { module: "a/b 中" }), ["recent"]);
+  await reads("$web.memory", {});
+  assert.deepEqual(readMapped, [["/tools?query=a%2Fb%20%E4%B8%AD"], ["/pages"], ["/activity?module=a%2Fb%20%E4%B8%AD"], ["/memory"]]);
   const optional = systemCall({ web: async () => { throw new Error("offline"); }, tool: async () => ({}), login: async () => {} });
   assert.deepEqual(await optional("$web.system-apps", {}), []);
+  assert.deepEqual(await optional("$web.diagnostics", { id: "x" }), { failure: "offline" });
+  assert.deepEqual(await optional("$web.pages", {}), []);
+  assert.deepEqual(await optional("$web.detail-activity", { module: "x" }), []);
   await assert.rejects(optional("$web.activity", {}), /offline/);
+  await assert.rejects(call("files.today", {}), /未知系统操作/);
+  await assert.rejects(call("$web.constructor", {}), /未知系统操作/);
+}
+function checkDetailSpecs() {
+  assert.equal(selectedTab("unknown"), "overview"); assert.equal(selectedTab("permissions", true), "overview"); assert.equal(selectedTab("settings", true, "session"), "overview");
+  for (const [type, value, checked, expected] of [["boolean", "on", true, true], ["boolean", "", false, false], ["number", "2.5", false, 2.5], ["text", "文本", false, "文本"]] as const) assert.equal(settingValue(type, value, checked), expected);
+  const overview = { app: { id: "app/1", name: "example", status: "active", health: {}, activeHash: "abc", runs: [], versions: [] }, settings: { declarations: {}, values: {} }, permissions: { capabilities: [], grants: [], approvals: [], secrets: [], model: null }, activity: [] };
+  const fallback = detailSpec({ overview }, { id: "app/1", tab: "unknown", session: "" });
+  const tabs = Object.values(fallback.elements).find(node => node.type === "TabNav")!.props.items as { current: boolean; href: string }[];
+  assert.equal(tabs[0]!.current, true); assert.equal(tabs.filter(tab => tab.current).length, 1); assert.equal(tabs[0]!.href, "/apps/app%2F1?tab=overview");
+  assert.match(JSON.stringify(detailSpec({ overview: {} }, { id: "missing", tab: "overview", session: "" })), /没有这个应用/);
+}
+function checkListSpecs() {
   for (const filtered of [false, true]) {
     for (const before of [null, "older"]) {
       const spec = activitySpec({ activity: { items: [
@@ -140,8 +184,8 @@ async function checkSystemPages() {
     if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 自身的一部分"]) assert.ok(serialized.includes(expected));
   }
   assert.match(JSON.stringify(appsSpec({})), /加载中/);
-  await assert.rejects(call("files.today", {}), /未知系统操作/);
-  await assert.rejects(call("$web.constructor", {}), /未知系统操作/);
+}
+function checkDisplayAndReach() {
   for (const value of ["", "bad", null, undefined]) {
     assert.equal(localTime(value), "时间未知");
     assert.equal(Time({ value }).props.children, "时间未知");
@@ -149,11 +193,17 @@ async function checkSystemPages() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["Approval", "Question", "SystemAction", "ActivityMore", "LoginForm"]) {
+  for (const type of ["Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };
   assert.ok(pageErrors({ spec: escaped }, new Map(), "files").length);
+}
+async function checkSystemPages() {
+  await checkAdapter();
+  checkDetailSpecs();
+  checkListSpecs();
+  checkDisplayAndReach();
 }
 try {
   await checkSystemPages();
@@ -167,7 +217,7 @@ try {
   assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8");
   const source = await script.text();
   assert.match(source, /\/api\/web/);
-  await checkHealthRendering(source);
+  await checkHealthRendering();
   assert.equal((await get("/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
   // Pages apps register are drawn by pages.js, built from src/pages.tsx.
   const pagesScript = await get("/pages.js");

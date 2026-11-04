@@ -1,23 +1,14 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStateStore, type ComponentRenderProps } from "@json-render/react";
 import type { ActivityPage } from "./activity";
+import { SettingsForm, ToolForm, ModelCap } from "./forms";
+import { Credentials } from "./credentials";
+import { DiagnosticRefresh, MemoryPanel, SessionWork } from "./detail-components";
 import { Time } from "../display";
 import type { Approval as ApprovalData, Interaction } from "./today";
+import { useAction } from "./action";
 
 type Args = Record<string, unknown>;
-export const SystemContext = createContext<{ call: (tool: string, args: Args) => Promise<unknown>; refresh: () => void } | null>(null);
-function useAction() {
-  const context = useContext(SystemContext)!;
-  const [pending, setPending] = useState(false), [error, setError] = useState("");
-  const busy = useRef(false);
-  const act = async (work: () => Promise<void>) => {
-    if (busy.current) return;
-    busy.current = true; setPending(true); setError("");
-    try { await work(); } catch (error) { setError((error as Error).message); }
-    finally { busy.current = false; setPending(false); }
-  };
-  return { ...context, pending, error, act };
-}
 export function SystemAction({ props }: { props: { label: string; tool: string; args: Args; confirm?: string } }) {
   const action = useAction();
   return <div><button type="button" disabled={action.pending} onClick={() => {
@@ -80,4 +71,5 @@ export function ActivityMore({ props }: { props: { module: string } }) {
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm };
+export const systemComponents = { Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
+  SettingsForm: component(SettingsForm), ToolForm: component(ToolForm), ModelCap: component(ModelCap), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };
