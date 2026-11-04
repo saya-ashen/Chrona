@@ -150,8 +150,10 @@ test.each(["version", "manifest", "trigger"])("invalid module metadata %s fails 
   if (kind === "trigger") await f.db.schedule.update({ where: { id: f.schedule.id }, data: { triggerId: "missing" } });
   await f.fire();
   expect(f.calls).toHaveLength(0);
-  expect((await f.db.moduleRun.findFirstOrThrow()).error).toBeTruthy();
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).failures).toBe(1);
+  expect(await f.db.moduleRun.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(0);
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("active");
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ failures: 1, lastResult: expect.stringContaining("Module exit") });
 });
 
 test("rollback-replaced schedule cannot execute, including stale rows selected before rollback", async () => {

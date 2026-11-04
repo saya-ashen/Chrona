@@ -9,6 +9,8 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { moduleContext } from "./module-context";
+import { recordModuleActivation } from "./module-evolution";
 // Provider-visible system module tools, including diagnostics and development references.
 const MODULES_TOOLS = 13;
 import { notice, notices } from "./test-notices";
@@ -35,6 +37,7 @@ async function fixture() {
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send", "provider.wake"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
+  await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash", generationId: "fixture" }));
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
   const run = (await api.runs.claimNext("foreground"))!;
   return { db, ports, service, module, manifest, tool, session, run, calls, workspaceId,
@@ -114,8 +117,9 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
 });
 test("module failure returns truncated public stderr and shares the consecutive failure pause", async () => {
   const f = await fixture();
-  await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "hash", triggerId: "daily", firedAt: f.ports.now(), exitCode: 1, error: "scheduled failure" } });
   f.fail("x".repeat(3000));
+  const now = f.ports.now().toISOString();
+  await expect(moduleSupervisor(f.ports).deliver(f.module.id, "hash", { trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} })).rejects.toThrow();
   for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "conflict", message: "x".repeat(2000) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   expect(await f.db.moduleRun.count()).toBe(3);

@@ -5,6 +5,9 @@ import { createModules } from "./modules";
 import { registerSystemModules } from "./system-modules";
 import { callSync } from "./module-calls";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleContext } from "./module-context";
+import { recordModuleActivation } from "./module-evolution";
+import { moduleFailurePolicy } from "./module-failure-policy";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
@@ -15,10 +18,13 @@ async function fixture() {
   const workspace = await db.workspace.create({ data: { name: "diagnostics" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const ports = { db, dataDir: "/not-used-for-read-only-diagnostics", publicUrl: null, now: () => new Date("2026-10-25T14:00:00Z") };
-  const fail = (extra: Partial<Parameters<typeof recordModuleFailure>[1]> = {}) => db.$transaction(tx => recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, hash: "v1", now: ports.now(), retry: true, evidence, ...extra }));
-  const recovery = (trigger?: string, hash = "v1") => recordModuleRecovery(ports, { workspaceId: workspace.id, moduleId: module.id, hash, activationId: null, triggerId: trigger });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
+  const { activationId } = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
+  let execution = 0;
+  const fail = (extra: Partial<Parameters<typeof recordModuleFailure>[1]> = {}) => db.$transaction(tx => recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, activationId, hash: "v1", now: ports.now(), retry: true, ...extra, evidence: { ...(extra.evidence ?? evidence), runId: `run-${++execution}` } }));
+  const recovery = (trigger?: string, hash = "v1") => recordModuleRecovery(ports, { workspaceId: workspace.id, moduleId: module.id, hash, activationId, triggerId: trigger, ...(trigger ? { runId: `success-${++execution}` } : {}) });
   const incidents = () => moduleIncidents(db, workspace.id, module.id);
-  return { db, workspace, module, ports, fail, recovery, incidents };
+  return { db, workspace, module, ports, activationId, fail, recovery, incidents };
 }
 
 test("repeated failures form one durable incident; connection alone and an unrelated event do not verify recovery", async () => {
@@ -28,9 +34,9 @@ test("repeated failures form one durable incident; connection alone and an unrel
   expect(await f.incidents()).toMatchObject([{ id: first.id, failures: 3, status: "unresolved", firstEvidence: { stderr: "panic: Failed to start HTTP Client thread" }, evidence: { reason: "Module start timeout", signal: "SIGABRT", virtualMemoryMb: 512 } }]);
   await f.recovery();
   expect(await f.incidents()).toMatchObject([{ status: "verifying", failures: 3 }]);
-  const count = await f.db.audit.count();
+  const count = await f.db.audit.count({ where: { kind: "module_runtime_incident" } });
   await f.recovery(); await f.recovery("tool:other");
-  expect(await f.db.audit.count()).toBe(count);
+  expect(await f.db.audit.count({ where: { kind: "module_runtime_incident" } })).toBe(count);
   await f.recovery("tool:fetch");
   const [recovered] = await f.incidents();
   expect(recovered).toMatchObject({ status: "recovered", deliveryUnknown: true, failures: 3, attempts: expect.arrayContaining([expect.objectContaining({ action: "verified" })]) });
@@ -76,6 +82,47 @@ test("version changes cannot silently resolve an older incident; evidence and at
     for (let i = 0; i < 12; i++) await f.fail();
     expect((await f.incidents())[0]!.attempts).toHaveLength(10);
   } finally { if (old === undefined) delete process.env[key]; else process.env[key] = old; }
+});
+
+test.each([
+  { outcomes: ["failure", "connected", "failure"], consecutiveFailures: 2, total: 2 },
+  { outcomes: ["failure", "success", "failure", "failure"], consecutiveFailures: 2, total: 3 },
+  { outcomes: ["failure", "failure", "success", "failure"], consecutiveFailures: 1, total: 3 },
+  { outcomes: ["failure", "failure", "failure"], consecutiveFailures: 3, total: 3 },
+])("one durable policy separates the execution streak from incident totals: %p", async ({ outcomes, consecutiveFailures, total }) => {
+  const f = await fixture();
+  for (const outcome of outcomes) {
+    if (outcome === "failure") await f.fail();
+    else await f.recovery(outcome === "success" ? "tool:other" : undefined);
+  }
+  expect(await moduleFailurePolicy(f.db, { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", activationId: f.activationId })).toMatchObject({ consecutiveFailures, shouldPause: consecutiveFailures >= 3 });
+  expect(await f.incidents()).toMatchObject([{ failures: total, pendingTriggers: ["tool:fetch"] }]);
+  const snapshots = await f.db.audit.findMany({ where: { kind: "module_runtime_incident" }, orderBy: { createdAt: "asc" } });
+  expect(snapshots.map(row => (row.details as { revision: number }).revision)).toEqual(snapshots.map((_, i) => i + 1));
+});
+
+test("legacy hash-only incidents stay unattributed and immutable, never merged or recovered by a current activation", async () => {
+  const f = await fixture();
+  const current = (await f.fail())!;
+  const { activationId: _activationId, revision: _revision, attribution: _attribution, ...old } = current;
+  const legacy = { ...old, id: "legacy-incident" };
+  const row = await f.db.audit.create({ data: { workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_runtime_incident", createdAt: new Date("2026-10-26T00:00:00Z"), details: legacy } });
+  const output = await createModules(f.ports, f.workspace.id).diagnostics("example");
+  expect(output[0]!.incidents[0]).toEqual({ ...legacy, attribution: "legacy-unattributed" });
+  expect(output[0]!.incidents[0]).not.toHaveProperty("activationId");
+  expect(output[0]!.incidents[0]).not.toHaveProperty("revision");
+  await f.recovery("tool:fetch");
+  await f.fail();
+  expect((await f.incidents()).find(item => item.id === legacy.id)).toEqual({ ...legacy, attribution: "legacy-unattributed" });
+  expect((await f.db.audit.findUniqueOrThrow({ where: { id: row.id } })).details).toEqual(legacy);
+});
+
+test("duplicate observation of a real failure run changes neither streak nor incident revision", async () => {
+  const f = await fixture();
+  const first = (await f.fail())!;
+  await f.db.$transaction(tx => recordModuleFailure(tx, { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", activationId: f.activationId, retry: true, now: f.ports.now(), evidence: first.evidence }));
+  expect(await f.incidents()).toEqual([first]);
+  expect(await moduleFailurePolicy(f.db, { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", activationId: f.activationId })).toMatchObject({ consecutiveFailures: 1, shouldPause: false });
 });
 
 test("offline diagnostics survive new service objects, are read-only and workspace-scoped", async () => {

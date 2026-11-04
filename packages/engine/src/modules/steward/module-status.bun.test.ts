@@ -4,6 +4,8 @@ import { moduleContext } from "./module-context";
 import { pauseFailedModule } from "./module-effects";
 import { requestStatus, setStatusIn } from "./module-status";
 import { recordModuleFailure } from "./module-diagnostics";
+import { recordModuleActivation } from "./module-evolution";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
@@ -14,6 +16,8 @@ async function fixture() {
   let now = new Date("2026-11-04T12:00:00Z");
   const ports = { db, dataDir: "/not-used-for-pause", publicUrl: null, now: () => now };
   const context = moduleContext(ports, workspace.id);
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
+  const { activationId } = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
   const schedule = (status = "active", rule = { kind: "every", minutes: 60 } as Record<string, string | number>) => db.schedule.create({ data: {
     workspaceId: workspace.id, moduleId: module.id, mode: "module", triggerId: "daily", text: "timer", createdBy: "chrona", rule, status,
     nextAt: status === "active" ? now : null,
@@ -22,10 +26,10 @@ async function fixture() {
   const failure = async (hash = "v1") => {
     const run = await db.moduleRun.create({ data: { moduleId: module.id, hash, triggerId: "daily", firedAt: now, error: "disconnected", exitCode: -1 } });
     await db.$transaction(async tx => {
-      await recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, hash, now, retry: false, evidence: {
+      await recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, activationId, hash, now, retry: false, evidence: {
         phase: "event", reason: "disconnected", triggerId: "daily", runId: run.id, delivery: "lost", pid: null, exitCode: -1, signal: null, stderr: "", virtualMemoryMb: null,
       } });
-      await pauseFailedModule(tx, ports, { workspaceId: workspace.id, moduleId: module.id, hash, triggerId: "daily", firedAt: now }, run.id);
+      await pauseFailedModule(tx, ports, { workspaceId: workspace.id, moduleId: module.id, hash, activationId, triggerId: "daily", firedAt: now }, run.id);
     });
   };
   const audit = (kind: string) => db.audit.findFirstOrThrow({ where: { workspaceId: workspace.id, subjectId: module.id, kind }, orderBy: { createdAt: "desc" } });

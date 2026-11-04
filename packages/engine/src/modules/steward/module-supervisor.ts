@@ -8,6 +8,7 @@ import { registerBuiltins } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
 import { diagnosticText, recordModuleFailure, recordModuleRecovery, type ModuleFailureEvidence } from "./module-diagnostics";
 import { currentModuleEvolution } from "./module-evolution";
+import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
 import { rollbackFailedStart } from "./module-generation";
 
@@ -16,7 +17,7 @@ type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 export type CallScope = { workspaceId: string; moduleId: string; hash: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
 type ModuleEffects = {
   handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<ReturnType<typeof moduleCallReplySchema.parse>>;
-  pauseFailedModule(tx: Prisma.TransactionClient, ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; triggerId: string; firedAt: Date }, runId: string): Promise<void>;
+  pauseFailedModule(tx: Prisma.TransactionClient, ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date }, runId: string): Promise<void>;
 };
 // module-effects routes a module's calls through module-calls, which delivers through this supervisor: it registers here instead of being imported.
 let effects: ModuleEffects | undefined;
@@ -42,11 +43,12 @@ type Instance = {
   dir?: string; idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
   exit?: { code: number | null; signal: string | null };
   failureEvidence?: ModuleFailureEvidence;
+  failureRecorded?: boolean;
 };
 const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
 const isClosing = (instance: Instance) => instance.closing;
 const RETIRE_GRACE_MS = 1000;
-const keyOf = (moduleId: string, hash: string, activationId?: string | null) => activationId === undefined ? `${moduleId}:${hash}` : `${moduleId}:${hash}:${activationId ?? "untracked"}`;
+const keyOf = (moduleId: string, hash: string, activationId: string | null) => `${moduleId}:${hash}:${activationId ?? "untracked"}`;
 function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
 function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
   const process = instance.process, exit = instance.exit;
@@ -70,7 +72,7 @@ export function moduleSupervisor(ports: StewardPorts) {
 class ModuleSupervisor {
   private readonly instances = new Map<string, Instance>();
   private readonly current = new Map<string, string>();
-  private readonly failures = new Map<string, number>();
+  private readonly backoffFailures = new Map<string, number>();
   private readonly restarts = new Map<string, ReturnType<typeof setTimeout>>();
   private stopped = false;
   private started = false;
@@ -101,8 +103,8 @@ class ModuleSupervisor {
       return false;
     }
   }
-  private async persistFailure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> } & Partial<Omit<Instance, "scope">>, input: { failureKey: string; execution: { workspaceId: string; triggerId: string; firedAt: Date }; detail: ModuleFailureEvidence & { runId: string | null; delivery: DeliveryStage | null }; runId: string | undefined; now: Date }) {
-    const { failureKey, execution, detail, runId, now } = input;
+  private async persistFailure(instance: Instance, input: { execution: { workspaceId: string; triggerId: string; firedAt: Date }; detail: ModuleFailureEvidence & { runId: string | null; delivery: DeliveryStage | null }; runId: string | undefined; now: Date }) {
+    const { execution, detail, runId, now } = input;
     let failureRunId = runId ?? "";
     try { await this.ports.db.$transaction(async tx => {
       const data = { error: diagnosticText(detail.reason, 2000), exitCode: detail.exitCode ?? -1 };
@@ -110,7 +112,7 @@ class ModuleSupervisor {
       failureRunId = run.id;
       const module = await tx.module.findUnique({ where: { id: instance.moduleId } });
       await recordModuleFailure(tx, { workspaceId: execution.workspaceId, moduleId: instance.moduleId, hash: instance.hash, now,
-        retry: !this.stopped && !instance.retiring && !!instance.manifest?.keepAlive && module?.status === "active" && module.activeHash === instance.hash && (this.failures.get(failureKey) ?? 0) < 3,
+        retry: !this.stopped && !instance.retiring && instance.manifest.keepAlive && module?.status === "active" && module.activeHash === instance.hash,
         activationId: instance.activationId, evidence: { ...detail, runId: run.id } });
     }); } catch (error) {
       console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) }));
@@ -122,34 +124,41 @@ class ModuleSupervisor {
     try { return (await rollbackFailedStart(moduleContext(this.ports, workspaceId), instance.moduleId, instance.hash, instance.activationId)).rolledBack; }
     catch (error) { console.error(JSON.stringify({ component: "module-supervisor", event: "module.rollback.failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })); return false; }
   }
-  private async failure(instance: { moduleId: string; hash: string; scope: Pick<CallScope, "workspaceId"> } & Partial<Omit<Instance, "scope">>, error: string, runId?: string, event?: ModuleEvent, delivery?: DeliveryStage) {
+  private async failure(instance: Instance, error: string, runId?: string, event?: ModuleEvent, delivery?: DeliveryStage) {
     const { ports } = this;
+    // The socket and process can report the same exit; a failed event may observe it too.
+    if (instance.failureRecorded) return;
+    instance.failureRecorded = true;
     if (!await this.currentFailure(instance)) return;
-    const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, triggerId: event ? triggerKey(event) : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
-    const failureKey = keyOf(instance.moduleId, instance.hash);
-    this.failures.set(failureKey, (this.failures.get(failureKey) ?? 0) + 1);
+    const now = ports.now(), execution = { workspaceId: instance.scope.workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: event ? triggerKey(event) : "process", firedAt: event ? new Date(event.trigger.firedAt) : now };
+    const failureKey = keyOf(instance.moduleId, instance.hash, instance.activationId);
+    this.backoffFailures.set(failureKey, (this.backoffFailures.get(failureKey) ?? 0) + 1);
     const detail = { ...(instance.failureEvidence ?? evidence(instance, error, runId, event)), reason: diagnosticText(error, 1000), runId: runId ?? null,
       triggerId: execution.triggerId, delivery: delivery ?? null };
     // Journal still has attributed evidence if SQLite itself cannot record the incident.
-    console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure", moduleId: instance.moduleId, module: instance.manifest?.name, hash: instance.hash, ...detail }));
-    const failureRunId = await this.persistFailure(instance, { failureKey, execution, detail, runId, now });
+    console.error(JSON.stringify({ component: "module-supervisor", event: "module.failure", moduleId: instance.moduleId, module: instance.manifest.name, hash: instance.hash, ...detail }));
+    const failureRunId = await this.persistFailure(instance, { execution, detail, runId, now });
     const rolledBack = await this.rollbackFailedStart(instance, execution.workspaceId, event, delivery);
     if (!rolledBack && failureRunId) await ports.db.$transaction(tx => moduleEffects().pauseFailedModule(tx, ports, execution, failureRunId)).catch(pauseError => console.error(JSON.stringify({ component: "module-supervisor", event: "module.pause.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(pauseError), 300) })));
   }
-  private restart(instance: Instance) {
-    if (this.stopped || instance.retiring || !instance.manifest.keepAlive || this.restarts.has(instance.moduleId) || (this.failures.get(keyOf(instance.moduleId, instance.hash)) ?? 0) >= 3) return;
+  private async restart(instance: Instance) {
+    if (this.stopped || instance.retiring || !instance.manifest.keepAlive || this.restarts.has(instance.moduleId)) return;
+    const policy = await moduleFailurePolicy(this.ports.db, { workspaceId: instance.scope.workspaceId, ...instance });
+    // Preserve the local restart execution limit even if evidence could not be persisted/attributed.
+    if (policy?.shouldPause || (this.backoffFailures.get(keyOf(instance.moduleId, instance.hash, instance.activationId)) ?? 0) >= 3) return;
     const timer = this.timers.setTimeout(() => {
       this.restarts.delete(instance.moduleId);
       void this.ensureActive(instance.moduleId).catch(() => {});
-    }, Math.min(60_000, this.backoffMs * 2 ** Math.max(0, (this.failures.get(keyOf(instance.moduleId, instance.hash)) ?? 1) - 1)));
+    }, Math.min(60_000, this.backoffMs * 2 ** Math.max(0, Math.max(policy?.consecutiveFailures ?? 0, this.backoffFailures.get(keyOf(instance.moduleId, instance.hash, instance.activationId)) ?? 1) - 1)));
     this.restarts.set(instance.moduleId, timer);
   }
   private async restartCurrent(instance: Instance) {
     const module = await this.ports.db.module.findUnique({ where: { id: instance.moduleId } });
-    if (module?.status === "active" && module.activeHash && module.activeHash !== instance.hash) {
-      this.failures.delete(keyOf(instance.moduleId, instance.hash));
+    const current = module?.activeHash ? await currentModuleEvolution(this.ports.db, instance.scope.workspaceId, instance.moduleId, module.activeHash) : null;
+    if (module?.status === "active" && module.activeHash && (module.activeHash !== instance.hash || (current?.activationId ?? null) !== instance.activationId)) {
+      this.backoffFailures.delete(keyOf(instance.moduleId, instance.hash, instance.activationId));
       await this.ensureActive(instance.moduleId);
-    } else this.restart(instance);
+    } else if (module?.status === "active") await this.restart(instance);
   }
   private async unexpectedExit(instance: Instance, reason = "Module process exited") {
     if (instance.closing || instance.busy) return;
@@ -350,8 +359,8 @@ class ModuleSupervisor {
       return;
     }
     await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: reply.result } });
-    this.failures.set(keyOf(instance.moduleId, instance.hash), 0);
-    await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event) }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
+    this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
+    await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
   private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult }: DeliveryOptions): Promise<Reply> {
     const { moduleId, hash } = instance;
@@ -361,13 +370,14 @@ class ModuleSupervisor {
       await this.close(instance);
       throw Object.assign(staged(new Error("Module activation changed before event delivery"), "unavailable"), { staleActivation: true });
     }
+    // Admission/metadata rejection is not a real execution result.
+    await this.validateTrigger(instance, event);
     const run = await this.ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: this.ports.now() } });
     instance.busy = true;
     instance.scope.moduleRunId = run.id;
     instance.scope.eventKey = `${event.trigger.id}:${event.trigger.firedAt}`;
     instance.scope.chain = chain; instance.scope.path = path;
     try {
-      await this.validateTrigger(instance, event);
       const reply = await this.sendEvent(instance, event, module.workspaceId, timeoutMs);
       await this.recordEventResult({ instance, event, workspaceId: module.workspaceId, runId: run.id, reply, validateResult });
       return reply;
@@ -381,13 +391,7 @@ class ModuleSupervisor {
   async deliver(moduleId: string, hash: string, event: ModuleEvent, options: DeliveryOptions = {}): Promise<Reply> {
     // A new request must not bypass recovery backoff or count as another failed execution.
     if (this.restarts.has(moduleId)) throw staged(new Error("模块正在等待恢复，请稍后查看诊断状态"), "unavailable");
-    let instance: Instance;
-    try { instance = await this.get(moduleId, hash); }
-    catch (error) {
-      const module = await this.ports.db.module.findUnique({ where: { id: moduleId } });
-      if (!this.stopped && module?.status === "active" && module.activeHash === hash) await this.failure({ moduleId, hash, scope: module }, String(error).slice(0, 2000), undefined, event);
-      throw staged(error, "unavailable");
-    }
+    const instance = await this.get(moduleId, hash).catch(error => { throw staged(error, "unavailable"); });
     if (instance.idle) this.timers.clearTimeout(instance.idle);
     if (options.activationId !== undefined && options.activationId !== instance.activationId) throw staged(new Error("Module activation changed before event delivery"), "unavailable");
     const result = instance.queue.then(() => this.deliverEvent(instance, event, options));

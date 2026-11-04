@@ -11,6 +11,7 @@ import { notices } from "./test-notices";
 import { moduleIncidents } from "./module-diagnostics";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
+import { moduleFailurePolicy } from "./module-failure-policy";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -31,9 +32,10 @@ async function fixture({ keepAlive = false, uses = ["notify.send", "provider.wak
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
+  const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
   const supervisor = createModuleSupervisor(ports, { timers: fakeClock.timers });
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  return { db, module, manifest, ports, supervisor, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
+  return { db, module, manifest, ports, supervisor, activation, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
 }
 test.each([false, true] as const)("start failure rolls back once before delivery; rollback target failure does not bounce (oldFails=%s)", async oldFails => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
@@ -174,6 +176,66 @@ test("event errors pause after three failures and retain one ModuleRun per event
   expect(await f.db.moduleRun.count()).toBe(3);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
 });
+test("same-hash reactivation starts a fresh failure streak and incident", async () => {
+  const f = await fixture({ handler: async () => { throw new Error("bad event"); } });
+  await expect(f.deliver()).rejects.toThrow("bad event");
+  await expect(f.deliver()).rejects.toThrow("bad event");
+  const [old] = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
+  const next = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivation" }));
+  await expect(f.deliver()).rejects.toThrow("bad event");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active" });
+  const incidents = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
+  expect(incidents).toMatchObject([{ activationId: next.activationId, failures: 1, revision: 1 }, { id: old!.id, activationId: f.activation.activationId, failures: 2, revision: old!.revision }]);
+  expect(incidents[0]!.id).not.toBe(old!.id);
+  expect(await moduleFailurePolicy(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: next.activationId })).toMatchObject({ consecutiveFailures: 1, shouldPause: false });
+});
+
+test("supervisor restarts retain the activation's real crash streak and pause on the third exit", async () => {
+  const f = await fixture({ keepAlive: true });
+  let supervisor = f.supervisor;
+  for (let i = 0; i < 3; i++) {
+    await supervisor.start();
+    expect(f.processes).toHaveLength(i + 1);
+    f.processes[i]!.kill();
+    if (i < 2) {
+      await until(() => supervisor.status(f.module.id, "v1", true).state === "backoff");
+      await supervisor.stop();
+      supervisor = createModuleSupervisor(f.ports, { timers: f.timers });
+      const current = supervisor; cleanups.push(() => current.stop());
+    } else await until(async () => (await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status === "paused");
+  }
+  expect(await f.db.moduleRun.count()).toBe(3);
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ failures: 3, activationId: f.activation.activationId, status: "unresolved" }]);
+  await supervisor.reconcile();
+  expect(f.processes).toHaveLength(3);
+});
+
+test.each(["before", "between"] as const)("output mismatches %s execution failures never count toward the pause", async placement => {
+  let fails = false;
+  const f = await fixture({ handler: async () => { if (fails) throw new Error("bad event"); return { result: "wrong type" }; } });
+  const mismatch = () => f.supervisor.deliver(f.module.id, "v1", event, { validateResult: () => "module_output_mismatch" });
+  if (placement === "before") { await mismatch(); await mismatch(); }
+  fails = true; await expect(f.deliver()).rejects.toThrow("bad event");
+  if (placement === "between") { fails = false; await mismatch(); await mismatch(); fails = true; }
+  await expect(f.deliver()).rejects.toThrow("bad event");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active" });
+  expect(await moduleFailurePolicy(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: f.activation.activationId })).toMatchObject({ consecutiveFailures: 2 });
+  await expect(f.deliver()).rejects.toThrow("bad event");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "paused" });
+});
+
+test("one real exit seen by both the socket and process observers counts once", async () => {
+  const f = await fixture({ keepAlive: true });
+  await f.supervisor.start();
+  f.processes[0]!.kill();
+  await until(() => f.supervisor.status(f.module.id, "v1", true).state === "backoff");
+  await Bun.sleep(60);
+  expect(await f.db.moduleRun.count()).toBe(1);
+  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(1);
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ failures: 1, revision: 1 }]);
+  expect(await moduleFailurePolicy(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: f.activation.activationId })).toMatchObject({ consecutiveFailures: 1 });
+});
+
 test("version switch drains old event while new events use the new process; stop kills all", async () => {
   let finish!: () => void;
   const gate = new Promise<void>(resolve => { finish = resolve; });

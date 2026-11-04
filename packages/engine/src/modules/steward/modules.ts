@@ -18,7 +18,7 @@ import { recoverMigrations } from "./module-migration";
 import { readModuleFiles } from "./module-preview";
 import { callModuleTool, moduleToolsets, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, moduleOutputMismatches, incidentNextAction } from "./module-diagnostics";
-import { moduleEvolutionOutcomes } from "./module-evolution";
+import { latestModuleEvolution, moduleEvolutionOutcomes } from "./module-evolution";
 
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
 async function list(context: ModuleContext) {
@@ -26,10 +26,11 @@ async function list(context: ModuleContext) {
   const rows = await db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true, manifest: true, report: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
   return Promise.all(rows.map(async ({ versions, ...row }) => {
     const manifest = moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data;
-    const incident = (await moduleIncidents(db, workspaceId, row.id)).find(item => item.hash === row.activeHash);
+    const activation = row.activeHash ? await latestModuleEvolution(db, workspaceId, row.id, row.activeHash) : null;
+    const incident = (await moduleIncidents(db, workspaceId, row.id)).find(item => item.hash === row.activeHash && item.activationId === (activation?.activationId ?? null));
     return { ...row, description: manifest?.description ?? null,
       runtime: row.status !== "active" ? { state: "paused", pid: null } : moduleSupervisor(context.ports).status(row.id, row.activeHash, manifest?.keepAlive ?? false),
-      incident: incident ? { id: incident.id, hash: incident.hash, status: incident.status, failures: incident.failures, lastAt: incident.lastAt,
+      incident: incident ? { id: incident.id, hash: incident.hash, activationId: incident.activationId, revision: incident.revision, attribution: incident.attribution, status: incident.status, failures: incident.failures, lastAt: incident.lastAt,
         reason: incident.evidence.reason, deliveryUnknown: incident.deliveryUnknown, nextAction: incidentNextAction(incident) } : null,
       versions: versions.map(({ manifest: _manifest, report, ...version }) => ({ ...version, errors: z.object({ errors: z.array(z.string()) }).safeParse(report).data?.errors ?? null })),
     };
@@ -78,7 +79,8 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
         const incidents = await moduleIncidents(context.db, workspaceId, row.id);
         const contractFailures = await moduleOutputMismatches(context.db, workspaceId, row.id);
         const evolution = await moduleEvolutionOutcomes(context.db, workspaceId, row.id);
-        const current = incidents.find(item => item.hash === row.activeHash);
+        const activation = evolution.find(item => item.candidateHash === row.activeHash);
+        const current = incidents.find(item => item.hash === row.activeHash && item.activationId === (activation?.activationId ?? null));
         const version = row.activeHash ? await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash } } }) : null;
         return { module: row.name, moduleId: row.id, activeHash: row.activeHash, configuredStatus: row.status,
           runtime: row.status !== "active" ? { state: "paused", pid: null } : moduleSupervisor(ports).status(row.id, row.activeHash, moduleManifestSchema.safeParse(version?.manifest).data?.keepAlive ?? false),
