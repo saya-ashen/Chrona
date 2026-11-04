@@ -57,7 +57,7 @@ async function activeManifest(ports: StewardPorts, workspaceId: string, name: st
   const version = module.activeHash ? await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
   return { module, manifest: moduleManifestSchema.safeParse(version?.manifest).data ?? null };
 }
-async function settingsView(ports: StewardPorts, workspaceId: string, name: string) {
+export async function settingsView(ports: StewardPorts, workspaceId: string, name: string) {
   const settings = await workspaceSettings(ports, workspaceId), system = listSystemModules().find(module => module.name === name);
   if (system) return system.settings ? { declarations: system.settings.declarations, values: system.settings.read(settings) } : { declarations: {}, values: {} };
   const found = await activeManifest(ports, workspaceId, name);
@@ -151,8 +151,8 @@ export function moduleOverviewExamples() {
     moduleOverviewOutputSchema.parse({ kind: "app", app: { id: "fixture-module", name: "example", status: "active", activeHash: "a".repeat(64) },
       tools: [], permissions: { module: "example", activeHash: "a".repeat(64), capabilities: ["Synthetic capability"], secrets: [{ name: "example_token", configured: false, updatedAt: null, label: "Example API key", description: null, fields: [{ name: "apiKey", label: "API key", description: null, optional: false, plain: false, saved: false }], extraFields: null, savedFields: null, oauth: null }], model: null, grants: [], approvals: [] },
       settings: fixtureSettings(), diagnostics: null, activity }),
-    moduleOverviewOutputSchema.parse({ kind: "system", name: "reflection", description: "Synthetic system module", sessions: "reflect", tools: [{ name: "suggest", description: "Synthetic", inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false }, outputSchema: null, examples: null, sideEffects: null, errors: null,
+    moduleOverviewOutputSchema.parse({ kind: "system", name: "memory", description: "Synthetic system module", sessions: null, tools: [{ name: "recall", description: "Synthetic", inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false }, outputSchema: null, examples: null, sideEffects: null, errors: null,
       idempotent: false, retry: "Unknown async outcomes are not redelivered automatically.", visibility: ["modules"] }], work: [],
-      settings: { declarations: { enabled: { type: "boolean", label: "Enabled", default: true } }, values: { enabled: true } }, activity: [] }),
+      settings: { declarations: { provider: { type: "string", label: "Provider", default: "" } }, values: { provider: "" } }, activity: [] }),
   ].map(json);
 }

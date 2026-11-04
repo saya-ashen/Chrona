@@ -40,7 +40,7 @@ try {
   assert.equal((await json("chrona_activity", { module: "web" })).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(await json("chrona_module_permissions", { module: "web" }), { module: "web", capabilities: [] });
   assert.deepEqual(calls.at(-1), ["modules.permissions", { module: "web" }]);
-  assert.deepEqual(await json("chrona_system_apps", { module: "reflection" }), { name: "reflection", work: [] });
+  assert.deepEqual(await json("chrona_system_apps", { module: "memory" }), { name: "memory", work: [] });
   assert.deepEqual(await json("chrona_app", { module: "okx" }), { kind: "app", module: "okx" });
   assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
   const build = { name: "web", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "authorized-once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };

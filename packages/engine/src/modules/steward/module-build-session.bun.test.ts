@@ -77,8 +77,6 @@ async function fixture() {
 
 test("a build is its own conversation: scoped diagnostics, restricted tools, submission and reply", async () => {
   const f = await fixture();
-  // Keep the synthetic incident from launching an unrelated reflection run in this build-flow test.
-  await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { reflection: { enabled: false } } } });
   const oldHash = "d".repeat(64), oldModule = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "paused", activeHash: oldHash } });
   await f.writeModule(join(f.dataDir, "prior"));
   await cp(join(f.dataDir, "prior", "mail-sort"), join(f.dataDir, "platform", "store", oldHash), { recursive: true });

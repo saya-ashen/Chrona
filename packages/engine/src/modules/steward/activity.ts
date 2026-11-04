@@ -8,7 +8,7 @@ const KINDS = ["approval_created", "approval_resolved", "module_build_started", 
   "module_activate", "module_auto_activated", "module_rollback", "admin_rollback", "module_migration_started", "module_runtime_incident",
   "grant_created", "grant_revoked", "settings_updated", "secret_set", "secret_removed", "reflection_started", "reflection_suggested", "module_settings_updated"] as const;
 const SOURCES: Record<string, string> = { web: "网页", qq: "QQ", mcp: "MCP", cli: "命令行", rescue: "救援控制台", entry: "其他应用" };
-const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建", reflection: "主动反思" };
+const SETTINGS: Record<string, string> = { notifications: "通知", moduleModel: "模块模型", builds: "构建" };
 const SIGNALS: Record<string, string> = { module_activate: "上线", module_auto_activated: "自动更新", module_runtime_incident: "出错" };
 const short = (hash: unknown) => typeof hash === "string" ? hash.slice(0, 8) : "?";
 type Row = { id: string; kind: string; subjectId: string | null; actorKey: string; details: unknown; createdAt: Date };

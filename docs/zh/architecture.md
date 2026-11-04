@@ -13,7 +13,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 ## 2. 内核、系统模块、内置模块与自定义应用
 
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
-- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `chat`、`modules`、`approvals`、`settings`、`schedules`、`provider`、`secrets`、`activity`、`content`；`memory.ts`、`reflection.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
+- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `chat`、`modules`、`approvals`、`settings`、`schedules`、`provider`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
 - **内置模块**位于 `steward/builtin/*`，如 `web`、`mcp`、`qq`、`files`、`notify`、`events`、`remind`、`mind`，随发行版提供，但使用与自定义应用相同的模块运行机制。`memory-local` 是按设置选择才注册的可选实现。
 - **自定义应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。内置应用也可有定制版本；发版不会用内置版覆盖当前定制版，检查通过的发行版副本留作显式恢复目标。
 

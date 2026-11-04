@@ -19,7 +19,6 @@ import { readContentRef } from "./content";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
-import { REFLECT_TOOLS } from "./reflection";
 import { MEMORY_TOOLS, memoryProvider } from "./memory";
 
 type ToolName = keyof typeof schemas;
@@ -124,11 +123,9 @@ const handlers: Record<ToolName, (ctx: ToolContext, raw: unknown) => Promise<unk
   chrona_forget: async (ctx, raw) => ctx.preferences.delete(parseInput(schemas.chrona_forget, raw).preferenceId),
   chrona_preferences: async (ctx, raw) => { parseInput(schemas.chrona_preferences, raw); return ctx.preferences.list(); },
 };
-/** No provider-supplied workspace IDs: all ownership comes from the capability. */
-/** A reflection (v2-19) only reads the facts in its prompt and may start builds through reflection.suggest. */
-const ONLY: Partial<Record<string, string[]>> = { reflect: REFLECT_TOOLS };
 /** A build conversation reports only to the conversation that started it; app tools are the same as in a conversation (security-simplification §3.3). */
 const allowedInBuild = (name: string) => name === "chrona_reply" || name.startsWith("m_");
+/** No provider-supplied workspace IDs: all ownership comes from the capability. */
 export function createTools(ports: StewardPorts) {
   const { db, now } = ports;
   /** `timeoutSeconds` (v2-13): how long the caller waits; tools that wait stop by then, and never past the run's deadline. */
@@ -151,8 +148,6 @@ export function createTools(ports: StewardPorts) {
     const deadline = Math.min(now().getTime() + timeoutSeconds * 1000, run.deadlineAt!.getTime());
     let ok = false;
     try {
-      const only = claim.session ? ONLY[claim.session.source] : undefined;
-      if (only && !only.includes(name)) throw new StewardError("forbidden", `A ${claim.session!.source} conversation may only use ${only.join(", ")}`);
       if (claim.session?.source === "build" && !allowedInBuild(name)) throw new StewardError("forbidden", "A build conversation reports with chrona_reply and uses app tools only");
       if (name.startsWith("m_")) {
         const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline }, name, raw);
@@ -172,10 +167,8 @@ export function createTools(ports: StewardPorts) {
   }
   return { catalog: async (token: string) => {
     const { run, session } = await authenticateRun(db, token, now());
-    if (session?.source === "reflect") return (await moduleToolCatalog(ports, run)).filter(tool => REFLECT_TOOLS.includes(tool.name));
-    // request-group only means something inside a build conversation (v2-15), suggest inside a reflection (v2-19),
-    // memory once there is a provider (v2-21).
-    const hidden = [...REFLECT_TOOLS, ...(await memoryProvider(ports, run.workspaceId) ? [] : MEMORY_TOOLS)], build = session?.source === "build";
+    // request-group only means something inside a build conversation (v2-15), memory once there is a provider (v2-21).
+    const hidden = await memoryProvider(ports, run.workspaceId) ? [] : MEMORY_TOOLS, build = session?.source === "build";
     const apps = (await moduleToolCatalog(ports, run)).filter(tool => (build || tool.name !== "m_modules_request_group") && !hidden.includes(tool.name));
     return [...CHRONA_TOOLS.filter(name => !build || allowedInBuild(name)).map(name => ({ name, inputSchema: z.toJSONSchema(schemas[name]) })), ...apps];
   }, call };

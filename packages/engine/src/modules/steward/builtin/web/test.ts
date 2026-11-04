@@ -15,7 +15,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
-  stub("modules.system", args => ({ name: "reflection", args })),
+  stub("modules.system", args => ({ name: "memory", args })),
   stub("modules.overview", args => ({ kind: "app", module: args.module })), stub("modules.settings-set", args => args),
   stub("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
@@ -66,8 +66,8 @@ try {
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(calls.at(-1), ["activity.list", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
-  assert.equal((await (await get("/api/web/system-apps?module=reflection")).json()).name, "reflection");
-  assert.deepEqual(calls.at(-1), ["modules.system", { module: "reflection" }]);
+  assert.equal((await (await get("/api/web/system-apps?module=memory")).json()).name, "memory");
+  assert.deepEqual(calls.at(-1), ["modules.system", { module: "memory" }]);
   assert.equal((await (await get("/api/web/modules/okx/overview")).json()).module, "okx");
   await post("/api/web/modules/okx/settings", { values: { "max-loss": 50 } });
   assert.deepEqual(calls.at(-1), ["modules.settings-set", { module: "okx", values: JSON.stringify({ "max-loss": 50 }) }]);

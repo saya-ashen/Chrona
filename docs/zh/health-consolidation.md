@@ -1,6 +1,6 @@
 # 应用健康机制整合提案
 
-状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1。步骤 5 已实施（2026-11-04，待验收）：公共 build admission 在串行区按 cause 复用同工作区 queued/running 构建，不读重复请求参考文件、不新增审计或计费；终态允许新建，owner execution 禁带 cause、key 重放不变；cause 写入审计与 request.json，mind 协议关联返回的构建会话。reflection 未改。
+状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1。步骤 5 已实施（2026-11-04）：公共 build admission 在串行区按 cause 复用同工作区 queued/running 构建，不读重复请求参考文件、不新增审计或计费；终态允许新建，owner execution 禁带 cause、key 重放不变；cause 写入审计与 request.json，mind 协议关联返回的构建会话。步骤 6 已实施（2026-11-04）：一次性迁移反思偏好与建议记录、取消在途反思，移除独立反思运行、工具与设置入口，保留历史会话和活动读取。
 
 步骤 1 已完成（2026-11-04）：自动/手动暂停共用实现，审计记录原因、关联 incident（如有）及精确日程 IDs；恢复仅处理最近一次暂停记录的日程，不重放错过或未知工作；历史自动暂停缺 IDs 时保留日程暂停并记录 unrestoredLegacyPause，保留确定性最小通知。
 

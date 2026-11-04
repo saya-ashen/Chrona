@@ -47,19 +47,32 @@ test("settings are changed only within what the active version declares, audited
   expect(await moduleOverview(f.ports, f.w, "okx-trader")).toMatchObject({ kind: "app", settings: { values: { "max-loss": 50 } }, permissions: { module: "okx-trader" } });
 });
 
-test("a system module's settings are its own: reflection's switch and memory's provider go through the owner's settings", async () => {
+test("a system module's settings are its own: memory's provider goes through the owner's settings", async () => {
   const f = await fixture();
-  expect(await setModuleSettings(f.ports, f.w, "reflection", { enabled: false })).toEqual(expect.objectContaining({ values: { enabled: false } }));
   expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "memory-local", autoRetain: false })).toMatchObject({ values: { provider: "memory-local", autoRecall: true, autoRetain: false } });
-  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.w } })).settings).toMatchObject({ reflection: { enabled: false }, memory: { provider: "memory-local", autoRetain: false } });
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.w } })).settings).toMatchObject({ memory: { provider: "memory-local", autoRetain: false } });
   expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "" })).toMatchObject({ values: { provider: "" } });
   await expect(setModuleSettings(f.ports, f.w, "activity", {})).rejects.toThrow("has no settings");
-  expect(await moduleOverview(f.ports, f.w, "reflection")).toMatchObject({ kind: "system", name: "reflection", settings: { declarations: { enabled: { type: "boolean" } } } });
+  expect(await moduleOverview(f.ports, f.w, "memory")).toMatchObject({ kind: "system", name: "memory", settings: { declarations: { autoRecall: { type: "boolean" } } } });
+});
+
+test("retired reflection is not a system app, while its historical activity keeps process links", async () => {
+  const f = await fixture();
+  await expect(moduleOverview(f.ports, f.w, "reflection")).rejects.toThrow();
+  for (const item of [
+    { kind: "reflection_started", subjectId: "old-reflect", details: { signals: [{ kind: "module_activate", module: "example" }] } },
+    { kind: "reflection_suggested", subjectId: "old-build", details: { title: "历史修复", why: "历史原因", modules: ["example"] } },
+  ]) await f.db.audit.create({ data: { workspaceId: f.w, actorKey: "chrona", ...item } });
+  const { items } = await listActivity(f.ports, f.w, { module: "reflection" });
+  expect(items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ text: "Chrona 反思了一次（example 上线）", session: { id: "old-reflect", source: "reflect" } }),
+    expect.objectContaining({ text: "Chrona 开始构建「历史修复」（example）：历史原因", session: { id: "old-build", source: "build" } }),
+  ]));
 });
 
 test("real overview and settings-set results fit their declared output schemas", async () => {
   const f = await fixture();
   moduleSettingsOutputSchema.parse(await setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50 }));
   moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "okx-trader"));
-  for (const name of ["reflection", "memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
+  for (const name of ["memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
 });

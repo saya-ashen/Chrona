@@ -11,6 +11,7 @@
   "secrets": ["mind_intuition"],
   "settings": {
     "enabled": {"type": "boolean", "label": "主动唤醒", "description": "关闭后心智不再唤醒 Chrona。", "default": true},
+    "health-fixes": {"type": "boolean", "label": "自主修复", "description": "发现应用故障时允许 Chrona 自己启动修复构建（检查通过后自动启用；迁移和新凭据仍需你确认）。关闭后只提醒你。", "default": true},
     "interval-minutes": {"type": "number", "label": "感知间隔（分钟）", "default": 15, "min": 5, "max": 120},
     "daily-wakes": {"type": "number", "label": "每 24 小时最多唤醒次数", "default": 6, "min": 1, "max": 24},
     "intuition-url": {"type": "string", "label": "直觉模型接口", "description": "System One 决策接口（Jev 格式，如 https://api.typesafe.ai/v1/systemone）；留空则按规则判断。变化摘要与关注清单（标题按“发给直觉模型的细节”）会发送到该服务。凭据 mind_intuition 的 key 字段作为 Bearer 发送。", "default": "", "maxLength": 500},

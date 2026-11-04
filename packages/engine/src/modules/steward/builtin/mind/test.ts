@@ -46,13 +46,15 @@ try {
   assert.equal(module.calls.length, calls);
   // A changed active hash is an update: by rules, Chrona is woken with a brief carrying the wake id.
   apps = [{ ...apps[0]!, activeHash: "a2" }];
-  await sense(15);
+  await sense(15, { "health-fixes": true });
   assert.equal(wakes().length, 1);
   assert.match(wakes()[0], /price-watch 已更新/);
   assert.match(wakes()[0], /wake-id=w-/);
   assert.match(wakes()[0], /^This run was started by your mind/);
   assert.match(wakes()[0], /Verify first:/);
   assert.match(wakes()[0], /Then m_mind_report/);
+  assert.doesNotMatch(wakes()[0], /自主修复已关闭/);
+  assert.ok(wakes()[0].length <= 4000);
   // Nothing changed since: no wake, and the user's toggle stops it entirely.
   await sense(30);
   await sense(45, { enabled: false });
@@ -68,8 +70,10 @@ try {
   await sense(60);
   assert.equal(wakes().length, 1);
   // Time passing is itself a change: entering the last 24 hours wakes Chrona with the matter in full.
-  await sense(435);
+  await sense(435, { "health-fixes": false });
   assert.equal(wakes().length, 2);
+  assert.match(wakes()[1], /紧急度：[^\n]+\n自主修复已关闭：不要启动修复构建；说明问题和建议，按需提醒用户，并记录关注。\n现在：/);
+  assert.ok(wakes()[1].length <= 4000);
   assert.match(wakes()[1], new RegExp(`due:${concern.id}:24h`));
   assert.match(wakes()[1], /CLS 申请｜waiting-user｜截止 .*（in 23h）/);
   assert.match(wakes()[1], /承诺 .*建了三次提醒/);

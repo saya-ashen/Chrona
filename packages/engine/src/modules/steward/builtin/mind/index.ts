@@ -276,13 +276,16 @@ function detail(concern: Concern, now: number) {
 }
 /** The wake brief (v2-28 §6.1): data for the woken Chrona; the kernel adds how to think about it. Most important first, so clipping drops the tail. */
 // eslint-disable-next-line max-params -- Explicit inputs keep the pure wake-brief formatter independent of mutable module state.
-function brief(entry: Entry, decision: Decision, sensed: Sensed, fresh: Signal[], concerns: Concern[], recent: Stats, now: number) {
+function brief(entry: Entry, decision: Decision, sensed: Sensed, fresh: Signal[], concerns: Concern[], recent: Stats, options: { now: number; healthFixes: boolean }) {
+  const { now, healthFixes } = options;
   const review = decision.source === "daily", first = new Set([decision.focus, ...fresh.flatMap(signal => signal.concern ? [signal.concern] : [])]);
   const list = ordered(concerns, first);
   const head = review ? "类型：每日回顾——逐条过一遍未关闭的关注。"
     : `来源：${decision.source}${decision.answer ? `（直觉 wake=${decision.answer.wake.toFixed(2)}）` : ""}；主要关注：${decision.focus}；紧急度：${decision.urgency.toFixed(2)}`;
   return [
-    `心智唤醒简报 wake-id=${entry.id}`, head, `现在：${new Date(now).toISOString()}`,
+    `心智唤醒简报 wake-id=${entry.id}`, head,
+    ...(!healthFixes ? ["自主修复已关闭：不要启动修复构建；说明问题和建议，按需提醒用户，并记录关注。"] : []),
+    `现在：${new Date(now).toISOString()}`,
     "", "本次变化：", ...(fresh.length ? fresh.map(signal => `- [${signal.key}] ${clip(signal.text, 200)}${signal.ref ? ` (ref: ${refText(signal.ref)})` : ""}`) : ["- 无"]),
     "", `近期：上次唤醒 ${lastWake(recent, now) ?? "无"}；7 天唤醒 ${recent.wakes7d} 次，有效 ${recent.useful7d}，无事 ${recent.nothing7d}，未报告 ${recent.unreported7d}`,
     `上下文：${JSON.stringify(sensed.context)}`,
@@ -328,7 +331,7 @@ async function judge(trigger: string, nowIso: string, params: Params, state: Sta
     wake: decision.wake, focus: decision.focus, urgency: decision.urgency, changes: fresh.map(signal => signal.key), refs: fresh.flatMap(signal => signal.ref ? [refText(signal.ref)] : []) };
   if (decision.wake && !allowed(params, state, decision.urgency, now)) { await agenda.log({ ...entry, blocked: true }); return; }
   if (decision.wake) {
-    await chrona.wakeProvider({ key: "wake", prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, now)}` });
+    await chrona.wakeProvider({ key: "wake", prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, { now, healthFixes: params["health-fixes"] !== false })}` });
     state.wakes.push(nowIso);
     if (review) state.lastReview = nowIso;
   }

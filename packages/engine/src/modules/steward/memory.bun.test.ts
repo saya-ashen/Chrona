@@ -74,7 +74,7 @@ if (!sandbox.health.available) console.info("SKIP memory end to end: module sand
     expect(input.text).toContain("Recalled memories");
     expect(input.text).toContain("okx 实验不要自动操作");
     expect(await autoRecall(ports, w, session, [{ direction: "in", text: "okx", at: new Date() }])).toBeNull();
-    // Build and reflection conversations are never recalled for.
+    // Build conversations are never recalled for.
     expect(await autoRecall(ports, w, { id: "b", source: "build" }, [{ direction: "in", text: "okx", at: new Date() }])).toBeNull();
 
     // Retained every four user messages, from where the last retain stopped.

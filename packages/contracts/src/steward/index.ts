@@ -23,6 +23,7 @@ export const relativePathSchema = z.string().trim().min(1).max(500)
 
 // ---------------------------------------------------------------- vocab ----
 
+// "reflect": stored history of the removed reflection loop; nothing creates such sessions any more.
 export const SESSION_SOURCES = ["web", "qq", "mcp", "rescue", "wake", "module", "build", "reflect"] as const;
 export const SESSION_STATUSES = ["active", "ended"] as const;
 export const RUN_LANES = ["foreground", "background", "build"] as const;
@@ -336,7 +337,7 @@ export function grantedUses(manifest: { uses?: readonly string[]; secrets?: read
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "reflection", "memory"] as const;
+export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "memory"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 export const moduleCallSchema = z.discriminatedUnion("method", [
@@ -473,8 +474,6 @@ export const buildSettingsSchema = z.object({
   timeoutMinutes: z.number().int().min(5).max(120),
   maxSubmissions: z.number().int().min(1).max(20),
 }).strict();
-/** v2-19: whether Chrona reflects on what changed and starts builds on its own (default on). */
-export const reflectionSettingsSchema = z.object({ enabled: z.boolean() }).strict();
 /** v2-21: which module provides memory (null: none), and whether conversations recall at their start and retain as they go. */
 export const memorySettingsSchema = z.object({ provider: slug.nullable(), autoRecall: z.boolean(), autoRetain: z.boolean() }).strict();
 /** Rotation of a QQ or web conversation before the next message: idle past the prompt cache's life with at least minContextTokens, or past maxContextTokens. */
@@ -482,7 +481,6 @@ export const sessionSettingsSchema = z.object({ idleMinutes: z.number().int().mi
 export const DEFAULT_SESSION_SETTINGS = { idleMinutes: 60, minContextTokens: 30_000, maxContextTokens: 100_000 } as const;
 export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
-  reflection: reflectionSettingsSchema,
   memory: memorySettingsSchema,
   sessions: sessionSettingsSchema,
   builds: buildSettingsSchema,
@@ -530,7 +528,7 @@ export const moduleScheduleSchema = z.object({
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), reflection: reflectionSettingsSchema.optional(), memory: memorySettingsSchema.partial().optional(), sessions: sessionSettingsSchema.partial().optional() }).strict();
+export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), memory: memorySettingsSchema.partial().optional(), sessions: sessionSettingsSchema.partial().optional() }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
