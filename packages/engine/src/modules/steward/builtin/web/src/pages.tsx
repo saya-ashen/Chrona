@@ -12,6 +12,7 @@ import { todayData, todaySpec } from "./system/today";
 import { loginSpec } from "./system/login";
 import { activityData, activitySpec } from "./system/activity";
 import { appsData, appsSpec } from "./system/apps";
+import { settingsData, settingsSpec } from "./system/settings";
 import { detailData, detailSpec, type DetailRoute } from "./system/detail";
 
 type Args = Record<string, unknown>;
@@ -212,10 +213,10 @@ export function mount(element: HTMLElement, page: Page, deps: Deps) {
 }
 
 /** The adapter and extra components exist only for system pages mounted here. */
-export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app", host: SystemHost, navigate: Deps["navigate"], message?: string) {
+export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app" | "settings", host: SystemHost, navigate: Deps["navigate"], message?: string) {
   const route: DetailRoute = name === "app" || name === "system-app" ? JSON.parse(message!) as DetailRoute : { id: "", tab: "overview", session: "" };
-  const specs: Record<string, (state: Args) => Spec> = { today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
-  const sources: Record<string, Page["data"]> = { today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
+  const specs: Record<string, (state: Args) => Spec> = { settings: settingsSpec, today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
+  const sources: Record<string, Page["data"]> = { settings: settingsData, today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
   const spec = specs[name]!, data = name === "app" || name === "system-app" ? detailData(route, name === "system-app") : sources[name]!;
   const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}), ...(name === "app" ? { needs: { tools: ["query"], recent: ["module"] } } : {}) };
   const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };

@@ -17,6 +17,8 @@ export function systemCall(host: SystemHost) {
     diagnostics: args => host.web(`/modules/${id(args)}/diagnostics`).then(result => { const view = (result as unknown[])[0]; if (!view) throw new Error("没有诊断记录"); return { view }; }).catch((error: Error) => ({ failure: error.message })),
     "settings-save": args => post(`/modules/${id(args)}/settings`, { values: args.values }),
     settings: () => host.web("/settings"),
+    "schedule-update": args => post(`/schedules/${id(args)}`, { status: args.status }),
+    "preference-forget": args => post(`/preferences/${id(args)}/forget`, {}),
     "settings-update": args => post("/settings", args.settings),
     "secret-save": args => post(`/secrets/${id(args)}`, { value: args.value }),
     "secret-remove": args => post(`/secrets/${id(args)}/remove`, args.field ? { field: args.field } : {}),
