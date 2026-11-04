@@ -56,6 +56,7 @@ button.danger { background: #d33; border-color: #d33; color: #fff; }
 .system-page { min-width: 0; overflow-wrap: anywhere; }
 .system-page section { margin-bottom: 0; }
 .system-page .approval { padding: .35rem 0; }
+.system-page li h3 { margin: 0; }
 .notification-body { margin: .2rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 480px) { header { flex-wrap: wrap; } header nav { flex-wrap: wrap; } }
 div[style*="z-index: 50"] > div { background: var(--card) !important; color: var(--fg) !important; border: 1px solid var(--line); }

@@ -11,6 +11,6 @@ export function Time({ value }: { value: unknown }) {
 }
 export function CollapsedText({ content, limit = 160 }: { content: string; limit?: number }) {
   const [expanded, setExpanded] = useState(false);
-  const body = String(content ?? ""), long = body.length > limit;
+  const body = String(content), long = body.length > limit;
   return <div><p className="notification-body">{long && !expanded ? `${body.slice(0, limit)}…` : body}</p>{long ? <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "收起" : "展开全文"}</button> : null}</div>;
 }

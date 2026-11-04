@@ -4,6 +4,8 @@ import { catalog } from "./catalog";
 import { pageErrors } from "./pages";
 import { systemCall } from "./src/system/adapter";
 import { todaySpec } from "./src/system/today";
+import { activitySpec } from "./src/system/activity";
+import { appsSpec } from "./src/system/apps";
 import { localTime, Time } from "./src/display";
 import { loginSpec } from "./src/system/login";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
@@ -62,7 +64,7 @@ async function checkHealthRendering(source: string) {
       { activationId: "earlier", attribution: "activation" },
       { attribution: "legacy-unattributed" },
     ].map(item => ({ ...item, hash: "same-hash", status: "unresolved", failures: 1, lastAt: "2026-11-04", evidence: { reason: "失败" }, attempts: [], pendingTriggers: [] })) };
-  const code = source.slice(source.indexOf("const runtimeText"), source.indexOf("async function apps()"))
+  const code = source.slice(source.indexOf("const runtimeText"), source.indexOf("const APP_TABS"))
     + ";globalThis.panel = diagnosticPanel;";
   const context = { h, when: (iso: string) => iso, main: { replaceChildren: (...children: unknown[]) => { nodes.push(children); } },
     web: async (path: string) => path === "/today" ? view : path === "/runs" ? [] : [health],
@@ -105,7 +107,41 @@ async function checkSystemPages() {
   await call("$web.feedback", { id: "n", feedback: "useful" });
   await call("$web.login", { key: " fixture " });
   assert.deepEqual(mapped, [["/today"], ["/runs"], ["/modules"], ["/approvals/a%2Fb/resolve", { method: "POST", body: { decision: "deny", scope: "once" } }], ["/interactions/q/answer", { method: "POST", body: { decision: "submit", value: false } }], ["/runs/r/cancel", { method: "POST", body: {} }], ["notify.feedback", { id: "n", feedback: "useful" }], ["login", "fixture"]]);
+  mapped.length = 0;
+  await call("$web.system-apps", {});
+  await call("$web.activity", {});
+  await call("$web.activity", { module: "a/b &中", before: "2026-11-04T10:00:00+08:00" });
+  assert.deepEqual(mapped, [["/system-apps"], ["/activity?"], ["/activity?module=a%2Fb+%26%E4%B8%AD&before=2026-11-04T10%3A00%3A00%2B08%3A00"]]);
+  const optional = systemCall({ web: async () => { throw new Error("offline"); }, tool: async () => ({}), login: async () => {} });
+  assert.deepEqual(await optional("$web.system-apps", {}), []);
+  await assert.rejects(optional("$web.activity", {}), /offline/);
+  for (const filtered of [false, true]) {
+    for (const before of [null, "older"]) {
+      const spec = activitySpec({ activity: { items: [
+        { id: "build", at: "2026-11-04T09:00:00Z", module: "a/b", text: "构建记录", session: { id: "build-id", source: "build" } },
+        { id: "other", at: "bad", module: "a/b", text: "反思记录", session: { id: "session /中", source: "reflect" } },
+      ], before } }, filtered ? "a/b" : "");
+      const elements = Object.values(spec.elements), serialized = JSON.stringify(spec);
+      assert.equal(spec.elements[spec.root]!.props.title, filtered ? "活动 · a/b" : "活动");
+      assert.equal(elements.some(item => item.type === "ActivityMore"), !!before);
+      assert.equal(elements.some(item => item.props.label === "看全部应用"), filtered);
+      assert.equal(elements.some(item => item.props.href === "/activity?module=a%2Fb"), !filtered);
+      for (const expected of ["构建记录", "反思记录", "/sessions/build-id", "/apps/system/a%2Fb?session=session%20%2F%E4%B8%AD", "Time"]) assert.ok(serialized.includes(expected), expected);
+    }
+  }
+  assert.match(JSON.stringify(activitySpec({ activity: { items: [], before: null } })), /还没有活动。/);
+  assert.match(JSON.stringify(activitySpec({})), /加载中/);
+  for (const systemApps of [[], [{ name: "chat", description: "系统对话" }]]) {
+    const spec = appsSpec({ apps: [{ id: "app /", name: "示例", builtin: true, description: "应用说明", health: { runtime: { state: "running" }, incident: { status: "unresolved" } } }], systemApps });
+    const serialized = JSON.stringify(spec);
+    assert.match(serialized, /运行中 · 未解决，需要处理 · 内置 · 应用说明/);
+    assert.ok(serialized.includes("/apps/app%20%2F"));
+    assert.equal(Object.values(spec.elements).some(item => item.props.title === "系统"), !!systemApps.length);
+    if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 自身的一部分"]) assert.ok(serialized.includes(expected));
+  }
+  assert.match(JSON.stringify(appsSpec({})), /加载中/);
   await assert.rejects(call("files.today", {}), /未知系统操作/);
+  await assert.rejects(call("$web.constructor", {}), /未知系统操作/);
   for (const value of ["", "bad", null, undefined]) {
     assert.equal(localTime(value), "时间未知");
     assert.equal(Time({ value }).props.children, "时间未知");
@@ -113,7 +149,7 @@ async function checkSystemPages() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["Approval", "Question", "SystemAction", "LoginForm"]) {
+  for (const type of ["Approval", "Question", "SystemAction", "ActivityMore", "LoginForm"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };

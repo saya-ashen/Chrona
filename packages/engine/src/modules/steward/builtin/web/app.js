@@ -204,15 +204,6 @@ function diagnosticPanel(meta) {
   void load();
   return h("section", { class: "diagnostics" }, h("h2", {}, "故障与恢复"), h("p", { class: "muted" }, "只读记录，不调用模型，不重放失败操作。"), refresh, body);
 }
-async function apps() {
-  const [items, system] = await Promise.all([web("/modules"), web("/system-apps").catch(() => [])]);
-  main.replaceChildren(h("section", {}, h("h2", {}, "应用"),
-    h("ul", { class: "plain" }, items.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ",
-      h("span", { class: "muted" }, `${runtimeText(app.health)} · ${app.health.incident ? `${faultText(app.health.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))),
-    // v2-20: Chrona's own modules: shown, never built, updated or paused.
-    system.length ? h("section", {}, h("h2", {}, "系统"), h("p", { class: "muted" }, "Chrona 自身的一部分，随 Chrona 版本更新，只能查看。"),
-      h("ul", { class: "plain" }, system.map(app => h("li", {}, h("a", { href: `/apps/system/${app.name}` }, app.name), " ", h("span", { class: "muted" }, app.description))))) : "");
-}
 // v2-23: one page per app, in tabs; everything about an app is here, Settings keeps only what is global.
 const APP_TABS = [["overview", "概览"], ["settings", "设置"], ["permissions", "权限"], ["activity", "活动"], ["versions", "版本"]];
 const SYSTEM_TABS = [["overview", "概览"], ["settings", "设置"], ["tools", "工具"], ["activity", "活动"]];
@@ -392,24 +383,6 @@ async function currentVersion(meta) {
     h("p", {}, h("strong", {}, `当前版本 ${String(meta.activeHash ?? "无").slice(0, 8)}`), switched ? h("span", { class: "muted" }, ` · ${when(switched.at)} · ${switched.text}`) : null),
     recent.length > 1 ? h("ul", { class: "plain" }, recent.filter(item => item !== switched).slice(0, 5).map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.text))) : null,
     h("p", {}, h("a", { href: `/activity?module=${encodeURIComponent(meta.name)}` }, "查看全部活动")));
-}
-// ---------------------------------------------------------------- activity --
-async function activity(params) {
-  const module = params.get("module") ?? "", items = h("ul", { class: "plain" }), more = h("button", { type: "button", hidden: true }, "更早的");
-  let before = null;
-  const load = async () => {
-    const query = new URLSearchParams({ ...(module ? { module } : {}), ...(before ? { before } : {}) });
-    const page = await web(`/activity?${query}`);
-    items.append(...page.items.map(item => h("li", {}, h("span", { class: "muted" }, when(item.at)), " ", item.module && !module ? h("a", { href: `/activity?module=${encodeURIComponent(item.module)}` }, item.module) : null, item.module && !module ? " · " : null, item.text,
-      processLink(item))));
-    before = page.before; more.hidden = !before;
-    if (!items.children.length) items.replaceWith(h("p", { class: "muted" }, "还没有活动。"));
-  };
-  more.addEventListener("click", () => load().catch(error => alert(error.message)));
-  main.replaceChildren(h("section", {}, h("h2", {}, module ? `活动 · ${module}` : "活动"),
-    h("p", { class: "muted" }, "Chrona 做过的事：审批与你的决定、AI 复核、应用的检查、启用、自动更新、回滚和故障、授权、设置与凭据的改动（只记名称）。"),
-    module ? h("p", {}, h("a", { href: "/activity" }, "看全部应用")) : null, items, more));
-  await load();
 }
 // Credentials (v2-16): field name + value pairs; saved values are never shown, only whether one is set.
 // v2-17: what the app can do, the grants you gave it and its recent approvals (credentials and model are on its Settings tab).
@@ -596,8 +569,8 @@ async function route() {
     else if (parts[0] === "settings") await settings();
     else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemApp(decodeURIComponent(parts[2]), url.searchParams.get("session"), url.searchParams.get("tab") ?? "overview");
     else if (parts[0] === "apps" && parts[1]) await app(parts[1], url.searchParams.get("tab") ?? "overview");
-    else if (parts[0] === "apps") await apps();
-    else if (parts[0] === "activity") await activity(url.searchParams);
+    else if (parts[0] === "apps") await systemPage("apps");
+    else if (parts[0] === "activity") await systemPage("activity", url.searchParams.get("module") ?? "");
     else await systemPage("today");
   } catch (error) {
     if (error instanceof Unauthorized) await login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);

@@ -12,6 +12,7 @@ const SHADCN = ["Card", "Stack", "Grid", "Separator", "Heading", "Text", "Badge"
 type Definition = { props: z.ZodObject<Record<string, z.ZodType>>; events?: string[]; slots?: string[]; description: string };
 export const components: Record<string, Definition> = {
   ...Object.fromEntries(SHADCN.map(name => [name, (shadcnComponentDefinitions as Record<string, Definition>)[name]!])),
+  List: { props: z.object({}), slots: ["default"], description: "带分隔线的列表；每个子组件作为一个列表项" },
   Image: { props: z.object({
     ref: z.string().describe("本应用内容引用 <本应用名>/<path>；可用 $state/$template 绑定"),
     alt: z.string(), width: z.number().nullable().optional(), height: z.number().nullable().optional(),

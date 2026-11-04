@@ -1,5 +1,5 @@
 // System and registered app pages share the same json-render components and data lifecycle.
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Children, createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp, type ComponentRenderProps } from "@json-render/react";
 import { createStateStore, type Spec, type StateStore } from "@json-render/core";
@@ -9,6 +9,8 @@ import { systemCall, type SystemHost } from "./system/adapter";
 import { SystemContext, systemComponents } from "./system/components";
 import { todayData, todaySpec } from "./system/today";
 import { loginSpec } from "./system/login";
+import { activityData, activitySpec } from "./system/activity";
+import { appsData, appsSpec } from "./system/apps";
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
@@ -97,6 +99,7 @@ const { registry } = defineRegistry(catalog, {
     Card: ({ props, children }: Props<{ title?: string | null; description?: string | null }>) => <section>{props.title ? <h2>{props.title}</h2> : null}{props.description ? <p className="muted">{props.description}</p> : null}{children}</section>,
     Stack: ({ props, children }: Props<{ direction?: string | null; gap?: string | null; align?: string | null }>) => <div style={{ display: "flex", flexDirection: props.direction === "horizontal" ? "row" : "column", flexWrap: props.direction === "horizontal" ? "wrap" : undefined, gap: gap(props.gap), alignItems: props.align ?? undefined }}>{children}</div>,
     Grid: ({ props, children }: Props<{ columns?: number | null; gap?: string | null }>) => <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${Math.max(8, 48 / (props.columns ?? 2))}rem), 1fr))`, gap: gap(props.gap) }}>{children}</div>,
+    List: ({ children }: ComponentRenderProps) => <ul className="plain">{Children.map(children, child => <li>{child}</li>)}</ul>,
     Separator: () => <hr style={{ border: 0, borderTop: "1px solid var(--line)", width: "100%" }} />,
     Heading: ({ props }: Props<{ text: string; level?: string | null }>) => props.level === "h1" || props.level === "h2" || !props.level ? <h2>{props.text}</h2> : <h3>{props.text}</h3>,
     Text: ({ props }: Props<{ text: string; variant?: string | null }>) => <p className={props.variant === "muted" || props.variant === "caption" ? "muted" : undefined} style={{ margin: ".2rem 0", whiteSpace: "pre-wrap" }}>{text(props.text)}</p>,
@@ -204,9 +207,10 @@ export function mount(element: HTMLElement, page: Page, deps: Deps) {
 }
 
 /** The adapter and extra components exist only for system pages mounted here. */
-export function mountSystem(element: HTMLElement, name: "today" | "login", host: SystemHost, navigate: Deps["navigate"], message?: string) {
-  const spec = name === "today" ? todaySpec : () => loginSpec(message);
-  const page: Page = { module: "$web", id: name, title: name, data: name === "today" ? todayData : {}, spec: spec({}) };
+export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps", host: SystemHost, navigate: Deps["navigate"], message?: string) {
+  const spec = name === "today" ? todaySpec : name === "activity" ? (state: Args) => activitySpec(state, message) : name === "apps" ? appsSpec : () => loginSpec(message);
+  const data = name === "today" ? todayData : name === "activity" ? activityData(message ?? "") : name === "apps" ? appsData : {};
+  const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}) };
   const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };
   const root = createRoot(element);
   root.render(<PageView page={page} deps={deps} system={{ spec }} />);

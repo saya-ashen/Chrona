@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { ComponentRenderProps } from "@json-render/react";
+import { useStateStore, type ComponentRenderProps } from "@json-render/react";
+import type { ActivityPage } from "./activity";
 import { Time } from "../display";
 import type { Approval as ApprovalData, Interaction } from "./today";
 
@@ -68,7 +69,15 @@ export function LoginForm() {
     <div className="row"><input aria-label="访问密钥" name="key" type="password" autoComplete="current-password" required value={key} onChange={event => setKey(event.target.value)} /><button className="primary" disabled={action.pending}>保存</button></div>
     {action.error ? <p role="alert" className="error">{action.error}</p> : null}</form>;
 }
+export function ActivityMore({ props }: { props: { module: string } }) {
+  const action = useAction(), store = useStateStore();
+  return <div><button type="button" disabled={action.pending} onClick={() => void action.act(async () => {
+    const current = store.get("/activity") as ActivityPage;
+    const page = await action.call("activity", { module: props.module, before: current.before }) as ActivityPage;
+    store.set("/activity", { items: [...current.items, ...page.items], before: page.before });
+  })}>更早的</button>{action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
+}
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), LoginForm };
+export const systemComponents = { Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm };
