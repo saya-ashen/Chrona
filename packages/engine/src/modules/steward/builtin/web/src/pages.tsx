@@ -1,10 +1,14 @@
-// A page an app registered (module-dependency-direction §4), rendered with json-render in this page's own style.
-// Built into /pages.js and loaded only when such a page opens; data and actions call only the registering app's tools.
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+// System and registered app pages share the same json-render components and data lifecycle.
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp, type ComponentRenderProps } from "@json-render/react";
 import { createStateStore, type Spec, type StateStore } from "@json-render/core";
 import { catalog } from "../catalog";
+import { CollapsedText, Time } from "./display";
+import { systemCall, type SystemHost } from "./system/adapter";
+import { SystemContext, systemComponents } from "./system/components";
+import { todayData, todaySpec } from "./system/today";
+import { loginSpec } from "./system/login";
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
@@ -119,15 +123,24 @@ const { registry } = defineRegistry(catalog, {
     Collapsible: ({ props, children }: Props<{ title: string; defaultOpen?: boolean | null }>) => <details open={!!props.defaultOpen}><summary>{props.title}</summary>{children}</details>,
     Markdown,
     Image,
+    Time: ({ props }: Props<{ value: string }>) => <Time value={props.value} />,
+    CollapsedText: ({ props }: Props<{ content: string; limit?: number }>) => <CollapsedText {...props} />,
   } as never,
   actions: { call: async () => {} },
 });
 const fallback = ({ element }: ComponentRenderProps) => <p className="muted">（这个网页还不能显示组件 {element.type}）</p>;
 
-export function PageView({ page, deps }: { page: Page; deps: Deps }) {
+type System = { spec: (state: Args) => Spec };
+const systemRegistry = { ...registry, ...systemComponents } as typeof registry;
+
+export function PageView({ page, deps, system }: { page: Page; deps: Deps; system?: System }) {
   const [store] = useState(() => createStateStore({ ...(page.spec.state ?? {}) }));
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [loadedAt, setLoadedAt] = useState(0);
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const currentRegistry = system ? systemRegistry : registry;
+  const spec = system ? system.spec(state) : page.spec;
+  const refresh = () => setLoadedAt(value => value + 1);
   const target = (tool: string) => `${page.module}.${tool}`;
   // Each source is read when the page opens, when the state its arguments use changes, and every `refresh` seconds.
   useEffect(() => {
@@ -170,10 +183,15 @@ export function PageView({ page, deps }: { page: Page; deps: Deps }) {
       if (params.reload !== false) setLoadedAt(Date.now());
     },
   };
-  return <JSONUIProvider registry={registry} store={store} handlers={handlers} navigate={deps.navigate}>
-    <div className="registered-page">
+  const systemContext = system ? { call: async (tool: string, args: Args) => {
+    const result = await deps.call(target(tool), args), failed = failure(result);
+    if (failed) throw new Error(failed);
+    return result;
+  }, refresh } : null;
+  return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={deps.navigate}>
+    <div className={system ? "registered-page system-page" : "registered-page"}>
       {feedback ? <p role="status" className={feedback.failed ? "error" : "muted"}>{feedback.text}</p> : null}
-      <ImageContext.Provider value={{ page, deps }}><Renderer spec={page.spec} registry={registry} fallback={fallback} /></ImageContext.Provider>
+      <SystemContext.Provider value={systemContext}><ImageContext.Provider value={{ page, deps }}><Renderer spec={spec} registry={currentRegistry} fallback={fallback} /></ImageContext.Provider></SystemContext.Provider>
     </div>
   </JSONUIProvider>;
 }
@@ -182,5 +200,15 @@ export function PageView({ page, deps }: { page: Page; deps: Deps }) {
 export function mount(element: HTMLElement, page: Page, deps: Deps) {
   const root = createRoot(element);
   root.render(<PageView page={page} deps={deps} />);
+  return () => root.unmount();
+}
+
+/** The adapter and extra components exist only for system pages mounted here. */
+export function mountSystem(element: HTMLElement, name: "today" | "login", host: SystemHost, navigate: Deps["navigate"], message?: string) {
+  const spec = name === "today" ? todaySpec : () => loginSpec(message);
+  const page: Page = { module: "$web", id: name, title: name, data: name === "today" ? todayData : {}, spec: spec({}) };
+  const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };
+  const root = createRoot(element);
+  root.render(<PageView page={page} deps={deps} system={{ spec }} />);
   return () => root.unmount();
 }

@@ -17,6 +17,8 @@ export const components: Record<string, Definition> = {
     alt: z.string(), width: z.number().nullable().optional(), height: z.number().nullable().optional(),
   }), description: "本应用内容区的图片（PNG、JPEG、GIF、WebP）；ref 是 <本应用名>/<path>，可用 $state/$template 绑定，不接受 src URL" },
   Markdown: { props: z.object({ content: z.string() }), description: "Markdown text: headings, lists, tasks, code, bold and links (no HTML)" },
+  Time: { props: z.object({ value: z.string() }), description: "ISO 时间，以 zh-CN 显示本地年月日和时分；空值或无效值显示时间未知" },
+  CollapsedText: { props: z.object({ content: z.string(), limit: z.number().int().min(1).max(2000).optional() }), description: "长正文默认折叠为 160 字，可展开和收起；limit 可调整折叠字数" },
 };
 export const callParams = z.object({
   tool: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/).describe("One of the registering app's own tools"),

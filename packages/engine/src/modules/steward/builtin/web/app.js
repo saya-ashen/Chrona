@@ -1,5 +1,5 @@
-// Chrona's simple web page: plain DOM, no build step. Data comes from this module's /api/web, which makes routed calls
-// for the user (v2-8); requests carry the user's key.
+// Chrona's router and remaining DOM pages. System and registered app pages share /pages.js.
+// Data comes from /api/web through routed calls for the user (v2-8); requests carry the user's key.
 const KEY = "chrona.accessKey"; // the same key the previous web app stored
 const main = document.getElementById("main");
 
@@ -54,84 +54,7 @@ async function listen() {
   }
 }
 
-function login(message) {
-  main.replaceChildren(h("section", {},
-    h("h2", {}, "访问密钥"),
-    h("p", { class: "muted" }, message ?? "请输入 Chrona 的 API_KEY。它只保存在这个浏览器里。"),
-    h("form", { onsubmit: event => { event.preventDefault(); localStorage.setItem(KEY, event.target.key.value.trim()); start(); } },
-      h("div", { class: "row" }, h("input", { name: "key", type: "password", autocomplete: "current-password", required: true }), h("button", { class: "primary" }, "保存")))));
-}
-
-// ------------------------------------------------------------------ today --
-function approvalItem(approval, after) {
-  // v2-18: say what happened in place of the card (and which version now runs), then refresh.
-  const result = h("div", { role: "status" });
-  const decide = (decision, scope = "once") => async event => {
-    const item = event.target.closest("li");
-    for (const button of item.querySelectorAll("button")) button.disabled = true;
-    try {
-      const resolved = await web(`/approvals/${approval.id}/resolve`, { method: "POST", body: { decision, scope } });
-      const app = approval.moduleId ? (await web("/modules")).find(module => module.id === approval.moduleId) : null;
-      const running = app && decision === "approve" ? ` · ${app.name} 当前版本 ${String(app.activeHash ?? "").slice(0, 8)}` : "";
-      item.replaceChildren(h("div", { class: "ok" }, `${resolved.status === "denied" ? "已拒绝" : "已批准"}：${approval.title}${running}`));
-      setTimeout(after, 4000);
-    } catch (error) {
-      result.textContent = `未处理：${error.message}`;
-      for (const button of item.querySelectorAll("button")) button.disabled = false;
-    }
-  };
-  return h("li", { class: "approval" },
-    h("div", {}, h("strong", {}, approval.title), " ", h("span", { class: "muted" }, when(approval.createdAt))),
-    approval.detail && h("div", {}, approval.detail),
-    approval.preview && h("details", {}, h("summary", {}, "详情"), h("pre", {}, approval.preview)),
-    h("div", { class: "row" }, h("button", { class: "primary", onclick: decide("approve") }, "批准"), h("button", { onclick: decide("deny") }, "拒绝")), result);
-}
-// A question a running Provider asked; unanswered questions expire and the run goes on without the answer.
-function interactionItem(interaction, after) {
-  const { question } = interaction;
-  const send = async answer => {
-    try { await web(`/interactions/${interaction.id}/answer`, { method: "POST", body: answer }); after(); }
-    catch (error) { alert(error.message); }
-  };
-  const input = question.method === "editor" ? h("textarea", { rows: 6 }, question.prefill ?? "") : question.method === "input" ? h("input", { type: "text" }) : null;
-  const choices = question.method === "confirm" ? [h("button", { class: "primary", onclick: () => send({ decision: "submit", value: true }) }, "是"), h("button", { onclick: () => send({ decision: "submit", value: false }) }, "否")]
-    : question.method === "select" ? question.options.map((option, index) => h("button", { onclick: () => send({ decision: "submit", value: index }) }, option))
-    : [h("button", { class: "primary", onclick: () => send({ decision: "submit", value: input.value }) }, "提交")];
-  return h("li", {}, h("div", {}, h("strong", {}, question.title), " ", h("span", { class: "muted" }, `${when(interaction.expiresAt)} 前`)),
-    question.message && h("div", {}, question.message), input,
-    h("div", { class: "row" }, ...choices, h("button", { onclick: () => send({ decision: "cancel" }) }, "不回答")));
-}
-async function today() {
-  const [view, runs] = await Promise.all([web("/today"), web("/runs")]);
-  const questions = runs.flatMap(run => run.interactions.filter(interaction => interaction.status === "pending"));
-  const active = runs.filter(run => run.active);
-  const stop = run => async () => {
-    if (!confirm("停止这次处理？已经做完的部分会保留。")) return;
-    try { await web(`/runs/${run.id}/cancel`, { method: "POST" }); today(); } catch (error) { alert(error.message); }
-  };
-  const feedback = (n, value) => async () => { try { await tool("notify.feedback", { id: n.id, feedback: value }); today(); } catch (error) { alert(error.message); } };
-  main.replaceChildren(
-    view.health && !view.health.provider.available ? h("section", {}, h("p", { class: "error" }, `Provider 不可用：${view.health.provider.lastError ?? view.health.provider.name}`)) : "",
-    questions.length ? h("section", {}, h("h2", {}, `Chrona 在问你（${questions.length}）`), h("ul", { class: "plain" }, questions.map(q => interactionItem(q, today)))) : "",
-    active.length ? h("section", {}, h("h2", {}, "正在处理"), h("ul", { class: "plain" }, active.map(run => h("li", {}, run.sessionTitle ?? "后台任务", " ", h("span", { class: "muted" }, run.progress?.phase ?? run.status), " ", h("button", { onclick: stop(run) }, "停止"))))) : "",
-    h("section", {}, h("h2", {}, `待你决定（${view.approvals.length}）`),
-      view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(a => approvalItem(a, today))) : h("p", { class: "muted" }, "没有待处理的事项。")),
-    view.problems.length ? h("section", {}, h("h2", {}, `需要处理的应用（${view.problems.length}）`),
-      h("ul", { class: "plain" }, view.problems.map(problem => h("li", {},
-        h("a", { href: `/apps/${encodeURIComponent(problem.moduleId)}` }, problem.module), " · ",
-        problem.incidentStatus ? faultText(problem.incidentStatus) : `输出不符合契约 ${problem.contractFailures} 次`,
-        h("div", { class: "muted" }, problem.nextAction))))) : "",
-    h("section", {}, h("h2", {}, "接下来"),
-      view.upcoming.length ? h("ul", { class: "plain" }, view.upcoming.map(item => h("li", {}, when(item.at), " · ", item.label ?? item.mode))) : h("p", { class: "muted" }, "七天内没有安排。")),
-    h("section", {}, h("h2", {}, "最近通知"),
-      view.updates.length ? h("ul", { class: "plain" }, view.updates.map(n => h("li", {}, h("strong", {}, n.title), " ", h("span", { class: "muted" }, when(n.createdAt)), h("div", {}, n.body),
-        n.feedback ? h("span", { class: "muted" }, n.feedback === "useful" ? "已标为有用" : "已标为没用") : h("div", { class: "row" }, h("button", { onclick: feedback(n, "useful") }, "有用"), h("button", { onclick: feedback(n, "not_useful") }, "没用"))))) : h("p", { class: "muted" }, "暂无。")),
-    h("section", {}, h("h2", {}, "应用"),
-      h("ul", { class: "plain" }, view.apps.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ", h("span", { class: "muted" }, app.status === "active" ? app.description ?? "" : "已暂停"))))),
-    h("section", {}, h("h2", {}, "最近会话"),
-      h("ul", { class: "plain" }, view.sessions.map(s => h("li", {}, h("a", { href: `/sessions/${s.id}` }, s.title ?? s.key), " ", h("span", { class: "muted" }, `${s.source} · ${when(s.lastActivityAt)}`))))),
-  );
-}
+const login = message => systemPage("login", message);
 
 // ------------------------------------------------------------------- chat --
 // Attachments are kept with the conversation; the page fetches them with the key and hands them over as a download.
@@ -524,7 +447,7 @@ function toolForm(tool) {
     ...properties.map(field), h("div", { class: "row" }, h("button", { class: "primary" }, "执行")), output);
 }
 // ------------------------------------------------------------ app pages --
-// Pages apps register (module-dependency-direction §4): drawn by pages.js (React + json-render), loaded only here.
+// Pages apps register (module-dependency-direction §4): drawn by pages.js with module-scoped calls.
 let unmountPage = null;
 async function registeredPage(module, id) {
   const page = await web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`);
@@ -532,6 +455,16 @@ async function registeredPage(module, id) {
   const view = h("div", {});
   main.replaceChildren(h("h2", {}, page.title), view);
   unmountPage = mount(view, page, { call: (target, args) => tool(target, args), navigate: path => go(path), content: path => web(path, { raw: true }) });
+}
+async function systemPage(name, message) {
+  const { mountSystem } = await import("/pages.js");
+  unmountPage?.();
+  main.replaceChildren();
+  const systemWeb = async (path, options) => {
+    try { return await web(path, options); }
+    catch (error) { if (error instanceof Unauthorized) await login("密钥不正确，请重新输入。"); throw error; }
+  };
+  unmountPage = mountSystem(main, name, { web: systemWeb, tool, login: async key => { localStorage.setItem(KEY, key); await start(); } }, path => go(path), message);
 }
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
 async function pageLinks() {
@@ -665,9 +598,9 @@ async function route() {
     else if (parts[0] === "apps" && parts[1]) await app(parts[1], url.searchParams.get("tab") ?? "overview");
     else if (parts[0] === "apps") await apps();
     else if (parts[0] === "activity") await activity(url.searchParams);
-    else await today();
+    else await systemPage("today");
   } catch (error) {
-    if (error instanceof Unauthorized) login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);
+    if (error instanceof Unauthorized) await login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);
     else main.replaceChildren(h("section", {}, h("p", { class: "error" }, error.message)));
   }
 }
@@ -686,6 +619,9 @@ document.getElementById("logout").addEventListener("click", () => { localStorage
 let listening = false;
 async function start() {
   document.getElementById("logout").hidden = !localStorage.getItem(KEY);
+  if (!localStorage.getItem(KEY)) { await login(); return; }
+  try { await web("/today"); }
+  catch (error) { if (error instanceof Unauthorized) { await login("密钥不正确，请重新输入。"); return; } }
   // Stops on a wrong key; the next start (after login) listens again.
   if (!listening) { listening = true; void listen().finally(() => { listening = false; }); }
   void pageLinks();

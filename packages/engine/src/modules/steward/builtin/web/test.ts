@@ -2,6 +2,10 @@ import { strict as assert } from "node:assert";
 import { runInNewContext } from "node:vm";
 import { catalog } from "./catalog";
 import { pageErrors } from "./pages";
+import { systemCall } from "./src/system/adapter";
+import { todaySpec } from "./src/system/today";
+import { localTime, Time } from "./src/display";
+import { loginSpec } from "./src/system/login";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
@@ -58,19 +62,17 @@ async function checkHealthRendering(source: string) {
       { activationId: "earlier", attribution: "activation" },
       { attribution: "legacy-unattributed" },
     ].map(item => ({ ...item, hash: "same-hash", status: "unresolved", failures: 1, lastAt: "2026-11-04", evidence: { reason: "失败" }, attempts: [], pendingTriggers: [] })) };
-  const code = source.slice(source.indexOf("async function today()"), source.indexOf("// ------------------------------------------------------------------- chat"))
-    + source.slice(source.indexOf("const runtimeText"), source.indexOf("async function apps()"))
-    + ";globalThis.render = today; globalThis.panel = diagnosticPanel;";
+  const code = source.slice(source.indexOf("const runtimeText"), source.indexOf("async function apps()"))
+    + ";globalThis.panel = diagnosticPanel;";
   const context = { h, when: (iso: string) => iso, main: { replaceChildren: (...children: unknown[]) => { nodes.push(children); } },
     web: async (path: string) => path === "/today" ? view : path === "/runs" ? [] : [health],
     render: async () => {}, panel: (_meta: Args) => ({}) };
   runInNewContext(code, context);
-  await context.render();
-  assert.doesNotMatch(JSON.stringify(nodes), /需要处理的应用/);
+  const rendered = () => JSON.stringify(todaySpec({ today: view, runs: [] }));
+  assert.doesNotMatch(rendered(), /需要处理的应用/);
   nodes.length = 0;
   view.problems = ["unresolved", "verifying", "retrying", null].map(incidentStatus => ({ module: "示例应用", moduleId: "app-1", incidentStatus, contractFailures: 4, nextAction: "检查实际效果" }));
-  await context.render();
-  const today = JSON.stringify(nodes);
+  const today = rendered();
   for (const text of ["需要处理的应用（4）", "/apps/app-1", "未解决，需要处理", "连接已恢复，功能待验证", "正在有限恢复", "输出不符合契约 4 次", "检查实际效果"]) assert.ok(today.includes(text), text);
   assert.ok(today.indexOf("需要处理的应用") < today.indexOf("接下来"));
   nodes.length = 0;
@@ -93,7 +95,32 @@ async function checkHealthRendering(source: string) {
     assert.deepEqual(status.children, ["该次启用结束时：未解决，需要处理"]);
   }
 }
+async function checkSystemPages() {
+  const mapped: unknown[] = [];
+  const call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async (...args) => { mapped.push(args); return {}; }, login: async key => { mapped.push(["login", key]); } });
+  for (const name of ["today", "runs", "modules"]) await call(`$web.${name}`, {});
+  await call("$web.resolve", { id: "a/b", decision: "deny" });
+  await call("$web.answer", { id: "q", answer: { decision: "submit", value: false } });
+  await call("$web.cancel", { id: "r" });
+  await call("$web.feedback", { id: "n", feedback: "useful" });
+  await call("$web.login", { key: " fixture " });
+  assert.deepEqual(mapped, [["/today"], ["/runs"], ["/modules"], ["/approvals/a%2Fb/resolve", { method: "POST", body: { decision: "deny", scope: "once" } }], ["/interactions/q/answer", { method: "POST", body: { decision: "submit", value: false } }], ["/runs/r/cancel", { method: "POST", body: {} }], ["notify.feedback", { id: "n", feedback: "useful" }], ["login", "fixture"]]);
+  await assert.rejects(call("files.today", {}), /未知系统操作/);
+  for (const value of ["", "bad", null, undefined]) {
+    assert.equal(localTime(value), "时间未知");
+    assert.equal(Time({ value }).props.children, "时间未知");
+    assert.equal(Time({ value }).props.dateTime, undefined);
+  }
+  assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
+  assert.equal(Object.keys(loginSpec().elements).length, 3);
+  for (const type of ["Approval", "Question", "SystemAction", "LoginForm"]) {
+    assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
+  }
+  const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };
+  assert.ok(pageErrors({ spec: escaped }, new Map(), "files").length);
+}
 try {
+  await checkSystemPages();
   for (const path of ["/", "/today", "/apps/a1?path=README.md", "/sessions/s1"]) {
     const page = await get(path);
     assert.equal(page.headers.get("content-type"), "text/html; charset=utf-8");
@@ -133,6 +160,7 @@ try {
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
   assert.equal((await post("/api/web/call", { target: "approvals.resolve", args: {} })).status, 404);
+  assert.equal((await post("/api/web/call", { target: "$web.resolve", args: {} })).status, 404);
   assert.equal((await get("/api/web/nope")).status, 404);
   assert.deepEqual(await (await post("/api/web/sessions/b1/stop-build", {})).json(), { status: "build_stopped", sessionId: "b1" });
   assert.deepEqual(calls.at(-1), ["modules.stop-build", { session: "b1" }]);
