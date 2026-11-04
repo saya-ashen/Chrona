@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moduleHealthSummarySchema } from "./module-diagnostics";
 import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { moduleOverviewOutputSchema, permissionsSchema } from "./module-overview";
 
@@ -25,8 +26,7 @@ export const approvalRequestOutput = z.object({ approval: z.string(), decision: 
 export const approvalStatusOutput = z.object({ approval: z.string(), status: z.enum(APPROVAL_STATUSES), hash: z.string(), resolvedAt: z.string().nullable() });
 export const modulesListOutput = z.array(appSchema.extend({
   workspaceId: z.string(), dataSchema: z.number().nullable(), createdAt: z.string(), versionCount: z.number().int().optional(),
-  runtime: z.object({ state: z.enum(["paused", "unobserved", "backoff", "running", "starting", "unavailable", "idle"]), pid: z.number().nullable() }),
-  incident: z.object({ id: z.string(), hash: z.string(), status: z.string(), failures: z.number(), lastAt: z.string(), reason: z.string(), deliveryUnknown: z.boolean(), nextAction: z.string() }).nullable(),
+  health: moduleHealthSummarySchema,
   versions: z.array(z.object({ hash: z.string(), status: z.string(), intent: z.json(), createdAt: z.string(), errors: z.array(z.string()).nullable() })),
   runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(), error: z.string().nullable(), createdAt: z.string() })),
 }));

@@ -45,14 +45,17 @@ export async function declaredModules(db: StewardPorts["db"], workspaceId: strin
 
 /** Diagnostics authority comes only from the authenticated Provider run and its kernel-written admission audit. */
 export async function buildDiagnostics(ports: StewardPorts, workspaceId: string, caller: { kind: string; runId?: string }, requested?: string) {
-  if (caller.kind !== "provider" || !caller.runId) throw new StewardError("forbidden", "Build diagnostics require the active build Provider");
-  const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId }, include: { session: true } });
-  if (!run?.session || run.session.source !== "build" || run.session.status !== "active") throw new StewardError("forbidden", "Build diagnostics require an active build conversation");
-  const targets = await buildDiagnosticTargets(ports, workspaceId, run.session.id);
+  const targets = await buildHealthTargets(ports, workspaceId, caller);
   const moduleName = requested ? await authorizedDiagnosticTarget(ports, workspaceId, targets, requested) : singleDiagnosticTarget(targets);
   const module = await ports.db.module.findFirst({ where: { workspaceId, name: moduleName }, select: { id: true } });
   if (!module) throw new StewardError("not_found", "Authorized build target module not found");
   return createModules(ports, workspaceId).diagnostics(module.id);
+}
+export async function buildHealthTargets(ports: StewardPorts, workspaceId: string, caller: { kind: string; runId?: string }) {
+  if (caller.kind !== "provider" || !caller.runId) throw new StewardError("forbidden", "Build diagnostics require the active build Provider");
+  const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId }, include: { session: true } });
+  if (!run?.session || run.session.source !== "build" || run.session.status !== "active") throw new StewardError("forbidden", "Build diagnostics require an active build conversation");
+  return buildDiagnosticTargets(ports, workspaceId, run.session.id);
 }
 async function buildDiagnosticTargets(ports: StewardPorts, workspaceId: string, sessionId: string) {
   const row = await ports.db.audit.findFirst({ where: { workspaceId, kind: "build_request", subjectId: sessionId } });

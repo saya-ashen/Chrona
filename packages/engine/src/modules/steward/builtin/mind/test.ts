@@ -6,7 +6,7 @@ import { startModule } from "chrona/testing";
 process.env.CHRONA_DATA = await mkdtemp("/tmp/mind-data-");
 const at = (minutes: number) => new Date(Date.parse("2026-10-30T00:00:00Z") + minutes * 60_000).toISOString();
 const today = { approvals: [], upcoming: [], updates: [], sessions: [], health: { provider: { available: true } } };
-let apps = [{ name: "price-watch", status: "active", activeHash: "a1", incident: null as null | object }];
+let apps = [{ name: "price-watch", status: "active", activeHash: "a1", health: { incident: null as null | object } }];
 let contributions: { module: string; hash: string; value: unknown }[] = [];
 let calendar: unknown = { items: [] };
 let intuition = { wake: { type: "noul", noul: 0.1 }, focus: { type: "choice", choice: "nothing", confidence: 0.9 }, urgency: { type: "score", score: 0, confidence: 0.9 } };
@@ -131,7 +131,7 @@ try {
   assert.ok(module.calls.some((call: { params: { target?: string; args?: object } }) => call.params.target === "calendar.attention"));
 
   // An unreachable model falls back to the rules, which see the failure, within the wake limits.
-  apps = [{ ...apps[0]!, incident: { id: "i3", status: "unresolved", failures: 5, reason: "timeout" } }];
+  apps = [{ ...apps[0]!, health: { incident: { id: "i3", status: "unresolved", failures: 5, reason: "timeout" } } }];
   await sense(1100, { "intuition-url": "http://127.0.0.1:1/none", "daily-wakes": 5 });
   assert.equal(wakes().length, 5);
   await sense(1115, { "intuition-url": "http://127.0.0.1:1/none" });
@@ -139,7 +139,7 @@ try {
   assert.match(wakes()[5], /来源：rules；主要关注：incident:i3；紧急度：0.80/);
 
   // A long brief still fits provider.wake's 4000-character limit together with the protocol.
-  apps = Array.from({ length: 30 }, (_, i) => ({ name: `app-${i}`, status: "active", activeHash: "a1", incident: { id: `long-${i}`, status: "unresolved", failures: 5, reason: "x".repeat(200) } }));
+  apps = Array.from({ length: 30 }, (_, i) => ({ name: `app-${i}`, status: "active", activeHash: "a1", health: { incident: { id: `long-${i}`, status: "unresolved", failures: 5, reason: "x".repeat(200) } } }));
   await sense(1145, { "daily-wakes": 7 });
   assert.equal(wakes().length, 7);
   assert.equal(wakes()[6].length, 4000);

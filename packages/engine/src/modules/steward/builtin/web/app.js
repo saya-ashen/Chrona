@@ -254,7 +254,7 @@ async function apps() {
   const [items, system] = await Promise.all([web("/modules"), web("/system-apps").catch(() => [])]);
   main.replaceChildren(h("section", {}, h("h2", {}, "应用"),
     h("ul", { class: "plain" }, items.map(app => h("li", {}, h("a", { href: `/apps/${app.id}` }, app.name), " ",
-      h("span", { class: "muted" }, `${runtimeText(app)} · ${app.incident ? `${faultText(app.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))),
+      h("span", { class: "muted" }, `${runtimeText(app.health)} · ${app.health.incident ? `${faultText(app.health.incident.status)} · ` : ""}${app.builtin ? "内置 · " : ""}${app.description ?? ""}`))))),
     // v2-20: Chrona's own modules: shown, never built, updated or paused.
     system.length ? h("section", {}, h("h2", {}, "系统"), h("p", { class: "muted" }, "Chrona 自身的一部分，随 Chrona 版本更新，只能查看。"),
       h("ul", { class: "plain" }, system.map(app => h("li", {}, h("a", { href: `/apps/system/${app.name}` }, app.name), " ", h("span", { class: "muted" }, app.description))))) : "");
@@ -340,7 +340,7 @@ async function app(appId, tab = "overview") {
   const panels = {
     overview: async () => {
       const tools = (await web(`/tools?query=${encodeURIComponent(meta.name)}`)).filter(tool => tool.target.startsWith(`${meta.name}.`));
-      return [h("p", {}, `${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta)}`), meta.description ? h("p", {}, meta.description) : "", await currentVersion(meta),
+      return [h("p", {}, `${meta.status === "active" ? "已启用" : "已暂停"} · ${runtimeText(meta.health)}`), meta.description ? h("p", {}, meta.description) : "", await currentVersion(meta),
         ...(await web("/pages").catch(() => [])).filter(page => page.module === meta.name).map(page => h("p", {}, h("a", { href: pageHref(page) }, `打开${page.title}`))), tools.length ? h("section", {}, h("h2", {}, "操作"), ...tools.map(toolForm)) : ""];
     },
     settings: async () => [h("h3", {}, "配置"), settingsForm(meta.name, view.settings, reload), ...await credentialsPanel(view.permissions, reload), ...await modelCapPanel(meta.name, view.permissions.model, reload)],

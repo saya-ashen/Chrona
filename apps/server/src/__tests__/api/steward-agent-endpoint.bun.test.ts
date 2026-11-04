@@ -20,7 +20,7 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     expect((await app.request("http://localhost/catalog", { headers: { authorization: "Bearer invalid" } })).status).toBe(401);
     expect((await app.request("http://localhost/catalog", { headers: { ...headers, forwarded: "for=127.0.0.1" } })).status).toBe(403);
     const catalog = await app.request("http://localhost/catalog", { headers });
-    expect(catalog.status).toBe(200); expect((await catalog.json()).tools.map((t: { name: string }) => t.name)).toEqual([...CHRONA_TOOLS, ...["list", "diagnostics", "reference", "check", "checkout", "propose", "rollback", "disable", "enable", "remove", "build", "stop_build", "revise_build"].map(name => `m_modules_${name}`)]);
+    expect(catalog.status).toBe(200); expect((await catalog.json()).tools.map((t: { name: string }) => t.name)).toEqual([...CHRONA_TOOLS, ...["list", "diagnostics", "health", "reference", "check", "checkout", "propose", "rollback", "disable", "enable", "remove", "build", "stop_build", "revise_build"].map(name => `m_modules_${name}`)]);
     const diagnostics = await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: "{}" });
     expect(diagnostics.status).toBe(200);
     expect(await diagnostics.json()).toMatchObject({ ok: true, data: { result: [] } });

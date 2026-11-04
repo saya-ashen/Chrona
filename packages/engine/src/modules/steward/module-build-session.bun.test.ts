@@ -109,7 +109,7 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
 
   let report: { status?: string; report?: unknown } = {};
   f.onRun(async (input, call) => {
-    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_diagnostics", "m_modules_request_group"] });
+    expect(input).toMatchObject({ lane: "build", cwd: queued.cwd, extraTools: ["m_modules_propose", "m_modules_check", "m_modules_checkout", "m_modules_reference", "m_modules_diagnostics", "m_modules_health", "m_modules_request_group"] });
     expect(input).toMatchObject({ searchTools: true });
     // App tools as in a conversation; of Chrona's own tools only chrona_reply.
     const catalog = (await f.service.tools.catalog(input.token)).map(tool => tool.name);
@@ -155,9 +155,13 @@ test("multi-module build diagnostics require one declared target and accept its 
   await expect(call({})).rejects.toMatchObject({ code: "invalid" });
   await expect(call({ module: outsider.id })).rejects.toMatchObject({ code: "forbidden" });
   expect(await call({ module: targets[1]!.id })).toMatchObject([{ module: "second-target", moduleId: targets[1]!.id, configuredStatus: "paused" }]);
+  const health = async () => (await f.service.tools.call(run.token, "m_modules_health", {}) as { result: unknown }).result;
+  expect(await health()).toMatchObject({ items: [{ module: "first-target" }, { module: "second-target" }], nextCursor: null });
+  expect((await health() as { items: unknown[] }).items).toHaveLength(2);
   const receipt = await f.db.audit.findFirstOrThrow({ where: { kind: "build_request", subjectId: started.sessionId } });
   await f.db.audit.update({ where: { id: receipt.id }, data: { details: { name: "first-target", modules: "malformed" } } });
   await expect(call({ module: "first-target" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(health()).rejects.toMatchObject({ code: "forbidden" });
 });
 
 test("a candidate with a public tool missing output is rejected before tests run", async () => {
@@ -186,7 +190,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // Explicit targets in uses do not grant access to Provider or owner-only tools.

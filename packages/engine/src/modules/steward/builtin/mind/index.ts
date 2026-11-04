@@ -12,7 +12,7 @@ const MIND_PROTOCOL = `This run was started by your mind to look after the user'
 5. Close: m_mind_note every matter you looked at (conclusion, status, revisitAt, new commitment, escalation); close what is done or dropped and cancel its reminders. Then m_mind_report with the brief's wake-id: acted, notified, asked or nothing, and one sentence why, including when you will look again.`;
 type Params = Record<string, string | number | boolean>;
 type State = { lastCheckAt: string | null; lastHash: string | null; handled: string[]; seen: Record<string, string>; wakes: string[]; calls: string[]; lastReview: string | null };
-type App = { name: string; status: string; activeHash: string | null; incident: { id: string; status: string; failures: number; reason: string } | null };
+type App = { name: string; status: string; activeHash: string | null; health: { incident: { id: string; status: string; failures: number; reason: string } | null } };
 type Today = {
   approvals: { id: string; title: string; status: string; createdAt: string }[];
   upcoming: { label: string | null; at: string }[];
@@ -51,7 +51,7 @@ function appSignals(apps: App[], seen: Record<string, string>): Signal[] {
   // The first sensing only learns what is there; later a new or changed active hash is a launch or an update.
   const learned = Object.keys(seen).length > 0;
   return apps.flatMap(app => [
-    ...(app.incident?.status === "unresolved" ? [{ key: `incident:${app.incident.id}`, kind: "incident" as const, text: `${app.name} 故障且自动恢复已放弃（${app.incident.failures} 次）：${clip(app.incident.reason, 200)}` }] : []),
+    ...(app.health.incident?.status === "unresolved" ? [{ key: `incident:${app.health.incident.id}`, kind: "incident" as const, text: `${app.name} 故障且自动恢复已放弃（${app.health.incident.failures} 次）：${clip(app.health.incident.reason, 200)}` }] : []),
     ...(learned && app.activeHash && seen[app.name] !== app.activeHash ? [{ key: `module:${app.name}:${app.activeHash}`, kind: "module" as const, text: `${app.name} ${seen[app.name] ? "已更新" : "新上线"}` }] : []),
   ]);
 }

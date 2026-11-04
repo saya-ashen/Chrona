@@ -35,7 +35,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 
 supervisor 另有 keepAlive 进程退避重启与连续失败暂停；三败暂停由当前 activationId 的实际执行结果经唯一持久化策略判断（Audit.module_execution_result），supervisor 重建不丢次数，同 hash 再激活不继承次数。成功事件清零，连接及输出契约 mismatch 均不改变连续次数；内存仅负责退避与有限重启执行，incident 与日程累计数不参与暂停判断。新 incident 快照带 activationId 与单调递增的 revision；旧 hash-only 快照保留并标记 legacy-unattributed，不猜测激活。连接恢复只表示待验证，不代表原操作成功，投递结果未知也不会被诊断逻辑偷偷重放。
 
-代码：`steward/module-generation.ts`、`module-activation.ts`、`module-supervisor.ts`、`module-diagnostics.ts`、`module-evolution.ts`。具体资格、证据与人工入口：[模块故障诊断与恢复](module-recovery.md)。
+代码：`steward/module-generation.ts`、`module-activation.ts`、`module-supervisor.ts`、`module-diagnostics.ts`、`module-evolution.ts`。`modules.list` 的当前运行状态与故障摘要位于 `health.runtime`、`health.incident`。具体资格、证据与人工入口：[模块故障诊断与恢复](module-recovery.md)。
 
 ## 5. Routed calls 与接口契约
 

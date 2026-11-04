@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { testDb } from "./test-db";
-import { moduleIncidents, recordModuleFailure, recordModuleRecovery, incidentNextAction, moduleDiagnosticsOutputSchema, type ModuleFailureEvidence } from "./module-diagnostics";
-import { createModules } from "./modules";
+import { moduleIncidents, recordModuleFailure, recordModuleRecovery, incidentNextAction, moduleDiagnosticsOutputSchema, moduleHealthOutputSchema, recordModuleOutputMismatch, type ModuleFailureEvidence } from "./module-diagnostics";
+import { createModules, moduleHealthSummary } from "./modules";
 import { registerSystemModules } from "./system-modules";
 import { callSync } from "./module-calls";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -97,6 +97,7 @@ test.each([
   }
   expect(await moduleFailurePolicy(f.db, { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", activationId: f.activationId })).toMatchObject({ consecutiveFailures, shouldPause: consecutiveFailures >= 3 });
   expect(await f.incidents()).toMatchObject([{ failures: total, pendingTriggers: ["tool:fetch"] }]);
+  expect(await moduleHealthSummary(f.ports, f.workspace.id, f.module)).toMatchObject({ consecutiveFailures, incident: { failures: total } });
   const snapshots = await f.db.audit.findMany({ where: { kind: "module_runtime_incident" }, orderBy: { createdAt: "asc" } });
   expect(snapshots.map(row => (row.details as { revision: number }).revision)).toEqual(snapshots.map((_, i) => i + 1));
 });
@@ -137,6 +138,52 @@ test("offline diagnostics survive new service objects, are read-only and workspa
   const other = await f.db.workspace.create({ data: { name: "other" } });
   await expect(createModules(f.ports, other.id).diagnostics(f.module.id)).rejects.toMatchObject({ code: "not_found" });
   expect(await createModules(f.ports, other.id).diagnostics()).toEqual([]);
+});
+
+test("health separates same-hash activations and legacy history, counts only attributed mismatches and omits stderr", async () => {
+  const f = await fixture(), api = createModules(f.ports, f.workspace.id);
+  const old = (await f.fail({ retry: false }))!;
+  const mismatch = { workspaceId: f.workspace.id, moduleId: f.module.id, hash: "v1", tool: "fetch", callId: "old", issues: ["$.value"], now: f.ports.now() };
+  await recordModuleOutputMismatch(f.db, { ...mismatch, activationId: f.activationId });
+  await recordModuleOutputMismatch(f.db, { ...mismatch, callId: "legacy" });
+  const activation = await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.workspace.id), tx, { moduleId: f.module.id, previousHash: "v1", hash: "v1", generationId: "reactivation" }));
+  const { activationId: _id, revision: _revision, attribution: _attribution, ...legacy } = old;
+  await f.db.audit.create({ data: { workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_runtime_incident", details: { ...legacy, id: "legacy" } } });
+  const [view] = await api.diagnostics("example");
+  expect(view).toMatchObject({ activation: { activationId: activation.activationId }, incident: null, consecutiveFailures: 0, contractFailureCount: 0, open: false, truncated: false });
+  expect(view!.incidents).toEqual(expect.arrayContaining([expect.objectContaining({ id: old.id, status: "unresolved" }), expect.objectContaining({ id: "legacy", attribution: "legacy-unattributed" })]));
+  await recordModuleOutputMismatch(f.db, { ...mismatch, callId: "current", activationId: activation.activationId });
+  const health = await moduleHealthSummary(f.ports, f.workspace.id, f.module);
+  expect(health).toMatchObject({ contractFailureCount: 1, open: true, incident: null });
+  expect(JSON.stringify(health)).not.toContain(evidence.stderr);
+  expect((await api.list())[0]!.health).toEqual(health);
+  expect((await api.list())[0]).not.toHaveProperty("runtime");
+  expect((await api.list())[0]).not.toHaveProperty("incident");
+});
+
+test("health bounded incident scan marks incomplete current evidence", async () => {
+  const f = await fixture(), old = (await f.fail())!;
+  await f.db.audit.createMany({ data: Array.from({ length: 201 }, (_, i) => ({ workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_runtime_incident", createdAt: new Date(f.ports.now().getTime() + i + 1), details: { ...old, activationId: "another-activation", id: `other-${i}` } })) });
+  expect(await moduleHealthSummary(f.ports, f.workspace.id, f.module)).toMatchObject({ incident: null, truncated: true });
+});
+
+test("health pages by name, filters open before pagination and isolates workspaces", async () => {
+  const f = await fixture(), api = createModules(f.ports, f.workspace.id);
+  await f.fail({ retry: false });
+  await f.db.module.createMany({ data: Array.from({ length: 51 }, (_, i) => ({ workspaceId: f.workspace.id, name: `app-${String(i).padStart(2, "0")}` })) });
+  const other = await f.db.workspace.create({ data: { name: "other-health" } });
+  await f.db.module.create({ data: { workspaceId: other.id, name: "foreign" } });
+  // Even a foreign workspace audit using this module's subject must not count.
+  await f.db.audit.create({ data: { workspaceId: other.id, subjectId: f.module.id, kind: "module_output_mismatch", actorKey: "chrona", details: { hash: "v1", activationId: f.activationId, tool: "fetch", callId: "foreign", at: f.ports.now().toISOString(), issues: [] } } });
+  const first = moduleHealthOutputSchema.parse(await api.health());
+  expect(first.items).toHaveLength(50); expect(first.nextCursor).toBe("app-49");
+  const second = await api.health({ cursor: first.nextCursor! });
+  expect(second.items.map(item => item.module)).toEqual(["app-50", "example"]); expect(second.nextCursor).toBeNull();
+  const open = await api.health({ open: true });
+  expect(open.items.map(item => item.module)).toEqual(["example"]); expect(open.nextCursor).toBeNull();
+  expect(open.items[0]).toMatchObject({ contractFailureCount: 0, open: true, incident: { status: "unresolved" } });
+  expect(JSON.stringify(open)).not.toContain(evidence.stderr);
+  expect((await createModules(f.ports, other.id).health()).items.map(item => item.module)).toEqual(["foreign"]);
 });
 
 test("detailed diagnostics admit Provider, owner and every module without a uses entry", async () => {

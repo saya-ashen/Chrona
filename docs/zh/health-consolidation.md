@@ -4,7 +4,9 @@
 
 步骤 1 已完成（2026-11-04）：自动/手动暂停共用实现，审计记录原因、关联 incident（如有）及精确日程 IDs；恢复仅处理最近一次暂停记录的日程，不重放错过或未知工作；历史自动暂停缺 IDs 时保留日程暂停并记录 unrestoredLegacyPause，保留确定性最小通知。
 
-步骤 2 已实施（2026-11-04，工作区待验收）：实际执行结果按 activationId 写入唯一连续失败策略，supervisor 重建保留次数，同 hash 再激活从零开始；删除 ModuleRun.error 回看暂停判断，mismatch 不计失败且不算恢复。内存仅保留退避/有限重启执行状态；incident 累计与单日程统计不决定暂停。新 incident 快照带 activationId 与逐次 revision，旧 hash-only 快照只读标记 legacy-unattributed，禁止猜测激活；进程/socket 重复观察及同 runId 重记均幂等。未更改自动回滚门槛、未知结果/不重放语义或共享契约。步骤 3–7 未实施。
+步骤 2 已实施（2026-11-04，工作区待验收）：实际执行结果按 activationId 写入唯一连续失败策略，supervisor 重建保留次数，同 hash 再激活从零开始；删除 ModuleRun.error 回看暂停判断，mismatch 不计失败且不算恢复。内存仅保留退避/有限重启执行状态；incident 累计与单日程统计不决定暂停。新 incident 快照带 activationId 与逐次 revision，旧 hash-only 快照只读标记 legacy-unattributed，禁止猜测激活；进程/socket 重复观察及同 runId 重记均幂等。未更改自动回滚门槛、未知结果/不重放语义或共享契约。步骤 2 已验收提交（b709d72c）。
+
+步骤 3 已实施（2026-11-04）：`moduleHealthSummary`（`E/modules.ts`）是唯一的当前健康投影，不含 stderr：observedAt、runtime、当前 activation 与已观测能力、策略连续失败数、当前激活的 incident（原因截 300 字）、当前激活的契约失败数、open、nextAction、truncated（有界扫描未能证明完整）。`modules.list` 以 `health` 字段替换原 `runtime`/`incident`；`modules.diagnostics` 在摘要上附历史（incidents/contractFailures/evolution）；新增只读 `modules.health` 按名称分页（每页 50，`open=true` 只列未解决），构建会话的 Provider 只见授权目标。输出 mismatch 记录 activationId，旧 hash-only 记录不计入当前激活。步骤 4–7 未实施。
 
 ## 1. 现状：代码中的事实、判断与动作
 
