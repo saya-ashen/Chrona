@@ -8,11 +8,13 @@ const MIND_PROTOCOL = `This run was started by your mind to look after the user'
 1. Verify first: check the real state of every change and focused matter with tools; never conclude "nothing to do" before checking.
 2. For each matter answer: where does it really stand and what is still missing; what is the worst outcome if nothing happens today, and is it reversible; who can take the missing step (you, within your permissions: do it; only the user: leave them alone if they already know and there is time; needs permission: ask for approval); when to look again.
 3. Move things forward before telling: finish a step yourself > notify the user > do nothing. A notification says what happened, why it matters and what you suggest; for deadlines send only the escalation step now due and record it; fold non-urgent news into the daily digest; ask the user once, clearly, when unsure. At most 3 user-visible actions.
-4. Look further: a repeated failure suggests a fix build; manual work seen a third time suggests an app; a goal without progress gets a concrete next step. Handle an unfocused matter that clearly needs it, and say the intuition missed it.
-5. Close: m_mind_note every matter you looked at (conclusion, status, revisitAt, new commitment, escalation); close what is done or dropped and cancel its reminders. Then m_mind_report with the brief's wake-id: acted, notified, asked or nothing, and one sentence why, including when you will look again.`;
+4. Look further: for health changes read m_modules_diagnostics live and check existing builds before acting; repeated failures may need a fix build. Manual work seen a third time suggests an app; a stalled goal needs a concrete step. Handle unfocused matters that clearly need it.
+5. Close: m_mind_note each assessed matter (conclusion, status, revisit-at, commitment, escalation). For health use source-module-id, source-activation-id, source-incident-id or topic, and assessed-revision from refs. When starting a fix build, note status acting and build-session-id; if the user declines, note declined with their reason; use silent-until for not-before reviews. Close done/dropped matters and cancel reminders. Then m_mind_report with wake-id, outcome (acted/notified/asked/nothing), summary, session-id and build-session-id if started.`;
 type Params = Record<string, string | number | boolean>;
 type State = { lastCheckAt: string | null; lastHash: string | null; handled: string[]; seen: Record<string, string>; wakes: string[]; calls: string[]; lastReview: string | null };
-type App = { name: string; status: string; activeHash: string | null; health: { incident: { id: string; status: string; failures: number; reason: string } | null } };
+type Health = { module: string; moduleId: string; configuredStatus: string; activeHash: string | null; activation: { activationId: string } | null;
+  incident: { id: string; revision: number; status: string; failures: number; reason: string } | null; contractFailureCount: number; open: boolean; truncated: boolean };
+type Ref = NonNullable<Concern["source"]> & { revision: number };
 type Today = {
   approvals: { id: string; title: string; status: string; createdAt: string }[];
   upcoming: { label: string | null; at: string }[];
@@ -21,7 +23,7 @@ type Today = {
   health: { provider: { available: boolean } };
 };
 type Run = { sessionTitle: string | null; interactions: { id: string; status: string; createdAt: string; question: { title?: string } }[] };
-type Signal = { key: string; kind: "incident" | "waiting" | "module" | "approval" | "deadline" | "revisit" | "anomaly" | "pending"; text: string; concern?: string };
+type Signal = { key: string; kind: "incident" | "waiting" | "module" | "approval" | "deadline" | "revisit" | "anomaly" | "pending"; text: string; concern?: string; ref?: Ref };
 type Item = { module: string; id: string; kind: "deadline" | "anomaly" | "pending"; title: string; at?: string };
 type Decision = { wake: boolean; source: Entry["source"]; focus: string; urgency: number; answer?: Answer };
 type Sensed = NonNullable<Awaited<ReturnType<typeof sense>>>;
@@ -47,14 +49,84 @@ function span(iso: string, now: number) {
   return ms >= 0 ? `in ${size}` : `${size} ago`;
 }
 
-function appSignals(apps: App[], seen: Record<string, string>): Signal[] {
-  // The first sensing only learns what is there; later a new or changed active hash is a launch or an update.
+function healthSignals(app: Health): Signal[] {
+  if (!app.open || !app.activation) return [];
+  const { moduleId, incident } = app, { activationId } = app.activation, signals: Signal[] = [];
+  if (incident && (incident.status === "unresolved" || incident.status === "verifying")) {
+    const status = incident.status === "verifying" ? "连接已恢复、功能待验证" : "故障且自动恢复已放弃";
+    signals.push({ key: `health:${moduleId}:${activationId}:${incident.id}:${incident.revision}`, kind: "incident",
+      ref: { moduleId, activationId, incidentId: incident.id, revision: incident.revision }, text: `${app.module} ${status}（${incident.failures} 次）：${clip(incident.reason, 200)}` });
+  }
+  if (app.contractFailureCount > 0) signals.push({ key: `contract:${moduleId}:${activationId}:${app.contractFailureCount}`, kind: "incident",
+    ref: { moduleId, activationId, topic: "contract", revision: app.contractFailureCount }, text: `${app.module} 输出契约不匹配（${app.contractFailureCount} 次）` });
+  return signals;
+}
+function appSignals(apps: Health[], seen: Record<string, string>): Signal[] {
   const learned = Object.keys(seen).length > 0;
-  return apps.flatMap(app => [
-    ...(app.health.incident?.status === "unresolved" ? [{ key: `incident:${app.health.incident.id}`, kind: "incident" as const, text: `${app.name} 故障且自动恢复已放弃（${app.health.incident.failures} 次）：${clip(app.health.incident.reason, 200)}` }] : []),
-    ...(learned && app.activeHash && seen[app.name] !== app.activeHash ? [{ key: `module:${app.name}:${app.activeHash}`, kind: "module" as const, text: `${app.name} ${seen[app.name] ? "已更新" : "新上线"}` }] : []),
+  return apps.flatMap(app => [ ...healthSignals(app),
+    ...(learned && app.activeHash && seen[app.module] !== app.activeHash ? [{ key: `module:${app.module}:${app.activeHash}`, kind: "module" as const, text: `${app.module} ${seen[app.module] ? "已更新" : "新上线"}` }] : []),
   ]);
 }
+async function healthPages(): Promise<Health[] | null> {
+  const items: Health[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const output = await chrona.call("modules.health", cursor ? { cursor } : {}) as { items: Health[]; nextCursor: string | null } | null;
+    if (!output || !Array.isArray(output.items)) return null;
+    items.push(...output.items);
+    cursor = output.nextCursor;
+    if (!cursor) break;
+  }
+  return items;
+}
+function matchesSource(source: Concern["source"], ref: Ref) {
+  return source && source.moduleId === ref.moduleId && source.activationId === ref.activationId && source.incidentId === ref.incidentId && source.topic === ref.topic;
+}
+function pendingSuppression(concern: Concern, now: number) {
+  if (!open(concern)) return undefined;
+  if (concern.silentUntil && Date.parse(concern.silentUntil) > now) return "silent-until";
+  if (concern.status === "acting" && concern.build) return "build in progress";
+  return undefined;
+}
+function suppression(concern: Concern, ref: Ref, now: number): string | undefined {
+  if (!matchesSource(concern.source, ref)) return undefined;
+  if (concern.declined) return "declined";
+  const pending = pendingSuppression(concern, now);
+  if (pending) return pending;
+  if (concern.assessedRevision !== undefined && concern.assessedRevision >= ref.revision) return "revision already assessed";
+  if (!open(concern) && now - Date.parse(concern.updatedAt) <= 30 * DAY) return "closed topic cooldown";
+  return undefined;
+}
+function suppress(signals: Signal[], concerns: Concern[], now: number) {
+  const suppressed: string[] = [];
+  const kept = signals.filter(signal => {
+    const reason = signal.ref && concerns.map(concern => suppression(concern, signal.ref!, now)).find(Boolean);
+    if (reason) suppressed.push(`${signal.key}: ${reason}`);
+    return !reason;
+  });
+  return { signals: kept, suppressed: suppressed.slice(0, 20) };
+}
+async function closeRecovered(concerns: Concern[], apps: Health[], now: number) {
+  const ids = new Set(concerns.filter(open).map(concern => concern.id));
+  return agenda.update(list => {
+    let changed = false;
+    for (const concern of list.filter(item => ids.has(item.id) && open(item))) {
+      const source = concern.source;
+      if (!source?.incidentId) continue;
+      const app = apps.find(item => item.moduleId === source.moduleId);
+      if (!app?.activation) continue;
+      const replaced = app.activation.activationId !== source.activationId;
+      const recovered = app.incident?.id === source.incidentId && app.incident.status === "recovered";
+      if (!replaced && !recovered) continue;
+      concern.status = "done";
+      concern.updatedAt = new Date(now).toISOString();
+      concern.lastAssessment = { at: concern.updatedAt, by: "mind", conclusion: replaced ? "已换新版本，旧激活故障不再适用" : "对应能力已验证恢复（未重放）" };
+      changed = true;
+    }
+    return changed;
+  });
+}
+const refText = (ref: Ref) => `${ref.moduleId}/${ref.activationId}/${ref.incidentId ?? ref.topic}@${ref.revision}`;
 function waitingSignals(today: Today, runs: Run[], now: number): Signal[] {
   const asks = runs.flatMap(run => run.interactions.filter(ask => ask.status === "pending" && !within(now, ask.createdAt, DAY))
     .map(ask => ({ key: `waiting:${ask.id}`, kind: "waiting" as const, text: `「${clip(run.sessionTitle)}」等你回答超过一天：${clip(ask.question.title)}` })));
@@ -71,13 +143,15 @@ function agendaSignals(concerns: Concern[], now: number): Signal[] {
     return signals;
   });
 }
+function validAttention(item: Record<string, unknown>, kind: string | null, at: string | undefined) {
+  return kind && typeof item.id === "string" && /^[\w.-]{1,60}$/.test(item.id) && typeof item.title === "string" && item.title.trim() && (kind !== "deadline" || at);
+}
 function items(module: string, output: unknown): Item[] {
-  // eslint-disable-next-line complexity -- Validate each untrusted attention item together before emitting a usable signal.
   return ((output as { items: unknown[] }).items).slice(0, 20).flatMap(raw => {
     const item = (raw ?? {}) as Record<string, unknown>, at = typeof item.at === "string" && Number.isFinite(Date.parse(item.at)) ? new Date(item.at).toISOString() : undefined;
     const kind = item.kind === "deadline" || item.kind === "anomaly" || item.kind === "pending" ? item.kind : null;
-    if (!kind || typeof item.id !== "string" || !/^[\w.-]{1,60}$/.test(item.id) || typeof item.title !== "string" || !item.title.trim() || (kind === "deadline" && !at)) return [];
-    return [{ module, id: item.id, kind, title: clip(item.title.trim(), 120), ...(at ? { at } : {}) }];
+    if (!validAttention(item, kind, at)) return [];
+    return [{ module, id: item.id as string, kind: kind!, title: clip((item.title as string).trim(), 120), ...(at ? { at } : {}) }];
   });
 }
 /** v2-28 §4.1: apps opt in with contributes.mind.attention, a tool visible to modules; a slow or broken app never blocks sensing. */
@@ -101,22 +175,26 @@ function attentionSignals(found: Item[], now: number): Signal[] {
 }
 /** What changed in Chrona, from its own records, the agenda and what apps hand over: names, clipped titles and states. */
 async function sense(now: number, seen: Record<string, string>, concerns: Concern[]) {
-  const [today, apps, runs, contributed] = await Promise.all([chrona.call("chat.today"), chrona.call("modules.list"), chrona.call("chat.runs"), attention()]) as [Today | null, App[] | null, Run[] | null, Awaited<ReturnType<typeof attention>>];
+  const [today, apps, runs, contributed] = await Promise.all([chrona.call("chat.today"), healthPages(), chrona.call("chat.runs"), attention()]) as [Today | null, Health[] | null, Run[] | null, Awaited<ReturnType<typeof attention>>];
   // Without Chrona's records (e.g. the build's smoke start) there is nothing to judge.
   if (!today || !Array.isArray(apps) || !Array.isArray(runs)) return null;
-  const signals = [...appSignals(apps, seen), ...waitingSignals(today, runs, now), ...agendaSignals(concerns, now), ...attentionSignals(contributed.items, now)];
+  concerns = await closeRecovered(concerns, apps, now);
+  const { signals, suppressed } = suppress([...appSignals(apps, seen), ...waitingSignals(today, runs, now), ...agendaSignals(concerns, now), ...attentionSignals(contributed.items, now)], concerns, now);
   const context = {
     dueWithin24h: today.upcoming.filter(item => Date.parse(item.at) >= now && Date.parse(item.at) - now < DAY).map(item => clip(item.label)).slice(0, 10),
     stalledConversations: today.sessions.filter(session => session.status === "active" && !within(now, session.lastActivityAt, 3 * DAY)).map(session => clip(session.title)).slice(0, 10),
     notUseful: today.updates.filter(update => update.feedback === "not_useful" && within(now, update.createdAt, 7 * DAY)).map(update => clip(update.title)).slice(0, 10),
-    pausedApps: apps.filter(app => app.status === "paused").map(app => app.name),
+    pausedApps: apps.filter(app => app.configuredStatus === "paused").map(app => app.module),
+    healthIncomplete: apps.filter(app => app.truncated).map(app => app.module),
+    suppressed,
     // Absolute times keep the hash stable between sensings; the signals carry how close a deadline is.
     attention: contributed.items.slice(0, 30).map(item => `${item.module} · ${item.kind} · ${item.title}${item.at ? ` · ${item.at.slice(0, 16)}Z` : ""}`),
     attentionUnavailable: contributed.unavailable,
   };
   // The hash covers states and time bands, not when a concern was last written, so the woken Chrona's own notes do not re-trigger it.
-  const summary = { signals: signals.map(signal => signal.key), context, concerns: concerns.filter(open).map(concern => [concern.id, concern.status, concern.escalation, band(concern.dueAt, now), revisitDue(concern, now)]) };
-  return { summary, context, signals, providerAvailable: today.health.provider.available, seen: Object.fromEntries(apps.flatMap(app => app.activeHash ? [[app.name, app.activeHash]] : [])) };
+  const { suppressed: _suppressed, ...stableContext } = context;
+  const summary = { signals: signals.map(signal => signal.key), context: stableContext, concerns: concerns.filter(open).map(concern => [concern.id, concern.status, concern.escalation, band(concern.dueAt, now), revisitDue(concern, now)]) };
+  return { concerns, summary, context, signals, providerAvailable: today.health.provider.available, seen: Object.fromEntries(apps.flatMap(app => app.activeHash ? [[app.module, app.activeHash]] : [])) };
 }
 
 /** Changed and nearest-due matters first. */
@@ -205,7 +283,7 @@ function brief(entry: Entry, decision: Decision, sensed: Sensed, fresh: Signal[]
     : `来源：${decision.source}${decision.answer ? `（直觉 wake=${decision.answer.wake.toFixed(2)}）` : ""}；主要关注：${decision.focus}；紧急度：${decision.urgency.toFixed(2)}`;
   return [
     `心智唤醒简报 wake-id=${entry.id}`, head, `现在：${new Date(now).toISOString()}`,
-    "", "本次变化：", ...(fresh.length ? fresh.map(signal => `- [${signal.key}] ${clip(signal.text, 200)}`) : ["- 无"]),
+    "", "本次变化：", ...(fresh.length ? fresh.map(signal => `- [${signal.key}] ${clip(signal.text, 200)}${signal.ref ? ` (ref: ${refText(signal.ref)})` : ""}`) : ["- 无"]),
     "", `近期：上次唤醒 ${lastWake(recent, now) ?? "无"}；7 天唤醒 ${recent.wakes7d} 次，有效 ${recent.useful7d}，无事 ${recent.nothing7d}，未报告 ${recent.unreported7d}`,
     `上下文：${JSON.stringify(sensed.context)}`,
     "", "关注清单：", ...(list.length ? list.map(concern => review || first.has(concern.id) ? detail(concern, now) : `- ${concern.id} ${concern.title}｜${concern.status}${concern.dueAt ? `｜截止 ${span(concern.dueAt, now)}` : ""}`) : ["- （清单为空）"]),
@@ -227,16 +305,19 @@ async function tick(trigger: string, nowIso: string, params: Params) {
   if (params.enabled === false || !due(trigger, params, state, now)) return;
   state.lastCheckAt = nowIso;
   const concerns = await agenda.concerns(), sensed = await sense(now, state.seen, concerns);
-  if (sensed) await judge(trigger, nowIso, params, state, sensed, concerns);
+  if (sensed) await judge(trigger, nowIso, params, state, sensed, sensed.concerns);
   await agenda.write("state.json", state);
 }
-// eslint-disable-next-line complexity, max-params -- Keep decision logging and wake-budget checks in their existing ordered lifecycle.
+function reviewDue(trigger: string, state: State, concerns: Concern[], hash: string, now: number) {
+  return trigger === "daily" && !(state.lastReview && within(now, state.lastReview, 20 * HOUR)) && (concerns.some(open) || hash !== state.lastHash);
+}
+// eslint-disable-next-line max-params -- Keep decision logging and wake-budget checks in their existing ordered lifecycle.
 async function judge(trigger: string, nowIso: string, params: Params, state: State, sensed: Sensed, concerns: Concern[]) {
   const now = Date.parse(nowIso), { summary, signals } = sensed;
   state.seen = sensed.seen;
   const hash = createHash("sha256").update(JSON.stringify(summary)).digest("hex"), fresh = signals.filter(signal => !state.handled.includes(signal.key));
   // Daily: one review of the open matters a day, or of anything that changed.
-  const review = trigger === "daily" && !(state.lastReview && within(now, state.lastReview, 20 * HOUR)) && (concerns.some(open) || hash !== state.lastHash);
+  const review = reviewDue(trigger, state, concerns, hash, now);
   if (!sensed.providerAvailable || (!review && hash === state.lastHash)) return;
   // Over the limits even for the most urgent case: decide nothing, look again next time with nothing marked handled.
   if (!allowed(params, state, 1, now)) return;
@@ -244,7 +325,7 @@ async function judge(trigger: string, nowIso: string, params: Params, state: Sta
   const decision: Decision = review ? { wake: true, source: "daily", focus: "review", urgency: 0.3 }
     : await decide(params, state, () => intuitionState(sensed, fresh, concerns, recent, now, params["intuition-detail"] === "minimal"), fresh, now);
   const entry: Entry = { id: `w-${randomUUID().slice(0, 8)}`, at: nowIso, trigger, source: decision.source, ...(decision.answer ? { answer: decision.answer } : {}),
-    wake: decision.wake, focus: decision.focus, urgency: decision.urgency, changes: fresh.map(signal => signal.key) };
+    wake: decision.wake, focus: decision.focus, urgency: decision.urgency, changes: fresh.map(signal => signal.key), refs: fresh.flatMap(signal => signal.ref ? [refText(signal.ref)] : []) };
   if (decision.wake && !allowed(params, state, decision.urgency, now)) { await agenda.log({ ...entry, blocked: true }); return; }
   if (decision.wake) {
     await chrona.wakeProvider({ key: "wake", prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, now)}` });

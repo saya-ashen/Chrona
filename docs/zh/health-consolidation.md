@@ -1,6 +1,6 @@
 # 应用健康机制整合提案
 
-状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。
+状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1，reflection 与 build admission 未改。
 
 步骤 1 已完成（2026-11-04）：自动/手动暂停共用实现，审计记录原因、关联 incident（如有）及精确日程 IDs；恢复仅处理最近一次暂停记录的日程，不重放错过或未知工作；历史自动暂停缺 IDs 时保留日程暂停并记录 unrestoredLegacyPause，保留确定性最小通知。
 

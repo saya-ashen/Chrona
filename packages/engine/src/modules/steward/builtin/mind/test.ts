@@ -1,12 +1,17 @@
 import { strict as assert } from "node:assert";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 // @ts-expect-error Chrona supplies the test kernel at this at run time.
 import { startModule } from "chrona/testing";
 
 process.env.CHRONA_DATA = await mkdtemp("/tmp/mind-data-");
 const at = (minutes: number) => new Date(Date.parse("2026-10-30T00:00:00Z") + minutes * 60_000).toISOString();
 const today = { approvals: [], upcoming: [], updates: [], sessions: [], health: { provider: { available: true } } };
-let apps = [{ name: "price-watch", status: "active", activeHash: "a1", health: { incident: null as null | object } }];
+const health = (id = "i3", revision = 1, activationId = "act-1") => ({ module: "price-watch", moduleId: "mod-1", configuredStatus: "active", activeHash: "a1", activation: { activationId }, incident: { id, revision, status: "unresolved", failures: 5, reason: "timeout" }, contractFailureCount: 0, open: true, truncated: false });
+let apps = [{ ...health(), incident: null as ReturnType<typeof health>["incident"] | null, open: false }];
+let secondPage: typeof apps = [];
+let beforeHealth: (() => Promise<void>) | undefined;
+const cursors: unknown[] = [];
 let contributions: { module: string; hash: string; value: unknown }[] = [];
 let calendar: unknown = { items: [] };
 let intuition = { wake: { type: "noul", noul: 0.1 }, focus: { type: "choice", choice: "nothing", confidence: 0.9 }, urgency: { type: "score", score: 0, confidence: 0.9 } };
@@ -18,7 +23,7 @@ const server = Bun.serve({ port: 0, hostname: "127.0.0.1", async fetch(request) 
 } });
 const url = `http://127.0.0.1:${server.port}/v1/systemone`;
 const module = await startModule("index.ts", { stubs: {
-  "chat.today": () => today, "chat.runs": () => [], "modules.list": () => apps, "secrets.get": () => ({ value: { key: "k1" } }),
+  "chat.today": () => today, "chat.runs": () => [], "modules.health": async (args: { cursor?: string }) => { await beforeHealth?.(); cursors.push(args.cursor); return { items: args.cursor ? secondPage : apps, nextCursor: !args.cursor && secondPage.length ? "page-2" : null }; }, "secrets.get": () => ({ value: { key: "k1" } }),
   "modules.contributions": () => contributions, "calendar.attention": () => calendar,
 } });
 const wakes = () => module.calls.filter((call: { params: { target?: string } }) => call.params.target === "provider.wake").map((call: { params: { args: { prompt: string } } }) => call.params.args.prompt);
@@ -131,18 +136,139 @@ try {
   assert.ok(module.calls.some((call: { params: { target?: string; args?: object } }) => call.params.target === "calendar.attention"));
 
   // An unreachable model falls back to the rules, which see the failure, within the wake limits.
-  apps = [{ ...apps[0]!, health: { incident: { id: "i3", status: "unresolved", failures: 5, reason: "timeout" } } }];
+  apps = [{ ...health(), activeHash: "a2" }];
   await sense(1100, { "intuition-url": "http://127.0.0.1:1/none", "daily-wakes": 5 });
   assert.equal(wakes().length, 5);
   await sense(1115, { "intuition-url": "http://127.0.0.1:1/none" });
   assert.equal(wakes().length, 6);
-  assert.match(wakes()[5], /来源：rules；主要关注：incident:i3；紧急度：0.80/);
+  assert.match(wakes()[5], /来源：rules；主要关注：health:mod-1:act-1:i3:1；紧急度：0.80/);
 
   // A long brief still fits provider.wake's 4000-character limit together with the protocol.
-  apps = Array.from({ length: 30 }, (_, i) => ({ name: `app-${i}`, status: "active", activeHash: "a1", health: { incident: { id: `long-${i}`, status: "unresolved", failures: 5, reason: "x".repeat(200) } } }));
+  apps = Array.from({ length: 30 }, (_, i) => ({ ...health(`long-${i}`), module: `app-${i}`, incident: { ...health(`long-${i}`).incident, reason: "x".repeat(200) } }));
   await sense(1145, { "daily-wakes": 7 });
   assert.equal(wakes().length, 7);
   assert.equal(wakes()[6].length, 4000);
+  // (e) Empty state and agenda still discover an existing unresolved incident.
+  const data = process.env.CHRONA_DATA!;
+  await writeFile(join(data, "state.json"), "{}");
+  await writeFile(join(data, "agenda.json"), "[]");
+  apps = [health("first")];
+  let count = wakes().length;
+  await sense(2000);
+  assert.equal(wakes().length, ++count);
+  assert.match(wakes().at(-1), /ref: mod-1\/act-1\/first@1/);
+  let decisions = await tool("decisions", {}, 2000);
+  assert.deepEqual(decisions.entries[0].refs, ["mod-1/act-1/first@1"]);
+  await tool("report", { "wake-id": wakeId(wakes().at(-1)), outcome: "acted", summary: "修复中", "session-id": "s-1", "build-session-id": "b-1" }, 2000);
+  decisions = await tool("decisions", {}, 2000);
+  assert.equal(decisions.entries[0].outcome.buildSessionId, "b-1");
+  assert.equal(decisions.entries[0].outcome.sessionId, "s-1");
+  // (a) Same revision wakes once; growth wakes again, assessed revisions suppress.
+  await sense(2020);
+  assert.equal(wakes().length, count);
+  apps = [health("first", 2)];
+  await sense(2040);
+  assert.equal(wakes().length, ++count);
+  const source = { "source-module-id": "mod-1", "source-activation-id": "act-1", "source-incident-id": "first" };
+  const tracked = (await tool("note", { title: "故障", ...source, "assessed-revision": 3, commitment: "核实未知效果" }, 2040)).concern;
+  apps = [health("first", 3)];
+  await sense(2060);
+  assert.equal(wakes().length, count);
+  // (c) Acting/build suppresses new evidence; its reason remains visible in context.
+  await tool("note", { id: tracked.id, status: "acting", "build-session-id": "build-1" }, 2060);
+  apps = [health("first", 4)];
+  await sense(2080);
+  assert.equal(wakes().length, count);
+  apps[0]!.truncated = true;
+  await sense(2100, {}, "daily");
+  assert.match(wakes().at(-1), /health:mod-1:act-1:first:4: build in progress/);
+  assert.match(wakes().at(-1), /"healthIncomplete":\["price-watch"\]/);
+  count = wakes().length;
+  // (d) Refusal beats revision growth; a different activation is a new fact.
+  await tool("note", { id: tracked.id, status: "watching", "build-session-id": "", declined: "不要修" }, 2100);
+  apps = [health("first", 5)];
+  await sense(2160);
+  assert.equal(wakes().length, count);
+  apps = [health("next", 1, "act-2")];
+  await sense(2180);
+  assert.equal(wakes().length, ++count);
+  const replaced = (await tool("agenda", { all: true }, 2180)).concerns[0];
+  assert.equal(replaced.status, "done");
+  assert.equal(replaced.lastAssessment.conclusion, "已换新版本，旧激活故障不再适用");
+  // (g) Real recovery closes deterministically without removing history.
+  const next = (await tool("note", { title: "第二次", ...source, "source-activation-id": "act-2", "source-incident-id": "next", commitment: "历史保留" }, 2180)).concern;
+  apps[0]!.incident!.status = "recovered";
+  apps[0]!.open = false;
+  // A note arriving after tick reads the agenda survives the recovery close.
+  beforeHealth = async () => {
+    beforeHealth = undefined;
+    const list = JSON.parse(await readFile(join(data, "agenda.json"), "utf8"));
+    await writeFile(join(data, "agenda.json"), JSON.stringify([...list, { ...next, id: "concurrent", title: "新增关注", source: undefined }]));
+  };
+  await sense(2200);
+  const afterClose = (await tool("agenda", { all: true }, 2200)).concerns;
+  assert.equal(afterClose.find((item: { id: string }) => item.id === "concurrent").title, "新增关注");
+  const recovered = (await tool("agenda", { all: true }, 2200)).concerns.find((item: { id: string }) => item.id === next.id);
+  assert.equal(recovered.status, "done");
+  assert.equal(recovered.lastAssessment.by, "mind");
+  assert.equal(recovered.lastAssessment.conclusion, "对应能力已验证恢复（未重放）");
+  assert.equal(recovered.commitments[0].text, "历史保留");
+  // (b) A new incident after recovery is not cooled down with the old one.
+  apps = [health("worse", 1, "act-2")];
+  await sense(2240);
+  assert.equal(wakes().length, ++count);
+  // (h) Contract mismatches use their count as revision and key.
+  apps = [{ ...health(), incident: null, contractFailureCount: 2 }];
+  await sense(2280);
+  assert.equal(wakes().length, ++count);
+  assert.match(wakes().at(-1), /contract:mod-1:act-1:2/);
+  apps[0]!.contractFailureCount = 3;
+  await sense(2300, { "daily-wakes": 20 });
+  assert.equal(wakes().length, ++count);
+  // (j) Read all pages, deriving seen and paused apps from those same items.
+  secondPage = [{ ...health("paged", 1, "act-page"), module: "page-app", moduleId: "page-mod", configuredStatus: "paused" }];
+  await sense(2340, { "daily-wakes": 20 });
+  assert.equal(wakes().length, ++count);
+  assert.equal(cursors.at(-1), "page-2");
+  assert.match(wakes().at(-1), /health:page-mod:act-page:paged:1/);
+  assert.match(wakes().at(-1), /"pausedApps":\["page-app"\]/);
+  const savedState = JSON.parse(await readFile(join(data, "state.json"), "utf8"));
+  assert.equal(savedState.seen["page-app"], "a1");
+  secondPage = [];
+  // (i) Old agendas update unchanged; updates preserve unknown additive fields.
+  const legacy = { id: "legacy", title: "旧关注", status: "watching", escalation: "none", commitments: [], userSignals: [], createdAt: at(0), updatedAt: at(0) };
+  await writeFile(join(data, "agenda.json"), JSON.stringify([legacy]));
+  assert.equal((await tool("note", { id: "legacy", conclusion: "兼容" }, 2400)).concern.title, "旧关注");
+  await tool("note", { id: "legacy", ...source, "assessed-revision": 9, "silent-until": at(2600), declined: "拒绝", "build-session-id": "b-legacy" }, 2400);
+  const before = JSON.parse(await readFile(join(data, "agenda.json"), "utf8"))[0];
+  before.futureField = { keep: true };
+  await writeFile(join(data, "agenda.json"), JSON.stringify([before]));
+  const updated = (await tool("note", { id: "legacy", title: "新标题" }, 2420)).concern;
+  for (const key of ["source", "assessedRevision", "silentUntil", "declined", "build", "futureField"]) assert.deepEqual(updated[key], before[key]);
+  assert.match((await tool("note", { id: "legacy", "source-module-id": "bad id" }, 2420)).error, /id/);
+  assert.match((await tool("note", { id: "legacy", ...source, "source-activation-id": "different" }, 2420)).error, /cannot be changed/);
+  assert.match((await tool("note", { id: "legacy", "assessed-revision": -1 }, 2420)).error, /nonnegative/);
+  await tool("note", { id: "legacy", "silent-until": "", declined: "", "build-session-id": "" }, 2420);
+  const cleared = (await tool("agenda", {}, 2420)).concerns[0];
+  for (const key of ["silentUntil", "declined", "build"]) assert.equal(cleared[key], undefined);
+  // Explicit not-before and closed-topic cooldown are deterministic too.
+  apps = [health("first", 10)];
+  await tool("note", { id: "legacy", "silent-until": at(2600) }, 2420);
+  count = wakes().length;
+  await sense(2440, { "daily-wakes": 20 });
+  assert.equal(wakes().length, count);
+  await tool("note", { id: "legacy", "silent-until": "", status: "dropped" }, 2440);
+  await sense(2460, { "daily-wakes": 20 });
+  assert.equal(wakes().length, count);
+  apps = [health("retry")];
+  apps[0]!.incident!.status = "retrying";
+  await sense(2480, { "daily-wakes": 20 });
+  assert.equal(wakes().length, count);
+  apps[0]!.incident!.status = "verifying";
+  await sense(2500, { "daily-wakes": 20 });
+  assert.equal(wakes().length, count + 1);
+  assert.match(wakes().at(-1), /连接已恢复、功能待验证/);
+  // (f) The original daily-wakes assertions above still exercise the quota.
   for (const prompt of wakes()) {
     assert.ok(prompt.length <= 4000);
     assert.match(prompt, /^This run was started by your mind/);
