@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promi
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema, type ProviderRunInput } from "@chrona/contracts/steward";
+import { moduleManifestSchema, modulesToolInputSchemas, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
@@ -18,7 +18,7 @@ import * as chatFiles from "./chat";
 import { approvalNoticeBody } from "./notify-user";
 import { startOwnerBuild } from "./owner-build";
 import { runOwnerBuild } from "./owner-build-run";
-import { controlBuild } from "./module-build-session";
+import { controlBuild, queueBuild, startBuild } from "./module-build-session";
 import { recordModuleFailure } from "./module-diagnostics";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -676,4 +676,106 @@ test("offline recovery executes one bounded build and activates its checks-passi
   expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(0);
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
   expect(f.starts).toHaveLength(1);
+});
+
+const cause = { moduleId: "health-module", activationId: "activation-1", incidentId: "incident-1" };
+async function otherConversation(f: Awaited<ReturnType<typeof fixture>>) {
+  const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "web" } });
+  return f.api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Recheck health" });
+}
+
+test("same cause across conversations reuses queued/running work before references, budget or queue checks", async () => {
+  const f = await fixture(), other = await otherConversation(f);
+  const first = await f.call("m_modules_build", { ...request, cause }) as { sessionId: string; runId: string };
+  await f.api.settings.update({ builds: { dailyLimit: 1 } });
+  const auditCount = await f.db.audit.count();
+  const parsed = modulesToolInputSchemas.build.parse({ ...request, goal: "Different description", files: ["missing.txt"],
+    cause: { incidentId: cause.incidentId, activationId: cause.activationId, moduleId: cause.moduleId } });
+  const expected = { sessionId: first.sessionId, runId: first.runId, duplicate: true, reason: "same_cause" };
+  expect(await startBuild(f.ports, f.workspaceId, other.id, parsed)).toMatchObject({ ...expected, status: "build_queued" });
+  expect(await f.db.audit.count()).toBe(auditCount);
+  expect(await f.db.session.count({ where: { source: "build" } })).toBe(1);
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(1);
+  expect((await f.api.settings.get()).buildUsage).toMatchObject({ used: 1, remaining: 0 });
+  expect((await f.db.audit.findFirstOrThrow({ where: { kind: "build_request" } })).details).toMatchObject({ cause });
+  expect(JSON.parse(await readFile(join(f.dataDir, "sessions", first.sessionId, "request.json"), "utf8"))).toMatchObject({ cause });
+  await f.api.runs.claimNext("build");
+  expect(await startBuild(f.ports, f.workspaceId, other.id, parsed)).toMatchObject({ ...expected, status: "build_running" });
+  // A full queue must not hide the outstanding cause either.
+  await f.db.run.createMany({ data: Array.from({ length: 10 }, (_, i) => ({ workspaceId: f.workspaceId, sessionId: f.session.id,
+    lane: "build", trigger: "build", status: "queued", provider: "fake", tokenHash: `cause-full-${i}`, cwd: "unused", prompt: "" })) });
+  expect(await startBuild(f.ports, f.workspaceId, other.id, parsed)).toMatchObject(expected);
+  expect(f.starts).toHaveLength(0);
+});
+
+test("concurrent admissions from different conversations serialize same-cause deduplication", async () => {
+  const f = await fixture(), other = await otherConversation(f);
+  const parsed = modulesToolInputSchemas.build.parse({ ...request, cause });
+  const results = await Promise.all([f.requester.id, other.id].map(id => startBuild(f.ports, f.workspaceId, id, parsed)));
+  expect(new Set(results.map(result => result.sessionId)).size).toBe(1);
+  expect(results.map(result => result.duplicate).sort()).toEqual([false, true]);
+  expect(await f.db.session.count({ where: { source: "build" } })).toBe(1);
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(1);
+  expect(await f.db.audit.count({ where: { kind: "build_request" } })).toBe(1);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(1);
+});
+
+for (const status of ["finished", "failed", "cancelled"] as const) test(`${status} causal work permits a fresh admission`, async () => {
+  const f = await fixture();
+  const first = await f.call("m_modules_build", { ...request, cause }) as { sessionId: string; runId: string };
+  await f.db.run.update({ where: { id: first.runId }, data: { status } });
+  const next = await f.call("m_modules_build", { ...request, cause }) as { sessionId: string; duplicate: boolean };
+  expect(next.duplicate).toBe(false);
+  expect(next.sessionId).not.toBe(first.sessionId);
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(2);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(2);
+});
+
+test("distinct incidents, activations, topics and modules do not deduplicate", async () => {
+  const f = await fixture(), ids = [];
+  for (const ref of [cause, { ...cause, incidentId: "incident-2" }, { ...cause, activationId: "activation-2" },
+    { ...cause, moduleId: "other-module" }, { moduleId: cause.moduleId, activationId: cause.activationId, topic: "output" }]) {
+    const result = await f.call("m_modules_build", { ...request, cause: ref }) as { sessionId: string; duplicate: boolean };
+    expect(result.duplicate).toBe(false);
+    ids.push(result.sessionId);
+  }
+  expect(new Set(ids).size).toBe(5);
+  const topic = { moduleId: cause.moduleId, activationId: cause.activationId, topic: "output" };
+  expect(await f.call("m_modules_build", { ...request, goal: "Topic recheck", cause: topic })).toMatchObject({ duplicate: true, reason: "same_cause", sessionId: ids[4] });
+});
+
+test("without cause identical requests in different conversations still queue separately", async () => {
+  const f = await fixture(), other = await otherConversation(f);
+  const first = await f.call("m_modules_build", request) as { sessionId: string };
+  const second = await startBuild(f.ports, f.workspaceId, other.id, modulesToolInputSchemas.build.parse(request));
+  expect(second.duplicate).toBe(false);
+  expect(second.sessionId).not.toBe(first.sessionId);
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(2);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(2);
+});
+
+test("owner authorization is independent of a same-target causal build and key replay never retries", async () => {
+  const f = await ownerFixture();
+  const causal = await f.call("m_modules_build", { ...request, cause }) as { sessionId: string };
+  const owner = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
+  expect(owner.duplicate).toBe(false);
+  expect(owner.sessionId).not.toBe(causal.sessionId);
+  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ sessionId: owner.sessionId, runId: owner.runId, duplicate: true });
+  await f.db.run.update({ where: { id: owner.runId }, data: { status: "cancelled" } });
+  expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ sessionId: owner.sessionId, runId: owner.runId, duplicate: true, status: "cancelled" });
+  await expect(queueBuild(f.ports, f.workspaceId, { key: "invalid-owner-cause", actorKey: "user", originSessionId: null,
+    request: modulesToolInputSchemas.build.parse({ ...request, cause }), execution: ownerRequest.execution })).rejects.toMatchObject({ code: "invalid" });
+  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, cause })).rejects.toThrow();
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(2);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(2);
+});
+
+test("causes with both incidentId and topic or neither are invalid before admission", async () => {
+  const f = await fixture();
+  for (const invalid of [{ ...cause, topic: "output" }, { moduleId: cause.moduleId, activationId: cause.activationId }]) {
+    expect(modulesToolInputSchemas.build.safeParse({ ...request, cause: invalid }).success).toBe(false);
+    await expect(f.call("m_modules_build", { ...request, cause: invalid })).rejects.toMatchObject({ code: "invalid" });
+  }
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
+  expect((await f.api.settings.get()).buildUsage.used).toBe(0);
 });

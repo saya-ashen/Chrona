@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -168,8 +169,30 @@ type BuildAdmission = { key: string; actorKey: string; originSessionId: string |
 export function queueBuild(ports: StewardPorts, workspaceId: string, input: BuildAdmission, refs: BuildReferences = []) {
   return serial(workspaceId, () => admitBuild(ports, workspaceId, input, refs));
 }
+async function outstandingCause(db: StewardPorts["db"], workspaceId: string, { request: { cause }, execution }: BuildAdmission) {
+  if (execution && cause) throw new StewardError("invalid", "Owner build execution cannot carry an autonomous cause");
+  if (!cause) return;
+  const queue = await buildQueue(db, workspaceId);
+  if (!queue.size) return;
+  const receipts = await db.audit.findMany({ where: { workspaceId, kind: "build_request", subjectId: { in: [...queue.keys()] } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { subjectId: true, details: true } });
+  for (const receipt of receipts) {
+    const details = z.object({ cause: z.unknown() }).safeParse(receipt.details);
+    if (details.success && isDeepStrictEqual(details.data.cause, cause)) {
+      const sessionId = receipt.subjectId!;
+      return { ...queue.get(sessionId)!, sessionId, duplicate: true, reason: "same_cause" };
+    }
+  }
+}
+function admissionDetails({ originSessionId, request, execution }: BuildAdmission, fingerprint: string) {
+  const names = requestModules(request);
+  return { originSessionId, name: names[0]!, ...(request.modules ? { modules: names } : {}),
+    ...(request.cause ? { cause: request.cause } : {}), ...(execution ? { fingerprint, execution } : {}) };
+}
 async function admitBuild(ports: StewardPorts, workspaceId: string, input: BuildAdmission, refs: BuildReferences) {
   const { db } = ports, now = ports.now(), { key: requestKey, actorKey, originSessionId, request, execution } = input;
+  const duplicate = await outstandingCause(db, workspaceId, input);
+  if (duplicate) return duplicate;
   const fingerprint = JSON.stringify({ request, execution: execution ?? null });
   const previous = await db.audit.findUnique({ where: { id: requestKey } });
   if (previous && execution) {
@@ -187,7 +210,7 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
     if (!(await buildUsage(tx, workspaceId, settings, now)).remaining) throw new StewardError("conflict", "Daily module build budget reached; change the limit in Settings > Builds");
     const created = await createRunSession(tx, workspaceId, "build", now, originSessionId ? { originSessionId } : {});
     const names = requestModules(request);
-    const receipt = { subjectId: created.id, details: { originSessionId, name: names[0]!, ...(request.modules ? { modules: names } : {}), ...(execution ? { fingerprint, execution } : {}) } };
+    const receipt = { subjectId: created.id, details: admissionDetails(input, fingerprint) };
     await tx.audit.upsert({ where: { id: requestKey }, update: receipt, create: { ...receipt, id: requestKey, workspaceId, actorKey, kind: "build_request" } });
     return tx.session.update({ where: { id: created.id }, data: { title: `构建模块 ${names.join("、")}` } });
   });
