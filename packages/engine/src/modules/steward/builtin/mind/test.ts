@@ -44,6 +44,8 @@ try {
   const registered = module.calls.find((call: { params: { target?: string } }) => call.params.target === "web.page-set");
   const page = registered.params.args;
   assert.equal(page.title, "心智");
+  assert.deepEqual(page.spec.elements["due-time"], { type: "Time", props: { value: { $item: "dueAt" } }, children: [] });
+  assert.deepEqual(page.spec.elements.due.visible, { $item: "dueAt" });
   // Own-tool references resolve to mind.agenda and mind.decisions, never cross-app tools.
   assert.deepEqual(page.data, { agenda: { tool: "agenda" }, decisions: { tool: "decisions", args: { limit: 1 } } });
   assert.doesNotMatch(JSON.stringify(page.spec), /"on":|"Button"|"Input"/);

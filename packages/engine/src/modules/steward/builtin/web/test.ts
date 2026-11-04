@@ -16,6 +16,7 @@ import { chatSpec, selectedSession, openMessages, type Message } from "./src/sys
 import type { ReplyEvent } from "./src/system/adapter";
 import { localTime, Time } from "./src/display";
 import { loginSpec } from "./src/system/login";
+import { systemPage } from "./src/system/page";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
@@ -57,7 +58,7 @@ async function get(path: string, init: RequestInit = {}) {
   }
 }
 const post = async (path: string, body: unknown) => get(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-// Exercise the shipped render functions with a node-recording h; no browser/DOM dependency.
+// Exercise the shipped specs directly; browser acceptance checks the mounted renderer.
 async function checkHealthRendering() {
   const view = { approvals: [], upcoming: [], updates: [], apps: [], sessions: [], problems: [] as Args[] };
   const health = { configuredStatus: "paused", runtime: { state: "paused" }, activeHash: "same-hash",
@@ -93,7 +94,16 @@ async function checkHealthRendering() {
     assert.equal(status.props.text, "该次启用结束时：未解决，需要处理");
   }
   assert.equal(checksText({ tests: { count: 3, failed: 0 } }), "测试 3 项全部通过");
-  assert.equal(checksText({ tests: { count: 3, failed: 1 }, smoke: "passed" }), "测试 3 项，失败 1；smoke: passed");
+  assert.equal(checksText({ tests: { count: 3, failed: 1 }, smoke: "passed" }), "测试 3 项，失败 1；smoke: 通过");
+  assert.equal(checksText({ typecheck: { status: "passed", errorCount: 0 }, continuity: { status: "failed", callers: { affected: 2, checked: 3 } }, smoke: { status: "unrecorded" } }), "typecheck: status 通过、errorCount 0；continuity: status 失败、callers affected 2、checked 3；smoke: status 未记录");
+  const errorPage = systemPage({ name: "error", message: "读取失败 <script>" });
+  assert.deepEqual(errorPage.data, {});
+  assert.match(JSON.stringify(errorPage.spec({})), /读取失败 <script>.*返回今天/);
+  assert.equal(Object.values(errorPage.spec({}).elements).filter(node => node.type === "Alert").length, 1);
+  assert.match(JSON.stringify(systemPage({ name: "login", message: "请重新输入" }).spec({})), /请重新输入/);
+  assert.deepEqual(systemPage({ name: "activity", module: "a/b" }).data, { activity: { tool: "activity", args: { module: "a/b" } } });
+  assert.deepEqual(systemPage({ name: "app", id: "a/b", tab: "activity", session: "" }).data.diagnostics!.args, { id: "a/b" });
+  assert.match(JSON.stringify(systemPage({ name: "chat", path: "/chat/new" }).spec({ sessions: [] })), /ChatStream/);
   const readable = builder();
   diagnosticNodes(readable, { view: { ...health, evolution: [{ ...health.evolution[0]!, checks: { tests: { count: 3, failed: 1 } } }] } as Diagnostic }, "app-1", "示例应用");
   assert.match(JSON.stringify(readable.finish("", [])), /检查：测试 3 项，失败 1/);

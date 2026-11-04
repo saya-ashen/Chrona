@@ -8,8 +8,13 @@ export function checksText(checks: Record<string, unknown>) {
     if (key === "tests" && value && typeof value === "object" && "count" in value && "failed" in value) {
       return `测试 ${String(value.count)} 项${value.failed === 0 ? "全部通过" : `，失败 ${String(value.failed)}`}`;
     }
-    return `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`;
+    return `${key}: ${checkValue(value)}`;
   }).join("；") || "无记录";
+}
+function checkValue(value: unknown): string {
+  if (value && typeof value === "object") return Object.entries(value).map(([key, item]) => `${key} ${checkValue(item)}`).join("、");
+  const label: Record<string, string> = { passed: "通过", failed: "失败", unrecorded: "未记录" };
+  return typeof value === "string" ? label[value] ?? value : String(value);
 }
 const warning = "此前调用结果不确定，请先核对外部效果，不要直接重放。";
 function incidentSummary(b: Builder, incident: Diagnostic["incident"]) {

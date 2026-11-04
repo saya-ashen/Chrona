@@ -8,13 +8,7 @@ import { CollapsedText, Time } from "./display";
 import { systemCall, type SystemHost } from "./system/adapter";
 import { SystemContext } from "./system/action";
 import { systemComponents } from "./system/components";
-import { todayData, todaySpec } from "./system/today";
-import { loginSpec } from "./system/login";
-import { activityData, activitySpec } from "./system/activity";
-import { appsData, appsSpec } from "./system/apps";
-import { settingsData, settingsSpec } from "./system/settings";
-import { detailData, detailSpec, type DetailRoute } from "./system/detail";
-import { chatData, chatSpec } from "./system/chat";
+import { systemPage, type SystemParams } from "./system/page";
 import { ChatHost } from "./system/chat-stream";
 
 type Args = Record<string, unknown>;
@@ -201,6 +195,7 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   }, refresh } : null;
   return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={deps.navigate}>
     <div className={system ? "registered-page system-page" : "registered-page"}>
+      {!system ? <h2>{page.title}</h2> : null}
       {feedback ? <p role="status" className={feedback.failed ? "error" : "muted"}>{feedback.text}</p> : null}
       <SystemContext.Provider value={systemContext}><ImageContext.Provider value={{ page, deps }}><Renderer spec={spec} registry={currentRegistry} fallback={fallback} /></ImageContext.Provider></SystemContext.Provider>
     </div>
@@ -215,12 +210,9 @@ export function mount(element: HTMLElement, page: Page, deps: Deps) {
 }
 
 /** The adapter and extra components exist only for system pages mounted here. */
-export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app" | "settings" | "chat", host: SystemHost, navigate: Deps["navigate"], message?: string) {
-  const route: DetailRoute = name === "app" || name === "system-app" ? JSON.parse(message!) as DetailRoute : { id: "", tab: "overview", session: "" };
-  const specs: Record<string, (state: Args) => Spec> = { chat: state => chatSpec(state, message ?? "/chat"), settings: settingsSpec, today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
-  const sources: Record<string, Page["data"]> = { chat: chatData, settings: settingsData, today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
-  const spec = specs[name]!, data = name === "app" || name === "system-app" ? detailData(route, name === "system-app") : sources[name]!;
-  const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}), ...(name === "app" ? { needs: { tools: ["query"], recent: ["module"] } } : {}) };
+export function mountSystem(element: HTMLElement, params: SystemParams, host: SystemHost, navigate: Deps["navigate"]) {
+  const { spec, data } = systemPage(params);
+  const page: Page = { module: "$web", id: params.name, title: params.name, data, spec: spec({}), ...(params.name === "app" ? { needs: { tools: ["query"], recent: ["module"] } } : {}) };
   const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };
   const root = createRoot(element);
   root.render(<ChatHost.Provider value={{ subscribe: host.subscribe ?? (() => () => {}), navigate }}><PageView page={page} deps={deps} system={{ spec }} /></ChatHost.Provider>);

@@ -4,10 +4,10 @@
 
 ## 约束
 
-- 聊天页（含新会话与会话详情）、今天页、登录页、活动页、应用列表、应用详情（全部标签与故障面板）、系统应用详情、设置与应用登记的页面共用 `pages.js` 的 PageView / Renderer（React + json-render，源码 `src/pages.tsx`，`bun build.ts` 生成并提交）；系统 spec 位于 `src/system/`，通过仅系统页挂载时创建的 adapter 访问现有数据 API。`app.js` 保留路由、认证与单一 SSE 连接，聊天组件通过系统 host 订阅回复；样式统一在 `style.css`，不引入外部字体或 CDN（页面要能离线打开）。
-- 静态页面不含数据；数据只来自 `/api/web`（带用户的 key）。`index.ts` 只发 `/app.js`、`/style.css` 和 `index.html`，新增静态文件要在那里登记。
+- 聊天页（含新会话与会话详情）、今天页、登录页、活动页、应用列表、应用详情（全部标签与故障面板）、系统应用详情、设置与应用登记的页面共用 `pages.js` 的 PageView / Renderer（React + json-render，源码 `src/pages.tsx`，`bun build.ts` 生成并提交）；系统 spec 位于 `src/system/`，通过仅系统页挂载时创建的 adapter 访问现有数据 API。`app.js` 仅保留 shell 基础设施（认证、请求、路由、导航链接、退出、启动与单一 SSE 连接），不构造页面内容；登记页标题也由共享 renderer 绘制，路由错误使用系统 spec。`mountSystem` 按页面接收 typed params 对象，不序列化路由参数。聊天组件通过系统 host 订阅回复；样式统一在 `style.css`，不引入外部字体或 CDN（页面要能离线打开）。
+- 静态页面不含数据；数据只来自 `/api/web`（带用户的 key）。`index.ts` 只发 `/app.js`、`/pages.js`、`/style.css` 和 `index.html`，新增静态文件要在那里登记。
 - 中文优先。文案用用户的说法（应用、文档、对话、通知、需要你确认），不用内部名词（run、grant、token、hash、module）。
-- web 不按模块名写专门页面：应用在 `on("activated")` 里调用 `web.page-set` 登记页面（组件目录见 `catalog.ts`，说明由 `web.catalog` 返回），web 统一绘制；新组件写在 `src/pages.tsx` 并加入 `catalog.ts`，样式只用本文件的语义变量（见 [module-dependency-direction](../../../../../../../docs/zh/module-dependency-direction.md) §4）。
+- web 不按模块名写专门页面：应用在 `on("activated")` 里调用 `web.page-set` 登记页面（组件目录见 `catalog.ts`，说明由 `web.catalog` 返回），web 统一绘制；共享显示需求在 `src/pages.tsx` 实现并加入 `catalog.ts`；只有系统页需要的交互组件留在 `src/system/`，不公开到 `web.catalog`。登记页只调用本应用工具，不获得系统 adapter；样式只用本文件的语义变量（见 [module-dependency-direction](../../../../../../../docs/zh/module-dependency-direction.md) §4）。
 
 ### 应用图片
 

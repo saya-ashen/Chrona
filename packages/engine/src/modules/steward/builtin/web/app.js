@@ -1,17 +1,8 @@
-// Chrona's router and remaining DOM pages. System and registered app pages share /pages.js.
+// Chrona's shell: authentication, router and one SSE connection. All pages render through /pages.js.
 // Data comes from /api/web through routed calls for the user (v2-8); requests carry the user's key.
 const KEY = "chrona.accessKey"; // the same key the previous web app stored
 const main = document.getElementById("main");
 
-const h = (tag, attrs = {}, ...children) => {
-  const node = document.createElement(tag);
-  for (const [name, value] of Object.entries(attrs)) {
-    if (name.startsWith("on")) node.addEventListener(name.slice(2), value);
-    else if (value !== false && value != null) node.setAttribute(name, value === true ? "" : value);
-  }
-  for (const child of children.flat()) if (child != null && child !== false) node.append(child instanceof Node ? child : String(child));
-  return node;
-};
 class Unauthorized extends Error {}
 const auth = () => { const key = localStorage.getItem(KEY); return key ? { authorization: `Bearer ${key}` } : {}; };
 
@@ -53,7 +44,7 @@ async function listen() {
   }
 }
 
-const login = message => systemPage("login", message);
+const login = message => systemPage({ name: "login", message });
 
 // ------------------------------------------------------------ app pages --
 // Pages apps register (module-dependency-direction §4): drawn by pages.js with module-scoped calls.
@@ -61,11 +52,10 @@ let unmountPage = null;
 async function registeredPage(module, id) {
   const page = await web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`);
   const { mount } = await import("/pages.js");
-  const view = h("div", {});
-  main.replaceChildren(h("h2", {}, page.title), view);
-  unmountPage = mount(view, page, { call: (target, args) => tool(target, args), navigate: path => go(path), content: path => web(path, { raw: true }) });
+  main.replaceChildren();
+  unmountPage = mount(main, page, { call: (target, args) => tool(target, args), navigate: path => go(path), content: path => web(path, { raw: true }) });
 }
-async function systemPage(name, message) {
+async function systemPage(params) {
   const { mountSystem } = await import("/pages.js");
   unmountPage?.();
   main.replaceChildren();
@@ -73,13 +63,17 @@ async function systemPage(name, message) {
     try { return await web(path, options); }
     catch (error) { if (error instanceof Unauthorized) await login("密钥不正确，请重新输入。"); throw error; }
   };
-  unmountPage = mountSystem(main, name, { web: systemWeb, tool, subscribe: listener => { replyListeners.add(listener); return () => replyListeners.delete(listener); }, login: async key => { localStorage.setItem(KEY, key); await start(); } }, (path, replace) => go(path, replace), message);
+  unmountPage = mountSystem(main, params, { web: systemWeb, tool, subscribe: listener => { replyListeners.add(listener); return () => replyListeners.delete(listener); }, login: async key => { localStorage.setItem(KEY, key); await start(); } }, (path, replace) => go(path, replace));
 }
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
 async function pageLinks() {
   const nav = document.querySelector("header nav"), apps = nav.querySelector('a[href="/apps"]');
   nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
-  for (const page of await web("/pages").catch(() => [])) apps.before(h("a", { href: pageHref(page), "data-page": "" }, page.title));
+  for (const page of await web("/pages").catch(() => [])) {
+    const link = document.createElement("a");
+    link.href = pageHref(page); link.dataset.page = ""; link.textContent = page.title;
+    apps.before(link);
+  }
 }
 
 // ----------------------------------------------------------------- router --
@@ -87,18 +81,17 @@ async function route() {
   const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
   unmountPage?.(); unmountPage = null;
   try {
-    if (parts[0] === "chat") await systemPage("chat", url.pathname);
-    else if (parts[0] === "sessions" && parts[1]) await systemPage("chat", url.pathname);
+    if (parts[0] === "chat" || (parts[0] === "sessions" && parts[1])) await systemPage({ name: "chat", path: url.pathname });
     else if (parts[0] === "p" && parts[1] && parts[2]) await registeredPage(decodeURIComponent(parts[1]), decodeURIComponent(parts[2]));
-    else if (parts[0] === "settings") await systemPage("settings");
-    else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemPage("system-app", JSON.stringify({ id: decodeURIComponent(parts[2]), tab: url.searchParams.get("tab") ?? "overview", session: url.searchParams.get("session") ?? "" }));
-    else if (parts[0] === "apps" && parts[1]) await systemPage("app", JSON.stringify({ id: decodeURIComponent(parts[1]), tab: url.searchParams.get("tab") ?? "overview", session: "" }));
-    else if (parts[0] === "apps") await systemPage("apps");
-    else if (parts[0] === "activity") await systemPage("activity", url.searchParams.get("module") ?? "");
-    else await systemPage("today");
+    else if (parts[0] === "settings") await systemPage({ name: "settings" });
+    else if (parts[0] === "apps" && parts[1] === "system" && parts[2]) await systemPage({ name: "system-app", id: decodeURIComponent(parts[2]), tab: url.searchParams.get("tab") ?? "overview", session: url.searchParams.get("session") ?? "" });
+    else if (parts[0] === "apps" && parts[1]) await systemPage({ name: "app", id: decodeURIComponent(parts[1]), tab: url.searchParams.get("tab") ?? "overview", session: "" });
+    else if (parts[0] === "apps") await systemPage({ name: "apps" });
+    else if (parts[0] === "activity") await systemPage({ name: "activity", module: url.searchParams.get("module") ?? "" });
+    else await systemPage({ name: "today" });
   } catch (error) {
     if (error instanceof Unauthorized) await login(localStorage.getItem(KEY) ? "密钥不正确，请重新输入。" : undefined);
-    else main.replaceChildren(h("section", {}, h("p", { class: "error" }, error.message)));
+    else await systemPage({ name: "error", message: error.message });
   }
 }
 function go(path, replace = false) {

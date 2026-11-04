@@ -80,7 +80,7 @@ live databases, real accounts or external sends, disabling auth, approvals or se
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
 | `apps/server` | Hono app: `/api/steward-agent` (Provider tool bridge), `/health`, the `listen` proxy (API key checked for `/api/*`), rescue console, runtime (tick, Provider queues) |
-| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `notify`, `events`, `mcp`, `qq`, `mind`, `web` (the web page: plain HTML + JS, no build) |
+| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `notify`, `events`, `mcp`, `qq`, `mind`, `web` (all web pages share the React/json-render renderer built into `pages.js`) |
 | `packages/cli` | `chrona start / backup / restore / doctor / qq bind-code` |
 
 Dependency direction: `apps → packages/engine → packages/domain → packages/contracts`;
@@ -88,7 +88,7 @@ routes validate and delegate; domain has no I/O.
 
 ## Tech stack
 
-- Web page: the built-in `web` module (`builtin/web`: `index.html`, `app.js`, `style.css`), with a React/json-render app-page renderer in `src/pages.tsx` built by `build.ts`; its own `/api/web` uses routed calls.
+- Web page: the built-in `web` module (`builtin/web`: `index.html`, `app.js`, `pages.js`, `style.css`). All system and registered app pages share the React/json-render renderer in `src/pages.tsx`, built by `build.ts`; system specs live in `src/system/` and alone receive the system adapter. `app.js` keeps authentication, requests, routing and the single SSE connection; its own `/api/web` uses routed calls.
 - Backend: Hono on Bun (`apps/server`).
 - Database: SQLite via Prisma 7 with `prisma-adapter-bun-sqlite`.
 - Provider: Pi RPC with Chrona's tool extension; optional explicit web extension.
@@ -119,7 +119,7 @@ routes validate and delegate; domain has no I/O.
 
 ## Web page principles
 
-- The web page is Chinese-first plain DOM; keep the static page data-free (data comes from `/api/web` with the user's key).
+- The web page is Chinese-first and all pages share the json-render components; keep the static page data-free (data comes from `/api/web` with the user's key).
 - Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
 - What needs the user's decision, and the primary action, must be visually obvious.
 - Copy speaks the user's language (apps, files, conversations, notifications), not internal names (runs, grants, tokens).

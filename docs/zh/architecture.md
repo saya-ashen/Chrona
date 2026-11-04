@@ -57,7 +57,7 @@ manifest 的 `contributes` 保存面向通用模块的声明；`modules.contribu
 
 网页由内置 `web` 入口提供，不存在 Next.js 或单独的 owner HTTP 业务 API。`/api/web` 是该模块自己的适配层，再调用系统与应用工具。web 保存应用经 `web.page-set` 登记的 json-render 页面结构及本应用工具引用，校验组件、动作与引用；用户打开页面时读取业务数据、执行回调。应用无需让 web 硬编码认识自己；未登记时仍有通用工具页，停用应用的页面隐藏，已删除应用的登记被清理。
 
-网页主体使用 `app.js` / `style.css`，登记页面的 React/json-render 渲染器由 `src/pages.tsx` 构建，不能把整个模块说成无构建的纯 DOM 页面。`web.catalog` 提供当前组件与绑定规则。
+所有页面（系统页与应用登记页）共用 `pages.js` 的 React/json-render 渲染器，由 `src/pages.tsx` 构建；系统 spec 位于 `src/system/`，仅系统页面获得访问现有数据 API 的 adapter。`app.js` 只负责认证、请求、路由与单一 SSE 等 shell 基础设施，样式统一在 `style.css`；共享显示组件及绑定规则由 `catalog.ts` / `web.catalog` 提供。
 
 代码：`steward/builtin/web/index.ts`、`pages.ts`、`catalog.ts`、`src/pages.tsx`、`build.ts`、`builtin/files/page.ts`。细节：[模块依赖方向 §4](module-dependency-direction.md#4-web应用登记页面规格草案)，具体可用格式以 `web.catalog` 与代码为准。
 

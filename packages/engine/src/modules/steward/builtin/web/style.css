@@ -50,7 +50,7 @@ nav.tabs a.selected { border-bottom-color: var(--accent); color: var(--accent); 
 h3 { font-size: .98rem; margin: .9rem 0 .3rem; }
 label.check { display: block; }
 label.check input { width: auto; margin: 0 .4rem 0 0; vertical-align: middle; }
-/* Pages apps register (pages.js). json-render draws its confirm dialog with inline white styles; follow the theme. */
+/* All pages share pages.js. json-render draws its confirm dialog with inline white styles; follow the theme. */
 button.danger { background: #d33; border-color: #d33; color: #fff; }
 .registered-page table th, .registered-page table td { vertical-align: top; }
 .system-page { min-width: 0; overflow-wrap: anywhere; }
