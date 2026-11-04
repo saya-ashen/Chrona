@@ -10,7 +10,7 @@ import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
 import { chatFilesDir, chatImages } from "./chat";
-import { announceApprovals } from "./notify-user";
+import { announceApprovals, forwardSettings } from "./notify-user";
 import { REFLECT_TOOLS, startReflection } from "./reflection";
 import { autoRetain, memoryInput } from "./memory";
 import { callsSettled, drainCalls } from "./module-calls";
@@ -120,7 +120,8 @@ export function createTick(ports: StewardPorts) {
         }
       }
       for (const [stage, action] of [
-        ["builtins", () => registerBuiltins(ports, workspaceId)],
+        // notify keeps its own copy of the owner's notification settings: a new install or data directory gets the current ones.
+        ["builtins", async () => { await registerBuiltins(ports, workspaceId); await forwardSettings(ports.db, ports, workspaceId, notificationSettings(workspace.settings), workspace.updatedAt); }],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
         ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
         ["reflect", () => startReflection(ports, workspaceId)],
