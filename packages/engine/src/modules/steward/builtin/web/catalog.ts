@@ -13,6 +13,7 @@ type Definition = { props: z.ZodObject<Record<string, z.ZodType>>; events?: stri
 export const components: Record<string, Definition> = {
   ...Object.fromEntries(SHADCN.map(name => [name, (shadcnComponentDefinitions as Record<string, Definition>)[name]!])),
   List: { props: z.object({}), slots: ["default"], description: "带分隔线的列表；每个子组件作为一个列表项" },
+  Link: { ...shadcnComponentDefinitions.Link, props: shadcnComponentDefinitions.Link.props.extend({ label: z.string().optional(), current: z.boolean().optional() }), slots: ["default"], description: "链接；label 或子组件作为内容，current 标记当前页" },
   TabNav: { props: z.object({ items: z.array(z.object({ label: z.string(), href: z.string(), current: z.boolean() })) }), description: "页面标签导航；current 标记当前页，包含 aria-current" },
   Article: { props: z.object({}), slots: ["default"], description: "独立文章区块，使用语义 article" },
   Preformatted: { props: z.object({ text: z.string() }), description: "保留换行和缩进的纯文本；不执行 HTML" },

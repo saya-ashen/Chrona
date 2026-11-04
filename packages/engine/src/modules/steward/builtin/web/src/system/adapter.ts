@@ -1,6 +1,9 @@
 type Args = Record<string, unknown>;
+export type ReplyEvent = { type: string; session?: string; message?: string; text?: string; attachments?: string };
+export type Subscribe = (listener: (event: ReplyEvent) => void) => () => void;
 export type SystemHost = {
-  web: (path: string, options?: { method: string; body?: unknown }) => Promise<unknown>;
+  web: (path: string, options?: { method?: string; body?: unknown; raw?: boolean }) => Promise<unknown>;
+  subscribe?: Subscribe;
   tool: (target: string, args: Args) => Promise<unknown>;
   login: (key: string) => Promise<void>;
 };
@@ -25,6 +28,12 @@ export function systemCall(host: SystemHost) {
     authorize: args => post(`/secrets/${id(args)}/authorize`, args.value),
     revoke: args => post(`/grants/${id(args)}/revoke`, {}),
     call: args => post("/call", { target: args.target, args: args.args }),
+    sessions: () => host.web("/sessions"),
+    messages: args => host.web(`/sessions/${id(args)}/messages`),
+    chat: args => post("/chat", { text: args.text, ...(args.session ? { session: args.session } : {}) }),
+    "revise-build": args => post(`/sessions/${id(args)}/revise-build`, { requirements: args.requirements }),
+    "stop-build": args => post(`/sessions/${id(args)}/stop-build`, {}),
+    file: args => host.web(`/file?message=${encodeURIComponent(String(args.message))}&ref=${encodeURIComponent(String(args.ref))}`, { raw: true }),
     transcript: args => host.web(`/sessions/${id(args)}/transcript`),
     memory: args => host.web(args.query ? `/memory?query=${encodeURIComponent(String(args.query))}` : "/memory"),
     forget: args => post("/memory/forget", { id: args.id }),

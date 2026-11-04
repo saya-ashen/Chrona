@@ -8,6 +8,7 @@ import { Time } from "../display";
 import type { Approval as ApprovalData, Interaction } from "./today";
 import { useAction } from "./action";
 import { NotificationSettings, BuildSettings, ModuleModelSettings } from "./settings-forms";
+import { ChatStream } from "./chat-stream";
 
 type Args = Record<string, unknown>;
 export function SystemAction({ props }: { props: { label: string; tool: string; args: Args; confirm?: string } }) {
@@ -72,5 +73,5 @@ export function ActivityMore({ props }: { props: { module: string } }) {
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { NotificationSettings: component(NotificationSettings), BuildSettings: component(BuildSettings), ModuleModelSettings: component(ModuleModelSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
+export const systemComponents = { ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), BuildSettings: component(BuildSettings), ModuleModelSettings: component(ModuleModelSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
   SettingsForm: component(SettingsForm), ToolForm: component(ToolForm), ModelCap: component(ModelCap), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };

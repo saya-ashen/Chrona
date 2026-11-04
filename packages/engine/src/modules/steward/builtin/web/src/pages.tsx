@@ -14,11 +14,13 @@ import { activityData, activitySpec } from "./system/activity";
 import { appsData, appsSpec } from "./system/apps";
 import { settingsData, settingsSpec } from "./system/settings";
 import { detailData, detailSpec, type DetailRoute } from "./system/detail";
+import { chatData, chatSpec } from "./system/chat";
+import { ChatHost } from "./system/chat-stream";
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
 export type Page = { module: string; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed?: string[]; needs?: Record<string, string[]> };
-export type Deps = { call: (target: string, args: Args) => Promise<unknown>; navigate: (path: string) => void; content: (path: string) => Promise<Blob> };
+export type Deps = { call: (target: string, args: Args) => Promise<unknown>; navigate: (path: string, replace?: boolean) => void; content: (path: string) => Promise<Blob> };
 type Feedback = { failed: boolean; text: string; source?: string } | null;
 
 const record = (value: unknown): value is Args => !!value && typeof value === "object" && !Array.isArray(value);
@@ -110,7 +112,7 @@ const { registry } = defineRegistry(catalog, {
     Alert: ({ props }: Props<{ title: string; message?: string | null; type?: string | null }>) => <div role={props.type === "error" ? "alert" : "status"} className={props.type === "error" ? "error" : props.type === "success" ? "ok" : undefined}><strong>{props.title}</strong>{props.message ? <div>{props.message}</div> : null}</div>,
     Table: ({ props }: Props<{ columns?: string[] | null; rows?: unknown[][] | null; caption?: string | null }>) => <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>{props.caption ? <caption className="muted">{props.caption}</caption> : null}<thead><tr>{(props.columns ?? []).map(column => <th key={column} style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{column}</th>)}</tr></thead><tbody>{(props.rows ?? []).map((row, i) => <tr key={i}>{(Array.isArray(row) ? row : []).map((cell, j) => <td key={j} style={{ borderBottom: "1px solid var(--line)", padding: ".3rem" }}>{text(cell)}</td>)}</tr>)}</tbody></table></div>,
     Button: ({ props, emit }: Props<{ label: string; variant?: string | null; disabled?: boolean | null }>) => <button type="button" className={props.variant === "secondary" ? undefined : props.variant === "danger" ? "danger" : "primary"} disabled={!!props.disabled} onClick={() => emit("press")}>{props.label}</button>,
-    Link: ({ props, on }: Props<{ label: string; href: string }>) => <a href={props.href} onClick={event => { const press = on("press"); if (press.bound) { event.preventDefault(); press.emit(); } }}>{props.label}</a>,
+    Link: ({ props, children, on }: Props<{ label?: string; href: string; current?: boolean }>) => <a href={props.href} className={props.current ? "selected" : undefined} aria-current={props.current ? "page" : undefined} onClick={event => { const press = on("press"); if (press.bound) { event.preventDefault(); press.emit(); } }}>{props.label ?? children}</a>,
     Input: ({ props, bindings }: Props<{ label: string; name: string; value?: string | null }>) => <Field label={props.label}><Bound kind="input" name={props.name} value={props.value} binding={bindings?.value} element={props as Args} /></Field>,
     Textarea: ({ props, bindings }: Props<{ label: string; name: string; value?: string | null }>) => <Field label={props.label}><Bound kind="textarea" name={props.name} value={props.value} binding={bindings?.value} element={props as Args} /></Field>,
     Select: ({ props, bindings, emit }: Props<{ label: string; name: string; options?: unknown[] | null; value?: string | null; placeholder?: string | null }>) => {
@@ -213,14 +215,14 @@ export function mount(element: HTMLElement, page: Page, deps: Deps) {
 }
 
 /** The adapter and extra components exist only for system pages mounted here. */
-export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app" | "settings", host: SystemHost, navigate: Deps["navigate"], message?: string) {
+export function mountSystem(element: HTMLElement, name: "today" | "login" | "activity" | "apps" | "app" | "system-app" | "settings" | "chat", host: SystemHost, navigate: Deps["navigate"], message?: string) {
   const route: DetailRoute = name === "app" || name === "system-app" ? JSON.parse(message!) as DetailRoute : { id: "", tab: "overview", session: "" };
-  const specs: Record<string, (state: Args) => Spec> = { settings: settingsSpec, today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
-  const sources: Record<string, Page["data"]> = { settings: settingsData, today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
+  const specs: Record<string, (state: Args) => Spec> = { chat: state => chatSpec(state, message ?? "/chat"), settings: settingsSpec, today: todaySpec, activity: state => activitySpec(state, message), apps: appsSpec, login: () => loginSpec(message), app: state => detailSpec(state, route), "system-app": state => detailSpec(state, route, true) };
+  const sources: Record<string, Page["data"]> = { chat: chatData, settings: settingsData, today: todayData, activity: activityData(message ?? ""), apps: appsData, login: {} };
   const spec = specs[name]!, data = name === "app" || name === "system-app" ? detailData(route, name === "system-app") : sources[name]!;
   const page: Page = { module: "$web", id: name, title: name, data, spec: spec({}), ...(name === "app" ? { needs: { tools: ["query"], recent: ["module"] } } : {}) };
   const deps: Deps = { call: systemCall(host), navigate, content: async () => { throw new Error("系统页没有应用内容"); } };
   const root = createRoot(element);
-  root.render(<PageView page={page} deps={deps} system={{ spec }} />);
+  root.render(<ChatHost.Provider value={{ subscribe: host.subscribe ?? (() => () => {}), navigate }}><PageView page={page} deps={deps} system={{ spec }} /></ChatHost.Provider>);
   return () => root.unmount();
 }

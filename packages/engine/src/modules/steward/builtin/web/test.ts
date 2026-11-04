@@ -12,6 +12,8 @@ import { activitySpec } from "./src/system/activity";
 import { appsSpec } from "./src/system/apps";
 import { settingsSpec, liveGrant, scheduleActions } from "./src/system/settings";
 import { modelValue } from "./src/system/model-settings";
+import { chatSpec, selectedSession, openMessages, type Message } from "./src/system/chat";
+import type { ReplyEvent } from "./src/system/adapter";
 import { localTime, Time } from "./src/display";
 import { loginSpec } from "./src/system/login";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
@@ -195,7 +197,7 @@ function checkDisplayAndReach() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["NotificationSettings", "BuildSettings", "ModuleModelSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
+  for (const type of ["ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };
@@ -248,7 +250,43 @@ function checkSettingsSpec() {
   const actions = Object.values(spec.elements).filter(node => node.type === "SystemAction");
   assert.equal(actions.filter(node => node.props.tool === "schedule-update").length, 4);
 }
+async function checkChat() {
+  const mapped: unknown[] = [], call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
+  await call("$web.sessions", {}); await call("$web.messages", { id: "a/b 中" });
+  await call("$web.chat", { text: "new" }); await call("$web.chat", { text: "existing", session: "s" });
+  await call("$web.revise-build", { id: "a/b", requirements: "修改" }); await call("$web.stop-build", { id: "a/b" });
+  await call("$web.file", { message: "m /", ref: "chat/a 中.txt" });
+  assert.deepEqual(mapped, [["/sessions"], ["/sessions/a%2Fb%20%E4%B8%AD/messages"], ["/chat", { method: "POST", body: { text: "new" } }], ["/chat", { method: "POST", body: { text: "existing", session: "s" } }], ["/sessions/a%2Fb/revise-build", { method: "POST", body: { requirements: "修改" } }], ["/sessions/a%2Fb/stop-build", { method: "POST", body: {} }], ["/file?message=m%20%2F&ref=chat%2Fa%20%E4%B8%AD.txt", { raw: true }]]);
+  const sessions = [{ id: "newest", title: "最新", source: "web", createdAt: "2026-11-04" }, { id: "a/b", source: "build", createdAt: "2026-11-03" }];
+  for (const [path, expected] of [["/chat", "newest"], ["/chat/new", null], ["/sessions/a%2Fb", "a/b"], ["/sessions/missing", "missing"]] as const) {
+    assert.equal(selectedSession(path, sessions), expected);
+    const nodes = Object.values(chatSpec({ sessions }, path).elements), stream = nodes.find(node => node.type === "ChatStream")!;
+    assert.equal(stream.props.session, expected); assert.equal(stream.props.building, expected === "a/b");
+    assert.equal(nodes.filter(node => node.type === "Link" && node.props.current).length, expected === "newest" || expected === "a/b" ? 1 : 0);
+    assert.ok(nodes.some(node => node.props.href === "/chat/new")); assert.ok(nodes.some(node => node.props.href === "/sessions/a%2Fb")); assert.ok(nodes.some(node => node.type === "Time"));
+  }
+  assert.equal(selectedSession("/chat", []), null); assert.match(JSON.stringify(chatSpec({}, "/chat")), /加载中/);
+}
+async function checkReplies() {
+  let listener!: (event: ReplyEvent) => void, finish!: (messages: Message[]) => void, closed = 0, replies = 0;
+  const snapshots: Message[][] = [], errors: Error[] = [];
+  const opened = openMessages("s", callback => { listener = callback; return () => { closed++; }; }, () => new Promise(resolve => { finish = resolve; }), { show: items => snapshots.push(items), reply: () => { replies++; }, fail: error => errors.push(error) });
+  const event = { type: "reply", session: "s", message: "m2", text: "reply", attachments: '[{"name":"a.txt","ref":"chat/a"}]' };
+  listener({ ...event, session: "other" }); listener({ ...event, type: "other" }); listener(event); listener(event);
+  assert.equal(snapshots.length, 0);
+  finish([{ id: "m1", text: "question", direction: "in" }, { id: "m2", text: "reply", direction: "out" }]); await opened.ready;
+  assert.deepEqual(snapshots.at(-1)!.map(message => message.id), ["m1", "m2"]);
+  listener(event); listener({ ...event, message: "m3" });
+  assert.deepEqual(snapshots.at(-1)!.map(message => message.id), ["m1", "m2", "m3"]);
+  assert.deepEqual(snapshots.at(-1)!.at(-1)!.attachments, [{ name: "a.txt", ref: "chat/a" }]); assert.equal(replies, 4);
+  opened.append({ id: "m4", text: "sent", direction: "in" }); assert.equal(snapshots.at(-1)!.at(-1)!.id, "m4");
+  opened.close(); assert.equal(closed, 1); const count = snapshots.length; listener({ ...event, message: "m5" }); assert.equal(snapshots.length, count);
+  const late = openMessages("s", callback => { listener = callback; return () => { closed++; }; }, () => new Promise(resolve => { finish = resolve; }), { show: items => snapshots.push(items), reply: () => {}, fail: error => errors.push(error) });
+  late.close(); finish([{ id: "late", text: "ignored", direction: "out" }]); await late.ready; assert.equal(snapshots.length, count); assert.equal(closed, 2); assert.deepEqual(errors, []);
+}
 async function checkSystemPages() {
+  await checkChat();
+  await checkReplies();
   await checkAdapter();
   await checkSettingsAdapter();
   checkModelValues();
