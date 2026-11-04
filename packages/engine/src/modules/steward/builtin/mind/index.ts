@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { on, chrona } from "chrona";
 import { createAgenda, type Answer, type Concern, type Entry } from "./agenda";
+import { PAGE } from "./page";
 
 // v2-26/v2-28: sense often and cheaply; wake the full Chrona (provider.wake) only when it is worth it, handing it the open
 // matters it keeps (the agenda). Nothing here acts itself; the protocol travels with the brief as untrusted module data.
@@ -340,5 +341,10 @@ async function judge(trigger: string, nowIso: string, params: Params, state: Sta
   state.handled = signals.map(signal => signal.key);
 }
 
+on("activated", async () => {
+  try { await chrona.call("web.page-set", PAGE); }
+  catch (error) { console.error(JSON.stringify({ level: "warn", message: "web page not registered", error: String(error) })); }
+  return {};
+});
 on("schedule", async event => { await tick(event.id, event.now, event.params); });
 on("tool", async event => ({ result: await agenda.tool(event.id, event.args, event.now, event.caller) }));

@@ -2,12 +2,13 @@
   "name": "mind",
   "description": "Chrona 的心智：维护用户未完成之事的关注清单，定时感知整体情况（含应用经 contributes.mind.attention 交出的截止、异常与待处理事项），由直觉模型（可选）或规则判断是否值得唤醒 Chrona 思考并推进。",
   "entry": "index.ts",
+  "activated": true,
   "triggers": [
     {"id": "sense", "schedule": {"kind": "every", "minutes": 5}},
     {"id": "daily", "schedule": {"kind": "daily", "time": "09:00"}}
   ],
   "effects": ["network"],
-  "uses": ["chat.today", "chat.runs", "modules.health", "modules.contributions", "provider.wake"],
+  "uses": ["chat.today", "chat.runs", "modules.health", "modules.contributions", "provider.wake", "web.page-set"],
   "secrets": ["mind_intuition"],
   "settings": {
     "enabled": {"type": "boolean", "label": "主动唤醒", "description": "关闭后心智不再唤醒 Chrona。", "default": true},

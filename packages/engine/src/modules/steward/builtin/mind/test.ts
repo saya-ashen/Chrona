@@ -23,6 +23,7 @@ const server = Bun.serve({ port: 0, hostname: "127.0.0.1", async fetch(request) 
 } });
 const url = `http://127.0.0.1:${server.port}/v1/systemone`;
 const module = await startModule("index.ts", { stubs: {
+  "web.page-set": () => ({ id: "main" }),
   "chat.today": () => today, "chat.runs": () => [], "modules.health": async (args: { cursor?: string }) => { await beforeHealth?.(); cursors.push(args.cursor); return { items: args.cursor ? secondPage : apps, nextCursor: !args.cursor && secondPage.length ? "page-2" : null }; }, "secrets.get": () => ({ value: { key: "k1" } }),
   "modules.contributions": () => contributions, "calendar.attention": () => calendar,
 } });
@@ -38,6 +39,20 @@ const tool = async (id: string, args: Record<string, unknown>, minutes: number, 
 };
 const wakeId = (prompt: string) => /wake-id=(w-[0-9a-f]+)/.exec(prompt)![1]!;
 try {
+  const activate = () => module.send({ trigger: { kind: "activated", id: "activated", firedAt: at(0) }, now: at(0), params: {} });
+  assert.equal((await activate()).error, undefined);
+  const registered = module.calls.find((call: { params: { target?: string } }) => call.params.target === "web.page-set");
+  const page = registered.params.args;
+  assert.equal(page.title, "心智");
+  // Own-tool references resolve to mind.agenda and mind.decisions, never cross-app tools.
+  assert.deepEqual(page.data, { agenda: { tool: "agenda" }, decisions: { tool: "decisions", args: { limit: 1 } } });
+  assert.doesNotMatch(JSON.stringify(page.spec), /"on":|"Button"|"Input"/);
+  for (const field of ["wakes7d", "useful7d", "nothing7d", "unreported7d", "lastAssessment/conclusion", "build/sessionId"]) assert.ok(JSON.stringify(page.spec).includes(field), field);
+  assert.equal(page.spec.elements.source, undefined);
+  assert.ok(!page.spec.elements.concerns.children.includes("source"));
+  assert.doesNotMatch(JSON.stringify(page.spec), /来源应用|source\/moduleId|修复构建会话/);
+  assert.equal(page.spec.elements.build.props.text, "已启动修复构建");
+  assert.deepEqual(page.spec.elements.build.visible, { $item: "build/sessionId" });
   // The first look only learns what is there; within the interval nothing is read at all.
   await sense(0);
   assert.equal(wakes().length, 0);

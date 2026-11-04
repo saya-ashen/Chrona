@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { runInNewContext } from "node:vm";
 import { catalog } from "./catalog";
 import { pageErrors } from "./pages";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
@@ -42,6 +43,56 @@ async function get(path: string, init: RequestInit = {}) {
   }
 }
 const post = async (path: string, body: unknown) => get(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+// Exercise the shipped render functions with a node-recording h; no browser/DOM dependency.
+async function checkHealthRendering(source: string) {
+  const nodes: unknown[] = [];
+  const h = (tag: string, attrs: Args = {}, ...children: unknown[]) => ({ tag, attrs, children: children.flat(), replaceChildren: (...next: unknown[]) => { nodes.push(next); }, addEventListener: () => {} });
+  const view = { approvals: [], upcoming: [], updates: [], apps: [], sessions: [], problems: [] as Args[] };
+  const health = { configuredStatus: "paused", runtime: { state: "paused" }, activeHash: "same-hash",
+    activation: { activationId: "current", hash: "same-hash", status: "verified", observedCapabilities: ["tool:read"] },
+    consecutiveFailures: 2, incident: { status: "verifying", pendingTriggers: ["tool:write"], deliveryUnknown: true },
+    contractFailureCount: 4, nextAction: "检查实际效果", truncated: true,
+    evolution: [{ status: "failed", candidateHash: "same-hash", activatedAt: "2026-11-04", changes: [], checks: {}, affectedCallers: [], observedCapabilities: [], dataHandling: "保留数据", nextAction: "查看恢复条件", rollback: { result: "blocked", reason: "条件不符" } }],
+    incidents: [
+      { activationId: "current", attribution: "activation" },
+      { activationId: "earlier", attribution: "activation" },
+      { attribution: "legacy-unattributed" },
+    ].map(item => ({ ...item, hash: "same-hash", status: "unresolved", failures: 1, lastAt: "2026-11-04", evidence: { reason: "失败" }, attempts: [], pendingTriggers: [] })) };
+  const code = source.slice(source.indexOf("async function today()"), source.indexOf("// ------------------------------------------------------------------- chat"))
+    + source.slice(source.indexOf("const runtimeText"), source.indexOf("async function apps()"))
+    + ";globalThis.render = today; globalThis.panel = diagnosticPanel;";
+  const context = { h, when: (iso: string) => iso, main: { replaceChildren: (...children: unknown[]) => { nodes.push(children); } },
+    web: async (path: string) => path === "/today" ? view : path === "/runs" ? [] : [health],
+    render: async () => {}, panel: (_meta: Args) => ({}) };
+  runInNewContext(code, context);
+  await context.render();
+  assert.doesNotMatch(JSON.stringify(nodes), /需要处理的应用/);
+  nodes.length = 0;
+  view.problems = ["unresolved", "verifying", "retrying", null].map(incidentStatus => ({ module: "示例应用", moduleId: "app-1", incidentStatus, contractFailures: 4, nextAction: "检查实际效果" }));
+  await context.render();
+  const today = JSON.stringify(nodes);
+  for (const text of ["需要处理的应用（4）", "/apps/app-1", "未解决，需要处理", "连接已恢复，功能待验证", "正在有限恢复", "输出不符合契约 4 次", "检查实际效果"]) assert.ok(today.includes(text), text);
+  assert.ok(today.indexOf("需要处理的应用") < today.indexOf("接下来"));
+  nodes.length = 0;
+  context.panel({ id: "app-1", name: "示例应用" });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const diagnostics = JSON.stringify(nodes);
+  const ordered = ["配置：已暂停", "当前版本 same-hash", "连续失败 2/3", "连接已恢复，功能待验证", "待验证能力：tool:write", "此前调用结果不确定", "输出契约不符 4 次（当前版本）", "检查实际效果", "记录较多，摘要可能不完整", "已采取保护：自动恢复受阻", "历史"];
+  for (const [index, text] of ordered.entries()) {
+    assert.ok(diagnostics.includes(text), text);
+    if (index) assert.ok(diagnostics.indexOf(ordered[index - 1]!) < diagnostics.indexOf(text), text);
+  }
+  for (const label of ["当前版本 · 版本", "更早的启用 · 版本", "旧记录（归属未知） · 版本", "故障证据", "已观测功能：tool:read"]) assert.ok(diagnostics.includes(label), label);
+  type Node = { tag: string; attrs: Args; children: (Node | string)[] };
+  const incidents = (nodes.at(-1) as Node[]).filter(node => node.tag === "article").slice(-3);
+  assert.deepEqual(incidents.map(node => (node.children[0] as Node).children[0]), ["未解决，需要处理", "更早的启用", "旧记录（归属未知）"]);
+  assert.equal(incidents[0]!.children[1], "");
+  for (const node of incidents.slice(1)) {
+    const status = node.children[1] as Node;
+    assert.equal(status.attrs.class, "muted");
+    assert.deepEqual(status.children, ["该次启用结束时：未解决，需要处理"]);
+  }
+}
 try {
   for (const path of ["/", "/today", "/apps/a1?path=README.md", "/sessions/s1"]) {
     const page = await get(path);
@@ -51,7 +102,9 @@ try {
   }
   const script = await get("/app.js");
   assert.equal(script.headers.get("content-type"), "text/javascript; charset=utf-8");
-  assert.match(await script.text(), /\/api\/web/);
+  const source = await script.text();
+  assert.match(source, /\/api\/web/);
+  await checkHealthRendering(source);
   assert.equal((await get("/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
   // Pages apps register are drawn by pages.js, built from src/pages.tsx.
   const pagesScript = await get("/pages.js");

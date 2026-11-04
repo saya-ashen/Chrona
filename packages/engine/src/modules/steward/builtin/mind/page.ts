@@ -1,0 +1,28 @@
+// Sources are own-tool names: web resolves these as mind.agenda and mind.decisions.
+export const PAGE = {
+  id: "main",
+  title: "心智",
+  data: { agenda: { tool: "agenda" }, decisions: { tool: "decisions", args: { limit: 1 } } },
+  spec: {
+    root: "layout",
+    elements: {
+      layout: { type: "Stack", props: { gap: "md" }, children: ["agenda", "stats"] },
+      agenda: { type: "Card", props: { title: "开放关注" }, children: ["empty", "concerns"] },
+      empty: { type: "Text", props: { text: "没有开放的关注。", variant: "muted" }, visible: { $state: "/agenda/concerns/length", eq: 0 }, children: [] },
+      concerns: { type: "Stack", props: { gap: "sm" }, repeat: { statePath: "/agenda/concerns", key: "id" }, children: ["title", "watching", "acting", "user", "external", "due", "assessment", "build"] },
+      title: { type: "Heading", props: { text: { $item: "title" }, level: "h3" }, children: [] },
+      watching: { type: "Text", props: { text: "持续关注" }, visible: { $item: "status", eq: "watching" }, children: [] },
+      acting: { type: "Text", props: { text: "正在处理" }, visible: { $item: "status", eq: "acting" }, children: [] },
+      user: { type: "Text", props: { text: "等你处理" }, visible: { $item: "status", eq: "waiting-user" }, children: [] },
+      external: { type: "Text", props: { text: "等待外部进展" }, visible: { $item: "status", eq: "waiting-external" }, children: [] },
+      due: { type: "Text", props: { text: { $template: "截止：${dueAt}" }, variant: "muted" }, visible: { $item: "dueAt" }, children: [] },
+      assessment: { type: "Text", props: { text: { $template: "上次评估：${lastAssessment/conclusion}" } }, visible: { $item: "lastAssessment/conclusion" }, children: [] },
+      build: { type: "Text", props: { text: "已启动修复构建", variant: "muted" }, visible: { $item: "build/sessionId" }, children: [] },
+      stats: { type: "Card", props: { title: "近 7 天" }, children: ["wakes", "useful", "nothing", "unreported"] },
+      wakes: { type: "Text", props: { text: { $template: "唤醒次数：${/decisions/stats/wakes7d}" } }, children: [] },
+      useful: { type: "Text", props: { text: { $template: "有效次数：${/decisions/stats/useful7d}" } }, children: [] },
+      nothing: { type: "Text", props: { text: { $template: "核实后无事：${/decisions/stats/nothing7d}" } }, children: [] },
+      unreported: { type: "Text", props: { text: { $template: "尚未报告：${/decisions/stats/unreported7d}" } }, children: [] },
+    },
+  },
+};

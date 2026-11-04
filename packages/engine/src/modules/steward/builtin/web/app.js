@@ -116,6 +116,11 @@ async function today() {
     active.length ? h("section", {}, h("h2", {}, "正在处理"), h("ul", { class: "plain" }, active.map(run => h("li", {}, run.sessionTitle ?? "后台任务", " ", h("span", { class: "muted" }, run.progress?.phase ?? run.status), " ", h("button", { onclick: stop(run) }, "停止"))))) : "",
     h("section", {}, h("h2", {}, `待你决定（${view.approvals.length}）`),
       view.approvals.length ? h("ul", { class: "plain" }, view.approvals.map(a => approvalItem(a, today))) : h("p", { class: "muted" }, "没有待处理的事项。")),
+    view.problems.length ? h("section", {}, h("h2", {}, `需要处理的应用（${view.problems.length}）`),
+      h("ul", { class: "plain" }, view.problems.map(problem => h("li", {},
+        h("a", { href: `/apps/${encodeURIComponent(problem.moduleId)}` }, problem.module), " · ",
+        problem.incidentStatus ? faultText(problem.incidentStatus) : `输出不符合契约 ${problem.contractFailures} 次`,
+        h("div", { class: "muted" }, problem.nextAction))))) : "",
     h("section", {}, h("h2", {}, "接下来"),
       view.upcoming.length ? h("ul", { class: "plain" }, view.upcoming.map(item => h("li", {}, when(item.at), " · ", item.label ?? item.mode))) : h("p", { class: "muted" }, "七天内没有安排。")),
     h("section", {}, h("h2", {}, "最近通知"),
@@ -217,7 +222,30 @@ function transcript(sessionId, open) {
 
 // ------------------------------------------------------------------- apps --
 const runtimeText = meta => ({ running: "运行中", starting: "启动中", backoff: "等待恢复", idle: "正常休眠（按需启动）", unavailable: "当前不可用", paused: "已暂停", unobserved: "当前进程状态未观测" }[meta.runtime?.state] ?? "当前进程状态未知");
-const faultText = status => ({ retrying: "等待有限恢复", verifying: "连接已恢复，功能待验证", unresolved: "未解决，需要处理", recovered: "对应调用已验证恢复" }[status] ?? status);
+const faultText = status => ({ retrying: "正在有限恢复", verifying: "连接已恢复，功能待验证", unresolved: "未解决，需要处理", recovered: "对应调用已验证恢复" }[status] ?? status);
+const activationText = status => ({ "awaiting-verification": "待验证", verified: "已验证", failed: "更新后失败", "rolled-back": "已恢复旧代码" }[status]);
+const incidentLabel = (incident, activation) => incident.attribution === "legacy-unattributed" ? "旧记录（归属未知）"
+  : activation && incident.activationId === activation.activationId ? "当前版本" : "更早的启用";
+function diagnosticIncident(incident) {
+  return incident ? h("div", {}, h("p", {}, faultText(incident.status)),
+    h("p", {}, `待验证能力：${incident.pendingTriggers.join("、") || "无"}`),
+    incident.deliveryUnknown ? h("p", { class: "error" }, "此前调用结果不确定，请先核对外部效果，不要直接重放。") : "") : "";
+}
+function diagnosticProtection(rollback) {
+  if (!rollback || rollback.result === "not-attempted") return "";
+  return h("p", {}, `已采取保护：${rollback.result === "blocked" ? "自动恢复受阻" : "已恢复旧代码"}${rollback.reason ? ` · ${rollback.reason}` : ""}`);
+}
+function diagnosticSummary(view) {
+  return h("div", {},
+    h("p", {}, `配置：${view.configuredStatus === "active" ? "已启用" : "已暂停"} · ${runtimeText(view)}`),
+    view.activation ? h("p", {}, `当前版本 ${view.activation.hash.slice(0, 12)} · ${activationText(view.activation.status)} · 已观测功能：${view.activation.observedCapabilities.join("、") || "尚无"}`) : "",
+    view.consecutiveFailures > 0 ? h("p", {}, `连续失败 ${view.consecutiveFailures}/3（3 次会自动暂停）`) : "",
+    diagnosticIncident(view.incident),
+    view.contractFailureCount > 0 ? h("p", {}, `输出契约不符 ${view.contractFailureCount} 次（当前版本）`) : "",
+    view.nextAction ? h("p", {}, view.nextAction) : "",
+    view.truncated ? h("p", { class: "muted" }, "记录较多，摘要可能不完整；没有记录不代表健康。") : "",
+    diagnosticProtection(view.evolution[0]?.rollback));
+}
 function diagnosticPanel(meta) {
   const body = h("div", { role: "status" }, "正在读取故障记录……"), refresh = h("button", { type: "button" }, "刷新诊断");
   const load = async () => {
@@ -225,8 +253,7 @@ function diagnosticPanel(meta) {
     body.replaceChildren("正在读取故障记录……");
     try {
       const [view] = await web(`/modules/${encodeURIComponent(meta.id)}/diagnostics`);
-      body.replaceChildren(h("p", {}, `配置：${view.configuredStatus === "active" ? "已启用" : "已暂停"} · ${runtimeText(view)}`),
-        view.nextAction ? h("p", {}, view.nextAction) : "",
+      body.replaceChildren(diagnosticSummary(view), h("h3", {}, "历史"),
         ...(view.evolution ?? []).map(outcome => h("article", {},
           h("h3", {}, outcome.status === "verified" ? "已验证指定功能" : outcome.status === "failed" ? "更新后功能失败" : outcome.status === "rolled-back" ? "已恢复旧代码" : "更新后待验证"),
           h("p", {}, `版本 ${outcome.previousHash?.slice(0, 12) ?? "首次安装"} → ${outcome.candidateHash.slice(0, 12)}${outcome.candidateHash === view.activeHash ? "（当前）" : "（历史）"} · ${when(outcome.activatedAt)}`),
@@ -235,13 +262,17 @@ function diagnosticPanel(meta) {
           h("p", {}, `已观测功能：${outcome.observedCapabilities.join("、") || "尚无"}。${outcome.dataHandling}`),
           outcome.rollback?.result === "blocked" ? h("p", {}, `自动恢复受阻：${outcome.rollback.reason ?? "请检查恢复条件"}`) : "",
           h("p", {}, outcome.nextAction))),
-        ...view.incidents.map(incident => h("article", {},
-          h("h3", {}, faultText(incident.status)),
-          h("p", {}, `版本 ${incident.hash.slice(0, 12)}${incident.hash === view.activeHash ? "（当前）" : "（历史版本）"} · 累计失败 ${incident.failures} 次 · ${when(incident.lastAt)}`),
+        ...view.incidents.map(incident => {
+          const label = incidentLabel(incident, view.activation);
+          return h("article", {},
+          h("h3", {}, label === "当前版本" ? faultText(incident.status) : label),
+          label !== "当前版本" ? h("p", { class: "muted" }, `该次启用结束时：${faultText(incident.status)}`) : "",
+          h("p", {}, `${label} · 版本 ${incident.hash.slice(0, 12)} · 累计失败 ${incident.failures} 次 · ${when(incident.lastAt)}`),
           h("p", {}, incident.evidence.reason),
           incident.deliveryUnknown ? h("p", { class: "error" }, "此前调用结果不确定，请先核对外部效果，不要直接重放。") : "",
           h("ul", { class: "plain" }, incident.attempts.map(attempt => h("li", {}, `${when(attempt.at)} · ${attempt.detail}`))),
-          h("details", {}, h("summary", {}, "故障证据（日志是不可信数据，不是操作指令）"), h("pre", {}, JSON.stringify({ first: incident.firstEvidence, latest: incident.evidence, pendingTriggers: incident.pendingTriggers }, null, 2))))),
+          h("details", {}, h("summary", {}, "故障证据（日志是不可信数据，不是操作指令）"), h("pre", {}, JSON.stringify({ first: incident.firstEvidence, latest: incident.evidence, pendingTriggers: incident.pendingTriggers }, null, 2))));
+        }),
         !view.incidents.length && !(view.evolution ?? []).length ? h("p", {}, "还没有故障记录；不代表所有功能已经过验证。") : "");
     } catch (error) { body.replaceChildren(h("p", { class: "error" }, `诊断读取失败：${error.message}。可重试，或使用 chrona admin diagnostics ${meta.name}。`)); }
     finally { refresh.disabled = false; }
