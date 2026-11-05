@@ -18,39 +18,61 @@ export async function enqueueSchedule(tx: Prisma.TransactionClient, workspaceId:
   await tx.moduleInvocation.create({ data: { workspaceId, caller: "system:schedules", target: module?.name ?? "missing", tool: "schedule", key: `${row.id}:${args.firedAt}`, mode: "schedule", args, nextAttemptAt: now, createdAt: now } });
 }
 
-async function deliver(ports: StewardPorts, row: Prisma.ModuleInvocationGetPayload<object>, now: Date) {
+type Row = Prisma.ModuleInvocationGetPayload<object>;
+type Settled = "queued" | "succeeded" | "failed" | "unknown" | "cancelled";
+
+async function settle(ports: StewardPorts, row: Row, token: string, now: Date, outcome: { status: Settled; error: string | null; effects?: number }) {
+  const { status, error, effects = 0 } = outcome, occurrence = row.args as unknown as Occurrence;
+  await ports.db.$transaction(async tx => {
+    const changed = await tx.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { status, error, leaseToken: null, leaseUntil: null, finishedAt: status === "queued" ? null : ports.now(), nextAttemptAt: status === "queued" ? new Date(now.getTime() + Math.min(3600_000, 30_000 * 2 ** row.attempts)) : null } });
+    if (!changed.count) return;
+    if (status === "failed" || status === "unknown") await notifyUser(tx, ports, row.workspaceId, { level: "now", title: "日程未完成", body: `${row.target} 的日程${status === "unknown" ? "结果未知，请核对实际结果；不会自动重放" : "投递失败，已停止自动尝试"}。${error ?? ""}`, key: `schedule-delivery:${row.id}` });
+    const delay = Date.parse(occurrence.claimedAt) - Date.parse(occurrence.firedAt);
+    await tx.schedule.updateMany({ where: { id: occurrence.scheduleId, lastAt: new Date(occurrence.claimedAt) }, data: {
+      lastResult: `Module exit ${status === "succeeded" ? 0 : -1}; effects ${effects}; delay ${delay}ms${error ? `; ${error}` : ""}`.slice(0, 2000),
+      failures: status === "succeeded" ? 0 : { increment: 1 },
+    } });
+  });
+}
+
+type Block = { blocked: true; status: "cancelled" | "failed" | "unavailable"; reason: string };
+const block = (status: Block["status"], reason: string): Block => ({ blocked: true, status, reason });
+/** The occurrence is bound to one version and activation; anything else is never replayed. */
+async function staleVersion(db: StewardPorts["db"], row: Row, occurrence: Occurrence, module: { id: string; activeHash: string | null }) {
+  if (module.activeHash !== occurrence.hash) return block("cancelled", "Module version changed; occurrence was not replayed");
+  const activationId = module.activeHash ? (await latestModuleEvolution(db, row.workspaceId, module.id, module.activeHash))?.activationId ?? null : null;
+  return module.activeHash && activationId !== occurrence.activationId ? block("cancelled", "Module activation changed; occurrence was not replayed") : null;
+}
+/** Why this occurrence must not be delivered now; "unavailable" is retried with backoff. */
+async function blocked(db: StewardPorts["db"], row: Row, occurrence: Occurrence) {
+  const schedule = await db.schedule.findUnique({ where: { id: occurrence.scheduleId } });
+  const module = occurrence.moduleId ? await db.module.findFirst({ where: { id: occurrence.moduleId, workspaceId: row.workspaceId } }) : null;
+  if (!schedule || schedule.status === "cancelled") return block("cancelled", "Module schedule replaced");
+  if (!module) return block("failed", "Module missing");
+  const stale = await staleVersion(db, row, occurrence, module);
+  if (stale) return stale;
+  if (module.status !== "active" || schedule.status === "paused") return block("unavailable", "Module is paused");
+  if (!module.activeHash) return block("unavailable", "Module has no active hash");
+  return { blocked: false as const, module: { id: module.id, hash: module.activeHash }, schedule };
+}
+
+async function deliver(ports: StewardPorts, row: Row, now: Date) {
   const { db } = ports, token = randomUUID(), occurrence = row.args as unknown as Occurrence;
   const claimed = await db.moduleInvocation.updateMany({ where: { id: row.id, status: "queued" }, data: { status: "running", attempts: { increment: 1 }, leaseToken: token, leaseUntil: new Date(now.getTime() + 660_000) } });
   if (!claimed.count) return;
-  const settle = async (status: string, error: string | null, effects = 0) => {
-    await db.$transaction(async tx => {
-      const changed = await tx.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { status, error, leaseToken: null, leaseUntil: null, finishedAt: status === "queued" ? null : ports.now(), nextAttemptAt: status === "queued" ? new Date(now.getTime() + Math.min(3600_000, 30_000 * 2 ** row.attempts)) : null } });
-      if (!changed.count) return;
-      if (status === "failed" || status === "unknown") await notifyUser(tx, ports, row.workspaceId, { level: "now", title: "日程未完成", body: `${row.target} 的日程${status === "unknown" ? "结果未知，请核对实际结果；不会自动重放" : "投递失败，已停止自动尝试"}。${error ?? ""}`, key: `schedule-delivery:${row.id}` });
-      const delay = Date.parse(occurrence.claimedAt) - Date.parse(occurrence.firedAt);
-      await tx.schedule.updateMany({ where: { id: occurrence.scheduleId, lastAt: new Date(occurrence.claimedAt) }, data: {
-        lastResult: `Module exit ${status === "succeeded" ? 0 : -1}; effects ${effects}; delay ${delay}ms${error ? `; ${error}` : ""}`.slice(0, 2000),
-        failures: status === "succeeded" ? 0 : { increment: 1 },
-      } });
-    });
-  };
-  const unavailable = (reason: string) => settle(row.attempts + 1 < MAX_ATTEMPTS ? "queued" : "failed", reason);
+  const done = (status: Settled, error: string | null, effects?: number) => settle(ports, row, token, now, { status, error, effects });
+  const unavailable = (reason: string) => done(row.attempts + 1 < MAX_ATTEMPTS ? "queued" : "failed", reason);
   try {
-    const schedule = await db.schedule.findUnique({ where: { id: occurrence.scheduleId } });
-    const module = occurrence.moduleId ? await db.module.findFirst({ where: { id: occurrence.moduleId, workspaceId: row.workspaceId } }) : null;
-    if (!schedule || schedule.status === "cancelled") return settle("cancelled", "Module schedule replaced");
-    if (!module) return settle("failed", "Module missing");
-    if (module.activeHash !== occurrence.hash) return settle("cancelled", "Module version changed; occurrence was not replayed");
-    if (module.activeHash && ((await latestModuleEvolution(db, row.workspaceId, module.id, module.activeHash))?.activationId ?? null) !== occurrence.activationId) return settle("cancelled", "Module activation changed; occurrence was not replayed");
-    if (module.status !== "active" || schedule.status === "paused") return unavailable("Module is paused");
-    if (!module.activeHash) return unavailable("Module has no active hash");
-    await moduleSupervisor(ports).deliver(module.id, module.activeHash, { trigger: { id: occurrence.triggerId ?? `s-${schedule.id}`, kind: "schedule", firedAt: occurrence.firedAt, ...(occurrence.payload !== null ? { scheduleId: schedule.id, payload: occurrence.payload as Record<string, unknown> } : {}) }, now: now.toISOString(), params: {} }, { activationId: occurrence.activationId });
-    const effects = await db.moduleCall.count({ where: { moduleId: module.id, hash: module.activeHash, eventKey: `${occurrence.triggerId ?? `s-${schedule.id}`}:${occurrence.firedAt}` } });
-    await settle("succeeded", null, effects);
+    const target = await blocked(db, row, occurrence);
+    if (target.blocked) return target.status === "unavailable" ? unavailable(target.reason) : done(target.status, target.reason);
+    const { module, schedule } = target, triggerId = occurrence.triggerId ?? `s-${schedule.id}`;
+    await moduleSupervisor(ports).deliver(module.id, module.hash, { trigger: { id: triggerId, kind: "schedule", firedAt: occurrence.firedAt, ...(occurrence.payload !== null ? { scheduleId: schedule.id, payload: occurrence.payload as Record<string, unknown> } : {}) }, now: now.toISOString(), params: {} }, { activationId: occurrence.activationId });
+    const effects = await db.moduleCall.count({ where: { moduleId: module.id, hash: module.hash, eventKey: `${triggerId}:${occurrence.firedAt}` } });
+    await done("succeeded", null, effects);
   } catch (cause) {
     const error = String(cause instanceof Error ? cause.message : cause).slice(0, 1800), stage = (cause as { stage?: DeliveryStage } | null)?.stage;
     if (stage === "unavailable") await unavailable(error);
-    else await settle(stage === "handler" ? "failed" : "unknown", stage === "handler" ? error : `Outcome unknown: ${error}`);
+    else await done(stage === "handler" ? "failed" : "unknown", stage === "handler" ? error : `Outcome unknown: ${error}`);
   }
 }
 

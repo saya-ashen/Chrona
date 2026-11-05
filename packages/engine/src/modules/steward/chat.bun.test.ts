@@ -28,16 +28,16 @@ test.each([
   ["mcp:owner", "🦊".repeat(41), `${"🦊".repeat(40)}…`],
   ["web:owner", "a".repeat(40), "a".repeat(40)],
 ])("first message titles %s without overwriting later", async (key, text, title) => {
-  const first = await chat.accept({ workspaceId, channel: "in_app", key, text });
-  expect((await db.session.findUniqueOrThrow({ where: { id: first.sessionId } })).title).toBe(title);
-  await chat.accept({ workspaceId, channel: "in_app", key, text: "另一条消息" });
-  expect((await db.session.findUniqueOrThrow({ where: { id: first.sessionId } })).title).toBe(title);
+  await chat.submit({ workspaceId, channel: "in_app", key, text });
+  expect((await db.session.findFirstOrThrow({ where: { key } })).title).toBe(title);
+  await chat.submit({ workspaceId, channel: "in_app", key, text: "另一条消息" });
+  expect((await db.session.findFirstOrThrow({ where: { key } })).title).toBe(title);
 });
 test.each([
   ["web", "手动命名"], ["wake", null], ["module", "思考"],
 ])("messages preserve %s session title %p", async (source, title) => {
   const session = await db.session.create({ data: { workspaceId, key: `${source}:named`, source, title } });
-  await chat.accept({ workspaceId, channel: "in_app", key: session.key, text: "新的消息" });
+  await chat.submit({ workspaceId, channel: "in_app", key: session.key, text: "新的消息" });
   expect((await db.session.findUniqueOrThrow({ where: { id: session.id } })).title).toBe(title);
 });
 test("same key resolves one active session across service instances and concurrent input", async () => {
