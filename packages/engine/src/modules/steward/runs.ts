@@ -12,6 +12,7 @@ import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
 import { assertBuildProvider, buildExecution } from "./build-execution";
+import { appendBuildOutcome, buildOutcomeLine } from "./module-build-outcome";
 
 const BUILD_IDLE_MS = 7 * 24 * 3600_000, MCP_IDLE_MS = 24 * 3600_000;
 
@@ -150,13 +151,21 @@ class RunService {
       return typeof details?.messageId === "string" ? [details.messageId] : [];
     });
     const replies = await tx.message.findMany({ where: { workspaceId: this.workspaceId, sessionId: session.id, id: { in: ids } } });
-    const ordered = ids.flatMap(id => replies.filter(reply => reply.id === id));
+    const ordered: { text: string; attachments: unknown }[] = ids.flatMap(id => replies.filter(reply => reply.id === id));
+    const line = session.source === "build" ? await buildOutcomeLine(tx, this.workspaceId, session.id) : null;
+    const replyText = ordered.map(reply => reply.text).join("\n\n");
+    const body = line ? appendBuildOutcome(replyText, line, 4000) : replyText;
+    if (line) {
+      const last = ordered.at(-1);
+      if (last) last.text = appendBuildOutcome(last.text, line);
+      else ordered.push({ text: line, attachments: [] });
+    }
     if (!ordered.length) return;
     // Pushed into the original conversation (e.g. QQ): the result needs no separate notice there.
-    if (session.originSessionId && session.source === "build") await this.wakeOrigin(tx, run, session.originSessionId, ordered.map(reply => reply.text).join("\n\n"));
+    if (session.originSessionId && session.source === "build") await this.wakeOrigin(tx, run, session.originSessionId, body);
     if (session.originSessionId && await this.pushResult(tx, session.originSessionId, ordered, now)) return;
     const module = session.moduleId ? await tx.module.findUnique({ where: { id: session.moduleId } }) : null;
-    await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body: ordered.map(reply => reply.text).join("\n\n"), key: `session-result:${run.id}`,
+    await notifyUser(tx, this.ports, this.workspaceId, { level: "now", title: session.title ?? run.label ?? "后台处理完成", body, key: `session-result:${run.id}`,
       session: session.originSessionId ?? session.id, ...(module ? { module: module.id, app: module.name } : {}) });
   }
   /** A wake or module conversation ends with its work: nothing queued and no approval it asked for still open (its decision resumes it). */
@@ -192,7 +201,7 @@ class RunService {
   private async tellBuildOrigin(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
     if (!run.session?.originSessionId || !["failed", "timed_out", "provider_unavailable", "cancelled"].includes(status)) return false;
     const why = { timed_out: "已达到时限", cancelled: "已被取消", provider_unavailable: "模型服务不可用" }[status] ?? "未完成";
-    const text = `构建「${run.session.title ?? run.label ?? "模块"}」结束：${why}${error ? `（${error.slice(0, 200)}）` : ""}。未提交新版本的部分不会自动重试，已有文件保留在构建会话中。`;
+    const text = appendBuildOutcome(`构建「${run.session.title ?? run.label ?? "模块"}」结束：${why}${error ? `（${error.slice(0, 200)}）` : ""}。未提交新版本的部分不会自动重试，已有文件保留在构建会话中。`, await buildOutcomeLine(tx, this.workspaceId, run.session.id), 4000);
     // A deleted origin falls back to the notice; it never blocks finishing the run (it throws before writing).
     const told = await this.pushResult(tx, run.session.originSessionId, [{ text, attachments: [] }], now).catch(() => false);
     await this.wakeOrigin(tx, run, run.session.originSessionId, text).catch(() => {});
@@ -221,7 +230,7 @@ class RunService {
     if (run.lane === "build" && await this.tellBuildOrigin(tx, run, status, now, error)) return;
     if (["failed", "timed_out", "provider_unavailable"].includes(status)) {
       if (run.lane === "build") {
-        await notifyUser(tx, ports, workspaceId, { level: "now", title: "模块构建已暂停", body: `${status === "timed_out" ? "本轮构建已达到时限" : "本轮构建未完成"}，已有文件和过程已保留。请查看构建会话，决定是否修改需求并继续；不会自动重试。`, key: `build-paused:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });
+        await notifyUser(tx, ports, workspaceId, { level: "now", title: "模块构建已暂停", body: appendBuildOutcome(`${status === "timed_out" ? "本轮构建已达到时限" : "本轮构建未完成"}，已有文件和过程已保留。请查看构建会话，决定是否修改需求并继续；不会自动重试。`, run.sessionId ? await buildOutcomeLine(tx, workspaceId, run.sessionId) : "未启用：本次构建未提交版本", 4000), key: `build-paused:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });
         return;
       }
       await this.retryFailed(tx, run, status, now, error);

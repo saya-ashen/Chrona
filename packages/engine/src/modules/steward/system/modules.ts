@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as outputs from "../system-outputs";
 import { buildSettingsSchema, modulesToolInputSchemas, RUN_LIMITS, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createModules } from "../modules";
+import { moduleVersionOutcome, proposedVersionOutcome } from "../module-build-outcome";
 import { admitted, CallError, normalizedToolInputSchema, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "../module-calls";
 import { buildDiagnostics, buildHealthTargets, declaredModules, startBuild } from "../module-build-session";
 import { requestGroup } from "../module-group";
@@ -31,10 +32,12 @@ async function moduleNamed(db: StewardPorts["db"], workspaceId: string, name: un
 async function checkVersion(ports: StewardPorts, workspaceId: string, args: z.output<typeof modulesToolInputSchemas.check>, deadline = Infinity) {
   const module = await moduleNamed(ports.db, workspaceId, args.module), until = Math.min(Date.now() + args.wait * 1000, deadline - 1000);
   for (;;) {
-    const version = await ports.db.moduleVersion.findFirst({ where: { moduleId: module.id, ...(args.hash ? { hash: args.hash } : {}) }, orderBy: { createdAt: "desc" } });
+    const version = await ports.db.moduleVersion.findFirst({ where: { moduleId: module.id, ...(args.hash ? { hash: args.hash } : {}) }, orderBy: { createdAt: "desc" }, include: { module: true } });
     if (!version) throw new CallError("not_found", `No version${args.hash ? ` ${args.hash}` : ""} of ${module.name}`);
-    if (!["building", "testing"].includes(version.status) || Date.now() >= until) {
-      return { module: module.name, hash: version.hash, status: version.status, active: module.activeHash === version.hash, report: shortReport(version.report) };
+    const outcome = await moduleVersionOutcome(ports.db, workspaceId, version);
+    const reviewing = outcome.status === "pending_review" && !await ports.db.audit.findUnique({ where: { id: `module-review:${version.id}` } });
+    if ((!reviewing && !["building", "testing"].includes(outcome.status)) || Date.now() >= until) {
+      return { module: module.name, hash: version.hash, ...outcome, report: shortReport(version.report) };
     }
     await Bun.sleep(Math.min(2000, Math.max(0, until - Date.now())));
   }
@@ -74,8 +77,12 @@ async function proposeFromRun(ports: StewardPorts, workspaceId: string, run: { i
   const input = args as z.output<typeof modulesToolInputSchemas.propose>;
   const proposal = await api.propose({ dir: input.dir, intent: input.intent, root: run.cwd, ...(declared ? { allowed: declared } : {}) }, run.lane === "build" ? "build" : "provider");
   // Who submitted (run, conversation): for reports now and for callbacks later.
-  await ports.db.audit.create({ data: { workspaceId, actorKey: `provider:${run.id}`, kind: "module_submission", subjectId: proposal.moduleId, details: { hash: proposal.hash, runId: run.id, sessionId: run.sessionId } } });
-  return proposal;
+  await ports.db.$transaction(async tx => {
+    const latest = await tx.audit.findFirst({ where: { workspaceId, kind: "module_submission" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    const createdAt = new Date(Math.max(Date.now(), (latest?.createdAt.getTime() ?? 0) + 1));
+    await tx.audit.create({ data: { workspaceId, actorKey: `provider:${run.id}`, kind: "module_submission", subjectId: proposal.moduleId, details: { hash: proposal.hash, runId: run.id, sessionId: run.sessionId }, createdAt } });
+  });
+  return { ...proposal, ...await proposedVersionOutcome(ports.db, workspaceId, proposal) };
 }
 /** `modules.contributions` (v2-14): what active modules declared for the calling module, in `contributes.<its name>`. */
 async function contributions(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>, section: string) {
@@ -135,7 +142,7 @@ export const modules: SystemModule = {
     tool("tools", "Module tools the caller may call (<module>.<tool>, description, input schema); query matches every word against names and descriptions.", { query: text() }, [], { idempotent: true, output: z.lazy(() => outputs.modulesToolsOutput) }),
     // v2-14: a module reads the `contributes.<its name>` declarations of the active modules; nobody else reads them.
     tool("contributions", "Active modules' declarations in contributes.<section>, where section is the caller's own name: [{ module, hash, value }].", { section: text() }, ["section"], { idempotent: true, output: z.lazy(() => outputs.modulesContributionsOutput) }),
-    tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["provider", "owner"], idempotent: true, output: z.lazy(() => outputs.modulesCheckOutput) })),
+    tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["provider", "owner"], idempotent: true, output: z.lazy(() => outputs.modulesCheckOutput.extend({ reason: z.string() })) })),
     tool("checkout", modulesToolInputSchemas.checkout.description!, {}, [], provider(modulesToolInputSchemas.checkout)),
     tool("propose", modulesToolInputSchemas.propose.description!, {}, [], provider(modulesToolInputSchemas.propose)),
     tool("rollback", modulesToolInputSchemas.rollback.description!, {}, [], provider(modulesToolInputSchemas.rollback, { visibility: ["provider", "owner"], output: z.lazy(() => outputs.modulesRollbackOutput) })),

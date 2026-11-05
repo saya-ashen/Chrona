@@ -63,7 +63,9 @@ test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves w
   expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
   expect(await db.audit.count({ where: { kind: "run_continuation", subjectId: run.id } })).toBe(0);
   expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
-  expect(await notices(db, { title: "模块构建已暂停" })).toMatchObject([{ sessionId, body: expect.stringContaining("不会自动重试") }]);
+  const paused = await notices(db, { title: "模块构建已暂停" });
+  expect(paused[0]!.body).toEndWith("未启用：本次构建未提交版本");
+  expect(paused).toMatchObject([{ sessionId, body: expect.stringContaining("不会自动重试") }]);
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
 });
 test.each(["failed", "cancelled"] as const)("a build that ends %s tells the conversation that asked for it", async outcome => {
@@ -76,6 +78,7 @@ test.each(["failed", "cancelled"] as const)("a build that ends %s tells the conv
   const [told] = await db.message.findMany({ where: { sessionId, direction: "out" } });
   expect(told!.text).toContain("构建「构建模块 image-generation」结束：");
   expect(told!.text).toContain(outcome === "cancelled" ? "已被取消" : "未完成（Connection error.）");
+  expect(told!.text).toEndWith("未启用：本次构建未提交版本");
   // The build is not retried; the conversation that asked for it runs once more with the result.
   expect(await db.run.findMany({ where: { status: "queued" }, select: { sessionId: true, lane: true, trigger: true } })).toEqual([{ sessionId, lane: "foreground", trigger: "build" }]);
 });
@@ -98,7 +101,7 @@ test("a finished build wakes its conversation with the result, at most five time
   const first = await finishBuild(1);
   expect(first).toMatchObject({ lane: "foreground", trigger: "build", label: "构建结束：构建模块 m1" });
   expect(first!.prompt).toContain("m1 已提交审批");
-  expect((await db.message.findMany({ where: { sessionId, direction: "out" } })).map(m => m.text)).toEqual(["m1 已提交审批"]);
+  expect((await db.message.findMany({ where: { sessionId, direction: "out" } })).map(m => m.text)).toEqual(["m1 已提交审批\n\n未启用：本次构建未提交版本"]);
   for (let n = 2; n <= 5; n++) expect(await finishBuild(n)).not.toBeNull();
   expect(await finishBuild(6)).toBeNull();
   time = new Date(time.getTime() + 1000);

@@ -135,12 +135,58 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
   });
   await f.step();
   expect(f.starts.map(input => input.lane)).toEqual(["build"]);
-  expect(report).toMatchObject({ status: "approved", report: { tests: expect.any(Array) } });
+  expect(report).toMatchObject({ status: "active", active: true, report: { tests: expect.any(Array) } });
   const version = await f.db.moduleVersion.findFirstOrThrow({ where: { source: "build" } });
   expect(version).toMatchObject({ source: "build", status: "approved" });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_submission" } })).toMatchObject({ details: { hash: version.hash, sessionId: build.id } });
   // The reply went back to the web conversation that asked.
-  expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准`]);
+  expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准\n\n已启用：mail-sort 版本 ${version.hash.slice(0, 8)}`]);
+});
+
+for (const scenario of ["active", "approval", "failed", "empty", "long", "latest-failed", "invalid-last", "unrelated"] as const) test(`build completion reports database outcome: ${scenario}`, async () => {
+  const f = await fixture();
+  const started = await f.call("m_modules_build", request) as { sessionId: string };
+  let expected = "未启用：本次构建未提交版本";
+  const reply = scenario === "long" ? "尚未启用，仍需你确认".repeat(700) : "尚未启用，仍需你确认";
+  f.onRun(async (input, call) => {
+    if (scenario !== "empty") {
+      await f.writeModule(input.cwd);
+      if (scenario === "approval") await writeFile(join(input.cwd, "mail-sort/module.json"), JSON.stringify({ ...manifest, secrets: ["mail_account"] }));
+      if (scenario === "latest-failed" || scenario === "invalid-last") {
+        await call("m_modules_propose", { dir: "mail-sort", intent });
+        await createModules(f.ports, f.workspaceId).buildPending();
+        await writeFile(join(input.cwd, "mail-sort/test.ts"), "process.exit(1)");
+      }
+      if (scenario === "invalid-last") await writeFile(join(input.cwd, "mail-sort/module.json"), "{");
+      const failed = scenario === "failed" || scenario === "latest-failed" || scenario === "invalid-last";
+      if (failed) f.ports.sandbox!.runModule = async () => ({ status: "failed", output: "", error: "Fixture check failure", exitCode: 1 });
+      const proposal = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
+      await createModules(f.ports, f.workspaceId).buildPending();
+      const status = scenario === "approval" ? "pending_approval" : failed ? "failed" : "active";
+      if (scenario !== "invalid-last") expect(await call("m_modules_check", { module: "mail-sort", hash: proposal.hash })).toMatchObject({ status, active: status === "active" });
+      expected = status === "active" ? `已启用：mail-sort 版本 ${proposal.hash.slice(0, 8)}`
+        : status === "pending_approval" ? "等待你确认：此版本需要新的凭据（网页「待你决定」）" : "未启用：mail-sort 版本检查未通过或已被撤回";
+      if (scenario === "invalid-last") expected = "未启用：最后提交的版本未通过检查";
+      if (status === "active") expect(await call("m_modules_propose", { dir: "mail-sort", intent })).toMatchObject({ status: "active", active: true, hash: proposal.hash });
+      if (scenario === "unrelated") {
+        await f.writeModule(f.requester.cwd);
+        await writeFile(join(f.requester.cwd, "mail-sort/test.ts"), "process.exit(1)");
+        await f.call("m_modules_propose", { dir: "mail-sort", intent });
+      }
+    }
+    await call("chrona_reply", { text: reply });
+  });
+  await f.step();
+  const buildRun = await f.db.run.findFirstOrThrow({ where: { sessionId: started.sessionId, lane: "build" } });
+  const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${buildRun.id}` } });
+  const body = (notice.args as { body: string }).body;
+  expect(body.endsWith(expected)).toBe(true);
+  expect(body.length).toBeLessThanOrEqual(4000);
+  expect(body).toStartWith("尚未启用，仍需你确认");
+  const report = await f.db.message.findFirstOrThrow({ where: { sessionId: f.session.id, direction: "out" } });
+  expect(report.text).toBe(`${reply}\n\n${expected}`);
+  const wake = await f.db.run.findFirstOrThrow({ where: { sessionId: f.session.id, trigger: "build" } });
+  expect(wake.prompt).toContain(`${expected}\n\n如果`);
 });
 
 test("multi-module build diagnostics require one declared target and accept its id", async () => {
@@ -519,7 +565,7 @@ test("a build discovers contracts and release reference, merges a fixture and ac
     await writeFile(join(input.cwd, "candidate", "app.js"), `${customized}\n${feature}`);
     submitted = await call("m_modules_propose", { dir: "candidate", intent }) as { hash: string };
     await createModules(f.ports, f.workspaceId).buildPending();
-    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "approved", active: true });
+    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "active", active: true });
     await call("chrona_reply", { text: "Fixture merge checked, waiting for approval" });
   });
   await f.step();
@@ -665,12 +711,15 @@ test("offline recovery executes one bounded build and activates its checks-passi
     expect(input).toMatchObject({ lane: "build", model: ownerRequest.execution.model, sessionId: null, searchTools: true });
     await f.writeModule(input.cwd);
     const version = await call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
-    expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "approved" });
+    expect(await call("m_modules_check", { module: "mail-sort", hash: version.hash, wait: 10 }, { timeoutSeconds: 12 })).toMatchObject({ status: "active", active: true });
     await call("chrona_reply", { text: "ready for approval" });
   });
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ status: "finished" });
   expect(f.starts).toHaveLength(1);
-  expect(await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } })).toMatchObject({ status: "active" });
+  const active = await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } });
+  expect(active).toMatchObject({ status: "active" });
+  const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${f.starts[0]!.runId}` } });
+  expect((notice.args as { body: string }).body).toBe(`ready for approval\n\n已启用：mail-sort 版本 ${active.activeHash!.slice(0, 8)}`);
   expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(0);
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
   expect(f.starts).toHaveLength(1);
