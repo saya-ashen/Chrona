@@ -1,7 +1,17 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { openStore } from "./store";
+import { composeDigest } from "./budget";
 import { createNotify, type Caller } from "./notify";
+
+test.each([
+  ["  Gmail 重要邮件  \r\n\r\n1. ETH AI Center", "1. ETH AI Center"],
+  ["Gmail 重要邮件", ""],
+  ["Gmail 重要邮件已有更新\n详情", "Gmail 重要邮件已有更新\n详情"],
+  ["独立正文\n详情", "独立正文\n详情"],
+])("digest removes only a repeated title line: %s", (body, expected) => {
+  expect(composeDigest([{ moduleTitle: "gmail", title: "Gmail 重要邮件", body }], { dayLabel: "今日" })).toEqual({ title: "今日日报", body: `gmail\n- Gmail 重要邮件：${expected}` });
+});
 
 const kernel: Caller = { kind: "kernel" };
 const owner: Caller = { kind: "module", module: "transport", moduleId: "transport-id", hash: "h" };

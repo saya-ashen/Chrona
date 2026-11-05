@@ -1,5 +1,6 @@
 import { type Health, type TodayView } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
+import { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
 import { toApproval, toSession } from "./store";
@@ -29,7 +30,7 @@ export function createToday({ db, workspaceId, now }: RecordContext, ports: Heal
     const at = now(), week = 7 * 86400000, conversations = await entryConversations(db, workspaceId);
     const [approvals, schedules, notifications, sessions, applications, status, issues] = await Promise.all([
       db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" } }),
-      db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { gte: at, lte: new Date(at.getTime() + week) } }, orderBy: { nextAt: "asc" }, take: 50 }),
+      db.schedule.findMany({ where: { workspaceId, status: "active", OR: [{ mode: "wake" }, { mode: "module", payload: { not: Prisma.DbNull } }], nextAt: { gte: at, lte: new Date(at.getTime() + week) } }, orderBy: { nextAt: "asc" }, take: 50 }),
       ports.notifications.list(20),
       db.session.findMany({ where: { workspaceId, ...conversations }, include: { runs: { where: { status: "running" }, select: { id: true }, take: 1 } }, orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }], take: 20 }),
       apps(), health(), problems().catch(() => []),

@@ -46,7 +46,11 @@ export function composeDigest(items: readonly { moduleTitle: string | null; titl
     group.push(item);
     groups.set(item.moduleTitle, group);
   }
-  const sections = [...groups].map(([title, group]) => `${title ?? "其他动态"}\n${group.map((item) => `- ${item.title}：${item.body}`).join("\n")}`);
+  const sections = [...groups].map(([title, group]) => `${title ?? "其他动态"}\n${group.map((item) => {
+    const [first, ...rest] = item.body.trim().split(/\r?\n/);
+    const body = first.trim() === item.title.trim() ? rest.join("\n").trim() : item.body;
+    return `- ${item.title}：${body}`;
+  }).join("\n")}`);
   if (items.length > 10) sections.push(`另有 ${items.length - 10} 条`);
   return { title: `${dayLabel}日报`, body: sections.join("\n\n") };
 }

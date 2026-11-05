@@ -60,7 +60,7 @@ async function get(path: string, init: RequestInit = {}) {
 const post = async (path: string, body: unknown) => get(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 // Exercise the shipped specs directly; browser acceptance checks the mounted renderer.
 async function checkHealthRendering() {
-  const view = { approvals: [], upcoming: [], updates: [], apps: [], sessions: [], problems: [] as Args[] };
+  const view = { approvals: [], upcoming: [], updates: [] as Args[], apps: [], sessions: [], problems: [] as Args[] };
   const health = { configuredStatus: "paused", runtime: { state: "paused" }, activeHash: "same-hash",
     activation: { activationId: "current", hash: "same-hash", status: "verified", observedCapabilities: ["tool:read"] },
     consecutiveFailures: 2, incident: { status: "verifying", pendingTriggers: ["tool:write"], deliveryUnknown: true },
@@ -72,7 +72,13 @@ async function checkHealthRendering() {
       { attribution: "legacy-unattributed" },
     ].map(item => ({ ...item, hash: "same-hash", status: "unresolved", failures: 1, lastAt: "2026-11-04", evidence: { reason: "失败" }, attempts: [], pendingTriggers: [] })) };
   const rendered = () => JSON.stringify(todaySpec({ today: view, runs: [] }));
-  assert.doesNotMatch(rendered(), /需要处理的应用/);
+  assert.doesNotMatch(rendered(), /需要处理的应用|未送达的通知/);
+  view.updates = [{ id: "failed-notice", title: "申请截止提醒", createdAt: "2026-11-05T04:00:00Z", body: "两天后截止", status: "failed", lastError: "投递失败".repeat(50) }, { id: "sent", title: "已送达", createdAt: "2026-11-05T03:00:00Z", body: "完成", status: "sent" }];
+  const failure = rendered();
+  for (const text of ["未送达的通知（1）", "申请截止提醒", "2026-11-05T04:00:00Z", `${"投递失败".repeat(40)}…`, "检查通知设置"]) assert.ok(failure.includes(text), text);
+  assert.ok(!failure.includes("投递失败".repeat(41)));
+  assert.ok(failure.indexOf("未送达的通知") < failure.indexOf("接下来"));
+  view.updates = [];
   view.problems = ["unresolved", "verifying", "retrying", null].map(incidentStatus => ({ module: "示例应用", moduleId: "app-1", incidentStatus, contractFailures: 4, nextAction: "检查实际效果" }));
   const today = rendered();
   for (const text of ["需要处理的应用（4）", "/apps/app-1", "未解决，需要处理", "连接已恢复，功能待验证", "正在有限恢复", "输出不符合契约 4 次", "检查实际效果"]) assert.ok(today.includes(text), text);

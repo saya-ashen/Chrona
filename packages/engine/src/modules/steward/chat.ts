@@ -157,6 +157,11 @@ class ChatService {
     if (!(await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } })).count) return;
     await audit(db, { workspaceId, actor: "chrona", kind: "session_rotated", subjectId: session.id, details: { tokens, idle } });
   }
+  private async titleFromMessage(session: { id: string; title: string | null; source: string }, text: string) {
+    if (session.title !== null || ["wake", "module", "build", "reflect"].includes(session.source)) return;
+    const line = [...text.trim().split(/\r?\n/, 1)[0]!.trim()];
+    if (line.length) await this.ports.db.session.updateMany({ where: { id: session.id, title: null }, data: { title: line.length > 40 ? `${line.slice(0, 40).join("")}…` : line.join("") } });
+  }
   private async prepare(raw: ChatInput, entryModuleId?: string) {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments), { ports } = this, { db } = ports;
     return serial(input.workspaceId, async () => {
@@ -188,6 +193,7 @@ class ChatService {
       const { key: _key, sessionId: _sessionId, quotedExternalId: _quoted, ...message } = input;
       const inbound = existing ?? await db.message.create({ data: { ...message, ...(quoted ? { quotedMessageId: quoted.id } : {}), sessionId: session.id, direction: "in", at: ports.now() } });
       await db.session.update({ where: { id: session.id }, data: { lastActivityAt: ports.now() } });
+      await this.titleFromMessage(session, input.text);
       const before = (await this.replies(inbound, [])).map(m => m.id);
       const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, sessionId: session.id, status: "running" } });
       const handle = active && liveRuns.get(active.id);

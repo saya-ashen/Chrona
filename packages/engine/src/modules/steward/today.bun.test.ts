@@ -43,6 +43,20 @@ test("today problems share current health facts, exclude recovered and other wor
   } finally { await f.db.$disconnect(); }
 });
 
+test("today upcoming excludes static polling before the limit, keeping runtime timers and wakes", async () => {
+  const f = await healthFixture();
+  try {
+    const module = await f.app("calendar");
+    const at = f.ports.now(), nextAt = new Date(at.getTime() + 60_000);
+    for (let i = 0; i < 51; i++) await f.db.schedule.create({ data: { workspaceId: f.workspaceId, moduleId: module.moduleId, mode: "module", triggerId: `poll-${i}`, text: "poll", label: "轮询", rule: { kind: "every", minutes: 15 }, nextAt, createdBy: "chrona" } });
+    for (const [mode, label, payload] of [["module", "申请截止前两天", {}], ["wake", "准备申请", undefined]] as const) {
+      await f.db.schedule.create({ data: { workspaceId: f.workspaceId, moduleId: mode === "module" ? module.moduleId : null, mode, text: label, label, ...(payload ? { payload } : {}), rule: { kind: "at", at: new Date(at.getTime() + 120_000).toISOString() }, nextAt: new Date(at.getTime() + 120_000), createdBy: "chrona" } });
+    }
+    const view = await workspaceToday(f.ports, f.workspaceId).get();
+    expect(view.upcoming.map(item => [item.mode, item.label])).toEqual([["module", "申请截止前两天"], ["wake", "准备申请"]]);
+  } finally { await f.db.$disconnect(); }
+});
+
 test("today tolerates a failed optional health facts read", async () => {
   const f = await healthFixture();
   try {
