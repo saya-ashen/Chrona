@@ -6,7 +6,7 @@ import { startModule } from "chrona/testing";
 
 process.env.CHRONA_DATA = await mkdtemp("/tmp/mind-data-");
 const at = (minutes: number) => new Date(Date.parse("2026-10-30T00:00:00Z") + minutes * 60_000).toISOString();
-const today = { approvals: [], upcoming: [], updates: [], sessions: [], health: { provider: { available: true } } };
+const today = { approvals: [], upcoming: [] as { label: string; at: string }[], updates: [] as { id: string; moduleId: string | null; title: string; body: string; createdAt: string; feedback: string | null }[], sessions: [], health: { provider: { available: true } } };
 const health = (id = "i3", revision = 1, activationId = "act-1") => ({ module: "price-watch", moduleId: "mod-1", configuredStatus: "active", activeHash: "a1", activation: { activationId }, incident: { id, revision, status: "unresolved", failures: 5, reason: "timeout" }, contractFailureCount: 0, open: true, truncated: false });
 let apps = [{ ...health(), incident: null as ReturnType<typeof health>["incident"] | null, open: false }];
 let secondPage: typeof apps = [];
@@ -99,7 +99,7 @@ try {
   assert.match((await tool("report", { "wake-id": "w-nope", outcome: "nothing", summary: "x" }, 440)).error, /No wake/);
   const log = await tool("decisions", {}, 440);
   assert.deepEqual([log.stats.wakes7d, log.stats.useful7d, log.stats.unreported7d], [2, 1, 1]);
-  assert.deepEqual(log.entries.map((entry: { wake: boolean }) => entry.wake), [true, false, false, true, false]);
+  assert.deepEqual(log.entries.map((entry: { wake: boolean }) => entry.wake), [true, true]);
   assert.equal(log.entries.find((entry: { id: string }) => entry.id === wakeId(wakes()[1])).outcome.kind, "notified");
   // Escalation only rises.
   assert.equal((await tool("note", { id: concern.id, escalation: "day-before", conclusion: "用户已知" }, 445)).concern.escalation, "day-before");
@@ -289,6 +289,62 @@ try {
   await sense(2500, { "daily-wakes": 20 });
   assert.equal(wakes().length, count + 1);
   assert.match(wakes().at(-1), /连接已恢复、功能待验证/);
+  // No fresh signal means no intuition call, even as polling labels and attention context change.
+  await writeFile(join(data, "state.json"), "{}");
+  await writeFile(join(data, "agenda.json"), "[]");
+  apps = [{ ...health(), module: "mind", moduleId: "mind-id", incident: null, open: false }];
+  contributions = [];
+  count = wakes().length;
+  const callsBefore = seen.length;
+  await sense(3000, { "intuition-url": url });
+  const initialHash = JSON.parse(await readFile(join(data, "state.json"), "utf8")).lastHash;
+  today.upcoming = [{ label: "gmail poll 3015", at: at(3020) }];
+  await sense(3015, { "intuition-url": url });
+  assert.equal(seen.length, callsBefore);
+  assert.equal(wakes().length, count);
+  assert.equal(JSON.parse(await readFile(join(data, "state.json"), "utf8")).lastHash, initialHash);
+  const silent = (await tool("note", { title: "[career-ops] ETH AI Center赵文明老师推荐", goal: "ETH AI Center reference letters", status: "waiting-user", escalation: "final", "due-at": at(2900), "revisit-at": at(2900), "silent-until": at(4000), conclusion: "等待推荐信回执" }, 3020)).concern;
+  await sense(3030, { "intuition-url": url });
+  assert.equal(wakes().length, count);
+  assert.equal(seen.length, callsBefore);
+  // An independent signal lets us inspect the intuition agenda: silent overdue concerns are absent.
+  intuition = { wake: { type: "noul", noul: 0.1 }, focus: { type: "choice", choice: "nothing", confidence: 0.9 }, urgency: { type: "score", score: 0, confidence: 0.9 } };
+  apps[0]!.activeHash = "mind-a2";
+  await sense(3045, { "intuition-url": url });
+  assert.deepEqual(JSON.parse(seen.at(-1)!.body.state).agenda, []);
+  assert.equal(wakes().length, count);
+  const notice = { id: "mail-eth", moduleId: "gmail-id", title: "[ETH AI Center] Receipt confirmation of your reference letters", body: "At least two of three referees have submitted.", createdAt: at(3050), feedback: null };
+  today.updates = [notice];
+  await sense(3060, { "intuition-url": url });
+  assert.equal(wakes().length, ++count);
+  assert.equal(seen.length, callsBefore + 1, "notice evidence bypasses intuition sleep");
+  assert.match(wakes().at(-1), /来源：rules/);
+  assert.ok(wakes().at(-1).includes(`[notice:mail-eth] (${silent.id})`));
+  assert.ok(wakes().at(-1).includes(notice.body));
+  assert.match(wakes().at(-1), /等待推荐信回执/);
+  await sense(3120, { "intuition-url": url });
+  assert.equal(wakes().length, count);
+  assert.equal(seen.length, callsBefore + 1);
+  // Unrelated and self/kernel notifications never become evidence, even with identical topic text.
+  today.updates = [notice, { ...notice, id: "promo", title: "Pinterest weekly inspiration", body: "Fresh design ideas for you" }, { ...notice, id: "self", moduleId: "mind-id" }, { ...notice, id: "kernel", moduleId: null }];
+  await sense(3180, { "intuition-url": url });
+  assert.equal(wakes().length, count);
+  assert.equal(seen.length, callsBefore + 1);
+  // Persist pending evidence while the provider is unavailable, even after it drops out of today's window.
+  today.health.provider.available = false;
+  today.updates = [{ ...notice, id: "mail-eth-next" }];
+  await sense(3240);
+  today.health.provider.available = true;
+  today.updates = [];
+  await sense(3300);
+  assert.equal(wakes().length, ++count);
+  assert.match(wakes().at(-1), /notice:mail-eth-next/);
+  await sense(3360);
+  assert.equal(wakes().length, count);
+  // Silence expiring restores deadline/revisit signals.
+  await sense(4000);
+  assert.equal(wakes().length, ++count);
+  assert.ok(wakes().at(-1).includes(`due:${silent.id}:overdue`));
   // (f) The original daily-wakes assertions above still exercise the quota.
   for (const prompt of wakes()) {
     assert.ok(prompt.length <= 4000);
