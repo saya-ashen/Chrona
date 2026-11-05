@@ -4,7 +4,7 @@ export type { ChatInput } from "./modules/steward/chat";
 export { createQqBotState } from "./modules/steward/builtin/qq/bot";
 export { createSecrets } from "./modules/steward/secrets";
 export { completeOAuth, OAUTH_CALLBACK_PATH } from "./modules/steward/oauth";
-export { createStewardService, createTools, StewardError } from "./modules/steward";
+export { createStewardService, createTools, StewardError, CallError } from "./modules/steward";
 export { startOwnerBuild, ownerBuildSchema } from "./modules/steward/owner-build";
 export { runOwnerBuild } from "./modules/steward/owner-build-run";
 export { moduleSupervisor } from "./modules/steward/module-supervisor";

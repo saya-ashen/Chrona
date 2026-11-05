@@ -7,7 +7,7 @@ import { toSchedule } from "./store";
 import { notificationSettings } from "./settings";
 import { createRuns, createRunSession } from "./runs";
 import { audit } from "./audit";
-import { moduleSupervisor } from "./module-supervisor";
+import { drainSchedules, enqueueSchedule } from "./schedule-delivery";
 
 function beforeDeadline(nextAt: Date | null, until: Date | null): Date | null {
   return until && nextAt && nextAt > until ? null : nextAt;
@@ -16,20 +16,6 @@ function nextDueOccurrence(rule: Parameters<typeof nextOccurrence>[0], now: Date
   const nextAt = nextOccurrence(rule, now, zone);
   if (until && now > until) return null;
   return beforeDeadline(nextAt, until);
-}
-
-async function runScheduledModule(ports: StewardPorts, row: Prisma.ScheduleGetPayload<object>, moduleId: string, hash: string, now: Date) {
-  let error: string | null = null, exitCode = -1;
-  try {
-    await moduleSupervisor(ports).deliver(moduleId, hash, { trigger: { id: row.triggerId ?? `s-${row.id}`, kind: "schedule", firedAt: row.nextAt!.toISOString(), ...(row.payload !== null ? { scheduleId: row.id, payload: row.payload as Record<string, unknown> } : {}) }, now: now.toISOString(), params: {} });
-    exitCode = 0;
-  } catch (cause) {
-    error = (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000);
-  }
-  return { error, exitCode };
-}
-function moduleResultSummary(exitCode: number, effectCount: number, delayMs: number, error: string | null) {
-  return `Module exit ${exitCode}; effects ${effectCount}; delay ${delayMs}ms${error ? `; ${error}` : ""}`.slice(0, 2000);
 }
 
 async function validateScheduleMode(tx: Prisma.TransactionClient, workspaceId: string, originSessionId: string | undefined) {
@@ -62,52 +48,39 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
       let nextAt = row.nextAt;
       if (input.status === "active") nextAt = nextOccurrence(scheduleRuleSchema.parse(row.rule), ports.now(), zone);
       if (row.until && nextAt && nextAt > row.until) nextAt = null;
+      if (input.status === "cancelled") await tx.moduleInvocation.updateMany({ where: { workspaceId, mode: "schedule", key: { startsWith: `${id}:` }, status: "queued" }, data: { status: "cancelled", finishedAt: ports.now(), error: "Schedule cancelled before delivery" } });
       const result = await tx.schedule.update({ where: { id }, data: { status: input.status === "active" && !nextAt ? "done" : input.status, nextAt, ...(input.status === "active" ? { failures: 0 } : {}) } });
       await audit(tx, { workspaceId, actor: "user", kind: "schedule_updated", subjectId: id, details: input });
       return toSchedule(result);
     });
   }
-  async function executeModule(row: Prisma.ScheduleGetPayload<object>, now: Date, delayMs: number) {
-    const module = row.moduleId ? await db.module.findFirst({ where: { id: row.moduleId, workspaceId } }) : null;
-    const schedule = await db.schedule.findUnique({ where: { id: row.id } });
-    const skip = !module ? "Module missing" : module.status !== "active" ? "Module is paused" : !module.activeHash ? "Module has no active hash" : schedule?.status === "cancelled" ? "Module schedule replaced" : null;
-    if (skip || !module?.activeHash) {
-      await db.schedule.update({ where: { id: row.id }, data: { lastResult: skip } });
-      return;
-    }
-    const hash = module.activeHash;
-    const { error, exitCode } = await runScheduledModule(ports, row, module.id, hash, now);
-    const callCount = await db.moduleCall.count({ where: { moduleId: module.id, hash, eventKey: `${row.triggerId ?? `s-${row.id}`}:${row.nextAt!.toISOString()}` } });
-    await db.schedule.update({ where: { id: row.id }, data: { failures: error ? { increment: 1 } : 0, lastResult: moduleResultSummary(exitCode, callCount, delayMs, error) } });
-  }
-  async function fireDue(now = ports.now()) {
+  async function fireDue(now = ports.now(), { waitForDelivery = true } = {}) {
     const zone = await timezone();
     const rows = await db.schedule.findMany({ where: { workspaceId, status: "active", nextAt: { lte: now } }, orderBy: { nextAt: "asc" } });
     let fired = 0;
     for (const row of rows) {
-      // Advance before external execution: concurrent ticks/downtime fire at most once.
-      // A crash leaves lastResult at "Firing" for inspection; it does not rerun external work.
+      // Advancing and recording delivery are atomic; effects run outside the tick.
       const rule = scheduleRuleSchema.parse(row.rule), delayMs = now.getTime() - row.nextAt!.getTime();
       const nextAt = nextDueOccurrence(rule, now, zone, row.until);
       const expired = !!row.until && now > row.until;
       const claimed = await db.$transaction(async tx => {
-        const changed = await tx.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt }, data: { nextAt, status: nextAt ? "active" : "done", ...(!expired ? { lastAt: now, lastResult: `Firing; delay ${delayMs}ms` } : {}) } });
+        if (row.mode === "module" && await tx.moduleInvocation.count({ where: { workspaceId, mode: "schedule", key: { startsWith: `${row.id}:` }, status: { in: ["queued", "running"] } } })) return false;
+        const changed = await tx.schedule.updateMany({ where: { id: row.id, status: "active", nextAt: row.nextAt }, data: { nextAt, status: nextAt ? "active" : "done", ...(!expired ? { lastAt: now, lastResult: `Queued; delay ${delayMs}ms` } : {}) } });
         if (!changed.count || expired) return false;
         if (row.mode === "wake") {
           const session = await createRunSession(tx, workspaceId, "wake", now, { originSessionId: row.originSessionId ?? undefined });
           await runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", label: row.label, prompt: `${row.text}\n\nSchedule ${row.id}; fired ${delayMs}ms late.` }, tx);
         }
+        if (row.mode === "module") await enqueueSchedule(tx, workspaceId, row, now);
         await audit(tx, { workspaceId, actor: "chrona", kind: "schedule_fired", subjectId: row.id, details: { delayMs, mode: row.mode } });
         return true;
       });
       if (!claimed) continue;
       fired++;
-      if (row.mode === "module") {
-        await executeModule(row, now, delayMs);
-        continue;
-      }
+      if (row.mode === "module") continue;
       await db.schedule.update({ where: { id: row.id }, data: { lastResult: `Fired; delay ${delayMs}ms`, failures: 0 } });
     }
+    if (waitForDelivery) await drainSchedules(ports, workspaceId, now);
     return fired;
   }
   return { create, update, cancel: (id: string) => update(id, { status: "cancelled" }), list: async (originSessionId?: string) => (await db.schedule.findMany({ where: { workspaceId, ...(originSessionId ? { originSessionId } : {}) }, orderBy: { createdAt: "desc" } })).map(toSchedule), fireDue, forModule: (moduleId: string, module: string) => moduleTimers(ports, workspaceId, timezone, moduleId, module) };
@@ -130,6 +103,8 @@ function moduleTimers(ports: StewardPorts, workspaceId: string, timezone: () => 
       nextAt = beforeDeadline(nextAt, until);
       return db.$transaction(async tx => {
         const current = await tx.schedule.findFirst({ where: own(input.key) });
+        const prior = await tx.schedule.findMany({ where: { workspaceId, moduleId, mode: "module", text: input.key, triggerId: null }, select: { id: true } });
+        for (const schedule of prior) await tx.moduleInvocation.updateMany({ where: { workspaceId, mode: "schedule", key: { startsWith: `${schedule.id}:` }, status: "queued" }, data: { status: "cancelled", finishedAt: now, error: "Timer replaced before delivery" } });
         const data = { rule: input.rule, payload: input.payload as Prisma.InputJsonValue, label: input.label, until, nextAt, status: nextAt ? "active" : "done", failures: 0 };
         if (!current && await tx.schedule.count({ where: { workspaceId, moduleId, payload: { not: Prisma.DbNull }, status: { in: ["active", "paused"] } } }) >= MODULE_SCHEDULE_LIMIT) throw new StewardError("conflict", `A module keeps at most ${MODULE_SCHEDULE_LIMIT} timers; cancel some first`);
         const row = current
@@ -141,8 +116,9 @@ function moduleTimers(ports: StewardPorts, workspaceId: string, timezone: () => 
     },
     async cancel(key: string) {
       return db.$transaction(async tx => {
-        const current = await tx.schedule.findFirst({ where: own(key) });
+        const current = await tx.schedule.findFirst({ where: { ...own(key), status: { in: ["active", "paused", "done"] } }, orderBy: { createdAt: "desc" } });
         if (!current) return { cancelled: false };
+        await tx.moduleInvocation.updateMany({ where: { workspaceId, mode: "schedule", key: { startsWith: `${current.id}:` }, status: "queued" }, data: { status: "cancelled", finishedAt: ports.now(), error: "Timer cancelled before delivery" } });
         await tx.schedule.update({ where: { id: current.id }, data: { status: "cancelled", nextAt: null } });
         await audit(tx, { workspaceId, actor: `module:${module}`, kind: "schedule_updated", subjectId: current.id, details: { key, status: "cancelled" } });
         return { cancelled: true };

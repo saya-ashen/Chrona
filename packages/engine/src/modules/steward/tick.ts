@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { hostname } from "node:os";
 import type { StewardPorts } from "./ports";
 import { createSchedules } from "./schedules";
+import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
 import { createRuns, liveRuns } from "./runs";
@@ -56,6 +57,7 @@ function closedInput(run: ClaimedRun, sessionId: string | null) {
 }
 export function createTick(ports: StewardPorts) {
   const builds = new Map<string, Promise<void>>(), buildFailures = new Map<string, unknown>();
+  const finalizers = new Set<Promise<unknown>>();
   function startBuild(workspaceId: string, now: Date) {
     if (builds.has(workspaceId)) return;
     builds.set(workspaceId, createModules(ports, workspaceId).buildPending(now).then(() => undefined, error => { buildFailures.set(workspaceId, error); }).finally(() => { builds.delete(workspaceId); }));
@@ -107,11 +109,13 @@ export function createTick(ports: StewardPorts) {
               handle = ports.provider.start({ runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId, prompt, images: chatImages(inbound?.attachments ?? []), deadline: run.deadlineAt, model: run.model, events: channel.events, extraTools, searchTools, hostPaths, content });
             } catch (error) { await channel.close(); throw error; }
             gate.attach(handle);
-            void gate.handle.done.finally(async () => { await channel.close(); }).then(outcome => runs.finish(run.id, outcome), () => runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }))
+            const finalized = gate.handle.done.finally(async () => { await channel.close(); }).then(outcome => runs.finish(run.id, outcome), () => runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }))
               // v2-21: what the conversation said since the last retain goes to memory (never throws).
               .then(() => autoRetain(ports, workspaceId, run.sessionId)).catch(async () => {
               try { await audit(ports.db, { workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
             });
+            finalizers.add(finalized);
+            void finalized.finally(() => finalizers.delete(finalized));
           } catch (error) {
             gate.fail();
             await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` });
@@ -122,7 +126,10 @@ export function createTick(ports: StewardPorts) {
         // notify keeps its own copy of the owner's notification settings: a new install or data directory gets the current ones.
         ["builtins", async () => { await registerBuiltins(ports, workspaceId); await forwardSettings(ports.db, ports, workspaceId, notificationSettings(workspace.settings), workspace.updatedAt); await retireReflection(ports, workspaceId); }],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(workspaceId, now); }],
-        ["schedules", () => createSchedules(ports, workspaceId).fireDue(now)],
+        ["schedules", async () => {
+          await createSchedules(ports, workspaceId).fireDue(now, { waitForDelivery: false });
+          void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
+        }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); await runs.endIdleBuilds(now); }],
         ["approvals", () => announceApprovals(ports, workspaceId)],
         // Routed async calls (notifications among them) are delivered beside the tick.
@@ -135,5 +142,8 @@ export function createTick(ports: StewardPorts) {
     }
     return { failures };
   }
-  return Object.assign(tick, { settled: () => Promise.all([...builds.values(), callsSettled(ports)]).then(() => undefined) });
+  return Object.assign(tick, { settled: async ({ includeRuns = false } = {}) => {
+    await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), schedulesSettled(ports)]);
+    await callsSettled(ports);
+  } });
 }

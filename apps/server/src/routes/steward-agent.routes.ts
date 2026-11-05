@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { createStewardService, StewardError, type StewardPorts, type StewardService } from "@chrona/engine";
+import { createStewardService, StewardError, CallError, type StewardPorts, type StewardService } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 
 const log = createLogger("apps.server.steward-agent");
@@ -30,6 +30,7 @@ export function createStewardAgentRoutes(ports: StewardPorts, service: StewardSe
   router.onError((error, c) => {
     if (error instanceof SyntaxError) return c.json(failure("INVALID_JSON"), 400);
     if (error instanceof StewardError) return c.json(failure(error.code, error.message), { forbidden: 403, invalid: 400, not_found: 404, conflict: 409 }[error.code] as 400 | 403 | 404 | 409);
+    if (error instanceof CallError) return c.json(failure(error.code, error.message), error.code === "unavailable" ? 503 : 409);
     // The Provider only sees INTERNAL_ERROR; keep the cause (redacted) in the service log so it can be diagnosed.
     log.error("tool.internal_error", { path: c.req.path, error: error instanceof Error ? (error.stack ?? error.message).slice(0, 4000) : String(error).slice(0, 4000) });
     return c.json(failure("INTERNAL_ERROR"), 500);

@@ -4,7 +4,7 @@
 
 ## 启动与数据位置
 
-源码开发用 `bun run dev`，仅启动源码 API 用 `bun run server:start`。打包版本用 `chrona start --no-open`，默认监听 `127.0.0.1:3101`；`chrona start` 只在打包版本提供。
+源码开发用 `bun run dev`（Hono watch 模式），不使用 watch 模式时用 `bun run server:start`；两者默认在 `127.0.0.1:3101` 提供内置 web 模块和 API，不另启 Vite 服务。打包版本用 `chrona start --no-open`，默认同样监听 `127.0.0.1:3101`；`chrona start` 只在打包版本提供。
 
 建议在启动、备份、恢复与诊断的同一环境中显式设置：
 
@@ -74,9 +74,15 @@ bun run packages/cli/src/index.ts doctor
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 模块依赖：有 `nix` 时用 `CHRONA_NIXPKGS`（flake 引用，建议固定为系统 nixpkgs）构建系统程序；没有时只检查主机已安装的程序。语言库只按模块的 `bun.lock` / `uv.lock` 安装，构建时需要能访问 npm / PyPI。
 - QQ：由内置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经 `secret` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
-- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_content_*`、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`，以及各模块的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
+- Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`；通过 `chrona_module_tools` 发现 owner 可用的模块工具，再用 `chrona_module_call` 调用，不直接暴露 Provider 的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
-环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本的 Vite 监听所有网卡，不应向不可信网络开放。
+环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本默认回环监听；修改 `HOST` 对外开放前须配置认证。
+
+## 停止与中断恢复
+
+正常停止先关闭 HTTP 接单和 tick，再等待已启动的 Provider、构建、日程投递及最终记录收尾，最后关闭模块与数据库。30 秒仍未收尾则以非零状态退出，按异常中断处理，不把它报告为正常停止。日程的投递记录与到期推进一起持久化：明确未送达最多退避重试六次；投递中的服务中断在租约过期后标为结果未知并通知用户，不重放可能已经产生的外部效果。到期后仍未送出的提醒可取消。
+
+普通 Agent 连续失败三次后停止自动续跑；Provider 配置不可用或应用调用结果未知时立即停止自动续跑，用户查看原因、核对结果后再继续。每日预算仍独立生效。构建维持不自动重试。
 
 ## 日志与健康
 
@@ -119,7 +125,7 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 ```
 
 1. 审查并固定专用可执行文件，不附带 shell 参数。不要直接复用会追加日常扩展/主题/配置的交互式包装器。版本输出须精确匹配配置；当前只接受 `0.85.0` 和 `1.3.0` 及以后的 `1.x`（1.x 小版本按 semver 视为 RPC 兼容），0.85 与 1.x 能力并不等同，不据本机版本推断服务能力。
-2. profile 须已存在、为绝对规范路径且不经符号链接，位于事务/工作目录之外。Unix 下不得有 group/other 权限（建议 `0700`），并应由服务用户管理。Chrona 不自动创建它、不复制认证。实际传给 Pi 的变量为 `PI_CODING_AGENT_DIR`。该目录仅隔开服务资源与可写状态，不是完整的宿主私密信息读取隔离。
+2. profile 须已存在、为绝对规范路径且不经符号链接，不与会话目录树重叠；默认 `<dataDir>/providers/pi` 可以位于数据根目录内。Unix 下不得有 group/other 权限（建议 `0700`），并应由服务用户管理。Chrona 不自动创建它、不复制认证。实际传给 Pi 的变量为 `PI_CODING_AGENT_DIR`。该目录仅隔开服务资源与可写状态，不是完整的宿主私密信息读取隔离。
 3. 设置 `CHRONA_STEWARD_AGENT=pi`，检查 Chrona 工具扩展有效；需要网页工具时显式设置已审查的网页扩展。保留关闭资源自动发现及 `--no-approve` 项目信任拒绝。每次启动在提示/注入前查询 `get_commands`，拒绝不属于显式扩展/技能的命令资源。可选资源清单须为 profile 和事务树之外、私有、规范路径的 JSON 文件，入口只接受明确的本地文件及三个已列明的 Pi 1.3 内置扩展；修改后重启，不自动安装或发现资源。配置与原生 MCP 限制见 [Provider 运行说明](provider-runtime.md)。命令检查不覆盖任意包装器代码或仅注入工具的扩展，不能替代入口审查。
 4. 重启后查看设置 → 运行状况及 `/health`。缺命令/profile/扩展、版本不符、未启用或正在停止都可能使 Agent 不可用。健康检查不发送模型请求，也不验证认证、完整工具清单或真实交互链路；命令资源检查发生在具体运行启动时。
 5. 由 owner 在网页输入一个无敏感内容的简单问题，确认收到实际回答。再交代一件小事务，确认有进展或成果；只出现排队状态不能算成功。另行核验取消、恢复、补充消息及跨日任务。
@@ -129,7 +135,7 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 
 ## 脚本限制
 
-Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_EXECUTION_MODE` 由 owner 设置，可选 `trusted-local`（明确本地运行，忽略 bwrap 包装）或 `required-isolation`（模块、构建检查和 Provider 都要求可用且探测成功的 bubblewrap；不可用时失败关闭）。未设置/空值默认 `trusted-local`，即使已安装 bwrap 也不包装隔离；未知非空值拒绝启动。`CHRONA_STEWARD_SANDBOX_BWRAP` 指定 bubblewrap。Provider 隔离包装的宿主挂载只读，事务/会话目录及服务专用 Pi profile 是可写例外，不再将整个宿主 `~/.pi` 设为可写。它不隔离所有宿主读取，不能当成凭据保密边界。
+Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_EXECUTION_MODE` 由 owner 设置，可选 `trusted-local`（明确本地运行，忽略 bwrap 包装）或 `required-isolation`（模块、构建检查和 Provider 都要求可用且探测成功的 bubblewrap；不可用时失败关闭）。未设置/空值默认 `trusted-local`，即使已安装 bwrap 也不包装隔离；未知非空值拒绝启动。`CHRONA_STEWARD_SANDBOX_BWRAP` 指定 bubblewrap。`trusted-local` 保留 Pi 的 bash 与文件工具，使用服务用户的 OS 权限；宿主文件不会默认隐藏，`content/chat` 是符号链接，附件只读是 Agent 行为规则而非挂载限制。`required-isolation` 下 Provider 隐藏 home 和 Chrona 数据，只读挂入附件，会话目录、服务专用 Pi profile 和已批准宿主路径为可写例外，其他宿主挂载只读且可联网。它不隔离所有宿主读取，不能当成凭据保密边界。两种模式均保留 Chrona 的路由授权、路径访问审批和对外动作审批，OS 可访问性不等于用户授权。
 
 `CHRONA_STEWARD_SANDBOX_BWRAP` 也配置模块沙箱。默认 `trusted-local` 以本地进程运行，不使用 bubblewrap；`required-isolation` 下探测不通过或未配置则拒绝模块启动/检查，不回退。依赖安装器目前仍在宿主执行；该模式下含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选在安装前拒绝，直到提供隔离安装实现；无依赖候选不受此安装限制影响。可信本地进程仍受超时、内存与输出限制，但网络与文件范围不再受隔离约束。构建检查全部通过的版本自动启用并事后通知，不再使用审批分级、AI 复核或长期模块启用授权。仅迁移已有数据、恢复旧数据快照、新增凭据与删除应用需要用户决定；运行时对外动作审批保留，所有入口均可批准或拒绝。以实际执行结果为准，不以模型文字为准。
 

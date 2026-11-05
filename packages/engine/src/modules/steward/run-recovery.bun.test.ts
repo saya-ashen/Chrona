@@ -22,10 +22,35 @@ test("failure retry retains session, prompt and cwd and preserves input linkage"
   const run = (await runs.claimNext("foreground"))!;
   await runs.finish(run.id, { outcome: "failed", sessionId: "provider-context", error: "Synthetic" });
   const retry = await db.run.findFirstOrThrow({ where: { status: "queued" } });
-  for (const key of ["sessionId", "lane", "trigger", "prompt", "cwd", "label"] as const) expect(retry[key]).toBe(run[key]);
+  for (const key of ["sessionId", "lane", "trigger", "cwd", "label"] as const) expect(retry[key]).toBe(run[key]);
+  expect(retry.prompt).toContain("Do not repeat an external action");
+  expect(retry.prompt).toEndWith(run.prompt);
   expect(retry.leaseUntil!.getTime()).toBeGreaterThan(time.getTime());
   expect((await db.session.findUniqueOrThrow({ where: { id: sessionId } })).providerSessionId).toBe("provider-context");
   expect(await db.audit.findFirst({ where: { subjectId: retry.id, kind: "chat_run_input" } })).not.toBeNull();
+});
+test("ordinary failures stop after three attempts rather than returning after midnight", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const run = (await runs.claimNext("foreground"))!;
+    expect(run).not.toBeNull();
+    await runs.finish(run.id, { outcome: "failed", sessionId: "context", error: "Persistent failure" });
+    time = new Date(time.getTime() + 3600_000);
+  }
+  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
+  time = new Date(time.getTime() + 86400_000);
+  expect(await runs.claimNext("foreground")).toBeNull();
+  expect(await notices(db, { title: "处理已暂停" })).toHaveLength(1);
+});
+test.each(["unavailable", "unknown"] as const)("%s stops automatic continuation", async kind => {
+  const runs = createRuns(ports, workspaceId);
+  await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
+  const run = (await runs.claimNext("foreground"))!;
+  if (kind === "unknown") await db.moduleInvocation.create({ data: { workspaceId, caller: `provider:${run.id}`, target: "mail", tool: "send", args: {}, key: "send", mode: "sync", status: "unknown" } });
+  await runs.finish(run.id, { outcome: kind === "unknown" ? "failed" : "unavailable", sessionId: null, error: "Interrupted" });
+  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
+  expect(await notices(db, { title: "处理已暂停" })).toHaveLength(1);
 });
 test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves work, notifies and never automatically retries", async outcome => {
   const runs = createRuns(ports, workspaceId);

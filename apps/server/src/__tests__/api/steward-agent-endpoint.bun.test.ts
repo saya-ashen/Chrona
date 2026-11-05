@@ -1,9 +1,9 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
-import { createStewardService, type StewardPorts } from "@chrona/engine";
+import { createStewardService, CallError, type StewardPorts } from "@chrona/engine";
 import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";
 test("agent catalog authenticates live capabilities and dispatches v3 tools", async () => {
@@ -30,6 +30,14 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     const invalid = await app.request("http://localhost/tools/chrona_remember", { method: "POST", headers, body: "{}" });
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("text:") } });
+    const dispatch = spyOn(service.tools, "call");
+    for (const code of ["unknown", "failed", "unavailable"] as const) {
+      dispatch.mockRejectedValueOnce(new CallError(code, `Delivery ${code}`));
+      const response = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
+      expect(response.status).toBe(code === "unavailable" ? 503 : 409);
+      expect(await response.json()).toEqual({ ok: false, error: { code, message: `Delivery ${code}` } });
+    }
+    dispatch.mockRestore();
     const root = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
     expect(root.status).toBe(200);
     expect(await root.json()).toMatchObject({ ok: true });

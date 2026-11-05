@@ -96,6 +96,24 @@ test("runtime forwards thrown and stage failures to onError", async () => {
   } finally { tick.mockRestore(); await runtime.stop(); await db.$disconnect(); }
 });
 
+test("shutdown waits for background finalization before closing modules and returning", async () => {
+  const db = testDb();
+  const runtime = createStewardRuntime(db, { dataDir: mkdtempSync(join(tmpdir(), "chrona-shutdown-")), provider: null });
+  let release!: () => void, entered!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const settled = spyOn(runtime.service.tick, "settled").mockImplementation(async () => { entered(); await pending; });
+  let stopped = false;
+  const stopping = runtime.stop().then(() => { stopped = true; });
+  try {
+    await started;
+    expect(stopped).toBe(false);
+    release(); await stopping;
+    expect(stopped).toBe(true);
+    expect(settled).toHaveBeenCalledTimes(2);
+  } finally { release(); await stopping; settled.mockRestore(); await db.$disconnect(); }
+});
+
 test("runtime data directory follows explicit setting then database directory", () => {
   expect(stewardDataDir({ CHRONA_DATA_DIR: "/tmp/chrona-data", DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/chrona-data");
   expect(stewardDataDir({ DATABASE_URL: "file:/tmp/db/test.db" })).toBe("/tmp/db");

@@ -65,9 +65,9 @@ manifest 的 `contributes` 保存面向通用模块的声明；`modules.contribu
 
 **通知**由内置 `notify` 处理 now / digest / web、每日上限、安静时段、队列与送达。内核自己的通知也经 `notify.send`。渠道模块调用 `notify.channel` 登记自己的投递工具，notify 校验回调归属与可见性后统一投递；没有就绪渠道时退到网页，不承诺外部渠道必达。QQ 是登记渠道之一，不是 notify 写死的业务依赖。
 
-**调度**由系统 `schedules` 保存与投递。manifest 的静态日程随版本启用安排；模块可用 `schedules.create/cancel/mine` 管理按自身 key 归属的运行时定时器，到时收到带 payload 的 `schedule` 事件。Provider 的 `chrona_schedule` 安排唤起；提醒是普通内置 `remind` 应用，使用同一套模块定时器。
+**调度**由系统 `schedules` 保存与投递。manifest 的静态日程随版本启用安排；模块可用 `schedules.create/cancel/mine` 管理按自身 key 归属的运行时定时器，到时收到带 payload 的 `schedule` 事件。Provider 的 `chrona_schedule` 安排唤起；提醒是普通内置 `remind` 应用，使用同一套模块定时器。日程推进与本次模块投递记录在同一事务提交（`ModuleInvocation.mode = schedule`），投递在 tick 外执行，同一应用串行、最多四个应用同时处理。明确未送达按退避最多尝试六次；处理失败或结果未知不重放，重启后过期的投递标为未知并通知核对。记录绑定版本及激活身份，变更后不投递旧事件；取消或替换定时器会取消尚未送出的记录。
 
-代码：`steward/notify-user.ts`、`builtin/notify/*`、`builtin/qq/index.ts`、`system/schedules.ts`、`schedules.ts`、`module-generation.ts`、`tick.ts`、`builtin/remind/*`。细节：[模块依赖方向](module-dependency-direction.md)、[运维说明](operations.md#qq-状态与绑定)。
+代码：`steward/schedule-delivery.ts`、`steward/notify-user.ts`、`builtin/notify/*`、`builtin/qq/index.ts`、`system/schedules.ts`、`schedules.ts`、`module-generation.ts`、`tick.ts`、`builtin/remind/*`。细节：[模块依赖方向](module-dependency-direction.md)、[运维说明](operations.md#qq-状态与绑定)。
 
 ## 9. 凭据与 OAuth
 
@@ -95,7 +95,7 @@ OAuth 由 `secrets.authorize` 发起 PKCE，用户在服务商页面同意；内
 
 ## 12. Provider、会话与用户入口
 
-会话保存交流上下文与入口归属；一次处理是 run，有队列、deadline、能力 token、预算与取消记录。入口经 `chat.send` 进入会话，回复推送到会话所属入口的 reply 工具。模块唤起与构建使用独立会话并向发起会话报告；完成构建可继续唤起原会话，但连续次数有界。持久业务状态仍应保存在应用中，而不是只留聊天记录。
+会话保存交流上下文与入口归属；一次处理是 run，有队列、deadline、能力 token、预算与取消记录。普通运行连续失败三次后停止自动续跑；Provider 不可用或存在结果未知的应用调用时立即停止自动续跑并通知用户。可重试的失败继续使用原会话和文件，并要求先核对已有结果，构建不自动重试。入口经 `chat.send` 进入会话，回复推送到会话所属入口的 reply 工具。模块唤起与构建使用独立会话并向发起会话报告；完成构建可继续唤起原会话，但连续次数有界。持久业务状态仍应保存在应用中，而不是只留聊天记录。
 
 当前适配器是 Pi RPC：Provider 负责推理和原生文件、命令、网页等工具，Chrona 提供 `m_*` 应用工具与运行通道。专用命令、版本、profile 和显式资源由 owner 配置；附件与会话工作目录按运行上下文提供。构建会话与主会话可调用同类应用工具，反思会话保留独立工具边界。
 

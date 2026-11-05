@@ -305,6 +305,20 @@ test("delivery outcomes: never-delivered retries, lost after sending is unknown,
   expect(seen).toEqual(["again"]);
 });
 
+test.each(["owner", "provider"] as const)("%s tool calls preserve unknown delivery outcomes", async audience => {
+  const f = await fixture({ alpha: async () => ({}), beta: async (_event, _call, input) => {
+    f.processes.find(process => process.input === input)!.kill();
+    await new Promise(() => {});
+  } });
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  manifest.tools[0]!.visibility = [audience];
+  await f.db.moduleVersion.update({ where: { id: version.id }, data: { manifest } });
+  await expect(callModuleTool(f.ports, { workspaceId: f.workspace.id, runId: audience === "provider" ? "run" : null }, "m_beta_echo", {})).rejects.toMatchObject({ code: "unknown", message: expect.stringContaining("outcome unknown") });
+  expect(await f.db.moduleInvocation.findFirstOrThrow({ where: { target: "beta" } })).toMatchObject({ status: "unknown", attempts: 1 });
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.beta.id } })).toBe(1);
+});
+
 test("uses \"*\" reaches owner and modules tools but not kernel-only tools", async () => {
   registerSystemModules();
   const f = await fixture({

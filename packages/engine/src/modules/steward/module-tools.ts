@@ -1,14 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { ModuleTool } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
-import { moduleSupervisor } from "./module-supervisor";
 import { audit } from "./audit";
-import { recordModuleOutputMismatch } from "./module-diagnostics";
-import { currentModuleEvolution } from "./module-evolution";
-import { CallError, callSync, checkModuleOutput, listSystemModules, moduleOutputError, normalizedToolInputSchema, validateToolArgs, type SystemTool } from "./module-calls";
+import { CallError, callSync, listSystemModules, normalizedToolInputSchema, type SystemTool } from "./module-calls";
 
 /** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
 type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" };
@@ -94,33 +90,11 @@ async function callSystemTool(ports: StewardPorts, caller: { workspaceId: string
     throw error;
   }
 }
-function eventCaller(caller: { runId: string | null; via?: string | null }) {
-  return caller.runId ? { kind: "provider" as const, runId: caller.runId } : { kind: "owner" as const, via: caller.via ?? null };
-}
-async function recordToolMismatch(ports: StewardPorts, input: { caller: { workspaceId: string }; module: Resolved["module"]; tool: Resolved["tool"]; activationId: string | null; cause: unknown }): Promise<never> {
-  const { caller, module, tool, activationId, cause } = input;
-  const issues = (cause as { diagnosticIssues?: string[] }).diagnosticIssues;
-  if (issues) await recordModuleOutputMismatch(ports.db, { workspaceId: caller.workspaceId, moduleId: module.id, activationId, hash: module.activeHash!, tool: tool.name, callId: randomUUID(), issues, now: ports.now() });
-  throw new StewardError("conflict", (cause instanceof Error ? cause.message : String(cause)).slice(0, 2000));
-}
-async function deliverModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number }, name: string, resolved: Resolved, raw: unknown) {
-  const args = validateToolArgs(resolved.tool as ModuleTool, raw), now = ports.now(), { module, tool } = resolved;
-  const activationId = (await currentModuleEvolution(ports.db, caller.workspaceId, module.id, module.activeHash!))?.activationId ?? null;
-  await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: module.id, details: { tool: name, callerRunId: caller.runId, callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
-  try {
-    const reply = await moduleSupervisor(ports).deliver(module.id, module.activeHash!, { trigger: { id: tool.name, kind: "tool", firedAt: now.toISOString(), args,
-      caller: eventCaller(caller) }, now: now.toISOString(), params: {} }, { activationId, validateResult: output => moduleOutputError(`${module.name}.${tool.name}`, tool as ModuleTool, output) });
-    if ("error" in reply) throw new Error(reply.error);
-    checkModuleOutput(`${module.name}.${tool.name}`, tool as ModuleTool, reply.result.result ?? null);
-    return { result: reply.result.result };
-  } catch (cause) {
-    return await recordToolMismatch(ports, { caller, module, tool, activationId, cause });
-  }
-}
 /** Runs a workspace-owned module tool for a Provider run or the owner (`via`: the entry module that relayed an owner request). */
 export async function callModuleTool(ports: StewardPorts, caller: Omit<Scope, "audience"> & { runId: string | null; via?: string | null; deadline?: number }, name: string, raw: unknown) {
   const audience = caller.runId ? "provider" as const : "owner" as const;
   const resolved = (await moduleTools(ports, { ...caller, audience })).find(tool => tool.name === name);
   if (!resolved) throw new StewardError("not_found", "Module tool not found");
-  return resolved.system ? callSystemTool(ports, caller, resolved, raw) : deliverModuleTool(ports, caller, name, resolved, raw);
+  if (!resolved.system) await audit(ports.db, { workspaceId: caller.workspaceId, actor: caller.runId ? "chrona" : "user", kind: "module_tool_call", subjectId: resolved.module.id, details: { tool: name, callerRunId: caller.runId, callerSessionId: caller.sessionId ?? null, via: caller.via ?? null } });
+  return callSystemTool(ports, caller, resolved, raw);
 }

@@ -107,7 +107,7 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "executed", "duplicate", "duplicate"]);
   expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
-    input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
+    input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(1);
   expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ prompt: expect.stringContaining("(untrusted data)") });
@@ -120,7 +120,7 @@ test("module failure returns truncated public stderr and shares the consecutive 
   f.fail("x".repeat(3000));
   const now = f.ports.now().toISOString();
   await expect(moduleSupervisor(f.ports).deliver(f.module.id, "hash", { trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} })).rejects.toThrow();
-  for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "conflict", message: "x".repeat(2000) });
+  for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "failed", message: expect.stringContaining("x".repeat(1900)) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   expect(await f.db.moduleRun.count()).toBe(3);
   expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);

@@ -34,6 +34,13 @@ async function loadApplicationGraph(databaseUrl: string, port: number) {
   return { createServerApp, steward };
 }
 
+function shutdownDeadline() {
+  return setTimeout(() => {
+    log.error("shutdown timed out; interrupted work will require recovery", { code: "SHUTDOWN_TIMEOUT" });
+    process.exit(1);
+  }, 30_000);
+}
+
 export async function startBunServer() {
   const env = readEnv();
   const host = env.HOST;
@@ -113,12 +120,16 @@ export async function startBunServer() {
     if (isShuttingDown) return;
     isShuttingDown = true;
     log.info("shutdown started", { signal });
+    // Do not disconnect a database still used by background work. A hard timeout is an interrupted shutdown.
+    const deadline = shutdownDeadline();
 
     server.stop(true);
     try {
       await steward.stop();
     } catch (err) {
       log.error("runtime shutdown failed", { error: String(err) });
+      clearTimeout(deadline);
+      process.exit(1);
     }
 
     try {
@@ -130,6 +141,7 @@ export async function startBunServer() {
       databaseLock.release();
     }
 
+    clearTimeout(deadline);
     log.info("shutdown complete", { signal });
     process.exit(0);
   }

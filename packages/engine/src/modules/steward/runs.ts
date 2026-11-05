@@ -224,15 +224,26 @@ class RunService {
         await notifyUser(tx, ports, workspaceId, { level: "now", title: "模块构建已暂停", body: `${status === "timed_out" ? "本轮构建已达到时限" : "本轮构建未完成"}，已有文件和过程已保留。请查看构建会话，决定是否修改需求并继续；不会自动重试。`, key: `build-paused:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });
         return;
       }
-      const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }] });
+      await this.retryFailed(tx, run, status, now, error);
+    }
+  }
+  private async retryFailed(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
+      const { workspaceId, ports } = this;
+      const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }], take: RUN_LIMITS.maxFailures });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
-      if (failures === RUN_LIMITS.maxFailures) await notifyUser(tx, ports, workspaceId, { level: "now", title: "处理连续失败", body: `连续三次处理失败，请检查服务状态。${error ? `\n最近一次原因：${error.slice(0, 300)}` : ""}`, key: `run-failed:${run.id}` });
-      const retry = await tx.run.create({ data: { workspaceId, sessionId: run.sessionId, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt: run.prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
+      const uncertain = await tx.moduleInvocation.count({ where: { workspaceId, caller: `provider:${run.id}`, status: { in: ["unknown", "running"] } } });
+      if (failures >= RUN_LIMITS.maxFailures || status === "provider_unavailable" || uncertain > 0) {
+        const reason = uncertain ? "有操作的结果尚未确认，请先核对实际结果，避免重复执行。" : status === "provider_unavailable" ? "模型服务不可用，请检查配置后再继续。" : "连续三次处理失败，请检查服务状态后再继续。";
+        await notifyUser(tx, ports, workspaceId, { level: "now", title: "处理已暂停", body: `${reason}本次不会自动重试。${error ? `\n最近一次原因：${error.slice(0, 300)}` : ""}`, key: `run-failed:${run.id}`, ...(run.sessionId ? { session: run.sessionId } : {}) });
+        return;
+      }
+      const recovery = "[Recovery] Inspect conversation history, saved files and actual external state before continuing. Previous actions may already have happened, including native Provider tools. Do not repeat an external action with an uncertain outcome; report it for verification.\n\n";
+      const prompt = run.prompt.startsWith(recovery) ? run.prompt : recovery + run.prompt;
+      const retry = await tx.run.create({ data: { workspaceId, sessionId: run.sessionId, lane: run.lane, trigger: run.trigger, provider: run.provider, prompt, label: run.label, cwd: run.cwd, tokenHash: hash(randomBytes(32).toString("hex")), createdAt: now, leaseUntil: new Date(now.getTime() + Math.min(30, 2 ** Math.min(failures - 1, 5)) * 60000) } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "run_continuation", subjectId: run.id, details: { runId: retry.id } });
       const source = await tx.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id } });
       if (source) await audit(tx, { workspaceId, actor: "chrona", kind: "chat_run_input", subjectId: retry.id, details: source.details as Prisma.InputJsonObject });
-    }
   }
   async expireLeases(now = this.ports.now()) {
     const rows = await this.ports.db.run.findMany({ where: { workspaceId: this.workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });

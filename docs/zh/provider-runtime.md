@@ -1,6 +1,6 @@
 # Provider 运行：复用 Pi，补齐宿主接线
 
-Chrona 管会话、持久消息、队列/恢复、调度、自己通道的审批/预算与用户界面；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。
+Chrona 内核管会话、持久消息、队列/恢复、调度、路由授权与运行预算，内置 `notify` 模块管通知预算与送达，`web` 模块管网页；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。
 
 ## 启动和显式资源
 
@@ -18,9 +18,11 @@ Chrona 管会话、持久消息、队列/恢复、调度、自己通道的审批
 
 这是示例，不是已安装资源。文件须私有（Unix 建议 0600）、规范绝对路径、不经符号链接，位于 Pi profile 与事务树之外；单文件最多 32KB。技能是明确的 Markdown 文件；扩展是明确的本地入口文件，不接受包安装指令、URL、glob 或任意内置扩展。入口须为规范绝对文件、非 group/world 可写，同样不能来自 profile/事务树。空清单/未配置不会发现个人资源；错误清单使 Provider 不可用，不退回默认环境。修改清单后重启服务。
 
-Pi 1.3 还可显式选择 `builtin:mcp`、`builtin:codemode`、`builtin:tool-search`。前者复用该专用 profile 的 Pi `mcp.json`；只允许 owner 明确批准的服务器/账户，**本次源码改动没有配置私人服务器、迁移 OAuth 或连接真实账户**。工具名也须列在 `tools`。例如只读假服务器工具名可为 `mcp__fixture__ping`，实际名称以 Pi 为准。`codemode` 或 `bash` 执行资源要求配置 bubblewrap，不能借清单绕过 bash 关闭规则。
+Pi 1.3 还可显式选择 `builtin:mcp`、`builtin:codemode`、`builtin:tool-search`。前者复用该专用 profile 的 Pi `mcp.json`；只允许 owner 明确批准的服务器/账户，**本次源码改动没有配置私人服务器、迁移 OAuth 或连接真实账户**。工具名也须列在 `tools`。例如只读假服务器工具名可为 `mcp__fixture__ping`，实际名称以 Pi 为准。`bash` 默认启用；显式加载的 `codemode` 等资源遵循 owner 选择的执行模式，不再以是否安装 bubblewrap 决定是否启用。
 
-启动后 `get_commands` 只接受显式选择的扩展/技能来源。网页执行详情显示已检查到的技能命令名、版本和显式扩展数；这不是完整工具注册表，也不证明每个工具已经成功执行。显式资源仍是受信代码：须审查入口、扩展及 profile 的权限/配置；只读宿主挂载和专用 profile 不是完整秘密隔离，原生 MCP 配置及授权仍由 Pi 环境负责。尤其不能把可写 profile 误称为 Agent 无法修改的配置边界。
+启动后 `get_commands` 只接受显式选择的扩展/技能来源。网页执行详情显示已检查到的技能命令名、版本和显式扩展数；这不是完整工具注册表，也不证明每个工具已经成功执行。显式资源仍是受信代码：须审查入口、扩展及 profile 的权限/配置；专用 profile 不是完整秘密隔离，原生 MCP 配置及授权仍由 Pi 环境负责。尤其不能把可写 profile 误称为 Agent 无法修改的配置边界。
+
+`CHRONA_STEWARD_EXECUTION_MODE` 未设置或为空时默认 `trusted-local`：Provider 的 bash、文件工具与显式扩展使用服务用户的 OS 权限，即使安装了 bubblewrap 也不包装。宿主文件不会默认隐藏；附件通过 `content/chat` 符号链接提供，只读是 Agent 行为规则，不是 OS 强制限制。显式 `required-isolation` 要求 bubblewrap 探测成功，否则 Provider 不可用；该模式隐藏 home 和 Chrona 数据，只读挂入附件，允许写入会话目录、专用 profile 及已批准宿主路径，仍可联网及读取其他宿主挂载，不能承诺隔离所有秘密。模块与构建检查也遵循该模式，需宿主安装依赖的候选目前会被拒绝。两种模式下路由授权、路径访问审批和对外动作审批都保留；能够访问文件或执行命令不代表获得用户授权。
 
 ## 完成、补充和停止
 

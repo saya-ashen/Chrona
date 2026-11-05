@@ -258,7 +258,7 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
   const name = callerName(origin.caller), edges = graph;
   await addWaitEdge(edges, name, resolved.module.name, target, finish);
   let reply;
-  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, rowId, finish }); }
+  try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }); }
   finally { if (name) removeWaitEdge(edges, name, resolved.module.name); }
   const output = "result" in reply ? reply.result.result ?? null : null;
   try { checkModuleOutput(target, resolved.tool, output); }

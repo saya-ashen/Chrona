@@ -89,11 +89,10 @@ test("declared wakes execute in order with untrusted prefix and dedupe within an
   expect(await f.db.moduleRun.count()).toBe(2);
 });
 
-test.each(["json", "schema", "exit", "timeout", "unavailable", "throw"])("module failure %s is bounded, counted, and pauses all active module schedules on third failure", async kind => {
+test.each(["json", "schema", "exit", "timeout", "throw"])("module failure %s is bounded, counted, and pauses all active module schedules on third failure", async kind => {
   const f = await fixture();
   const other = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.moduleId, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "other trigger", createdBy: "chrona", nextAt: new Date("2030-01-01Z") } });
   f.setResult({ status: kind === "timeout" ? "timed_out" : kind === "exit" ? "failed" : "succeeded", exitCode: kind === "exit" ? 1 : 0, output: kind === "schema" ? '{"effects":[{}]}' : "not JSON", error: "x".repeat(3000) });
-  if (kind === "unavailable") f.ports.sandbox = undefined;
   if (kind === "throw") f.ports.sandbox = testModuleSandbox(async () => { throw new Error("x".repeat(3000)); });
   for (let i = 1; i <= 3; i++) {
     await f.fire();
@@ -106,7 +105,7 @@ test.each(["json", "schema", "exit", "timeout", "unavailable", "throw"])("module
   }
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("paused");
   for (const id of [f.schedule.id, other.id]) expect((await f.db.schedule.findUniqueOrThrow({ where: { id } })).status).toBe("paused");
-  const notification = await notice(f.db);
+  const [notification] = await notices(f.db, { title: "模块连续失败，已暂停" });
   expect(notification).toMatchObject({ title: "模块连续失败，已暂停", level: "now", idempotencyKey: `module:${f.moduleId}:paused:${records[2]!.firedAt.toISOString()}` });
   expect(await f.db.run.count()).toBe(0);
 });

@@ -17,7 +17,7 @@ Chrona gets things done, keeps looking after them, and grows new apps (modules) 
 Rules that follow from the goals:
 
 - There are no affairs. Chrona's features are **modules (apps)**: `module.json` + entry + tests,
-  long-running sandboxed SDK processes that receive events (schedule, tool, call_result)
+  long-running SDK processes (trusted-local by default; sandboxed in required-isolation) that receive events (schedule, tool, call_result)
   and reach Chrona and other modules only through routed calls
   (`chrona.call`; the callee's `visibility` defines its audience; `uses` is a contract, not runtime admission, except `uses: ["*"]` also reaches `owner` tools; Chrona records the real caller; see security-simplification §3.2). That is the only way modules
   interact (v2-8): a module keeps its files private (`chrona.paths.data`, `chrona.paths.content`) and offers tools; the web module decides how to show
@@ -39,7 +39,7 @@ Rules that follow from the goals:
   notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
   Executable code Chrona runs is only a module submitted via `modules.propose` (the Provider's `m_modules_propose`), built and checked in the Chrona sandbox
   (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated automatically when checks pass
-  (data migrations and new credentials still ask the user), stored under `<dataDir>/platform` (hidden from Providers), and rolled back by hash.
+  (data migrations and new credentials still ask the user), stored under `<dataDir>/platform` (not exposed through Provider tools; OS hiding requires isolation), and rolled back by hash.
   A newly activated version that fails to start before any event is delivered automatically switches back once to the previous approved version,
   including entry/network modules, without opt-in or a standing grant. Both manifests must be valid and approved; data schema must be unchanged,
   with no migration/restore, group activation or changed/dynamic schedules. The module must still be active at that activation/hash and unverified;

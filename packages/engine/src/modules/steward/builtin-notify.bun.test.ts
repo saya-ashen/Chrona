@@ -6,7 +6,7 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { registerBuiltins } from "./module-builtin";
 import { moduleSupervisor } from "./module-supervisor";
 import { callsSettled, drainCalls } from "./module-calls";
-import { createNotificationsView, notificationItems, notifyUser } from "./notify-user";
+import { createNotificationsView, notificationItems, notifyUser, forwardSettings } from "./notify-user";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
@@ -44,6 +44,8 @@ if (!sandbox.health.available) console.info("SKIP notify end to end: module sand
     await registerBuiltins(ports, w);
     for (const name of ["notify", "qq"]) expect(await db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ status: "active", activeHash: expect.any(String) });
     await moduleSupervisor(ports).reconcile();
+    await forwardSettings(db, ports, w, { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" }, ports.now());
+    await drainCalls(ports, w);
     const view = createNotificationsView(ports, w);
     async function until(condition: () => Promise<boolean>) {
       for (let i = 0; i < 150; i++) { void drainCalls(ports, w); await callsSettled(ports); if (await condition()) return; await Bun.sleep(100); }

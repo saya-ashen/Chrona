@@ -105,6 +105,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;
+  let starting: Promise<void> | undefined;
   const canTick = () => pending && !stopping;
   function tickOnce(): Promise<void> {
     if (stopping) return Promise.resolve();
@@ -135,7 +136,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
       rescue ??= startRescueListener(ports, service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
-      void moduleSupervisor(ports).start().catch(error => options.onError?.(error));
+      starting = moduleSupervisor(ports).start().catch(error => options.onError?.(error));
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);
       wake();
@@ -146,9 +147,12 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       rescue = undefined;
       if (timer) timers.clearInterval(timer);
       timer = undefined;
-      await moduleSupervisor(ports).stop();
       await running;
+      await starting;
       await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.done; }));
+      await service.tick.settled({ includeRuns: true });
+      await moduleSupervisor(ports).stop();
+      await service.tick.settled({ includeRuns: true });
     },
   };
 }
