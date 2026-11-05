@@ -1,30 +1,30 @@
-FROM oven/bun:1-slim AS runner
+FROM oven/bun:1.4.2-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3101
 ENV DATABASE_URL="file:/data/chrona.db"
+ENV CHRONA_DATA_DIR=/data
 
-COPY bun.lock package.json ./
-COPY apps/server/package.json apps/server/
-RUN bun install --frozen-lockfile --production --ignore-scripts
-
+# Workspace manifests must exist before install; module checks need TypeScript at runtime.
+COPY bun.lock package.json prisma.config.ts tsconfig.json ./
 COPY apps/server apps/server
 COPY packages packages
-COPY prisma/schema.prisma prisma/
-COPY prisma/migrations prisma/migrations
-COPY scripts/init-sqlite-db.ts scripts/init-sqlite-db.ts
-COPY tsconfig.json .
+COPY prisma prisma
+COPY external-plugins/pi-steward-agent external-plugins/pi-steward-agent
+COPY scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
+RUN bun install --frozen-lockfile --ignore-scripts \
+    && bun run db:generate
+ENV NODE_ENV=production
 
-RUN bunx prisma generate
-RUN addgroup --system chrona && adduser --system --ingroup chrona chrona && mkdir -p /data && chown -R chrona:chrona /app /data
-USER chrona
+RUN mkdir -p /data && chmod 700 /data && chown -R bun:bun /app /data
+USER bun
 
 EXPOSE 3101
 VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD bun -e "const response = await fetch('http://localhost:3101/health'); process.exit(response.ok ? 0 : 1)"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD bun -e "const response = await fetch('http://localhost:' + (process.env.PORT || '3101') + '/health'); process.exit(response.ok ? 0 : 1)"
 
-CMD ["sh", "-c", "if [ -z \"$API_KEY\" ]; then export API_KEY=$(bun -e \"console.log(crypto.randomUUID().replaceAll('-', ''))\"); echo \"Generated API_KEY for this container: $API_KEY\"; fi; bun run apps/server/src/index.bun.ts"]
+ENTRYPOINT ["sh", "/app/scripts/docker-entrypoint.sh"]
+CMD ["bun", "run", "apps/server/src/index.bun.ts"]

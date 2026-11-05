@@ -1,4 +1,15 @@
-node_modules/
+**/node_modules/
+**/.env*
+!**/.env.example
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite3
+**/*.pem
+.tmp/
+data/
 .git/
 .worktrees/
 .direnv/
@@ -11,10 +22,6 @@ artifacts/
 e2e/
 dist/
 build/
-*.test.ts
-*.test.tsx
-*.bun.test.ts
-__tests__/
 *.tsbuildinfo
 .env*
 !.env.example

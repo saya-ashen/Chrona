@@ -43,7 +43,7 @@
           bun = prev.bun.overrideAttrs (old: {
             version = "1.4.2";
             passthru = old.passthru // {
-              # Bun 1.4 no longer publishes an x86_64-darwin binary.
+              # Keep explicit platform asset overrides for Bun 1.4 release artifacts.
               sources = builtins.mapAttrs (platform: source: final.fetchurl {
                 url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-${source.name}.zip";
                 inherit (source) hash;

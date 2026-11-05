@@ -18,9 +18,9 @@
     "event-sourcing",
     "vite"
   ],
-  "packageManager": "bun@1.3.11",
+  "packageManager": "bun@1.4.2",
   "engines": {
-    "bun": ">=1.3.11"
+    "bun": ">=1.4.2"
   },
   "scripts": {
     "dev": "bun --watch apps/server/src/index.bun.ts",

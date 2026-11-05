@@ -62,15 +62,19 @@ export function releaseSmokeEnvironment(
     CHRONA_CONFIG_DIR: configDir,
     DATABASE_URL: `file:${join(dataDir, "chrona.db")}`,
     CHRONA_NO_OPEN: "1",
+    API_KEY: crypto.randomUUID(),
+    CHRONA_STEWARD_AGENT: "",
+    CHRONA_QQ_APP_ID: "",
+    CHRONA_QQ_SECRET_FILE: "",
   };
 }
 
-async function waitForJson(url: string, label: string) {
+async function waitForJson(url: string, label: string, apiKey?: string) {
   const deadline = Date.now() + RUNTIME_TIMEOUT_MS;
   let lastError = "not requested";
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {} });
       if (response.ok) return await response.json();
       lastError = `${response.status} ${await response.text()}`;
     } catch (error) {
@@ -104,9 +108,10 @@ async function assertRuntimeStarts(binaryPath: string) {
   const dataDir = join(tempRoot, "data");
   const configDir = join(tempRoot, "config");
 
+  const env = releaseSmokeEnvironment(dataDir, configDir);
   const proc = Bun.spawn([binaryPath, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], {
     cwd: ROOT,
-    env: releaseSmokeEnvironment(dataDir, configDir),
+    env,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -117,14 +122,14 @@ async function assertRuntimeStarts(binaryPath: string) {
     // The page comes from the built-in web module, which builds at first start.
     await waitForText(`${baseUrl}/`, "web index");
     // The page's data API (web module, routed calls): today's overview of the default workspace.
-    await waitForJson(`${baseUrl}/api/web/today`, "web today endpoint");
+    await waitForJson(`${baseUrl}/api/web/today`, "web today endpoint", env.API_KEY);
     await assertExists(join(dataDir, "chrona.db"), "Runtime SQLite database");
   } catch (error) {
     proc.kill();
     await proc.exited.catch(() => undefined);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     throw new Error(
-      `Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+      `Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`.replaceAll(env.API_KEY!, "[REDACTED]"),
       { cause: error },
     );
   } finally {

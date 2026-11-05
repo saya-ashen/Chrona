@@ -34,7 +34,7 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
   }
 
   await mkdir(dirname(dst), { recursive: true });
-  await cp(src, dst, { recursive: true });
+  await cp(src, dst, { recursive: true, filter: path => resource.to !== "resources/builtin" || !path.slice(src.length).split(/[\\/]/).includes("node_modules") });
   log("copy", `${resource.from} → ${resource.to}`);
 }
 
