@@ -62,12 +62,15 @@ async function writeJson(path: string, value: unknown) {
   await writeFile(`${path}.tmp`, JSON.stringify(value, null, 2) + "\n");
   await rename(`${path}.tmp`, path);
 }
+function validateReleaseIdentity(entry: ModuleGitReleaseEntry, names: Set<string>) {
+  if (!buildArtifacts.moduleGit.modules.some(module => module.name === entry.name) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
+}
 async function readLock(seedDir: string): Promise<ReleaseLock> {
-  const lock: ReleaseLock = JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8"));
-  const names = new Set<string>();
-  if (lock.version !== 1 || !Array.isArray(lock.modules)) throw new Error("Invalid module Git release lock");
+  const raw: unknown = JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8"));
+  if (typeof raw !== "object" || raw === null || !("version" in raw) || raw.version !== 1 || !("modules" in raw) || !Array.isArray(raw.modules)) throw new Error("Invalid module Git release lock");
+  const lock = raw as ReleaseLock, names = new Set<string>();
   for (const entry of lock.modules) {
-    if (!buildArtifacts.moduleGit.modules.some(module => module.name === entry.name) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
+    validateReleaseIdentity(entry, names);
     names.add(entry.name);
   }
   if (names.size !== buildArtifacts.moduleGit.modules.length) throw new Error("Module Git release lock is incomplete");
@@ -80,6 +83,52 @@ export async function stageModuleGitLicense(resourcesRoot: string, licensePath: 
     await cp(licensePath, join(resourcesRoot, module.source, "LICENSE"));
     if (["web", "coding", "editor"].includes(module.name)) await cp(noticesPath, join(resourcesRoot, module.source, "THIRD-PARTY-NOTICES.txt"));
   }
+}
+
+async function restoreSeedRepository(repo: string, seedDir: string, old?: ModuleGitReleaseEntry) {
+  await mkdir(repo, { recursive: true });
+  await gitDirectory(repo);
+  try { await lstat(join(repo, "HEAD")); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    git(repo, ["init", "--bare", "--object-format=sha1", "--template=", "--initial-branch=main"]);
+  }
+  let parent = git(repo, ["for-each-ref", "--format=%(objectname)", "refs/heads/main"]);
+  if (!parent && old) {
+    const bundlePath = resolve(seedDir, old.bundle);
+    if (createHash("sha256").update(await readFile(bundlePath)).digest("hex") !== old.bundleSha256) throw new Error(`Module seed checksum mismatch: ${old.name}`);
+    git(repo, ["bundle", "verify", bundlePath]);
+    git(repo, ["fetch", "--no-tags", bundlePath, "refs/heads/main:refs/heads/main"]);
+    parent = git(repo, ["rev-parse", "refs/heads/main"]);
+    if (parent !== old.commit) throw new Error(`Module seed commit mismatch: ${old.name}`);
+  }
+  return parent;
+}
+
+async function writeSeedBundle(input: { repo: string; seedDir: string; name: string; commit: string; unchanged: boolean; old?: ModuleGitReleaseEntry }): Promise<ModuleGitReleaseEntry> {
+  const { repo, seedDir, name, commit, unchanged, old } = input;
+  const bundle = `${name}.bundle`, bundlePath = resolve(seedDir, bundle);
+  if (!unchanged || old?.commit !== commit) {
+    git(repo, ["bundle", "create", `${bundlePath}.tmp`, "refs/heads/main"]);
+    await rename(`${bundlePath}.tmp`, bundlePath);
+  }
+  git(repo, ["bundle", "verify", bundlePath]);
+  const bundleSha256 = createHash("sha256").update(await readFile(bundlePath)).digest("hex");
+  if (unchanged && old?.commit === commit && old.bundleSha256 !== bundleSha256) throw new Error(`Module seed checksum mismatch: ${name}`);
+  return { name, repository: old?.commit === commit ? old.repository : null, branch: "main", commit, bundle, bundleSha256 };
+}
+
+type PreparedModuleInput = { resourcesRoot: string; seedDir: string; hostCommit: string; hostTimestamp: string };
+async function prepareModuleSeed(input: PreparedModuleInput, module: { name: string; source: string }, old?: ModuleGitReleaseEntry) {
+  const repo = resolve(input.seedDir, "repos", `${module.name}.git`);
+  const parent = await restoreSeedRepository(repo, input.seedDir, old);
+  const { hostCommit, hostTimestamp } = input;
+  const tree = await sourceTree(repo, join(input.resourcesRoot, module.source), module.name);
+  const unchanged = !!parent && git(repo, ["rev-parse", `${parent}^{tree}`]) === tree;
+  const message = `${parent ? "Update" : "Extract initial"} module release from Chrona ${hostCommit}\n\nExtracted from the build input working source; this is not inherited monorepo history.\nLICENSE copied unchanged from the Chrona repository MIT License; bundled dependencies retain their third-party notices.\n`;
+  const commit = unchanged ? parent : git(repo, ["commit-tree", tree, ...(parent ? ["-p", parent] : [])], Buffer.from(message), `@${hostTimestamp} +0000`);
+  git(repo, ["update-ref", "refs/heads/main", commit, parent || "0".repeat(40)]);
+  return writeSeedBundle({ repo, seedDir: input.seedDir, name: module.name, commit, unchanged, old });
 }
 
 /** Extract current sources, not rewritten monorepo history. A stable tree reuses its existing commit. */
@@ -95,39 +144,9 @@ export async function prepareModuleGitRelease(input: { root: string; resourcesRo
   try { previous = await readLock(input.seedDir); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const modules: ModuleGitReleaseEntry[] = [], plan: PublishPlan = { version: 1, modules: [] };
   for (const module of buildArtifacts.moduleGit.modules) {
-    const repo = resolve(input.seedDir, "repos", `${module.name}.git`);
-    await mkdir(repo, { recursive: true });
-    await gitDirectory(repo);
-    try { await lstat(join(repo, "HEAD")); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      git(repo, ["init", "--bare", "--object-format=sha1", "--template=", "--initial-branch=main"]);
-    }
-    const old = previous?.modules.find(entry => entry.name === module.name);
-    let parent = git(repo, ["for-each-ref", "--format=%(objectname)", "refs/heads/main"]);
-    if (!parent && old) {
-      const bundlePath = resolve(input.seedDir, old.bundle);
-      if (createHash("sha256").update(await readFile(bundlePath)).digest("hex") !== old.bundleSha256) throw new Error(`Module seed checksum mismatch: ${module.name}`);
-      git(repo, ["bundle", "verify", bundlePath]);
-      git(repo, ["fetch", "--no-tags", bundlePath, "refs/heads/main:refs/heads/main"]);
-      parent = git(repo, ["rev-parse", "refs/heads/main"]);
-      if (parent !== old.commit) throw new Error(`Module seed commit mismatch: ${module.name}`);
-    }
-    const tree = await sourceTree(repo, join(input.resourcesRoot, module.source), module.name);
-    const unchanged = parent && git(repo, ["rev-parse", `${parent}^{tree}`]) === tree;
-    const message = `${parent ? "Update" : "Extract initial"} module release from Chrona ${hostCommit}\n\nExtracted from the build input working source; this is not inherited monorepo history.\nLICENSE copied unchanged from the Chrona repository MIT License; bundled dependencies retain their third-party notices.\n`;
-    const commit = unchanged ? parent : git(repo, ["commit-tree", tree, ...(parent ? ["-p", parent] : [])], Buffer.from(message), `@${hostTimestamp} +0000`);
-    git(repo, ["update-ref", "refs/heads/main", commit, parent || "0".repeat(40)]);
-    const bundle = `${module.name}.bundle`, bundlePath = resolve(input.seedDir, bundle);
-    if (!unchanged || old?.commit !== commit) {
-      git(repo, ["bundle", "create", `${bundlePath}.tmp`, "refs/heads/main"]);
-      await rename(`${bundlePath}.tmp`, bundlePath);
-    }
-    git(repo, ["bundle", "verify", bundlePath]);
-    const bundleSha256 = createHash("sha256").update(await readFile(bundlePath)).digest("hex");
-    if (unchanged && old?.commit === commit && old.bundleSha256 !== bundleSha256) throw new Error(`Module seed checksum mismatch: ${module.name}`);
-    modules.push({ name: module.name, repository: old?.commit === commit ? old.repository : null, branch: "main", commit, bundle, bundleSha256 });
-    plan.modules.push({ name: module.name, proposedRepository: `chrona-core/chrona-module-${module.name}`, localRepository: repo, branch: "main", commit });
+    const entry = await prepareModuleSeed({ ...input, hostCommit, hostTimestamp }, module, previous?.modules.find(entry => entry.name === module.name));
+    modules.push(entry);
+    plan.modules.push({ name: module.name, proposedRepository: `chrona-core/chrona-module-${module.name}`, localRepository: resolve(input.seedDir, "repos", `${module.name}.git`), branch: "main", commit: entry.commit });
   }
   const lock: ReleaseLock = { version: 1, modules };
   await writeJson(join(input.seedDir, "lock.json"), lock);

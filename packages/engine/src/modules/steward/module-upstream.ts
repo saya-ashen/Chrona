@@ -46,7 +46,7 @@ export async function moduleUpstream(ports: StewardPorts, workspaceId: string, r
   const row = await ports.db.audit.findFirst({ where: { id: descriptorId(module.id), workspaceId, subjectId: module.id } });
   const descriptor = row ? upstreamSchema.parse(row.details) : null;
   const location = { platform: context.platform, moduleId: module.id };
-  const result: UpstreamResult = { moduleId: module.id, repository: descriptor?.repository ?? null, branch: descriptor?.branch ?? null, localCommit: await getModuleLocalHead(location) ?? null, fetchedCommit: descriptor ? await getModuleUpstreamHead({ ...location, branch: descriptor.branch }) ?? null : null, proposal: null };
+  const result = await readUpstreamStatus(location, descriptor);
   if (request.action === "status") return result;
   if (!descriptor?.repository) throw new StewardError("not_found", "Module upstream is not configured; offline release installation remains available");
   if (request.action === "fetch") {
@@ -54,6 +54,9 @@ export async function moduleUpstream(ports: StewardPorts, workspaceId: string, r
     return { ...result, fetchedCommit: fetched.commit };
   }
   return mergeUpstream(context, request, result, module.activeHash);
+}
+async function readUpstreamStatus(location: { platform: string; moduleId: string }, descriptor: z.infer<typeof upstreamSchema> | null): Promise<UpstreamResult> {
+  return { moduleId: location.moduleId, repository: descriptor?.repository ?? null, branch: descriptor?.branch ?? null, localCommit: await getModuleLocalHead(location) ?? null, fetchedCommit: descriptor ? await getModuleUpstreamHead({ ...location, branch: descriptor.branch }) ?? null : null, proposal: null };
 }
 async function mergeUpstream(context: ModuleContext, request: Extract<ModuleUpstreamRequest, { action: "merge" }>, result: UpstreamResult, activeHash: string | null): Promise<UpstreamResult> {
   const { db, ports, workspaceId } = context;
