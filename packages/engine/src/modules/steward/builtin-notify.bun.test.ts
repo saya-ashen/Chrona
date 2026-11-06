@@ -7,6 +7,7 @@ import { createScriptSandbox } from "../../../../integrations/src/steward/script
 import { moduleSupervisor } from "./module-supervisor";
 import { callSync, kernelOrigin, drainCalls } from "./module-calls";
 import { notificationItems } from "./notify-user";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease } from "./module-release";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
@@ -24,6 +25,7 @@ test("real notify SDK uses two external callbacks, persists target bindings and 
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleBuiltinResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   try {
     await mkdir(resources, { recursive: true }); await cp(join(import.meta.dirname, "builtin/notify"), join(resources, "notify"), { recursive: true });
+    await seedTestModuleRelease(resources, "notify");
     const release = await resolveBuiltinRelease(ports, "notify");
     const workspaceId = (await db.workspace.create({ data: { name: "notify-routed" } })).id;
     const notify = await db.module.create({ data: { workspaceId, name: "notify", builtin: true, activeHash: release.hash } });

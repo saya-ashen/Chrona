@@ -1,5 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readModuleFiles } from "./module-preview";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,6 +25,11 @@ import { recordModuleFailure } from "./module-diagnostics";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+async function legacySourceHash(dir: string) {
+  const digest = createHash("sha256");
+  for (const file of (await readModuleFiles(dir, "Unsafe fixture source")).sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
+  return digest.digest("hex");
+}
 const intent = { changes: ["Sort shop mail without the model"], preserves: [] };
 const request = { name: "mail-sort", goal: "Mark mail from *@shop.example handled", examples: ["from a@shop.example → handled"], intent };
 const manifest = { name: "mail-sort", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], tests: ["test.ts"] };
@@ -76,8 +83,8 @@ async function fixture() {
 
 test("a build is its own conversation: scoped diagnostics, restricted tools, submission and reply", async () => {
   const f = await fixture();
-  const oldHash = "d".repeat(64), oldModule = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "paused", activeHash: oldHash } });
   await f.writeModule(join(f.dataDir, "prior"));
+  const oldHash = await legacySourceHash(join(f.dataDir, "prior", "mail-sort")), oldModule = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "paused", activeHash: oldHash } });
   await cp(join(f.dataDir, "prior", "mail-sort"), join(f.dataDir, "platform", "store", oldHash), { recursive: true });
   await f.db.moduleVersion.create({ data: { moduleId: oldModule.id, hash: oldHash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
   await recordModuleFailure(f.db, { workspaceId: f.workspaceId, moduleId: oldModule.id, hash: oldHash, now: new Date(), retry: false, evidence: {
@@ -234,7 +241,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // Explicit targets in uses do not grant access to Provider or owner-only tools.
@@ -540,19 +547,22 @@ test("a Provider supplements an old build without losing work; missing or owner 
 });
 
 test("a build discovers contracts and updates an external fixture after checks", async () => {
-  const f = await fixture(), hash = "b".repeat(64);
+  const f = await fixture();
   const webManifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
-  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "example", builtin: false, activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: web.id, hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
-  const active = join(f.dataDir, "platform", "store", hash), builtin = join(f.ports.moduleBuiltinResources, "web");
-  for (const [dir, app] of [[active, "// custom layout"], [builtin, "// release feature"]]) {
+  const source = join(f.dataDir, "legacy-source"), builtin = join(f.ports.moduleBuiltinResources, "web");
+  for (const [dir, app] of [[source, "// custom layout"], [builtin, "// release feature"]]) {
     await mkdir(dir!, { recursive: true });
     await writeFile(join(dir!, "module.json"), JSON.stringify(webManifest));
     await writeFile(join(dir!, "index.ts"), 'import {on} from "chrona"; on("tool", async () => ({}));');
     await writeFile(join(dir!, "test.ts"), "process.exit(0)");
     await writeFile(join(dir!, "app.js"), app!);
   }
+  const hash = await legacySourceHash(source);
+  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "example", builtin: false, activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: web.id, hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const active = join(f.dataDir, "platform", "store", hash);
+  await cp(source, active, { recursive: true });
   const started = await f.call("m_modules_build", { ...request, name: "example", goal: "Update the external app and preserve its data" }) as { sessionId: string };
   let submitted: { hash: string } | undefined;
   f.onRun(async (input, call) => {
@@ -614,12 +624,15 @@ async function groupBuild(f: Awaited<ReturnType<typeof fixture>>, includeImpact 
 test("group approval preview lists current consumers affected by member output changes", async () => {
   const f = await fixture();
   const schema = (type: string) => ({ type: "object", properties: { value: { type } }, required: ["value"], additionalProperties: false });
-  const active = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "active", activeHash: "old", dataSchema: 1 } });
+  const active = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort", status: "active", dataSchema: 1 } });
   const oldManifest = moduleManifestSchema.parse({ ...manifest, name: "mail-sort", tools: [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: {}, required: [] }, output: schema("string") }] });
-  await f.db.moduleVersion.create({ data: { moduleId: active.id, hash: "old", manifest: oldManifest, source: "user", status: "approved", intent: {}, report: {} } });
   const oldStore = join(f.dataDir, "platform/store/old"); await mkdir(oldStore, { recursive: true });
   await writeFile(join(oldStore, "index.ts"), 'import { on } from "chrona"; on("tool", () => ({ result: { value: "ok" } }));');
   await writeFile(join(oldStore, "test.ts"), "export {};");
+  const oldHash = await legacySourceHash(oldStore);
+  await rename(oldStore, join(f.dataDir, "platform/store", oldHash));
+  await f.db.module.update({ where: { id: active.id }, data: { activeHash: oldHash } });
+  await f.db.moduleVersion.create({ data: { moduleId: active.id, hash: oldHash, manifest: oldManifest, source: "user", status: "approved", intent: {}, report: {} } });
   const caller = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-reader", status: "active", activeHash: "reader", dataSchema: 1 } });
   await f.db.moduleVersion.create({ data: { moduleId: caller.id, hash: "reader", manifest: moduleManifestSchema.parse({ ...manifest, name: "mail-reader", uses: ["mail-sort.read"] }), source: "user", status: "approved", intent: {}, report: {} } });
   const { approval } = await groupBuild(f, true);

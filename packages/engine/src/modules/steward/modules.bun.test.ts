@@ -1,11 +1,12 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStewardService } from "./service";
 import { createModules } from "./modules";
 import { buildPending, reviewManifest } from "./module-build";
+import { commitModuleSource, readModuleSource } from "./module-git";
+import { snapshotModule } from "./module-files";
 import { moduleContext } from "./module-context";
 import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
@@ -14,6 +15,8 @@ import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "./test-notices";
+import { modulesListOutput } from "./system-outputs";
+import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 import { approvalNoticeBody } from "./notify-user";
 
@@ -720,15 +723,14 @@ test("stale testing is retried, while a recent claim is left alone", async () =>
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "pending_review" });
 });
 
-test("missing staging is rejected clearly, cleaned, and reported to the provider", async () => {
+test("missing transient staging is rebuilt from the pinned Git commit", async () => {
   const f = await fixture();
-  await f.submit();
+  const proposal = await f.submit();
   const version = await f.db.moduleVersion.findFirstOrThrow();
   await rm(join(f.dataDir, "platform/staging", version.id), { recursive: true });
   await f.service.modules.buildPending();
-  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected", report: { tests: [{ stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 }] } });
-  expect(await f.db.run.count()).toBe(1);
-  expect(f.calls).toHaveLength(0);
+  expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ hash: proposal.hash, status: "pending_review", report: { git: { commit: proposal.hash } } });
+  expect(f.calls).toHaveLength(1);
 });
 
 test("three consecutive rejected versions stop waking and enqueue only one budgeted digest per streak", async () => {
@@ -799,7 +801,7 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   const f = await fixture(), result = await f.propose();
   expect(result.status).toBe("pending_review");
   expect(result.moduleId).toBeString();
-  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false }, outputImpacts: [] });
+  expect(result.report).toEqual({ git: { commit: result.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) }, tests: [{ stdout: "public stdout", stderr: "", exitCode: 0 }], continuity: { status: "skipped", reason: "no data", fromSchema: null, toSchema: 1, migrated: false }, outputImpacts: [] });
   expect(f.calls).toHaveLength(1);
   expect(f.calls[0]!.timeoutMs).toBe(60_000);
   expect(f.calls[0]!.maxOutputBytes).toBe(64 * 1024);
@@ -889,11 +891,11 @@ test("huge code diff truncates with checkout hash while manifest and intent stay
   expect(preview.endsWith(`…代码差异过长，已截断；完整代码可用 m_modules_checkout 检出 hash ${second.hash}`)).toBe(true);
 });
 
-test("hash follows sorted path-NUL-content-NUL; identical content reuses approved version without approval", async () => {
+test("hash is a Git commit; identical trees reuse the approved version without approval", async () => {
   const f = await fixture(), first = await f.propose();
-  const digest = createHash("sha256");
-  for (const path of ["index.ts", "module.json", "test.ts"]) digest.update(path).update("\0").update(await readFile(join(f.dir, path))).update("\0");
-  expect(first.hash).toBe(digest.digest("hex"));
+  expect(first.hash).toMatch(/^[a-f0-9]{40}$/);
+  expect(first.report).toMatchObject({ git: { commit: first.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) } });
+  expect(await readModuleSource({ platform: join(f.dataDir, "platform"), moduleId: first.moduleId!, commit: first.hash })).toEqual(await snapshotModule(f.root, "price-watch"));
   await f.approve(first.approvalId!);
   const second = await f.propose();
   expect(second).toMatchObject({ moduleId: first.moduleId, hash: first.hash, status: "approved" });
@@ -926,10 +928,10 @@ test("failing tests reject with public outputs only, no approval, staging cleane
   const f = await fixture(); f.fail();
   const result = await f.propose();
   expect(result.status).toBe("rejected");
-  expect(result.report).toEqual({ tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
+  expect(result.report).toEqual({ git: { commit: result.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) }, tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.run.count()).toBe(1);
-  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", status: "queued", prompt: 'Module price-watch build failed (untrusted test output):\n{"tests":[{"stdout":"public stdout","stderr":"public stderr","exitCode":1}]}' });
+  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", status: "queued", prompt: `Module price-watch build failed (untrusted test output):\n${JSON.stringify(result.report)}` });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -950,10 +952,9 @@ test.each(["../escape", "/tmp", "price-watch/../price-watch", "price-watch/.git"
   expect(await f.db.approval.count()).toBe(0);
 });
 
-test.each(["symlink", "git", "bytes", "files"])("reject unsafe module contents: %s", async kind => {
+test.each(["symlink", "bytes", "files"])("reject unsafe module contents: %s", async kind => {
   const f = await fixture();
   if (kind === "symlink") await symlink(join(f.dir, "index.ts"), join(f.dir, "linked.ts"));
-  if (kind === "git") await mkdir(join(f.dir, ".git"));
   if (kind === "bytes") await writeFile(join(f.dir, "big"), Buffer.alloc(1024 * 1024));
   if (kind === "files") for (let i = 0; i < 198; i++) await writeFile(join(f.dir, `extra-${i}`), "");
   await expect(f.propose()).rejects.toThrow();
@@ -1112,4 +1113,48 @@ test("the review shows output contracts and examples as digests, and every autho
   expect(shown).not.toContain("field199");
   for (const kept of ['"owner"', '"modules"', '"mail_oauth"', '"network"']) expect(shown).toContain(kept);
   expect(shown.length).toBeLessThan(JSON.stringify(output).length / 2);
+});
+
+test("trusted pinned proposals preserve the selected Git commit and reject different source", async () => {
+  const f = await fixture(false), first = await f.submit();
+  await f.write(2);
+  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: first.moduleId!, versionId: "official-candidate", files: await snapshotModule(f.root, "price-watch"), parent: first.hash, message: "upstream ancestry" });
+  const input = { root: f.root, dir: "price-watch", intent, allowed: ["price-watch"], sourceCommit: git.commit, expectedLocal: git.commit };
+  await expect(f.service.modules.propose({ ...input, expectedModuleId: "removed-module" }, "user")).rejects.toMatchObject({ code: "conflict", message: "Module identity changed before proposal" });
+  await expect(f.service.modules.propose({ ...input, expectedModuleId: null }, "user")).rejects.toMatchObject({ code: "conflict", message: "Module identity changed before proposal" });
+  const pinned = await f.service.modules.propose({ ...input, expectedModuleId: first.moduleId! }, "user");
+  expect(pinned).toMatchObject({ moduleId: first.moduleId, hash: git.commit, status: "building", report: { git } });
+  await f.write(3);
+  await expect(f.service.modules.propose(input, "user")).rejects.toMatchObject({ code: "conflict", message: "Submitted source differs from its selected Git commit" });
+  expect(await f.db.moduleVersion.count()).toBe(2);
+});
+
+test("invalid manifests have no source commit, module identity, or repository", async () => {
+  const f = await fixture();
+  await writeFile(join(f.dir, "module.json"), "{");
+  expect(await f.submit()).toMatchObject({ moduleId: null, hash: "", status: "rejected" });
+  expect(await f.db.module.count()).toBe(0);
+  await expect(stat(join(f.dataDir, "platform", "repos"))).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test("proposals omit local Git metadata from the committed source", async () => {
+  const f = await fixture(false);
+  await mkdir(join(f.dir, ".git"));
+  await writeFile(join(f.dir, ".git", "config"), "private local metadata");
+  const proposed = await f.submit();
+  const files = await readModuleSource({ platform: join(f.dataDir, "platform"), moduleId: proposed.moduleId!, commit: proposed.hash });
+  expect(files.map(file => file.path)).toEqual(["index.ts", "module.json", "test.ts"]);
+});
+
+test("registered upstream tool routes module status and rejects Provider and extra source authority", async () => {
+  const f = await fixture(false), proposal = await f.propose();
+  const upstream = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "upstream")!;
+  expect(upstream.visibility).toEqual(["modules", "owner"]);
+  const request = { action: "status", moduleId: proposal.moduleId! };
+  const scope = { workspaceId: f.workspace.id, caller: { kind: "module" as const, module: "price-watch", moduleId: proposal.moduleId!, hash: proposal.hash }, chain: [], path: [] };
+  expect((await callSync(f.ports, scope, "modules.upstream", request)).output).toMatchObject({ moduleId: proposal.moduleId, localCommit: proposal.hash, repository: null, proposal: null });
+  const list = modulesListOutput.parse((await callSync(f.ports, scope, "modules.list", {})).output);
+  expect(list.find(item => item.id === proposal.moduleId)?.versions[0]?.git?.commit).toBe(proposal.hash);
+  await expect(callSync(f.ports, { ...scope, caller: { kind: "provider", runId: "untrusted-provider" } }, "modules.upstream", request)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(callSync(f.ports, scope, "modules.upstream", { ...request, repository: "https://github.com/other/repo" })).rejects.toMatchObject({ code: "invalid" });
 });

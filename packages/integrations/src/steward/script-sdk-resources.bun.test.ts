@@ -13,8 +13,18 @@ for (const inherited of [undefined, "/synthetic/untrusted-node-path"]) test(`tru
     const codeDir = join(root, "release/resources/builtin/probe"), dataDir = join(root, "data");
     await mkdir(codeDir, { recursive: true }); await mkdir(dataDir);
     await writeFile(join(codeDir, "package.json"), JSON.stringify({ name: "probe", type: "module", dependencies: {} }));
+    await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: ["executions.start", "executions.snapshot"] }));
     await writeFile(join(codeDir, "tsconfig.json"), JSON.stringify({ compilerOptions: { module: "esnext", moduleResolution: "bundler" } }));
-    await writeFile(join(codeDir, "test.ts"), 'import { startModule } from "chrona/testing"; console.log(typeof startModule);');
+    await writeFile(join(codeDir, "test.ts"), `import assert from "node:assert/strict";
+import { startModule } from "chrona/testing";
+const module = await startModule("index.ts");
+try {
+  const now = new Date().toISOString();
+  const reply = await module.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} });
+  assert.deepEqual(reply.result?.result, { sdk: true, inherited: null, codes: [] });
+  console.log(typeof startModule);
+} finally { await module.stop(); }
+`);
     await writeFile(join(codeDir, "index.ts"), 'import { on, chrona } from "chrona"; on("tool", async () => { const codes = []; for (const target of ["executions.start", "executions.snapshot"]) { try { await chrona.call(target, {}); } catch (error) { codes.push((error as {code:string}).code); } } return { result: { sdk: true, inherited: process.env.NODE_PATH ?? null, codes } }; });');
     const before = await readFile(join(codeDir, "index.ts"), "utf8");
     const sdk = join(root, "release/resources/module-sdk");

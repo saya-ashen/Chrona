@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { resolve } from "node:path";
+import { appendFile, cp, mkdtemp, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
+import { seedTestModuleRelease, testReleasePackages } from "./module-release-test-fixture";
 import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
 import { buildPending } from "./module-build";
+import { propose } from "./module-proposal";
+import { resolveExternalRelease } from "./module-release";
 import { moduleContext } from "./module-context";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { registerBuiltins } from "./module-builtin";
@@ -14,9 +18,14 @@ import { notice } from "./test-notices";
 
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 const now = new Date("2026-10-22T12:00:00Z");
-const resources = resolve(import.meta.dirname, "builtin");
+const shippedResources = resolve(import.meta.dirname, "builtin");
 async function fixture(migrated = false) {
   const dataDir = await mkdtemp("/tmp/chrona-remind-");
+  const resources = join(dataDir, "resources", "builtin"), externalResources = join(dataDir, "resources", "external");
+  await cp(shippedResources, resources, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
+  await cp(resolve(import.meta.dirname, "external/remind"), join(externalResources, "remind"), { recursive: true });
+  await seedTestModuleRelease(externalResources, "remind");
   const db = testDb();
   await db.workspace.create({ data: { id: "w", name: "Reminders" } });
   if (migrated) {
@@ -24,14 +33,27 @@ async function fixture(migrated = false) {
     await db.schedule.create({ data: { workspaceId: "w", mode: "module", moduleId: "remind-id", rule: { kind: "at", at: now.toISOString() }, text: "legacy-00000000-0000-0000-0000-000000000001", label: "Old label", createdBy: "user", nextAt: now, payload: { text: "Migrated reminder" } } });
   }
   const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
-    moduleExternalResources: resolve(import.meta.dirname, "external"), sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, packages: testReleasePackages(resources),
+    moduleExternalResources: externalResources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
   async function install() {
     await registerBuiltins(ports, "w");
-    await installExternal(ports, "w", { package: "remind", mode: migrated ? "update" : "install", requestKey: "remind-fixture" });
+    if (migrated) {
+      const release = await resolveExternalRelease(ports, "remind");
+      await propose(moduleContext(ports, "w"), { root: externalResources, dir: "remind", intent: { changes: ["Installed reminder baseline"], preserves: [] }, expectedModuleId: "remind-id", sourceCommit: release.hash, gitBundle: release.git! }, "user");
+      await buildPending(moduleContext(ports, "w"));
+      expect(await db.module.findUniqueOrThrow({ where: { id: "remind-id" } })).toMatchObject({ activeHash: release.hash });
+      await appendFile(join(externalResources, "remind/index.ts"), "\n// Synthetic official update; preserve reminder behavior.\n");
+      const updated = await seedTestModuleRelease(externalResources, "remind");
+      expect(updated.commit).not.toBe(release.hash);
+    }
+    const expectedHash = (await resolveExternalRelease(ports, "remind")).hash;
+    expect(expectedHash).toMatch(/^[a-f0-9]{40}$/);
+    const request = { package: "remind" as const, mode: migrated ? "update" as const : "install" as const, requestKey: "remind-fixture" };
+    await installExternal(ports, "w", request);
     await buildPending(moduleContext(ports, "w"));
     await refreshInstallationReceipts(ports, "w");
+    expect(await installExternal(ports, "w", request)).toMatchObject({ status: "installed", hash: expectedHash });
   }
   const service = createStewardService(ports), api = service.forWorkspace("w");
   return { db, ports, service, api, install, async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };

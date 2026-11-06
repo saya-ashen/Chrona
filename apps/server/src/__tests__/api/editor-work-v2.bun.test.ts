@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { PREINSTALLED_MODULE_NAMES, EXECUTION_PROTOCOL, WORK_PROTOCOL, editorResponseDataSchemas, parseWorkResponse, type ExecutionView, type ProviderAdapter } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
+import { seedTestModuleRelease, testReleasePackages } from "../../../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import { resolveExternalRelease } from "../../../../../packages/engine/src/modules/steward/module-release";
 import { createStewardRuntime } from "../../steward-runtime";
 import { createServerApp } from "../../app";
@@ -36,6 +37,7 @@ test("real editor SDK/module routing accepts v1 three-id history and v2 work pro
     let codingId = "";
     for (const name of ["coding", "editor"]) {
       await cp(join(sourceRoot, "packages/engine/src/modules/steward/external", name), join(externalRoot, name), { recursive: true });
+      await seedTestModuleRelease(externalRoot, name);
       const release = await resolveExternalRelease({ moduleExternalResources: externalRoot }, name);
       const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: release.hash, status: "active", dataSchema: release.manifest.data.schema } });
       await db.moduleVersion.create({ data: { moduleId: module.id, hash: release.hash, manifest: release.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
@@ -57,6 +59,7 @@ test("real editor SDK/module routing accepts v1 three-id history and v2 work pro
     await writeFile(join(dataDir, "execution-projects.json"), JSON.stringify({ projects: [{ workspaceId: workspace.id, ownerId: "owner", moduleId: codingId, projectRef: "project", canonicalPath: project, baseline: "snapshot:strict-history-test" }], placements: [{ workspaceId: workspace.id, ownerId: "owner", moduleId: codingId, grant: { ...placement, executor: "server", executorGeneration: 1, directoryIdentity: localDirectoryIdentity(project), baseline, label: "Temporary integration project", canonicalPath: project } }] }));
     runtime = createStewardRuntime(db, { dataDir, provider });
     runtime.ports.moduleExternalResources = externalRoot;
+    runtime.ports.packages = testReleasePackages(runtime.ports.moduleBuiltinResources!);
     await moduleSupervisor(runtime.ports).start();
     const app = await createServerApp({ steward: runtime });
     let count = 0;

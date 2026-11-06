@@ -1,3 +1,4 @@
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { afterEach, expect, test } from "bun:test";
 import { chmod, link, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -28,6 +29,7 @@ async function fixture() {
     await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], ...extra })));
     await writeFile(join(dir, "index.ts"), "// synthetic fixture\n");
     await writeFile(join(dir, "test.ts"), "// offline fixture\n");
+    await seedTestModuleRelease(ports.moduleExternalResources!, name);
     return dir;
   }
   await resource("remind");
@@ -90,7 +92,8 @@ test("prepared copy failures are failed with an explicit retry while uncertain p
 
 test("same-hash existing version is reconciled by version id when propose preserves its old intent", async () => {
   const f = await fixture(), context = moduleContext(f.ports, f.workspaceId);
-  const local = await propose(context, { root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Original owner intent"] } }, "user");
+  const selected = await resolveExternalRelease(f.ports, "remind");
+  const local = await propose(context, { sourceCommit: selected.hash, gitBundle: selected.git!, root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Original owner intent"] } }, "user");
   const request = { package: "remind" as const, mode: "update" as const, requestKey: "existing-version" };
   await installExternal(f.ports, f.workspaceId, request);
   const id = installationId(f.workspaceId, request.requestKey);
@@ -105,7 +108,8 @@ test("lost receipt cannot bind a same-name reinstall with the same hash", async 
   const old = await installExternal(f.ports, f.workspaceId, request), id = installationId(f.workspaceId, request.requestKey);
   await f.db.module.delete({ where: { id: old.moduleId! } });
   await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "user", kind: "module_removed", subjectId: old.moduleId, details: { name: "remind", hash: old.hash }, createdAt: f.ports.now() } });
-  const replacement = await propose(moduleContext(f.ports, f.workspaceId), { root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Same name new installation"] } }, "user");
+  const selected = await resolveExternalRelease(f.ports, "remind");
+  const replacement = await propose(moduleContext(f.ports, f.workspaceId), { sourceCommit: selected.hash, gitBundle: selected.git!, root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Same name new installation"] } }, "user");
   const submission = await f.db.audit.findUniqueOrThrow({ where: { id: `${id}:submission` } });
   await f.db.audit.update({ where: { id: submission.id }, data: { details: { ...(submission.details as object), moduleId: null } } });
   await f.db.audit.update({ where: { id }, data: { details: { request, result: { package: "remind", requestKey: request.requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null } } } });
@@ -240,8 +244,30 @@ test("real checks and credential approval refresh the same installation receipt 
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", approvalId: null });
 });
 
-test("the ordinary checked proposal uses the same release hash as official installation", async () => {
+test("ordinary local source uses its own real Git commit rather than impersonating a release", async () => {
   const f = await fixture(), release = await resolveExternalRelease(f.ports, "remind");
   const result = await propose(moduleContext(f.ports, f.workspaceId), { root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Owner local source"] } }, "user");
-  expect(result.hash).toBe(release.hash);
+  expect(result.hash).toMatch(/^[a-f0-9]{40}$/);
+  expect(result.report.git?.commit).toBe(result.hash);
+  expect(result.hash).not.toBe(release.hash);
+});
+
+test("offline official update preserves a local fork and queues the merged commit", async () => {
+  const f = await fixture(), first = await installExternal(f.ports, f.workspaceId, { package: "remind", mode: "install", requestKey: "fork-initial" });
+  const context = moduleContext(f.ports, f.workspaceId), dir = join(f.ports.moduleExternalResources!, "remind");
+  await writeFile(join(dir, "local.txt"), "owner customization\n");
+  await propose(context, { root: f.ports.moduleExternalResources!, dir: "remind", intent: { changes: ["Owner customization"] } }, "user");
+  await rm(join(dir, "local.txt"));
+  await f.resource("remind", { description: "New upstream release" });
+  const release = await resolveExternalRelease(f.ports, "remind");
+  const request = { package: "remind" as const, mode: "update" as const, requestKey: "fork-update" };
+  const result = await installExternal(f.ports, f.workspaceId, request);
+  expect(result).toMatchObject({ status: "building", moduleId: first.moduleId, error: null });
+  expect(result.hash).not.toBe(release.hash);
+  const { readModuleSource } = await import("./module-git");
+  const files = await readModuleSource({ platform: context.platform, moduleId: first.moduleId!, commit: result.hash! });
+  expect(files.find(file => file.path === "local.txt")?.bytes.toString()).toBe("owner customization\n");
+  expect(JSON.parse(Buffer.from(files.find(file => file.path === "module.json")!.bytes).toString()).description).toBe("New upstream release");
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).activeHash).toBeNull();
+  expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
 });

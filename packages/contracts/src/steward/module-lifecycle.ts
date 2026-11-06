@@ -8,6 +8,7 @@ export const PREINSTALLED_MODULE_NAMES = ["qq", "remind", "mind"] as const;
 export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
 export const MODULE_CONTRACT_VERSION = "m1-p0-v1";
+export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const moduleOriginSchema = z.enum(["kernel", "builtin", "external"]);
 export type ModuleOrigin = z.infer<typeof moduleOriginSchema>;
 export const MODULE_OPERATIONS = ["build", "propose", "group", "activate", "update", "rollback", "remove", "install", "enable", "disable", "configure", "diagnose"] as const;
@@ -36,13 +37,14 @@ export type ModuleInstallRequest = z.infer<typeof moduleInstallRequestSchema>;
 export const moduleInstallResultSchema = z.object({
   package: z.enum(OFFICIAL_EXTERNAL_MODULE_NAMES), requestKey: z.string(),
   status: z.enum(["pending", "building", "pending_approval", "installed", "failed", "unavailable"]),
-  moduleId: z.string().nullable(), hash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), approvalId: z.string().nullable(),
+  moduleId: z.string().nullable(), hash: moduleVersionHashSchema.nullable(), approvalId: z.string().nullable(),
   error: z.object({ code: z.enum(["invalid", "forbidden", "conflict", "not_found", "failed", "unavailable"]), reason: z.string(), message: z.string() }).strict().nullable(),
 }).strict();
 export type ModuleInstallResult = z.infer<typeof moduleInstallResultSchema>;
 export const modulePackageCatalogSchema = z.array(z.object({
   name: z.enum(OFFICIAL_EXTERNAL_MODULE_NAMES), description: z.string().nullable(), available: z.boolean(), releaseHash: z.string().nullable(),
   moduleId: z.string().nullable(), installation: moduleInstallResultSchema.nullable(), error: z.string().nullable(),
+  git: z.object({ repository: z.string().nullable(), branch: z.string(), commit: z.string().regex(/^[a-f0-9]{40}$/) }).strict().nullable().default(null),
 }).strict());
 export const moduleInitializationStateSchema = z.object({
   version: z.literal(1), status: z.enum(["pending", "complete"]),
@@ -52,3 +54,10 @@ export const moduleInitializationStateSchema = z.object({
   }).strict()),
 }).strict();
 export type ModuleInitializationState = z.infer<typeof moduleInitializationStateSchema>;
+
+export const moduleUpstreamRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("status"), moduleId: z.string().min(1) }).strict(),
+  z.object({ action: z.literal("fetch"), moduleId: z.string().min(1) }).strict(),
+  z.object({ action: z.literal("merge"), moduleId: z.string().min(1), commit: z.string().regex(/^[a-f0-9]{40}$/), baseHash: moduleVersionHashSchema, requestKey: z.string().trim().min(1).max(200) }).strict(),
+]);
+export type ModuleUpstreamRequest = z.infer<typeof moduleUpstreamRequestSchema>;

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Proposal } from "./module-context";
+import type { moduleUpstream } from "./module-upstream";
 import { moduleHealthSummarySchema } from "./module-diagnostics";
 import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { moduleOverviewOutputSchema, permissionsSchema } from "./module-overview";
@@ -27,7 +29,8 @@ export const approvalStatusOutput = z.object({ approval: z.string(), status: z.e
 export const modulesListOutput = z.array(appSchema.extend({
   workspaceId: z.string(), dataSchema: z.number().nullable(), createdAt: z.string(), versionCount: z.number().int().optional(),
   health: moduleHealthSummarySchema,
-  versions: z.array(z.object({ hash: z.string(), status: z.string(), intent: z.json(), createdAt: z.string(), errors: z.array(z.string()).nullable() })),
+  versions: z.array(z.object({ hash: z.string(), status: z.string(), intent: z.json(), createdAt: z.string(), errors: z.array(z.string()).nullable(),
+    git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).nullable().default(null) })),
   runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(), error: z.string().nullable(), createdAt: z.string() })),
 }));
 // Overview's service imports the system registry; defer schema reuse until that registry is initialized.
@@ -40,6 +43,30 @@ const toolExampleOutput = z.object({ description: z.string().optional(), args: z
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
 export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), contractHash: z.string().optional(), target: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
 export const modulesContributionsOutput = z.array(z.object({ module: z.string(), hash: z.string(), value: z.json() }));
+const gitCommitOutput = z.string().regex(/^[a-f0-9]{40}$/);
+const buildTestOutput = z.object({ stdout: z.string(), stderr: z.string(), exitCode: z.number() }).strict();
+const typecheckErrorOutput = z.object({ file: z.string(), line: z.number(), code: z.number(), message: z.string() }).strict();
+const buildStatusOutput = z.enum(["passed", "failed", "skipped"]);
+const proposalOutput = z.object({
+  moduleId: z.string().nullable(), hash: gitCommitOutput, status: z.enum(["building", "testing", "rejected", "pending_review", "approved"]), approvalId: z.string().optional(),
+  report: z.object({
+    tests: z.array(buildTestOutput), git: z.object({ commit: gitCommitOutput, tree: gitCommitOutput }).strict().optional(),
+    continuity: z.object({ status: buildStatusOutput, reason: z.string().optional(), fromSchema: z.number().nullable(), toSchema: z.number(), migrated: z.boolean(),
+      effects: z.array(z.discriminatedUnion("type", [
+        z.object({ type: z.literal("notify_user"), key: z.string(), level: z.enum(["now", "digest"]), title: z.string(), body: z.string() }).strict(),
+        z.object({ type: z.literal("wake_provider"), key: z.string(), prompt: z.string() }).strict(),
+      ])).optional(), migration: buildTestOutput.optional(), output: buildTestOutput.optional() }).strict().optional(),
+    keyProbe: z.object({ status: z.enum(["passed", "repeated", "skipped"]), reason: z.string().optional(), keys: z.array(z.string()).optional() }).strict().optional(),
+    migration: buildTestOutput.optional(), errors: z.array(z.string()).optional(),
+    typecheck: z.object({ status: buildStatusOutput, reason: z.string().optional(), errors: z.array(typecheckErrorOutput).optional(), total: z.number().optional() }).strict().optional(),
+    outputImpacts: z.array(z.object({ caller: z.string(), targets: z.array(z.string()) }).strict()).optional(),
+    dependentChecks: z.array(z.object({ caller: z.string(), status: buildStatusOutput, reason: z.string().optional(), errors: z.array(typecheckErrorOutput).optional() }).strict()).optional(),
+    dependencies: z.object({ npm: z.boolean(), python: z.boolean(), packages: z.record(z.string(), z.array(z.string())) }).strict().optional(),
+  }).strict(),
+}).strict() satisfies z.ZodType<Proposal>;
+export const modulesUpstreamOutput = z.object({
+  moduleId: z.string(), repository: z.string().nullable(), branch: z.string().nullable(), localCommit: gitCommitOutput.nullable(), fetchedCommit: gitCommitOutput.nullable(), proposal: proposalOutput.nullable(),
+}).strict() satisfies z.ZodType<Awaited<ReturnType<typeof moduleUpstream>>>;
 export const modulesCheckOutput = z.object({ module: z.string(), hash: z.string(), status: z.string(), active: z.boolean(), report: z.json() });
 export const modulesRollbackOutput = z.discriminatedUnion("status", [
   z.object({ status: z.literal("pending_approval"), approvalId: z.string() }),

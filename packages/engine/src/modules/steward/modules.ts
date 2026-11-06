@@ -1,8 +1,8 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { z } from "zod";
 import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { assertExternalModule, moduleIdentity } from "./module-identity";
+import { moduleUpstream } from "./module-upstream";
+import { moduleUpstreamRequestSchema } from "@chrona/contracts/steward";
 import { installExternal, externalPackageCatalog, refreshInstallationReceipts } from "./module-install";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
@@ -17,7 +17,7 @@ import { buildPending } from "./module-build";
 import { onApproved, rollback } from "./module-activation";
 import { activateIn } from "./module-generation";
 import { recoverMigrations } from "./module-migration";
-import { readModuleFiles } from "./module-preview";
+import { readVersionSource } from "./module-source";
 import { callModuleTool, moduleToolsets, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, moduleOutputMismatches, moduleHealthSummarySchema, moduleOutputContractFailureSchema, incidentSchema, kind as moduleIncidentKind, diagnosticText, incidentNextAction, type ModuleIncident } from "./module-diagnostics";
 import { latestModuleEvolution, moduleEvolutionOutcomes } from "./module-evolution";
@@ -87,17 +87,18 @@ async function list(context: ModuleContext) {
     const manifest = moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data;
     return { ...row, ...moduleIdentity(row, { configurable: !!manifest && Object.keys(manifest.settings).length > 0, removable: !manifest || !isEntryModule(manifest) }), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row),
-      versions: versions.map(({ manifest: _manifest, report, ...version }) => ({ ...version, errors: z.object({ errors: z.array(z.string()) }).safeParse(report).data?.errors ?? null })),
+      versions: versions.map(({ manifest: _manifest, report, ...version }) => {
+        const metadata = z.object({ errors: z.array(z.string()).optional(), git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).optional() }).safeParse(report).data;
+        return { ...version, errors: metadata?.errors ?? null, git: metadata?.git ?? null };
+      }),
     };
   }));
 }
 async function checkout(context: ModuleContext, moduleId: string, hash: string | undefined, dir: string, root: string) {
-  const { db, store } = context;
+  const { db } = context;
   const module = await requireModule(context, db, moduleId), selected = hash ?? module.activeHash;
   if (!selected || !await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: selected } } })) throw new StewardError("not_found", "Module version not found");
-  // A version rejected before testing (e.g. a manifest error) was recorded but its files were never stored.
-  if (!existsSync(join(store, selected))) throw new StewardError("not_found", `Version ${selected} has no stored source (rejected before it was stored); rebuild it from the active version or your own copy`);
-  const files = await readModuleFiles(join(store, selected), "Unsafe module store file");
+  const files = await readVersionSource(context, moduleId, selected);
   await checkoutModule(root, dir, files);
 }
 /** Approvals the module system carries out (activation, groups, removal); every path that resolves approvals must route these here. */
@@ -116,6 +117,7 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     }
   }
   return {
+    upstream: (request: z.input<typeof moduleUpstreamRequestSchema>) => moduleUpstream(ports, workspaceId, moduleUpstreamRequestSchema.parse(request)),
     propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
     buildPending: (now = ports.now()) => reconcile(buildPending(context, now)),
     recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),

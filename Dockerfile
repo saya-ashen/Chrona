@@ -1,6 +1,10 @@
 FROM oven/bun:1.4.2-slim AS runner
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV HOST=0.0.0.0
 ENV PORT=3101
 ENV DATABASE_URL="file:/data/chrona.db"
@@ -15,6 +19,12 @@ COPY external-plugins/pi-steward-agent external-plugins/pi-steward-agent
 COPY scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
 RUN bun install --frozen-lockfile --ignore-scripts \
     && bun run db:generate
+COPY build build
+COPY scripts/build-binaries.ts scripts/module-git-release.ts scripts/
+COPY resources/module-git resources/module-git
+COPY .env.example .env.example
+RUN bun scripts/build-binaries.ts --resources-only /app
+ENV CHRONA_RESOURCE_DIR=/app/resources
 ENV NODE_ENV=production
 
 RUN mkdir -p /data && chmod 700 /data && chown -R bun:bun /app /data

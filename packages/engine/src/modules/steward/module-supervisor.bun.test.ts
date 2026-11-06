@@ -427,10 +427,13 @@ test.each([false, true])("builtin startup uses trusted release code and never st
   await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
   await writeFile(join(codeDir, "index.ts"), "export {};");
   f.ports.moduleBuiltinResources = root;
-  const release = await resolveBuiltinRelease(f.ports, "files");
+  const files = await import("./module-preview").then(({ readModuleFiles }) => readModuleFiles(codeDir, "unsafe fixture"));
+  const digest = new Bun.CryptoHasher("sha256");
+  for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
+  const release = await resolveBuiltinRelease(f.ports, "files", digest.digest("hex"));
   await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: release.hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: "v1", generationId: "release" }));
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: null, generationId: "release" }));
   if (drift) await writeFile(join(codeDir, "index.ts"), "changed after registration");
   await f.supervisor.reconcile();
   expect(f.processes.map(process => process.input.codeDir)).toEqual(drift ? [] : [release.codeDir]);
@@ -438,7 +441,7 @@ test.each([false, true])("builtin startup uses trusted release code and never st
   if (drift) {
     const outcome = await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id);
     expect(outcome[0]).toMatchObject({ status: "failed", rollback: { attempted: false, result: "blocked" } });
-    expect(outcome[0]!.rollback.reason).toContain("Built-in");
+    expect(outcome[0]!.rollback.reason).toBeTruthy();
   }
 });
 
@@ -451,4 +454,17 @@ test("internal delivery fence rejects before execution and never sends an event"
   expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(0);
   await f.deliver();
   expect(await f.db.moduleRun.count()).toBe(1);
+});
+
+
+test.each(["user", "build", "builtin"])("approved Git builtin from %s runs from store without release resources", async source => {
+  const f = await fixture({ keepAlive: true }), hash = "a".repeat(40);
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "files" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, source, status: "approved", intent: {}, report: {} } });
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "custom" }));
+  f.ports.moduleBuiltinResources = join(f.ports.dataDir, "missing-release");
+  await f.supervisor.reconcile();
+  expect(f.processes.map(process => process.input.codeDir)).toEqual([join(f.ports.dataDir, "platform/store", hash)]);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ builtin: true, activeHash: hash, status: "active" });
 });

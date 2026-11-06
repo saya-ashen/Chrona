@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "name": "web",
+      "repository": "https://github.com/chrona-core/chrona-module-web",
+      "branch": "main",
+      "commit": "3124fcfae4cb3d45d31bd5f52db56e1719d3e08e"
+    },
+    {
+      "name": "mcp",
+      "repository": "https://github.com/chrona-core/chrona-module-mcp",
+      "branch": "main",
+      "commit": "9b2e425aa2073ff3efc5f2945bebcc071bae621f"
+    },
+    {
+      "name": "files",
+      "repository": "https://github.com/chrona-core/chrona-module-files",
+      "branch": "main",
+      "commit": "f9baa5df32c092ed839a0d933b5ceaff323ea1e7"
+    },
+    {
+      "name": "notify",
+      "repository": "https://github.com/chrona-core/chrona-module-notify",
+      "branch": "main",
+      "commit": "c75e16cc8f0198bc83ab8e22f6d7f175c5ccf98a"
+    },
+    {
+      "name": "events",
+      "repository": "https://github.com/chrona-core/chrona-module-events",
+      "branch": "main",
+      "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425"
+    },
+    {
+      "name": "qq",
+      "repository": "https://github.com/chrona-core/chrona-module-qq",
+      "branch": "main",
+      "commit": "2cb3c4eee9d168c5a4d083bbb096079606dfed8c"
+    },
+    {
+      "name": "remind",
+      "repository": "https://github.com/chrona-core/chrona-module-remind",
+      "branch": "main",
+      "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61"
+    },
+    {
+      "name": "mind",
+      "repository": "https://github.com/chrona-core/chrona-module-mind",
+      "branch": "main",
+      "commit": "ac48500a13ea384d1456b43981fb583ea354c1e4"
+    },
+    {
+      "name": "memory-local",
+      "repository": "https://github.com/chrona-core/chrona-module-memory-local",
+      "branch": "main",
+      "commit": "c2353f20718f1b08756bca10259e979592cde3ca"
+    },
+    {
+      "name": "coding",
+      "repository": "https://github.com/chrona-core/chrona-module-coding",
+      "branch": "main",
+      "commit": "086459226c73b6b10894d4d1271f0e298f6ae82d"
+    },
+    {
+      "name": "editor",
+      "repository": "https://github.com/chrona-core/chrona-module-editor",
+      "branch": "main",
+      "commit": "560d06f9759483ad896b8022ad31e3fafb4d2226"
+    }
+  ]
+}

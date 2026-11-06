@@ -7,7 +7,8 @@ import { moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts
 import type { StewardPorts } from "./ports";
 import { buildUsage, moduleModelSettings } from "./settings";
 import { StewardError } from "./errors";
-import { readModuleFiles } from "./module-preview";
+import { readVersionSource } from "./module-source";
+import { moduleContext } from "./module-context";
 import { checkoutModule } from "./module-files";
 import { writeBuildHelpers } from "./module-build-helpers";
 import { callsDeclaration } from "./module-contracts";
@@ -136,7 +137,7 @@ async function prepareBuild(ports: StewardPorts, workspaceId: string, cwd: strin
   for (const name of names) {
     const module = await ports.db.module.findFirst({ where: { workspaceId, name } });
     if (!module?.activeHash) continue;
-    for (const file of await readModuleFiles(join(ports.dataDir, "platform", "store", module.activeHash), "Unsafe module store file")) {
+    for (const file of await readVersionSource(moduleContext(ports, workspaceId), module.id, module.activeHash)) {
       const target = join(cwd, "current", ...(names.length > 1 ? [name] : []), file.path);
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, file.bytes);

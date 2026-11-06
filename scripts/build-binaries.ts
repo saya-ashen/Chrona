@@ -7,6 +7,7 @@ import { dirname, resolve } from "node:path";
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile } from "../build/portable-elf";
 import { buildExecutionContracts } from "../build/execution-contracts";
+import { copyModuleGitRelease, stageModuleGitLicense } from "./module-git-release";
 
 const ROOT = resolve(import.meta.dirname, "..");
 
@@ -35,7 +36,8 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
   }
 
   await mkdir(dirname(dst), { recursive: true });
-  await cp(src, dst, { recursive: true, filter: path => !["resources/builtin", "resources/external"].includes(resource.to) || !path.slice(src.length).split(/[\\/]/).includes("node_modules") });
+  await rm(dst, { recursive: true, force: true });
+  await cp(src, dst, { recursive: true, filter: path => !["resources/builtin", "resources/external"].includes(resource.to) || !path.slice(src.length).split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) });
   log("copy", `${resource.from} → ${resource.to}`);
 }
 
@@ -64,6 +66,19 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
     args.push("--minify", "--sourcemap");
   }
   return args;
+}
+
+/** Generated contract files belong to the exact module commit shipped in its bundle. */
+export async function prepareReleaseModules(resourcesRoot: string) {
+  await buildExecutionContracts(resolve(resourcesRoot, "external"));
+  const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
+  await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
+  await copyModuleGitRelease(seedDir, resourcesRoot);
+}
+
+export async function prepareReleaseResources(releaseDir: string) {
+  for (const resource of buildArtifacts.resources) await copyResource(resource, releaseDir);
+  await prepareReleaseModules(resolve(releaseDir, buildArtifacts.resourcesRoot));
 }
 
 export async function buildBinary(target: BuildTargetName) {
@@ -100,10 +115,7 @@ export async function buildBinary(target: BuildTargetName) {
   log("output", `Binary: ${binaryPath}`);
 
   log("copy", "Copying resources...");
-  for (const resource of buildArtifacts.resources) {
-    await copyResource(resource, releaseDir);
-  }
-  await buildExecutionContracts(resolve(releaseDir, "resources/external"));
+  await prepareReleaseResources(releaseDir);
 
   console.log("");
   const tarPath = resolve(ROOT, "dist", "releases", `${manifestTarget.releaseName}.tar.gz`);
@@ -118,6 +130,11 @@ export async function buildBinary(target: BuildTargetName) {
 }
 
 async function main() {
+  if (process.argv[2] === "--resources-only") {
+    if (!process.argv[3] || process.argv.length !== 4) throw new Error("Usage: bun scripts/build-binaries.ts --resources-only <release-directory>");
+    await prepareReleaseResources(resolve(process.argv[3]));
+    return;
+  }
   await buildBinary(parseBuildTarget(process.argv.slice(2)));
 }
 

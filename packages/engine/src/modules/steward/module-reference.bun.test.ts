@@ -1,8 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { cp, link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { commitModuleSource } from "./module-git";
+import { snapshotModule } from "./module-files";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { testDb } from "./test-db";
 import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
@@ -31,17 +34,21 @@ async function fixture() {
 const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [],
   tools: [{ name: "inspect", description: "Read-only example interface", parameters: { type: "object", properties: {}, required: [] } }] });
 async function sources(f: Awaited<ReturnType<typeof fixture>>) {
-  const hash = "b".repeat(64);
-  const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "web", activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-  const stored = join(f.dataDir, "platform", "store", hash), builtin = join(f.ports.moduleBuiltinResources!, "web");
-  for (const [dir, text] of [[stored, "custom appearance"], [builtin, "new release feature"]]) {
+  const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "web", builtin: true } });
+  const source = join(f.dataDir, "custom-source"), builtin = join(f.ports.moduleBuiltinResources!, "web");
+  for (const [dir, text] of [[source, "custom appearance"], [builtin, "new release feature"]]) {
     await mkdir(dir!, { recursive: true });
     await writeFile(join(dir!, "module.json"), JSON.stringify(manifest));
     await writeFile(join(dir!, "index.ts"), text!);
     await writeFile(join(dir!, "test.ts"), "// offline test");
   }
-  return { module, hash, stored, builtin };
+  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: module.id, versionId: "custom", files: await snapshotModule(f.dataDir, "custom-source"), message: "custom appearance" });
+  const hash = git.commit, stored = join(f.dataDir, "platform", "store", hash);
+  await cp(source, stored, { recursive: true });
+  await f.db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { git } } });
+  const release = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "web");
+  return { module, hash, stored, builtin, release };
 }
 
 test("development reference exposes exact contracts, synthetic non-empty examples and permissions without production calls", async () => {
@@ -103,7 +110,7 @@ test("checkout distinguishes active customization from the current release even 
   await link(join(seeded.builtin, "index.ts"), join(f.dataDir, "deduplicated.ts"));
   expect(await f.call("m_modules_checkout", { module: "web", dir: "active" })).toMatchObject({ source: "stored", hash: seeded.hash });
   const result = await f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "reference" }) as { hash: string };
-  expect(result).toMatchObject({ source: "builtin", hash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+  expect(result).toMatchObject({ source: "builtin", hash: seeded.release.commit });
   expect(result.hash).not.toBe(seeded.hash);
   expect(await readFile(join(f.run.cwd, "active", "index.ts"), "utf8")).toBe("custom appearance");
   expect(await readFile(join(f.run.cwd, "reference", "index.ts"), "utf8")).toBe("new release feature");

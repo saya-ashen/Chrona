@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { callSync, type Caller } from "./module-calls";
@@ -7,6 +7,7 @@ import { registerSystemModules } from "./system-modules";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease } from "./module-release";
 import { createPages } from "./builtin/web/pages";
 import type { StewardPorts } from "./ports";
@@ -30,7 +31,9 @@ async function fixture() {
       await writeFile(join(code, "module.json"), JSON.stringify(manifest));
       await writeFile(join(code, "index.ts"), "// Synthetic peer transport; never executed\n");
       await writeFile(join(code, "test.ts"), "// Synthetic release fixture\n");
+      await seedTestModuleRelease(ports.moduleBuiltinResources!, name);
       activeHash = (await resolveBuiltinRelease(ports, name)).hash;
+      await cp(code, join(dataDir, "platform/store", activeHash), { recursive: true });
     }
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash, builtin } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: activeHash, manifest, source: "user", status: "approved", intent: {}, report: {} } });

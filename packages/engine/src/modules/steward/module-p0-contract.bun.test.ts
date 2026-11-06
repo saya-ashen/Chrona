@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, moduleInstallRequestSchema, modulePackageCatalogSchema } from "@chrona/contracts/steward";
 import { assertExternalName, assertExternalModule, assertModuleOperation, moduleIdentity } from "./module-identity";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { installExternal, recordInstallationResult, externalPackageCatalog } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
@@ -33,16 +34,21 @@ async function fixture() {
       await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], triggers: [] })));
       await writeFile(join(dir, "index.ts"), "// synthetic, never executed\n");
       await writeFile(join(dir, "test.ts"), "// synthetic author test\n");
+      await seedTestModuleRelease(root, name);
     }
   }
   return { ports, db, workspaceId: workspace.id, dataDir };
 }
 
-test("identity is a database fact; operation matrix rejects immutable and forged identities", async () => {
+test("identity is a database fact; built-ins update while removal, installation and forged identities stay protected", async () => {
   const f = await fixture();
   for (const operation of MODULE_OPERATIONS) {
-    if (["enable", "disable", "configure", "diagnose"].includes(operation)) expect(() => assertModuleOperation(fixtures.builtin.row, operation)).not.toThrow();
-    else expect(() => assertModuleOperation(fixtures.builtin.row, operation)).toThrow("Built-in");
+    for (const name of BUILTIN_MODULE_NAMES) {
+      const builtin = { ...fixtures.builtin.row, name };
+      if (["remove", "install"].includes(operation)) expect(() => assertModuleOperation(builtin, operation)).toThrow("Built-in");
+      else expect(() => assertModuleOperation(builtin, operation)).not.toThrow();
+    }
+    for (const name of [...KERNEL_MODULE_NAMES, "rescue"]) expect(() => assertModuleOperation({ name, builtin: true }, operation)).toThrow("reserved identity");
     expect(() => assertModuleOperation(fixtures.external.row, operation)).not.toThrow();
     expect(() => assertModuleOperation(fixtures.forgedRow, operation)).toThrow("reserved identity");
   }
@@ -59,7 +65,8 @@ test("identity is a database fact; operation matrix rejects immutable and forged
 test("trusted release binds manifest and exact code hash; missing, drift, mismatches and symlinks fail closed", async () => {
   const f = await fixture(), release = await resolveBuiltinRelease(f.ports, "web");
   expect(release).toMatchObject({ name: "web", origin: "builtin", codeDir: join(f.ports.moduleBuiltinResources!, "web") });
-  expect(release.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(release.hash).toMatch(/^[a-f0-9]{40}$/);
+  expect(release.git?.commit).toBe(release.hash);
   expect((await resolveExternalRelease(f.ports, "qq")).origin).toBe("external");
   await expect(resolveBuiltinRelease(f.ports, "../qq")).rejects.toMatchObject({ reason: "release_not_found" });
   await expect(resolveBuiltinRelease({}, "web")).rejects.toMatchObject({ reason: "release_not_found" });
@@ -185,20 +192,28 @@ test("build claim refuses changed identities and continues to a valid queued bui
   expect(starts).toEqual([queued[1]!]);
 });
 
-test("approval creation transaction refuses immutable single, grouped and removal requests without records", async () => {
+test("approval creation accepts built-in updates but refuses forged, kernel and removal requests without records", async () => {
   const f = await fixture();
   const approvals = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
   const builtin = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: "a".repeat(64) } });
   const external = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "b".repeat(64) } });
   for (const module of [builtin, external]) await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, source: "user", status: "approved", manifest: module.builtin ? fixtures.builtin.manifest : fixtures.external.manifest, intent: {}, report: {} } });
   const common = { title: "Fixture", detail: "", preview: "" };
+  await expect(approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: builtin.id, name: builtin.name, hash: builtin.activeHash } })).rejects.toMatchObject({ reason: "immutable_module" });
+  for (const identity of [{ name: "events", builtin: false }, { name: "modules", builtin: true }]) {
+    const invalid = await f.db.module.create({ data: { workspaceId: f.workspaceId, ...identity, activeHash: "c".repeat(64) } });
+    await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
+    for (const request of [
+      { ...common, action: "activate_module", moduleId: invalid.id, payload: { kind: "activate_module", moduleId: invalid.id, hash: invalid.activeHash } },
+      { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: invalid.id, hash: invalid.activeHash }] } },
+    ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
+  }
+  expect(await f.db.approval.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "approval_created" } })).toBe(0);
   for (const request of [
     { ...common, action: "activate_module", moduleId: builtin.id, payload: { kind: "activate_module", moduleId: builtin.id, hash: builtin.activeHash } },
     { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: builtin.id, hash: builtin.activeHash }] } },
-    { ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: builtin.id, name: builtin.name, hash: builtin.activeHash } },
-  ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "immutable_module" });
-  expect(await f.db.approval.count()).toBe(0);
-  expect(await f.db.audit.count({ where: { kind: "approval_created" } })).toBe(0);
+  ]) expect((await approvals.create(request)).status).toBe("open");
   const allowed = await approvals.create({ ...common, action: "activate_module", moduleId: external.id, payload: { kind: "activate_module", moduleId: external.id, hash: external.activeHash } });
   expect(allowed.status).toBe("open");
 });
@@ -208,7 +223,7 @@ test("list, overview and kernel projections share lifecycle identity without ove
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: "a".repeat(64) } });
   await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
   const [list] = await createModules(f.ports, f.workspaceId).list();
-  expect(list).toMatchObject({ origin: "builtin", capabilities: { build: false, rollback: false, remove: false } });
+  expect(list).toMatchObject({ origin: "builtin", capabilities: { build: true, rollback: true, remove: false, install: false } });
   expect((await createApps(f.ports, f.workspaceId).list())[0]!.origin).toBe("builtin");
   const overview = await moduleOverview(f.ports, f.workspaceId, "web") as { app: { origin: string }; permissions: { capabilities: unknown } };
   expect(overview.app.origin).toBe("builtin"); expect(Array.isArray(overview.permissions.capabilities)).toBe(true);

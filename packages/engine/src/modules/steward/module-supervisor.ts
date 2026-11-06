@@ -180,11 +180,14 @@ class ModuleSupervisor {
     const module = await ports.db.module.findUniqueOrThrow({ where: { id: instance.moduleId } });
     if (module.activeHash !== instance.hash || module.status !== "active") throw new Error("Module identity changed before start");
     let codeDir = join(ports.dataDir, "platform/store", instance.hash);
-    if (module.builtin) {
+    assertModuleOperation(module, "activate");
+    const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
+    if (version.status !== "approved") throw new Error("Module version is not approved");
+    if (module.builtin && version.source === "builtin" && /^[a-f0-9]{64}$/.test(instance.hash)) {
       const release = await resolveBuiltinRelease(ports, module.name, instance.hash);
       if (JSON.stringify(release.manifest) !== JSON.stringify(instance.manifest)) throw new Error("Built-in release manifest differs from registered metadata");
       codeDir = release.codeDir;
-    } else assertModuleOperation(module, "activate");
+    }
     return codeDir;
   }
   private async spawn(instance: Instance, sandbox: NonNullable<StewardPorts["sandbox"]>) {

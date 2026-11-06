@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ExecutionResultSource, ExecutionView } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
+import { seedTestModuleRelease } from "../../../../../packages/engine/src/modules/steward/module-release-test-fixture";
 
 const repo = resolve(import.meta.dirname, "../../../../..");
 const workbench = process.env.CHRONA_TEST_WORKBENCH ?? "/home/saya/workspace/agent-workbench.nvim";
@@ -66,6 +68,7 @@ import {callSync} from ${moduleFile("packages/engine/src/modules/steward/module-
 import {moduleManifestSchema,PREINSTALLED_MODULE_NAMES} from ${moduleFile("packages/contracts/src/steward/index.ts")};
 import {buildExecutionContracts} from ${moduleFile("build/execution-contracts.ts")};
 import {startTestTickPump} from ${moduleFile("apps/server/src/test-tick-pump.ts")};
+import {testReleasePackages} from ${moduleFile("packages/engine/src/modules/steward/module-release-test-fixture.ts")};
 const root=process.env.CHRONA_TEST_ROOT;
 const dataDir=join(root,'data');await mkdir(dataDir,{recursive:true});
 const initialization={version:1,status:'complete',packages:Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name=>[name,{requestKey:'host:'+name,attempts:1,status:'skipped',moduleId:null,hash:null,approvalId:null,error:null}]))};
@@ -125,6 +128,8 @@ const server=Bun.serve({hostname:'127.0.0.1',port:0,idleTimeout:30,async fetch(r
 }});
 const provider=createPiProvider({command:join(root,'fake-pi'),agentDir:join(root,'profile'),expectedVersion:'0.85.0',chronaExtension:${moduleFile("external-plugins/pi-steward-agent/chrona-tools.ts")},agentUrl:'http://127.0.0.1:'+server.port+'/api/steward-agent',executionMode:'trusted-local'});
 runtime=createStewardRuntime(observedDb,{dataDir,provider,onError:error=>console.error('HOST_RUNTIME',error)});
+runtime.ports.moduleBuiltinResources=join(root,'resources/builtin');
+runtime.ports.packages=testReleasePackages(runtime.ports.moduleBuiltinResources);
 app=await createServerApp({steward:runtime});
 await runtime.tickOnce();
 await runtime.listener('/api/editor');
@@ -220,6 +225,9 @@ async function fixture() {
   expect(existsSync(join(workbench, "lua/agent-workbench/chrona/client.lua"))).toBe(true);
   expect(Bun.which("nvim")).not.toBeNull();
   const root = await mkdtemp(join(tmpdir(), "chrona-neovim-host-"));
+  const builtinRoot = join(root, "resources/builtin");
+  await cp(join(repo, "packages/engine/src/modules/steward/builtin"), builtinRoot, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtinRoot, name);
   const project = join(root, "project");
   await mkdir(project); await mkdir(join(root, "profile"), { mode: 0o700 });
   await writeFile(join(project, "answer.txt"), "baseline\n");

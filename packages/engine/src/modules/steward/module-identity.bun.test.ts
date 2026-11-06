@@ -6,14 +6,16 @@ import { testDb } from "./test-db";
 import { moduleContext } from "./module-context";
 import { propose } from "./module-proposal";
 import { queueBuild } from "./module-build-session";
-import { activateIn, activateBuiltinReleaseIn, switchActiveIn } from "./module-generation";
-import { rollback, activateApprovedIn } from "./module-activation";
+import { activateIn, activateBuiltinReleaseIn } from "./module-generation";
+import { rollback } from "./module-activation";
 import { buildPending } from "./module-build";
-import { activateGroupIn, requestGroup } from "./module-group";
+import { requestGroup } from "./module-group";
 import { resolveBuiltinRelease } from "./module-release";
+import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { currentModuleEvolution, updateModuleEvolution } from "./module-evolution";
 import { requestStatus } from "./module-status";
 import { rollbackFailedStart } from "./module-generation";
+import { assertExternalName, assertModuleOperation, moduleIdentity } from "./module-identity";
 import type { StewardPorts } from "./ports";
 
 const closes: (() => Promise<unknown>)[] = [];
@@ -38,9 +40,12 @@ test.each([...BUILTIN_MODULE_NAMES, ...KERNEL_MODULE_NAMES, "rescue"])("empty-wo
   const f = await fixture();
   await expect(queueBuild(f.ports, f.workspace.id, { key: "build", actorKey: "user", originSessionId: null, request: request(name) })).rejects.toMatchObject({ code: "forbidden" });
   await mkdir(join(f.dataDir, "candidate"));
-  await writeFile(join(f.dataDir, "candidate/module.json"), JSON.stringify({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] }));
+  const manifest = { name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] };
+  await writeFile(join(f.dataDir, "candidate/module.json"), JSON.stringify(manifest));
   await writeFile(join(f.dataDir, "candidate/index.ts"), "export {};");
-  await expect(propose(f.context, { root: f.dataDir, dir: "candidate", intent: request(name).intent }, "user")).rejects.toMatchObject({ code: "forbidden" });
+  const proposal = propose(f.context, { root: f.dataDir, dir: "candidate", intent: request(name).intent }, "user");
+  if (moduleManifestSchema.safeParse(manifest).success) await expect(proposal).rejects.toMatchObject({ code: "forbidden" });
+  else expect(await proposal).toMatchObject({ moduleId: null, status: "rejected", report: { errors: [expect.stringContaining("reserved")] } });
   expect(await f.db.module.count()).toBe(0);
   expect(await f.db.moduleVersion.count()).toBe(0);
   expect(await f.db.session.count()).toBe(0);
@@ -48,20 +53,24 @@ test.each([...BUILTIN_MODULE_NAMES, ...KERNEL_MODULE_NAMES, "rescue"])("empty-wo
   expect(await f.db.approval.count()).toBe(0);
 });
 
-test.each(["activate", "switch", "rollback", "restore-approval", "group-approval"])("%s rejects a builtin with source=user and preserves current code", async operation => {
-  const f = await fixture(), app = await f.app("files", true);
-  const payload = operation === "group-approval" ? { kind: "activate_modules", versions: [{ moduleId: app.id, hash: "next" }, { moduleId: "other", hash: "next" }] } : { kind: "activate_module", moduleId: app.id, hash: "next", restore: { schema: 1, snapshotAt: "snapshot" } };
-  const approval = await f.db.approval.create({ data: { workspaceId: f.workspace.id, moduleId: operation === "group-approval" ? null : app.id, action: "activate_module", status: "approved", title: "old request", detail: "", preview: "", payload } });
-  const action = { workspaceId: f.workspace.id, approvalId: approval.id, payload };
-  const perform = () => f.db.$transaction(async tx => {
-    if (operation === "activate") return activateIn(f.context, tx, { moduleId: app.id, hash: "next", reason: "activate" });
-    if (operation === "switch") return switchActiveIn(f.context, tx, app.id, "next");
-    if (operation === "group-approval") return activateGroupIn(f.context, tx, action);
-    return activateApprovedIn(f.context, tx, action);
-  });
-  await expect(operation === "rollback" ? rollback(f.context, app.id, "next") : perform()).rejects.toMatchObject({ code: "forbidden" });
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).activeHash).toBe("old");
-  expect(await f.db.generation.count()).toBe(0);
+test.each([...BUILTIN_MODULE_NAMES])("builtin %s keeps its origin and deletion protection while accepting checked lifecycle updates", async name => {
+  const f = await fixture(), app = await f.app(name, true);
+  expect(moduleIdentity(app)).toMatchObject({ origin: "builtin", capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: false, install: false } });
+  for (const operation of ["build", "propose", "group", "activate", "update", "rollback"] as const) {
+    expect(() => assertModuleOperation(app, operation)).not.toThrow();
+    expect(await assertExternalName(f.db, f.workspace.id, name, operation)).toMatchObject({ id: app.id });
+  }
+  for (const operation of ["remove", "install"] as const) expect(() => assertModuleOperation(app, operation)).toThrow();
+  await f.db.$transaction(tx => activateIn(f.context, tx, { moduleId: app.id, hash: "next", reason: "activate" }));
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: true, activeHash: "next" });
+  await rollback(f.context, app.id, "old");
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: true, activeHash: "old" });
+});
+
+test.each([...KERNEL_MODULE_NAMES, "rescue"])("persisted builtin flag cannot grant dynamic authority to %s", async name => {
+  const f = await fixture(), app = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, builtin: true } });
+  expect(() => assertModuleOperation(app, "activate")).toThrow();
+  await expect(assertExternalName(f.db, f.workspace.id, name, "propose")).rejects.toMatchObject({ code: "forbidden" });
 });
 
 test.each(["building", "pending_review"])("%s candidate becoming builtin is rejected before dependency install, author tests or activation", async status => {
@@ -92,24 +101,33 @@ test("version source does not grant builtin identity and external activation pre
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: independentlyPaused.id } })).toMatchObject({ status: "paused", nextAt: null });
 });
 
-test("trusted release activation is idempotent and rejects caller tampering", async () => {
+test("trusted Git seed is idempotent and rejects untrusted metadata or replacing active code", async () => {
   const f = await fixture();
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
   await mkdir(join(f.ports.moduleBuiltinResources, "files"), { recursive: true });
   const app = await f.app("files", true);
   await writeFile(join(f.ports.moduleBuiltinResources, "files/module.json"), JSON.stringify(app.manifest));
   await writeFile(join(f.ports.moduleBuiltinResources, "files/index.ts"), "export {};");
+  const git = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "files");
   const release = await resolveBuiltinRelease(f.ports, "files");
-  await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
+  await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "builtin", status: "approved", intent: {}, report: { git: { commit: git.commit, tree: git.tree } } } });
   await requestStatus(f.context, app.id, "paused", "maintenance");
+  await f.db.module.update({ where: { id: app.id }, data: { activeHash: null } });
   await f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release));
   const evolution = await currentModuleEvolution(f.db, f.workspace.id, app.id, release.hash);
   await f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release));
   expect(await f.db.generation.count()).toBe(1);
   expect(await currentModuleEvolution(f.db, f.workspace.id, app.id, release.hash)).toEqual(evolution);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ activeHash: release.hash, status: "paused" });
-  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, { ...release, codeDir: f.dataDir }))).rejects.toMatchObject({ code: "conflict" });
-  await writeFile(join(release.codeDir, "index.ts"), "changed");
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { source: "user" } });
+  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { source: "builtin" } });
+  await f.db.module.update({ where: { id: app.id }, data: { activeHash: "next" } });
+  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
+  await f.db.module.update({ where: { id: app.id }, data: { activeHash: null } });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: release.hash } }, data: { report: { git: { commit: "b".repeat(40), tree: git.tree } } } });
+  await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
+  await f.db.module.update({ where: { id: app.id }, data: { builtin: false } });
   await expect(f.db.$transaction(tx => activateBuiltinReleaseIn(f.context, tx, release))).rejects.toMatchObject({ code: "conflict" });
 });
 

@@ -108,13 +108,13 @@
         nativeBuildInputs = [pkgs.bun];
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-6Gsc4Fh13T6G01tUcy/hhtsiVLCeekrTl6PMQfkb6Sc=";
+        outputHash = "sha256-oKg+YNp5vYJdOd6kiiQ37JOmNqOZLrD/My4lDP3orVQ=";
         dontCheckForBrokenSymlinks = true;
         dontPatchShebangs = true;
         dontFixup = true;
         buildPhase = ''
           export HOME=$TMPDIR
-          bun install --ignore-scripts
+          bun install --frozen-lockfile --ignore-scripts
         '';
         installPhase = ''
           mkdir -p $out
@@ -130,6 +130,7 @@
           bun
           nodejs_22
           makeWrapper
+          git
         ];
         PRISMA_SCHEMA_ENGINE_BINARY = "${pkgs.prisma-engines}/bin/schema-engine";
         # Bun appends the compiled application payload to the ELF file. Nix's
@@ -168,6 +169,8 @@
             test -e "$addon" || continue
             cp "$addon" $out/bin/
           done
+
+          wrapProgram $out/bin/chrona --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.git pkgs.bun pkgs.bash]}
 
           runHook postInstall
         '';

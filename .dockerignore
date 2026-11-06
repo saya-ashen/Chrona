@@ -21,7 +21,11 @@ test-results/
 artifacts/
 e2e/
 dist/
-build/
+build/*
+!build/manifest.ts
+!build/portable-elf.ts
+!build/execution-contracts.ts
+!build/execution-contract-types.ts
 *.tsbuildinfo
 .env*
 !.env.example

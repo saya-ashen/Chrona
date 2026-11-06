@@ -6,6 +6,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { type CallScope } from "./module-effects";
 import { completeForModule } from "./module-model";
 import { createSettings } from "./settings";
+import { commitModuleSource } from "./module-git";
 import { buildPending } from "./module-build";
 import { moduleContext } from "./module-context";
 import { createModuleSupervisor } from "./module-supervisor";
@@ -39,6 +40,12 @@ async function fixture() {
     catch (error) { return { error: { code: /^(\w+):/.exec((error as Error).message)?.[1] } }; }
   };
   return { db, dataDir, workspace, module, manifest, ports, scope, call, calls: () => calls };
+}
+
+async function buildCandidate(f: Awaited<ReturnType<typeof fixture>>, manifest: ReturnType<typeof moduleManifestSchema.parse>, label: string) {
+  const files = [{ path: "index.ts", bytes: Buffer.from("") }, { path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) }, { path: "test.ts", bytes: Buffer.from("") }];
+  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: f.module.id, versionId: label, files, message: label });
+  return f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: git.commit, manifest, intent: { changes: [label] }, source: "user", report: { tests: [], git }, status: "building" } });
 }
 
 test("settings moduleModel defaults null, persists owner updates and disabling", async () => {
@@ -93,21 +100,19 @@ test("success caps output and audits only model and token counts", async () => {
 for (const setting of [null, { ...limits, models: { fast: "fake/fast" } }, { ...limits, maxCallsPerEvent: 1 }, { ...limits, maxOutputTokens: 10 }]) test(`build rejects unavailable or excessive model limits ${JSON.stringify(setting)}`, async () => {
   const f = await fixture();
   await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: setting } } });
-  const version = await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "build", manifest: f.manifest, intent: { changes: ["model"] }, source: "user", report: {}, status: "building" } });
-  const staging = join(f.dataDir, "platform/staging", version.id); await mkdir(staging, { recursive: true }); await writeFile(join(staging, "index.ts"), "");
+  const version = await buildCandidate(f, f.manifest, "model");
   await buildPending(moduleContext(f.ports, f.workspace.id));
   const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
   expect(row.status).toBe("rejected"); expect(JSON.stringify(row.report)).toContain(!setting ? "configure moduleModel" : "strong" in setting.models ? "limits exceed" : 'tier \\"strong\\" is not configured'); expect(f.calls()).toBe(0);
 });
 test("build refuses listen outside entry modules: apps offer tools, the web module shows them (v2-8)", async () => {
   const f = await fixture();
-  for (const [hash, extra] of [["page", {}], ["entry", { uses: ["chat.send"] }]] as const) {
+  for (const [kind, extra] of [["page", {}], ["entry", { uses: ["chat.send"] }]] as const) {
     const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], listen: "/api/page", ...extra });
-    const version = await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, intent: { changes: ["page"] }, source: "user", report: {}, status: "building" } });
-    const staging = join(f.dataDir, "platform/staging", version.id); await mkdir(staging, { recursive: true }); await writeFile(join(staging, "index.ts"), "");
+    const version = await buildCandidate(f, manifest, kind);
     await buildPending(moduleContext(f.ports, f.workspace.id));
     const report = JSON.stringify((await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).report);
-    expect(report.includes("listen is only for entry modules")).toBe(hash === "page");
+    expect(report.includes("listen is only for entry modules")).toBe(kind === "page");
   }
 });
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });

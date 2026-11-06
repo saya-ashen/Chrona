@@ -68,9 +68,8 @@ function renderFileDifference(code: string[], path: string, before: Buffer | und
   }
   code.push(...lineDiff(before?.toString("utf8") ?? "", after?.toString("utf8") ?? ""));
 }
-export async function codeDifference(store: string, activeHash: string | null, files: { path: string; bytes: Buffer }[]) {
+export function codeDifference(activeFiles: { path: string; bytes: Buffer }[], files: { path: string; bytes: Buffer }[]) {
   const previous = new Map<string, Buffer>();
-  const activeFiles = activeHash ? await readModuleFiles(join(store, activeHash), "Unsafe module store file") : [];
   activeFiles.forEach(file => previous.set(file.path, file.bytes));
   const proposed = new Map(files.map(file => [file.path, Buffer.from(file.bytes)]));
   const code: string[] = ["代码差异："], unchanged: string[] = [];

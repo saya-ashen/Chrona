@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
@@ -15,7 +16,7 @@ function isExactLoopbackHost(host: string): boolean {
 }
 
 export type ChronaDoctorCheck = {
-  key: "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
+  key: "git" | "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
   status: "ok" | "warning" | "error";
   message: string;
 };
@@ -77,7 +78,9 @@ function artifactPermissionsCheck(databasePath: string): ChronaDoctorCheck {
 }
 
 export function inspectLocalChrona(): ChronaDoctorCheck[] {
-  const checks: ChronaDoctorCheck[] = [];
+  const git = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true });
+  const gitAvailable = git.status === 0 && /^git version /m.test(git.stdout);
+  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }];
   const databaseUrl = configuredDatabaseUrl();
   const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
   if (!sqlitePath || sqlitePath === ":memory:") {

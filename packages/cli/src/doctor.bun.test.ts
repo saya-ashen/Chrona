@@ -13,6 +13,16 @@ afterEach(() => {
 });
 
 describe("chrona doctor", () => {
+  it("reports missing Git without attempting installation", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-no-git-"));
+    try {
+      process.env.DATABASE_URL = `file:${join(directory, "missing.db")}`;
+      process.env.CHRONA_CONFIG_DIR = join(directory, "config");
+      process.env.PATH = directory;
+      expect(inspectLocalChrona()).toContainEqual(expect.objectContaining({ key: "git", status: "error", message: expect.stringContaining("Install Git") }));
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it("reports a healthy localhost database", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-"));
     try {
@@ -26,6 +36,7 @@ describe("chrona doctor", () => {
 
       const checks = inspectLocalChrona();
       expect(checks).toEqual(expect.arrayContaining([
+        expect.objectContaining({ key: "git", status: "ok" }),
         expect.objectContaining({ key: "database", status: "ok" }),
         expect.objectContaining({ key: "databaseIntegrity", status: "ok" }),
         expect.objectContaining({ key: "networkBind", status: "ok" }),

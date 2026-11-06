@@ -4,5 +4,8 @@ import type { ModuleInstallRequest, ModuleInstallResult } from "@chrona/contract
 export type ExternalModuleInstaller = (input: {
   workspaceId: string;
   request: ModuleInstallRequest;
-  release: { name: string; origin: "builtin" | "external"; codeDir: string; hash: string };
+  release: {
+    name: string; origin: "builtin" | "external"; codeDir: string; hash: string;
+    git: { repository: string | null; branch: string; commit: string; bundlePath: string } | null;
+  };
 }) => Promise<ModuleInstallResult>;

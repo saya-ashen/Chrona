@@ -11,6 +11,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
 import { assertModuleOperation } from "./module-identity";
+import { moduleGitPath } from "./module-git";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
 /**
@@ -79,7 +80,7 @@ export async function removeApproved(context: ModuleContext, action: ApprovedAct
   await moduleSupervisor(ports).reconcile();
   await moduleSupervisor(ports).settleModule(moduleId);
   const backup = join(platform, "removed", `${name}-${ports.now().toISOString().replace(/[:.]/g, "-")}`);
-  const parts = [[join(platform, "data", moduleId), "data"], [join(platform, "content", moduleId), "content"], [join(platform, "store", hash), "code"]] as const;
+  const parts = [[join(platform, "data", moduleId), "data"], [join(platform, "content", moduleId), "content"], [join(platform, "store", hash), "code"], [moduleGitPath(platform, moduleId), "repository"]] as const;
   await mkdir(backup, { recursive: true });
   for (const [from, to] of parts) if (await exists(from)) await cp(from, join(backup, to), { recursive: true });
   await context.db.$transaction(async tx => {

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, type Socket } from "node:net";
 import { randomUUID } from "node:crypto";
@@ -92,7 +93,9 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(path, resolve); }); }
   catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
   const httpSocket = join(dir, "http");
-  const child = spawn(process.execPath, ["--no-install", entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
+  // Child processes do not inherit the parent's SDK preload for external release directories.
+  const loader = join(import.meta.dirname, "..", "chrona-sdk-loader.ts");
+  const child = spawn(process.execPath, ["--no-install", ...(existsSync(loader) ? ["--preload", loader] : []), entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
   const exited = new Promise<void>(resolve => { child.once("error", () => { fail(); resolve(); }); child.once("close", () => { fail(); resolve(); }); });
   let queue: Promise<unknown> = Promise.resolve();
   return {

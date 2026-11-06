@@ -1,8 +1,11 @@
+import { StewardError } from "./errors";
+import { checkoutModule, snapshotModule } from "./module-files";
+import { readVersionSource, versionSource } from "./module-source";
 import { moduleModelSettings } from "./settings";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
@@ -19,19 +22,29 @@ import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
 import { moduleToolExampleError } from "./module-calls";
-import { readModuleFiles, codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
+import { codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
-  try { return await readModuleFiles(join(context.platform, "staging", version.id), "Unsafe module staging file"); }
+  try {
+    const staging = join(context.platform, "staging", version.id);
+    const source = await versionSource(context, version, staging);
+    report.git = source.revision;
+    await rm(staging, { recursive: true, force: true });
+    await checkoutModule(context.platform, `staging/${version.id}`, source.files);
+    const checked = await snapshotModule(context.platform, `staging/${version.id}`);
+    if (checked.length !== source.files.length || checked.some((file, index) => file.path !== source.files[index]?.path || !Buffer.from(file.bytes).equals(source.files[index]!.bytes))) throw new StewardError("conflict", "Module staging differs from its Git source");
+    await Promise.all(source.files.map(file => chmod(join(staging, file.path), 0o444)));
+    return source.files;
+  }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    report.tests.push({ stdout: "", stderr: "Module staging files are missing; build interrupted. Submit the module again.", exitCode: 1 });
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" && !(error instanceof StewardError)) throw error;
+    report.tests.push({ stdout: "", stderr: error instanceof StewardError ? error.message : "Module source files are missing; build interrupted. Submit the module again.", exitCode: 1 });
     await context.db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
     return null;
   }
 }
 /** Lockfile libraries and system programs go into the staging copy before anything runs it. */
-async function installDependencies(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string) {
+export async function installDependencies(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string) {
   if (!manifest.packages.length && !existsSync(join(staging, "package.json")) && !existsSync(join(staging, "pyproject.toml"))) return null;
   // The host installer may execute package build backends; do not cross an explicitly required isolation boundary.
   if (context.ports.sandbox?.executionMode === "required-isolation") return { errors: ["required-isolation: dependency installation is not isolated yet; builds with language or system packages are unavailable in this mode"], installed: { npm: false, python: false, packages: {} } };
@@ -62,7 +75,7 @@ export function reviewManifest(value: unknown) {
   return JSON.stringify({ ...manifest, tools }, null, 2);
 }
 async function reviewPreview(context: ModuleContext, review: Review, active: Awaited<ReturnType<ModuleContext["db"]["moduleVersion"]["findUnique"]>>) {
-  const { store } = context, { version, module, report, files, needsMigration } = review, { hash } = version;
+  const { version, module, report, files, needsMigration } = review, { hash } = version;
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
   // Only what changes (v2-22): two whole manifests could fill an approval, and a group's would not fit one.
   const diff = ["--- active", "+++ proposed", ...compactDiff(active?.manifest ? reviewManifest(active.manifest) : "", reviewManifest(manifest))].join("\n");
@@ -72,7 +85,7 @@ async function reviewPreview(context: ModuleContext, review: Review, active: Awa
   const suffix = `${impactPreview}${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null, codeDiff = "";
-  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = await codeDifference(store, module.activeHash, files), hash);
+  if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = codeDifference(module.activeHash ? await readVersionSource(context, module.id, module.activeHash) : [], files), hash);
   return { active, manifest, hash, preview, parts: { prefix, suffix, codeDiff } };
 }
 const SUPERSEDED = "Superseded by newer candidate ";
@@ -239,7 +252,7 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
 }
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {
   const { db, platform } = context, { hash } = version;
-  const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [] };
+  const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [], ...((version.report as BuildReport).git ? { git: (version.report as BuildReport).git } : {}) };
   try {
     const module = await assertExternalModule(db, context.workspaceId, version.moduleId, "build");
     const manifest = moduleManifestSchema.parse(version.manifest);
@@ -298,7 +311,9 @@ async function recoverReview(context: ModuleContext, version: ModuleVersion) {
   if (module.activeHash === version.hash) return;
   const report = version.report as BuildReport | null;
   if (!report?.continuity) return;
-  const files = await readModuleFiles(join(context.store, version.hash), "Unsafe module store file");
+  const source = await versionSource(context, version);
+  const files = source.files;
+  report.git = source.revision;
   const manifest = moduleManifestSchema.parse(version.manifest);
   const needsMigration = module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id));
   await requestReview(context, { version, module, report, files, needsMigration });

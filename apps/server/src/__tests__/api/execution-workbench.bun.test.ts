@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/p
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
-  EDITOR_HTTP, EXECUTION_PROTOCOL, PREINSTALLED_MODULE_NAMES, editorResponseDataSchemas,
+  BUILTIN_MODULE_NAMES, EDITOR_HTTP, EXECUTION_PROTOCOL, PREINSTALLED_MODULE_NAMES, editorResponseDataSchemas,
   moduleManifestSchema, type ExecutionCommand, type ExecutionEventPage, type ExecutionPayload,
   type ExecutionResult, type ExecutionSnapshot, type ExecutionView, type ProviderAdapter, type ProviderRunInput,
 } from "@chrona/contracts/steward";
@@ -12,6 +12,7 @@ import { testDb } from "@chrona/engine/test-support";
 import { buildExecutionContracts } from "../../../../../build/execution-contracts";
 import { moduleContext } from "../../../../../packages/engine/src/modules/steward/module-context";
 import { switchActiveIn } from "../../../../../packages/engine/src/modules/steward/module-generation";
+import { seedTestModuleRelease, testReleasePackages } from "../../../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import { resolveExternalRelease } from "../../../../../packages/engine/src/modules/steward/module-release";
 import { requestRemove } from "../../../../../packages/engine/src/modules/steward/module-remove";
 import { requestStatus } from "../../../../../packages/engine/src/modules/steward/module-status";
@@ -72,6 +73,8 @@ let errors: unknown[];
 async function boot() {
   runtime = createStewardRuntime(db, { dataDir: join(root, "data"), provider: fake.provider, onError: error => { errors.push(error); } });
   runtime.ports.moduleExternalResources = join(root, "external");
+  runtime.ports.moduleBuiltinResources = join(root, "builtin");
+  runtime.ports.packages = testReleasePackages(runtime.ports.moduleBuiltinResources);
   await moduleSupervisor(runtime.ports).start();
   app = await createServerApp({ steward: runtime });
 }
@@ -92,12 +95,16 @@ beforeEach(async () => {
     requestKey: `integration:${name}`, attempts: 1, status: "skipped", moduleId: null, hash: null, approvalId: null, error: null,
   }])) };
   workspaceId = (await db.workspace.create({ data: { name: "Execution integration", settings: { moduleInitialization: initialization } } })).id;
+  const builtinRoot = join(root, "builtin");
+  await cp(join(sourceRoot, "packages/engine/src/modules/steward/builtin"), builtinRoot, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtinRoot, name);
   const externalRoot = join(root, "external");
   await mkdir(externalRoot);
   for (const name of ["coding", "editor"]) await cp(join(sourceRoot, "packages/engine/src/modules/steward/external", name), join(externalRoot, name), { recursive: true });
   // Official generator, actual package source, private build output. No replacement handlers or contract fixtures.
   expect(await buildExecutionContracts(externalRoot)).toEqual(["coding", "editor"]);
   for (const name of ["coding", "editor"]) {
+    await seedTestModuleRelease(externalRoot, name);
     const release = await resolveExternalRelease({ moduleExternalResources: externalRoot }, name);
     const module = await db.module.create({ data: { workspaceId, name, activeHash: release.hash, status: "active", dataSchema: release.manifest.data.schema } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: release.hash, manifest: release.manifest, source: "user", intent: {}, report: {}, status: "approved" } });

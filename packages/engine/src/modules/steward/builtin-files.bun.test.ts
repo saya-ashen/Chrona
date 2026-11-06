@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
+import { seedTestModuleRelease, testReleasePackages } from "./module-release-test-fixture";
 import { createFiles } from "./builtin/files/files";
 import { registerBuiltins } from "./module-builtin";
 import { moduleSupervisor } from "./module-supervisor";
@@ -11,11 +13,14 @@ import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 
-const resources = fileURLToPath(new URL("./builtin", import.meta.url));
+const shippedResources = fileURLToPath(new URL("./builtin", import.meta.url));
 const now = new Date("2026-10-22T00:00:00Z");
 
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-files-engine-");
+  const resources = join(dataDir, "resources", "builtin");
+  await cp(shippedResources, resources, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
   const workspaceId = (await db.workspace.create({ data: { name: "files" } })).id;
   const peer = testModuleProcess(async (event, _call, input) => {
     const app = createFiles(input.contentDir!, input.dataDir);
@@ -23,7 +28,7 @@ async function fixture(real = false) {
     throw new Error("Unexpected event");
   });
   const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir }) : null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources,
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, packages: testReleasePackages(resources),
     // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
     sandbox: { available: sandbox?.health.available ?? true, isolated: sandbox?.health.isolated ?? true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   const api = createStewardService(ports).forWorkspace(workspaceId);
@@ -106,7 +111,7 @@ if (!realSandbox.health.available) console.info("SKIP files real process: module
     const sandbox = createScriptSandbox({ dataDir: f.ports.dataDir });
     await mkdir(join(f.ports.dataDir, "platform/data", app.id), { recursive: true });
     await mkdir(join(f.ports.dataDir, "platform/content", app.id), { recursive: true });
-    const author = await sandbox.runModule({ codeDir: join(resources, "files"), dataDir: join(f.ports.dataDir, "platform/data", app.id), contentDir: join(f.ports.dataDir, "platform/content", app.id), entry: "test.ts", input: {} });
+    const author = await sandbox.runModule({ codeDir: join(f.ports.moduleBuiltinResources!, "files"), dataDir: join(f.ports.dataDir, "platform/data", app.id), contentDir: join(f.ports.dataDir, "platform/content", app.id), entry: "test.ts", input: {} });
     expect(author).toMatchObject({ status: "succeeded", exitCode: 0 });
     expect(app.activeHash).toBeTruthy();
     expect(await f.call("write", { path: "real.txt", content: "sandbox" })).toEqual({ ok: true });

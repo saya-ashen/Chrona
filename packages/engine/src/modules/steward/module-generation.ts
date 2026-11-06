@@ -1,13 +1,13 @@
 import { Prisma } from "@chrona/db/generated/prisma/client";
-import { listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
 import { notificationSettings } from "./settings";
 import { latestModuleEvolution, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { StewardError } from "./errors";
-import { json, type ModuleContext } from "./module-context";
+import { json, type ModuleContext, type ModuleVersion } from "./module-context";
 import { assertExternalModule, assertModuleOperation } from "./module-identity";
-import { resolveBuiltinRelease, type ModuleRelease } from "./module-release";
+import type { ModuleRelease } from "./module-release";
 import { pauseIn } from "./module-status";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
@@ -72,22 +72,29 @@ export async function switchActiveIn(context: ModuleContext, tx: Prisma.Transact
   if (preservePause && module.status === "paused") await preservePausedStatus(context, tx, moduleId);
   return module;
 }
-/** The release root is host-owned; callers cannot grant release authority with a stored hash. */
+function assertBuiltinSeedRelease(release: ModuleRelease) {
+  if (release.origin !== "builtin" || !(BUILTIN_MODULE_NAMES as readonly string[]).includes(release.name) || !/^[a-f0-9]{40}$/.test(release.hash) || !release.git || release.git.commit !== release.hash) throw new StewardError("conflict", "Trusted release identity changed");
+}
+function assertBuiltinSeedVersion(version: ModuleVersion | null, release: ModuleRelease) {
+  const report = version?.report as { git?: { commit?: unknown } } | null;
+  if (version?.status !== "approved" || version.source !== "builtin" || report?.git?.commit !== release.hash || JSON.stringify(version.manifest) !== JSON.stringify(release.manifest)) throw new StewardError("conflict", "Trusted release metadata does not match");
+}
+/** Internal bootstrap only: registrar resolves and exports the trusted seed before this DB transaction; never pass routed input. */
 export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prisma.TransactionClient, release: ModuleRelease) {
-  const trusted = await resolveBuiltinRelease(context.ports, release.name, release.hash);
-  if (release.origin !== "builtin" || release.codeDir !== trusted.codeDir || JSON.stringify(release.manifest) !== JSON.stringify(trusted.manifest)) throw new StewardError("conflict", "Trusted release identity changed");
-  const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId: context.workspaceId, name: trusted.name } } });
+  assertBuiltinSeedRelease(release);
+  const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId: context.workspaceId, name: release.name } } });
   if (!module?.builtin) throw new StewardError("conflict", "Trusted release requires a built-in module identity");
-  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: trusted.hash } } });
-  if (version?.status !== "approved" || JSON.stringify(version.manifest) !== JSON.stringify(trusted.manifest)) throw new StewardError("conflict", "Trusted release metadata does not match");
+  if (module.activeHash && module.activeHash !== release.hash) throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
+  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: release.hash } } });
+  assertBuiltinSeedVersion(version, release);
   const previous = await tx.generation.findFirst({ where: { workspaceId: context.workspaceId }, orderBy: { seq: "desc" } });
-  if (module.activeHash === trusted.hash && previous) return previous;
+  if (module.activeHash === release.hash && previous) return previous;
   const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } })).settings).timezone;
-  await replaceModuleSchedules(tx, { workspaceId: context.workspaceId, moduleId: module.id, manifest: trusted.manifest, now: context.now(), zone });
-  await tx.module.update({ where: { id: module.id }, data: { activeHash: trusted.hash, dataSchema: trusted.manifest.data.schema, status: "active" } });
+  await replaceModuleSchedules(tx, { workspaceId: context.workspaceId, moduleId: module.id, manifest: release.manifest, now: context.now(), zone });
+  await tx.module.update({ where: { id: module.id }, data: { activeHash: release.hash, dataSchema: release.manifest.data.schema, status: "active" } });
   if (module.status === "paused") await preservePausedStatus(context, tx, module.id);
   const generation = await recordGeneration(context, tx, "activate");
-  await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash: trusted.hash, generationId: generation.id });
+  await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash: release.hash, generationId: generation.id });
   return generation;
 }
 function staticSchedules(manifest: ReturnType<typeof moduleManifestSchema.parse>) {

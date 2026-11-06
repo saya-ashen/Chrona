@@ -1,3 +1,4 @@
+import { modulesUpstreamOutput } from "./system-outputs";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -68,7 +69,7 @@ test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
   // Chrona's own tools open to the user (v2-13) come first.
-  expect(tools.map(tool => tool.name)).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_list", "m_content_read", "m_memory_recall", "m_memory_retain", "m_memory_forget", "m_memory_status", "m_executions_start", "m_executions_get", "m_executions_lookup_start", "m_executions_list", "m_executions_send", "m_executions_answer", "m_executions_cancel", "m_executions_events", "m_executions_snapshot", "m_executions_result_source", "m_executions_start_v2", "m_executions_placement", "m_executions_locations", "m_executions_workspace_cleanup", "m_mail_sort_find_mail"]);
+  expect(tools.map(tool => tool.name)).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_list", "m_content_read", "m_memory_recall", "m_memory_retain", "m_memory_forget", "m_memory_status", "m_executions_start", "m_executions_get", "m_executions_lookup_start", "m_executions_list", "m_executions_send", "m_executions_answer", "m_executions_cancel", "m_executions_events", "m_executions_snapshot", "m_executions_result_source", "m_executions_start_v2", "m_executions_placement", "m_executions_locations", "m_executions_workspace_cleanup", "m_mail_sort_find_mail"]);
   expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
@@ -150,4 +151,14 @@ test("call uses the current version rather than a previously catalogued schema",
   const f = await fixture(); await f.service.tools.catalog(f.run.token);
   await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, tools: [{ ...f.tool, parameters: { type: "object", properties: { changed: { type: "boolean" } }, required: ["changed"] } }] } } });
   await expect(f.call()).rejects.toMatchObject({ code: "invalid", message: expect.stringContaining("changed") });
+});
+
+test("upstream output declares exact commit and checked proposal shapes", () => {
+  const commit = "a".repeat(40), tree = "b".repeat(40);
+  const output = { moduleId: "fixture-module", repository: null, branch: "main", localCommit: commit, fetchedCommit: commit,
+    proposal: { moduleId: "fixture-module", hash: commit, status: "building" as const, report: { tests: [], git: { commit, tree } } } };
+  expect(modulesUpstreamOutput.parse(output)).toEqual(output);
+  expect(modulesUpstreamOutput.safeParse({ ...output, proposal: null, localCommit: null, fetchedCommit: null }).success).toBe(true);
+  expect(modulesUpstreamOutput.safeParse({ ...output, localCommit: "not-a-commit" }).success).toBe(false);
+  expect(modulesUpstreamOutput.safeParse({ ...output, proposal: { ...output.proposal, report: { tests: "invalid" } } }).success).toBe(false);
 });

@@ -76,3 +76,13 @@ test("real overview and settings-set results fit their declared output schemas",
   moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "okx-trader"));
   for (const name of ["memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
 });
+
+
+test("builtin overview retains origin and protected deletion while exposing checked Git version and update actions", async () => {
+  const f = await fixture(), hash = "a".repeat(40), tree = "b".repeat(40);
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: moduleManifestSchema.parse({ ...base, name: "files" }), source: "user", status: "approved", intent: {}, report: { tests: [], git: { commit: hash, tree } } } });
+  const overview = await moduleOverview(f.ports, f.w, "files");
+  expect(overview).toMatchObject({ kind: "app", app: { origin: "builtin", activeHash: hash, capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: false, install: false }, versions: expect.arrayContaining([expect.objectContaining({ hash, git: { commit: hash, tree } })]) } });
+  moduleOverviewOutputSchema.parse(overview);
+});

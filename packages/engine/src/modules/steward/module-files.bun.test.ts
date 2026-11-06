@@ -31,3 +31,12 @@ test("snapshots reject symlinks and oversized files", async () => {
   await writeFile(join(root, "module", "large.bin"), new Uint8Array(1024 * 1024 + 1));
   await expect(snapshotModule(root, "module")).rejects.toMatchObject({ code: "invalid" });
 });
+
+test("snapshot ignores repository metadata but still rejects nested .git paths", async () => {
+  const root = await fixture();
+  await mkdir(join(root, "module", ".git"));
+  await writeFile(join(root, "module", ".git", "config"), "not module source");
+  expect((await snapshotModule(root, "module")).map(file => file.path)).toEqual(["index.ts", "module.json"]);
+  await mkdir(join(root, "module", "nested", ".git"), { recursive: true });
+  await expect(snapshotModule(root, "module")).rejects.toMatchObject({ code: "invalid" });
+});

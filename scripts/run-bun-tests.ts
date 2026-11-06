@@ -27,6 +27,7 @@ function shouldInclude(path: string) {
 	const standalone = new Set([
 		"packages/cli/src/doctor.bun.test.ts", "packages/cli/src/start-server.bun.test.ts",
 		"scripts/portable-elf.bun.test.ts",
+		"scripts/module-git-release.bun.test.ts", "scripts/build-binaries.bun.test.ts",
 	]);
 	return (standalone.has(path) || retained.some(prefix => path.startsWith(prefix)))
 		&& !path.split("/").some((segment) => ignoredSegments.has(segment));

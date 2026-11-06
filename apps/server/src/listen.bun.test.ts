@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "@chrona/engine";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 import { resetEnvCacheForTests } from "./config/env";
+import { seedTestModuleRelease, testReleasePackages } from "../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
@@ -67,6 +68,11 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   if (isolated) process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!; else delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   const steward = createStewardRuntime(db, { provider: null, dataDir });
   if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP; else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
+  const resources = join(dataDir, "resources", "builtin");
+  await cp(join(import.meta.dirname, "../../../packages/engine/src/modules/steward/builtin"), resources, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
+  steward.ports.moduleBuiltinResources = resources;
+  steward.ports.packages = testReleasePackages(resources);
   stop = () => steward.stop();
   expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();

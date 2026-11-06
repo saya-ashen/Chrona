@@ -37,7 +37,7 @@ export async function snapshotModule(root: string, path: string) {
   async function walk(path: string, relative: string): Promise<void> {
     const target = await confined(root, path), info = await lstat(target);
     if (info.isDirectory()) {
-      for (const entry of await readdir(target)) if (relative || !INSTALLED_DIRS.has(entry)) await walk(`${path}/${entry}`, relative ? `${relative}/${entry}` : entry);
+      for (const entry of await readdir(target)) if (relative || (entry !== ".git" && !INSTALLED_DIRS.has(entry))) await walk(`${path}/${entry}`, relative ? `${relative}/${entry}` : entry);
       return;
     }
     await snapshotFile(target, relative, info.size);

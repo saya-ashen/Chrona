@@ -9,6 +9,23 @@ export type ReleaseResource = {
 export const buildArtifacts = {
   binaryEntry: "packages/cli/src/bun-entry.ts",
   resourcesRoot: "resources",
+  moduleGit: {
+    resourcesDir: "module-git",
+    seedDir: "resources/module-git",
+    modules: [
+      { name: "web", source: "builtin/web" },
+      { name: "mcp", source: "builtin/mcp" },
+      { name: "files", source: "builtin/files" },
+      { name: "notify", source: "builtin/notify" },
+      { name: "events", source: "builtin/events" },
+      { name: "qq", source: "external/qq" },
+      { name: "remind", source: "external/remind" },
+      { name: "mind", source: "external/mind" },
+      { name: "memory-local", source: "external/memory-local" },
+      { name: "coding", source: "external/coding" },
+      { name: "editor", source: "external/editor" },
+    ],
+  },
   executor: { platform: "linux", manager: "systemd 262", processEntry: "__executor-process", extension: "external-plugins/pi-steward-agent/chrona-tools.ts", foregroundOnly: true },
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
