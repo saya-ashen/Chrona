@@ -34,11 +34,11 @@ try {
   assert.equal(pages.size, 1);
   assert.deepEqual(pages.get("main"), firstPage);
   assert.equal(firstPage?.title, "提醒");
-  assert.deepEqual(firstPage?.data, { list: { tool: "list" } });
+  assert.deepEqual(firstPage.data, { list: { tool: "list" } });
   assert.ok(firstPage);
   assert.match(firstPage.spec.elements.empty.props.text, /还没有提醒/);
-  assert.equal(firstPage?.spec.elements.active.props.text, "等待提醒");
-  assert.equal(firstPage?.spec.elements.paused.props.text, "已暂停");
+  assert.equal(firstPage.spec.elements.active.props.text, "等待提醒");
+  assert.equal(firstPage.spec.elements.paused.props.text, "已暂停");
   for (const [scheduleId, text] of [["first", "喝水"], ["second", "Take a break"]]) {
     const reply = await module.send({ trigger: { kind: "schedule", id: scheduleId, scheduleId, firedAt: now, payload: { text } }, now, params: {} });
     assert.equal(reply.error, undefined);

@@ -22,6 +22,11 @@ async function authorize(db: Tx, p: ExecutionPrincipal, ref: ExecutionRef, activ
   const a = await db.executionAttempt.findUnique({ where: { id: ref.attemptId }, include: { run: true } });
   if (!a) throw new CallError("not_found", "Execution attempt not found");
   if (a.workspaceId !== p.workspaceId || a.ownerId !== p.ownerId) throw new CallError("forbidden", "Execution scope denied");
+  await authorizeModule(db, p, a, activeCaller);
+  if (a.workId !== ref.workId || a.runId !== ref.runId || a.run.sessionId !== ref.sessionId) throw new CallError("conflict", "Execution reference mismatch");
+  return a;
+}
+async function authorizeModule(db: Tx, p: ExecutionPrincipal, a: Attempt, activeCaller: boolean) {
   if (p.caller.kind === "module") {
     if (a.moduleId !== p.caller.moduleId || a.callerHash !== p.caller.hash || a.callerKey !== `module:${p.caller.moduleId}`) throw new CallError("forbidden", "Execution caller denied");
     if (activeCaller) {
@@ -29,8 +34,6 @@ async function authorize(db: Tx, p: ExecutionPrincipal, ref: ExecutionRef, activ
       if (!active) throw new CallError("forbidden", "Execution caller is no longer active");
     }
   }
-  if (a.workId !== ref.workId || a.runId !== ref.runId || a.run.sessionId !== ref.sessionId) throw new CallError("conflict", "Execution reference mismatch");
-  return a;
 }
 
 function initial(a: Attempt, now: Date): ExecutionSnapshot {
@@ -87,12 +90,23 @@ async function writeSnapshot(tx: Tx, a: Attempt, snapshot: ExecutionSnapshot, no
   if (finished) await tx.executionDetail.updateMany({ where: { attemptId: a.id }, data: { expiresAt: new Date(a.stopConfirmedAt!.getTime() + limits.detailRetentionMs) } });
 }
 
+function assertPageBounds(input: ExecutionEventRead) {
+  if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > limits.pageEvents || !Number.isInteger(input.waitMs) || input.waitMs < 0 || input.waitMs > limits.pollMs) throw new CallError("invalid", "Invalid execution page bounds");
+}
+function persistedEvent(value: unknown, seq: number, a: Attempt): ExecutionEvent {
+  const parsed = executionEventSchema.safeParse(value);
+  if (!parsed.success) throw new CallError("unavailable", "Stored execution event is invalid");
+  const event = parsed.data;
+  if (event.attemptId !== a.id || event.seq !== seq || event.workId !== a.workId || event.runId !== a.runId || event.sessionId !== a.run.sessionId) throw new CallError("unavailable", "Stored execution event reference is invalid");
+  return event;
+}
+function pageReady(result: ExecutionEventPage) { return result.events.length > 0 || result.gap || result.snapshotRequired; }
 const polls = new Map<string, number>();
 
 export function createExecutionEventStore(ports: StewardPorts): NonNullable<StewardPorts["executionEvents"]> {
   async function page(p: ExecutionPrincipal, input: ExecutionEventRead): Promise<ExecutionEventPage> {
     const a = await authorize(ports.db, p, input);
-    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > limits.pageEvents || !Number.isInteger(input.waitMs) || input.waitMs < 0 || input.waitMs > limits.pollMs) throw new CallError("invalid", "Invalid execution page bounds");
+    assertPageBounds(input);
     const { after, lifecycle: observed } = executionPosition(input, input.cursor);
     if (after > a.highWatermark) throw new CallError("conflict", "Execution cursor is ahead of persisted history");
     const now = ports.now();
@@ -104,16 +118,23 @@ export function createExecutionEventStore(ports: StewardPorts): NonNullable<Stew
     const result: ExecutionEventPage = { events: [], cursor: executionCursor(input, after, lifecycle), highWatermark: a.highWatermark, gap: false, snapshotRequired: changed };
     let position = after;
     for (const row of rows) {
-      const parsed = executionEventSchema.safeParse(row.event);
-      if (!parsed.success) throw new CallError("unavailable", "Stored execution event is invalid");
-      const event = parsed.data;
-      if (event.attemptId !== a.id || event.seq !== row.seq || event.workId !== a.workId || event.runId !== a.runId || event.sessionId !== a.run.sessionId) throw new CallError("unavailable", "Stored execution event reference is invalid");
+      const event = persistedEvent(row.event, row.seq, a);
       const gap = result.gap || event.seq !== position + 1 || event.payload.type === "gap";
       const candidate = { ...result, events: [...result.events, event], cursor: executionCursor(input, event.seq, lifecycle), gap, snapshotRequired: changed || gap };
       if (executionJsonBytes(candidate) > limits.pageBytes) break;
       Object.assign(result, candidate); position = event.seq;
     }
     if (rows.length < input.limit && result.events.length === rows.length && position < a.highWatermark) { result.gap = true; result.snapshotRequired = true; result.cursor = executionCursor(input, a.highWatermark, lifecycle); }
+    return result;
+  }
+  async function pollPage(p: ExecutionPrincipal, input: ExecutionEventRead, result: ExecutionEventPage) {
+    const deadline = Date.now() + input.waitMs;
+    while (!input.signal?.aborted && Date.now() < deadline) {
+      await executionWait(input.signal, deadline - Date.now());
+      if (input.signal?.aborted) break;
+      result = await page(p, input);
+      if (pageReady(result)) break;
+    }
     return result;
   }
   return {
@@ -161,20 +182,13 @@ export function createExecutionEventStore(ports: StewardPorts): NonNullable<Stew
       });
     },
     async read(p, input) {
-      let result = await page(p, input);
-      if (result.events.length || result.gap || result.snapshotRequired || !input.waitMs || input.signal?.aborted) return result;
+      const result = await page(p, input);
+      if (pageReady(result) || !input.waitMs || input.signal?.aborted) return result;
       const key = JSON.stringify([p.workspaceId, p.ownerId]), count = polls.get(key) ?? 0;
       if (count >= limits.ownerPolls) throw new CallError("capacity", "Too many execution polls for owner");
       polls.set(key, count + 1);
       try {
-        const deadline = Date.now() + input.waitMs;
-        while (!input.signal?.aborted && Date.now() < deadline) {
-          await executionWait(input.signal, deadline - Date.now());
-          if (input.signal?.aborted) break;
-          result = await page(p, input);
-          if (result.events.length || result.gap || result.snapshotRequired) break;
-        }
-        return result;
+        return await pollPage(p, input, result);
       } finally {
         const remaining = (polls.get(key) ?? 1) - 1;
         if (remaining) polls.set(key, remaining); else polls.delete(key);

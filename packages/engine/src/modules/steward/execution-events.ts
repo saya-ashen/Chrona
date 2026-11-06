@@ -16,14 +16,18 @@ export function executionCursor(ref: ExecutionRef, after: number, lifecycle?: st
 /** Positions carry no authority; callers must independently authorize the attempt first. */
 export function executionPosition(ref: ExecutionRef, cursor?: string): { after: number; lifecycle: string | null } {
   if (cursor === undefined) return { after: 0, lifecycle: null };
+  const value = decodeExecutionPosition(cursor);
+  if (value[0] !== ref.workId || value[1] !== ref.sessionId || value[2] !== ref.runId || value[3] !== ref.attemptId) throw new CallError("conflict", "Execution cursor reference mismatch");
+  return { after: value[4] as number, lifecycle: value.length === 6 ? value[5] as string : null };
+}
+function decodeExecutionPosition(cursor: string): unknown[] {
   if (cursor.length > 1024 || !/^[\w-]+$/.test(cursor)) throw new CallError("invalid", "Invalid execution cursor");
   let value: unknown;
   try { value = JSON.parse(Buffer.from(cursor, "base64url").toString()); }
   catch { throw new CallError("invalid", "Invalid execution cursor"); }
   if (!Array.isArray(value) || (value.length !== 5 && value.length !== 6) || !Number.isSafeInteger(value[4]) || value[4] < 0) throw new CallError("invalid", "Invalid execution cursor");
   if (value.length === 6 && (typeof value[5] !== "string" || value[5].length > 128)) throw new CallError("invalid", "Invalid execution lifecycle position");
-  if (value[0] !== ref.workId || value[1] !== ref.sessionId || value[2] !== ref.runId || value[3] !== ref.attemptId) throw new CallError("conflict", "Execution cursor reference mismatch");
-  return { after: value[4] as number, lifecycle: value.length === 6 ? value[5] as string : null };
+  return value;
 }
 
 /** A bounded recoverable display, never a controller or question-answer authority. */

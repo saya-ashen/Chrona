@@ -62,14 +62,7 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
       previous.status = "pending";
       await save(ports, workspaceId, state);
     }
-    try {
-      const result = await installExternal(ports, workspaceId, { package: name, mode: previous.attempts > 1 && previous.moduleId ? "update" : "install", requestKey: previous.requestKey });
-      state.packages[name] = {
-        requestKey: result.requestKey, attempts: previous.attempts, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId, error: result.error,
-      };
-    } catch (error) {
-      state.packages[name] = { ...previous, status: "failed", error: { code: "failed", reason: "initialization_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Initialization failed" } };
-    }
+    state.packages[name] = await initializePackage(ports, workspaceId, name, previous);
     await save(ports, workspaceId, state);
   }
   if (PREINSTALLED_MODULE_NAMES.every(name => ["installed", "skipped"].includes(state.packages[name].status))) {
@@ -77,4 +70,15 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
     await save(ports, workspaceId, state);
   }
   return state;
+}
+
+async function initializePackage(ports: StewardPorts, workspaceId: string, name: typeof PREINSTALLED_MODULE_NAMES[number], previous: ModuleInitializationState["packages"][typeof name]): Promise<ModuleInitializationState["packages"][typeof name]> {
+  try {
+    const result = await installExternal(ports, workspaceId, { package: name, mode: previous.attempts > 1 && previous.moduleId ? "update" : "install", requestKey: previous.requestKey });
+    return {
+      requestKey: result.requestKey, attempts: previous.attempts, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId, error: result.error,
+    };
+  } catch (error) {
+    return { ...previous, status: "failed", error: { code: "failed", reason: "initialization_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Initialization failed" } };
+  }
 }

@@ -14,6 +14,13 @@ export function projectExecutionQuestion(question: ExecutionSnapshot["questions"
     options: question.options.map(option => executionDisplayText(option, 300)), expiresAt: question.expiresAt, status: question.status };
 }
 
+function projectToolDisplay(p: Extract<ExecutionEvent["payload"], { type: "tool_started" }>) {
+  const display: { path?: string; command?: string } = {};
+  if (["read", "edit", "write"].includes(p.tool) && p.display.path !== undefined) display.path = executionDisplayText(p.display.path, 1000);
+  if (p.tool === "bash" && p.display.command !== undefined) display.command = executionDisplayText(p.display.command, 1000);
+  return display;
+}
+
 /** Input is the public normalized event, not a Provider/RPC envelope. Whitelist before redaction. */
 export function projectExecutionEvent(event: ExecutionEvent): ExecutionEvent {
   const p = event.payload;
@@ -22,9 +29,7 @@ export function projectExecutionEvent(event: ExecutionEvent): ExecutionEvent {
     case "message": payload = { type: p.type, messageId: p.messageId, role: p.role, text: executionDisplayText(p.text), complete: p.complete }; break;
     case "text_delta": payload = { type: p.type, messageId: p.messageId, delta: executionDisplayText(p.delta) }; break;
     case "tool_started": {
-      const display: { path?: string; command?: string } = {};
-      if (["read", "edit", "write"].includes(p.tool) && p.display.path !== undefined) display.path = executionDisplayText(p.display.path, 1000);
-      if (p.tool === "bash" && p.display.command !== undefined) display.command = executionDisplayText(p.display.command, 1000);
+      const display = projectToolDisplay(p);
       payload = { type: p.type, toolCallId: p.toolCallId, tool: executionDisplayText(p.tool, 100), display }; break;
     }
     case "tool_finished": payload = { type: p.type, toolCallId: p.toolCallId, tool: executionDisplayText(p.tool, 100), isError: p.isError,

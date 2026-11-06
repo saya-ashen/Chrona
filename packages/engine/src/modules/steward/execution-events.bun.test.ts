@@ -24,3 +24,9 @@ test("abort releases a bounded wait promptly", async () => {
   const waiting = executionWait(controller.signal, 15_000); controller.abort(); await waiting;
   expect(Date.now() - start).toBeLessThan(100);
 });
+test("cursor format and lifecycle errors precede reference mismatch", () => {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  expect(() => executionPosition(ref, encode(["other", "s", "r", "a", -1]))).toThrow("Invalid execution cursor");
+  expect(() => executionPosition(ref, encode(["other", "s", "r", "a", 0, 12]))).toThrow("Invalid execution lifecycle position");
+  expect(() => executionPosition(ref, encode(["other", "s", "r", "a", 0]))).toThrow("Execution cursor reference mismatch");
+});
