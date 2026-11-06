@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CHRONA_TOOLS, type ProviderRunInput } from "@chrona/contracts/steward";
 import { modernPi, readPiResources, resourceCommand, resourceVersionError, type PiResources } from "./pi-resources";
+import type { PiProcess, PiProcessInput } from "./pi-process";
 
 export type PiProviderOptions = {
   command?: string; agentDir?: string; expectedVersion?: string; model?: string; resourcesFile?: string; executionMode?: "trusted-local" | "required-isolation";
@@ -14,6 +15,8 @@ export type PiProviderOptions = {
   workspaceRoot?: string; dataDir?: string;
   /** End a run whose Pi RPC stream is silent this long outside tool runs and user questions (default 5 min). */
   idleTimeoutMs?: number;
+  /** Trusted launcher; closed must reject if its owned process tree cannot be proven stopped. */
+  launch?: (input: PiProcessInput) => PiProcess;
 };
 export type PiLaunchConfig = {
   options: PiProviderOptions; command: string; agentDir: string; version: string;
@@ -115,6 +118,11 @@ function optionalExtensions(config: PiLaunchConfig, browser: string | null) {
     ...(browser && config.browserExtension ? [{ extension: config.browserExtension, tools: ["browser_screenshot"], files: [config.browserExtension, dirname(browser)] }] : []),
   ];
 }
+function piTools(config: PiLaunchConfig, input: ProviderRunInput, optional: ReturnType<typeof optionalExtensions>) {
+  return [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...(input.execution ? [] : CHRONA_TOOLS), ...optional.flatMap(extension => extension.tools), ...(input.execution ? [] : config.resources.tools), ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
+    // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
+    ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(",");
+}
 /** `browser`: the executable this run's browser tool uses (v2-12), or null for no browser tool. */
 export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string, browser: string | null = null) {
   const optional = optionalExtensions(config, browser);
@@ -123,11 +131,11 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   for (const { extension } of optional) args.push("-e", extension);
   // --no-extensions also drops Pi's built-in tool search; deferred module tools need it.
   if (input.searchTools) args.push("-e", "builtin:tool-search");
-  for (const extension of config.resources.extensions) args.push("-e", extension);
-  for (const skill of config.resources.skills) args.push("--skill", skill);
-  args.push("--tools", [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...CHRONA_TOOLS, ...optional.flatMap(extension => extension.tools), ...config.resources.tools, ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
-    // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
-    ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(","), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
+  if (!input.execution) {
+    for (const extension of config.resources.extensions) args.push("-e", extension);
+    for (const skill of config.resources.skills) args.push("--skill", skill);
+  }
+  args.push("--tools", piTools(config, input, optional), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
   const model = input.model ?? config.options.model;
   if (model) args.push("--model", model);
   if (!config.bwrap) return args;

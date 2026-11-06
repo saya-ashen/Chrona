@@ -17,6 +17,23 @@ async function withBridge(base: string, fetcher: typeof fetch, run: (tools: Tool
     if (token === undefined) delete process.env.CHRONA_AGENT_TOKEN; else process.env.CHRONA_AGENT_TOKEN = token;
   }
 }
+test("execution budget admits at most the configured tools before concurrent execution", async () => {
+  const previous = process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS, url = process.env.CHRONA_AGENT_URL;
+  process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS = "2"; delete process.env.CHRONA_AGENT_URL;
+  try {
+    let before!: () => { block: true; reason: string } | undefined;
+    await bridge({ registerTool: () => {}, on: (_event, handler) => { before = handler; } });
+    const executed: number[] = [];
+    await Promise.all(Array.from({ length: 8 }, async (_, index) => { if (!before()) executed.push(index); }));
+    expect(executed).toEqual([0, 1]);
+    await expect(bridge({ registerTool: () => {} })).rejects.toThrow("guard unavailable");
+    process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS = "invalid";
+    await expect(bridge({ registerTool: () => {}, on: () => {} })).rejects.toThrow("guard unavailable");
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS; else process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS = previous;
+    if (url === undefined) delete process.env.CHRONA_AGENT_URL; else process.env.CHRONA_AGENT_URL = url;
+  }
+});
 const base = "http://127.0.0.1:1234/api/steward-agent";
 test("bridge registers catalog schemas, forwards calls, never terminates or nudges", async () => {
   const seen: { url: string; init?: RequestInit }[] = [];

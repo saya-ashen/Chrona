@@ -47,6 +47,17 @@ test("channel drops malformed lines, validates calls and event replies, then rec
     expect(f.channel.diagnostics()).toEqual(["Malformed JSON", "Invalid module call", "Invalid module call", "Invalid event reply"]);
   } finally { await f.close(); }
 });
+test("channel preserves known typed handler errors and rejects unknown codes", async () => {
+  const f = await fixture();
+  try {
+    const result = f.channel.send(event, 1000);
+    const message = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: message.id, error: "Conflict", errorCode: "invented" }) + "\n");
+    f.socket.write(JSON.stringify({ id: message.id, error: "Conflict", errorCode: "conflict" }) + "\n");
+    expect(await result).toEqual({ id: message.id, error: "Conflict", errorCode: "conflict" });
+    expect(f.channel.diagnostics()).toContain("Invalid event reply");
+  } finally { await f.close(); }
+});
 test("channel drops oversize lines and rejects in-flight event", async () => {
   const f = await fixture();
   try {

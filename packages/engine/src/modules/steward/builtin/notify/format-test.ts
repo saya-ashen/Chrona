@@ -8,6 +8,7 @@ import { startModule, paths } from "chrona/testing";
 import { openStore, type Store } from "./store";
 import { createNotify } from "./notify";
 import { migrateFormat } from "./migrate";
+import { testDirectory } from "./test-directory";
 
 const root = await mkdtemp(join(paths.data, "format-"));
 const kernel = { kind: "kernel" } as const;
@@ -17,7 +18,7 @@ const nextDay = new Date("2026-10-22T04:00:00Z");
 type Call = { target: string; args: Record<string, unknown>; options: { key: string; mode: string; reply: boolean }; callId: string };
 function harness(store: Store) {
   const calls: Call[] = [];
-  const notify = createNotify({ store, publicUrl: "https://chrona.example", call: async (target, args, options) => {
+  const notify = createNotify({ store, publicUrl: "https://chrona.example", directory: async () => testDirectory(), call: async (target, args, options) => {
     const callId = `call-${calls.length + 1}`;
     calls.push({ target, args, options, callId }); return { callId, status: "queued" };
   }, status: async callId => ({ callId, status: "queued" }) });
@@ -26,12 +27,12 @@ function harness(store: Store) {
 }
 async function fresh(name: string) { const dir = join(root, name); await mkdir(dir); return dir; }
 const message = (key: string, extra = {}) => ({ key, level: "now", title: "Trending", body: "## Repos\n- [repo](https://github.com/a/b)", ...extra });
-const ready = (h: ReturnType<typeof harness>) => h.handle("channel", { channel: "chrona_qqbot", tool: "deliver", ready: true, at: noon.toISOString() });
+const ready = async (h: ReturnType<typeof harness>) => { await h.notify.refresh(); return h.handle("channel", { channel: "chrona_qqbot", tool: "deliver", ready: true, at: noon.toISOString() }); };
 try {
   // Send → durable row → stop → reopen → dispatch → real channel result semantics.
   const dir = await fresh("restart");
   let store = openStore(dir), h = harness(store);
-  ready(h);
+  await ready(h);
   const saved = h.handle("send", message("md", { format: "markdown" }));
   h.handle("send", message("plain"));
   assert.equal(store.byId(saved.id)!.format, "markdown");
@@ -86,7 +87,7 @@ try {
   // Budget/quiet/web routing is identical, digest always explicitly text for mixed sources.
   store = openStore(await fresh("budget")); h = harness(store);
   try {
-    ready(h);
+    await ready(h);
     h.handle("configure", { "daily-cap": 0, timezone: "Asia/Shanghai", "digest-at": "09:00", at: noon.toISOString() });
     const folded = h.handle("send", message("fold-md", { format: "markdown" }));
     h.handle("send", message("fold-text"));
@@ -145,14 +146,14 @@ try {
     assert.equal(format, "text"); assert.deepEqual(after, before); assert.equal(store.settings().dailyCap, 7);
     // Legacy readiness survives migration but is not a channel registration.
     assert.equal(h.handle("status", {}).chat.bound, false);
-    ready(h);
+    await ready(h);
     assert.equal(h.handle("status", {}).chat.bound, true);
     h.notify.result({ callId: "old-call", status: "succeeded", output: { outcome: "accepted", receiptRef: "after-migration" } }, noon);
     assert.equal(store.byKey("legacy")!.status, "sent"); assert.equal(store.byKey("legacy")!.receipt_ref, "after-migration");
   } finally { store.close(); }
 
   // Crash before call-id persistence: recovery reuses the exact call key and preserves format.
-  const recoveryDir = await fresh("recovery"); store = openStore(recoveryDir); h = harness(store); ready(h);
+  const recoveryDir = await fresh("recovery"); store = openStore(recoveryDir); h = harness(store); await ready(h);
   const recovery = h.handle("send", message("recover", { format: "markdown" }));
   await h.notify.tick(noon); const originalKey = h.calls[0]!.options.key;
   store.update(recovery.id, { call_id: null }); store.close();
@@ -165,7 +166,7 @@ try {
   process.env.CHRONA_DATA = sdkDir;
   let mod: Awaited<ReturnType<typeof startModule>> | undefined;
   try {
-    const start = () => startModule("index.ts", { stubs: { "modules.tools": () => [{ target: "qq.deliver" }] } });
+    const start = () => startModule("index.ts", { stubs: { "modules.list": () => testDirectory().modules, "modules.tools": () => testDirectory().tools } });
     mod = await start();
     let n = 0;
     const tool = (id: string, args: Record<string, unknown>) => mod!.send({ trigger: { kind: "tool", id, args, firedAt: new Date(noon.getTime() + n++ * 1000).toISOString(), caller: id === "channel" ? channelOwner : kernel }, now: noon.toISOString(), params: {} });

@@ -1,7 +1,7 @@
 import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createPages, type Caller } from "./pages";
+import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
@@ -10,7 +10,7 @@ const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
-const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409 };
+const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409, conflict: 409, unavailable: 503 };
 const NO_ROUTE = Symbol("no-route");
 type ApiContext = { request: Request; url: URL; path: string[]; body: Args; route: string };
 type ApiResult = unknown | typeof NO_ROUTE;
@@ -38,9 +38,9 @@ function events() {
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
 }
 // Pages apps register (module-dependency-direction §4); `tools` is what this page may call of that app.
-const pages = createPages({ dataDir: chrona.paths.data, tools: async module => {
-  const tools = await call("modules.tools", { query: module }) as { target: string; inputSchema?: { properties?: Record<string, unknown> } }[];
-  return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool.inputSchema ?? {}]));
+const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("modules.list") as Promise<ModuleState[]>, tools: async module => {
+  const tools = await call("modules.tools", { query: module }) as (PageTool & { target: string })[];
+  return new Map(tools.filter(tool => tool.target.startsWith(`${module}.`)).map(tool => [tool.target.slice(module.length + 1), tool]));
 } });
 on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
   // Chrona records the caller of every routed call; only the build's smoke start sends a tool event without one.
@@ -98,6 +98,10 @@ const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unkn
   "GET permissions": module => call("modules.permissions", { module }),
   "GET overview": module => call("modules.overview", { module }),
   "POST settings": (module, body) => call("modules.settings-set", { module, values: JSON.stringify(body.values ?? {}) }),
+  "POST disable": module => call("modules.disable", { module, reason: "用户在网页操作" }),
+  "POST enable": module => call("modules.enable", { module, reason: "用户在网页操作" }),
+  "POST remove": module => call("modules.remove", { module, reason: "用户在网页申请删除应用" }),
+  "POST rollback": (module, body) => call("modules.rollback", { module, hash: body.hash }),
 };
 async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   const route = `${request.method} ${path[2]}`;
@@ -110,10 +114,7 @@ async function pageRoute({ request, path }: ApiContext): Promise<ApiResult> {
   if (!page) throw Object.assign(new Error("没有这个页面"), { code: "not_found" });
   return page;
 }
-async function listPages() {
-  const modules = await call("modules.list") as { name: string; status: string }[];
-  return pages.list(new Set(modules.filter(module => module.status === "active").map(module => module.name)), new Set(modules.map(module => module.name)));
-}
+const listPages = () => pages.list();
 const dynamicRoutes: ApiHandler[] = [sessionRoute, approvalRoute, settingsRoute, secretRoute, runRoute, moduleRoute, pageRoute];
 
 async function api(request: Request, path: string[]) {
@@ -133,6 +134,9 @@ async function api(request: Request, path: string[]) {
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
+    "GET /catalog": () => call("modules.catalog"),
+    "POST /install": () => call("modules.install", body),
+    "GET /credentials": () => call("secrets.list"),
     "GET /pages": () => listPages(),
     // v2-20: Chrona's own modules, read-only; with ?module=, also the conversations it works in.
     // v2-21: the user's own memory search and deletion, through the memory system module.
@@ -149,10 +153,15 @@ async function api(request: Request, path: string[]) {
   }
   throw Object.assign(new Error(`No route ${context.route}`), { code: "not_found" });
 }
-function moduleCall(body: Args) {
+async function moduleCall(body: Args) {
   // Conversations, approvals and app records have their own routes above.
   const target = String(body.target);
   if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(target) || /^(chat|approvals|modules|settings|schedules|secrets)\./.test(target)) throw Object.assign(new Error(`Unknown module tool ${target}`), { code: "not_found" });
+  if (body.page && typeof body.page === "object") {
+    const ref = body.page as { module: string; id: string; revision: string }, page = await pages.get(ref.module, ref.id);
+    if (!page || page.revision !== ref.revision || !target.startsWith(`${page.module}.`) || !Object.hasOwn(page.contracts, target.slice(page.module.length + 1))) throw Object.assign(new Error("页面或工具已变化，请重新打开页面"), { code: "conflict" });
+    return chrona.call(target, (body.args ?? {}) as Args, { expectedTarget: { moduleId: page.moduleId, contractHash: page.contracts[target.slice(page.module.length + 1)]! } });
+  }
   return chrona.call(target, (body.args ?? {}) as Args);
 }
 async function fileResponse(request: Request) {
@@ -173,11 +182,14 @@ async function pageContentResponse(request: Request, module: string, id: string)
     if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
     const ref = new URL(request.url).searchParams.get("ref") ?? "";
     if (!ref.startsWith(`${page.module}/`)) return new Response("只能读取本应用的图片", { status: 403, headers: imageHeaders });
-    const file = await call("content.read", { ref }) as { base64: string; mime: string };
+    const file = await call("content.read", { ref }) as { base64: string; mime: string } | null;
+    if (!file) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
     if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) return new Response("不支持的图片类型", { status: 403, headers: imageHeaders });
     return new Response(Buffer.from(file.base64, "base64"), { headers: { ...imageHeaders, "content-type": file.mime } });
-  } catch {
-    return new Response("没有这张图片", { status: 404, headers: imageHeaders });
+  } catch (error) {
+    const { code } = error as { code?: string };
+    const status = code === "conflict" ? 409 : code === "not_found" ? 404 : 502;
+    return new Response(status === 409 ? "页面已失效，请恢复应用或重新登记页面" : status === 404 ? "没有这张图片" : "页面状态读取失败，请稍后核对", { status, headers: imageHeaders });
   }
 }
 function apiError(error: unknown) {

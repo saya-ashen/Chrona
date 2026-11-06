@@ -113,11 +113,11 @@ test("affected caller type checks use candidate output contracts without modifyi
   expect(await readFile(join(f.dir, "index.ts"), "utf8")).toContain("const value: string");
 });
 
-test("built-in qq type-checks against the built-in notify contract it registers with", async () => {
+test("external qq type-checks against the built-in notify contract it registers with", async () => {
   const f = await fixture(), builtin = resolve(import.meta.dirname, "builtin");
   const qq = join(f.dir, "qq");
-  await Bun.$`cp -r ${join(builtin, "qq")} ${qq}`.quiet();
-  const manifest = (name: string) => readFile(join(builtin, name, "module.json"), "utf8").then(text => moduleManifestSchema.parse(JSON.parse(text)));
+  await Bun.$`cp -r ${resolve(import.meta.dirname, "external/qq")} ${qq}`.quiet();
+  const manifest = (name: string) => readFile(join(name === "qq" ? resolve(import.meta.dirname, "external") : builtin, name, "module.json"), "utf8").then(text => moduleManifestSchema.parse(JSON.parse(text)));
   const report = await typecheckBuild(moduleContext(f.ports, f.workspaceId), qq, await manifest("qq"), { moduleName: "notify", manifest: await manifest("notify") });
   expect(typecheckErrors(report)).toEqual([]);
   expect(report.status).toBe("passed");

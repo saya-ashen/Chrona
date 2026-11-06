@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { downloadQqAttachment, parseC2cEvent, sendQqC2c, uploadQqImage } from "./builtin/qq/official";
+import { downloadQqAttachment, parseC2cEvent, sendQqC2c, uploadQqImage } from "./external/qq/official";
 
 const attachment = { url: "https://multimedia.nt.qq.com/file", name: "a.png", mime: "image/png" };
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

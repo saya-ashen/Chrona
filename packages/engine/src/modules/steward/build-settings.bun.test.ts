@@ -68,6 +68,7 @@ for (const c of [
 test("build claim snapshots owner budgets, leaves running work unchanged and informs the model", async () => {
   const f = await fixture();
   const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "build:one", source: "build" } });
+  await f.db.audit.create({ data: { id: `build-targets:${session.id}`, workspaceId: f.workspaceId, subjectId: session.id, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
   const runs = createRuns(f.ports, f.workspaceId);
   await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Build" });
   await f.settings().update({ builds: { timeoutMinutes: 17, maxSubmissions: 3 } });

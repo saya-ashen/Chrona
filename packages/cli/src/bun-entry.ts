@@ -1,5 +1,5 @@
-import { createProgram, type StartCommandOptions } from "./program.js";
-import { startChronaServer } from "./start-server.js";
+import { dispatchExecutorProcess } from "./executor-entry";
+import type { StartCommandOptions } from "./program.js";
 
 async function bootServer() {
   const { startBunServer } = await import("@server/index.bun");
@@ -7,11 +7,13 @@ async function bootServer() {
 }
 
 function startServer(options: StartCommandOptions) {
-  return startChronaServer(bootServer, options);
+  return import("./start-server.js").then(({ startChronaServer }) => startChronaServer(bootServer, options));
 }
 
 async function main() {
   const args = process.argv.slice(2);
+  if (await dispatchExecutorProcess(args)) return;
+  const { createProgram } = await import("./program.js");
 
   if (args.length > 0 && args[0] !== "start") {
     await createProgram({ startServer }).parseAsync(process.argv);
@@ -32,5 +34,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
-export { startChronaServer };

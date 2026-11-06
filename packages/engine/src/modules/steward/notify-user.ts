@@ -1,5 +1,5 @@
 import type { Prisma } from "@chrona/db";
-import { NOTIFY_INTERFACE, notificationSchema, type NotificationSettings } from "@chrona/contracts/steward";
+import { NOTIFY_INTERFACE, notificationChannelSchema, notificationSchema, type NotificationSettings } from "@chrona/contracts/steward";
 import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { callSync, enqueueCall, kernelOrigin } from "./module-calls";
@@ -63,12 +63,9 @@ async function ask(ports: StewardPorts, workspaceId: string, tool: string, args:
   try { return (await callSync(ports, kernelOrigin(workspaceId), `${NOTIFY}.${tool}`, args, { timeoutMs: 10_000 })).output; }
   catch { return null; }
 }
-// The shared owner view still uses a legacy channel enum. Keep new-channel notices visible there;
-// notify's own list/status retain the actual registered channel name.
-const viewChannel = z.string().transform(channel => notificationSchema.shape.channel.safeParse(channel).data ?? "in_app");
-const viewNotification = notificationSchema.extend({ channel: viewChannel }).strip();
-const statusSchema = z.object({ chat: z.object({ channel: viewChannel, bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
-/** Item by item, ignoring extra fields: a customized notify module must not blank the whole list. */
+const viewNotification = notificationSchema.strip();
+const statusSchema = z.object({ chat: z.object({ channel: notificationChannelSchema, bound: z.boolean(), sentToday: z.number().int().min(0) }), queued: z.number().int().min(0), failed: z.number().int().min(0) });
+/** Validate item by item, ignoring extra fields while preserving the actual registered channel. */
 export const notificationItems = (output: unknown) => (z.object({ items: z.array(z.unknown()) }).safeParse(output).data?.items ?? [])
   .flatMap(item => { const parsed = viewNotification.safeParse(item); return parsed.success ? [parsed.data] : []; });
 /** The owner's view of notifications, answered by the notify module. */

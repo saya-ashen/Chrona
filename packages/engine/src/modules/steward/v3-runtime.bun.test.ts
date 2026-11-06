@@ -19,6 +19,10 @@ test("run cwd and context belong to the session", async () => {
 });
 test.each([['foreground', 5], ['background', 20], ['build', 60]] as const)("%s has its own %i minute deadline", async (lane, minutes) => {
   const runs = createRuns(ports, workspaceId);
+  if (lane === "build") {
+    await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
+    await db.audit.create({ data: { id: `build-targets:${sessionId}`, workspaceId, subjectId: sessionId, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
+  }
   await runs.enqueue({ sessionId, lane, trigger: lane === 'build' ? 'build' : 'message', prompt: 'Bounded work' });
   const run = (await runs.claimNext(lane))!;
   expect(run.deadlineAt.getTime() - ports.now().getTime()).toBe(minutes * 60_000);

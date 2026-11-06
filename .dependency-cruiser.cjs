@@ -16,8 +16,8 @@ const TEST = "(__tests__/|(?:^|/)test\\.ts$|\\.test\\.|\\.bun\\.test\\.|\\.spec\
 
 /** A package's public entry points (barrels). Importing anything else in the
  *  package from the outside is a boundary violation. */
-const ENGINE_PUBLIC = "^packages/engine/src/(index|engine)\\.ts$";
-const ENGINE_TEST_PUBLIC = "^packages/engine/src/(index|engine|test-support)\\.ts$";
+const ENGINE_PUBLIC = "^packages/engine/src/(index|engine|executor)\\.ts$";
+const ENGINE_TEST_PUBLIC = "^packages/engine/src/(index|engine|executor|test-support)\\.ts$";
 const DB_INTERNAL = "^packages/db/src/(generated/|db\\.ts$)";
 
 module.exports = {

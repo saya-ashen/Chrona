@@ -27,12 +27,12 @@ async function fixture() {
 }
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["build", "modules", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["build", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
 });
 test("admin build respects the runtime lock and runs no ordinary tick or built-in upgrades", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   const file = join(f.options.dataDir, "request.json");
-  writeFileSync(file, JSON.stringify({ name: "web", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } }));
+  writeFileSync(file, JSON.stringify({ name: "owner-app", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } }));
   const seen: unknown[] = [];
   const provider = { name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: true, error: null }; }, start(input: unknown) { seen.push(input); return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) }; } };
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
@@ -70,17 +70,36 @@ test("admin reads while runtime locked but refuses writes; approval audit source
     expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
   } finally { log.mockRestore(); }
 });
-test("admin rollback activates entry modules directly, supports builtin, and disable pauses schedules", async () => {
+test("admin rollback uses an external hash, rejects builtin token, and disable pauses schedules", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   try {
     await runAdmin("rollback", [f.module.name, "b".repeat(64)], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: "b".repeat(64) });
     expect(await f.db.approval.count({ where: { moduleId: f.module.id } })).toBe(0);
-    await runAdmin("rollback", [f.module.name, "builtin"], f.options);
-    expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: "a".repeat(64) });
+    await expect(runAdmin("rollback", [f.module.name, "builtin"], f.options)).rejects.toThrow("external module version hash");
+    expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ activeHash: "b".repeat(64) });
     await runAdmin("disable", [f.module.name], f.options);
     expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toMatchObject({ status: "paused" });
     expect(await f.db.audit.findFirst({ where: { kind: "module_disabled" } })).toMatchObject({ actorKey: "user", details: { source: "cli" } });
+  } finally { log.mockRestore(); }
+});
+
+test("admin install queues trusted official code offline, preserves the lock and deduplicates request keys", async () => {
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
+  try { await expect(runAdmin("install", ["remind", "install", "offline-one"], f.options)).rejects.toThrow("already in use"); }
+  finally { lock.release(); }
+  try {
+    const receipt = await runAdmin("install", ["remind", "install", "offline-one"], f.options);
+    expect(receipt).toMatchObject({ package: "remind", status: "building", moduleId: expect.any(String), hash: expect.any(String) });
+    expect(await runAdmin("install", ["remind", "install", "offline-one"], f.options)).toEqual(receipt);
+    expect(await f.db.moduleVersion.count({ where: { module: { name: "remind" } } })).toBe(1);
+    expect(await f.db.stewardState.count()).toBe(0);
+    expect(await f.db.run.count()).toBe(0);
+    expect(await f.db.moduleRun.count()).toBe(0);
+    expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
+    await expect(runAdmin("install", ["../private", "install", "invalid"], f.options)).rejects.toThrow("Invalid");
+    const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
   } finally { log.mockRestore(); }
 });
 

@@ -13,8 +13,30 @@ async function cancelAttempt(ports: StewardPorts, workspaceId: string, id: strin
   if (seen.has(id)) return { ok: true };
   if (seen.size >= 32) throw new StewardError("conflict", "Too many automatic continuations to cancel safely");
   seen.add(id);
-  const { db, now } = ports, run = await db.run.findFirst({ where: { workspaceId, id } });
+  const { db } = ports, run = await db.run.findFirst({ where: { workspaceId, id } });
   if (!run) throw new StewardError("not_found", "Run not found");
+  const execution = await db.executionAttempt.findUnique({ where: { runId: id } });
+  if (execution) {
+    if (!ports.executions) throw new StewardError("conflict", "Execution service unavailable");
+    await ports.executions.cancel({ workspaceId, ownerId: execution.ownerId, caller: { kind: "owner" } }, {
+      op: "cancel", workId: execution.workId, runId: id, attemptId: execution.id, commandKey: `owner-cancel:${id}`,
+    });
+    return { ok: true };
+  }
+  await cancelOrdinaryRun(ports, workspaceId, run, allowEnded);
+  // If finalization committed first, its unique child edge is now visible. If the cancel
+  // marker committed first, finalization observes it and creates no automatic retry.
+  const edges = await db.audit.findMany({ where: { workspaceId, kind: "run_continuation", subjectId: id }, take: 4 });
+  for (const edge of edges) {
+    const next = continuation.safeParse(edge.details);
+    if (next.success) await cancelAttempt(ports, workspaceId, next.data.runId, true, seen);
+  }
+  return { ok: true };
+}
+
+/** Persist the ordinary run's cancel marker before stopping it or discovering retries. */
+async function cancelOrdinaryRun(ports: StewardPorts, workspaceId: string, run: { id: string; status: string }, allowEnded: boolean) {
+  const { db, now } = ports, { id } = run;
   const prior = await db.audit.findUnique({ where: { id: providerCancelKey(id) } });
   if (!allowEnded && !prior && !["running", "queued"].includes(run.status)) throw new StewardError("conflict", "Run already ended");
   await db.audit.upsert({ where: { id: providerCancelKey(id) }, update: {}, create: { id: providerCancelKey(id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: id, details: {} } });
@@ -24,12 +46,4 @@ async function cancelAttempt(ports: StewardPorts, workspaceId: string, id: strin
     await liveRuns.get(id)?.abort();
     await createRuns(ports, workspaceId).finish(id, { outcome: "failed", sessionId: null, error: "Cancelled by owner" });
   }
-  // If finalization committed first, its unique child edge is now visible. If the cancel
-  // marker committed first, finalization observes it and creates no automatic retry.
-  const edges = await db.audit.findMany({ where: { workspaceId, kind: "run_continuation", subjectId: id }, take: 4 });
-  for (const edge of edges) {
-    const next = continuation.safeParse(edge.details);
-    if (next.success) await cancelAttempt(ports, workspaceId, next.data.runId, true, seen);
-  }
-  return { ok: true };
 }

@@ -9,7 +9,7 @@ import { createStewardService } from "./service";
 import { testDb } from "./test-db";
 import { liveRuns } from "./runs";
 import type { StewardPorts } from "./ports";
-import type { ProviderQuestion } from "@chrona/contracts/steward";
+import type { ProviderQuestion, ProviderInteraction } from "@chrona/contracts/steward";
 import { notice, notices } from "./test-notices";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, time: Date;
 let service: ReturnType<typeof createStewardService>, api: ReturnType<typeof service.forWorkspace>;
@@ -20,10 +20,10 @@ beforeEach(async () => {
   service = createStewardService(ports); api = service.forWorkspace(workspaceId);
 });
 afterEach(async () => { await Promise.all(channels.splice(0).map(channel => channel.close())); liveRuns.clear(); await db.$disconnect(); });
-async function fixture() {
+async function fixture(observer?: (request: ProviderInteraction) => Promise<void>) {
   const session = await db.session.create({ data: { workspaceId, key: "web:test", source: "web" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Work" });
-  const run = (await api.runs.claimNext("foreground"))!, controller = new AbortController(), channel = createProviderChannel(ports, run); channels.push(channel);
+  const run = (await api.runs.claimNext("foreground"))!, controller = new AbortController(), channel = createProviderChannel(ports, run, observer); channels.push(channel);
   liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { controller.abort(); await channel.close(); await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Abort" }); } });
   return { session, run, channel, controller };
 }
@@ -44,6 +44,18 @@ for (const method of ["select", "confirm", "input", "editor"] as const) test(`${
   expect(JSON.stringify(await db.audit.findMany())).not.toContain("PRIVATE_FIXTURE_ANSWER_DO_NOT_STORE");
   expect(await db.grant.count()).toBe(0); expect(await db.approval.count()).toBe(0);
   await expect(api.provider.answer(request.id, { decision: "submit", value })).rejects.toMatchObject({ code: "conflict" });
+});
+test("interaction observer uses persisted public identity and retains answer authority after detail failure", async () => {
+  const observed: ProviderInteraction[] = [];
+  const f = await fixture(async request => { observed.push(structuredClone(request)); throw new Error("Detail full"); });
+  const result = f.channel.events.question({ ...question("editor"), prefill: "PRIVATE_ORIGINAL" }, f.controller.signal);
+  const request = await waiting();
+  await api.provider.answer(request.id, { decision: "submit", value: "PRIVATE_ANSWER" });
+  expect(await result).toEqual({ decision: "submit", value: "PRIVATE_ANSWER" });
+  expect(observed.map(value => [value.id, value.status])).toEqual([[request.id, "pending"], [request.id, "answered"]]);
+  expect(JSON.stringify(observed)).not.toContain("PRIVATE_");
+  await expect(f.channel.close()).rejects.toThrow("Detail full");
+  channels.splice(channels.indexOf(f.channel), 1);
 });
 test("editor originals are available only while live and never enter the journal", async () => {
   const f = await fixture(), original = "PRIVATE_PREFILL_DO_NOT_STORE\nSecond line";

@@ -1,0 +1,22 @@
+{
+  "name": "memory-local",
+  "description": "Optional local memory provider for Chrona (mnemopi, local SQLite): retain, recall and forget for the memory system module. Full-text by default; remote embeddings when the memory_embedding credential is saved.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "triggers": [{ "id": "sleep", "schedule": { "kind": "daily", "time": "04:00" } }],
+  "effects": ["network"],
+  "limits": { "virtualMemoryMb": 4096 },
+  "secrets": ["memory_embedding"],
+  "contributes": { "memory": { "interface": 1 } },
+  "tools": [
+    { "name": "retain", "description": "Store one memory.", "visibility": ["kernel"], "idempotent": false,
+      "parameters": { "type": "object", "required": ["content", "source", "at"], "properties": {
+        "content": { "type": "string" }, "source": { "type": "string" }, "at": { "type": "string" } } } },
+    { "name": "recall", "description": "Memories matching a query, best first.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["query"], "properties": { "query": { "type": "string" }, "limit": { "type": "number" } } } },
+    { "name": "forget", "description": "Delete one memory by id.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } } } }
+  ],
+  "data": { "schema": 1 },
+  "tests": ["test.ts"]
+}

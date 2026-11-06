@@ -1,37 +1,18 @@
 import { startRescueListener } from "./rescue";
-import { readProtectedSecret } from "../../../packages/integrations/src/steward/protected-secret";
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
+import { createModuleRuntimePorts, stewardDataDir, resourcePath, executionMode } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
-import { moduleSupervisor, createStewardService, type StewardPorts } from "@chrona/engine";
+import { moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
+import { createServerWorkspacePreparer } from "./execution-server-workspace";
+import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
+import { installDeviceExecution } from "./execution-device-runtime";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
-import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
-import { createModulePackages } from "../../../packages/integrations/src/steward/module-packages";
 import { createBrowsers } from "../../../packages/integrations/src/steward/browser";
 import { createLogger } from "@chrona/logging";
 
-function publicOrigin(): string | null {
-  try {
-    const url = new URL(process.env.CHRONA_PUBLIC_URL ?? "");
-    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && url.pathname === "/" && !url.search && !url.hash ? url.origin : null;
-  } catch { return null; }
-}
-export function stewardDataDir(env = process.env): string {
-  if (env.CHRONA_DATA_DIR?.trim()) return resolve(env.CHRONA_DATA_DIR.trim());
-  const file = sqlitePathFromFileUrl(env.DATABASE_URL ?? "file:./prisma/dev.db");
-  if (!file || file === ":memory:") throw new Error("CHRONA_DATA_DIR required for an in-memory database");
-  return dirname(resolve(file));
-}
-// Packaged binaries ship these files under resources/; source runs use the repo copy.
-function resourcePath(relative: string, source = relative): string {
-  const packaged = [process.env.CHRONA_RESOURCE_DIR, join(dirname(process.execPath), "resources")]
-    .filter((dir): dir is string => Boolean(dir)).map((dir) => join(dir, relative));
-  return packaged.find((path) => existsSync(path)) ?? fileURLToPath(new URL(`../../../${source}`, import.meta.url));
-}
 type RuntimeOptions = {
   now?: () => Date; onError?: (error: unknown) => void; port?: number; provider?: ProviderAdapter | null;
   dataDir?: string; tickSeconds?: number; chatTimeoutMs?: number;
@@ -46,14 +27,7 @@ function providerBrowsers(options: RuntimeOptions) {
     onError: error => createLogger("steward.browser").warn("browser.unavailable", { error }),
   });
 }
-type ExecutionMode = "trusted-local" | "required-isolation";
-function executionMode(env = process.env): ExecutionMode {
-  const configured = env.CHRONA_STEWARD_EXECUTION_MODE?.trim();
-  if (!configured) return "trusted-local";
-  if (configured === "trusted-local" || configured === "required-isolation") return configured;
-  throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
-}
-function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, mode: ExecutionMode) {
+function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, mode: ReturnType<typeof executionMode>) {
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
   return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
     agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
@@ -69,10 +43,39 @@ function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, 
     dataDir: resolve(options.dataDir ?? stewardDataDir()),
   }) : null) : options.provider;
 }
-/** Kernel-held module credentials (manifest `secrets`); read from protected files only when asked. */
-async function configuredSecret(name: string) {
-  const appId = process.env.CHRONA_QQ_APP_ID?.trim(), file = process.env.CHRONA_QQ_SECRET_FILE?.trim();
-  return name === "qq_bot" && appId && file ? { appId, clientSecret: await readProtectedSecret(file) } : null;
+function executorOwnerPorts(ports: StewardPorts): NonNullable<StewardPorts["executorOwner"]> {
+  const auth = createExecutorAuth(ports);
+  const owner = async () => {
+    if (!await ports.db.workspace.findUnique({ where: { id: "ws_default" }, select: { id: true } })) throw new CallError("unavailable", "Owner workspace unavailable");
+    const principal = await resolveExecutionPrincipal(ports, "ws_default", { kind: "owner", via: null });
+    return { workspaceId: principal.workspaceId, ownerId: principal.ownerId };
+  };
+  return {
+    async createPairing(input) { return { ...await auth.createPairing(await owner()), label: input.label }; },
+    async revoke(input) { return auth.revoke(await owner(), input); },
+    async prepareIncarnation(input) { return auth.prepareIncarnation(await owner(), input); },
+  };
+}
+function executionInitialization(ports: StewardPorts) {
+  let initialized: Promise<void> | undefined;
+  let placements: Awaited<ReturnType<typeof loadExecutionPlacements>>;
+  ports.resolveExecutionPlacement = async (principal, placement) => {
+    if (!placements) throw new CallError("unavailable", "Execution placements are not initialized or configured");
+    return placements(principal, placement);
+  };
+  ports.executionLocations = async principal => {
+    if (!placements) throw new CallError("unavailable", "Execution placements are not initialized or configured");
+    return placements.list(principal);
+  };
+  ports.executionServerWorkspace = createServerWorkspacePreparer(ports.dataDir, ports.now);
+  const cleanup = createExecutionWorkspaceCleanup(ports, createExecutionWorkspaceCleanupHost(ports.dataDir));
+  ports.executionWorkspaces = { cleanup: cleanup.cleanup };
+  ports.executionWorkspaceCleanupTransport = { poll: cleanup.poll, report: cleanup.report };
+  return () => initialized ??= (async () => {
+    // Configuration I/O precedes every writer transaction; placement resolution uses this host snapshot.
+    placements = await loadExecutionPlacements(ports.dataDir);
+    await ports.db.executionExecutor.updateMany({ data: { authorizedUntil: null, reconciledAt: null } });
+  })();
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
@@ -86,22 +89,36 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});
     return handle;
   } } : undefined;
-  const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
-  const moduleTypecheck = resourcePath("module-typecheck", "packages/integrations/src/steward/module-typecheck");
-  const scriptSandbox = createScriptSandbox({ bwrapPath: bwrap, executionMode: mode, dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
-  const sandbox: StewardPorts["sandbox"] = {
-    ...scriptSandbox.health, executionMode: mode,
-    runModule: input => scriptSandbox.runModule(input),
-    startModule: input => scriptSandbox.startModule(input),
-  };
   const ports: StewardPorts = {
-    db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(), provider,
-    secrets: configuredSecret, packages: createModulePackages(),
-    sandbox: options.sandbox ?? sandbox, moduleSdk, moduleTypecheck,
-    moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
+    ...createModuleRuntimePorts(db, options), provider,
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
+  // Factory closures must use the final runtime ports, including the selected Provider and wake callbacks.
+  ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
+  ports.executorOwner = executorOwnerPorts(ports);
+  const initialize = executionInitialization(ports);
+  let projects: ReturnType<typeof loadExecutionProjects> | undefined;
+  ports.resolveExecutionProject = async (principal, projectRef) => {
+    const resolveProject = await (projects ??= loadExecutionProjects(ports.dataDir));
+    if (!resolveProject) throw new CallError("forbidden", "Execution projects are not configured");
+    return resolveProject(principal, projectRef);
+  };
+  ports.executionEvents = createExecutionEventStore(ports);
+  ports.executions = createExecutions(ports);
+  ports.executionV2Admission = createExecutionV2Admission(ports);
+  installDeviceExecution(ports);
+  ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
+    const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
+    if (attempt?.moduleId) {
+      const module = await tx.module.findUnique({ where: { id: attempt.moduleId } });
+      if (module?.name === "coding" && module.status === "active" && module.activeHash === attempt.callerHash) {
+        // Queue with the final state; publication runs after commit and never waits behind cancel.
+        await enqueueCall({ tx, ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: "coding.get", raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
+      }
+    }
+  };
+  ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;
@@ -112,6 +129,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     pending = true;
     if (running) return running;
     running = (async () => {
+      await initialize();
       while (canTick()) {
         pending = false;
         try { for (const failure of (await service.tick()).failures) options.onError?.(failure.error); }
@@ -122,7 +140,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   }
   function wake() { void tickOnce(); }
   return {
-    ports, service, tickOnce, wake,
+    ports, service, tickOnce, wake, initialize,
     /** HTTP socket of the module declaring `listen: path`, or null. */
     listener: (path: string) => moduleSupervisor(ports).listener(path),
     async health() {

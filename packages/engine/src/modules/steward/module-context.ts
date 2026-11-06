@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
+import { assertExternalModule } from "./module-identity";
 
 export const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
 export type TestReport = { stdout: string; stderr: string; exitCode: number }[];
@@ -32,16 +33,12 @@ export async function requireModule(context: ModuleContext, tx: Prisma.Transacti
   if (!row) throw new StewardError("not_found", "Module not found");
   return row;
 }
-/** A release is not an incremental update to someone's fork. Explicit rollback is separate. */
-export async function assertBuiltinUpgrade(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | null, payload: Prisma.JsonValue) {
-  const input = z.object({ hash: z.string(), restore: z.unknown().optional() }).safeParse(payload);
-  if (!moduleId || !input.success || input.data.restore !== undefined) return;
-  const target = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: input.data.hash } } });
-  if (target?.source !== "builtin") return;
-  const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId } });
-  if (!module?.activeHash) return;
-  const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
-  if (active && active.source !== "builtin") throw new StewardError("conflict", `内置版本不能作为定制模块的普通更新启用。当前定制会被丢弃；如确需恢复已批准的内置版，请明确执行 chrona admin rollback ${module.name} builtin。`);
+/** Approval restoration is a dynamic path; source hashes and restore payloads cannot grant release authority. */
+export async function assertDynamicModuleActivation(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string | null, payload: Prisma.JsonValue) {
+  const group = groupPayloadSchema.safeParse(payload);
+  if (group.success) {
+    for (const version of group.data.versions) await assertExternalModule(tx, workspaceId, version.moduleId, "group");
+  } else if (moduleId) await assertExternalModule(tx, workspaceId, moduleId, "activate");
 }
 export async function expireModuleApprovals(context: ModuleContext, moduleId: string, db: Prisma.TransactionClient = context.db) {
   const { workspaceId, ports } = context;

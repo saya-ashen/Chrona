@@ -1,17 +1,35 @@
 import { lstat, mkdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { z } from "zod";
+import type { Prisma } from "@chrona/db";
 import type { moduleManifestSchema } from "@chrona/contracts/steward";
 import { StewardError } from "./errors";
 import { notifyUser } from "./notify-user";
 import { json, type ModuleContext, type ModuleVersion, type BuildReport, type TestReport, type requireModule } from "./module-context";
 import { prepareData, runOffline, type Restore } from "./module-data";
 import { activateIn } from "./module-generation";
+import { assertExternalModule } from "./module-identity";
+
+async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback") {
+  const current = await assertExternalModule(db, context.workspaceId, prepared.module.id, reason);
+  const migration = await db.audit.findFirst({ where: { workspaceId: context.workspaceId, subjectId: current.id, kind: "module_migration_started" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  if (current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || (migration?.details as { hash?: unknown } | null)?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
+  return current;
+}
 
 export type PreparedMigration = { module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: z.output<typeof moduleManifestSchema>; from: number | null; to: number };
+async function withMigrationOwner<T>(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", work: (tx: Prisma.TransactionClient) => Promise<T>) {
+  return context.db.$transaction(async tx => {
+    // Acquire SQLite's writer lock before reading ownership; no author code runs in this transaction.
+    const locked = await tx.module.updateMany({ where: { id: prepared.module.id, workspaceId: context.workspaceId, builtin: false, status: "migrating", activeHash: prepared.module.activeHash }, data: { status: "migrating" } });
+    if (locked.count !== 1) throw new StewardError("conflict", "Module changed during migration");
+    await assertMigrationOwner(context, tx, prepared, reason);
+    return work(tx);
+  });
+}
 async function migrationFailed(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", output: TestReport[number], restore?: Restore) {
   const { db, workspaceId, ports } = context, { module, version } = prepared;
-  await db.$transaction(async tx => {
+  await withMigrationOwner(context, prepared, reason, async tx => {
     await tx.module.update({ where: { id: module.id }, data: { status: module.status } });
     if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json({ ...version.report as BuildReport, migration: { ...output, exitCode: output.exitCode || 1 } }) } });
   });
@@ -23,37 +41,60 @@ async function runMigration(context: ModuleContext, prepared: PreparedMigration,
   if (!manifest.data.migrate) throw new Error("Migration entry missing");
   return runOffline(context.ports, join(context.store, version.hash), next, manifest.data.migrate, { migrate: { from, to }, now: context.ports.now().toISOString() });
 }
-export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore) {
-  const { db, platform } = context, { module, version, from, to } = prepared, moduleId = module.id, hash = version.hash;
-  const live = join(platform, "data", moduleId), next = join(platform, "data-next", moduleId), old = join(platform, "data-old", moduleId);
-  let output: TestReport[number] = { stdout: "", stderr: "Data migration failed", exitCode: 1 }, moved = false, swapped = false;
+type Swap = { moved: boolean; swapped: boolean; recoveryFailed: boolean };
+async function restoreSwap(live: string, old: string, state: Swap) {
+  if (!state.moved) return;
   try {
+    if (state.swapped) await rm(live, { recursive: true, force: true });
+    await rename(old, live);
+    state.moved = false; state.swapped = false;
+  } catch (error) { state.recoveryFailed = true; throw error; }
+}
+async function finishMigration(context: ModuleContext, tx: Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback", { output, restore }: { output: TestReport[number]; restore?: Restore }) {
+  const { module, version, from, to } = prepared;
+  if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved", report: json({ ...version.report as BuildReport, migration: output }) } });
+  await tx.module.update({ where: { id: module.id }, data: { dataSchema: to } });
+  const dataHandling = restore
+    ? `已恢复 schema ${to} 的快照 ${restore.snapshotAt}；切换前当前数据另存为 before-rollback 快照。`
+    : `已将数据迁移 schema ${String(from)} → ${to}；迁移前数据快照保留。`;
+  if (module.status === "paused") await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
+  await activateIn(context, tx, { moduleId: module.id, hash: version.hash, reason, dataHandling });
+}
+export async function migrateData(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", restore?: Restore) {
+  const { db, platform } = context, { module, from, to } = prepared, moduleId = module.id;
+  const live = join(platform, "data", moduleId), next = join(platform, "data-next", moduleId), old = join(platform, "data-old", moduleId);
+  let output: TestReport[number] = { stdout: "", stderr: "Data migration failed", exitCode: 1 };
+  const state: Swap = { moved: false, swapped: false, recoveryFailed: false };
+  try {
+    await assertMigrationOwner(context, db, prepared, reason);
     await prepareData(context, moduleId, from, to, restore);
     if (!restore) {
       const migration = await runMigration(context, prepared, next);
       output = migration.output;
       if (!migration.succeeded) throw new Error("Migration failed");
     }
-    await mkdir(dirname(old), { recursive: true });
-    await rm(old, { recursive: true, force: true });
-    // Always leave data-old behind so crash recovery can restore the pre-swap state.
-    await mkdir(live, { recursive: true });
-    await rename(live, old); moved = true;
-    await rename(next, live); swapped = true;
-    await db.$transaction(async tx => {
-      if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved", report: json({ ...version.report as BuildReport, migration: output }) } });
-      await tx.module.update({ where: { id: moduleId }, data: { dataSchema: to } });
-      const dataHandling = restore
-        ? `已恢复 schema ${to} 的快照 ${restore.snapshotAt}；切换前当前数据另存为 before-rollback 快照。`
-        : `已将数据迁移 schema ${String(from)} → ${to}；迁移前数据快照保留。`;
-      await activateIn(context, tx, { moduleId, hash, reason, dataHandling });
+    await withMigrationOwner(context, prepared, reason, async tx => {
+      try {
+        await mkdir(dirname(old), { recursive: true });
+        await rm(old, { recursive: true, force: true });
+        // Keep data-old until commit; interrupted transactions recover the pre-swap data.
+        await mkdir(live, { recursive: true });
+        await rename(live, old); state.moved = true;
+        await rename(next, live); state.swapped = true;
+        await finishMigration(context, tx, prepared, reason, { output, restore });
+      } catch (error) {
+        try { await restoreSwap(live, old, state); }
+        catch (recovery) { throw new AggregateError([error, recovery], "Migration activation and data recovery failed", { cause: recovery }); }
+        throw error;
+      }
     });
-  } catch {
-    if (moved) {
-      if (swapped) await rm(live, { recursive: true, force: true });
-      await rename(old, live);
-    }
-    await rm(next, { recursive: true, force: true });
+  } catch (error) {
+    if (state.recoveryFailed) throw error;
+    // A callback can succeed and its commit fail. Reacquire ownership before compensating that case.
+    await withMigrationOwner(context, prepared, reason, async () => {
+      await restoreSwap(live, old, state);
+      await rm(next, { recursive: true, force: true });
+    });
     await migrationFailed(context, prepared, reason, output, restore);
     return;
   }
@@ -63,6 +104,7 @@ export async function migrateData(context: ModuleContext, prepared: PreparedMigr
 export async function recoverMigrations(context: ModuleContext, now = context.ports.now()) {
   const { db, workspaceId, platform } = context;
   for (const module of await db.module.findMany({ where: { workspaceId, status: "migrating" } })) {
+    await assertExternalModule(db, workspaceId, module.id, "activate");
     const started = await db.audit.findFirst({ where: { workspaceId, kind: "module_migration_started", subjectId: module.id }, orderBy: { createdAt: "desc" } });
     if (!started || started.createdAt.getTime() >= now.getTime() - 15 * 60_000) continue;
     await rm(join(platform, "data-next", module.id), { recursive: true, force: true });
@@ -70,6 +112,7 @@ export async function recoverMigrations(context: ModuleContext, now = context.po
     // Still migrating means activation never committed: data-old is pre-migration data.
     try { await lstat(old); await rm(live, { recursive: true, force: true }); await rename(old, live); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    await db.module.updateMany({ where: { id: module.id, status: "migrating" }, data: { status: "active" } });
+    const previousStatus = (started.details as { previousStatus?: unknown } | null)?.previousStatus === "paused" ? "paused" : "active";
+    await db.module.updateMany({ where: { id: module.id, status: "migrating", activeHash: module.activeHash }, data: { status: previousStatus } });
   }
 }

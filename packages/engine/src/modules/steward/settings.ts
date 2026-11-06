@@ -53,7 +53,7 @@ export async function modelUsage(db: StewardPorts["db"], workspaceId: string, se
 }
 /** `notify` is the notification module: it reports chat readiness and receives the settings it applies. */
 export function createSettings({ db, workspaceId, now }: RecordContext, notify: {
-  status(): Promise<{ chat: { channel: "in_app" | "chrona_qqbot"; bound: boolean; sentToday: number } } | null>;
+  status(): Promise<{ chat: { channel: string; bound: boolean; sentToday: number } } | null>;
   forward(tx: Parameters<Parameters<RecordContext["db"]["$transaction"]>[0]>[0], settings: NotificationSettings, at: Date): Promise<unknown>;
 }) {
   async function get() {

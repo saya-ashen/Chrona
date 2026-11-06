@@ -1,4 +1,4 @@
-import { accessSync, chmodSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { accessSync, chmodSync, constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -70,6 +70,15 @@ function installLocalSdk(dataDir: string | undefined, moduleSdk: string, isolate
   rmSync(target, { recursive: true, force: true });
   mkdirSync(dirname(target), { recursive: true });
   cpSync(moduleSdk, target, { recursive: true });
+  // Bun ignores NODE_PATH in modules with their own tsconfig. Resolve only our SDK from the kernel's copy.
+  writeFileSync(join(dirname(target), "chrona-sdk-loader.ts"), `import { plugin } from "bun";
+import { join } from "node:path";
+plugin({ name: "chrona-sdk", setup(build) {
+  for (const [name, file] of [["chrona", "sdk.ts"], ["chrona/testing", "testing.ts"]]) {
+    build.module(name, () => ({ contents: "export * from " + JSON.stringify(join(import.meta.dir, "chrona", file)), loader: "js" }));
+  }
+} });
+`);
 }
 function createSpawnModule({ isolated, isolationRequired, bwrap, dataDir, moduleSdk, paths, command, memoryMb }: { isolated: boolean; isolationRequired: boolean; bwrap: string | null; dataDir?: string; moduleSdk: string; paths: string[]; command: Command; memoryMb: number }) {
   return (dirs: ModuleDirs, entry: string, network: boolean, memoryLimitMb = memoryMb) => {
@@ -111,7 +120,7 @@ export function createScriptSandbox({ bwrapPath, executionMode = "trusted-local"
     const interpreter = venv ? join(code, ".venv", "bin", "python") : interpreters[kind];
     if (!shell || !interpreter) throw new Error("模块运行环境不可用");
     // --no-install: never let Bun fetch an npm package named like a missing import.
-    return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryLimitMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install"] : []), join(code, entry)];
+    return [shell, "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "module", String(memoryLimitMb * 1024), interpreter, ...(kind === "typescript" ? ["--no-install", ...(!isolated && dataDir ? ["--preload", join(resolve(dataDir), "platform/node_modules/chrona-sdk-loader.ts")] : [])] : []), join(code, entry)];
   };
   const spawnModule = createSpawnModule({ isolated, isolationRequired, bwrap, dataDir, moduleSdk, paths, command, memoryMb });
   function kill(child: ReturnType<typeof spawn>) {

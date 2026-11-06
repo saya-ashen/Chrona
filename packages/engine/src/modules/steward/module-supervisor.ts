@@ -11,6 +11,8 @@ import { currentModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
 import { rollbackFailedStart } from "./module-generation";
+import { resolveBuiltinRelease } from "./module-release";
+import { assertModuleOperation } from "./module-identity";
 
 type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 /** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
@@ -35,7 +37,7 @@ function staged(error: unknown, stage: DeliveryStage) {
 type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
-type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; validateResult?: (result: unknown) => string | null };
+type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; validateResult?: (result: unknown) => string | null };
 type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
   queue: Promise<unknown>; start?: Promise<void>;
@@ -173,8 +175,20 @@ class ModuleSupervisor {
     // Socket close can precede the child's exit notification; collect evidence, never replay the event.
     if (reason === "Module disconnected" && instance.process) await Promise.race([instance.process.exited.catch(() => {}), new Promise(resolve => setTimeout(resolve, 50))]);
   }
+  private async codeDir(instance: Instance) {
+    const { ports } = this;
+    const module = await ports.db.module.findUniqueOrThrow({ where: { id: instance.moduleId } });
+    if (module.activeHash !== instance.hash || module.status !== "active") throw new Error("Module identity changed before start");
+    let codeDir = join(ports.dataDir, "platform/store", instance.hash);
+    if (module.builtin) {
+      const release = await resolveBuiltinRelease(ports, module.name, instance.hash);
+      if (JSON.stringify(release.manifest) !== JSON.stringify(instance.manifest)) throw new Error("Built-in release manifest differs from registered metadata");
+      codeDir = release.codeDir;
+    } else assertModuleOperation(module, "activate");
+    return codeDir;
+  }
   private async spawn(instance: Instance, sandbox: NonNullable<StewardPorts["sandbox"]>) {
-    const { ports, timers } = this;
+    const { ports, timers } = this, codeDir = await this.codeDir(instance);
     // Deliberately not under dataDir: deep installations exceed Unix socket path limits.
     instance.dir = await mkdtemp("/tmp/cm-");
     await chmod(instance.dir, 0o700);
@@ -187,7 +201,7 @@ class ModuleSupervisor {
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const httpDir = instance.manifest.listen ? join(instance.dir, "http") : undefined;
     if (httpDir) await mkdir(httpDir, { mode: 0o700 });
-    const process = sandbox.startModule!({ codeDir: join(ports.dataDir, "platform/store", instance.hash), dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), ...(instance.manifest.limits ? { memoryMb: instance.manifest.limits.virtualMemoryMb } : {}) });
+    const process = sandbox.startModule!({ codeDir, dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), ...(instance.manifest.limits ? { memoryMb: instance.manifest.limits.virtualMemoryMb } : {}) });
     instance.process = process;
     // Install exit observers before yielding after startModule returns.
     return this.connect(instance, process);
@@ -337,7 +351,7 @@ class ModuleSupervisor {
     let reply: Reply;
     try { reply = await instance.channel!.send({ ...event, params }, timeoutMs); }
     catch (error) { throw staged(error, (error as { written?: boolean }).written === false ? "unavailable" : "lost"); }
-    if ("error" in reply) throw staged(new Error(reply.error), "handler");
+    if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode }), "handler");
     return reply;
   }
   private async failedDelivery(instance: Instance, event: ModuleEvent, runId: string, error: unknown) {
@@ -352,7 +366,7 @@ class ModuleSupervisor {
   }
   private async recordEventResult(input: { instance: Instance; event: ModuleEvent; workspaceId: string; runId: string; reply: Reply; validateResult?: DeliveryOptions["validateResult"] }) {
     const { instance, event, workspaceId, runId, reply, validateResult } = input;
-    if ("error" in reply) throw staged(new Error(reply.error), "handler");
+    if ("error" in reply) throw staged(Object.assign(new Error(reply.error), { code: reply.errorCode }), "handler");
     const outputError = validateResult?.(reply.result.result ?? null) ?? null;
     if (outputError) {
       await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: outputError.slice(0, 1000) } });
@@ -362,7 +376,7 @@ class ModuleSupervisor {
     this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
     await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
-  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult }: DeliveryOptions): Promise<Reply> {
+  private async assertCurrentActivation(instance: Instance) {
     const { moduleId, hash } = instance;
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     const evolution = await currentModuleEvolution(this.ports.db, module.workspaceId, moduleId, hash);
@@ -370,8 +384,13 @@ class ModuleSupervisor {
       await this.close(instance);
       throw Object.assign(staged(new Error("Module activation changed before event delivery"), "unavailable"), { staleActivation: true });
     }
+    return module;
+  }
+  private async deliverEvent(instance: Instance, event: ModuleEvent, { chain = [], path = [], timeoutMs, validateResult, beforeDelivery }: DeliveryOptions): Promise<Reply> {
+    const { moduleId, hash } = instance, module = await this.assertCurrentActivation(instance);
     // Admission/metadata rejection is not a real execution result.
     await this.validateTrigger(instance, event);
+    try { await beforeDelivery?.(); } catch (error) { throw staged(error, "unavailable"); }
     const run = await this.ports.db.moduleRun.create({ data: { moduleId, hash, triggerId: triggerKey(event), firedAt: new Date(event.trigger.firedAt), exitCode: -1, createdAt: this.ports.now() } });
     instance.busy = true;
     instance.scope.moduleRunId = run.id;
@@ -383,7 +402,12 @@ class ModuleSupervisor {
       return reply;
     } catch (error) {
       if ((error as { staleActivation?: boolean }).staleActivation) throw error;
-      await this.failedDelivery(instance, event, run.id, error);
+      const rejection = error as { stage?: DeliveryStage; code?: string };
+      if (rejection.stage === "handler" && rejection.code && !["internal", "failed", "unknown"].includes(rejection.code)) {
+        // A validated application rejection (invalid input, conflict, permission, capacity)
+        // completes this call; the SDK process remains healthy and can serve the next one.
+        await this.ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 1, error: diagnosticText(error instanceof Error ? error.message : String(error), 1000) } });
+      } else await this.failedDelivery(instance, event, run.id, error);
       throw error;
     } finally { await this.finishEvent(instance); }
   }
@@ -421,9 +445,22 @@ class ModuleSupervisor {
   async start() {
     if (this.started) return;
     this.stopped = false; this.started = true;
-    for (const workspace of await this.ports.db.workspace.findMany()) await registerBuiltins(this.ports, workspace.id);
+    for (const workspace of await this.ports.db.workspace.findMany()) {
+      try { await registerBuiltins(this.ports, workspace.id); }
+      catch (error) { console.error(JSON.stringify({ component: "module-supervisor", event: "builtin.registration_failed", workspaceId: workspace.id, error: diagnosticText(String(error), 1000) })); }
+    }
     const loop = async () => { try { await this.reconcile(); } finally { if (!this.stopped) this.poll = this.timers.setTimeout(() => { void loop().catch(() => {}); }, 30_000); } };
     await loop();
+  }
+  /** Removal waits for this app's in-flight event and confirmed process exit before copying data. */
+  async settleModule(moduleId: string) {
+    const instances = [...this.instances.values()].filter(instance => instance.moduleId === moduleId);
+    await Promise.all(instances.map(async instance => {
+      instance.retiring = true;
+      await instance.start?.catch(() => {});
+      await instance.queue.catch(() => {});
+      await this.close(instance);
+    }));
   }
   async stop() {
     this.stopped = true; this.started = false;
@@ -439,5 +476,5 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
   const runtime = new ModuleSupervisor(ports, timers, idleMs, backoffMs);
   // Preserve the closure API: consumers may extract methods without a receiver.
   return { deliver: runtime.deliver.bind(runtime), reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
-    status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime) };
+    status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
 }

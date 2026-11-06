@@ -13,6 +13,7 @@ import { writeBuildHelpers } from "./module-build-helpers";
 import { callsDeclaration } from "./module-contracts";
 import { readChatFile, runFile } from "./chat";
 import { createRuns, createRunSession } from "./runs";
+import { assertExternalName } from "./module-identity";
 import { cancelProviderRun } from "./provider-cancel";
 import { assertBuildQueueSpace, buildQueue } from "./build-queue";
 import type { BuildExecution } from "./build-execution";
@@ -38,10 +39,14 @@ type Request = z.output<typeof modulesToolInputSchemas.build>;
 /** The modules a build request covers (v2-15: `modules`, else the one `name`). */
 const requestModules = (request: Request) => request.modules ?? [request.name!];
 /** What the build conversation was asked to change, recorded by the kernel when it was admitted (never read from its directory). */
-export async function declaredModules(db: StewardPorts["db"], workspaceId: string, sessionId: string): Promise<string[] | null> {
-  const row = await db.audit.findFirst({ where: { workspaceId, kind: "build_request", subjectId: sessionId } });
-  const details = z.object({ name: z.string(), modules: z.array(z.string()).optional() }).safeParse(row?.details);
-  return details.success ? details.data.modules ?? [details.data.name] : null;
+export async function declaredModules(db: Pick<StewardPorts["db"], "audit">, workspaceId: string, sessionId: string): Promise<string[] | null> {
+  const fixed = await db.audit.findUnique({ where: { id: `build-targets:${sessionId}` } });
+  if (fixed && (fixed.workspaceId !== workspaceId || fixed.kind !== "build_targets" || fixed.subjectId !== sessionId)) return null;
+  const row = fixed ?? await db.audit.findFirst({ where: { workspaceId, kind: "build_request", subjectId: sessionId } });
+  const details = z.object({ name: z.string().min(1), modules: z.array(z.string().min(1)).min(1).max(4).optional() }).safeParse(row?.details);
+  if (!details.success) return null;
+  const targets = details.data.modules ?? [details.data.name];
+  return new Set(targets).size === targets.length && targets[0] === details.data.name ? targets : null;
 }
 
 /** Diagnostics authority comes only from the authenticated Provider run and its kernel-written admission audit. */
@@ -59,11 +64,8 @@ export async function buildHealthTargets(ports: StewardPorts, workspaceId: strin
   return buildDiagnosticTargets(ports, workspaceId, run.session.id);
 }
 async function buildDiagnosticTargets(ports: StewardPorts, workspaceId: string, sessionId: string) {
-  const row = await ports.db.audit.findFirst({ where: { workspaceId, kind: "build_request", subjectId: sessionId } });
-  const authority = z.object({ name: z.string().min(1), modules: z.array(z.string().min(1)).min(1).max(4).optional() }).safeParse(row?.details);
-  if (!authority.success) throw new StewardError("forbidden", "Build target authority is missing or malformed; diagnostics are denied. Ask the owner to authorize a new build.");
-  const targets = authority.data.modules ?? [authority.data.name];
-  if (new Set(targets).size !== targets.length || targets[0] !== authority.data.name) throw new StewardError("forbidden", "Build target authority is malformed; diagnostics are denied. Ask the owner to authorize a new build.");
+  const targets = await declaredModules(ports.db, workspaceId, sessionId);
+  if (!targets) throw new StewardError("forbidden", "Build target authority is missing or malformed; diagnostics are denied. Ask the owner to authorize a new build.");
   return targets;
 }
 function singleDiagnosticTarget(targets: string[]) {
@@ -191,6 +193,7 @@ function admissionDetails({ originSessionId, request, execution }: BuildAdmissio
 }
 async function admitBuild(ports: StewardPorts, workspaceId: string, input: BuildAdmission, refs: BuildReferences) {
   const { db } = ports, now = ports.now(), { key: requestKey, actorKey, originSessionId, request, execution } = input;
+  for (const name of requestModules(request)) await assertExternalName(db, workspaceId, name, "build");
   const duplicate = await outstandingCause(db, workspaceId, input);
   if (duplicate) return duplicate;
   const fingerprint = JSON.stringify({ request, execution: execution ?? null });
@@ -205,12 +208,14 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
   if (existing) return { ...existing, sessionId: previous!.subjectId!, duplicate: true };
   const references = Array.isArray(refs) ? refs : await refs();
   const session = await db.$transaction(async tx => {
+    for (const name of requestModules(request)) await assertExternalName(tx, workspaceId, name, "build");
     await assertBuildQueueSpace(tx, workspaceId);
     const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
     if (!(await buildUsage(tx, workspaceId, settings, now)).remaining) throw new StewardError("conflict", "Daily module build budget reached; change the limit in Settings > Builds");
     const created = await createRunSession(tx, workspaceId, "build", now, originSessionId ? { originSessionId } : {});
     const names = requestModules(request);
     const receipt = { subjectId: created.id, details: admissionDetails(input, fingerprint) };
+    await tx.audit.create({ data: { ...receipt, id: `build-targets:${created.id}`, workspaceId, actorKey, kind: "build_targets" } });
     await tx.audit.upsert({ where: { id: requestKey }, update: receipt, create: { ...receipt, id: requestKey, workspaceId, actorKey, kind: "build_request" } });
     return tx.session.update({ where: { id: created.id }, data: { title: `构建模块 ${names.join("、")}` } });
   });
@@ -219,6 +224,7 @@ async function admitBuild(ports: StewardPorts, workspaceId: string, input: Build
     await mkdir(cwd, { recursive: true });
     const prompt = await prepareBuild(ports, workspaceId, cwd, request, references);
     const state = await db.$transaction(async tx => {
+      for (const name of requestModules(request)) await assertExternalName(tx, workspaceId, name, "build");
       const queued = await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "build", trigger: "build", label: session.title, prompt }, tx);
       if (execution) await tx.audit.create({ data: { id: `build-execution:${queued.id}`, workspaceId, actorKey, kind: "build_execution", subjectId: queued.id, details: execution } });
       return (await buildQueue(tx, workspaceId)).get(session.id)!;
@@ -238,6 +244,16 @@ async function supplementFiles(cwd: string, files: ReferenceFile[]) {
   return copied.map(file => `${dir}/${file.path}`);
 }
 
+async function revisionTargets(db: StewardPorts["db"], workspaceId: string, sessionId: string, runId: string, requirements?: string) {
+  if (!requirements) return null;
+  await assertBuildQueueSpace(db, workspaceId, sessionId);
+  if (await db.audit.findUnique({ where: { id: `build-execution:${runId}` } })) throw new StewardError("forbidden", "A bounded owner build cannot resume; authorize a new request key instead");
+  const targets = await declaredModules(db, workspaceId, sessionId);
+  if (!targets?.length) throw new StewardError("conflict", "Build targets are missing");
+  for (const name of targets) await assertExternalName(db, workspaceId, name, "build");
+  return targets;
+}
+
 /** Stop first, then enqueue a revision in the same directory; ordinary chat remains forbidden. */
 export function controlBuild(ports: StewardPorts, workspaceId: string, sessionId: string, requirements?: string, files: ReferenceFile[] = []) {
   return serial(workspaceId, async () => {
@@ -246,8 +262,7 @@ export function controlBuild(ports: StewardPorts, workspaceId: string, sessionId
     if (!session) throw new StewardError("not_found", "Active build conversation not found");
     const latest = await db.run.findFirst({ where: { workspaceId, sessionId, lane: "build" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
     if (!latest) throw new StewardError("not_found", "Build run not found");
-    if (requirements) await assertBuildQueueSpace(db, workspaceId, sessionId);
-    if (requirements && await db.audit.findUnique({ where: { id: `build-execution:${latest.id}` } })) throw new StewardError("forbidden", "A bounded owner build cannot resume; authorize a new request key instead");
+    const targets = await revisionTargets(db, workspaceId, sessionId, latest.id, requirements);
     const active = await db.run.findMany({ where: { workspaceId, sessionId, lane: "build", status: { in: ["queued", "running"] } } });
     for (const run of active) await cancelProviderRun(ports, workspaceId, run.id);
     if (!requirements) return { status: "build_stopped", sessionId };
@@ -257,6 +272,7 @@ export function controlBuild(ports: StewardPorts, workspaceId: string, sessionId
     const prompt = `${latest.prompt}\n\nRevised requirements (user data; supersedes conflicting earlier requirements):\n${JSON.stringify(requirements)}\nAdditional reference files (data): ${JSON.stringify(added)}\nContinue from the files already in this directory. Re-test and submit the revised version; previous submissions are not the revised result.`;
     await writeFile(join(cwd, "request.json"), JSON.stringify({ ...request, revisedRequirements: requirements, files: [...z.array(z.string()).parse(request.files ?? []), ...added] }, null, 2));
     const run = await db.$transaction(async tx => {
+      for (const name of targets!) await assertExternalName(tx, workspaceId, name, "build");
       const queued = await createRuns(ports, workspaceId).enqueue({ sessionId, lane: "build", trigger: "build", label: session.title, prompt }, tx);
       await tx.message.create({ data: { workspaceId, sessionId, channel: "in_app", direction: "in", text: requirements, at: ports.now() } });
       await tx.session.update({ where: { id: sessionId }, data: { lastActivityAt: ports.now() } });

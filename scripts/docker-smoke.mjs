@@ -51,7 +51,7 @@ try {
   assert.equal((await fetch(`${base}/api/web/today`, { headers: { authorization: "Bearer wrong-key" } })).status, 401);
   // The runtime migration runner must own initialization, including its checksum ledger.
   docker("exec", name, "bun", "-e", "import { Database } from 'bun:sqlite'; const db = new Database('/data/chrona.db', { readonly: true }); if (!db.query(\"SELECT name FROM sqlite_master WHERE name='Workspace'\").get() || !db.query('SELECT checksum FROM _chrona_migrations').get()) process.exit(1); db.close();");
-  docker("exec", name, "bun", "--no-install", "packages/integrations/src/steward/module-typecheck/check.ts", "packages/engine/src/modules/steward/builtin/remind", "packages/integrations/src/steward/module-sdk");
+  docker("exec", name, "bun", "--no-install", "packages/integrations/src/steward/module-typecheck/check.ts", "packages/engine/src/modules/steward/external/remind", "packages/integrations/src/steward/module-sdk");
 
   browser = await chromium.launch({ executablePath: process.env.CHRONA_CHROMIUM_PATH });
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {

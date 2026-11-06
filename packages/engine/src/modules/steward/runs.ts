@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger, type SessionSource } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
-import type { StewardPorts } from "./ports";
+import type { ExecutionClaimSelection, VerifiedDeviceStop, StewardPorts } from "./ports";
 import { buildSettings, notificationSettings } from "./settings";
 import { notifyUser } from "./notify-user";
 import { pushReply } from "./chat-replies";
@@ -13,6 +13,11 @@ import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
 import { assertBuildProvider, buildExecution } from "./build-execution";
 import { appendBuildOutcome, buildOutcomeLine } from "./module-build-outcome";
+import { assertExternalName } from "./module-identity";
+import { declaredModules } from "./module-build-session";
+import { finishExecution, executionPrincipal, executionNeverOfferedIn } from "./execution-state";
+import { claimExecutionIn, prepareServerClaim } from "./execution-claim";
+import { assertExecutionPrincipal } from "./execution-principal";
 
 const BUILD_IDLE_MS = 7 * 24 * 3600_000, MCP_IDLE_MS = 24 * 3600_000;
 
@@ -26,7 +31,7 @@ export function nextLocalMidnight(now: Date, timezone: string) {
 }
 export async function authenticateRun(tx: Prisma.TransactionClient, token: string, now: Date, _tool?: string) {
   const row = await tx.run.findUnique({ where: { tokenHash: hash(token) }, include: { session: true } });
-  if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now || await tx.audit.findUnique({ where: { id: providerCancelKey(row.id) } })) throw new StewardError("forbidden", "Run capability is no longer valid");
+  if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now || (await tx.executionAttempt.findUnique({ where: { runId: row.id }, select: { capabilityRevokedAt: true } }))?.capabilityRevokedAt || await tx.audit.findUnique({ where: { id: providerCancelKey(row.id) } })) throw new StewardError("forbidden", "Run capability is no longer valid");
   const { session, ...run } = row;
   return { run, session, workspaceId: row.workspaceId };
 }
@@ -36,6 +41,25 @@ export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigge
 type RunRow = Prisma.RunGetPayload<{ include: { session: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 
+/** Stop uncertainty and owner cancellation take precedence over Provider output. */
+function finalRunOutcome(outcome: RunOutcome, state: { knownStop: boolean; cancelled: boolean; expired: boolean }) {
+  if (!state.knownStop) return { status: "failed", error: "Execution stop is unconfirmed" };
+  if (state.cancelled) return { status: "cancelled", error: "Cancelled by owner" };
+  if (state.expired) return { status: "timed_out", error: "Run lease expired" };
+  return { status: outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome, error: outcome.error };
+}
+
+function runExpired(run: { deadlineAt: Date | null; leaseUntil: Date | null }, now: Date) {
+  return !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now));
+}
+async function runWasCancelled(tx: Prisma.TransactionClient, runId: string, attempt: { cancelRequestedAt: Date | null } | null) {
+  return !!attempt?.cancelRequestedAt || !!await tx.audit.findUnique({ where: { id: providerCancelKey(runId) } });
+}
+function claimSelection(selection?: ExecutionClaimSelection): Prisma.RunWhereInput {
+  if (selection?.kind === "ordinary") return { execution: null };
+  if (selection?.kind === "execution") return { execution: { executorId: selection.executorId } };
+  return { OR: [{ execution: null }, { execution: { executorId: "server" } }] };
+}
 /** Called by module wakeProvider; every invocation starts an independent context. */
 export async function enqueueModuleWake(ports: StewardPorts, workspaceId: string, moduleId: string, prompt: string) {
   if (!await ports.db.module.findFirst({ where: { id: moduleId, workspaceId, status: "active" } })) throw new StewardError("not_found", "Active module not found");
@@ -47,9 +71,13 @@ export async function enqueueModuleWake(ports: StewardPorts, workspaceId: string
 export function createRunSession(tx: Prisma.TransactionClient, workspaceId: string, source: SessionSource, now: Date, origin: { originSessionId?: string; moduleId?: string } = {}) {
   return tx.session.create({ data: { workspaceId, key: `${source}:${randomUUID()}`, source, ...origin, createdAt: now, lastActivityAt: now } });
 }
+/** Coding admission already owns its writer transaction; logs are created by the launch/capture path. */
+export function enqueueExecutionRunIn(ports: StewardPorts, tx: Prisma.TransactionClient, input: { workspaceId: string; sessionId: string; prompt: string; cwd: string; now: Date }) {
+  return tx.run.create({ data: { workspaceId: input.workspaceId, sessionId: input.sessionId, prompt: input.prompt, cwd: input.cwd, lane: "background", trigger: "source", provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), createdAt: input.now } });
+}
 export function createRuns(ports: StewardPorts, workspaceId: string) {
   const runs = new RunService(ports, workspaceId);
-  return { enqueue: runs.enqueue.bind(runs), claimNext: runs.claimNext.bind(runs), finish: runs.finish.bind(runs), expireLeases: runs.expireLeases.bind(runs), endIdleBuilds: runs.endIdleBuilds.bind(runs), authenticate: (token: string) => authenticateRun(ports.db, token, ports.now()) };
+  return { enqueue: runs.enqueue.bind(runs), claimNext: runs.claimNext.bind(runs), finish: runs.finish.bind(runs), finishRunIn: runs.finishRunIn.bind(runs), expireLeases: runs.expireLeases.bind(runs), endIdleBuilds: runs.endIdleBuilds.bind(runs), authenticate: (token: string) => authenticateRun(ports.db, token, ports.now()) };
 }
 class RunService {
   constructor(private readonly ports: StewardPorts, private readonly workspaceId: string) {}
@@ -77,7 +105,22 @@ class RunService {
     }
     return "ready";
   }
+  private async checkBuildTargets(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
+      try {
+        const targets = run.sessionId ? await declaredModules(tx, this.workspaceId, run.sessionId) : null;
+        if (!targets?.length) throw new StewardError("forbidden", "Build target authority is missing or malformed; authorize a new build");
+        for (const name of targets) await assertExternalName(tx, this.workspaceId, name, "build");
+      } catch (error) {
+        if (!(error instanceof StewardError)) throw error;
+        const reason = `Build refused before Provider start: ${error.message}`.slice(0, 1000);
+        await tx.run.update({ where: { id: run.id }, data: { status: "failed", endedAt: now, leaseUntil: null, error: reason } });
+        await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_finished", subjectId: run.id, details: { status: "failed", reason } });
+        return false;
+      }
+    return true;
+  }
   private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, now: Date, builds: ReturnType<typeof buildSettings> | null) {
+    if (lane === "build" && !await this.checkBuildTargets(tx, run, now)) return null;
     const execution = lane === "build" ? await buildExecution(tx, run.id) : null;
     if (execution) {
       try { assertBuildProvider(this.ports, execution); }
@@ -87,59 +130,93 @@ class RunService {
       }
       builds = { ...builds!, timeoutMinutes: execution.timeoutMinutes, maxSubmissions: execution.maxSubmissions };
     }
-    const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + (builds ? builds.timeoutMinutes * 60_000 : { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane]));
+    const timeoutMs = await this.claimTimeout(tx, run, lane, builds);
+    if (timeoutMs === null) return null;
+    const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + timeoutMs);
     const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
     if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;
     await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane, ...(builds ? { builds } : {}), ...(execution ? { execution } : {}) } });
     return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id, ...(execution ? { model: execution.model } : {}) };
   }
+  /** Authorize the admitted execution before selecting its stored budget or lane limits. */
+  private async claimTimeout(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, builds: ReturnType<typeof buildSettings> | null) {
+    const coding = await tx.executionAttempt.findUnique({ where: { runId: run.id }, include: { run: true } });
+    if (coding) {
+      if (coding.capabilityRevokedAt) return null;
+      await assertExecutionPrincipal(tx, executionPrincipal(coding));
+      return (coding.budget as { timeoutMs: number }).timeoutMs;
+    }
+    return builds ? builds.timeoutMinutes * 60_000 : { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane];
+  }
   private async foregroundHasPriority(tx: Prisma.TransactionClient, now: Date) {
     const { workspaceId } = this;
     return !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }], lane: "foreground" } });
   }
-  async claimNext(lane: RunLane, now = this.ports.now()) {
-    return this.ports.db.$transaction(async tx => {
+  private async claimOrdinaryQueued(tx: Prisma.TransactionClient, run: RunRow, state: { lane: RunLane; now: Date; today: { sessionId: string | null }[]; timezone: string; builds: ReturnType<typeof buildSettings> | null }) {
+    const { lane, now, today, timezone, builds } = state;
+    const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
+    if (admission === "blocked") return "blocked" as const;
+    if (admission === "skip") return null;
+    if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
+    return this.claimQueued(tx, run, lane, now, builds);
+  }
+  async claimNext(lane: RunLane, now = this.ports.now(), selection?: ExecutionClaimSelection): Promise<(RunRow & { token: string; runId: string; startedAt: Date; deadlineAt: Date; leaseUntil: Date; model?: string }) | null> {
+    const prepared = await prepareServerClaim(this.ports, this.workspaceId, lane, selection);
+    try { return await this.ports.db.$transaction(async tx => {
       const { workspaceId } = this;
-      if (await tx.run.count({ where: { workspaceId, lane, status: "running" } })) return null;
+      await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
+      const fresh = this.ports.now();
+      const ordinaryBusy = await tx.run.count({ where: { workspaceId, lane, status: "running", execution: null } });
       const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
-      if (lane === "background" && await this.foregroundHasPriority(tx, now)) return null;
       const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
       const timezone = notificationSettings(settings).timezone, builds = lane === "build" ? buildSettings(settings) : null;
-      const recent = await tx.run.findMany({ where: { workspaceId, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true, sessionId: true } });
+      const recent = await tx.run.findMany({ where: { workspaceId, execution: null, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true, sessionId: true } });
       const today = recent.filter(r => r.startedAt && localDayKey(r.startedAt, timezone) === localDayKey(now, timezone));
       const waiting = lane === "build" ? { workspaceId, status: "queued" } : eligible;
-      for (const run of await tx.run.findMany({ where: { ...waiting, lane }, include: { session: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
-        const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
-        if (admission === "blocked") return null;
-        if (admission === "skip") continue;
-        if (run.sessionId && await tx.run.count({ where: { workspaceId, sessionId: run.sessionId, status: "running" } })) continue;
-        const claimed = await this.claimQueued(tx, run, lane, now, builds);
+      const scope = claimSelection(selection);
+      for (const run of await tx.run.findMany({ where: { AND: [{ ...waiting, lane }, scope] }, include: { session: true, execution: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
+        if (run.execution) {
+          const claimed = await claimExecutionIn(this.ports, tx, run, fresh, prepared);
+          if (claimed) return claimed;
+          continue;
+        }
+        if (ordinaryBusy || lane === "background" && await this.foregroundHasPriority(tx, now)) continue;
+        const claimed = await this.claimOrdinaryQueued(tx, run, { lane, now, today, timezone, builds });
+        if (claimed === "blocked") return null;
         if (claimed) return claimed;
       }
       return null;
-    });
+    }); } finally { prepared?.prepared.release(); }
   }
-  async finish(runId: string, outcome: RunOutcome) {
-    const { ports, workspaceId } = this, { db } = ports, now = ports.now();
-    const run = await db.run.findFirst({ where: { id: runId, workspaceId }, include: { session: true } });
-    if (!run) throw new StewardError("not_found", "Run not found");
-    if (run.status !== "running") return;
-    const expired = !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now));
-    const finalized = await db.$transaction(async tx => {
-      const cancelled = !!await tx.audit.findUnique({ where: { id: providerCancelKey(runId) } });
-      const status = cancelled ? "cancelled" : expired ? "timed_out" : outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome;
-      const error = cancelled ? "Cancelled by owner" : expired ? "Run lease expired" : outcome.error;
-      if (!(await tx.run.updateMany({ where: { id: runId, workspaceId, status: "running" }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } })).count) return false;
-      if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
-      if (status === "finished") await this.deliverResult(tx, run, now);
-      await this.followUp(tx, run, status, now, error);
-      if (status === "finished") await this.endIfDone(tx, run, now);
-      await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
-      return true;
+  async finish(runId: string, outcome: RunOutcome, options: { stopEvidence?: "provider_exited" | "never_started" } = {}) {
+    const finalized = await this.ports.db.$transaction(async tx => {
+      await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${this.workspaceId}`;
+      return this.finishRunIn(tx, runId, outcome, this.ports.now(), options.stopEvidence);
     });
     if (!finalized) return;
     liveRuns.delete(runId);
-    await ports.onRunFinished?.(workspaceId, runId);
+    await this.ports.onRunFinished?.(this.workspaceId, runId);
+  }
+  /** Actual Run finalization core, shared with trusted remote ingress; caller holds writer lock. */
+  async finishRunIn(tx: Prisma.TransactionClient, runId: string, outcome: RunOutcome, now: Date, evidence?: "provider_exited" | "never_started" | VerifiedDeviceStop): Promise<boolean> {
+    const { ports, workspaceId } = this;
+    const run = await tx.run.findFirst({ where: { id: runId, workspaceId }, include: { session: true } });
+    if (!run) throw new StewardError("not_found", "Run not found");
+    const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
+    if (attempt?.stopConfirmedAt || run.status !== "running" && !(evidence && attempt)) return false;
+    const { status, error } = finalRunOutcome(outcome, { knownStop: !attempt || !!evidence, cancelled: await runWasCancelled(tx, runId, attempt), expired: runExpired(run, now) });
+    await tx.run.update({ where: { id: runId }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } });
+    if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
+    if (attempt) await finishExecution(ports, tx, runId, evidence, now);
+    else await this.finishOrdinaryRun(tx, run, status, now, error);
+    await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
+    return true;
+  }
+  /** Ordinary runs deliver and follow up inside the same finalization transaction. */
+  private async finishOrdinaryRun(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
+    if (status === "finished") await this.deliverResult(tx, run, now);
+    await this.followUp(tx, run, status, now, error);
+    if (status === "finished") await this.endIfDone(tx, run, now);
   }
   // eslint-disable-next-line complexity -- Preserve origin wake, entry delivery and notification fallback ordering without duplicate delivery.
   private async deliverResult(tx: Prisma.TransactionClient, run: RunRow, now: Date) {
@@ -257,8 +334,42 @@ class RunService {
   async expireLeases(now = this.ports.now()) {
     const rows = await this.ports.db.run.findMany({ where: { workspaceId: this.workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });
     for (const row of rows) {
-      await liveRuns.get(row.id)?.abort();
-      await this.finish(row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" });
+      const state = await this.ports.db.$transaction(async tx => {
+        await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${this.workspaceId}`;
+        const current = await tx.run.findFirst({ where: { id: row.id, workspaceId: this.workspaceId, status: "running" } });
+        if (!current || !runExpired(current, now)) return null;
+        const execution = await tx.executionAttempt.findUnique({ where: { runId: row.id }, include: { run: true } });
+        if (execution) {
+          await tx.executionAttempt.update({ where: { id: execution.id }, data: { capabilityRevokedAt: execution.capabilityRevokedAt ?? now } });
+          if (await executionNeverOfferedIn(tx, execution)) {
+            await this.finishRunIn(tx, row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" }, now, "never_started");
+            return { execution, confirmed: true };
+          }
+        }
+        return { execution, confirmed: false };
+      });
+      if (!state) continue;
+      const { execution } = state, handle = liveRuns.get(row.id);
+      if (state.confirmed) {
+        await this.ports.remoteCompletion?.committed(this.workspaceId, row.id);
+        continue;
+      }
+      if (execution) {
+        if (execution.executorId !== "server") {
+          // A waiting relay cannot observe remote process exit. Retain capacity and let device stop/reconcile finalize.
+          await handle?.abort();
+          continue;
+        }
+        if (handle) {
+          try { await handle.abort(); await handle.done; }
+          catch { await this.finish(row.id, { outcome: "timed_out", sessionId: null, error: "Execution stop is unconfirmed" }); continue; }
+        }
+        // liveRuns can contain the prelaunch gate; only tick's actual Provider completion supplies exit proof.
+        await this.finish(row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" });
+      } else {
+        await handle?.abort();
+        await this.finish(row.id, { outcome: "timed_out", sessionId: null, error: "Run lease expired" });
+      }
     }
     return rows.length;
   }

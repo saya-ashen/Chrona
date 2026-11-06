@@ -4,12 +4,14 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import type { ApprovedAction } from "./ports";
 import { StewardError } from "./errors";
-import { assertBuiltinUpgrade, expireModuleApprovals, isGroupPayload, requireModule, type ModuleContext } from "./module-context";
+import { assertDynamicModuleActivation, expireModuleApprovals, isGroupPayload, requireModule, type ModuleContext } from "./module-context";
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
 import { activateGroupIn } from "./module-group";
-import { moduleRemovePayloadSchema, removeApproved } from "./module-remove";
+import { removeApproved } from "./module-remove";
+import { moduleRemovePayloadSchema } from "./module-remove-payload";
+import { assertExternalModule } from "./module-identity";
 
 function parseRestore(value: Prisma.JsonValue | undefined): Restore | undefined {
   if (value === undefined) return;
@@ -32,8 +34,7 @@ async function prepareApproved(context: ModuleContext, tx: Prisma.TransactionCli
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   await checkApproval(context, tx, action, module.id);
   const version = await approvedVersion(tx, moduleId, hash, restore);
-  // Restore confirmations and explicit rollback use their own owner-authorized path.
-  if (!restore) await assertBuiltinUpgrade(tx, context.workspaceId, moduleId, { hash });
+  await assertDynamicModuleActivation(tx, context.workspaceId, moduleId, { hash });
   const manifest = moduleManifestSchema.parse(version.manifest), from = module.dataSchema, to = manifest.data.schema;
   if (restore && (restore.schema !== to || await snapshotAt(context, moduleId, to) !== restore.snapshotAt)) throw new StewardError("conflict", "Module restore snapshot is missing or changed");
   if (restore || (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId)))) {
@@ -61,7 +62,7 @@ export async function onApproved(context: ModuleContext, action: ApprovedAction)
   await migrateData(context, prepared, restore ? "rollback" : "activate", restore);
 }
 async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
-  const module = await requireModule(context, tx, moduleId);
+  const module = await assertExternalModule(tx, context.workspaceId, moduleId, "rollback");
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");

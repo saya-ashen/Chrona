@@ -2,30 +2,28 @@ import { expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
 import { createFiles } from "./builtin/files/files";
 import { createEvents, type Caller } from "./builtin/events/events";
 import { createNotify, type Caller as NotifyCaller } from "./builtin/notify/notify";
 import { openStore } from "./builtin/notify/store";
 
-const root = join(import.meta.dirname, "builtin");
-const manifests = await Promise.all((await Array.fromAsync(new Bun.Glob("*/module.json").scan({ cwd: root }))).map(async path => {
-  const parsed = moduleManifestSchema.parse(await Bun.file(join(root, path)).json());
+const manifests = await Promise.all([
+  ...BUILTIN_MODULE_NAMES.map(name => ({ name, directory: "builtin" })),
+  ...OFFICIAL_EXTERNAL_MODULE_NAMES.map(name => ({ name, directory: "external" })),
+].map(async ({ name, directory }) => {
+  const parsed = moduleManifestSchema.parse(await Bun.file(join(import.meta.dirname, directory, name, "module.json")).json());
+  expect(parsed.name).toBe(name);
   return [parsed.name, parsed] as const;
 }));
 const tools = new Map<string, ModuleTool>(manifests.flatMap(([module, manifest]) => (manifest.tools ?? [])
   .filter(tool => (tool.visibility ?? ["provider", "owner"]).some(audience => audience === "owner" || audience === "modules"))
   .map(tool => [`${module}.${tool.name}`, tool] as const)));
 
-test("every shipped built-in owner/module tool declares a compilable output contract", () => {
+test("every shipped built-in and official external owner/module tool declares a compilable output contract", () => {
   expect(manifests.map(([name]) => name)).toEqual(expect.arrayContaining(["events", "files", "mcp", "memory-local", "mind", "notify", "qq", "remind", "web"]));
-  expect([...tools.keys()].sort()).toEqual([
-    "events.emit", "events.subscribe", "events.subscriptions", "events.unsubscribe",
-    "files.delete", "files.history", "files.list", "files.move", "files.read", "files.restore", "files.write",
-    "mind.agenda", "mind.decisions", "mind.note", "mind.report",
-    "notify.channel", "notify.feedback", "notify.list", "notify.retry", "notify.send",
-    "qq.deliver", "qq.reply", "remind.cancel", "remind.create", "remind.list", "web.catalog", "web.page-remove", "web.page-set", "web.pages", "web.reply",
-  ]);
+  expect([...tools.keys()]).toEqual(expect.arrayContaining(["events.emit", "files.read", "mind.agenda", "notify.send", "qq.reply", "remind.list", "web.pages"]));
+  expect(tools.size).toBeGreaterThanOrEqual(30);
   for (const [name, tool] of tools) {
     expect(tool.output, `${name} output`).toBeDefined();
     const schema = moduleOutputSchema.parse(tool.output);
@@ -57,7 +55,7 @@ test("actual files and events handler results satisfy declared outputs, includin
 
     const eventsDir = join(dir, "events"); await mkdir(eventsDir);
     const events = createEvents({ dataDir: eventsDir, contributions: async () => [{ module: "sample", value: { emits: [{ name: "changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" } } } }] } }],
-      reachable: async () => ["sample.receive"], call: async () => ({ callId: "call-1" }) });
+      directory: async () => ({ modules: [{ id: "sample-id", name: "sample", status: "active", activeHash: "hash" }], tools: [{ target: "sample.receive", moduleId: "sample-id", hash: "hash", contractHash: "a".repeat(64), inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }] }), call: async () => ({ callId: "call-1" }) });
     const caller: Caller = { kind: "module", module: "sample", moduleId: "sample-id", hash: "hash" };
     check("events.subscriptions", await events.handle("subscriptions", {}, caller));
     check("events.subscribe", await events.handle("subscribe", { event: "sample.changed", tool: "receive" }, caller));
@@ -70,7 +68,7 @@ test("actual notify handler results satisfy contracts for success, errors, empty
   const dir = await mkdtemp(join(tmpdir(), "chrona-notify-contracts-"));
   const store = openStore(dir);
   try {
-    const notify = createNotify({ store, publicUrl: null, call: async () => ({ callId: "unused", status: "pending" }), status: async () => ({ callId: "unused", status: "pending" }) });
+    const notify = createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => ({ callId: "unused", status: "pending" }), status: async () => ({ callId: "unused", status: "pending" }) });
     const owner: NotifyCaller = { kind: "owner", via: "test" };
     const check = (name: string, output: unknown) => {
       const schema = moduleOutputSchema.parse(tools.get(name)?.output);

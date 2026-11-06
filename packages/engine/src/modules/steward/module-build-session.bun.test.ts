@@ -57,9 +57,8 @@ async function fixture() {
   async function step() {
     await tick();
     await Promise.all(pending.splice(0));
-    // Finishing a run (and delivering a build's reply) follows the Provider's completion.
-    for (let i = 0; i < 100 && await db.run.count({ where: { workspaceId, status: "running" } }) > 1; i++) await Bun.sleep(10);
-    await tick.settled();
+    // Await finalization and reply delivery, not only the Provider or the run status write.
+    await tick.settled({ includeRuns: true });
   }
   async function writeModule(cwd: string) {
     await mkdir(join(cwd, "mail-sort"), { recursive: true });
@@ -119,7 +118,7 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
     const diagnostic = await call("m_modules_diagnostics", {}) as { module: string; activeHash: string; incidents: { evidence: { reason: string } }[] }[];
     expect(diagnostic).toMatchObject([{ module: "mail-sort", activeHash: oldHash, configuredStatus: "paused", incidents: [{ evidence: { reason: "Synthetic test startup failure" } }] }]);
     await expect(call("m_modules_diagnostics", { module: "other" })).rejects.toMatchObject({ code: "forbidden" });
-    const authority = await f.db.audit.findFirstOrThrow({ where: { kind: "build_request", subjectId: build.id } });
+    const authority = await f.db.audit.findUniqueOrThrow({ where: { id: `build-targets:${build.id}` } });
     await f.db.audit.update({ where: { id: authority.id }, data: { details: { name: [] } } });
     await expect(call("m_modules_diagnostics", {})).rejects.toMatchObject({ code: "forbidden" });
     await f.db.audit.update({ where: { id: authority.id }, data: { details: { originSessionId: f.session.id, name: request.name } } });
@@ -135,12 +134,13 @@ test("a build is its own conversation: scoped diagnostics, restricted tools, sub
   });
   await f.step();
   expect(f.starts.map(input => input.lane)).toEqual(["build"]);
-  expect(report).toMatchObject({ status: "active", active: true, report: { tests: expect.any(Array) } });
+  expect(report).toMatchObject({ status: "approved", active: false, report: { tests: expect.any(Array) } });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: oldModule.id } })).toMatchObject({ status: "paused" });
   const version = await f.db.moduleVersion.findFirstOrThrow({ where: { source: "build" } });
   expect(version).toMatchObject({ source: "build", status: "approved" });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_submission" } })).toMatchObject({ details: { hash: version.hash, sessionId: build.id } });
   // The reply went back to the web conversation that asked.
-  expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准\n\n已启用：mail-sort 版本 ${version.hash.slice(0, 8)}`]);
+  expect((await f.db.message.findMany({ where: { sessionId: f.session.id } })).map(m => m.text)).toEqual([`构建完成：mail-sort ${version.hash.slice(0, 8)} 待你批准\n\n未启用：mail-sort 该版本当前未启用`]);
 });
 
 for (const scenario of ["active", "approval", "failed", "empty", "long", "latest-failed", "invalid-last", "unrelated"] as const) test(`build completion reports database outcome: ${scenario}`, async () => {
@@ -202,7 +202,7 @@ test("multi-module build diagnostics require one declared target and accept its 
   const health = async () => (await f.service.tools.call(run.token, "m_modules_health", {}) as { result: unknown }).result;
   expect(await health()).toMatchObject({ items: [{ module: "first-target" }, { module: "second-target" }], nextCursor: null });
   expect((await health() as { items: unknown[] }).items).toHaveLength(2);
-  const receipt = await f.db.audit.findFirstOrThrow({ where: { kind: "build_request", subjectId: started.sessionId } });
+  const receipt = await f.db.audit.findUniqueOrThrow({ where: { id: `build-targets:${started.sessionId}` } });
   await f.db.audit.update({ where: { id: receipt.id }, data: { details: { name: "first-target", modules: "malformed" } } });
   await expect(call({ module: "first-target" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(health()).rejects.toMatchObject({ code: "forbidden" });
@@ -234,7 +234,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // Explicit targets in uses do not grant access to Provider or owner-only tools.
@@ -539,10 +539,10 @@ test("a Provider supplements an old build without losing work; missing or owner 
   expect((await f.api.settings.get()).buildUsage.used).toBe(1);
 });
 
-test("a build discovers contracts and release reference, merges a fixture and activates after checks", async () => {
+test("a build discovers contracts and updates an external fixture after checks", async () => {
   const f = await fixture(), hash = "b".repeat(64);
-  const webManifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
-  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: hash } });
+  const webManifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] });
+  const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "example", builtin: false, activeHash: hash } });
   await f.db.moduleVersion.create({ data: { moduleId: web.id, hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
   const active = join(f.dataDir, "platform", "store", hash), builtin = join(f.ports.moduleBuiltinResources, "web");
@@ -553,24 +553,23 @@ test("a build discovers contracts and release reference, merges a fixture and ac
     await writeFile(join(dir!, "test.ts"), "process.exit(0)");
     await writeFile(join(dir!, "app.js"), app!);
   }
-  const started = await f.call("m_modules_build", { ...request, name: "web", goal: "Merge the release feature without losing customization" }) as { sessionId: string };
+  const started = await f.call("m_modules_build", { ...request, name: "example", goal: "Update the external app and preserve its data" }) as { sessionId: string };
   let submitted: { hash: string } | undefined;
   f.onRun(async (input, call) => {
     expect(await call("m_modules_reference", {})).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.diagnostics" })]));
     expect(await call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ outputSchema: { type: "array" }, examples: expect.any(Array) });
-    expect(await call("m_modules_checkout", { module: "web", dir: "active-latest" })).toMatchObject({ source: "stored", hash });
-    expect(await call("m_modules_checkout", { module: "web", source: "builtin", dir: "release-reference" })).toMatchObject({ source: "builtin" });
+    expect(await call("m_modules_checkout", { module: "example", dir: "active-latest" })).toMatchObject({ source: "stored", hash });
     await cp(join(input.cwd, "active-latest"), join(input.cwd, "candidate"), { recursive: true });
-    const customized = await readFile(join(input.cwd, "candidate", "app.js"), "utf8"), feature = await readFile(join(input.cwd, "release-reference", "app.js"), "utf8");
+    const customized = await readFile(join(input.cwd, "candidate", "app.js"), "utf8"), feature = "// external feature";
     await writeFile(join(input.cwd, "candidate", "app.js"), `${customized}\n${feature}`);
     submitted = await call("m_modules_propose", { dir: "candidate", intent }) as { hash: string };
     await createModules(f.ports, f.workspaceId).buildPending();
-    expect(await call("m_modules_check", { module: "web", hash: submitted.hash })).toMatchObject({ status: "active", active: true });
+    expect(await call("m_modules_check", { module: "example", hash: submitted.hash })).toMatchObject({ status: "active", active: true });
     await call("chrona_reply", { text: "Fixture merge checked, waiting for approval" });
   });
   await f.step();
   expect(submitted).toBeDefined();
-  expect(await readFile(join(f.dataDir, "platform", "store", submitted!.hash, "app.js"), "utf8")).toBe("// custom layout\n// release feature");
+  expect(await readFile(join(f.dataDir, "platform", "store", submitted!.hash, "app.js"), "utf8")).toBe("// custom layout\n// external feature");
   expect((await f.db.module.findUniqueOrThrow({ where: { id: web.id } })).activeHash).toBe(submitted!.hash);
   expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: web.id, hash: submitted!.hash } } })).status).toBe("approved");
   expect(JSON.parse(await readFile(join(f.dataDir, "sessions", started.sessionId, "request.json"), "utf8")).files).toEqual([]);
@@ -686,6 +685,15 @@ test("owner builds pin their own limits and model, deduplicate even after comple
   await expect(controlBuild(f.ports, f.workspaceId, started.sessionId, "continue")).rejects.toMatchObject({ code: "forbidden" });
   expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
   expect(before).not.toHaveProperty("builds.timeoutMinutes", 10);
+});
+test("owner bounds cannot authorize builtin targets, including replay after identity changes", async () => {
+  const f = await ownerFixture();
+  await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, name: "web" })).rejects.toMatchObject({ code: "forbidden" });
+  expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
+  const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
+  await f.db.module.create({ data: { workspaceId: f.workspaceId, name: ownerRequest.name, builtin: true } });
+  await expect(startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).rejects.toMatchObject({ code: "forbidden" });
+  expect(await f.db.run.count({ where: { sessionId: started.sessionId } })).toBe(1);
 });
 test("owner build validation rejects host paths, multiple modules, unsupported providers and excess caps without enqueueing", async () => {
   const f = await ownerFixture();

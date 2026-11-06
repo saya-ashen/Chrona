@@ -27,6 +27,7 @@ model Workspace {
   invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
+  executions ExecutionAttempt[]
 }
 
 /// A conversation with the Provider. Entries choose keys; at most one active session per key (enforced by Chrona).
@@ -68,6 +69,7 @@ model Module {
   status String @default("active")
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  executions ExecutionAttempt[]
   versions ModuleVersion[]
   runs ModuleRun[]
   calls ModuleCall[]
@@ -205,6 +207,7 @@ model Run {
   trigger String
   status String @default("queued")
   provider String
+  execution ExecutionAttempt?
   tokenHash String @unique
   leaseUntil DateTime?
   deadlineAt DateTime?
@@ -223,6 +226,179 @@ model Run {
   @@index([workspaceId, status, leaseUntil])
   @@index([workspaceId, status, deadlineAt])
   @@index([sessionId, createdAt])
+}
+
+/// Run owns lifecycle and queue status. This row binds admission, authorization and retained evidence.
+model ExecutionAttempt {
+  id String @id @default(uuid())
+  workspaceId String
+  ownerId String
+  /// owner or module:<immutable module id>; hash remains separate authorization evidence.
+  callerKey String
+  moduleId String?
+  callerHash String?
+  workId String
+  commandKey String
+  requestDigest String
+  runId String @unique
+  projectRef String
+  projectDigest String
+  /// P2 device attempts have no server filesystem path; v1/server retain their canonical cwd.
+  resolvedCwd String?
+  executorId String @default("server")
+  executorGeneration Int @default(1)
+  mappingRevision Int @default(1)
+  directoryIdentity String?
+  queueExpiresAt DateTime?
+  workspaceRef String?
+  workspaceMode String?
+  sourceManifest Json?
+  sourceReceipt Json?
+  logDir String
+  baseline String
+  budget Json
+  cancelRequestedAt DateTime?
+  capabilityRevokedAt DateTime?
+  stopConfirmedAt DateTime?
+  stopEvidence Json?
+  /// Canonical cwd while occupied, NULL only after confirmed stop; SQLite allows multiple released NULLs.
+  heldDirectory String? @unique
+  /// Current charges: active headroom, terminal actual bytes; never historical maximum reservations.
+  snapshotChargeBytes Int @default(0)
+  controlChargeBytes Int @default(0)
+  detailBytes Int @default(0)
+  highWatermark Int @default(0)
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  run Run @relation(fields: [runId], references: [id], onDelete: Restrict)
+  events ExecutionDetail[]
+  snapshot ExecutionSnapshot?
+  controls ExecutionControl[]
+  commands ExecutionCommand[]
+  assignment ExecutorAssignment?
+  @@index([executorId, stopConfirmedAt])
+  @@index([moduleId, stopConfirmedAt])
+  @@unique([workspaceId, ownerId, callerKey, commandKey])
+  @@index([workspaceId, ownerId, workId, createdAt])
+}
+
+/// Normalized, redacted v1 events only; no raw Provider envelopes.
+model ExecutionDetail {
+  attemptId String
+  seq Int
+  event Json
+  bytes Int
+  expiresAt DateTime
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@id([attemptId, seq])
+  @@index([expiresAt])
+}
+
+model ExecutionSnapshot {
+  attemptId String @id
+  snapshot Json
+  bytes Int
+  expiresAt DateTime
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+}
+
+/// Four fixed v1 slots, validated by G before upsert in F's transaction.
+model ExecutionControl {
+  attemptId String
+  slot String
+  fact Json
+  bytes Int
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@id([attemptId, slot])
+}
+
+/// F deduplicates send/answer/cancel without storing their sensitive input again.
+model ExecutionCommand {
+  attemptId String
+  commandKey String
+  operation String
+  requestDigest String
+  receipt Json
+  /// One-shot inject transport intent, never the text or an answer body.
+  offeredAt DateTime?
+  effect String?
+  createdAt DateTime @default(now())
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@id([attemptId, commandKey])
+}
+
+/// Device security generation and connection incarnation are distinct fences. No plaintext credentials.
+model ExecutionExecutor {
+  id String @id
+  workspaceId String
+  ownerId String
+  label String
+  credentialHash String @unique
+  generation Int @default(1)
+  revokedAt DateTime?
+  authorizedUntil DateTime?
+  incarnation String?
+  reconciledAt DateTime?
+  lastSeenAt DateTime?
+  createdAt DateTime @default(now())
+  pairings ExecutorPairing[]
+  assignments ExecutorAssignment[]
+  @@index([workspaceId, ownerId])
+}
+
+/// A consumed pairing is a stable receipt; the original credential hash cannot resurrect a revoked device.
+model ExecutorPairing {
+  codeHash String @id
+  workspaceId String
+  ownerId String
+  expiresAt DateTime
+  receiptExpiresAt DateTime
+  executorId String?
+  credentialHash String?
+  consumedAt DateTime?
+  executor ExecutionExecutor? @relation(fields: [executorId], references: [id], onDelete: Restrict)
+  @@index([receiptExpiresAt])
+}
+
+/// One transport journal for an already claimed Run, never another scheduling queue.
+model ExecutorAssignment {
+  attemptId String @id
+  assignmentId String @unique
+  executorId String
+  generation Int
+  incarnation String
+  launchDigest String?
+  launch Json?
+  preparedAt DateTime?
+  offeredAt DateTime?
+  startedAt DateTime?
+  processIdentity Json?
+  sourceHighWatermark Int @default(0)
+  sourceProducedThrough Int @default(0)
+  receiptCount Int @default(0)
+  receiptBytes Int @default(0)
+  finalDigest String?
+  final Json?
+  finalizedAt DateTime?
+  tombstoneDigest String?
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  executor ExecutionExecutor @relation(fields: [executorId], references: [id], onDelete: Restrict)
+  receipts ExecutorSourceReceipt[]
+  @@index([executorId, generation])
+}
+
+/// Retained independently of detail retention; no payloads, credentials, questions or answers.
+model ExecutorSourceReceipt {
+  attemptId String
+  sourceSeq Int
+  digest String
+  throughSourceSeq Int
+  storedSeq Int?
+  bytes Int
+  assignment ExecutorAssignment @relation(fields: [attemptId], references: [attemptId], onDelete: Restrict)
+  @@id([attemptId, sourceSeq])
 }
 
 model Message {

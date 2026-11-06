@@ -8,7 +8,7 @@ import { liveRuns } from "./runs";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { recordModuleActivation } from "./module-evolution";
 import { moduleContext } from "./module-context";
-import mindManifest from "./builtin/mind/module.json";
+import mindManifest from "./external/mind/module.json";
 
 const databases: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of databases.splice(0)) await db.$disconnect(); });

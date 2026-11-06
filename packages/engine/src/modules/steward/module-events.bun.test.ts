@@ -18,8 +18,8 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "sdk" } });
   const api = createStewardService(ports).forWorkspace(workspace.id);
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "events", activeHash: "sdk" } });
-  const manifest = { name: "events", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "event-counter", activeHash: "sdk" } });
+  const manifest = { name: "event-counter", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send"], triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], tools: [{ name: "read", description: "Read event count", parameters: { type: "object", properties: {}, required: [] } }] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "sdk", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/sdk"); await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `
@@ -30,7 +30,7 @@ on('tool', async () => ({ result: { count } }));
 `);
   await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "daily", createdBy: "chrona", nextAt: now } });
   expect(await api.schedules.fireDue()).toBe(1);
-  expect(await api.modules.callTool("m_events_read", {})).toEqual({ result: { count: 1 } });
+  expect(await api.modules.callTool("m_event_counter_read", {})).toEqual({ result: { count: 1 } });
   expect(await db.moduleRun.count({ where: { error: null, exitCode: 0 } })).toBe(2);
   expect(await db.moduleCall.count({ where: { status: "executed" } })).toBe(1);
   expect((await notices(db)).length).toBe(1);

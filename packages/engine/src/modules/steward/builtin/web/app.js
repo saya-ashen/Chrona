@@ -13,6 +13,7 @@ async function request(url, { method = "GET", body, raw = false } = {}) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || error.code || `请求失败（${response.status}）`);
   }
+  if (method === "POST") void pageLinks();
   return raw ? response.blob() : response.json();
 }
 const web = (path, options) => request(`/api/web${path}`, options);
@@ -53,7 +54,7 @@ async function registeredPage(module, id) {
   const page = await web(`/pages/${encodeURIComponent(module)}/${encodeURIComponent(id)}`);
   const { mount } = await import("/pages.js");
   main.replaceChildren();
-  unmountPage = mount(main, page, { call: (target, args) => tool(target, args), navigate: path => go(path), content: path => web(path, { raw: true }) });
+  unmountPage = mount(main, page, { call: (target, args) => web("/call", { method: "POST", body: { target, args, page: { module: page.module, id: page.id, revision: page.revision } } }), navigate: path => go(path), content: path => web(path, { raw: true }) });
 }
 async function systemPage(params) {
   const { mountSystem } = await import("/pages.js");
@@ -68,8 +69,10 @@ async function systemPage(params) {
 const pageHref = page => `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`;
 async function pageLinks() {
   const nav = document.querySelector("header nav"), apps = nav.querySelector('a[href="/apps"]');
+  let pages;
+  try { pages = await web("/pages"); } catch { return; }
   nav.querySelectorAll("a[data-page]").forEach(link => link.remove());
-  for (const page of await web("/pages").catch(() => [])) {
+  for (const page of pages) {
     const link = document.createElement("a");
     link.href = pageHref(page); link.dataset.page = ""; link.textContent = page.title;
     apps.before(link);
@@ -80,6 +83,7 @@ async function pageLinks() {
 async function route() {
   const url = new URL(location.href), parts = url.pathname.split("/").filter(Boolean);
   unmountPage?.(); unmountPage = null;
+  if (localStorage.getItem(KEY)) void pageLinks();
   try {
     if (parts[0] === "chat" || (parts[0] === "sessions" && parts[1])) await systemPage({ name: "chat", path: url.pathname });
     else if (parts[0] === "p" && parts[1] && parts[2]) await registeredPage(decodeURIComponent(parts[1]), decodeURIComponent(parts[2]));

@@ -2,6 +2,10 @@
 
 状态：2026-11-02 讨论、2026-11-03 用户确认方向与顺序（3 → 2 → 5）。§3.1–§3.3 均已实现（2026-11-03）。与 [module-dependency-direction.md](module-dependency-direction.md) 并列。
 
+## M1 开发集成契约（2026-11-05）
+
+内核/五个发行内置名及 rescue 保留，应用类别只认 Module.builtin。动态操作禁止改内置；外置安装只接受可信官方包白名单，不接受宿主路径。具体 schema 见冻结 [P0 契约](chrona-workbench-p0-contract.md)，后续事务复核、回调持久身份与最终验证见[共享接线记录](chrona-workbench-m1-shared-integration.md)和 [M1 验收记录](chrona-workbench-m1-acceptance.md)。开发集成已连接动态入口的事务身份复核、可信发行注册与官方安装适配器。内置不走普通提案或代码回滚；修改须发布 Chrona。登记调用的 expectedTarget 只收紧 moduleId/contractHash，不授予权限。全量开发检查已完成，协调者已签署 M1 开发验收；[P1 契约](chrona-workbench-p1-contract.md)尚待审核冻结、无新的运行时权限路径；不能把受信资源目录当作 OS 隔离，也不能据此宣称生产部署。下文 2026-11-02/03 的审批统计、部署和旧模式转换是当时的决策背景；M1 不执行旧生产转换。
+
 ## 1. 结论
 
 模块以同一个 OS 用户运行（`trusted-local`，已部署），manifest 与路由层面的权限挡不住恶意代码，只能约束守规矩的代码，实际作用是防误操作与留痕。现有体系却按"防攻击"建造：`uses`、`visibility`、`callers`、`effects`、绿/黄/红定级、AI 复核、审批习惯、5 种 grant 模式、2 种更新复核模式……复杂度全付了，安全收益很少。
@@ -24,7 +28,7 @@
   2. 新增凭据（`secrets` 增加）或新的外部账户授权；
   3. 删除应用。
 - 删除：绿/黄/红定级（`approval-level.ts` 的定级与 `Approval.level`）、AI 复核（`approval-review.ts`、模型设置中的 `review`）、审批习惯（`approval-habits.ts`）、`moduleUpdateReview`（`checks-only`）、`activate_module` 的长期授权与自动授权逻辑（`module-auto.ts`）、按能力扩张判定的资格检查。
-- 全新应用首次启用同样自动启用（用户 2026-11-03 确认）。内置模块是随发版的可信代码，新增凭据不问（凭据仍由用户在应用页填写），只在迁移数据时问。
+- 全新外置应用首次启用同样自动启用（用户 2026-11-03 确认）。内置是随发版的可信代码，由 registrar 绑定发行资源，禁止进入普通提案/构建/审批候选路径；新增凭据声明不问，实际凭据仍由用户填写，数据兼容与迁移不能绕过检查或确认。
 - 构建检查中 key probe 失败（重复投递会产生重复效果）现在直接拒绝该版本，而不是转为人工审批。
 - Chrona 暂停、恢复应用直接生效并记入审计。
 - 运行时审批不再分级；卡片只保留标题、说明与详情；网页、QQ、MCP 任何入口都可批准或拒绝（用户确认，删除"红色只能在网页批准"）。

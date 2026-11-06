@@ -70,9 +70,9 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   stop = () => steward.stop();
   expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();
-  // Every built-in, including qq (unconfigured here), builds, passes its author tests and activates.
+  // Only the five trusted release builtins activate here; external packages are separately queued.
   const unfinished = await db.moduleVersion.findMany({ where: { module: { builtin: true, activeHash: null } }, select: { manifest: true, status: true, report: true } });
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["events", "files", "mcp", "mind", "notify", "qq", "remind", "web"].map(name => [name, "active", true]));
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["events", "files", "mcp", "notify", "web"].map(name => [name, "active", true]));
   const app = await createServerApp({ steward });
   // The web module serves the page at / (no key needed), while the API it calls stays protected.
   const page = await app.request("/apps/a1?path=README.md");
@@ -87,9 +87,11 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect(await view.json()).toMatchObject({ approvals: [], apps: expect.arrayContaining([expect.objectContaining({ name: "files" })]) });
   const apps = await (await app.request("/api/web/modules", { headers: { authorization: "Bearer listen-test" } })).json() as { name: string; versions: unknown[] }[];
   expect(apps.find(row => row.name === "web")?.versions.length).toBeGreaterThan(0);
-  // notify checks each channel registration with modules.tools; those calls follow qq's start timing, not the page.
-  expect(await db.moduleInvocation.findMany({ where: { target: { in: ["chat", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true }, orderBy: { createdAt: "asc" } }))
-    .toEqual([{ target: "chat", tool: "today", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]);
+  // Startup and each page may refresh the app list; every page read still uses attributed routed calls.
+  const web = await db.module.findFirstOrThrow({ where: { builtin: true, name: "web" } });
+  const reads = await db.moduleInvocation.findMany({ where: { callerModuleId: web.id, target: { in: ["chat", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true } });
+  expect(reads).toEqual(expect.arrayContaining([{ target: "chat", tool: "today", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]));
+  expect(reads.every(read => read.status === "succeeded")).toBe(true);
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
     const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });

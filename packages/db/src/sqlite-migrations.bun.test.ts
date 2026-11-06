@@ -6,12 +6,13 @@ import { join, resolve } from "node:path";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 const models = [
-  "Workspace", "Affair", "Schedule", "Run", "Message", "Activity", "Approval", "Grant",
-  "Preference", "Notification", "Connector", "InboundItem", "Audit", "StewardState",
+  "Workspace", "Session", "Module", "ModuleVersion", "Generation", "ModuleRun", "ModuleCall", "ModuleInvocation",
+  "Schedule", "Run", "Message", "Approval", "Grant", "Preference", "Audit", "StewardState",
+  "ExecutionAttempt", "ExecutionDetail", "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand",
+  "ExecutionExecutor", "ExecutorPairing", "ExecutorAssignment", "ExecutorSourceReceipt",
 ];
 
 function fixture() {
-  // Only the new baseline: obsolete repository migrations await supervisor deletion.
   const root = mkdtempSync(join(tmpdir(), "chrona-migrations-test-"));
   const migrationsDir = join(root, "migrations");
   const initial = join(migrationsDir, "0001_initial");
@@ -28,7 +29,7 @@ function inspect<T>(path: string, read: (db: Database) => T): T {
 }
 
 describe("clean steward SQLite baseline", () => {
-  test("fresh database contains exactly the steward tables and cascade workspace keys", () => {
+  test("fresh database contains exactly current models and their actual foreign-key deletion rules", () => {
     const options = fixture();
     ensureSqliteDatabase(options);
     inspect(options.databasePath, (db) => {
@@ -36,12 +37,16 @@ describe("clean steward SQLite baseline", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
       ).all().map((row) => row.name).sort();
       expect(names).toEqual([...models, "_chrona_migrations"].sort());
-      expect(db.query<{ table: string; from: string; on_delete: string }, []>('PRAGMA foreign_key_list("InboundItem")').all()).toContainEqual(expect.objectContaining({ table: "Connector", from: "connectorId", on_delete: "CASCADE" }));
-      for (const model of models.filter((name) => name !== "Workspace")) {
+      for (const model of ["Session", "Module", "Generation", "ModuleInvocation", "Schedule", "Run", "Message", "Approval", "Grant", "Preference", "Audit", "StewardState"]) {
         const keys = db.query<{ table: string; from: string; on_delete: string }, []>(
           `PRAGMA foreign_key_list("${model}")`,
         ).all();
         expect(keys.some((key) => key.table === "Workspace" && key.from === "workspaceId" && key.on_delete === "CASCADE")).toBe(true);
+      }
+      const attemptKeys = db.query<{ table: string; on_delete: string }, []>('PRAGMA foreign_key_list("ExecutionAttempt")').all();
+      expect(attemptKeys.map(key => [key.table, key.on_delete]).sort()).toEqual([["Module", "RESTRICT"], ["Run", "RESTRICT"], ["Workspace", "RESTRICT"]]);
+      for (const model of ["ExecutionDetail", "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand"]) {
+        expect(db.query<{ table: string; on_delete: string }, []>(`PRAGMA foreign_key_list("${model}")`).all()).toContainEqual(expect.objectContaining({ table: "ExecutionAttempt", on_delete: "CASCADE" }));
       }
     });
   });
@@ -54,6 +59,8 @@ describe("clean steward SQLite baseline", () => {
       expect(db.query('PRAGMA table_info("ModuleRun")').all()).not.toContainEqual(expect.objectContaining({ name: "inboundItemId" }));
       const tables = db.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(row => row.name);
       expect(tables).not.toContain("Connector"); expect(tables).not.toContain("InboundItem");
+      expect(db.query('SELECT name FROM "_chrona_migrations"').all()).toEqual([{ name: "0001_initial" }]);
+      expect(tables.filter(name => name !== "_chrona_migrations").sort()).toEqual([...models].sort());
     });
   });
 
@@ -66,9 +73,13 @@ describe("clean steward SQLite baseline", () => {
         ["Run", ["workspaceId", "lane", "status", "createdAt"], false],
         ["Run", ["tokenHash"], true],
         ["Approval", ["workspaceId", "status", "createdAt"], false],
-        ["Activity", ["affairId", "at"], false],
+        ["ExecutionAttempt", ["workspaceId", "ownerId", "callerKey", "commandKey"], true],
+        ["ExecutionAttempt", ["heldDirectory"], true],
+        ["ExecutionDetail", ["attemptId", "seq"], true],
+        ["ExecutionDetail", ["expiresAt"], false],
+        ["ExecutionSnapshot", ["expiresAt"], false],
         ["Message", ["workspaceId", "externalId"], true],
-        ["InboundItem", ["connectorId", "externalId"], true],
+        ["Module", ["workspaceId", "name"], true],
       ] as const) {
         const indexes = db.query<{ name: string; unique: number }, []>(`PRAGMA index_list("${table}")`).all();
         expect(indexes.some(index => {

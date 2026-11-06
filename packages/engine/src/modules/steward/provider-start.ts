@@ -17,6 +17,9 @@ export function providerStartGate() {
       if (active) await active.abort(); else resolve(null);
     },
   };
+  // Tick observes the real Provider promise for exit evidence; this cancellation facade
+  // can outlive its consumers. Keep its rejection observable without an unhandled promise.
+  void handle.done.catch(() => {});
   return { handle, stopped: () => stopped, fail: () => resolve(null), attach(value: Handle) {
     if (stopped) throw new Error("Provider launch was cancelled");
     active = value; resolve(value);

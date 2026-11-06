@@ -1,11 +1,12 @@
 import type { ActivityItem } from "./activity";
+import type { ModuleOrigin, ModuleCapabilities } from "@chrona/contracts/steward";
 export type Setting = { type: string; label: string; description?: string; options?: string[]; min?: number; max?: number; maxLength?: number };
 export type Settings = { declarations?: Record<string, Setting>; values: Record<string, unknown> };
 export type Secret = { name: string; label?: string; description?: string; configured: boolean; updatedAt?: string; fields: { name: string; label: string; description?: string; saved: boolean; optional?: boolean; plain?: boolean }[]; savedFields?: string[]; extraFields?: { saved: string[]; label: string; valueLabel: string; description?: string }; oauth?: { provider: string; scopes: string[]; accounts?: boolean; authorized: string[] } };
 export type Model = { tier: string; target?: { model: string; thinking?: string }; today: { calls: number; inputTokens: number; outputTokens: number }; dailyCap?: number };
 export type Permissions = { module: string; secrets: Secret[]; model: Model | null; capabilities: string[]; grants: { id: string; action: string; mode: string; once?: boolean }[]; approvals: { title: string; status: string; createdAt: string }[] };
 export type Tool = { target: string; description: string; idempotent: boolean; inputSchema: { properties?: Record<string, { type?: string; enum?: unknown[]; description?: string }>; required?: string[] } };
-export type App = { id: string; name: string; description?: string; status: string; activeHash?: string; health: { runtime?: { state: string } }; runs: { createdAt: string; triggerId: string; error?: string; exitCode: number | null }[]; versions: { createdAt: string; hash: string; status: string; errors?: string[] }[] };
+export type App = { id: string; name: string; origin: ModuleOrigin; capabilities: ModuleCapabilities; builtin?: boolean; description?: string; status: string; activeHash?: string; health: { runtime?: { state: string } }; runs: { createdAt: string; triggerId: string; error?: string; exitCode: number | null }[]; versions: { createdAt: string; hash: string; status: string; errors?: string[] }[] };
 export type Overview = { app?: App; description: string; settings: Settings; permissions: Permissions; activity: ActivityItem[]; sessions?: string; work: { id: string; createdAt: string; status: string }[]; tools: { name: string; description: string; visibility: string[] }[] };
 export type Rollback = { result: string; reason?: string };
 export type Activation = { activationId: string; hash: string; status: string; observedCapabilities: string[] };

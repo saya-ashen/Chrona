@@ -47,7 +47,7 @@ test("only exact capability endpoints bypass owner auth, retaining their own pro
     expect((await app.request(`/api/steward-agent/${path}`, { method, headers })).status).toBe(403);
   }
   expect((await app.request("/api/steward-agent/catalog/extra", { headers })).status).toBe(401);
-  expect((await app.request("/api/steward-agent/catalog")).status).toBe(401);
+  expect((await app.request("/api/steward-agent/catalog", undefined, { server: { requestIP: () => ({ address: "127.0.0.1" }) } })).status).toBe(401);
 });
 
 test("legacy routes and the disabled test seam are absent", async () => {

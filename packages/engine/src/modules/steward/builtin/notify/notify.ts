@@ -1,5 +1,7 @@
 import { composeDigest, deliveryStatus, foldedBeforeDigest, isDigestDue, localDayKey, RESPONSE_KEY_PREFIX, retryDelayMs, routeNotification, validSettings, type DeliveryOutcome, type Level, type Settings } from "./budget";
 import type { Format, Row, Store } from "./store";
+import { randomUUID } from "node:crypto";
+import { callbackReady, type Directory } from "./registry";
 
 // Built-in modules run standalone: these mirror Chrona's contract (caller, call replies).
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
@@ -7,12 +9,14 @@ type CallReply = { callId: string; status: string; output?: unknown; error?: str
 export type CallResult = { callId: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string };
 type Ports = {
   store: Store; publicUrl: string | null;
-  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean }): Promise<CallReply>;
+  directory(): Promise<Directory>;
+  call(target: string, args: Record<string, unknown>, options: { mode: "async"; key: string; reply: boolean; expectedTarget: { moduleId: string; contractHash: string } }): Promise<CallReply>;
   status(callId: string): Promise<CallReply>;
 };
 type Args = Record<string, unknown>;
 type ImportedArgs = Args & { idempotencyKey: string; title: string };
-type Channel = { module: string; moduleId: string; tool: string; ready: boolean; at: number };
+type Channel = { module: string; moduleId: string; tool: string; ready: boolean; at: number; contractHash: string; revision: string; invalid?: boolean };
+type Attempt = Channel & { name: string };
 const text = (value: unknown) => typeof value === "string" && value.length ? value : null;
 const iso = (ms: number | null) => ms === null ? null : new Date(ms).toISOString();
 const DAY = 86_400_000;
@@ -28,16 +32,45 @@ function formatError(args: Args) {
   return null;
 }
 
+function validOutcome(value: unknown): value is DeliveryOutcome {
+  if (!value || typeof value !== "object") return false;
+  const output = value as Record<string, unknown>;
+  switch (output.outcome) {
+    case "accepted": return output.receiptRef === null || typeof output.receiptRef === "string";
+    case "rejected": return typeof output.retryable === "boolean" && typeof output.error === "string";
+    case "uncertain": return typeof output.error === "string";
+    default: return false;
+  }
+}
+
 class NotifyRuntime {
   private readonly store: Store;
   private readonly base: string;
   private readonly callPort: Ports["call"];
   private readonly statusPort: Ports["status"];
-  constructor({ store, publicUrl, call, status }: Ports) {
+  private readonly directoryPort: Ports["directory"];
+  private directory: Directory = { modules: [], tools: [] };
+  constructor({ store, publicUrl, call, status, directory }: Ports) {
     this.store = store;
     this.base = (publicUrl ?? "").replace(/\/$/, "");
     this.callPort = call;
     this.statusPort = status;
+    this.directoryPort = directory;
+  }
+  async refresh() {
+    const directory = await this.directoryPort();
+    if (!Array.isArray(directory.modules) || !Array.isArray(directory.tools)) throw new Error("Module directory unavailable");
+    this.directory = directory;
+    // Only a successful complete directory proves deletion. A paused owner keeps its registration.
+    for (const channel of this.channels()) {
+      const owner = directory.modules.find(module => module.id === channel.moduleId && module.name === channel.module);
+      if (!owner) this.store.db.run("DELETE FROM kv WHERE key = ?", [`channel:${channel.name}`]);
+      else if (owner.status === "active" && !callbackReady(directory, channel.moduleId, channel.module, channel.tool, channel.contractHash))
+        this.store.set(`channel:${channel.name}`, JSON.stringify({ ...channel, invalid: true }));
+    }
+  }
+  private usable(channel: Channel) {
+    return !channel.invalid && channel.ready && callbackReady(this.directory, channel.moduleId, channel.module, channel.tool, channel.contractHash);
   }
   /** Old readiness-only records are not registrations: wait for their owner to register again. */
   private channels() {
@@ -46,8 +79,8 @@ class NotifyRuntime {
       .filter(channel => channel.module && channel.moduleId && channel.tool);
   }
   private channelFor(row: Row) {
-    const channels = this.channels();
-    return row.channel !== "in_app" ? channels.find(channel => channel.name === row.channel) : channels.find(channel => channel.ready);
+    const channels = this.channels().filter(channel => this.usable(channel));
+    return row.channel !== "in_app" ? channels.find(channel => channel.name === row.channel) : channels[0];
   }
   private view(row: Row) {
     return { id: row.id, moduleId: row.module_id, sessionId: row.session_id, level: row.level, channel: row.channel, status: row.status === "sending" ? "queued" : row.status,
@@ -90,17 +123,22 @@ class NotifyRuntime {
       last_error: outcome.outcome === "accepted" ? null : outcome.error.slice(0, 500), next_attempt_at: next === "queued" ? now.getTime() + retryDelayMs(attempts) : null });
   }
   private async dispatch(row: Row, attempts: number, now: Date) {
-    const channel = this.channelFor(row);
-    if (!channel?.ready) return;
+    const saved = this.store.get(`attempt:${row.id}:${attempts}`);
+    const channel = saved ? JSON.parse(saved) as Attempt : null;
+    // Recovery must never choose a new target after an enqueue receipt was lost.
+    if (!channel || !this.usable(channel)) {
+      this.finish(row, { outcome: "uncertain", error: "Original delivery target is unavailable or changed; verify its receipt" }, attempts, now);
+      return;
+    }
     const args: Args = { key: row.key, title: row.title, body: row.body, format: row.format, ...(row.link ? { link: row.link } : {}), ...(row.recipient ? { recipient: row.recipient } : {}),
       ...(row.approval_id ? { approval: row.approval_id, scoped: row.scoped === 1 } : {}) };
     try {
       // Async with the attempt in the key: a repeat after a crash returns the same call instead of sending twice.
-      const reply = await this.callPort(`${channel.module}.${channel.tool}`, args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true });
+      const reply = await this.callPort(`${channel.module}.${channel.tool}`, args, { mode: "async", key: `deliver:${row.id}:${attempts}`, reply: true, expectedTarget: { moduleId: channel.moduleId, contractHash: channel.contractHash } });
       this.store.update(row.id, { call_id: reply.callId });
       if (["succeeded", "failed", "unknown"].includes(reply.status)) this.result({ ...reply, status: reply.status as CallResult["status"] }, now);
     } catch (error) {
-      this.finish(this.store.byId(row.id)!, { outcome: "rejected", retryable: true, error: `Channel unavailable: ${error instanceof Error ? error.message : String(error)}` }, attempts, now);
+      this.finish(this.store.byId(row.id)!, { outcome: "uncertain", error: `Delivery enqueue receipt unknown; verify before resending: ${error instanceof Error ? error.message : String(error)}` }, attempts, now);
     }
   }
   private digestBlocked(row: Row, settings: Settings, now: Date) {
@@ -117,7 +155,10 @@ class NotifyRuntime {
       // The channel is chosen when sending: no registered, ready channel falls back to the web.
       const channel = this.channelFor(row);
       if (row.web || !channel?.ready) { this.deliverInApp(row, attempts, now); continue; }
-      this.store.update(row.id, { channel: channel.name, status: "sending", attempts, call_id: null, call_at: now.getTime() });
+      this.store.db.transaction(() => {
+        this.store.set(`attempt:${row.id}:${attempts}`, JSON.stringify(channel satisfies Attempt));
+        this.store.update(row.id, { channel: channel.name, status: "sending", attempts, call_id: null, call_at: now.getTime() });
+      })();
       await this.dispatch({ ...row, channel: channel.name }, attempts, now);
     }
   }
@@ -125,10 +166,9 @@ class NotifyRuntime {
   result(event: CallResult, now: Date) {
     const row = this.store.byCall(event.callId);
     if (!row || row.status !== "sending") return;
-    const output = event.output as DeliveryOutcome | undefined;
-    const valid = event.status === "succeeded" && output && typeof output === "object" && ["accepted", "rejected", "uncertain"].includes(output.outcome);
+    const output: unknown = event.output;
     // The channel may have reached the transport before failing: never resend an unknown outcome.
-    this.finish(row, valid ? output : { outcome: "uncertain", error: event.error ?? "Channel returned no delivery outcome; receipt unknown" }, row.attempts, now);
+    this.finish(row, event.status === "succeeded" && validOutcome(output) ? output : { outcome: "uncertain", error: event.error ?? "Channel returned no delivery outcome; receipt unknown" }, row.attempts, now);
   }
   private async recover(now: Date) {
     for (const row of this.store.rows("SELECT * FROM notifications WHERE status = 'sending' AND call_at <= ?", now.getTime() - 60_000)) {
@@ -200,12 +240,16 @@ class NotifyRuntime {
     // Build smoke probes have no module caller.
     if (caller.kind !== "module") return { ignored: true };
     const name = text(args.channel), tool = text(args.tool), at = Date.parse(String(args.at));
-    if (!name || name === "in_app" || !/^[a-z][a-z0-9_-]{0,63}$/.test(name) || !tool || !/^[a-z][a-z0-9-]{0,63}$/.test(tool)) return { error: "invalid", message: "channel and local delivery tool are required" };
+    if (!name || name === "in_app" || !/^[a-z][a-z0-9_-]{0,119}$/.test(name) || !tool || !/^[a-z][a-z0-9-]{0,63}$/.test(tool)) return { error: "invalid", message: "channel and local delivery tool are required" };
     if (!Number.isFinite(at)) return { error: "invalid", message: "at must be a time" };
     const value = this.store.get(`channel:${name}`), previous = value ? JSON.parse(value) as Partial<Channel> : null;
     if (previous?.moduleId && previous.moduleId !== caller.moduleId) return { error: "forbidden", message: "Channel belongs to another module" };
     if (previous?.moduleId && previous.at! > at) return { ignored: true };
-    this.store.set(`channel:${name}`, JSON.stringify({ module: caller.module, moduleId: caller.moduleId, tool, ready: args.ready === true, at } satisfies Channel));
+    const reference = this.directory.tools.find(candidate => candidate.target === `${caller.module}.${tool}` && candidate.moduleId === caller.moduleId && candidate.hash === caller.hash);
+    if (!reference?.contractHash || !callbackReady(this.directory, caller.moduleId, caller.module, tool, reference.contractHash))
+      return { error: "forbidden", message: "Delivery tool must belong to the active caller and accept the notification protocol; register again after fixing it" };
+    const revision = !previous?.invalid && previous?.tool === tool && previous.contractHash === reference.contractHash && previous.ready === (args.ready === true) ? previous.revision! : randomUUID();
+    this.store.set(`channel:${name}`, JSON.stringify({ module: caller.module, moduleId: caller.moduleId, tool, ready: args.ready === true, at, contractHash: reference.contractHash, revision } satisfies Channel));
     return { ready: args.ready === true };
   }
   private list(args: Args) {
@@ -214,7 +258,7 @@ class NotifyRuntime {
   }
   private status(now: Date) {
     const settings = this.store.settings(), day = localDayKey(now, settings.timezone);
-    const channels = this.channels(), channel = channels.find(channel => channel.ready) ?? (channels[0] as (typeof channels)[number] | undefined);
+    const channels = this.channels().filter(channel => this.usable(channel)), channel = channels.at(0);
     const sent = this.store.rows("SELECT * FROM notifications WHERE channel = ? AND responds = 0 AND sent_at >= ?", channel?.name ?? "in_app", now.getTime() - 2 * DAY).filter(row => localDayKey(new Date(row.sent_at!), settings.timezone) === day).length;
     const count = (statuses: string) => (this.store.db.query(`SELECT COUNT(*) AS n FROM notifications WHERE status IN (${statuses})`).get() as { n: number }).n;
     return { chat: { channel: channel?.name ?? "in_app", bound: channel?.ready ?? false, sentToday: sent }, queued: count("'queued', 'sending'"), failed: count("'failed', 'uncertain'") };
@@ -241,11 +285,11 @@ class NotifyRuntime {
     if (!Object.hasOwn(handlers, tool)) throw new Error(`Unknown tool ${tool}`);
     return handlers[tool]!();
   }
-  async tick(now: Date) { await this.recover(now); this.digest(now); await this.deliverDue(now); }
+  async tick(now: Date) { await this.refresh(); await this.recover(now); this.digest(now); await this.deliverDue(now); }
 }
 
 /** Budget, registered channel callbacks and delivery receipts. */
 export function createNotify(ports: Ports) {
   const runtime = new NotifyRuntime(ports);
-  return { handle: runtime.handle.bind(runtime), result: runtime.result.bind(runtime), tick: runtime.tick.bind(runtime) };
+  return { handle: runtime.handle.bind(runtime), result: runtime.result.bind(runtime), tick: runtime.tick.bind(runtime), refresh: runtime.refresh.bind(runtime) };
 }

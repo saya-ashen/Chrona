@@ -142,6 +142,7 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   const [store] = useState(() => createStateStore({ ...(page.spec.state ?? {}) }));
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [loadedAt, setLoadedAt] = useState(0);
+  const [loading, setLoading] = useState(false);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const currentRegistry = system ? systemRegistry : registry;
   const spec = system ? system.spec(state) : page.spec;
@@ -150,13 +151,15 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   // Each source is read when the page opens, when the state its arguments use changes, and every `refresh` seconds.
   useEffect(() => {
     const last = new Map<string, string>(), timers: ReturnType<typeof setInterval>[] = [];
-    let stopped = false;
+    let stopped = false, pending = 0;
+    setLoading(false);
     // eslint-disable-next-line complexity -- Preserve source deduplication, stale-response checks and feedback ordering in one request lifecycle.
     const read = async (key: string, source: Source, force = false) => {
       const args = (resolve(source.args ?? {}, store) ?? {}) as Args, signature = JSON.stringify(args);
       if (!force && last.get(key) === signature) return;
       last.set(key, signature);
       if ((page.needs?.[key] ?? []).some(name => args[name] === undefined || args[name] === null || args[name] === "")) return;
+      pending++; setLoading(true);
       try {
         const result = await deps.call(target(source.tool), args), failed = failure(result);
         if (stopped || last.get(key) !== signature) return;
@@ -164,6 +167,7 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
         store.set(`/${key}`, result);
         setFeedback(current => current?.source === key ? null : current);
       } catch (error) { if (!stopped) setFeedback({ failed: true, text: `读取失败：${(error as Error).message}`, source: key }); }
+      finally { pending--; if (!stopped && pending === 0) setLoading(false); }
     };
     const all = (force: boolean) => { for (const [key, source] of Object.entries(page.data)) void read(key, source, force); };
     all(true);
@@ -196,6 +200,7 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={deps.navigate}>
     <div className={system ? "registered-page system-page" : "registered-page"}>
       {!system ? <h2>{page.title}</h2> : null}
+      {loading ? <p role="status" aria-live="polite" className="muted">正在读取应用数据……</p> : null}
       {feedback ? <p role="status" className={feedback.failed ? "error" : "muted"}>{feedback.text}</p> : null}
       <SystemContext.Provider value={systemContext}><ImageContext.Provider value={{ page, deps }}><Renderer spec={spec} registry={currentRegistry} fallback={fallback} /></ImageContext.Provider></SystemContext.Provider>
     </div>

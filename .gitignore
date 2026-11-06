@@ -27,6 +27,9 @@ node_modules/
 /build/*
 !/build/manifest.ts
 !/build/manifest.bun.test.ts
+!/build/execution-contracts.ts
+!/build/execution-contract-types.ts
+!/build/execution-contracts.bun.test.ts
 !/build/release-smoke.ts
 !/build/release-smoke.bun.test.ts
 # misc

@@ -2,6 +2,14 @@
 
 适用于重构后的单一 owner 版本。先读[快速开始与配置表](../../README.zh.md)。所有命令均在仓库根目录执行，或使用对应版本的打包 CLI；不要用旧版本可执行文件操作新库。
 
+## M1 开发集成边界（2026-11-05）
+
+当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。内置固定 web/mcp/files/notify/events；qq/remind/mind 是预装外置，memory-local 仅可选。
+
+## M2 编码开发集成边界
+
+可选官方外置 `coding`、`editor` 的项目映射、owner 身份、成果与停止未知恢复见[服务器编码工作](server-coding.md)。当前单服务器编码、真实 fake Pi/Neovim 目标联调已通过；完整集成检查状态见[M2 验收记录](chrona-workbench-m2-acceptance.md)。M3 本机执行器与并行尚未实现，不配置私人设备或将旧 loopback Provider bridge 暴露到外网。
+
 ## 启动与数据位置
 
 源码开发用 `bun run dev`（Hono watch 模式），不使用 watch 模式时用 `bun run server:start`；两者默认在 `127.0.0.1:3101` 提供内置 web 模块和 API，不另启 Vite 服务。打包版本用 `chrona start --no-open`，默认同样监听 `127.0.0.1:3101`；`chrona start` 只在打包版本提供。
@@ -73,7 +81,7 @@ bun run packages/cli/src/index.ts doctor
 - Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0` 及以后的 `1.x`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
 - 模块依赖：有 `nix` 时用 `CHRONA_NIXPKGS`（flake 引用，建议固定为系统 nixpkgs）构建系统程序；没有时只检查主机已安装的程序。语言库只按模块的 `bun.lock` / `uv.lock` 安装，构建时需要能访问 npm / PyPI。
-- QQ：由内置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经 `secret` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
+- QQ：由官方预装外置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经声明的 `secrets.get` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`；通过 `chrona_module_tools` 发现 owner 可用的模块工具，再用 `chrona_module_call` 调用，不直接暴露 Provider 的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
 环境变量修改后重启服务。保持 `CHRONA_E2E_TEST_ROUTES` 未设置。开发脚本默认回环监听；修改 `HOST` 对外开放前须配置认证。
@@ -139,4 +147,4 @@ Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/
 
 `CHRONA_STEWARD_SANDBOX_BWRAP` 也配置模块沙箱。默认 `trusted-local` 以本地进程运行，不使用 bubblewrap；`required-isolation` 下探测不通过或未配置则拒绝模块启动/检查，不回退。依赖安装器目前仍在宿主执行；该模式下含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选在安装前拒绝，直到提供隔离安装实现；无依赖候选不受此安装限制影响。可信本地进程仍受超时、内存与输出限制，但网络与文件范围不再受隔离约束。构建检查全部通过的版本自动启用并事后通知，不再使用审批分级、AI 复核或长期模块启用授权。仅迁移已有数据、恢复旧数据快照、新增凭据与删除应用需要用户决定；运行时对外动作审批保留，所有入口均可批准或拒绝。以实际执行结果为准，不以模型文字为准。
 
-新激活的模块版本若在任何事件投递前启动失败，Chrona 自动切回前一已批准版本一次，无需开关或长期授权，入口/网络模块也适用。候选与目标均须已批准且 manifest 有效，模块仍为当前 active 激活与 hash、尚无已验证能力；数据 schema 必须与前版及当前数据一致，且无迁移/恢复记录、非分组激活、无动态或变化的日程。不满足条件时按[模块故障诊断与恢复](module-recovery.md)人工处理。自动回滚保留当前数据和兼容静态日程，不重建日程、不重放工作；恢复目标不会继续自动回滚。
+新激活的外置模块版本若在任何事件投递前启动失败，Chrona 自动切回前一已批准版本一次，无需开关或长期授权，入口/网络模块也适用。候选与目标均须已批准且 manifest 有效，模块仍为当前 active 激活与 hash、尚无已验证能力；数据 schema 必须与前版及当前数据一致，且无迁移/恢复记录、非分组激活、无动态或变化的日程。内置故障只重启/暂停/诊断，不回到旧 store 代码。不满足条件时按[模块故障诊断与恢复](module-recovery.md)人工处理。自动回滚保留当前数据和兼容静态日程，不重建日程、不重放工作；恢复目标不会继续自动回滚。

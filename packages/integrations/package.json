@@ -4,5 +4,5 @@
   "private": true,
   "type": "module",
   "dependencies": { "@chrona/contracts": "workspace:*" },
-  "exports": { ".": "./src/index.ts", "./steward": "./src/steward/index.ts" }
+  "exports": { ".": "./src/index.ts", "./steward": "./src/steward/index.ts", "./executor": "./src/executor/index.ts" }
 }

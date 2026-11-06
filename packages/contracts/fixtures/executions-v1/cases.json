@@ -1,0 +1,56 @@
+{
+  "v": "chrona.execution.v1",
+  "status": "candidate-pending-coordinator-review",
+  "requests": [
+    {"name":"create","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","command":{"op":"start","workId":"work-1","projectRef":"project-1","commandKey":"create-1","goal":"修复测试","budget":{"timeoutMs":60000,"maxToolCalls":10}}}},
+    {"name":"forged-caller","valid":false,"value":{"v":"chrona.execution.v1","requestId":"req-2","command":{"op":"start","workId":"work-1","projectRef":"project-1","commandKey":"create-1","goal":"修复测试","budget":{"timeoutMs":60000,"maxToolCalls":10},"caller":"owner"}}},
+    {"name":"detach-is-local","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-3","command":{"op":"detach","workId":"work-1"}}},
+    {"name":"poll-limit","valid":false,"value":{"v":"chrona.execution.v1","requestId":"req-4","command":{"op":"events","workId":"work-1","runId":"run-1","attemptId":"attempt-1","limit":101,"waitMs":15001}}},
+    {"name":"answer","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-5","command":{"op":"answer","workId":"work-1","runId":"run-1","attemptId":"attempt-1","commandKey":"answer-1","requestId":"question-1","answer":{"decision":"submit","value":0}}}},
+    {"name":"wrong-version","valid":false,"value":{"v":"chrona.execution.v2","requestId":"req-6","command":{"op":"get","workId":"work-1"}}}
+  ],
+  "events": [
+    {"name":"normalized-message","valid":true,"value":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","seq":1,"at":"2026-11-05T12:00:00Z","payload":{"type":"message","messageId":"msg-1","role":"assistant","text":"你好 🐱","complete":true}}},
+    {"name":"raw-rpc-forbidden","valid":false,"value":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","seq":2,"at":"2026-11-05T12:00:00Z","payload":{"type":"raw","rpc":{}}}},
+    {"name":"thinking-forbidden","valid":false,"value":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","seq":3,"at":"2026-11-05T12:00:00Z","payload":{"type":"thinking","text":"hidden"}}},
+    {"name":"question-no-original","valid":true,"value":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","seq":4,"at":"2026-11-05T12:00:00Z","payload":{"type":"question","question":{"requestId":"question-1","title":"继续？","method":"select","options":["继续","取消"],"expiresAt":"2026-11-05T12:01:00Z","status":"interrupted"}}}}
+  ],
+  "responses": [
+    {"name":"stable-view","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":true,"data":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","projectRef":"project-1","status":"running","cancelRequested":true,"stopConfirmed":false}}},
+    {"name":"expired-cursor","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":false,"error":{"code":"cursor_expired","message":"history expired; read authorized snapshot","retryable":false}}},
+    {"name":"poll-capacity","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":false,"error":{"code":"capacity","message":"poll capacity","retryable":true,"retryAfterMs":1000}}},
+    {"name":"unsupported-capability","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":false,"error":{"code":"unsupported","message":"thinking is unavailable","retryable":false}}},
+    {"name":"empty-page","valid":true,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":true,"data":{"events":[],"cursor":"opaque","highWatermark":0,"gap":false,"snapshotRequired":false}}},
+    {"name":"stop-without-proof","valid":false,"value":{"v":"chrona.execution.v1","requestId":"req-1","ok":true,"data":{"workId":"work-1","sessionId":"session-1","runId":"run-1","attemptId":"attempt-1","projectRef":"project-1","status":"cancelled","cancelRequested":true,"stopConfirmed":false}}}
+  ],
+  "scenarios": [
+    {"name":"duplicate-same-key","action":"submit original commandKey and identical body","expect":"same work/session/run/attempt; one enqueue"},
+    {"name":"duplicate-different-body","action":"reuse commandKey with changed goal","expect":"conflict; no new enqueue"},
+    {"name":"submit-timeout","action":"query original commandKey","expect":"return prior receipt; never replace key automatically"},
+    {"name":"cross-work","action":"other owner reads work/cursor","expect":"forbidden"},
+    {"name":"stale-attempt","action":"answer or cancel with previous attemptId","expect":"conflict"},
+    {"name":"answer-duplicate","action":"same valid answer key twice","expect":"original receipt; one answer effect"},
+    {"name":"expired-question","action":"answer after expiresAt","expect":"conflict; historical question grants nothing"},
+    {"name":"restart-question","action":"answer saved question after controller restart","expect":"conflict; show interrupted"},
+    {"name":"detach","action":"close backend or exit editor","expect":"detach only; run continues"},
+    {"name":"disconnect","action":"transport fails","expect":"stale connection; no fallback to direct Pi"},
+    {"name":"duplicate-seq","action":"same event seq same payload","expect":"deduplicate"},
+    {"name":"duplicate-seq-changed","action":"same event seq changed payload","expect":"conflict"},
+    {"name":"out-of-order-gap","action":"receive seq 1 then 3 then 2","expect":"gap and snapshotRequired; late seq rejected"},
+    {"name":"cursor-expired","action":"read compacted detail","expect":"cursor_expired; authorized snapshot remains within retention"},
+    {"name":"size","action":"UTF-8 event exceeds 32768 bytes","expect":"too_large before storage"},
+    {"name":"redaction","action":"tool has allowed path and secret/env/raw fields","expect":"only redacted allowed path"},
+    {"name":"delta-loss","action":"detail unavailable at completion","expect":"bounded final snapshot with missing flag"},
+    {"name":"cancel-unconfirmed","action":"cancel running process without exit evidence","expect":"cancelRequested true; stopConfirmed false"},
+    {"name":"cancel-race-complete","action":"completion commits before cancel","expect":"completed plus cancel intent; no invented killed state"},
+    {"name":"capacity","action":"reserved final/control space unavailable","expect":"capacity before enqueue; never promise unlimited final history"},
+    {"name":"unsupported","action":"invoke thinking/raw_rpc/model switch","expect":"unsupported; no native Pi command"},
+    {"name":"json-shapes","action":"decode empty arrays, null finalMessage and Unicode","expect":"preserve array/null/string distinctions in TS and Lua"}
+  ],
+  "normalizedUi": {
+    "message": {"type":"message_finished","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"你好 🐱"}]}},
+    "question": {"requestId":"question-1","runId":"run-1","attemptId":"attempt-1","method":"select","options":[],"status":"interrupted"},
+    "snapshot": {"finalMessage":null,"questions":[],"missing":true},
+    "capabilities": {"history":true,"messages":true,"tools":true,"answer":true,"cancel":true,"results":true,"raw_rpc":false,"thinking":false,"direct_bash":false,"tree":false,"compaction":false,"commands":false,"models":false,"attachments":false,"changed_files":false,"follow_up":false}
+  }
+}

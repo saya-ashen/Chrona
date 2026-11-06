@@ -30,7 +30,15 @@ const tools: McpTool[] = [
     inputSchema: schema({ interactionId: str(), decision: { type: "string", enum: ["submit", "cancel"] }, value: { type: ["boolean", "integer", "string"], description: "confirm: true/false; select: option index; input/editor: text" } }, ["interactionId", "decision"]),
     run: ({ interactionId, decision, value }) => call("chat.answer", { interaction: interactionId, answer: JSON.stringify(decision === "cancel" ? { decision } : { decision, value }) }) },
   { name: "chrona_run_cancel", description: "Stop a running Chrona run (work already done is kept).", inputSchema: schema({ runId: str() }, ["runId"]), run: ({ runId }) => call("chat.cancel", { run: runId }) },
-  { name: "chrona_modules", description: "List modules (apps Chrona runs without the Provider), their versions and recent runs.", inputSchema: schema(), run: () => call("modules.list") },
+  { name: "chrona_modules", description: "List installed apps, their origin, current lifecycle capabilities, versions and recent runs.", inputSchema: schema(), run: () => call("modules.list") },
+  { name: "chrona_module_catalog", description: "Read official external packages, release availability and the latest installation receipt. Does not install anything.", inputSchema: schema(), run: () => call("modules.catalog") },
+  { name: "chrona_module_install", description: "Install or explicitly update one official external package after the user authorized it. Reuse requestKey to query the same request; pending or unavailable is not success. Never retry an unknown result with a new key.", destructive: true,
+    inputSchema: schema({ package: { type: "string", enum: ["qq", "remind", "mind", "memory-local"] }, mode: { type: "string", enum: ["install", "update"] }, requestKey: { type: "string", minLength: 1, maxLength: 120 } }, ["package", "mode", "requestKey"]),
+    run: args => {
+      if (Object.keys(args).some(key => !["package", "mode", "requestKey"].includes(key)) || typeof args.package !== "string" || !["qq", "remind", "mind", "memory-local"].includes(args.package) || typeof args.mode !== "string" || !["install", "update"].includes(args.mode) || typeof args.requestKey !== "string" || !args.requestKey.trim() || args.requestKey.trim().length > 120)
+        throw new Error("invalid: expected official package, install/update mode and requestKey of 1–120 characters; host paths are not accepted");
+      return call("modules.install", { ...args, requestKey: args.requestKey.trim() });
+    } },
   { name: "chrona_activity", description: "What Chrona did, newest first: approvals and their decisions, module checks, activations and auto-updates (with version), rollbacks, faults, grants, settings and credential changes (names only).",
     inputSchema: schema({ module: str("Optional module name"), before: str("ISO time from the previous page") }), run: ({ module, before }) => call("activity.list", { module, before }) },
   { name: "chrona_module_permissions", description: "One app's permissions and use: what it can do, credentials (set or not), model tier and today's calls, standing grants, recent approvals.",

@@ -4,19 +4,20 @@ import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { createQqBotState, createSecrets, createStewardService, moduleSupervisor } from "@chrona/engine";
+import { createQqBotState, createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
+import { createModuleRuntimePorts } from "../../integrations/src/steward/module-runtime";
+import { moduleInstallRequestSchema } from "@chrona/contracts/steward";
 
-export type AdminCommand = "diagnostics" | "modules" | "rollback" | "disable" | "approvals" | "approve" | "reject";
+export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "approvals" | "approve" | "reject";
 type AdminApi = ReturnType<ReturnType<typeof createStewardService>["forWorkspace"]>;
 async function changeModule(db: PrismaClient, api: AdminApi, command: AdminCommand, args: string[]) {
   const workspaceId = "ws_default";
   const module = await db.module.findFirst({ where: { workspaceId, OR: [{ id: args[0] }, { name: args[0] }] } });
   if (!module) throw new Error("Module not found");
   if (command === "disable") return api.modules.disable(module.id, "cli");
-  const version = args[1] === "builtin" ? await db.moduleVersion.findFirst({ where: { moduleId: module.id, source: "builtin", status: "approved" }, orderBy: { createdAt: "desc" } }) : null;
-  const hash = args[1] === "builtin" ? version?.hash : args[1];
-  if (!hash) throw new Error("Approved built-in module version not found");
+  const hash = args[1];
+  if (!hash || !/^[a-f0-9]{64}$/.test(hash)) throw new Error("An approved external module version hash is required");
   const rollback = await api.modules.rollback(module.id, hash);
   // Local administration is a trusted approval source, including data-restore confirmations.
   const result = rollback.status === "pending_approval" ? (await api.approvals.resolve(rollback.approvalId, { decision: "approve", scope: "once" }, "cli")).approval : rollback;
@@ -28,16 +29,22 @@ function adminLocation(options: { dataDir?: string; databaseUrl?: string }) {
   const databaseUrl = options.databaseUrl ?? process.env.DATABASE_URL ?? `file:${join(dataDir, "chrona.db")}`;
   return { dataDir, databaseUrl };
 }
+const readOnlyAdmin = (command: AdminCommand) => ["modules", "approvals", "diagnostics", "catalog"].includes(command);
+function adminPorts(db: PrismaClient, dataDir: string, command: AdminCommand): StewardPorts {
+  if (!["install", "catalog"].includes(command)) return { db, dataDir, now: () => new Date(), publicUrl: null };
+  return createModuleRuntimePorts(db, { dataDir });
+}
 /** Local filesystem ownership, never API_KEY or Provider credentials, authorizes administration. */
 export async function runAdmin(command: AdminCommand, args: string[] = [], options: { dataDir?: string; databaseUrl?: string } = {}) {
   const { dataDir, databaseUrl } = adminLocation(options);
   const path = sqlitePathFromFileUrl(databaseUrl);
   if (!path || !existsSync(path)) throw new Error("Chrona database not found. Start Chrona once before using chrona admin.");
-  const readOnly = command === "modules" || command === "approvals" || command === "diagnostics";
+  const readOnly = readOnlyAdmin(command);
   const lock = readOnly ? undefined : acquireSqliteRuntimeLock(databaseUrl);
   const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
-  const ports = { db, dataDir, now: () => new Date(), publicUrl: null, deliveries: [], chat: null };
+  let ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
   try {
+    ports = adminPorts(db, dataDir, command);
     // Offline administration updates generations without starting long-running modules.
     await moduleSupervisor(ports).stop();
     const workspaceId = "ws_default";
@@ -45,9 +52,11 @@ export async function runAdmin(command: AdminCommand, args: string[] = [], optio
     const handlers: Partial<Record<AdminCommand, () => Promise<unknown>>> = {
       modules: async () => [...await api.modules.list(), { name: "rescue", status: "immutable" }],
       diagnostics: () => api.modules.diagnostics(args[0]),
+      catalog: () => api.modules.catalog(),
+      install: () => api.modules.install(moduleInstallRequestSchema.parse({ package: args[0], mode: args[1], requestKey: args[2] })),
       approvals: () => api.approvals.list("open"),
-      approve: async () => (await api.approvals.resolve(args[0]!, { decision: "approve", scope: "once" }, "cli")).approval,
-      reject: async () => (await api.approvals.resolve(args[0]!, { decision: "deny", scope: "once" }, "cli")).approval,
+      approve: async () => { const resolved = (await api.approvals.resolve(args[0]!, { decision: "approve", scope: "once" }, "cli")).approval; await refreshInstallationReceipts(ports, workspaceId); return resolved; },
+      reject: async () => { const resolved = (await api.approvals.resolve(args[0]!, { decision: "deny", scope: "once" }, "cli")).approval; await refreshInstallationReceipts(ports, workspaceId); return resolved; },
     };
     const handler = Object.hasOwn(handlers, command) ? handlers[command] : undefined;
     const result = handler ? await handler() : await changeModule(db, api, command, args);

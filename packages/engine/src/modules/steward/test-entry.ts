@@ -1,15 +1,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { handleModuleCall } from "./module-effects";
-import type { QqReplyItem } from "./builtin/qq/bot";
+import type { QqReplyItem } from "./external/qq/bot";
 
-/** Tests: an active built-in entry module (`qq`, `web`, `mcp`) with its real manifest; `call` routes as its socket would. */
+/** Tests: an active shipped entry with its real manifest; `call` routes as its socket would. */
 export async function builtinEntry(ports: StewardPorts, workspaceId: string, name: string) {
-  const manifest: ModuleManifest = moduleManifestSchema.parse(JSON.parse(readFileSync(join(import.meta.dirname, `builtin/${name}/module.json`), "utf8")));
-  const module = await ports.db.module.create({ data: { workspaceId, name, activeHash: `${name}-test`, builtin: true } });
-  await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-test`, manifest, source: "builtin", intent: {}, report: {}, status: "approved" } });
+  const builtin = (BUILTIN_MODULE_NAMES as readonly string[]).includes(name);
+  const manifest: ModuleManifest = moduleManifestSchema.parse(JSON.parse(readFileSync(join(import.meta.dirname, `${builtin ? "builtin" : "external"}/${name}/module.json`), "utf8")));
+  const module = await ports.db.module.create({ data: { workspaceId, name, activeHash: `${name}-test`, builtin } });
+  await ports.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-test`, manifest, source: builtin ? "builtin" : "user", intent: {}, report: {}, status: "approved" } });
   const scope = { workspaceId, moduleId: module.id, hash: `${name}-test`, manifest };
   async function call(target: string, args: Record<string, unknown>) {
     const reply = await handleModuleCall(ports, scope, { id: "test", method: "call", params: { target, args: args as never, mode: "sync", reply: false } });
@@ -19,7 +20,7 @@ export async function builtinEntry(ports: StewardPorts, workspaceId: string, nam
   return { module, call };
 }
 /**
- * Tests: an active `qq` module row with the real built-in manifest, and `call` as the module's socket would make it
+ * Tests: an active `qq` module row with the real external manifest, and `call` as the module's socket would make it
  * (handleModuleCall: `uses`, recorded caller, routing). `pushed` reads the `qq.reply` calls Chrona queued for it.
  */
 export async function qqEntry(ports: StewardPorts, workspaceId: string) {

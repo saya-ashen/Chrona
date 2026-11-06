@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
-import { chmod, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
+import { launchPiProcess } from "./pi-process";
 import type { ProviderRunInput } from "@chrona/contracts/steward";
 
 /** Every executable is synthetic; no installed Pi, credentials, model or QQ. */
@@ -92,6 +93,44 @@ test("aborted settlement is not success and EOF without settlement is failure", 
     expect((await f.provider.start(f.input).done).outcome).toBe("failed");
   }
 });
+test("a trusted launcher withholds done until owned process closure is confirmed", async () => {
+  const f = await fixture();
+  let confirm!: () => void;
+  const proof = new Promise<void>(resolveProof => { confirm = resolveProof; });
+  const provider = createPiProvider({ ...f.options, launch(input) {
+    const process = launchPiProcess(input);
+    return { ...process, closed: process.closed.then(async exit => { await proof; return exit; }) };
+  } });
+  const handle = provider.start(f.input);
+  let completed = false;
+  const done = handle.done.then(result => { completed = true; return result; });
+  try {
+    await until(() => f.marked("last-write"));
+    await Bun.sleep(20);
+    expect(completed).toBe(false);
+  } finally { confirm(); }
+  expect((await done).outcome).toBe("finished");
+});
+
+test("unknown launcher closure rejects done instead of publishing stopped completion", async () => {
+  const f = await fixture();
+  const uncertainty = new Error("Owned cgroup identity could not be verified");
+  // A model pin creates a disposable profile; the fake's mismatched model makes it close without a model call.
+  f.input.model = "synthetic/model";
+  let profile = "";
+  const provider = createPiProvider({ ...f.options, launch(input) {
+    profile = input.env.PI_CODING_AGENT_DIR!;
+    const process = launchPiProcess(input);
+    return { ...process, closed: process.closed.then(() => { throw uncertainty; }) };
+  } });
+  const handle = provider.start(f.input);
+  await expect(handle.done).rejects.toBe(uncertainty);
+  expect(await f.marked("last-write")).toBe(true);
+  await expect(handle.abort()).rejects.toBe(uncertainty);
+  expect(profile).not.toBe(f.agentDir);
+  expect((await stat(profile)).isDirectory()).toBe(true);
+});
+
 test("done waits for the child's final write and exit", async () => {
   const f = await fixture("late-exit");
   expect((await f.provider.start(f.input).done).outcome).toBe("finished");

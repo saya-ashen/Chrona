@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { effectiveSettings, moduleManifestSchema, moduleSettingSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
+import { effectiveSettings, moduleCapabilitiesSchema, moduleOriginSchema, moduleManifestSchema, moduleSettingSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
 import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
 import type { StewardPorts } from "./ports";
 import { CallError, listSystemModules, normalizedToolInputSchema, type Json } from "./module-calls";
@@ -12,6 +12,7 @@ import { createModules } from "./modules";
 import { listActivity } from "./activity";
 import { systemApps } from "./system-apps";
 import { audit } from "./audit";
+import { moduleCapabilities } from "./module-identity";
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Json;
 
@@ -28,9 +29,9 @@ export async function modulePermissions(ports: StewardPorts, workspaceId: string
     capabilities: manifest ? addedCapabilities(null, manifest) : [],
     secrets: await Promise.all((manifest?.secrets ?? []).map(async declared => {
       const name = typeof declared === "string" ? declared : declared.name;
-      // Field names only (v2-16 §2.1); qq_bot comes from the service environment.
-      const value = name === "qq_bot" ? null : await createSecrets(ports.dataDir).read(name).catch(() => null);
-      return { name, configured: name === "qq_bot" || saved.has(name), updatedAt: saved.get(name) ?? null, ...secretView(declared, value) };
+      // Field metadata stays local; adapters expose only whether an environment-held credential is configured.
+      const value = saved.has(name) ? await createSecrets(ports.dataDir).read(name).catch(() => null) : null;
+      return { name, configured: saved.has(name) || await ports.secretConfigured?.(name) === true, updatedAt: saved.get(name) ?? null, ...secretView(declared, value) };
     })),
     model: manifest?.model ? await moduleModelView(ports, workspaceId, module.name, manifest.model) : null,
     grants: grants.map(grant => ({ id: grant.id, action: grant.action, mode: grant.mode, once: grant.once, createdAt: grant.createdAt.toISOString() })),
@@ -136,7 +137,7 @@ export const permissionsSchema = z.object({
 });
 export const moduleOverviewOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("app"), app: z.record(z.string(), z.unknown()).nullable(), tools: z.array(overviewToolSchema), permissions: permissionsSchema, settings: moduleSettingsOutputSchema, diagnostics: moduleDiagnosticsOutputSchema.element.nullable(), activity: z.array(activitySchema).max(30) }),
-  z.object({ kind: z.literal("system"), name: z.string(), description: z.string(), sessions: z.string().nullable(),
+  z.object({ kind: z.literal("system"), origin: moduleOriginSchema, capabilities: moduleCapabilitiesSchema, name: z.string(), description: z.string(), sessions: z.string().nullable(),
     tools: z.array(overviewToolSchema),
     work: z.array(z.object({ id: z.string(), title: z.string().nullable(), status: z.string(), createdAt: z.string(), endedAt: z.string().nullable() })),
     settings: moduleSettingsOutputSchema, activity: z.array(activitySchema).max(30) }),
@@ -151,7 +152,7 @@ export function moduleOverviewExamples() {
     moduleOverviewOutputSchema.parse({ kind: "app", app: { id: "fixture-module", name: "example", status: "active", activeHash: "a".repeat(64) },
       tools: [], permissions: { module: "example", activeHash: "a".repeat(64), capabilities: ["Synthetic capability"], secrets: [{ name: "example_token", configured: false, updatedAt: null, label: "Example API key", description: null, fields: [{ name: "apiKey", label: "API key", description: null, optional: false, plain: false, saved: false }], extraFields: null, savedFields: null, oauth: null }], model: null, grants: [], approvals: [] },
       settings: fixtureSettings(), diagnostics: null, activity }),
-    moduleOverviewOutputSchema.parse({ kind: "system", name: "memory", description: "Synthetic system module", sessions: null, tools: [{ name: "recall", description: "Synthetic", inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false }, outputSchema: null, examples: null, sideEffects: null, errors: null,
+    moduleOverviewOutputSchema.parse({ kind: "system", origin: "kernel", capabilities: moduleCapabilities("kernel", { configurable: true }), name: "memory", description: "Synthetic system module", sessions: null, tools: [{ name: "recall", description: "Synthetic", inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false }, outputSchema: null, examples: null, sideEffects: null, errors: null,
       idempotent: false, retry: "Unknown async outcomes are not redelivered automatically.", visibility: ["modules"] }], work: [],
       settings: { declarations: { provider: { type: "string", label: "Provider", default: "" } }, values: { provider: "" } }, activity: [] }),
   ].map(json);

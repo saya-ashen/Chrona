@@ -1085,7 +1085,7 @@ test("removing an app asks once from any entry; built-ins are refused; data and 
   await mkdir(data, { recursive: true });
   await writeFile(join(data, "prices.json"), "[1]");
   await f.db.module.update({ where: { id: moduleId }, data: { builtin: true } });
-  await expect(f.service.modules.lifecycle("remove", moduleId, { reason: "x" }, true)).rejects.toThrow("内置应用");
+  await expect(f.service.modules.lifecycle("remove", moduleId, { reason: "x" }, true)).rejects.toThrow("Built-in price-watch cannot remove");
   await f.db.module.update({ where: { id: moduleId }, data: { builtin: false } });
   const request = await f.service.modules.lifecycle("remove", moduleId, { reason: "三个月没用过" }, false);
   const approvalId = "approvalId" in request ? request.approvalId : undefined;

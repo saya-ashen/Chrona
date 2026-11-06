@@ -5,12 +5,18 @@
  * sessions, keyed by the entry that owns them. There are no affairs.
  */
 import { z } from "zod";
-import { moduleOutputSchema } from "./module-output";
-import { moduleToolParameterSchema } from "./module-input";
+import { slug, moduleToolSchema } from "./module-tool";
+export { slug, TOOL_VISIBILITY, type ModuleTool } from "./module-tool";
+import { moduleOriginSchema, moduleCapabilitiesSchema, moduleInstallRequestSchema } from "./module-lifecycle";
+export * from "./module-lifecycle";
 export { moduleToolParameterSchema, type ModuleToolParameter } from "./module-input";
 export { moduleOutputSchema, compileModuleOutput } from "./module-output";
 import type { ProviderEvents } from "./provider";
 export * from "./provider";
+export * from "./execution";
+export * from "./execution-events";
+export * from "./execution-tools";
+export * from "./executor";
 
 const id = z.string().trim().min(1).max(128);
 const iso = z.string().datetime({ offset: true }).max(40);
@@ -103,34 +109,8 @@ function withoutRemovedFields(value: unknown) {
 /** Module model tier name (e.g. fast, strong); the user maps tiers to exact models in `moduleModel.models`. */
 export const modelTier = z.string().regex(/^[a-z][a-z0-9-]{1,20}$/);
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
-export const slug = z.string().regex(/^[a-z][a-z0-9-]{1,40}$/);
 export const RESERVED_LISTEN_PATHS = ["/api/steward", "/api/workspaces", "/api/health"] as const;
 const moduleTriggerSchema = z.object({ id: slug, schedule: scheduleRuleSchema }).strict();
-const toolParameterSchema = moduleToolParameterSchema;
-/**
- * Who a module tool is for: `provider` (m_* tools of runs), `owner` (the user: entry modules with `uses: ["*"]`),
- * `modules` (any other module, routed by Chrona) and `kernel` (Chrona itself).
- */
-export const TOOL_VISIBILITY = ["provider", "owner", "modules", "kernel"] as const;
-// Versions stored before security-simplification §3.2 may list `callers`, which no longer means anything.
-const withoutCallers = (value: unknown) => {
-  if (!value || typeof value !== "object" || Array.isArray(value) || !("callers" in value)) return value;
-  const { callers: _callers, ...rest } = value as Record<string, unknown>;
-  return rest;
-};
-const moduleToolSchema = z.preprocess(withoutCallers, z.object({
-  name: slug, description: z.string().min(1).max(500),
-  /** Optional for stored legacy versions; new public/module-facing builds require it (v2-25). */
-  output: moduleOutputSchema.optional(),
-  /** Usage metadata is descriptive only: it never grants authority or makes a call safe to replay. */
-  examples: z.array(z.object({ description: z.string().max(300).optional(), args: z.record(z.string(), z.json()), result: z.json().optional() }).strict()).max(3).optional(),
-  sideEffects: z.array(z.string().min(1).max(300)).max(8).optional(),
-  errors: z.array(z.object({ code: z.string().min(1).max(80), description: z.string().min(1).max(300), recovery: z.string().min(1).max(300) }).strict()).max(8).optional(),
-  parameters: z.object({ type: z.literal("object"), properties: z.record(slug, toolParameterSchema).default({}), required: z.array(slug).default([]) }).strict(),
-  visibility: z.array(z.enum(TOOL_VISIBILITY)).min(1).max(TOOL_VISIBILITY.length).default(["provider", "owner"]),
-  /** Safe to run twice: Chrona redelivers an asynchronous call whose outcome is unknown only when this is true. */
-  idempotent: z.boolean().default(false),
-}).strict());
 /** `<module>.<tool>`: a module tool other modules call through Chrona. */
 export const interfaceRefSchema = z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/);
 const listenPath = z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]);
@@ -282,7 +262,6 @@ const MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
  */
 export const isEntryModule = (manifest: { listen?: string | readonly string[]; uses?: readonly string[] }) =>
   listenPaths(manifest).includes("/") || (manifest.uses ?? []).some(target => target === "*" || target.startsWith("chat.") || (target.startsWith("approvals.") && !MODULE_APPROVAL_TOOLS.includes(target)));
-export type ModuleTool = z.infer<typeof moduleToolSchema>;
 /**
  * v2 module channel (Unix socket `CHRONA_SOCKET`, one JSON object per line, both directions). Modules import the SDK as
  * `chrona` and find their directories through `chrona.paths`, with or without a sandbox.
@@ -324,9 +303,13 @@ export const moduleEventSchema = z.object({
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
 }).strict();
 export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleEventSchema }).strict();
+export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
+  /** Routed calls: visibility, unknown target, cycles, uncertain outcomes and target errors. */
+  "forbidden", "not_found", "conflict", "cycle", "unknown", "failed", "unavailable", "reauthorize",
+  "unauthorized", "cursor_expired", "too_large", "capacity", "unsupported_version", "unsupported"] as const;
 /** `result` answers a tool call. `handled` is ignored (it handed inbound items back before connectors were removed); kept so older modules still answer. */
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
-  .or(z.object({ id: channelId, error: z.string().max(2000) }).strict());
+  .or(z.object({ id: channelId, error: z.string().max(2000), errorCode: z.enum(MODULE_CALL_ERRORS).optional() }).strict());
 /** The credential names a manifest declares, whichever form each entry takes. */
 export const secretNames = (manifest: { secrets?: readonly (string | { name: string })[] }) => (manifest.secrets ?? []).map(secret => typeof secret === "string" ? secret : secret.name);
 export const SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
@@ -340,6 +323,9 @@ export const NOTIFY_INTERFACE = "notify.send";
 export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "memory"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
+/** A saved registration may only call this exact app identity and tool contract; this grants no access. */
+export const expectedModuleTargetSchema = z.object({ moduleId: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+export type ExpectedModuleTarget = z.infer<typeof expectedModuleTargetSchema>;
 export const moduleCallSchema = z.discriminatedUnion("method", [
   /**
    * A routed call to another module's tool (`target` must be in `uses`). `sync` waits for the result (bounded by
@@ -349,16 +335,11 @@ export const moduleCallSchema = z.discriminatedUnion("method", [
    */
   z.object({ id: channelId, method: z.literal("call"), params: z.object({
     target: interfaceRefSchema, args: z.record(z.string(), z.json()).default({}), mode: z.enum(["sync", "async"]).default("sync"),
-    key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(),
+    key: z.string().min(1).max(200).optional(), reply: z.boolean().default(false), timeoutMs: z.number().int().min(1000).max(600_000).optional(), expectedTarget: expectedModuleTargetSchema.optional(),
   }).strict().refine(params => params.mode === "sync" || params.key !== undefined, "async calls need a key") }).strict(),
   /** State of an async call this module made. */
   z.object({ id: channelId, method: z.literal("callStatus"), params: z.object({ callId: z.string().min(1).max(128) }).strict() }).strict(),
 ]);
-export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
-  /** Routed calls: refused by the target's visibility, unknown target, would wait on itself, outcome unknown, the target failed or never got it. */
-  "forbidden", "not_found", "conflict", "cycle", "unknown", "failed", "unavailable",
-  /** secrets.token (v2-30 §4): the user must authorize the OAuth credential again. */
-  "reauthorize"] as const;
 export const moduleCallReplySchema = z.object({ id: channelId, result: z.union([
   /** Sync `call` replies: the target's result. */
   z.object({ output: z.json() }).strict(),
@@ -400,6 +381,7 @@ export const sessionSchema = z.object({
 /** A module as an app: identity and state. */
 export const appSchema = z.object({
   id, name: slug, description: z.string().max(300).nullable(), status: z.enum(["active", "paused"]), builtin: z.boolean(), activeHash: z.string().max(64).nullable(),
+  origin: moduleOriginSchema, capabilities: moduleCapabilitiesSchema,
 }).strict();
 
 export const runSchema = z.object({
@@ -440,8 +422,10 @@ export const policyDecisionSchema = z.object({ action: z.enum(ACTIONS), mode: z.
 export const PREFERENCE_TOPICS = ["general", "ui"] as const;
 export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), topic: z.enum(PREFERENCE_TOPICS), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
 
+/** Registered notification channel name; entry-message delivery channels remain a separate contract. */
+export const notificationChannelSchema = z.string().min(1).max(120);
 export const notificationSchema = z.object({
-  id, moduleId: id.nullable(), sessionId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: z.enum(DELIVERY_CHANNELS), status: z.enum(NOTIFICATION_STATUSES),
+  id, moduleId: id.nullable(), sessionId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: notificationChannelSchema, status: z.enum(NOTIFICATION_STATUSES),
   title: short, body: z.string().max(4000), link: z.string().max(2048).nullable(),
   attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), createdAt: iso, sentAt: iso.nullable(),
   feedback: z.enum(["useful", "not_useful"]).nullable(),
@@ -489,7 +473,7 @@ export const settingsSchema = z.object({
   modelUsage: z.array(z.object({ module: z.string(), calls: z.number().int().min(0), inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) }).strict()),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
   moduleModel: moduleModelSettingsSchema.nullable(),
-  chat: z.object({ channel: z.enum(DELIVERY_CHANNELS), bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
+  chat: z.object({ channel: notificationChannelSchema, bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
 }).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
@@ -572,6 +556,7 @@ const moduleIntent = z.object({ changes: z.array(text.max(500)).min(1).max(20), 
   .describe("What this version changes and what it keeps (shown on the approval card)");
 /** Inputs of the `modules` system module's tools for the Provider (v2-13), reached as m_modules_<tool>. */
 export const modulesToolInputSchemas = {
+  install: moduleInstallRequestSchema.describe("Explicitly install or update a named official external package from the running release. No host path or caller-supplied identity. Local source uses propose. Reuse requestKey after an uncertain receipt; never silently overwrite an installed or customized app."),
   reference: z.object({ target: z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/).optional() }).strict()
     .describe("Read development reference only: without target, list available interfaces (target, source, one-line description); with <module>.<tool>, get its input schema, declared output schema/examples and admission rules. Never executes the target or reads its business data. Undeclared outputs are explicitly unknown, not inferred from empty results."),
   check: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/).optional().describe("Defaults to the newest version"),
@@ -580,7 +565,7 @@ export const modulesToolInputSchemas = {
   checkout: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/).optional(), dir: relativePathSchema,
     source: z.enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation") }).strict()
     .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
-    .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the running release's reference even when customization prevented registering that built-in. Returns the exact content hash; does not submit or activate it."),
+    .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; its code can only change through a Chrona release. Returns the exact content hash; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
     .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, provider.wake, provider.complete (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration and new credentials require the owner decision.'),
   rollback: z.object({ module: slug, hash: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
@@ -624,6 +609,11 @@ export type ProviderRunInput = {
   content?: { name: string; dir: string; writable: boolean }[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;
+  /** F binds this execution and its trusted principal before handing details to the Provider. */
+  execution?: import("./execution").ExecutionRef;
+  detail?: import("./execution-events").ExecutionDetailSink;
+  /** Enforced by the existing Pi extension before native tool execution, never prompt-only. */
+  executionBudget?: { maxToolCalls: number };
 };
 export type ProviderAdapter = {
   name: string;

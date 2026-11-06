@@ -9,16 +9,37 @@ import type { Approval as ApprovalData, Interaction } from "./today";
 import { useAction } from "./action";
 import { NotificationSettings, BuildSettings, ModuleModelSettings } from "./settings-forms";
 import { ChatStream } from "./chat-stream";
+import { PackageInstall } from "./install";
 
 type Args = Record<string, unknown>;
 export function SystemAction({ props }: { props: { label: string; tool: string; args: Args; confirm?: string } }) {
-  const action = useAction();
+  const action = useAction(), [note, setNote] = useState("");
   return <div><button type="button" disabled={action.pending} onClick={() => {
     if (props.confirm && !globalThis.confirm(props.confirm)) return;
-    void action.act(async () => { await action.call(props.tool, props.args); action.refresh(); });
-  }}>{props.label}</button>{action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
+    void action.act(async () => {
+      const result = await action.call(props.tool, props.args) as { status?: string } | null;
+      setNote(result?.status === "pending_approval" ? "已申请，待你确认；尚未完成。请前往今天的待你决定。" : "操作已完成");
+      action.refresh();
+    });
+  }}>{action.pending ? "处理中……" : props.label}</button>{note ? <p role="status">{note}</p> : null}{action.error ? <p role="alert" className="error">{action.error}</p> : null}</div>;
 }
-export function Approval({ props: { approval } }: { props: { approval: ApprovalData } }) {
+export function AppRemoval({ props: { name } }: { props: { name: string } }) {
+  const action = useAction(), [approvalId, setApprovalId] = useState(""), [approval, setApproval] = useState<ApprovalData | null>(null);
+  return <div>
+    {approvalId ? <div className="app-removal">
+      <p>删除 {name} 及其数据、文件、日程和设置；删除前会自动备份。</p>
+      {approval ? <Approval props={{ approval, destructive: true }} /> : <p role="status">删除申请已提交，尚未删除。请到<a href="/">今天的「待你决定」</a>批准或拒绝。</p>}
+    </div> : <button type="button" className="danger" disabled={action.pending} onClick={() => void action.act(async () => {
+      const result = await action.call("module-remove", { id: name }) as { approvalId?: string };
+      if (!result.approvalId) throw new Error("未收到删除申请，请刷新查看待你决定。");
+      setApprovalId(result.approvalId);
+      const today = await action.call("today", {}) as { approvals: ApprovalData[] };
+      setApproval(today.approvals.find(item => item.id === result.approvalId) ?? null);
+    })}>删除应用</button>}
+    {action.error ? <p role="alert" className="error">{action.error}</p> : null}
+  </div>;
+}
+export function Approval({ props: { approval, destructive = false } }: { props: { approval: ApprovalData; destructive?: boolean } }) {
   const action = useAction(), [result, setResult] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
@@ -39,7 +60,7 @@ export function Approval({ props: { approval } }: { props: { approval: ApprovalD
   return <div className="approval"><div><strong>{approval.title}</strong> <Time value={approval.createdAt} /></div>
     {approval.detail ? <div>{approval.detail}</div> : null}
     {approval.preview ? <details><summary>详情</summary><pre>{approval.preview}</pre></details> : null}
-    <div className="row"><button type="button" className="primary" disabled={action.pending} onClick={() => decide("approve")}>批准</button><button type="button" disabled={action.pending} onClick={() => decide("deny")}>拒绝</button></div>
+    <div className="row"><button type="button" className={destructive ? "danger" : "primary"} disabled={action.pending} onClick={() => decide("approve")}>{destructive ? "确认删除" : "批准"}</button><button type="button" disabled={action.pending} onClick={() => decide("deny")}>拒绝</button></div>
     {action.error ? <p role="alert" className="error">未处理：{action.error}</p> : null}</div>;
 }
 export function Question({ props: { interaction } }: { props: { interaction: Interaction } }) {
@@ -73,5 +94,5 @@ export function ActivityMore({ props }: { props: { module: string } }) {
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), BuildSettings: component(BuildSettings), ModuleModelSettings: component(ModuleModelSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
+export const systemComponents = { PackageInstall: component(PackageInstall), AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), BuildSettings: component(BuildSettings), ModuleModelSettings: component(ModuleModelSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
   SettingsForm: component(SettingsForm), ToolForm: component(ToolForm), ModelCap: component(ModelCap), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };

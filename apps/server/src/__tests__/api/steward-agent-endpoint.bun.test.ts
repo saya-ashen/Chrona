@@ -6,12 +6,15 @@ import { testDb } from "@chrona/engine/test-support";
 import { createStewardService, CallError, type StewardPorts } from "@chrona/engine";
 import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";
+function trusted(app: ReturnType<typeof createStewardAgentRoutes>) {
+  return { request: (input: Parameters<typeof app.request>[0], init?: RequestInit) => app.request(input, init, { server: { requestIP: () => ({ address: "127.0.0.1" }) } }) };
+}
 test("agent catalog authenticates live capabilities and dispatches v3 tools", async () => {
   const db = testDb();
   try {
     await db.workspace.create({ data: { id: "w", name: "Test" } });
     const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-agent-")), now: () => new Date(), publicUrl: null };
-    const service = createStewardService(ports), app = createStewardAgentRoutes(ports, service);
+    const service = createStewardService(ports), app = trusted(createStewardAgentRoutes(ports, service));
     const session = await db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
     await service.forWorkspace("w").runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Hi" });
     const run = (await service.forWorkspace("w").runs.claimNext("foreground"))!;
@@ -20,7 +23,7 @@ test("agent catalog authenticates live capabilities and dispatches v3 tools", as
     expect((await app.request("http://localhost/catalog", { headers: { authorization: "Bearer invalid" } })).status).toBe(401);
     expect((await app.request("http://localhost/catalog", { headers: { ...headers, forwarded: "for=127.0.0.1" } })).status).toBe(403);
     const catalog = await app.request("http://localhost/catalog", { headers });
-    expect(catalog.status).toBe(200); expect((await catalog.json()).tools.map((t: { name: string }) => t.name)).toEqual([...CHRONA_TOOLS, ...["list", "diagnostics", "health", "reference", "check", "checkout", "propose", "rollback", "disable", "enable", "remove", "build", "stop_build", "revise_build"].map(name => `m_modules_${name}`)]);
+    expect(catalog.status).toBe(200); expect((await catalog.json()).tools.map((t: { name: string }) => t.name)).toEqual([...CHRONA_TOOLS, ...["catalog", "list", "diagnostics", "health", "reference", "check", "checkout", "propose", "rollback", "disable", "enable", "remove", "build", "stop_build", "revise_build"].map(name => `m_modules_${name}`)]);
     const diagnostics = await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: "{}" });
     expect(diagnostics.status).toBe(200);
     expect(await diagnostics.json()).toMatchObject({ ok: true, data: { result: [] } });
@@ -62,7 +65,7 @@ test("routed build refusals retain conflict/409 and actionable detail instead of
   try {
     const { id: workspaceId } = await db.workspace.create({ data: { name: "queue-http" } });
     const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
-    const service = createStewardService(ports), api = service.forWorkspace(workspaceId), app = createStewardAgentRoutes(ports, service);
+    const service = createStewardService(ports), api = service.forWorkspace(workspaceId), app = trusted(createStewardAgentRoutes(ports, service));
     const session = await db.session.create({ data: { workspaceId, key: "web:http-queue", source: "web" } });
     await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "fixture" });
     const run = (await api.runs.claimNext("foreground"))!;

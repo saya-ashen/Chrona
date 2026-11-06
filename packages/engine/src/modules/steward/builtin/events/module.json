@@ -5,7 +5,7 @@
   "keepAlive": true,
   "triggers": [],
   "effects": [],
-  "uses": ["modules.contributions", "modules.tools"],
+  "uses": ["modules.contributions", "modules.list", "modules.tools"],
   "tools": [
     { "name": "emit", "description": "Emit an event the caller declares in contributes.events.emits; delivered to each subscriber as { event, from, payload }.", "visibility": ["modules"], "idempotent": true,
       "output": { "type": "object", "properties": { "delivered": { "type": "integer" } }, "required": ["delivered"], "additionalProperties": false },

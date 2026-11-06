@@ -3,7 +3,11 @@ import { writeFile } from "node:fs/promises";
 // @ts-expect-error Chrona supplies the test kernel at this at run time.
 import { paths, startModule } from "chrona/testing";
 
-const module = await startModule("index.ts", { stubs: { "web.page-set": () => ({ id: "main", catalog: "json-render@0.21.4" }) } });
+let failRegistration = false;
+const module = await startModule("index.ts", { stubs: { "web.page-set": () => {
+  if (failRegistration) return { error: "web temporarily unavailable" };
+  return { id: "main", catalog: "json-render@0.21.4" };
+} } });
 const now = "2026-10-22T00:00:00Z";
 async function tool(id: string, args: Record<string, unknown> = {}) {
   const reply = await module.send({ trigger: { kind: "tool", id, firedAt: now, args }, now, params: {} });
@@ -44,4 +48,13 @@ try {
   assert.equal((await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
   const registered = module.calls.find((call: { method: string; params: { target: string } }) => call.params.target === "web.page-set");
   assert.equal(registered.params.args.id, "main"); assert.equal(registered.params.args.data.doc.tool, "read");
+  const activate = () => module.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} });
+  assert.equal((await activate()).error, undefined);
+  failRegistration = true;
+  assert.ok((await activate()).error, "Failed registration must reach the existing activated retry mechanism");
+  failRegistration = false;
+  assert.equal((await activate()).error, undefined);
+  const registrations = module.calls.filter((call: { params: { target?: string } }) => call.params.target === "web.page-set");
+  assert.equal(registrations.length, 4);
+  assert.ok(registrations.every((call: { params: { args: { id: string } } }) => call.params.args.id === "main"));
 } finally { await module.stop(); }

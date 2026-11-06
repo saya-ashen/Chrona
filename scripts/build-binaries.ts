@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile } from "../build/portable-elf";
+import { buildExecutionContracts } from "../build/execution-contracts";
 
 const ROOT = resolve(import.meta.dirname, "..");
 
@@ -34,7 +35,7 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
   }
 
   await mkdir(dirname(dst), { recursive: true });
-  await cp(src, dst, { recursive: true, filter: path => resource.to !== "resources/builtin" || !path.slice(src.length).split(/[\\/]/).includes("node_modules") });
+  await cp(src, dst, { recursive: true, filter: path => !["resources/builtin", "resources/external"].includes(resource.to) || !path.slice(src.length).split(/[\\/]/).includes("node_modules") });
   log("copy", `${resource.from} → ${resource.to}`);
 }
 
@@ -46,12 +47,15 @@ async function createTarGz(sourceDir: string, outFile: string) {
   await $`tar -czf ${normalizedOut} -C ${parentDir} ${dirName}`.cwd(ROOT);
 }
 
-function compileArgs(target: BuildTargetName, binaryPath: string) {
+export function compileArgs(target: BuildTargetName, binaryPath: string) {
   const manifestTarget = buildTargets[target];
   const args = [
     "build",
     resolve(ROOT, buildArtifacts.binaryEntry),
     "--compile",
+    "--define=CHRONA_COMPILED=true",
+    '--define=process.env.NODE_ENV="production"',
+    '--define=process.env.BUN_ENV="production"',
     `--target=${manifestTarget.bunTarget}`,
     `--outfile=${binaryPath}`,
     "--tsconfig-override=tsconfig.json",
@@ -99,6 +103,7 @@ export async function buildBinary(target: BuildTargetName) {
   for (const resource of buildArtifacts.resources) {
     await copyResource(resource, releaseDir);
   }
+  await buildExecutionContracts(resolve(releaseDir, "resources/external"));
 
   console.log("");
   const tarPath = resolve(ROOT, "dist", "releases", `${manifestTarget.releaseName}.tar.gz`);

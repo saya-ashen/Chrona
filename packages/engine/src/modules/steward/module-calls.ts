@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource } from "@chrona/contracts/steward";
+import { grantedUses, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type callerSchema, type ModuleEvent, type ModuleManifest, type ModuleSetting, type SessionSource, expectedModuleTargetSchema, type ExpectedModuleTarget } from "@chrona/contracts/steward";
 import { z } from "zod";
 import { compileModuleOutput } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
@@ -20,7 +20,7 @@ export type Json = z.output<ReturnType<typeof z.json>>;
 export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string }; deadline?: number };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 export type Tool = ModuleManifest["tools"][number];
-export type CallErrorCode = "forbidden" | "not_found" | "conflict" | "cycle" | "invalid" | "unknown" | "failed" | "unavailable" | "reauthorize";
+export type CallErrorCode = (typeof import("@chrona/contracts/steward").MODULE_CALL_ERRORS)[number];
 export class CallError extends Error {
   constructor(public readonly code: CallErrorCode, message: string) { super(message); this.name = "CallError"; }
 }
@@ -55,6 +55,68 @@ export function registerSystemModule(module: SystemModule) { systemModules.set(m
 /** System modules and their tools, for catalogs (v2-13: the Provider reaches those visible to it). */
 export const listSystemModules = () => [...systemModules.values()];
 type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
+/** Exact callback shape, independent of source/version hash; compatible code updates keep queued calls valid. */
+export function moduleCallbackContractHash(tool: Tool | SystemTool) {
+  const input = "input" in tool && tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool);
+  const output = tool.output instanceof z.ZodType ? z.toJSONSchema(tool.output) : tool.output ?? null;
+  return createHash("sha256").update(JSON.stringify({ input, output, visibility: [...tool.visibility].sort(), idempotent: tool.idempotent })).digest("hex");
+}
+function assertExpectedTarget(resolved: Target | CallError, expected?: ExpectedModuleTarget) {
+  if (!expected) return;
+  const parsed = expectedModuleTargetSchema.safeParse(expected);
+  if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
+  if (resolved instanceof CallError || resolved.module.id !== parsed.data.moduleId || moduleCallbackContractHash(resolved.tool as Tool | SystemTool) !== parsed.data.contractHash) throw new CallError("conflict", "Registered target identity or contract changed; register again");
+}
+/** Kernel-only closure used at the supervisor's final never-sent boundary. */
+function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target, caller: Caller) {
+  return async () => {
+    const current = await resolveTarget(ports.db, workspaceId, `${resolved.module.name}.${resolved.tool.name}`);
+    try {
+      assertExpectedTarget(current, { moduleId: resolved.module.id, contractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) });
+      if (current instanceof CallError || current.module.activeHash !== resolved.module.activeHash) throw new CallError("conflict", "Target activation changed before delivery");
+      if (!await admitted(ports.db, caller, current.tool)) throw new CallError("forbidden", "Target no longer accepts this caller");
+    } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { stage: "unavailable" }); }
+  };
+}
+const targetBindingId = (callId: string) => `module-invocation-target:${callId}`;
+async function bindInvocationTarget(tx: Db, input: { workspaceId: string; callId: string; resolved: Target | CallError; target: string; now: Date }) {
+  const { workspaceId, callId, resolved, target, now } = input;
+  // An unavailable known app still has an identity. Bind it before a later same-name reinstall can take over.
+  const module = resolved instanceof CallError ? await tx.module.findFirst({ where: { workspaceId, name: splitTarget(target).module } }) : resolved.module;
+  let contractHash: string | null = resolved instanceof CallError ? null : moduleCallbackContractHash(resolved.tool as Tool | SystemTool);
+  // Pause affects delivery, not identity: freeze a known tool's contract even while unavailable.
+  if (resolved instanceof CallError && module?.activeHash) {
+    const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
+    const tool = moduleManifestSchema.safeParse(version?.manifest).data?.tools.find(tool => tool.name === splitTarget(target).tool);
+    if (tool) contractHash = moduleCallbackContractHash(tool);
+  }
+  // Explicit null identity authorizes only a never-sent missing target to bind later; absence is legacy, not permission.
+  const binding = { moduleId: module?.id ?? null, contractHash };
+  await tx.audit.create({ data: { id: targetBindingId(callId), workspaceId, actorKey: "kernel", kind: "module_invocation_target", subjectId: callId, details: binding, createdAt: now } });
+}
+const differentBinding = (binding: { moduleId: string | null; contractHash: string | null }, current: { moduleId: string; contractHash: string }) =>
+  binding.moduleId !== null && binding.moduleId !== current.moduleId || binding.contractHash !== null && binding.contractHash !== current.contractHash;
+const differentActivation = (active: Target | CallError, resolved: Target, contractHash: string) =>
+  active instanceof CallError || active.module.id !== resolved.module.id || active.module.activeHash !== resolved.module.activeHash || moduleCallbackContractHash(active.tool as Tool | SystemTool) !== contractHash;
+async function checkInvocationTarget(ports: StewardPorts, row: Row, resolved: Target) {
+  return ports.db.$transaction(async tx => {
+    const previous = await tx.audit.findUnique({ where: { id: targetBindingId(row.id) } });
+    if (!previous) return false; // No migration or inference for legacy calls lacking attribution.
+    const parsed = z.object({ moduleId: z.string().nullable(), contractHash: z.string().nullable() }).strict().safeParse(previous.details);
+    if (!parsed.success) return false;
+    const current = { moduleId: resolved.module.id, contractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) };
+    const binding = parsed.data;
+    if (differentBinding(binding, current)) return false;
+    // Resolve and claim the exact identity inside the transaction. Supervisor rechecks id/hash before sending.
+    const active = await resolveTarget(tx, row.workspaceId, `${row.target}.${row.tool}`);
+    if (differentActivation(active, resolved, current.contractHash)) return false;
+    const claimed = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running", leaseToken: row.leaseToken } });
+    if (!claimed) return false;
+    if (binding.moduleId === null || binding.contractHash === null) await tx.audit.update({ where: { id: previous.id }, data: { details: current } });
+    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent } });
+    return true;
+  });
+}
 const MAX_ATTEMPTS = 6;
 const BATCH = 20;
 
@@ -232,9 +294,9 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, finish, 
 }
 async function deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   try {
-    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: null, attempt: 1, chain: path }), { chain, path, ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
+    return await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, origin.caller, { id: rowId, key: null, attempt: 1, chain: path }), { chain, path, beforeDelivery: targetFence(ports, origin.workspaceId, resolved, origin.caller), ...(activationId !== undefined ? { activationId } : {}), validateResult: output => moduleOutputError(target, resolved.tool, output), ...(timeoutMs ? { timeoutMs } : {}) });
   } catch (error) {
-    const stage = stageOf(error), code = stage === "unavailable" ? "unavailable" : stage === "handler" ? "failed" : "unknown";
+    const stage = stageOf(error), code = stage === "unavailable" ? "unavailable" : stage === "handler" ? (error as { code?: CallErrorCode }).code ?? "failed" : "unknown";
     await finish({ status: code === "unknown" ? "unknown" : "failed", error: message(error) });
     throw new CallError(code, code === "unknown" ? `${target}: outcome unknown (${message(error)})` : `${target}: ${message(error)}`);
   }
@@ -271,17 +333,19 @@ async function invokeModuleSync({ ports, origin, resolved, target, args, chain, 
   await finish({ status: "succeeded", output: output as Prisma.InputJsonValue });
   return { callId: rowId, output: output as Json };
 }
-async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target: string) {
+async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target: string, expectedTarget?: ExpectedModuleTarget) {
   const resolved = await resolveTarget(ports.db, origin.workspaceId, target);
   if (resolved instanceof CallError) throw resolved;
   if (!await admitted(ports.db, origin.caller, resolved.tool)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
+  assertExpectedTarget(resolved, expectedTarget);
   const route = nextPath(origin);
   if (route.chain.includes(resolved.module.name)) throw new CallError("cycle", `${target}: ${resolved.module.name} is waiting on this call path (${route.chain.join(" → ")})`);
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
   return { resolved, route };
 }
-async function invokeSyncCall(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, timeoutMs?: number) {
-  const { resolved, route: { chain, path } } = await validateSyncRoute(ports, origin, target);
+async function invokeSyncCall(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, options: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget }) {
+  const { timeoutMs, expectedTarget } = options;
+  const { resolved, route: { chain, path } } = await validateSyncRoute(ports, origin, target, expectedTarget);
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = resolved.system?.unrecorded?.includes(resolved.tool.name) ?? false;
   const row = await ports.db.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), callerModuleId: origin.caller.kind === "module" ? origin.caller.moduleId : null, callerHash: origin.caller.kind === "module" ? origin.caller.hash : null,
     target: resolved.module.name, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: randomUUID(), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } });
@@ -291,8 +355,8 @@ async function invokeSyncCall(ports: StewardPorts, origin: CallOrigin, target: s
   if (resolved.system) return invokeSystemSync({ ...invocation, rowId: row.id, finish, quiet });
   return invokeModuleSync({ ...invocation, timeoutMs, rowId: row.id, finish });
 }
-export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs }: { timeoutMs?: number } = {}) {
-  return invokeSyncCall(ports, origin, target, raw, timeoutMs);
+export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs, expectedTarget }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget } = {}) {
+  return invokeSyncCall(ports, origin, target, raw, { timeoutMs, expectedTarget });
 }
 
 /**
@@ -309,17 +373,40 @@ async function resolveEnqueueTarget(tx: Db, origin: CallOrigin, target: string, 
   else if (resolved.system?.unrecorded?.includes(resolved.tool.name)) throw new CallError("invalid", `${target} is called synchronously (its arguments are never stored)`);
   return resolved;
 }
-export async function enqueueCall({ tx, ports, origin, target, raw }: { tx: Db; ports: StewardPorts; origin: CallOrigin; target: string; raw: unknown }, { key, reply = false, lenient = false }: { key: string; reply?: boolean; lenient?: boolean }) {
+type EnqueueInput = { tx: Db; ports: StewardPorts; origin: CallOrigin; target: string; raw: unknown };
+type EnqueueOptions = { key: string; reply?: boolean; lenient?: boolean; expectedTarget?: ExpectedModuleTarget };
+type EnqueuedCall = { callId: string; status: "queued"; duplicate: boolean };
+export async function enqueueCall(input: EnqueueInput, options: EnqueueOptions): Promise<EnqueuedCall> {
+  // Prisma transaction proxies may expose $transaction too. Enter at most once; never redispatch recursively.
+  const client = input.tx as StewardPorts["db"];
+  return typeof client.$transaction === "function"
+    ? client.$transaction(tx => enqueueIn({ ...input, tx }, options))
+    : enqueueIn(input, options);
+}
+async function checkDuplicateTarget(tx: Db, callId: string, expectedTarget?: ExpectedModuleTarget) {
+  if (!expectedTarget) return;
+  const parsed = expectedModuleTargetSchema.safeParse(expectedTarget);
+  if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
+  const binding = await tx.audit.findUnique({ where: { id: targetBindingId(callId) } });
+  const identity = binding?.details as { moduleId?: unknown; contractHash?: unknown } | null | undefined;
+  if (!identity || identity.moduleId !== parsed.data.moduleId || identity.contractHash !== parsed.data.contractHash) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
+}
+async function enqueueIn({ tx, ports, origin, target, raw }: EnqueueInput, { key, reply = false, lenient = false, expectedTarget }: EnqueueOptions): Promise<EnqueuedCall> {
   const name = splitTarget(target), caller = callerKey(origin.caller);
   const existing = await tx.moduleInvocation.findUnique({ where: { workspaceId_caller_target_tool_key: { workspaceId: origin.workspaceId, caller, target: name.module, tool: name.tool, key } } });
-  if (existing) return { callId: existing.id, status: existing.status as "queued", duplicate: true };
+  if (existing) {
+    await checkDuplicateTarget(tx, existing.id, expectedTarget);
+    return { callId: existing.id, status: existing.status as "queued", duplicate: true };
+  }
   const resolved = await resolveEnqueueTarget(tx, origin, target, lenient);
+  assertExpectedTarget(resolved, expectedTarget);
   const { path } = nextPath(origin);
   if (path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${path.join(" → ")})`);
   const args = resolved instanceof CallError ? raw : validArgs(resolved.tool, raw), now = ports.now();
   const row = await tx.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller, callerModuleId: origin.caller.kind === "module" ? origin.caller.moduleId : null, callerHash: origin.caller.kind === "module" ? origin.caller.hash : null,
     target: name.module, tool: name.tool, args: (args ?? {}) as Prisma.InputJsonValue, key, chain: path, mode: "async", idempotent: resolved instanceof CallError ? false : resolved.tool.idempotent,
     reply: reply && origin.caller.kind === "module", nextAttemptAt: now, createdAt: now } });
+  await bindInvocationTarget(tx, { workspaceId: origin.workspaceId, callId: row.id, resolved, target, now });
   return { callId: row.id, status: "queued" as const, duplicate: false };
 }
 
@@ -342,7 +429,7 @@ const backoff = (now: Date, attempts: number) => new Date(now.getTime() + Math.m
 async function deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail }: { ports: StewardPorts; row: Row; resolved: Target; args: Record<string, unknown>; caller: Caller; path: string[]; now: Date; settle: (data: Prisma.ModuleInvocationUpdateManyMutationInput) => Promise<unknown>; retryOrFail: (error: string) => Promise<unknown> }) {
   try {
     const activationId = (await currentModuleEvolution(ports.db, row.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
-    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path }), { chain: [], path, activationId, validateResult: output => moduleOutputError(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output) });
+    const reply = await moduleSupervisor(ports).deliver(resolved.module.id, resolved.module.activeHash, toolEvent(resolved, args, now, caller, { id: row.id, key: row.key, attempt: row.attempts, chain: path }), { chain: [], path, activationId, beforeDelivery: targetFence(ports, row.workspaceId, resolved, caller), validateResult: output => moduleOutputError(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output) });
     const output = "result" in reply ? reply.result.result ?? null : null;
     try { checkModuleOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool, output); }
     catch (error) {
@@ -360,6 +447,18 @@ async function deliverModuleRow({ ports, row, resolved, args, caller, path, now,
     return settle({ status: "unknown", error: `Outcome unknown: ${message(error)}`, finishedAt: ports.now() });
   }
 }
+async function deliverSystemRow(ports: StewardPorts, row: Row, input: { resolved: Target; caller: Caller; args: Record<string, unknown>; settle: (data: Prisma.ModuleInvocationUpdateManyMutationInput) => Promise<unknown> }) {
+  const { resolved, caller, args, settle } = input;
+  try {
+    const output = await resolved.system!.handle({ ports, workspaceId: row.workspaceId, caller, call: { id: row.id } }, resolved.tool.name, args);
+    checkSystemOutput(`${row.target}.${row.tool}`, resolved.tool as SystemTool, output);
+    return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
+  } catch (error) {
+    if (error instanceof AwaitUser) return settle({ status: "waiting", output: error.output as Prisma.InputJsonValue, error: null });
+    const failure = systemError(error); return settle({ status: "failed", error: `${failure.code}: ${failure.message}`.slice(0, 2000), finishedAt: ports.now() });
+  }
+}
+const missingCaller = (row: Row, module: { workspaceId: string } | null) => row.callerModuleId && (!module || module.workspaceId !== row.workspaceId);
 async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   const { db } = ports, now = ports.now();
   const settle = (data: Prisma.ModuleInvocationUpdateManyMutationInput) => db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { leaseToken: null, leaseUntil: null, ...data } });
@@ -367,22 +466,15 @@ async function deliverRow(ports: StewardPorts, row: Row, token: string) {
   const target = `${row.target}.${row.tool}`, resolved = await resolveTarget(db, row.workspaceId, target);
   // Not there yet (e.g. a built-in still building) or paused: it never got the call, so trying later is safe.
   if (resolved instanceof CallError) return resolved.code === "unavailable" || resolved.code === "not_found" ? retryOrFail(resolved.message) : settle({ status: "failed", error: resolved.message, finishedAt: now });
+  if (!await checkInvocationTarget(ports, row, resolved)) return settle({ status: "failed", error: "conflict: queued callback target identity or contract changed; register again", finishedAt: now });
   const callerModule = row.callerModuleId ? await db.module.findUnique({ where: { id: row.callerModuleId } }) : null;
+  if (missingCaller(row, callerModule)) return settle({ status: "failed", error: "forbidden: original caller no longer exists", finishedAt: now });
   const caller = originOf(row, callerModule);
   if (!await admitted(db, caller, resolved.tool)) return settle({ status: "failed", error: "forbidden: the target no longer accepts this caller", finishedAt: now });
   let args;
   try { args = validArgs(resolved.tool, row.args); }
   catch (error) { return settle({ status: "failed", error: message(error), finishedAt: now }); }
-  if (resolved.system) {
-    try {
-      const output = await resolved.system.handle({ ports, workspaceId: row.workspaceId, caller, call: { id: row.id } }, resolved.tool.name, args);
-      checkSystemOutput(target, resolved.tool as SystemTool, output);
-      return settle({ status: "succeeded", output: output as Prisma.InputJsonValue, error: null, finishedAt: ports.now() });
-    } catch (error) {
-      if (error instanceof AwaitUser) return settle({ status: "waiting", output: error.output as Prisma.InputJsonValue, error: null });
-      const failure = systemError(error); return settle({ status: "failed", error: `${failure.code}: ${failure.message}`.slice(0, 2000), finishedAt: ports.now() });
-    }
-  }
+  if (resolved.system) return deliverSystemRow(ports, row, { resolved, caller, args, settle });
   const path = Array.isArray(row.chain) ? row.chain.filter((name): name is string => typeof name === "string") : [];
   return deliverModuleRow({ ports, row, resolved, args, caller, path, now, settle, retryOrFail });
 }
@@ -406,7 +498,9 @@ export async function runDueCalls(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, now = ports.now();
   for (const row of await db.moduleInvocation.findMany({ where: { workspaceId, mode: "async", status: "running", leaseUntil: { lte: now } } })) {
     // Chrona stopped or lost the delivery mid-flight: the target may have acted.
-    await db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: row.leaseToken }, data: row.idempotent && row.attempts < MAX_ATTEMPTS
+    const binding = await db.audit.findUnique({ where: { id: targetBindingId(row.id) } });
+    const identity = z.object({ moduleId: z.string(), contractHash: z.string() }).strict().safeParse(binding?.details);
+    await db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: row.leaseToken }, data: identity.success && row.idempotent && row.attempts < MAX_ATTEMPTS
       ? { status: "queued", leaseToken: null, leaseUntil: null, nextAttemptAt: now, error: "Delivery interrupted; retrying an idempotent call" }
       : { status: "unknown", leaseToken: null, leaseUntil: null, error: "Delivery interrupted; outcome unknown", finishedAt: now } });
   }
@@ -415,7 +509,7 @@ export async function runDueCalls(ports: StewardPorts, workspaceId: string) {
     const token = randomUUID();
     const claimed = await db.moduleInvocation.updateMany({ where: { id: row.id, status: "queued" }, data: { status: "running", leaseToken: token, leaseUntil: new Date(now.getTime() + RUN_LIMITS.jobTimeoutMs * 10 + 60_000), attempts: { increment: 1 } } });
     if (!claimed.count) continue;
-    await deliverRow(ports, { ...row, status: "running", attempts: row.attempts + 1 }, token);
+    await deliverRow(ports, { ...row, status: "running", leaseToken: token, attempts: row.attempts + 1 }, token);
     delivered++;
   }
   for (const row of await db.moduleInvocation.findMany({ where: { workspaceId, mode: "async", reply: true, repliedAt: null, status: { in: ["succeeded", "failed", "unknown"] }, replyAttempts: { lt: 3 } }, orderBy: { finishedAt: "asc" }, take: BATCH })) await replyRow(ports, row);

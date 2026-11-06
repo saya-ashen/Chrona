@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createPiProvider } from "./pi-provider";
 import { piArguments, piLaunchConfig, prepareContent } from "./pi-launch";
-import type { ProviderRunInput } from "@chrona/contracts/steward";
+import { EXECUTION_EVENT_LIMITS, executionEventSchema, type ExecutionEvent, type ProviderRunInput } from "@chrona/contracts/steward";
 
 // Only fake subprocesses, never the installed model runner. Temp artifacts deliberately
 // remain in OS temp (worker task forbids deletions).
@@ -15,13 +15,20 @@ async function fixture(mode = "normal") {
   await writeFile(command, `#!${process.execPath}
 import { appendFileSync, writeFileSync } from 'node:fs';
 if (process.argv.includes('--version')) {console.log('0.85.0');process.exit(0);}
-writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),profile:process.env.PI_CODING_AGENT_DIR,hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
+writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),profile:process.env.PI_CODING_AGENT_DIR,executionToolBudget:process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS,hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
 const mode=${JSON.stringify(mode)};
 let streaming=false, queue=0, cycle=0, retried=false;
 const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
 const reply=(c,data={})=>emit({id:c.id,type:'response',command:c.type,success:true,data});
 function run() {
  streaming=true; cycle++; emit({type:'agent_start'});
+ if(mode==='details') {
+  emit({type:'message_start',message:{role:'assistant'}});
+  for(let i=0;i<300;i++) emit({type:'message_update',assistantMessageEvent:{type:'text_delta',delta:'safe '+process.env.CHRONA_AGENT_TOKEN}});
+  emit({type:'tool_execution_start',toolCallId:'tool1',toolName:'bash',args:{command:'TOP SECRET RAW ARGS',headers:{authorization:'Bearer private'}}});
+  emit({type:'tool_execution_end',toolCallId:'tool1',toolName:'bash',result:{content:[{type:'text',text:'TOP SECRET RAW RESULT'}]}});
+  emit({type:'message_end',message:{role:'assistant',content:[{type:'thinking',thinking:'TOP SECRET THINKING'},{type:'text',text:'Final safe '+process.env.CHRONA_AGENT_TOKEN}]}});
+ }
  setTimeout(()=>{
   if(mode==='error') emit({type:'message_end',message:{role:'assistant',stopReason:'error',errorMessage:'failed '+process.env.CHRONA_AGENT_TOKEN}});
   streaming=false; writeFileSync('completed-cycles.txt',String(cycle));emit({type:'agent_end'});
@@ -126,6 +133,7 @@ describe("Pi RPC provider", () => {
       const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
       expect(launch.cwd).toBe(f.cwd);
       expect(launch.hasChronaDatabaseSecret).toBe(false);
+      expect(launch.executionToolBudget).toBeUndefined();
       expect(launch.tokenMatches).toBe(true);
       expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe("previous-id");
       const tools = launch.args[launch.args.indexOf("--tools") + 1].split(",");
@@ -226,6 +234,36 @@ test.skipIf(!realBwrap)("real bwrap: content areas appear under content/, writab
   const [out, err] = [await new Response(proc.stdout).text(), await new Response(proc.stderr).text()];
   expect({ code: await proc.exited, err }).toEqual({ code: 0, err: "" });
   expect(out.split("\n").filter(Boolean)).toEqual(["hi", "notes-rw", "files-ro", "root-ro"]);
+});
+test("execution details are bounded/redacted, recover final after saturation and omit personal steward context", async () => {
+  const f = await fixture("details"), records: ExecutionEvent[] = [];
+  const ref = { workId: "work", sessionId: "coding-session", runId: "run", attemptId: "attempt" };
+  let concurrent = 0, maxConcurrent = 0;
+  const result = await f.provider.start({ ...f.input, execution: ref, executionBudget: { maxToolCalls: 5 }, sessionId: null, detail: { async append(event) {
+    concurrent++; maxConcurrent = Math.max(maxConcurrent, concurrent);
+    await Bun.sleep(2); records.push(event); concurrent--;
+  } } }).done;
+  expect(result.outcome).toBe("failed");
+  expect(result.error).toContain("detail is incomplete");
+  expect(maxConcurrent).toBe(1);
+  expect(records.length).toBeLessThanOrEqual(EXECUTION_EVENT_LIMITS.bufferEvents + 4);
+  expect(records.every(event => executionEventSchema.safeParse(event).success)).toBe(true);
+  expect(records.some(event => event.payload.type === "gap")).toBe(true);
+  expect(records.findLast(event => event.payload.type === "message")?.payload).toMatchObject({ text: "Final safe [redacted]", complete: true });
+  expect(records.at(-1)?.payload).toMatchObject({ type: "state", stopConfirmed: true });
+  expect(JSON.stringify(records)).not.toContain("TOP SECRET");
+  expect(JSON.stringify(records)).not.toContain(f.input.token);
+  const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+  const prompt = launch.args[launch.args.indexOf("--append-system-prompt") + 1];
+  expect(prompt).not.toContain("personal steward");
+  expect(launch.args[launch.args.indexOf("--tools") + 1]).not.toContain("chrona_remember");
+  expect(launch.executionToolBudget).toBe("5");
+  expect(existsSync(join(f.cwd, "content"))).toBe(false);
+});
+test("detail append failure is surfaced after process exit and final delivery still attempted", async () => {
+  const f = await fixture("details"); let finalAttempted = false;
+  const result = await f.provider.start({ ...f.input, execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { if (event.payload.type === "message" && event.payload.complete) finalAttempted = true; throw new Error("Disk unavailable"); } } }).done;
+  expect(result.outcome).toBe("failed"); expect(finalAttempted).toBe(true);
 });
 test("without bwrap content areas are symlinks under content/ and stale links are replaced", async () => {
   const f = await fixture();

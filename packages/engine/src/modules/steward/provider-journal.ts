@@ -9,11 +9,24 @@ export const providerAnswerKey = (id: string) => `provider-answer:${id}`;
 export async function providerReceipt(db: Prisma.TransactionClient, workspaceId: string, id: string, status: ProviderInteraction["status"], now: Date) {
   return db.audit.upsert({ where: { id: providerAnswerKey(id) }, update: {}, create: { id: providerAnswerKey(id), workspaceId, kind: "provider_answer", actorKey: status === "answered" ? "user" : "chrona", subjectId: id, details: { status, at: now.toISOString() } } });
 }
-export function providerJournal(db: PrismaClient, workspaceId: string, runId: string, now: () => Date) {
+export type ProviderWriteGuard = (tx: Prisma.TransactionClient) => Promise<void>;
+/** Acquire SQLite's writer before checking an optional device fence and applying the effect. */
+export function providerWrite<T>(db: PrismaClient, guard: ProviderWriteGuard | undefined, effect: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return db.$transaction(async tx => {
+    if (guard) {
+      await tx.$executeRaw`UPDATE "Audit" SET "id" = "id" WHERE 0`;
+      await guard(tx);
+    }
+    return effect(tx);
+  });
+}
+export function providerJournal(db: PrismaClient, workspaceId: string, runId: string, now: () => Date, guard?: ProviderWriteGuard) {
   let sequence = 0;
   return async (type: "progress" | "usage" | "resources", value: Prisma.InputJsonValue) => {
     if (++sequence > 300 && type === "progress") return;
-    await db.audit.create({ data: { id: `provider:${runId}:${String(sequence).padStart(8, "0")}`, workspaceId, kind: "provider_event", actorKey: "chrona", subjectId: runId, details: { type, value, at: now().toISOString() } } });
+    const data = { id: `provider:${runId}:${String(sequence).padStart(8, "0")}`, workspaceId, kind: "provider_event", actorKey: "chrona", subjectId: runId, details: { type, value, at: now().toISOString() } };
+    if (guard) await providerWrite(db, guard, tx => tx.audit.create({ data }));
+    else await db.audit.create({ data });
   };
 }
 function eventValue(row: { details: unknown }) {

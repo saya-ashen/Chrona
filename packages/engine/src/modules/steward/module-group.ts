@@ -5,7 +5,7 @@ import { moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import type { ApprovedAction, StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { createApprovals } from "./approvals";
-import { assertBuiltinUpgrade, expireModuleApprovals, groupPayloadSchema, json, moduleContext, requireModule, type ModuleContext, type ModuleVersion } from "./module-context";
+import { assertDynamicModuleActivation, expireModuleApprovals, groupPayloadSchema, json, moduleContext, type ModuleContext, type ModuleVersion } from "./module-context";
 import { declaredModules } from "./module-build-session";
 import { dataEmpty } from "./module-data";
 import { recordGeneration, switchActiveIn } from "./module-generation";
@@ -13,6 +13,7 @@ import { recordModuleActivation } from "./module-evolution";
 import { audit } from "./audit";
 import { insertCodeDiff } from "./module-preview";
 import { activationNotice } from "./module-build";
+import { assertExternalModule } from "./module-identity";
 
 /**
  * v2-15: one build may change several modules. Their candidates wait for one `activate_module` approval whose payload
@@ -59,6 +60,7 @@ async function groupMember(db: StewardPorts["db"], workspaceId: string, sessionI
   const module = await db.module.findFirst({ where: { workspaceId, name } });
   const version = module ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } }) : null;
   if (!module || !version) throw new StewardError("not_found", `${name} ${hash} not found`);
+  await assertExternalModule(db, workspaceId, module.id, "group");
   if (version.status !== "pending_review") throw new StewardError("conflict", `${name} ${hash} is ${version.status}, not waiting for review`);
   if (await submittedBy(db, workspaceId, version) !== sessionId) throw new StewardError("forbidden", `${name} ${hash} was not submitted by this build`);
   const review = reviewSchema.safeParse((await db.audit.findUnique({ where: { id: reviewKey(version.id) } }))?.details).data;
@@ -86,10 +88,11 @@ export async function requestGroup(ports: StewardPorts, workspaceId: string, ses
       }
       for (const { module, hash } of members) await switchActiveIn(context, tx, module.id, hash);
       const generation = await recordGeneration(context, tx, "activate");
+      await audit(tx, { workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { modules: members.map(member => member.module.id) } });
       for (const { module, version, hash } of members) {
         await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id });
         await audit(tx, { workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash, generationId: generation.id } });
-        if (version.source !== "builtin") await activationNotice(context, tx, version, !!module.activeHash);
+        await activationNotice(context, tx, version, !!module.activeHash);
       }
     });
     return { status: "approved" as const };
@@ -106,11 +109,11 @@ export async function requestGroup(ports: StewardPorts, workspaceId: string, ses
 /** Marks one group version approved, after the same checks as a single activation; no migration here. */
 async function approveMemberIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string) {
   const { workspaceId } = context;
-  const module = await requireModule(context, tx, moduleId);
+  const module = await assertExternalModule(tx, workspaceId, moduleId, "group");
   if (module.status === "migrating") throw new StewardError("conflict", `${module.name} is migrating`);
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
   if (version?.status !== "pending_review") throw new StewardError("conflict", `${module.name} ${hash} is no longer waiting for review`);
-  await assertBuiltinUpgrade(tx, workspaceId, moduleId, { hash });
+  await assertDynamicModuleActivation(tx, workspaceId, moduleId, { hash });
   const to = moduleManifestSchema.parse(version.manifest).data.schema, from = module.dataSchema;
   if (from !== null && to > from && !await dataEmpty(join(context.platform, "data", moduleId))) throw new StewardError("conflict", `${module.name} now needs a data migration; approve it on its own`);
   await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
@@ -125,6 +128,7 @@ export async function activateGroupIn(context: ModuleContext, tx: Prisma.Transac
   const previous = new Map((await tx.module.findMany({ where: { id: { in: payload.versions.map(item => item.moduleId) } }, select: { id: true, activeHash: true } })).map(module => [module.id, module.activeHash]));
   for (const { moduleId, hash } of payload.versions) await switchActiveIn(context, tx, moduleId, hash);
   const generation = await recordGeneration(context, tx, "activate");
+  await audit(tx, { workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { modules: payload.versions.map(member => member.moduleId) } });
   for (const { moduleId, hash } of payload.versions) {
     await recordModuleActivation(context, tx, { moduleId, previousHash: previous.get(moduleId) ?? null, hash, generationId: generation.id });
     await audit(tx, { workspaceId, actor: "chrona", kind: "module_activate", subjectId: moduleId, details: { hash, generationId: generation.id, approvalId: action.approvalId } });

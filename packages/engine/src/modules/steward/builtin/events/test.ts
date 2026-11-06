@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { createHash } from "node:crypto";
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
 
@@ -7,7 +8,8 @@ const declared = [{ module: "planning", hash: "p1", value: { emits: [{ name: "up
 // beta.on-plan is visible to modules (modules.tools lists it); beta.private is not.
 const module = await startModule("index.ts", { stubs: {
   "modules.contributions": () => declared,
-  "modules.tools": (args: { query?: string }) => (args.query === "beta.on-plan" ? [{ target: "beta.on-plan" }] : []),
+  "modules.list": () => ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })),
+  "modules.tools": () => [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", contractHash: "callback-v1", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }],
 } });
 const caller = (name: string) => ({ kind: "module", module: name, moduleId: `${name}-id`, hash: "h" });
 let clock = Date.parse("2026-10-25T04:00:00.000Z");
@@ -44,11 +46,11 @@ try {
   const [delivery] = deliveries();
   assert.deepEqual(delivery!.params.args, { event: "planning.updated", from: "planning", payload: '{"id":"p1","rev":2}' });
   assert.equal(delivery!.params.mode, "async");
-  assert.equal(delivery!.params.key, "planning.updated:k1:beta.on-plan");
+  assert.equal(delivery!.params.key, createHash("sha256").update(JSON.stringify(["planning-id", "updated", "k1", "beta-id", "on-plan"])).digest("hex"));
 
-  // A delivery the subscriber can no longer take ends the subscription.
+  // A delivery whose contract failed stays visible but receives nothing until the owner registers again.
   await module.send({ trigger: { kind: "call_result", id: "call", firedAt: now(), callId: delivery!.id, target: "beta.on-plan", key: delivery!.params.key, status: "failed", error: "forbidden: the target no longer accepts this caller" }, now: now(), params: {} });
-  assert.deepEqual(await ok("subscriptions", {}, caller("beta")), { subscriptions: [] });
+  assert.deepEqual(await ok("subscriptions", {}, caller("beta")), { subscriptions: [{ event: "planning.updated", module: "beta", tool: "on-plan" }] });
   assert.deepEqual(await ok("emit", { event: "updated", payload: '{"id":"p1"}', key: "k2" }, caller("planning")), { delivered: 0 });
 
   // Unsubscribing.

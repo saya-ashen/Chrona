@@ -19,6 +19,7 @@
       "@chrona/db": ["./packages/db/src/index.ts"], "@chrona/db/*": ["./packages/db/src/*"],
       "@chrona/shared": ["./packages/shared/src/index.ts"], "@chrona/shared/*": ["./packages/shared/src/*"],
       "@chrona/engine": ["./packages/engine/src/index.ts"],
+      "@chrona/engine/test-support": ["./packages/engine/src/test-support.ts"],
       "@chrona/integrations": ["./packages/integrations/src/index.ts"],
       "@chrona/integrations/steward": ["./packages/integrations/src/steward/index.ts"],
       "chrona": ["./packages/integrations/src/steward/module-sdk/sdk.ts"]

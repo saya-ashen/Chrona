@@ -126,7 +126,7 @@ test("built-in references reject ambiguous provenance, missing resources, path e
   await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "linked-output/copy" })).rejects.toMatchObject({ code: "forbidden" });
   expect(await readdir(outside)).toEqual([]);
   await symlink(seeded.stored, join(f.ports.moduleBuiltinResources!, "linked"));
-  await expect(f.call("m_modules_checkout", { module: "linked", source: "builtin", dir: "linked" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.call("m_modules_checkout", { module: "linked", source: "builtin", dir: "linked" })).rejects.toMatchObject({ code: "not_found" });
   await symlink(join(seeded.stored, "index.ts"), join(seeded.builtin, "leak.ts"));
   await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "unsafe" })).rejects.toMatchObject({ code: "forbidden" });
   f.ports.moduleBuiltinResources = undefined;

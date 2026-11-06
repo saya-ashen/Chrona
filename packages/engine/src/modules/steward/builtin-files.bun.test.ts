@@ -37,14 +37,14 @@ async function fixture(real = false) {
   };
 }
 
-test("files fresh workspace: author SDK tests, automatic activation, owner tools, history and trash", async () => {
+test("files fresh workspace: trusted release activation, owner tools, history and trash", async () => {
   const f = await fixture();
   try {
     const app = await f.start();
     expect(app).toMatchObject({ builtin: true, status: "active" });
     expect(await f.db.approval.count()).toBe(0);
     const version = await f.db.moduleVersion.findFirstOrThrow();
-    expect(version.report).toMatchObject({ tests: [{ exitCode: 0 }] });
+    expect(version.report).toMatchObject({ tests: [], errors: [] });
     expect(app.activeHash).toBeTruthy();
     expect((await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_files_"))).toEqual(["list", "read", "write", "move", "delete", "history", "restore"].map(name => `m_files_${name}`));
     expect(await f.call("write", { path: "report.txt", content: "one" })).toEqual({ ok: true });
@@ -102,7 +102,12 @@ if (!realSandbox.health.available) console.info("SKIP files real process: module
   try {
     const app = await f.start();
     const version = await f.db.moduleVersion.findFirstOrThrow();
-    expect(version.report).toMatchObject({ tests: [{ exitCode: 0 }] });
+    expect(version.report).toMatchObject({ tests: [], errors: [] });
+    const sandbox = createScriptSandbox({ dataDir: f.ports.dataDir });
+    await mkdir(join(f.ports.dataDir, "platform/data", app.id), { recursive: true });
+    await mkdir(join(f.ports.dataDir, "platform/content", app.id), { recursive: true });
+    const author = await sandbox.runModule({ codeDir: join(resources, "files"), dataDir: join(f.ports.dataDir, "platform/data", app.id), contentDir: join(f.ports.dataDir, "platform/content", app.id), entry: "test.ts", input: {} });
+    expect(author).toMatchObject({ status: "succeeded", exitCode: 0 });
     expect(app.activeHash).toBeTruthy();
     expect(await f.call("write", { path: "real.txt", content: "sandbox" })).toEqual({ ok: true });
     expect(await f.call("read", { path: "real.txt" })).toMatchObject({ content: "sandbox" });

@@ -9,6 +9,7 @@ export type ReleaseResource = {
 export const buildArtifacts = {
   binaryEntry: "packages/cli/src/bun-entry.ts",
   resourcesRoot: "resources",
+  executor: { platform: "linux", manager: "systemd 262", processEntry: "__executor-process", extension: "external-plugins/pi-steward-agent/chrona-tools.ts", foregroundOnly: true },
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },
@@ -16,6 +17,7 @@ export const buildArtifacts = {
     { from: ".env.example", to: "resources/.env.example", required: false },
     { from: "external-plugins/pi-steward-agent", to: "resources/external-plugins/pi-steward-agent", required: true },
     { from: "packages/engine/src/modules/steward/builtin", to: "resources/builtin", required: true },
+    { from: "packages/engine/src/modules/steward/external", to: "resources/external", required: true },
     { from: "packages/integrations/src/steward/module-sdk/package.json", to: "resources/module-sdk/package.json", required: true },
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },

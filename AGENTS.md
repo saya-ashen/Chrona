@@ -22,7 +22,7 @@ Rules that follow from the goals:
   (`chrona.call`; the callee's `visibility` defines its audience; `uses` is a contract, not runtime admission, except `uses: ["*"]` also reaches `owner` tools; Chrona records the real caller; see security-simplification §3.2). That is the only way modules
   interact (v2-8): a module keeps its files private (`chrona.paths.data`, `chrona.paths.content`) and offers tools; the web module decides how to show
   them (apps register their own json-render pages through `web.page-set`). Only entry modules serve HTTP (`listen`). Built-in modules (e.g. `files`)
-  ship with Chrona and activate without approval. When the active version is user/AI-modified, releases skip that built-in and never create ordinary replacement approvals. Merge features into the active custom version; discarding customization requires an explicit recovery rollback (e.g. `chrona admin rollback web builtin` to a saved approved built-in), not an update approval.
+  ship immutably with Chrona: web/mcp/files/notify/events. Dynamic build/propose/group/activation/rollback/removal of these modules is forbidden; improve Chrona and ship a release. qq/remind/mind are official preinstalled external modules; memory-local is optional external. See the frozen [M1 P0 contract](docs/zh/chrona-workbench-p0-contract.md) for interfaces and A–E ownership, and the [M1 acceptance record](docs/zh/chrona-workbench-m1-acceptance.md) for coordinator-accepted M1 development checks and environment boundaries. The [P1 execution/client contract](docs/zh/chrona-workbench-p1-contract.md) is frozen; M2 Run-backed executions, persistent event storage, coding/editor SDK modules and the Workbench consumer are integrated in development. M2 development integration is accepted: actual host/SDK/SQLite and fake Pi subprocess/Neovim, immutable artifact capture/MCP inspection, full supported-runtime checks and Linux x64 build/smoke passed; see docs/zh/chrona-workbench-m2-acceptance.md for the retained Workbench baseline failure and environment skips. P2 device/work contracts are being frozen; M3 device execution and bounded parallelism are not yet implemented.
 - Manifest `effects` only lists `network`; routed interfaces belong in `uses` (`provider.complete` also needs `model`). Manifest `channel` and `dynamicSchedules` are removed; conversation entry comes from `session.entryModuleId`, timers use `schedules.*`.
 - Conversations are **sessions** keyed by their entry (`qq:dm`, `web:<id>`, `rescue`); entry modules reach them through the in-process system
   module `chat` (`chat.send`), and replies are pushed to the session's entry module (`<entry>.reply`), never polled; `wake` and module wakes run in
@@ -37,10 +37,10 @@ Rules that follow from the goals:
   Local OS permissions are not constrained by manifest declarations; never describe routed permissions as malicious-code isolation. Chrona supplies scheduling, events, sessions, credentials,
   approvals, run budgets and routed calls; notification budget and delivery are the built-in `notify` module. The kernel holds no
   notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
-  Executable code Chrona runs is only a module submitted via `modules.propose` (the Provider's `m_modules_propose`), built and checked in the Chrona sandbox
+  External executable modules are submitted via `modules.propose` or official-package installation using the same checked queue; immutable built-ins bind trusted running-release resources. External code is built and checked in the Chrona sandbox
   (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated automatically when checks pass
   (data migrations and new credentials still ask the user), stored under `<dataDir>/platform` (not exposed through Provider tools; OS hiding requires isolation), and rolled back by hash.
-  A newly activated version that fails to start before any event is delivered automatically switches back once to the previous approved version,
+  A newly activated external version that fails to start before any event is delivered automatically switches back once to the previous approved version,
   including entry/network modules, without opt-in or a standing grant. Both manifests must be valid and approved; data schema must be unchanged,
   with no migration/restore, group activation or changed/dynamic schedules. The module must still be active at that activation/hash and unverified;
   restored code never automatically rolls back again. Current data and compatible schedules are preserved; work is not replayed.
@@ -80,7 +80,8 @@ live databases, real accounts or external sends, disabling auth, approvals or se
 | `external-plugins/pi-steward-agent` | Pi extension that forwards tool calls to Chrona's loopback agent endpoint |
 | `packages/db` | Prisma client, SQLite migration runner, backup/restore |
 | `apps/server` | Hono app: `/api/steward-agent` (Provider tool bridge), `/health`, the `listen` proxy (API key checked for `/api/*`), rescue console, runtime (tick, Provider queues) |
-| `packages/engine/src/modules/steward/builtin` | Built-in modules: `files`, `remind`, `notify`, `events`, `mcp`, `qq`, `mind`, `web` (all web pages share the React/json-render renderer built into `pages.js`) |
+| `packages/engine/src/modules/steward/builtin` | Immutable `files`, `notify`, `events`, `mcp`, `web`; shared React/json-render renderer in `pages.js` |
+| `packages/engine/src/modules/steward/external` | Official external `qq`, `remind`, `mind`, optional `memory-local` |
 | `packages/cli` | `chrona start / backup / restore / doctor / qq bind-code` |
 
 Dependency direction: `apps → packages/engine → packages/domain → packages/contracts`;
@@ -107,6 +108,18 @@ routes validate and delegate; domain has no I/O.
 ## Owner bounded builds
 
 `modules.build-owner` / MCP `chrona_build` starts only an explicitly authorized single-module build, with a single-use request key and exact Provider/model, timeout and submission cap. Never resume or retry it automatically. `chrona admin build <request-file>` is the stopped-service recovery path; it uses the same checks and approvals, without a normal tick or built-in upgrades. See [owner bounded builds](docs/zh/owner-bounded-builds.md).
+
+## Keep implementations minimal
+
+These rules apply to the coordinator and every delegated worker.
+
+- Validate raw external input and persisted data at their actual trust boundary. Within the same operation, pass the parsed value onward; do not repeat schema parsing, enum membership checks, or defensive type conversions on trusted internal values.
+- Read and validate a database identity once per write transaction, then reuse that row. Recheck after a separate approval, queued delivery, or asynchronous lifecycle boundary when the state can actually change; preserve authorization, idempotency and data-loss protections.
+- Add a defensive branch, fallback or retry only for an explicit requirement, a reachable current failure, or a documented trust/concurrency boundary. Otherwise remove it. Propagate unexpected failures instead of silently substituting success or empty data.
+- Test doubles implement the smallest public contract needed by their consumers. Do not prebuild a future storage engine, scheduler, quota allocator or recovery system inside a fake. Prefer reusable input/output cases over tests coupled to fake-private methods.
+- Extract helpers for a clear responsibility or useful reuse. Do not add forwarding layers, wrappers or abstractions merely to move a lint complexity score; simplify the control flow while preserving behavior.
+- Review connected callers and delete unnecessary checks and code before accepting a change. A request for proof must establish user-visible behavior or a real boundary, not mandate speculative implementation details.
+- Run the checks appropriate to the changed behavior. After they pass, repeat or broaden them only for new changes, failures or a concrete unresolved concern; do not add another approval loop for work already authorized.
 
 ## Checks
 

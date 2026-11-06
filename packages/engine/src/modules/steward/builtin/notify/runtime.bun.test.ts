@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { openStore } from "./store";
 import { composeDigest } from "./budget";
 import { createNotify, type Caller } from "./notify";
+import { testDirectory } from "./test-directory";
 
 test.each([
   ["  Gmail 重要邮件  \r\n\r\n1. ETH AI Center", "1. ETH AI Center"],
@@ -19,10 +20,11 @@ const at = new Date("2026-11-02T04:00:00Z");
 test("channel registration is owned, idempotent and calls only the registering module; without a ready channel notifications go to the web", async () => {
   const dir = await mkdtemp("/tmp/chrona-notify-channels-"), store = openStore(dir);
   const calls: { target: string; args: Record<string, unknown> }[] = [];
-  const ports = { store, publicUrl: null, call: async (target: string, args: Record<string, unknown>) => {
+  const ports = { store, publicUrl: null, directory: async () => testDirectory("transport"), call: async (target: string, args: Record<string, unknown>) => {
     calls.push({ target, args }); return { callId: `c${calls.length}`, status: "succeeded", output: { outcome: "accepted", receiptRef: "receipt" } };
   }, status: async () => ({ callId: "unused", status: "pending" }) };
   let notify = createNotify(ports);
+  await notify.refresh();
   const handle = (tool: string, args: Record<string, unknown>, caller: Caller = kernel) => notify.handle(tool, args, caller, at);
   const registration = { channel: "chrona_qqbot", tool: "deliver", ready: true, at: at.toISOString() };
   try {

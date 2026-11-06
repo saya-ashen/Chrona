@@ -6,12 +6,14 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { parseInput, StewardError } from "./errors";
 import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
 import { snapshotModule } from "./module-files";
+import { assertExternalModule, assertExternalName, isReservedModuleName, ModuleIdentityError } from "./module-identity";
 
 type Manifest = z.output<typeof moduleManifestSchema>;
-type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource | "builtin"; report: BuildReport };
+type Submission = { moduleId: string; hash: string; versionId: string; manifest: Manifest; intent: z.output<typeof intentSchema>; source: ModuleSource; report: BuildReport };
 async function queueVersion(context: ModuleContext, submission: Submission) {
   const { db, ports } = context, { moduleId, hash, versionId, manifest, intent, source, report } = submission;
   return db.$transaction(async tx => {
+    await assertExternalModule(tx, context.workspaceId, moduleId, "propose");
     // Preserve submission order for failure streaks even within one millisecond.
     const latest = await tx.moduleVersion.findFirst({ where: { moduleId }, orderBy: { createdAt: "desc" } });
     const createdAt = new Date(Math.max(ports.now().getTime(), (latest?.createdAt.getTime() ?? 0) + 1));
@@ -42,6 +44,7 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
   // Invalid manifests have no validated identity; never expose JSON parser/host diagnostics.
   try { raw = JSON.parse(await readFile(join(staging, "module.json"), "utf8")); }
   catch { return { errors: ["module.json: missing or not valid JSON"] }; }
+  if (raw && typeof raw === "object" && "name" in raw && typeof raw.name === "string" && isReservedModuleName(raw.name)) throw new ModuleIdentityError("forbidden", "reserved_module_name", `Module name ${raw.name} is reserved by Chrona`);
   const parsed = moduleManifestSchema.safeParse(raw);
   // Schema issue paths and messages come from the contract, so the Provider can fix its manifest.
   return parsed.success ? { manifest: parsed.data } : { errors: manifestIssues(parsed.error.issues).slice(0, 10).map(issue => `${issue.path.join(".") || "module.json"}: ${issue.message}`.slice(0, 300)) };
@@ -49,9 +52,12 @@ async function readManifest(staging: string): Promise<{ manifest: Manifest } | {
 function submissionErrors(manifest: Manifest, hasEntry: boolean, hasMigrate: boolean) {
   return [...(hasEntry ? [] : [`entry: ${manifest.entry} not found`]), ...(hasMigrate ? [] : [`data.migrate: ${manifest.data.migrate} not found`])];
 }
-function proposedModule(context: ModuleContext, manifest: Manifest, source: Submission["source"]) {
+function proposedModule(context: ModuleContext, manifest: Manifest) {
   const { db, workspaceId, ports } = context;
-  return db.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: source === "builtin", createdAt: ports.now() }, update: source === "builtin" ? { builtin: true } : {} });
+  return db.$transaction(async tx => {
+    await assertExternalName(tx, workspaceId, manifest.name, "propose");
+    return tx.module.upsert({ where: { workspaceId_name: { workspaceId, name: manifest.name } }, create: { workspaceId, name: manifest.name, builtin: false, createdAt: ports.now() }, update: {} });
+  });
 }
 async function writeStaging(staging: string, files: { path: string; bytes: Uint8Array }[]) {
   for (const file of files) {
@@ -69,9 +75,8 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   const parsed = await readManifest(staging);
   if ("errors" in parsed) return { moduleId: null, hash, status: "rejected", report: { ...report, errors: parsed.errors } };
   const { manifest } = parsed;
-  if (manifest.name === "rescue") throw new StewardError("forbidden", "The rescue console is immutable");
   assertDeclared(manifest.name, allowed);
-  const module = await proposedModule(context, manifest, submission.source);
+  const module = await proposedModule(context, manifest);
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
   const hasEntry = files.some(file => file.path === manifest.entry);
   const hasMigrate = hasMigration(manifest, files);
@@ -88,11 +93,7 @@ export async function propose(context: ModuleContext, input: { dir: string; inte
   if (!["provider", "user", "build"].includes(source)) throw new StewardError("invalid", "Invalid module source");
   return submitProposal(context, input, source);
 }
-/** Only the release-resource registrar may submit trusted built-in code. */
-export async function proposeBuiltin(context: ModuleContext, root: string, dir: string) {
-  return submitProposal(context, { root, dir, intent: { changes: ["Chrona built-in release"], preserves: [] } }, "builtin");
-}
-async function submitProposal(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[] }, source: ModuleSource | "builtin"): Promise<Proposal> {
+async function submitProposal(context: ModuleContext, input: { dir: string; intent: z.input<typeof intentSchema>; root: string; allowed?: string[] }, source: ModuleSource): Promise<Proposal> {
   const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
   const files = await snapshotModule(input.root, input.dir);

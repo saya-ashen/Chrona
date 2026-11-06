@@ -18,7 +18,7 @@ export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleI
 type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
-export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number };
+export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; contractHash: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
 type Contract = keyof ChronaCalls & string;
 type ArgsOf<K extends Contract> = ChronaCalls[K] extends { args: infer A } ? A : never;
@@ -60,7 +60,7 @@ async function event(message: { id: string; event: { trigger: Trigger; now: stri
     current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
-  } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000) }); }
+  } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code } : {}) }); }
   finally { current = null; }
 }
 // Lines may carry attachments (up to 32 MiB); collect chunks instead of re-copying the buffer.
@@ -195,8 +195,9 @@ export const chrona = {
       });
     } finally { if (dir) await fs.rm(dir, { recursive: true, force: true }); }
   },
-  /** Serves the manifest's `listen` path; Chrona proxies authenticated requests here. */
-  serve: (fetch: (request: Request) => Response | Promise<Response>) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch }),
+  /** Serves the manifest's `listen` path. Long-poll entries use { idleTimeout: 30 }; omitted keeps Bun's default. */
+  // @ts-expect-error Installed bun-types rejects Unix idleTimeout; the real SDK 15s proxy probe verifies runtime support.
+  serve: (fetch: (request: Request) => Response | Promise<Response>, options: { idleTimeout?: number } = {}) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch, ...options }),
   /**
    * One completion: a routed call to `provider.complete` (uses ["provider.complete"] and the manifest's `model` tier and limits).
    * Rejects with ModelError code unconfigured, budget_exceeded, provider_error, timeout or undeclared.

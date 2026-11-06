@@ -6,6 +6,7 @@ import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { requireModule, type ModuleContext } from "./module-context";
 import { notificationSettings } from "./settings";
+import { assertExecutionModuleIdle } from "./execution-module-guard";
 
 /** Pausing or resuming an app keeps its data and versions. */
 export type ModuleStatus = "paused" | "active";
@@ -30,6 +31,7 @@ export async function pauseIn(context: ModuleContext, tx: Prisma.TransactionClie
   const { workspaceId } = context, module = await requireModule(context, tx, moduleId), result = { moduleId, status: "paused" as const };
   if (module.status === "paused") return result;
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
+  await assertExecutionModuleIdle(tx, moduleId);
   const schedules = (await tx.schedule.findMany({ where: { workspaceId, moduleId, status: "active" }, select: { id: true } })).map(row => row.id);
   await tx.module.update({ where: { id: moduleId }, data: { status: "paused" } });
   await tx.schedule.updateMany({ where: { id: { in: schedules } }, data: { status: "paused", nextAt: null } });

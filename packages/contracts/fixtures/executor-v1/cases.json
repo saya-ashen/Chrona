@@ -1,0 +1,272 @@
+{
+  "assignment": {
+    "workId": "work-fixture",
+    "sessionId": "session-fixture",
+    "runId": "run-fixture",
+    "attemptId": "attempt-fixture",
+    "assignmentId": "assignment-fixture",
+    "generation": 1,
+    "executorId": "device-fixture",
+    "incarnation": "incarnation-fixture",
+    "mapping": {
+      "executorId": "device-fixture",
+      "projectRef": "project-fixture",
+      "mappingRevision": 1,
+      "directoryIdentity": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "baseline": {
+        "kind": "commit",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "label": "Fixture device project"
+    },
+    "workspaceRef": "workspace-fixture",
+    "workspaceMode": "independent_worktree",
+    "goal": "Inspect the selected source",
+    "budget": {
+      "timeoutMs": 1000,
+      "maxToolCalls": 1
+    },
+    "deadlineAt": "2026-11-06T00:00:01Z",
+    "source": {
+      "files": [
+        {
+          "path": "src/main.ts",
+          "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    }
+  },
+  "assignmentDigest": "c92303e09d7ef002107754659f1fe1a0b75a7cb91db98cbd684ea113198b655b",
+  "record": {
+    "sourceSeq": 1,
+    "at": "2026-11-06T00:00:00Z",
+    "item": {
+      "kind": "detail",
+      "payload": {
+        "type": "message",
+        "messageId": "message-fixture",
+        "role": "assistant",
+        "text": "Fixture response",
+        "complete": true
+      }
+    },
+    "digest": "35deaafaaa938500231522d969f1df4a409da571f7401495ae7e9014a2063635"
+  },
+  "final": {
+    "workId": "work-fixture",
+    "sessionId": "session-fixture",
+    "runId": "run-fixture",
+    "attemptId": "attempt-fixture",
+    "assignmentId": "assignment-fixture",
+    "generation": 1,
+    "throughSourceSeq": 1,
+    "baseline": {
+      "kind": "commit",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "launchDigest": "c92303e09d7ef002107754659f1fe1a0b75a7cb91db98cbd684ea113198b655b",
+    "outcome": {
+      "outcome": "finished",
+      "sessionId": null,
+      "error": null
+    },
+    "finalMessage": null,
+    "missing": false,
+    "sourceReceipt": {
+      "placement": {
+        "executorId": "device-fixture",
+        "projectRef": "project-fixture",
+        "mappingRevision": 1
+      },
+      "baseline": {
+        "kind": "commit",
+        "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+      "fileCount": 1,
+      "verifiedAt": "2026-11-06T00:00:00Z",
+      "stage": "claim"
+    },
+    "stop": {
+      "kind": "cgroup_empty",
+      "identity": {
+        "bootId": "00000000-0000-4000-8000-000000000001",
+        "unit": "chrona-executor-00000000-0000-4000-8000-000000000002.service",
+        "invocationId": "dddddddddddddddddddddddddddddddd",
+        "controlGroup": "/user.slice/chrona-fixture.service"
+      },
+      "observedAt": "2026-11-06T00:00:02Z",
+      "observer": "open_cgroup_events",
+      "populated": 0,
+      "observationDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "finalDigest": "73e16ab3f6550b733cc1756afa64d33689fe78f802d0ea0827b2cb49548f2611",
+  "requests": {
+    "poll": {
+      "v": "chrona.executor.v1",
+      "executorId": "device-fixture",
+      "generation": 1,
+      "incarnation": "incarnation-fixture",
+      "requestId": "poll-fixture",
+      "waitMs": 0
+    },
+    "report": {
+      "v": "chrona.executor.v1",
+      "executorId": "device-fixture",
+      "generation": 1,
+      "incarnation": "incarnation-fixture",
+      "requestId": "report-fixture",
+      "target": {
+        "workId": "work-fixture",
+        "sessionId": "session-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "assignmentId": "assignment-fixture",
+        "generation": 1
+      },
+      "records": [
+        {
+          "sourceSeq": 1,
+          "at": "2026-11-06T00:00:00Z",
+          "item": {
+            "kind": "detail",
+            "payload": {
+              "type": "message",
+              "messageId": "message-fixture",
+              "role": "assistant",
+              "text": "Fixture response",
+              "complete": true
+            }
+          },
+          "digest": "35deaafaaa938500231522d969f1df4a409da571f7401495ae7e9014a2063635"
+        }
+      ],
+      "started": {
+        "launchDigest": "c92303e09d7ef002107754659f1fe1a0b75a7cb91db98cbd684ea113198b655b",
+        "identity": {
+          "bootId": "00000000-0000-4000-8000-000000000001",
+          "unit": "chrona-executor-00000000-0000-4000-8000-000000000002.service",
+          "invocationId": "dddddddddddddddddddddddddddddddd",
+          "controlGroup": "/user.slice/chrona-fixture.service"
+        },
+        "sourceReceipt": {
+          "placement": {
+            "executorId": "device-fixture",
+            "projectRef": "project-fixture",
+            "mappingRevision": 1
+          },
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+          "fileCount": 1,
+          "verifiedAt": "2026-11-06T00:00:00Z",
+          "stage": "claim"
+        }
+      }
+    },
+    "final": {
+      "v": "chrona.executor.v1",
+      "executorId": "device-fixture",
+      "generation": 1,
+      "incarnation": "incarnation-fixture",
+      "requestId": "final-fixture",
+      "digest": "73e16ab3f6550b733cc1756afa64d33689fe78f802d0ea0827b2cb49548f2611",
+      "final": {
+        "workId": "work-fixture",
+        "sessionId": "session-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "assignmentId": "assignment-fixture",
+        "generation": 1,
+        "throughSourceSeq": 1,
+        "baseline": {
+          "kind": "commit",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "launchDigest": "c92303e09d7ef002107754659f1fe1a0b75a7cb91db98cbd684ea113198b655b",
+        "outcome": {
+          "outcome": "finished",
+          "sessionId": null,
+          "error": null
+        },
+        "finalMessage": null,
+        "missing": false,
+        "sourceReceipt": {
+          "placement": {
+            "executorId": "device-fixture",
+            "projectRef": "project-fixture",
+            "mappingRevision": 1
+          },
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+          "fileCount": 1,
+          "verifiedAt": "2026-11-06T00:00:00Z",
+          "stage": "claim"
+        },
+        "stop": {
+          "kind": "cgroup_empty",
+          "identity": {
+            "bootId": "00000000-0000-4000-8000-000000000001",
+            "unit": "chrona-executor-00000000-0000-4000-8000-000000000002.service",
+            "invocationId": "dddddddddddddddddddddddddddddddd",
+            "controlGroup": "/user.slice/chrona-fixture.service"
+          },
+          "observedAt": "2026-11-06T00:00:02Z",
+          "observer": "open_cgroup_events",
+          "populated": 0,
+          "observationDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      }
+    },
+    "reconcile": {
+      "v": "chrona.executor.v1",
+      "executorId": "device-fixture",
+      "generation": 1,
+      "incarnation": "incarnation-fixture",
+      "requestId": "reconcile-fixture",
+      "entries": [
+        {
+          "target": {
+            "workId": "work-fixture",
+            "sessionId": "session-fixture",
+            "runId": "run-fixture",
+            "attemptId": "attempt-fixture",
+            "assignmentId": "assignment-fixture",
+            "generation": 1
+          },
+          "launchDigest": "c92303e09d7ef002107754659f1fe1a0b75a7cb91db98cbd684ea113198b655b",
+          "phase": "final",
+          "identity": {
+            "bootId": "00000000-0000-4000-8000-000000000001",
+            "unit": "chrona-executor-00000000-0000-4000-8000-000000000002.service",
+            "invocationId": "dddddddddddddddddddddddddddddddd",
+            "controlGroup": "/user.slice/chrona-fixture.service"
+          },
+          "sourceAck": 1,
+          "finalDigest": "73e16ab3f6550b733cc1756afa64d33689fe78f802d0ea0827b2cb49548f2611",
+          "stop": {
+            "kind": "cgroup_empty",
+            "identity": {
+              "bootId": "00000000-0000-4000-8000-000000000001",
+              "unit": "chrona-executor-00000000-0000-4000-8000-000000000002.service",
+              "invocationId": "dddddddddddddddddddddddddddddddd",
+              "controlGroup": "/user.slice/chrona-fixture.service"
+            },
+            "observedAt": "2026-11-06T00:00:02Z",
+            "observer": "open_cgroup_events",
+            "populated": 0,
+            "observationDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        }
+      ],
+      "after": null,
+      "complete": true
+    }
+  }
+}

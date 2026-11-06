@@ -9,10 +9,11 @@ import { secrets } from "./system/secrets";
 import { activity } from "./system/activity";
 import { content } from "./system/content";
 import { memory } from "./memory";
+import { executions } from "./system/executions";
 
 let registered = false;
 /** Called by the service: Chrona's system modules become routable call targets. */
 export function registerSystemModules() {
   if (registered) return;
-  registered = true; [chat, approvals, modules, settings, schedules, ai, secrets, activity, content, memory].forEach(registerSystemModule);
+  registered = true; [chat, approvals, modules, settings, schedules, ai, secrets, activity, content, memory, executions].forEach(registerSystemModule);
 }

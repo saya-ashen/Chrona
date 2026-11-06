@@ -1,0 +1,636 @@
+{
+  "name": "coding",
+  "description": "服务器项目编码工作、可恢复执行引用、成果版本与人工接受。",
+  "entry": "index.ts",
+  "triggers": [],
+  "tools": [
+    {
+      "name": "create",
+      "description": "Coding create; input is JSON matching execution start",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution start payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "projectRef": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "stopConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "sessionId",
+          "runId",
+          "attemptId",
+          "projectRef",
+          "status",
+          "cancelRequested",
+          "stopConfirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get",
+      "description": "Coding get; input is JSON matching execution get",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution get payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "projectRef": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "stopConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "sessionId",
+          "runId",
+          "attemptId",
+          "projectRef",
+          "status",
+          "cancelRequested",
+          "stopConfirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list",
+      "description": "Coding list; input is JSON matching execution list",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution list payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "attemptId": {
+                  "type": "string"
+                },
+                "projectRef": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "unknown"
+                  ]
+                },
+                "cancelRequested": {
+                  "type": "boolean"
+                },
+                "stopConfirmed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "workId",
+                "sessionId",
+                "runId",
+                "attemptId",
+                "projectRef",
+                "status",
+                "cancelRequested",
+                "stopConfirmed"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "works",
+          "after"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "send",
+      "description": "Coding send; input is JSON matching execution send",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution send payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "answer",
+      "description": "Coding answer; input is JSON matching execution answer",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution answer payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "cancel",
+      "description": "Coding cancel; input is JSON matching execution cancel",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution cancel payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "projectRef": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "stopConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "sessionId",
+          "runId",
+          "attemptId",
+          "projectRef",
+          "status",
+          "cancelRequested",
+          "stopConfirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "results",
+      "description": "Coding results; input is JSON matching execution results",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution results payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "attemptId": {
+                  "type": "string"
+                },
+                "resultId": {
+                  "type": "string"
+                },
+                "baseline": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "commit",
+                        "snapshot"
+                      ]
+                    },
+                    "digest": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "digest"
+                  ],
+                  "additionalProperties": false
+                },
+                "artifactRef": {
+                  "type": "string"
+                },
+                "accepted": {
+                  "type": "boolean"
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "command": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "passed",
+                          "failed",
+                          "not_run"
+                        ]
+                      },
+                      "exitCode": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "outcome",
+                      "exitCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "workId",
+                "sessionId",
+                "runId",
+                "attemptId",
+                "resultId",
+                "baseline",
+                "artifactRef",
+                "accepted",
+                "checks"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "accept",
+      "description": "Coding accept; input is JSON matching execution accept",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution accept payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "work",
+      "description": "固定位置编码工作：创建父子图、查询、取消与逐份成果验收；不会自动合并代码。",
+      "output": {
+        "type": "object"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON matching frozen chrona.execution.v2 WorkRequest"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true
+    },
+    {
+      "name": "workspace-cleanup",
+      "description": "显式预览或确认清理精确工作树；确认需要原previewDigest及独立commandKey。",
+      "output": {
+        "type": "object"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON matching frozen chrona.execution.v2 WorkRequest"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true
+    },
+    {
+      "name": "reconcile",
+      "description": "内部完成通知：重新核对持久业务图与前置成果。",
+      "output": {
+        "type": "object"
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON object containing the exact workId to reconcile"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true
+    }
+  ],
+  "keepAlive": true,
+  "activated": true,
+  "content": true,
+  "uses": [
+    "executions.start",
+    "executions.get",
+    "executions.lookup-start",
+    "executions.list",
+    "executions.send",
+    "executions.answer",
+    "executions.cancel",
+    "executions.snapshot",
+    "executions.result-source",
+    "web.page-set",
+    "executions.start-v2",
+    "executions.placement",
+    "executions.locations",
+    "executions.workspace-cleanup",
+    "schedules.create"
+  ],
+  "packages": [],
+  "secrets": [],
+  "effects": [],
+  "params": {},
+  "settings": {},
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test.ts",
+    "test-v2.ts"
+  ]
+}

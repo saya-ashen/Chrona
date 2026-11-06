@@ -1,36 +1,58 @@
 import { cp, mkdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "./audit";
 import { createApprovals } from "./approvals";
+import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { StewardError } from "./errors";
 import { requireModule, type ModuleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
+import { assertModuleOperation } from "./module-identity";
+import { assertExecutionModuleIdle } from "./execution-module-guard";
 
 /**
  * Removing an app deletes its records, data, files, grants and settings after a once-only `delete_data` approval.
  * It is never bound to the module row (which the removal deletes); a backup is kept first.
  */
-export const moduleRemovePayloadSchema = z.object({ kind: z.literal("module_remove"), moduleId: z.string(), hash: z.string(), name: z.string() }).strict();
 type Db = Prisma.TransactionClient | ModuleContext["db"];
 type Row = Awaited<ReturnType<typeof requireModule>>;
 
 async function assertRemovable(db: Db, module: Row) {
-  if (module.builtin) throw new StewardError("conflict", `${module.name} 是内置应用，不能删除；可以停用`);
+  assertModuleOperation(module, "remove");
+  await assertExecutionModuleIdle(db, module.id);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, hash: module.activeHash ?? "" } });
   const manifest = moduleManifestSchema.safeParse(versions[0]?.manifest).data;
   if (manifest && isEntryModule(manifest)) throw new StewardError("conflict", `${module.name} 是入口应用，不能删除；可以停用`);
+  await assertNoDependents(db, module);
+  await assertNoPendingWork(db, module);
+}
+async function assertNoDependents(db: Db, module: Row) {
   const users = [];
   for (const other of await db.module.findMany({ where: { workspaceId: module.workspaceId, status: "active", id: { not: module.id }, activeHash: { not: null } } })) {
     const active = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: other.id, hash: other.activeHash! } } });
     if (moduleManifestSchema.safeParse(active?.manifest).data?.uses.some(target => target.startsWith(`${module.name}.`))) users.push(other.name);
   }
   if (users.length) throw new StewardError("conflict", `${users.join("、")} 正在调用 ${module.name}，先修改或删除它们`);
+}
+async function assertNoPendingWork(db: Db, module: Row) {
+  const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true } });
+  if (sessions.some(session => session.status === "active")) throw new StewardError("conflict", "应用仍有关联的活动会话，请先结束会话并核对结果");
+  if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: sessions.map(session => session.id) }, status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "关联会话仍有排队或运行中的工作，请先停止并核对结果");
+  const builds = await db.audit.findMany({ where: { workspaceId: module.workspaceId, kind: { in: ["build_request", "build_targets"] } }, select: { subjectId: true, details: true } });
+  const targets = builds.filter(row => {
+    const request = row.details as { name?: unknown; modules?: unknown } | null;
+    return request?.name === module.name || Array.isArray(request?.modules) && request.modules.includes(module.name);
+  }).flatMap(row => row.subjectId ? [row.subjectId] : []);
+  if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: targets }, lane: "build", status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "应用仍有排队或运行中的构建，请先停止构建");
+  if (await db.moduleInvocation.count({ where: { workspaceId: module.workspaceId, AND: [
+    { OR: [{ callerModuleId: module.id }, { target: module.name }] },
+    { OR: [{ status: { in: ["queued", "running", "waiting", "unknown"] } }, { reply: true, repliedAt: null }] },
+  ] } })) throw new StewardError("conflict", "应用仍有未结束、结果未知的调用或未处理回调，请先核对调用结果");
+  if (await db.moduleCall.count({ where: { moduleId: module.id, OR: [{ status: { in: ["queued", "running", "waiting", "unknown"] } }, { status: "failed", error: { in: ["unknown", "internal"] } }] } })) throw new StewardError("conflict", "应用仍有未核实的执行记录，请先核对已有结果");
 }
 
 export async function requestRemove(context: ModuleContext, moduleId: string, reason: string) {
@@ -54,13 +76,16 @@ export async function removeApproved(context: ModuleContext, action: ApprovedAct
     await assertRemovable(tx, module);
     await setStatusIn(context, tx, moduleId, "paused", "remove");
   });
-  // Its process stops before its files are copied and deleted.
   await moduleSupervisor(ports).reconcile();
+  await moduleSupervisor(ports).settleModule(moduleId);
   const backup = join(platform, "removed", `${name}-${ports.now().toISOString().replace(/[:.]/g, "-")}`);
   const parts = [[join(platform, "data", moduleId), "data"], [join(platform, "content", moduleId), "content"], [join(platform, "store", hash), "code"]] as const;
   await mkdir(backup, { recursive: true });
   for (const [from, to] of parts) if (await exists(from)) await cp(from, join(backup, to), { recursive: true });
   await context.db.$transaction(async tx => {
+    const current = await requireModule(context, tx, moduleId);
+    if (current.activeHash !== hash || current.name !== name || current.status !== "paused") throw new StewardError("conflict", "应用在备份期间发生变化，请重新申请删除");
+    await assertRemovable(tx, current);
     for (const grant of await tx.grant.findMany({ where: { workspaceId, revokedAt: null } })) {
       if ((grant.scope as { moduleId?: unknown } | null)?.moduleId === moduleId) await tx.grant.update({ where: { id: grant.id }, data: { revokedAt: ports.now() } });
     }

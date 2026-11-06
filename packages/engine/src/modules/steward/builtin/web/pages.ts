@@ -9,13 +9,15 @@ import { BUILTIN_ACTIONS, CATALOG_VERSION, callParams, catalog, components as de
  */
 type Args = Record<string, unknown>;
 type Schema = { properties?: Record<string, unknown>; required?: string[] };
-export type Caller = { kind: string; module?: string };
+export type Caller = { kind: string; module?: string; moduleId?: string };
+export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
+export type PageTool = { inputSchema: Schema; moduleId: string; contractHash: string };
 /** `keyed`: the app's tools that take a request key (the page sends a fresh one per press); `needs`: each source's required arguments (not read while one is empty). */
-export type Page = { module: string; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string };
+export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string };
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
-export type Deps = { dataDir: string; tools: (module: string) => Promise<Map<string, Schema>>; now?: () => Date };
+export type Deps = { dataDir: string; modules: () => Promise<ModuleState[]>; tools: (module: string) => Promise<Map<string, PageTool>>; now?: () => Date };
 
 const SLUG = /^[a-z][a-z0-9-]{0,40}$/, MAX_BYTES = 64 * 1024, MAX_PAGES = 20, MAX_ELEMENTS = 300;
 const invalid = (message: string) => Object.assign(new Error(message), { code: "invalid" });
@@ -76,6 +78,21 @@ export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<
   return errors;
 }
 
+const moduleStateSchema = z.object({ id: z.string().min(1), name: z.string().min(1), status: z.string(), activeHash: z.string().nullable() });
+function activeOwner(modules: ModuleState[], moduleId: string, name: string) {
+  return modules.find(item => item.id === moduleId && item.name === name && item.status === "active" && item.activeHash);
+}
+function assertPageIdentity(page: Partial<Page>) {
+  if (!page.moduleId || !page.contracts || !page.revision) throw stalePage();
+}
+function assertRegistration(args: Args) {
+  if (typeof args.id !== "string" || !SLUG.test(args.id)) throw invalid("id 须为小写字母开头的 slug");
+  if (typeof args.title !== "string" || !args.title.trim() || args.title.length > 80) throw invalid("title 须为 1–80 个字符");
+  if (JSON.stringify({ spec: args.spec, data: args.data }).length > MAX_BYTES) throw invalid("页面最多 64 KiB");
+  return { id: args.id, title: args.title };
+}
+const stalePage = () => Object.assign(new Error("页面登记已失效，请应用重新登记页面"), { code: "conflict" });
+
 export function createPages(deps: Deps) {
   const file = join(deps.dataDir, "pages.json");
   let pages: Page[] | undefined;
@@ -91,47 +108,89 @@ export function createPages(deps: Deps) {
     await rename(`${file}.tmp`, file);
     pages = next;
   }
-  async function set(module: string, args: Args) {
-    const { id, title, spec, data } = args;
-    if (typeof id !== "string" || !SLUG.test(id)) throw invalid("id 须为小写字母开头的 slug");
-    if (typeof title !== "string" || !title.trim() || title.length > 80) throw invalid("title 须为 1–80 个字符");
-    if (JSON.stringify({ spec, data }).length > MAX_BYTES) throw invalid("页面最多 64 KiB");
-    const tools = await deps.tools(module), errors = pageErrors({ spec, data }, tools, module);
+  async function knownPages() {
+    // A failed/incomplete read must never become an empty inventory and erase registrations.
+    const parsed = moduleStateSchema.array().safeParse(await deps.modules());
+    if (!parsed.success) throw new Error("应用目录读取失败");
+    const modules = parsed.data;
+    const all = await load(), kept = all.filter(page => !page.moduleId || modules.some(module => module.id === page.moduleId && module.name === page.module));
+    if (kept.length !== all.length) await save(kept);
+    return { modules, pages: kept };
+  }
+  async function set(module: string, moduleId: string, args: Args) {
+    const { spec, data } = args, { id, title } = assertRegistration(args);
+    const { modules } = await knownPages();
+    if (!activeOwner(modules, moduleId, module)) throw Object.assign(new Error("应用身份已失效或尚未启用，请启用后重新登记页面"), { code: "conflict" });
+    const current = await deps.tools(module);
+    if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
+    const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
+    const errors = pageErrors({ spec, data }, tools, module);
     if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
     const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
     if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
     const keyed = [...tools].filter(([, schema]) => schema.properties && Object.hasOwn(schema.properties, "request-key")).map(([name]) => name);
     const sources = (data ?? {}) as Record<string, Source>;
     const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
-    const page: Page = { module, id, title: title.trim(), data: sources, spec: spec as Spec, keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
+    const contracts = Object.fromEntries(references(spec as Spec, sources).map(name => [name, current.get(name)!.contractHash]));
+    const revision = crypto.randomUUID();
+    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), data: sources, spec: spec as Spec, keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
     await save([...others, page]);
     return { id, catalog: CATALOG_VERSION };
   }
+  // Page reads may prune deleted owners; serialize them with registration/removal saves.
+  let pending: Promise<unknown> = Promise.resolve();
+  function exclusive<T>(work: () => Promise<T>) {
+    const next = pending.then(work); pending = next.catch(() => {}); return next;
+  }
   return {
     /** Tools other modules call. Pages belong to the caller Chrona recorded, never to a name in the arguments. */
-    async tool(name: string, args: Args, caller: Caller | undefined) {
+    tool(name: string, args: Args, caller: Caller | undefined) { return exclusive(async () => {
       if (name === "catalog") return describeCatalog();
-      const module = caller?.kind === "module" ? caller.module : undefined;
-      if (!module) throw Object.assign(new Error("只有应用可以登记页面"), { code: "forbidden" });
-      if (name === "page-set") return set(module, args);
+      const module = caller?.kind === "module" ? caller.module : undefined, moduleId = caller?.moduleId;
+      if (!module || !moduleId) throw Object.assign(new Error("只有身份完整的应用可以登记页面"), { code: "forbidden" });
+      if (name === "page-set") return set(module, moduleId, args);
       if (name === "page-remove") {
-        const all = await load(), next = all.filter(page => !(page.module === module && page.id === args.id));
+        const all = await load(), next = all.filter(page => !(page.moduleId === moduleId && page.id === args.id));
         if (next.length !== all.length) await save(next);
         return { removed: next.length !== all.length };
       }
-      if (name === "pages") return { items: (await load()).filter(page => page.module === module).map(({ id, title, updatedAt }) => ({ id, title, updatedAt })) };
+      if (name === "pages") return { items: (await load()).filter(page => page.moduleId === moduleId).map(({ id, title, updatedAt }) => ({ id, title, updatedAt })) };
       throw new Error(`Unknown tool ${name}`);
-    },
+    }); },
     /** For the page: what active apps registered. Pages of apps that are gone are dropped. */
-    async list(active: Set<string>, known: Set<string>) {
-      const all = await load(), kept = all.filter(page => known.has(page.module));
-      if (kept.length !== all.length) await save(kept);
-      return kept.filter(page => active.has(page.module)).map(({ module, id, title }) => ({ module, id, title }));
-    },
-    async get(module: string, id: string) {
-      return (await load()).find(page => page.module === module && page.id === id) ?? null;
-    },
+    list() { return exclusive(async () => {
+      const { modules, pages } = await knownPages();
+      return pages.filter(page => modules.some(module => module.id === page.moduleId && module.status === "active" && module.activeHash)).map(({ module, id, title }) => ({ module, id, title }));
+    }); },
+    get(module: string, id: string) { return exclusive(async () => {
+      const { modules, pages } = await knownPages(), page = pages.find(page => page.module === module && page.id === id);
+      if (!page) return null;
+      assertPageIdentity(page);
+      const owner = modules.find(item => item.id === page.moduleId);
+      if (!owner || owner.status !== "active" || !owner.activeHash) throw Object.assign(new Error("应用已暂停或不可用，请先恢复应用"), { code: "conflict" });
+      const current = await deps.tools(module);
+      for (const [name, contract] of Object.entries(page.contracts)) {
+        const tool = current.get(name);
+        if (!tool || tool.moduleId !== owner.id || tool.contractHash !== contract) throw stalePage();
+      }
+      const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
+      if (pageErrors(page, tools, module).length) throw stalePage();
+      return { ...page, keyed: [...tools].filter(([, schema]) => schema.properties && Object.hasOwn(schema.properties, "request-key")).map(([name]) => name),
+        needs: Object.fromEntries(Object.entries(page.data).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []])) };
+    }); },
   };
+}
+
+function references(spec: Spec, sources: Record<string, Source>) {
+  const names = new Set(Object.values(sources).map(source => source.tool));
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    if (!record(value)) return;
+    if (value.action === "call" && record(value.params) && typeof value.params.tool === "string") names.add(value.params.tool);
+    Object.values(value).forEach(visit);
+  };
+  for (const element of Object.values(spec.elements)) visit(element.on);
+  return [...names];
 }
 
 /** Under the 16 KiB tool result limit: component props as JSON Schema, events, and how data and `call` work. */

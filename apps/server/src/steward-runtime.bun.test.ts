@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
-import { createStewardRuntime, stewardDataDir } from "./steward-runtime";
+import { createStewardRuntime } from "./steward-runtime";
+import { stewardDataDir } from "../../../packages/integrations/src/steward/module-runtime";
 test("E2E provider requires both the explicit test gate and provider selection", async () => {
   const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
   const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;
@@ -112,6 +113,24 @@ test("shutdown waits for background finalization before closing modules and retu
     expect(stopped).toBe(true);
     expect(settled).toHaveBeenCalledTimes(2);
   } finally { release(); await stopping; settled.mockRestore(); await db.$disconnect(); }
+});
+
+test("runtime clears persisted executor authority before requests and propagates startup failure", async () => {
+  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-executor-startup-"));
+  try {
+    await db.workspace.create({ data: { id: "ws_default", name: "Owner" } });
+    await db.executionExecutor.create({ data: { id: "startup-device", workspaceId: "ws_default", ownerId: "owner", label: "Startup", credentialHash: "startup-hash", incarnation: "retained", reconciledAt: new Date(), authorizedUntil: new Date(Date.now() + 60000) } });
+    const runtime = createStewardRuntime(db, { dataDir, provider: null });
+    await runtime.initialize();
+    expect(await db.executionExecutor.findUniqueOrThrow({ where: { id: "startup-device" } })).toMatchObject({ incarnation: "retained", authorizedUntil: null, reconciledAt: null });
+    await db.executionExecutor.update({ where: { id: "startup-device" }, data: { reconciledAt: new Date() } });
+    await runtime.initialize();
+    expect((await db.executionExecutor.findUniqueOrThrow({ where: { id: "startup-device" } })).reconciledAt).not.toBeNull();
+    const failed = createStewardRuntime(db, { dataDir, provider: null });
+    await db.$executeRawUnsafe('CREATE TRIGGER "fail_executor_startup" BEFORE UPDATE ON "ExecutionExecutor" BEGIN SELECT RAISE(ABORT, \'startup unavailable\'); END');
+    await expect(failed.initialize()).rejects.toThrow();
+    await db.$executeRawUnsafe('DROP TRIGGER "fail_executor_startup"');
+  } finally { await db.$disconnect(); }
 });
 
 test("runtime data directory follows explicit setting then database directory", () => {

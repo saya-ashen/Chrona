@@ -24,21 +24,30 @@ import { startModule } from "chrona/testing";
 type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
 const stub = (target: string, answer: (args: Args) => unknown) => [target, (args: Args) => { calls.push([target, args]); return answer(args); }] as const;
+let inventoryFailure = false;
+const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
+let filesContract = "a".repeat(64);
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("chat.today", () => ({ approvals: [] })),
   stub("chat.session", args => ({ id: args.session, key: "web:k1" })),
   stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
+  stub("modules.disable", () => ({ status: "paused" })),
+  stub("modules.enable", () => ({ status: "active" })),
+  stub("modules.remove", () => ({ status: "pending_approval", approvalId: "remove-1" })),
   stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
   stub("modules.system", args => ({ name: "memory", args })),
   stub("modules.overview", args => ({ kind: "app", module: args.module })), stub("modules.settings-set", args => args),
   stub("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
-  stub("modules.tools", args => args.query === "files"
+  stub("modules.tools", args => (args.query === "files"
     ? [{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true }, { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
-    : [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]),
-  stub("modules.list", () => [{ id: "m-files", name: "files", status: "active" }, { id: "m-p", name: "planning", status: "paused" }]),
+    : [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]).map(tool => ({ ...tool, moduleId: args.query === "files" ? "m-files" : "m-p", hash: "h", contractHash: args.query === "files" ? filesContract : "b".repeat(64) }))),
+  stub("modules.list", () => inventoryFailure ? null : inventory),
+  stub("modules.catalog", () => []),
+  stub("modules.install", args => ({ package: args.package, requestKey: args.requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null })),
+  stub("modules.rollback", () => ({ status: "pending_approval", approvalId: "rollback-1" })),
   stub("planning.get", () => ({ plan: 1 })),
   stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
   stub("modules.revise-build", args => ({ status: "build_revised", sessionId: args.session })),
@@ -161,9 +170,9 @@ async function checkAdapter() {
   await reads("$web.memory", {});
   assert.deepEqual(readMapped, [["/tools?query=a%2Fb%20%E4%B8%AD"], ["/pages"], ["/activity?module=a%2Fb%20%E4%B8%AD"], ["/memory"]]);
   const optional = systemCall({ web: async () => { throw new Error("offline"); }, tool: async () => ({}), login: async () => {} });
-  assert.deepEqual(await optional("$web.system-apps", {}), []);
+  await assert.rejects(optional("$web.system-apps", {}), /offline/);
   assert.deepEqual(await optional("$web.diagnostics", { id: "x" }), { failure: "offline" });
-  assert.deepEqual(await optional("$web.pages", {}), []);
+  await assert.rejects(optional("$web.pages", {}), /offline/);
   assert.deepEqual(await optional("$web.detail-activity", { module: "x" }), []);
   await assert.rejects(optional("$web.activity", {}), /offline/);
   await assert.rejects(call("files.today", {}), /未知系统操作/);
@@ -172,7 +181,20 @@ async function checkAdapter() {
 function checkDetailSpecs() {
   assert.equal(selectedTab("unknown"), "overview"); assert.equal(selectedTab("permissions", true), "overview"); assert.equal(selectedTab("settings", true, "session"), "overview");
   for (const [type, value, checked, expected] of [["boolean", "on", true, true], ["boolean", "", false, false], ["number", "2.5", false, 2.5], ["text", "文本", false, "文本"]] as const) assert.equal(settingValue(type, value, checked), expected);
-  const overview = { app: { id: "app/1", name: "example", status: "active", health: {}, activeHash: "abc", runs: [], versions: [] }, settings: { declarations: {}, values: {} }, permissions: { capabilities: [], grants: [], approvals: [], secrets: [], model: null }, activity: [] };
+  const overview = { app: { id: "app/1", name: "example", origin: "external", capabilities: { remove: true, enable: true, disable: true, build: true }, status: "active", health: {}, activeHash: "abc", runs: [], versions: [] }, settings: { declarations: {}, values: {} }, permissions: { capabilities: [], grants: [], approvals: [], secrets: [], model: null }, activity: [] };
+  for (const builtin of [false, true]) for (const status of ["active", "paused", "migrating"]) {
+    const spec = detailSpec({ overview: { ...overview, app: { ...overview.app, builtin, status, origin: builtin ? "builtin" : "external", capabilities: { remove: !builtin, disable: true, enable: true, build: !builtin } } } }, { id: "app/1", tab: "overview", session: "" });
+    const nodes = Object.values(spec.elements);
+    assert.equal(nodes.some(node => node.type === "AppRemoval"), !builtin && status !== "migrating");
+    const control = nodes.find(node => node.type === "SystemAction");
+    if (status === "migrating") assert.equal(control, undefined);
+    else {
+      assert.equal(control!.props.label, status === "active" ? "暂停" : "恢复");
+      assert.equal(control!.props.tool, status === "active" ? "module-disable" : "module-enable");
+      assert.deepEqual(control!.props.args, { id: "example" });
+      assert.match(String(control!.props.confirm), /example/);
+    }
+  }
   const fallback = detailSpec({ overview }, { id: "app/1", tab: "unknown", session: "" });
   const tabs = Object.values(fallback.elements).find(node => node.type === "TabNav")!.props.items as { current: boolean; href: string }[];
   assert.equal(tabs[0]!.current, true); assert.equal(tabs.filter(tab => tab.current).length, 1); assert.equal(tabs[0]!.href, "/apps/app%2F1?tab=overview");
@@ -196,11 +218,11 @@ function checkListSpecs() {
   assert.match(JSON.stringify(activitySpec({ activity: { items: [], before: null } })), /还没有活动。/);
   assert.match(JSON.stringify(activitySpec({})), /加载中/);
   for (const systemApps of [[], [{ name: "chat", description: "系统对话" }]]) {
-    const spec = appsSpec({ apps: [{ id: "app /", name: "示例", builtin: true, description: "应用说明", health: { runtime: { state: "running" }, incident: { status: "unresolved" } } }], systemApps });
+    const spec = appsSpec({ apps: [{ id: "app /", name: "示例", builtin: true, origin: "builtin", description: "应用说明", health: { runtime: { state: "running" }, incident: { status: "unresolved" } } }], systemApps });
     const serialized = JSON.stringify(spec);
-    assert.match(serialized, /运行中 · 未解决，需要处理 · 内置 · 应用说明/);
+    assert.match(serialized, /内置 · 尚未启用 · 运行中 · 未解决，需要处理 · 应用说明/);
     assert.ok(serialized.includes("/apps/app%20%2F"));
-    assert.equal(Object.values(spec.elements).some(item => item.props.title === "系统"), !!systemApps.length);
+    assert.equal(Object.values(spec.elements).some(item => item.props.title === "内核"), !!systemApps.length);
     if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 自身的一部分"]) assert.ok(serialized.includes(expected));
   }
   assert.match(JSON.stringify(appsSpec({})), /加载中/);
@@ -213,7 +235,7 @@ function checkDisplayAndReach() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
+  for (const type of ["PackageInstall", "AppRemoval", "ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };
@@ -342,6 +364,16 @@ try {
   assert.equal((await (await get("/api/web/system-apps?module=memory")).json()).name, "memory");
   assert.deepEqual(calls.at(-1), ["modules.system", { module: "memory" }]);
   assert.equal((await (await get("/api/web/modules/okx/overview")).json()).module, "okx");
+  const lifecycleCalls: unknown[] = [];
+  const lifecycle = systemCall({ web: async (...args) => { lifecycleCalls.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
+  for (const operation of ["disable", "enable", "remove"]) {
+    const result = await post(`/api/web/modules/example/${operation}`, { reason: "untrusted replacement" });
+    assert.equal(result.status, 200);
+    assert.deepEqual(calls.at(-1), [`modules.${operation}`, { module: "example", reason: operation === "remove" ? "用户在网页申请删除应用" : "用户在网页操作" }]);
+    await lifecycle(`$web.module-${operation}`, { id: "app/name" });
+    assert.deepEqual(lifecycleCalls.at(-1), [`/modules/app%2Fname/${operation}`, { method: "POST", body: {} }]);
+    assert.equal((await get(`/api/web/modules/example/${operation}`)).status, 404);
+  }
   await post("/api/web/modules/okx/settings", { values: { "max-loss": 50 } });
   assert.deepEqual(calls.at(-1), ["modules.settings-set", { module: "okx", values: JSON.stringify({ "max-loss": 50 }) }]);
   assert.deepEqual(await (await get("/api/web/modules/a1/permissions")).json(), { module: "a1", capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] });
@@ -400,6 +432,19 @@ try {
   assert.match(chunk, /"type":"reply"/); assert.match(chunk, /"text":"hello"/);
   await reader.cancel();
 
+  // Official installation and rollback use owner-visible narrow routes, never generic Provider calls.
+  const installRequest = { package: "qq", mode: "install", requestKey: "owner-web-1" };
+  assert.deepEqual(await (await get("/api/web/catalog")).json(), []);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const installed = await post("/api/web/install", installRequest);
+    assert.equal(installed.status, 200);
+    assert.equal((await installed.json()).status, "pending");
+    assert.deepEqual(calls.at(-1), ["modules.install", installRequest]);
+  }
+  assert.equal((await post("/api/web/call", { target: "modules.build", args: {} })).status, 404);
+  assert.equal((await post("/api/web/modules/example/rollback", { hash: "a".repeat(64) })).status, 200);
+  assert.deepEqual(calls.at(-1), ["modules.rollback", { module: "example", hash: "a".repeat(64) }]);
+
   // Apps register pages (module-dependency-direction §4): owned by the recorded caller, checked against the catalog and the app's own tools.
   const tool = (id: string, args: Args, caller?: unknown) => module.send({ trigger: { kind: "tool", id, firedAt: new Date().toISOString(), args, caller }, now: new Date().toISOString(), params: {} });
   const files = { kind: "module", module: "files", moduleId: "m-files", hash: "h" }, planning = { kind: "module", module: "planning", moduleId: "m-p", hash: "h" };
@@ -410,13 +455,23 @@ try {
   assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "文档", spec, data: { list: { tool: "list", args: { path: "" }, refresh: 30 } } }, files)), /json-render@/);
   // Only the build's smoke start calls without a recorded caller: nothing is stored.
   assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, undefined)), /no caller/);
-  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, { kind: "owner", via: null })), /只有应用/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "main", title: "x", spec }, { kind: "owner", via: null })), /只有身份完整的应用/);
   const wrong = JSON.stringify(await tool("page-set", { id: "bad", title: "x", spec: { root: "b", elements: { b: { type: "Button", props: { label: 1 }, children: [], on: { press: { action: "call", params: { tool: "get" } } } } } } }, files));
   assert.match(wrong, /props\.label/); assert.match(wrong, /没有工具 get/);
   // Another app's page with the same id is its own; the page lists only active apps' pages.
   await tool("page-set", { id: "main", title: "计划", spec: { root: "t", elements: { t: { type: "Text", props: { text: "x" }, children: [] } } } }, planning);
+  inventory[1]!.status = "paused";
   assert.deepEqual(await (await get("/api/web/pages")).json(), [{ module: "files", id: "main", title: "文档" }]);
+  assert.equal((await get("/api/web/pages/planning/main")).status, 409);
+  inventory[1]!.status = "active";
+  assert.equal((await get("/api/web/pages/planning/main")).status, 200);
+  inventory[1]!.status = "paused";
   const page = await (await get("/api/web/pages/files/main")).json();
+  const pageCall = { target: "files.list", args: { path: "" }, page: { module: "files", id: "main", revision: page.revision } };
+  assert.equal((await post("/api/web/call", pageCall)).status, 200);
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && call.params.target === "files.list")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
+  assert.equal((await post("/api/web/call", { ...pageCall, page: { ...pageCall.page, revision: "stale" } })).status, 409);
+  assert.equal((await post("/api/web/call", { ...pageCall, target: "planning.get" })).status, 409);
   assert.equal(page.data.list.tool, "list"); assert.equal(page.spec.elements.remove.on.press.params.tool, "delete");
   // A source is not read while a required argument is empty (files.delete needs path; list needs nothing).
   assert.deepEqual(page.needs, { list: [] }); assert.deepEqual(page.keyed, []);
@@ -431,9 +486,9 @@ try {
   assert.match(pageErrors({ spec: foreignSpec }, new Map(), "files").join(), /只能引用本应用/);
   assert.match(JSON.stringify(await tool("page-set", { id: "bad-image", title: "图片", spec: foreignSpec }, files)), /只能引用本应用/);
   const imageUrl = "/api/web/pages/files/images/content?ref=";
-  const before = calls.length;
+  const before = calls.filter(([target]) => target === "content.read").length;
   for (const ref of ["planning/private.png", "files-other/a.png", ""]) assert.equal((await get(imageUrl + encodeURIComponent(ref))).status, 403);
-  assert.equal(calls.length, before); // Rejected before content.read.
+  assert.equal(calls.filter(([target]) => target === "content.read").length, before); // Rejected before content.read.
   assert.equal((await get(imageUrl + "files%2Fno.svg")).status, 403);
   const missing = await get(imageUrl + "files%2Fmissing.png");
   assert.equal(missing.status, 404); assert.doesNotMatch(await missing.text(), /private internal/);
@@ -446,6 +501,20 @@ try {
   assert.equal(image.headers.get("content-security-policy"), "sandbox; default-src 'none'");
   assert.equal(image.headers.get("cache-control"), "private, no-cache");
   assert.deepEqual(calls.at(-1), ["content.read", { ref: "files/picture.png" }]);
+  inventory[0]!.status = "paused";
+  assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
+  assert.equal((await get("/api/web/pages/files/main")).status, 409);
+  inventory[0]!.status = "active";
+  filesContract = "c".repeat(64);
+  assert.equal((await get("/api/web/pages/files/main")).status, 409);
+  filesContract = "a".repeat(64);
+  inventoryFailure = true;
+  assert.equal((await get("/api/web/pages")).status, 502);
+  inventoryFailure = false;
+  assert.equal((await get("/api/web/pages/files/main")).status, 200);
+  Object.assign(inventory[1]!, { id: "planning-reinstalled", status: "active" });
+  assert.equal((await get("/api/web/pages/planning/main")).status, 404);
+  assert.ok(!(await (await get("/api/web/pages")).json()).some((item: { module: string }) => item.module === "planning"));
   await tool("page-remove", { id: "images" }, files);
   assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
   assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);

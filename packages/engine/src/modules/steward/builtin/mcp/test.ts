@@ -4,6 +4,9 @@ import { startModule } from "chrona/testing";
 
 type Args = Record<string, unknown>;
 const calls: [string, Args][] = [];
+const installedApps = [{ id: "alpha-id", name: "alpha", origin: "external", capabilities: { build: true, remove: true } }, { id: "notify-id", name: "notify", origin: "builtin", capabilities: { build: false, remove: false } }];
+let installStatus = "pending";
+const installation = (args: Args) => ({ package: args.package, requestKey: args.requestKey, status: installStatus, moduleId: null, hash: null, approvalId: null, error: null });
 const problems = [{ module: "web", moduleId: "web-id", incidentStatus: "verifying", contractFailures: 0, nextAction: "等待实际调用验证", since: "2026-10-27T04:00:00Z" }];
 const diagnostics = { module: "web", runtime: { state: "connected" }, activation: { observedCapabilities: [] }, consecutiveFailures: 0,
   incident: { status: "verifying" }, contractFailureCount: 0, open: true, nextAction: "等待实际调用验证", truncated: true, incidents: [], contractFailures: [], evolution: [] };
@@ -12,7 +15,7 @@ const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: t
 const module = await startModule("index.ts", { stubs: {
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
-    routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list"),
+    routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
     routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
     routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ ...diagnostics, module: args.module }]),
     routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
@@ -46,7 +49,21 @@ try {
   assert.deepEqual(await json("chrona_system_apps", { module: "memory" }), { name: "memory", work: [] });
   assert.deepEqual(await json("chrona_app", { module: "okx" }), { kind: "app", module: "okx" });
   assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
-  const build = { name: "web", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "authorized-once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
+  assert.deepEqual(await json("chrona_modules"), installedApps);
+  assert.deepEqual(await json("chrona_module_catalog"), [{ name: "memory-local", available: true, installation: null }]);
+  const install = { package: "memory-local", mode: "install", requestKey: "authorized-install" };
+  assert.equal((await json("chrona_module_install", install)).status, "pending");
+  assert.equal((await json("chrona_module_install", install)).status, "pending");
+  assert.deepEqual(calls.at(-1), ["modules.install", install]);
+  installStatus = "unavailable";
+  assert.equal((await json("chrona_module_install", install)).status, "unavailable");
+  const installCalls = calls.filter(([target]) => target === "modules.install").length;
+  assert.equal(installCalls, 3, "one routed call per explicit owner request; no background retries");
+  for (const invalid of [{ ...install, package: "web" }, { ...install, path: "/host/private" }, { ...install, requestKey: " " }, { ...install, requestKey: "x".repeat(121) }, { ...install, package: ["qq"] }, { ...install, mode: ["install"] }])
+    assert.equal((await tool("chrona_module_install", invalid)).isError, true);
+  assert.equal(calls.filter(([target]) => target === "modules.install").length, installCalls);
+  assert.equal((await tool("chrona_module_call", { name: "modules.install", arguments: install })).isError, true);
+  const build = { name: "alpha", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "authorized-once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } };
   assert.ok(names.includes("chrona_build"));
   assert.deepEqual(await json("chrona_build", build), build);
   assert.deepEqual(calls.at(-1), ["modules.build-owner", build]);

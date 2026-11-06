@@ -5,10 +5,14 @@ import { audit } from "./audit";
 import { notificationSettings } from "./settings";
 import { latestModuleEvolution, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { StewardError } from "./errors";
-import { json, requireModule, type ModuleContext } from "./module-context";
+import { json, type ModuleContext } from "./module-context";
+import { assertExternalModule, assertModuleOperation } from "./module-identity";
+import { resolveBuiltinRelease, type ModuleRelease } from "./module-release";
+import { pauseIn } from "./module-status";
+import { assertExecutionModuleIdle } from "./execution-module-guard";
 
 async function replaceModuleSchedules(tx: Prisma.TransactionClient, { workspaceId, moduleId, manifest, now, zone }: { workspaceId: string; moduleId: string; manifest: ReturnType<typeof moduleManifestSchema.parse>; now: Date; zone: string }) {
-  await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: "active", payload: { equals: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
+  await tx.schedule.updateMany({ where: { workspaceId, moduleId, mode: "module", status: { in: ["active", "paused"] }, payload: { equals: Prisma.DbNull } }, data: { status: "cancelled", nextAt: null } });
   for (const trigger of manifest.triggers) {
     if (!("schedule" in trigger)) continue;
     let nextAt = nextOccurrence(trigger.schedule, now, zone);
@@ -16,10 +20,17 @@ async function replaceModuleSchedules(tx: Prisma.TransactionClient, { workspaceI
     await tx.schedule.create({ data: { workspaceId, moduleId, triggerId: trigger.id, mode: "module", rule: json(trigger.schedule), text: `${manifest.name}:${trigger.id}`, label: manifest.name, createdBy: "chrona", createdAt: now, nextAt, status: nextAt ? "active" : "done" } });
   }
 }
+async function preservePausedStatus(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string) {
+  const previous = await tx.audit.findFirst({ where: { workspaceId: context.workspaceId, subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  const details = previous?.details as { schedules?: unknown } | null;
+  const ids = previous?.kind === "module_disabled" && Array.isArray(details?.schedules) ? details.schedules.filter((id): id is string => typeof id === "string") : [];
+  // Only timers paused by the preceding disable belong to the next enable; cancelled static timers stay cancelled.
+  await tx.schedule.updateMany({ where: { workspaceId: context.workspaceId, moduleId, id: { in: ids }, status: "paused" }, data: { status: "active" } });
+  await pauseIn(context, tx, moduleId, { source: "chrona", reason: "版本切换保留原停用状态" });
+}
 export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, { moduleId, hash, reason, dataHandling }: { moduleId: string; hash: string; reason: "activate" | "rollback"; dataHandling?: string }) {
-  const previousHash = (await requireModule(context, tx, moduleId)).activeHash;
+  const { activeHash: previousHash } = await switchActiveIn(context, tx, moduleId, hash, { preservePause: reason === "activate", operation: reason });
   const previousOutcome = reason === "rollback" && previousHash ? await latestModuleEvolution(tx, context.workspaceId, moduleId, previousHash) : null;
-  await switchActiveIn(context, tx, moduleId, hash);
   const generation = await recordGeneration(context, tx, reason);
   if (reason === "activate") await recordModuleActivation(context, tx, { moduleId, previousHash, hash, generationId: generation.id, ...(dataHandling ? { dataHandling } : {}) });
   else {
@@ -36,23 +47,48 @@ export async function recordGeneration(context: ModuleContext, tx: Prisma.Transa
   const previous = await tx.generation.findFirst({ where: { workspaceId }, orderBy: { seq: "desc" } });
   return tx.generation.create({ data: { workspaceId, seq: (previous?.seq ?? 0) + 1, modules: Object.fromEntries(modules.map(row => [row.id, row.activeHash])), reason, createdAt: context.ports.now() } });
 }
-/** Makes an approved version the active one (listen paths, schedules), without recording a generation. */
-export async function switchActiveIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, { preserveSchedules = false }: { preserveSchedules?: boolean } = {}) {
-  const { workspaceId, ports } = context;
-  await requireModule(context, tx, moduleId);
-  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
-  if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
-  const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
-  if (manifest.listen) for (const other of await tx.module.findMany({ where: { id: { not: moduleId }, status: "active", activeHash: { not: null } } })) {
+async function assertListenAvailable(tx: Prisma.TransactionClient, moduleId: string, manifest: ReturnType<typeof moduleManifestSchema.parse>) {
+  if (!manifest.listen) return;
+  for (const other of await tx.module.findMany({ where: { id: { not: moduleId }, status: "active", activeHash: { not: null } } })) {
     const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: other.id, hash: other.activeHash! } } });
     const taken = active ? listenPaths(moduleManifestSchema.parse(active.manifest)).find(path => listenPaths(manifest).includes(path)) : undefined;
     if (taken) throw new StewardError("conflict", `${taken} is served by module ${other.name}`);
   }
+}
+/** Switches an approved version and returns the pre-switch row for activation history. */
+export async function switchActiveIn(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, { preserveSchedules = false, preservePause = true, operation = "activate" }: { preserveSchedules?: boolean; preservePause?: boolean; operation?: "activate" | "rollback" } = {}) {
+  const { workspaceId, ports } = context;
+  const module = await assertExternalModule(tx, workspaceId, moduleId, operation);
+  if (module.activeHash !== hash) await assertExecutionModuleIdle(tx, moduleId);
+  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
+  if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
+  const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
+  await assertListenAvailable(tx, moduleId, manifest);
   if (!preserveSchedules) {
     const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
     await replaceModuleSchedules(tx, { workspaceId, moduleId, manifest, now, zone });
   }
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active" } });
+  if (preservePause && module.status === "paused") await preservePausedStatus(context, tx, moduleId);
+  return module;
+}
+/** The release root is host-owned; callers cannot grant release authority with a stored hash. */
+export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prisma.TransactionClient, release: ModuleRelease) {
+  const trusted = await resolveBuiltinRelease(context.ports, release.name, release.hash);
+  if (release.origin !== "builtin" || release.codeDir !== trusted.codeDir || JSON.stringify(release.manifest) !== JSON.stringify(trusted.manifest)) throw new StewardError("conflict", "Trusted release identity changed");
+  const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId: context.workspaceId, name: trusted.name } } });
+  if (!module?.builtin) throw new StewardError("conflict", "Trusted release requires a built-in module identity");
+  const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: trusted.hash } } });
+  if (version?.status !== "approved" || JSON.stringify(version.manifest) !== JSON.stringify(trusted.manifest)) throw new StewardError("conflict", "Trusted release metadata does not match");
+  const previous = await tx.generation.findFirst({ where: { workspaceId: context.workspaceId }, orderBy: { seq: "desc" } });
+  if (module.activeHash === trusted.hash && previous) return previous;
+  const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } })).settings).timezone;
+  await replaceModuleSchedules(tx, { workspaceId: context.workspaceId, moduleId: module.id, manifest: trusted.manifest, now: context.now(), zone });
+  await tx.module.update({ where: { id: module.id }, data: { activeHash: trusted.hash, dataSchema: trusted.manifest.data.schema, status: "active" } });
+  if (module.status === "paused") await preservePausedStatus(context, tx, module.id);
+  const generation = await recordGeneration(context, tx, "activate");
+  await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash: trusted.hash, generationId: generation.id });
+  return generation;
 }
 function staticSchedules(manifest: ReturnType<typeof moduleManifestSchema.parse>) {
   return JSON.stringify(manifest.triggers.filter((trigger): trigger is Extract<typeof trigger, { schedule: unknown }> => "schedule" in trigger)
@@ -64,10 +100,6 @@ function automaticRollbackDataError(candidate: ReturnType<typeof moduleManifestS
   const migrated = current.checks.continuity && typeof current.checks.continuity === "object" && "migrated" in current.checks.continuity && current.checks.continuity.migrated === true;
   return candidate.data.schema !== previous.data.schema || candidate.data.schema !== moduleSchema || migrated ? "Data schema changed or migration was recorded; automatic code rollback is unsafe." : null;
 }
-function automaticRollbackManifestError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>, moduleSchema: number, current: AutomaticRollbackInput["current"]) {
-  const dataError = automaticRollbackDataError(candidate, previous, moduleSchema, current);
-  return dataError ?? automaticRollbackScheduleError(candidate, previous);
-}
 async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
   const { tx, moduleId, hash, previousHash, moduleSchema, current } = input;
   const [candidateRow, previousRow] = await Promise.all([
@@ -77,7 +109,7 @@ async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
   if (!candidateRow || candidateRow.status !== "approved" || !previousRow || previousRow.status !== "approved") return "Candidate or rollback target is not an approved version.";
   const candidate = moduleManifestSchema.safeParse(candidateRow.manifest).data, previous = moduleManifestSchema.safeParse(previousRow.manifest).data;
   if (!candidate || !previous) return "Candidate or rollback target manifest is invalid.";
-  return automaticRollbackManifestError(candidate, previous, moduleSchema, current);
+  return automaticRollbackDataError(candidate, previous, moduleSchema, current) ?? automaticRollbackScheduleError(candidate, previous);
 }
 async function automaticRollbackMigrationError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string) {
   const migration = await tx.audit.findFirst({ where: { workspaceId, subjectId: moduleId, kind: "module_migration_started" }, orderBy: { createdAt: "desc" }, select: { details: true } });
@@ -89,6 +121,7 @@ function automaticRollbackScheduleError(candidate: ReturnType<typeof moduleManif
     ? "Scheduled behavior changed or uses dynamic timers; automatic rollback will not recreate or replay schedules." : null;
 }
 async function automaticRollbackGroupError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, generationId: string) {
+  if (await tx.audit.findFirst({ where: { workspaceId, subjectId: generationId, kind: "module_group_activation" } })) return "This version was activated as a group; partial automatic rollback is disabled.";
   const activationAudit = await tx.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_activate" }, orderBy: { createdAt: "desc" }, take: 20, select: { details: true } });
   const groupApproval = activationAudit.map(row => row.details).find(details => details && typeof details === "object" && !Array.isArray(details) && details.hash === hash && details.generationId === generationId && typeof details.approvalId === "string") as { approvalId: string } | undefined;
   if (!groupApproval) return null;
@@ -110,6 +143,7 @@ async function automaticRollbackTarget(tx: Prisma.TransactionClient, context: Mo
   if (current.observedCapabilities.length) return { reason: "A successful capability was already verified." };
   const module = await tx.module.findFirst({ where: { id: moduleId, workspaceId: context.workspaceId } });
   if (!module || module.status !== "active" || module.activeHash !== hash) return { reason: "Module is paused, migrating, removed, or its active hash changed." };
+  try { assertModuleOperation(module, "rollback"); } catch { return { reason: "Built-in or reserved modules cannot automatically switch code." }; }
   if (!current.previousHash) return { reason: "No previously approved version exists for a first installation." };
   return { moduleSchema: module.dataSchema, previousHash: current.previousHash };
 }
@@ -153,6 +187,10 @@ export async function rollbackFailedStart(context: ModuleContext, moduleId: stri
 
 export async function startMigration(context: ModuleContext, tx: Prisma.TransactionClient, moduleId: string, hash: string, schema: { from: number | null; to: number }) {
   const { from, to } = schema;
+  const module = await assertExternalModule(tx, context.workspaceId, moduleId, "activate");
+  await assertExecutionModuleIdle(tx, moduleId);
   await tx.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
-  await tx.audit.create({ data: { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash, from, to }, createdAt: context.ports.now() } });
+  const previous = await tx.audit.findFirst({ where: { workspaceId: context.workspaceId, kind: "module_migration_started", subjectId: moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  const createdAt = new Date(Math.max(context.ports.now().getTime(), previous ? previous.createdAt.getTime() + 1 : 0));
+  await tx.audit.create({ data: { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash, from, to, previousStatus: module.status }, createdAt } });
 }

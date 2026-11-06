@@ -5,10 +5,13 @@ import { bodyLimit } from "hono/body-limit";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
+import { createExecutorRouter, isExecutorPath, isExecutorOwnerPath } from "./executor-router";
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
 import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
+
+import type { ServerBindings } from "./request-peer";
 
 const log = createLogger("apps.server");
 const MAX_HTTP_BODY_BYTES = 21 * 1024 * 1024;
@@ -35,7 +38,7 @@ async function proxy(socket: string, request: Request) {
   headers.delete("authorization");
   headers.delete("cookie");
   try {
-    const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: request.method, headers, body: request.body, redirect: "manual" });
+    const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: request.method, headers, body: request.body, redirect: "manual", signal: request.signal });
     const out = new Headers(response.headers);
     out.delete("set-cookie");
     return new Response(response.body, { status: response.status, headers: out });
@@ -44,7 +47,7 @@ async function proxy(socket: string, request: Request) {
   }
 }
 
-function mountHealthRoutes(app: Hono, steward: StewardRuntime) {
+function mountHealthRoutes(app: Hono<{ Bindings: ServerBindings }>,  steward: StewardRuntime) {
   app.get("/health", async (c) => c.json({ status: "ok", server: "chrona-hono", ...await steward.health() }));
   app.get("/ready", async (c) => {
     try {
@@ -66,8 +69,9 @@ function mountHealthRoutes(app: Hono, steward: StewardRuntime) {
  *   const client = hc<AppType>("/api");
  */
 export async function createServerApp(options: { steward?: StewardRuntime } = {}) {
-  const app = new Hono();
+  const app = new Hono<{ Bindings: ServerBindings }>();
   const steward = options.steward ?? createStewardRuntime((await import("@chrona/db")).db);
+  await steward.initialize();
   const api = createApiRouter({ steward });
   const allowedOrigins = getAllowedOrigins();
 
@@ -88,7 +92,19 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/*", apiKeyAuth({ isExempt: isStewardAgentPath }));
+  app.use("/api/editor/*", async (c, next) => {
+    if (!readEnv().API_KEY?.trim()) return c.json({ code: "EDITOR_AUTH_UNCONFIGURED" }, 503);
+    await next();
+  });
+  app.use("/api/*", async (c, next) => {
+    if (isExecutorOwnerPath(c.req.path, c.req.method)) {
+      c.header("Cache-Control", "no-store");
+      if (!readEnv().API_KEY?.trim()) return c.json({ code: "EXECUTOR_OWNER_AUTH_UNCONFIGURED" }, 503);
+    }
+    await next();
+  });
+  app.use("/api/*", apiKeyAuth({ isExempt: (path, method) => isStewardAgentPath(path, method) || isExecutorPath(path, method) }));
+  app.route("/", createExecutorRouter(steward.ports));
   app.use(
     "/api/*",
     bodyLimit({

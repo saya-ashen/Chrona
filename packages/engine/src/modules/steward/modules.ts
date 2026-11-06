@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { assertExternalModule, moduleIdentity } from "./module-identity";
+import { installExternal, externalPackageCatalog, refreshInstallationReceipts } from "./module-install";
 import { moduleSupervisor } from "./module-supervisor";
 import type { StewardPorts } from "./ports";
 import type { ApprovedAction } from "./ports";
@@ -83,7 +85,7 @@ async function list(context: ModuleContext) {
   const rows = await db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true, manifest: true, report: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
   return Promise.all(rows.map(async ({ versions, ...row }) => {
     const manifest = moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data;
-    return { ...row, description: manifest?.description ?? null,
+    return { ...row, ...moduleIdentity(row, { configurable: !!manifest && Object.keys(manifest.settings).length > 0, removable: !manifest || !isEntryModule(manifest) }), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row),
       versions: versions.map(({ manifest: _manifest, report, ...version }) => ({ ...version, errors: z.object({ errors: z.array(z.string()) }).safeParse(report).data?.errors ?? null })),
     };
@@ -104,15 +106,25 @@ export const isModuleApproval = (payload: unknown) => !!payload && typeof payloa
 export function createModules(ports: StewardPorts, workspaceId: string) {
   const context = moduleContext(ports, workspaceId);
   async function reconcile<T>(operation: Promise<T>) {
-    const result = await operation;
-    await moduleSupervisor(ports).reconcile();
-    return result;
+    try {
+      const result = await operation;
+      await moduleSupervisor(ports).reconcile();
+      return result;
+    } finally {
+      // Reconcile durable facts after success, denial, migration failure or activation recovery.
+      await refreshInstallationReceipts(ports, workspaceId);
+    }
   }
   return {
     propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
     buildPending: (now = ports.now()) => reconcile(buildPending(context, now)),
     recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),
-    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile(ports.db.$transaction(tx => activateIn(context, tx, { moduleId, hash, reason }))),
+    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile(ports.db.$transaction(async tx => {
+      await assertExternalModule(tx, workspaceId, moduleId, reason === "rollback" ? "rollback" : "activate");
+      return activateIn(context, tx, { moduleId, hash, reason });
+    })),
+    install: (request: Parameters<typeof installExternal>[2]) => installExternal(ports, workspaceId, request),
+    catalog: () => externalPackageCatalog(ports, workspaceId),
     onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
     rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
     disable: (moduleId: string, source: "cli") => reconcile(ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source))),

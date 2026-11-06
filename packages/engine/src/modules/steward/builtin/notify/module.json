@@ -5,7 +5,7 @@
   "keepAlive": true,
   "triggers": [],
   "effects": [],
-  "uses": ["modules.tools"],
+  "uses": ["modules.list", "modules.tools"],
   "tools": [
     { "name": "send", "description": "Queue a notification for the user. The budget decides now, digest or web; a repeated key is dropped.", "visibility": ["modules", "kernel"], "idempotent": true,
       "output": { "anyOf": [{ "type": "object", "properties": { "id": { "type": "string" }, "status": { "type": "string" }, "duplicate": { "type": "boolean" } }, "required": ["id", "status", "duplicate"], "additionalProperties": false }, { "type": "object", "properties": { "error": { "const": "invalid" }, "message": { "type": "string" } }, "required": ["error", "message"], "additionalProperties": false }] },

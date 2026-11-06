@@ -1,4 +1,5 @@
 import { moduleModelSettings } from "./settings";
+import { assertExternalModule, ModuleIdentityError } from "./module-identity";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
@@ -76,17 +77,16 @@ async function reviewPreview(context: ModuleContext, review: Review, active: Awa
 }
 const SUPERSEDED = "Superseded by newer candidate ";
 const superseded = (report: unknown) => (report as BuildReport | null)?.errors?.[0]?.startsWith(SUPERSEDED) === true;
-/** Their approvals just expired: say so on the versions too, instead of leaving them pending forever. Built-in releases stay on file. */
+/** Expired approvals also reject their superseded candidates. */
 async function supersedeCandidates(context: ModuleContext, moduleId: string, hash: string) {
   const { db } = context;
-  for (const row of await db.moduleVersion.findMany({ where: { moduleId, status: "pending_review", source: { not: "builtin" }, hash: { not: hash } } })) {
+  for (const row of await db.moduleVersion.findMany({ where: { moduleId, status: "pending_review", hash: { not: hash } } })) {
     const report = row.report && typeof row.report === "object" && !Array.isArray(row.report) ? row.report : {};
     await db.moduleVersion.updateMany({ where: { id: row.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...report, errors: [`${SUPERSEDED}${hash}`] }) } });
   }
 }
-/** A release built-in is trusted code; its credentials are still entered by the owner on the app page. */
+/** New credential declarations require the owner's confirmation. */
 function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
-  if (version.source === "builtin") return false;
   const had = active ? secretNames(moduleManifestSchema.parse(active.manifest)) : [];
   return secretNames(moduleManifestSchema.parse(version.manifest)).some(name => !had.includes(name));
 }
@@ -94,25 +94,21 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
   await context.db.$transaction(async tx => {
-    const current = await requireModule(context, tx, module.id);
+    const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
     if (current.status === "migrating" || current.activeHash !== module.activeHash) throw new Error("Module changed during build; submit again");
     await expireModuleApprovals(context, module.id, tx);
     await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "approved" } });
     await tx.module.update({ where: { id: module.id }, data: { dataSchema: manifest.data.schema } });
     await activateIn(context, tx, { moduleId: module.id, hash, reason: "activate" });
     await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash } });
-    if (version.source !== "builtin") await activationNotice(context, tx, version, update);
+    await activationNotice(context, tx, version, update);
   });
   await supersedeCandidates(context, module.id, hash);
 }
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-  // A customized module keeps its version: the tested built-in stays inactive, for an explicit `admin rollback <m> builtin`.
-  if (version.source === "builtin" && active && active.source !== "builtin") {
-    await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "approved" } });
-    return { moduleId: module.id, hash, status: "approved", report };
-  }
+  await assertExternalModule(db, context.workspaceId, module.id, "activate");
   if (!await isGroupCandidate(context, version) && !review.needsMigration && !addsCredentials(version, active)) {
     await activateChecked(context, review, !!active);
     return { moduleId: module.id, hash, status: "approved", report };
@@ -200,15 +196,9 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };
 }
-async function customized(db: ModuleContext["db"], module: { id: string; activeHash: string | null }) {
-  const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
-  return !!active && active.source !== "builtin";
-}
-async function consumersBlock(context: ModuleContext, { module, version, manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
+async function consumersBlock(context: ModuleContext, { manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
   if (!report.outputImpacts?.length || await checkDependentCallers(context, manifest, report.outputImpacts, report)) return false;
-  // A customized module's release built-in is switched to only by an explicit `admin rollback`, usually together with
-  // its customized consumers (which may never type-check): the checks stay in the report, but do not reject it.
-  return !(version.source === "builtin" && await customized(context.db, module));
+  return true;
 }
 async function checkDependentCallers(context: ModuleContext, manifest: ReturnType<typeof moduleManifestSchema.parse>, impacts: { caller: string; targets: string[] }[], report: BuildReport) {
   report.dependentChecks = [];
@@ -251,7 +241,7 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
   const { db, platform } = context, { hash } = version;
   const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [] };
   try {
-    const module = await requireModule(context, db, version.moduleId);
+    const module = await assertExternalModule(db, context.workspaceId, version.moduleId, "build");
     const manifest = moduleManifestSchema.parse(version.manifest);
     intentSchema.parse(version.intent);
     const files = await stagingFiles(context, version, report);
@@ -260,7 +250,6 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     const invalidManifest = await validateBuildManifest(context, version, manifest, report);
     if (invalidManifest) return invalidManifest;
     const checks = await checkBuildCandidate({ context, module, version, manifest, staging, report });
-    // requestReview suppresses replacements if a custom version is active.
     return await finishBuild({ context, module, version, manifest, report, checks, files });
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
@@ -301,11 +290,11 @@ function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
 }
 async function recoverReview(context: ModuleContext, version: ModuleVersion) {
   const { db, workspaceId } = context;
-  const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId, source: { not: "builtin" } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
+  const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
   if (latest?.id !== version.id || latest.status !== "pending_review" || await isGroupCandidate(context, version)) return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
   if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
-  const module = await requireModule(context, db, version.moduleId);
   if (module.activeHash === version.hash) return;
   const report = version.report as BuildReport | null;
   if (!report?.continuity) return;
@@ -323,11 +312,16 @@ async function recoverReviews(context: ModuleContext) {
   if (running.has(workspaceId)) return;
   running.add(workspaceId);
   try {
-    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, source: { not: "builtin" }, status: "pending_review" } });
+    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: "pending_review" } });
     for (const version of candidates) {
       try {
         await recoverReview(context, version);
       } catch (error) {
+        if (error instanceof ModuleIdentityError) {
+          await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
+          await expireModuleApprovals(context, version.moduleId);
+          continue;
+        }
         console.error(JSON.stringify({ level: "error", component: "module-build", event: "review.recovery_failed", versionId: version.id,
           name: redactSensitiveText(error instanceof Error ? error.name : typeof error),
           message: redactSensitiveText(error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error") }));
@@ -347,18 +341,15 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
       return changed.count > 0;
     });
     if (!claimed) continue;
-    let result: Proposal;
+    let result: Proposal, identityRejected = false;
     try { result = await buildVersion(context, version); }
     catch (error) {
-      if (version.source !== "builtin") throw error;
+      if (!(error instanceof ModuleIdentityError)) throw error;
+      identityRejected = true;
       const report: BuildReport = { tests: [], errors: [String(error).slice(0, 4000)] };
       await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
       result = { moduleId: version.moduleId, hash: version.hash, status: "rejected", report };
     }
-    if (result.status === "rejected" && version.source === "builtin") {
-      const module = await requireModule(context, db, version.moduleId);
-      console.error(JSON.stringify({ level: "error", component: "module-build", event: "builtin.rejected", module: module.name, hash: version.hash, errors: result.report.errors?.map(error => error.slice(0, 1000)).slice(0, 10) ?? [], tests: result.report.tests.filter(test => test.exitCode !== 0).map(test => ({ exitCode: test.exitCode, stderr: test.stderr.slice(0, 1000) })).slice(0, 10) }));
-    }
-    if (result.status === "rejected" && version.source === "provider") await reportFailure(context, version, result);
+    if (result.status === "rejected" && version.source === "provider" && !identityRejected) await reportFailure(context, version, result);
   }
 }

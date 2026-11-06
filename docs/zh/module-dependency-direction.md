@@ -1,6 +1,14 @@
 # 模块依赖方向审查
 
-状态：2026-11-02 审查记录，问题清单已与用户确认。2026-11-03：第 1–6 项均已实现并部署。
+文档性质：依赖方向原则 + 有日期的历史审查记录。§2–§5 保留 2026-11-02/03 的问题、试验、旧生产处置和当时部署结论；其中旧 `rollback <module> builtin`、定制内置双轨、旧迁移编号与“待迁移”名单不再是当前操作指引，不批量改写历史。M1 的当前事实见下节与[当前架构](architecture.md)，开发证据、协调者 M1 验收签署及环境边界见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。
+
+## M1 当前规则（2026-11-05）
+
+- 内置固定 web/mcp/files/notify/events，只随发行变更，不能普通构建/回滚/删除；qq/remind/mind 已移至 `packages/engine/src/modules/steward/external/`，memory-local 是可选外置。历史定制应用与生产转换另行授权。
+- web 页面、notify 渠道、events 订阅按实际 moduleId 和工具 contractHash 登记；`expectedTarget` 在入队/投递复核。停用与删除、同名重装不继承旧回调；结果未知不猜测补发，旧无身份绑定 fail closed。
+- mind 在 `provider.wake` 时携带自身协议，tick 不按 mind 名字附加提示；memory 系统按配置和贡献发现实现。移除这些外置应用不阻断普通基础对话。
+- 内置/外置共用 routed calls；业务依赖仍只能从具体指向通用。`uses` 是契约，`visibility` 决定受众，详情见[安全规则](security-simplification.md)。
+- M1 已完成全组与浏览器开发验证；这不重新声称历史生产部署已切换，也不代表 P1 执行契约已经存在。
 
 ## 1. 原则
 

@@ -1,0 +1,704 @@
+{
+  "requests": [
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "start-fixture",
+      "command": {
+        "op": "start",
+        "input": {
+          "kind": "execution",
+          "workId": "work-fixture",
+          "commandKey": "start-fixture",
+          "goal": "Inspect the selected source",
+          "budget": {
+            "timeoutMs": 1000,
+            "maxToolCalls": 1
+          },
+          "placement": {
+            "executorId": "device-fixture",
+            "projectRef": "project-fixture",
+            "mappingRevision": 1
+          },
+          "workspace": {
+            "mode": "independent_worktree",
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "source": {
+              "files": [
+                {
+                  "path": "src/main.ts",
+                  "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                }
+              ]
+            }
+          },
+          "queueExpiresAt": "2026-11-07T00:00:00Z"
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "get-fixture",
+      "command": {
+        "op": "get",
+        "workId": "work-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "lookup_start-fixture",
+      "command": {
+        "op": "lookup_start",
+        "commandKey": "start-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "list-fixture",
+      "command": {
+        "op": "list",
+        "resource": "works",
+        "limit": 10
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "send-fixture",
+      "command": {
+        "op": "send",
+        "workId": "work-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "commandKey": "send-key",
+        "text": "Continue inspection"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "answer-fixture",
+      "command": {
+        "op": "answer",
+        "workId": "work-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "commandKey": "answer-key",
+        "requestId": "question-fixture",
+        "answer": {
+          "decision": "cancel"
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "cancel-fixture",
+      "command": {
+        "op": "cancel",
+        "workId": "work-fixture",
+        "commandKey": "cancel-key"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "attach-fixture",
+      "command": {
+        "op": "attach",
+        "workId": "work-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "detach-fixture",
+      "command": {
+        "op": "detach",
+        "workId": "work-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "events-fixture",
+      "command": {
+        "op": "events",
+        "workId": "work-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "limit": 10,
+        "waitMs": 0
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "snapshot-fixture",
+      "command": {
+        "op": "snapshot",
+        "workId": "work-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "results-fixture",
+      "command": {
+        "op": "results",
+        "workId": "work-fixture"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "accept-fixture",
+      "command": {
+        "op": "accept",
+        "workId": "work-fixture",
+        "resultId": "result-fixture",
+        "commandKey": "accept-key"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "start-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "kind": "execution",
+        "goal": "Inspect the selected source",
+        "parentWorkId": null,
+        "children": [],
+        "dependsOnWorkIds": [],
+        "blockedBy": [],
+        "dependencyResults": [],
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "phase": "running",
+        "cancelRequested": false,
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "workspaceRef": "workspace-fixture",
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "state": "ready",
+          "sourceReceipt": {
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+            "fileCount": 1,
+            "verifiedAt": "2026-11-06T00:00:00Z",
+            "stage": "claim"
+          },
+          "retained": true
+        },
+        "execution": {
+          "workId": "work-fixture",
+          "sessionId": "session-fixture",
+          "runId": "run-fixture",
+          "attemptId": "attempt-fixture",
+          "projectRef": "project-fixture",
+          "status": "running",
+          "cancelRequested": false,
+          "stopConfirmed": false
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "get-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "kind": "execution",
+        "goal": "Inspect the selected source",
+        "parentWorkId": null,
+        "children": [],
+        "dependsOnWorkIds": [],
+        "blockedBy": [],
+        "dependencyResults": [],
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "phase": "running",
+        "cancelRequested": false,
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "workspaceRef": "workspace-fixture",
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "state": "ready",
+          "sourceReceipt": {
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+            "fileCount": 1,
+            "verifiedAt": "2026-11-06T00:00:00Z",
+            "stage": "claim"
+          },
+          "retained": true
+        },
+        "execution": {
+          "workId": "work-fixture",
+          "sessionId": "session-fixture",
+          "runId": "run-fixture",
+          "attemptId": "attempt-fixture",
+          "projectRef": "project-fixture",
+          "status": "running",
+          "cancelRequested": false,
+          "stopConfirmed": false
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "lookup_start-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "kind": "execution",
+        "goal": "Inspect the selected source",
+        "parentWorkId": null,
+        "children": [],
+        "dependsOnWorkIds": [],
+        "blockedBy": [],
+        "dependencyResults": [],
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "phase": "running",
+        "cancelRequested": false,
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "workspaceRef": "workspace-fixture",
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "state": "ready",
+          "sourceReceipt": {
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+            "fileCount": 1,
+            "verifiedAt": "2026-11-06T00:00:00Z",
+            "stage": "claim"
+          },
+          "retained": true
+        },
+        "execution": {
+          "workId": "work-fixture",
+          "sessionId": "session-fixture",
+          "runId": "run-fixture",
+          "attemptId": "attempt-fixture",
+          "projectRef": "project-fixture",
+          "status": "running",
+          "cancelRequested": false,
+          "stopConfirmed": false
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "list-fixture",
+      "ok": true,
+      "data": {
+        "resource": "works",
+        "works": [
+          {
+            "workId": "work-fixture",
+            "kind": "execution",
+            "goal": "Inspect the selected source",
+            "parentWorkId": null,
+            "children": [],
+            "dependsOnWorkIds": [],
+            "blockedBy": [],
+            "dependencyResults": [],
+            "queueExpiresAt": "2026-11-07T00:00:00Z",
+            "phase": "running",
+            "cancelRequested": false,
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "workspace": {
+              "workspaceRef": "workspace-fixture",
+              "mode": "independent_worktree",
+              "baseline": {
+                "kind": "commit",
+                "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              },
+              "state": "ready",
+              "sourceReceipt": {
+                "placement": {
+                  "executorId": "device-fixture",
+                  "projectRef": "project-fixture",
+                  "mappingRevision": 1
+                },
+                "baseline": {
+                  "kind": "commit",
+                  "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+                "fileCount": 1,
+                "verifiedAt": "2026-11-06T00:00:00Z",
+                "stage": "claim"
+              },
+              "retained": true
+            },
+            "execution": {
+              "workId": "work-fixture",
+              "sessionId": "session-fixture",
+              "runId": "run-fixture",
+              "attemptId": "attempt-fixture",
+              "projectRef": "project-fixture",
+              "status": "running",
+              "cancelRequested": false,
+              "stopConfirmed": false
+            }
+          }
+        ],
+        "after": null
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "send-fixture",
+      "ok": true,
+      "data": {
+        "accepted": true
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "answer-fixture",
+      "ok": true,
+      "data": {
+        "accepted": true
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "cancel-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "kind": "execution",
+        "goal": "Inspect the selected source",
+        "parentWorkId": null,
+        "children": [],
+        "dependsOnWorkIds": [],
+        "blockedBy": [],
+        "dependencyResults": [],
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "phase": "running",
+        "cancelRequested": false,
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "workspaceRef": "workspace-fixture",
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "state": "ready",
+          "sourceReceipt": {
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+            "fileCount": 1,
+            "verifiedAt": "2026-11-06T00:00:00Z",
+            "stage": "claim"
+          },
+          "retained": true
+        },
+        "execution": {
+          "workId": "work-fixture",
+          "sessionId": "session-fixture",
+          "runId": "run-fixture",
+          "attemptId": "attempt-fixture",
+          "projectRef": "project-fixture",
+          "status": "running",
+          "cancelRequested": false,
+          "stopConfirmed": false
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "attach-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "kind": "execution",
+        "goal": "Inspect the selected source",
+        "parentWorkId": null,
+        "children": [],
+        "dependsOnWorkIds": [],
+        "blockedBy": [],
+        "dependencyResults": [],
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "phase": "running",
+        "cancelRequested": false,
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "workspaceRef": "workspace-fixture",
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "state": "ready",
+          "sourceReceipt": {
+            "placement": {
+              "executorId": "device-fixture",
+              "projectRef": "project-fixture",
+              "mappingRevision": 1
+            },
+            "baseline": {
+              "kind": "commit",
+              "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+            "fileCount": 1,
+            "verifiedAt": "2026-11-06T00:00:00Z",
+            "stage": "claim"
+          },
+          "retained": true
+        },
+        "execution": {
+          "workId": "work-fixture",
+          "sessionId": "session-fixture",
+          "runId": "run-fixture",
+          "attemptId": "attempt-fixture",
+          "projectRef": "project-fixture",
+          "status": "running",
+          "cancelRequested": false,
+          "stopConfirmed": false
+        }
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "detach-fixture",
+      "ok": true,
+      "data": {
+        "accepted": true
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "events-fixture",
+      "ok": true,
+      "data": {
+        "events": [
+          {
+            "workId": "work-fixture",
+            "sessionId": "session-fixture",
+            "runId": "run-fixture",
+            "attemptId": "attempt-fixture",
+            "seq": 1,
+            "at": "2026-11-06T00:00:00Z",
+            "payload": {
+              "type": "message",
+              "messageId": "message-fixture",
+              "role": "assistant",
+              "text": "Fixture response",
+              "complete": true
+            }
+          }
+        ],
+        "cursor": "fixture-cursor",
+        "highWatermark": 1,
+        "gap": false,
+        "snapshotRequired": false
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "snapshot-fixture",
+      "ok": true,
+      "data": {
+        "workId": "work-fixture",
+        "sessionId": "session-fixture",
+        "runId": "run-fixture",
+        "attemptId": "attempt-fixture",
+        "highWatermark": 1,
+        "status": "running",
+        "cancelRequested": false,
+        "stopConfirmed": false,
+        "finalMessage": null,
+        "questions": [],
+        "missing": false,
+        "expiresAt": "2026-12-01T00:00:00Z"
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "results-fixture",
+      "ok": true,
+      "data": {
+        "results": [],
+        "missing": []
+      }
+    },
+    {
+      "v": "chrona.execution.v2",
+      "requestId": "accept-fixture",
+      "ok": true,
+      "data": {
+        "accepted": true
+      }
+    }
+  ],
+  "group": {
+    "kind": "group",
+    "workId": "group-fixture",
+    "commandKey": "group-key",
+    "goal": "Compare selected results",
+    "children": [
+      {
+        "kind": "execution",
+        "workId": "work-fixture",
+        "commandKey": "start-fixture",
+        "goal": "Inspect the selected source",
+        "budget": {
+          "timeoutMs": 1000,
+          "maxToolCalls": 1
+        },
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "source": {
+            "files": [
+              {
+                "path": "src/main.ts",
+                "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              }
+            ]
+          }
+        },
+        "queueExpiresAt": "2026-11-07T00:00:00Z"
+      },
+      {
+        "kind": "execution",
+        "workId": "child-fixture",
+        "commandKey": "child-key",
+        "goal": "Inspect the selected source",
+        "budget": {
+          "timeoutMs": 1000,
+          "maxToolCalls": 1
+        },
+        "placement": {
+          "executorId": "device-fixture",
+          "projectRef": "project-fixture",
+          "mappingRevision": 1
+        },
+        "workspace": {
+          "mode": "independent_worktree",
+          "baseline": {
+            "kind": "commit",
+            "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "source": {
+            "files": [
+              {
+                "path": "src/main.ts",
+                "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              }
+            ]
+          }
+        },
+        "queueExpiresAt": "2026-11-07T00:00:00Z",
+        "dependsOnWorkIds": [
+          "work-fixture"
+        ]
+      }
+    ]
+  },
+  "sourceReceipt": {
+    "placement": {
+      "executorId": "device-fixture",
+      "projectRef": "project-fixture",
+      "mappingRevision": 1
+    },
+    "baseline": {
+      "kind": "commit",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "manifestDigest": "b455f50af713856f8acafafb9390c20cc9b2011070e25664e8c264b85d5d5da7",
+    "fileCount": 1,
+    "verifiedAt": "2026-11-06T00:00:00Z",
+    "stage": "claim"
+  },
+  "cleanup": [
+    {
+      "workId": "work-fixture",
+      "commandKey": "preview-key",
+      "action": "preview"
+    },
+    {
+      "workId": "work-fixture",
+      "commandKey": "confirm-key",
+      "action": "confirm",
+      "previewDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+}

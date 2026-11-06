@@ -4,7 +4,7 @@ type Exposure = "direct" | "deferred";
 type Catalog = { tools: { name: string; description: string; parameters: Record<string, unknown>; exposure?: Exposure; namespace?: Namespace }[] };
 type ToolResult = { content: { type: "text"; text: string }[]; details: undefined };
 // Structural subset keeps this extension independent of the host Pi package version.
-type BridgeApi = { registerTool(tool: {
+type BridgeApi = { on?(event: "tool_call", handler: () => { block: true; reason: string } | undefined): void; registerTool(tool: {
   name: string; label: string; description: string; parameters: Record<string, unknown>;
   /** Pi ≥1.3: deferred tools wait for tool_search; a namespace groups a module's tools like one MCP server. */
   exposure?: Exposure; namespace?: Namespace;
@@ -14,6 +14,13 @@ type BridgeApi = { registerTool(tool: {
 const TIMEOUT = { type: "integer", minimum: 1, maximum: 600, description: "Seconds this call may take (default 60); set it to what the work needs, e.g. while waiting for module checks" };
 
 export default async function (pi: BridgeApi) {
+  const budget = process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS;
+  if (budget !== undefined) {
+    const limit = Number(budget);
+    if (!/^[1-9]\d*$/.test(budget) || !Number.isSafeInteger(limit) || limit > 60 || !pi.on) throw new Error("Execution tool budget guard unavailable");
+    let admitted = 0;
+    pi.on("tool_call", () => ++admitted > limit ? { block: true, reason: "Execution tool budget exhausted" } : undefined);
+  }
   const base = process.env.CHRONA_AGENT_URL ?? "", token = process.env.CHRONA_AGENT_TOKEN ?? "";
   // Never send a run capability to a non-loopback host or follow a redirect.
   if (!/^http:\/\/127\.0\.0\.1:\d{1,5}\/api\/steward-agent$/.test(base) || !token) return;

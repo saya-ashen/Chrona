@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { registerBuiltins } from "./module-builtin";
+import { moduleContext } from "./module-context";
+import { propose } from "./module-proposal";
+import { buildPending } from "./module-build";
 import { moduleSupervisor } from "./module-supervisor";
 import { autoRecall, autoRetain, memory, memoryInput } from "./memory";
 import { testDb } from "./test-db";
@@ -35,17 +37,19 @@ on("tool", async event => {
 
 if (!sandbox.health.available) console.info("SKIP memory end to end: module sandbox unavailable");
 (sandbox.health.available ? test : test.skip)("memory forwards to the chosen provider; conversations recall once at the start and retain every four user messages", async () => {
-  const dataDir = await mkdtemp("/tmp/chrona-memory-e2e-"), resources = join(dataDir, "builtin");
+  const dataDir = await mkdtemp("/tmp/chrona-memory-e2e-"), resources = join(dataDir, "external");
   for (const name of ["memory-fake", "memory-local"]) await mkdir(join(resources, name), { recursive: true });
   for (const [name, content] of Object.entries(fakeProvider)) await writeFile(join(resources, "memory-fake", name), content);
-  // The optional built-in is not registered (or downloaded) until chosen: an unbuildable stand-in proves it is skipped.
+  // Optional memory-local remains uninstalled; selecting a provider never triggers an implicit install.
   await writeFile(join(resources, "memory-local", "module.json"), "{}");
   const db = testDb(), runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
   let at = Date.parse("2026-10-27T12:00:00Z");
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(at += 1000), publicUrl: null, moduleBuiltinResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(at += 1000), publicUrl: null, moduleExternalResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   try {
     const w = (await db.workspace.create({ data: { name: "memory" } })).id;
-    await registerBuiltins(ports, w);
+    const context = moduleContext(ports, w);
+    await propose(context, { root: resources, dir: "memory-fake", intent: { changes: ["Install test memory provider"] } }, "user");
+    await buildPending(context);
     expect(await db.module.findFirst({ where: { name: "memory-local" } })).toBeNull();
     expect(await db.module.findFirstOrThrow({ where: { name: "memory-fake" } })).toMatchObject({ status: "active" });
     await moduleSupervisor(ports).reconcile();

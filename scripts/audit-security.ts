@@ -33,7 +33,7 @@ function readWaivers(): AuditWaiver[] {
     parsed = JSON.parse(readFileSync(waiverFile, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw new Error(`Invalid JSON in ${waiverFile.pathname}`);
+    throw new Error(`Invalid JSON in ${waiverFile.pathname}`, { cause: error });
   }
 
   if (

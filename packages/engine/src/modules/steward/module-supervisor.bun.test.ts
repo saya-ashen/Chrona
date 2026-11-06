@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
 import { createModuleSupervisor } from "./module-supervisor";
@@ -12,6 +12,7 @@ import { moduleIncidents } from "./module-diagnostics";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy } from "./module-failure-policy";
+import { resolveBuiltinRelease } from "./module-release";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -415,4 +416,39 @@ test("activated reaches opted-in modules once per version and again when a modul
   await until(async () => (await recorded())[app.id] === "a1 web@w2");
   expect(await recorded()).toEqual({ [app.id]: "a1 web@w2" });
   expect(quiet.id).not.toBe(app.id);
+});
+
+
+test.each([false, true])("builtin startup uses trusted release code and never stored fallback (drift=%s)", async drift => {
+  const f = await fixture({ keepAlive: true });
+  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "files");
+  await mkdir(codeDir, { recursive: true });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "files" });
+  await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
+  await writeFile(join(codeDir, "index.ts"), "export {};");
+  f.ports.moduleBuiltinResources = root;
+  const release = await resolveBuiltinRelease(f.ports, "files");
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: release.hash } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: "v1", generationId: "release" }));
+  if (drift) await writeFile(join(codeDir, "index.ts"), "changed after registration");
+  await f.supervisor.reconcile();
+  expect(f.processes.map(process => process.input.codeDir)).toEqual(drift ? [] : [release.codeDir]);
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: release.hash });
+  if (drift) {
+    const outcome = await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id);
+    expect(outcome[0]).toMatchObject({ status: "failed", rollback: { attempted: false, result: "blocked" } });
+    expect(outcome[0]!.rollback.reason).toContain("Built-in");
+  }
+});
+
+
+test("internal delivery fence rejects before execution and never sends an event", async () => {
+  const f = await fixture();
+  await expect(f.supervisor.deliver(f.module.id, "v1", event, { beforeDelivery: async () => { throw new Error("callback identity changed"); } })).rejects.toMatchObject({ stage: "unavailable", message: "callback identity changed" });
+  expect(f.processes).toHaveLength(0);
+  expect(await f.db.moduleRun.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(0);
+  await f.deliver();
+  expect(await f.db.moduleRun.count()).toBe(1);
 });

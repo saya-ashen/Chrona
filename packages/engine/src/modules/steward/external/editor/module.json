@@ -1,0 +1,17 @@
+{
+  "name": "editor",
+  "description": "经 Chrona host 认证的单 owner 编辑器入口。",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "listen": "/api/editor",
+  "triggers": [],
+  "effects": [],
+  "uses": [
+    "*"
+  ],
+  "tools": [],
+  "tests": [
+    "test.ts",
+    "test-v2.ts"
+  ]
+}

@@ -55,6 +55,7 @@ test.each(["unavailable", "unknown"] as const)("%s stops automatic continuation"
 test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves work, notifies and never automatically retries", async outcome => {
   const runs = createRuns(ports, workspaceId);
   await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
+  await db.audit.create({ data: { id: `build-targets:${sessionId}`, workspaceId, subjectId: sessionId, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
   await runs.enqueue({ sessionId, lane: "build", trigger: "build", prompt: "Keep this draft" });
   const run = (await runs.claimNext("build"))!;
   await writeFile(join(run.cwd, "draft.txt"), "kept");
@@ -71,6 +72,7 @@ test.each(["failed", "timed_out", "unavailable"] as const)("build %s preserves w
 test.each(["failed", "cancelled"] as const)("a build that ends %s tells the conversation that asked for it", async outcome => {
   const runs = createRuns(ports, workspaceId);
   const build = await db.session.create({ data: { workspaceId, key: "build:images", source: "build", title: "构建模块 image-generation", originSessionId: sessionId } });
+  await db.audit.create({ data: { id: `build-targets:${build.id}`, workspaceId, subjectId: build.id, kind: "build_targets", actorKey: "user", details: { name: "image-generation", modules: ["image-generation"] } } });
   await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Build it" });
   const run = (await runs.claimNext("build"))!;
   if (outcome === "cancelled") await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: run.id, details: {} } });
@@ -86,6 +88,7 @@ test("a finished build wakes its conversation with the result, at most five time
   const runs = createRuns(ports, workspaceId);
   const finishBuild = async (n: number) => {
     const build = await db.session.create({ data: { workspaceId, key: `build:b${n}`, source: "build", title: `构建模块 m${n}`, originSessionId: sessionId } });
+    await db.audit.create({ data: { id: `build-targets:${build.id}`, workspaceId, subjectId: build.id, kind: "build_targets", actorKey: "user", details: { name: `m${n}`, modules: [`m${n}`] } } });
     await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Build it" });
     const run = (await runs.claimNext("build"))!;
     const reply = await db.message.create({ data: { workspaceId, sessionId: build.id, channel: "in_app", direction: "out", text: `m${n} 已提交审批`, at: time } });

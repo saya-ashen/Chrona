@@ -1,65 +1,64 @@
-import { chmod, cp, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { access, lstat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { isAbsolute, join } from "node:path";
+import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
+import { redactSensitiveText } from "@chrona/logging/redaction";
 import type { StewardPorts } from "./ports";
-import { moduleContext } from "./module-context";
-import { proposeBuiltin } from "./module-proposal";
-import { buildPending } from "./module-build";
-import { memorySettings } from "./settings";
+import { moduleContext, json } from "./module-context";
+import { resolveBuiltinRelease, type ModuleRelease } from "./module-release";
+import { activateBuiltinReleaseIn } from "./module-generation";
+import { dataEmpty } from "./module-data";
+import { StewardError } from "./errors";
 
-/** Store copies keep the store's read-only modes; the private copy must be removable. */
-async function writable(dir: string) {
-  await chmod(dir, 0o700);
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) await writable(join(dir, entry.name));
-    else if (entry.isFile()) await chmod(join(dir, entry.name), 0o600);
-  }
+async function executable(name: string) {
+  if (isAbsolute(name)) return access(name, constants.X_OK).then(() => true, () => false);
+  return Boolean(Bun.which(name));
 }
-async function preserveCustomization(ports: StewardPorts, workspaceId: string, name: string) {
-  return ports.db.$transaction(async tx => {
-    const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
-    if (!module?.activeHash) return false;
-    const active = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } });
-    if (!active || active.source === "builtin") return false;
-    // Retire only old built-in replacement cards, not pending custom updates.
-    const hashes = new Set((await tx.moduleVersion.findMany({ where: { moduleId: module.id, source: "builtin" }, select: { hash: true } })).map(row => row.hash));
-    const open = await tx.approval.findMany({ where: { workspaceId, moduleId: module.id, action: "activate_module", status: "open" } });
-    const ids = open.filter(row => {
-      const p = row.payload;
-      return p && typeof p === "object" && !Array.isArray(p) && p.restore === undefined && typeof p.hash === "string" && hashes.has(p.hash);
-    }).map(row => row.id);
-    await tx.approval.updateMany({ where: { id: { in: ids }, status: "open" }, data: { status: "expired", resolvedAt: ports.now() } });
-    return true;
-  });
+async function entryErrors(release: ModuleRelease) {
+  try {
+    const entry = await lstat(join(release.codeDir, release.manifest.entry));
+    return !entry.isFile() || entry.isSymbolicLink() ? ["Release entry is not a regular file"] : [];
+  } catch { return ["Release entry is missing"]; }
 }
-/** Release resources, never Provider-controlled directories. Repeated starts are idempotent. */
-// v2-21: the built-in memory provider is downloaded (its packages) only once the owner chooses it.
-const OPTIONAL = ["memory-local"];
-async function notChosen(ports: StewardPorts, workspaceId: string) {
-  const chosen = memorySettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).provider;
-  return (name: string) => OPTIONAL.includes(name) && chosen !== name;
+async function runtimeErrors(ports: StewardPorts, release: ModuleRelease, module: { id: string; dataSchema: number | null; status: string } | null) {
+  const errors: string[] = [];
+  if (!ports.sandbox?.available || !ports.sandbox.startModule) errors.push("Module runtime unavailable; check the configured execution mode and interpreter");
+  errors.push(...await entryErrors(release));
+  for (const name of release.manifest.packages) if (!await executable(name)) errors.push(`Required host program unavailable: ${name}`);
+  if (module?.status === "migrating") errors.push("Module data migration is in progress; finish recovery before using this release");
+  if (module && module.dataSchema !== release.manifest.data.schema && !await dataEmpty(join(ports.dataDir, "platform/data", module.id))) errors.push("Release data schema differs from existing data; back up and explicitly upgrade data before resuming");
+  return errors;
 }
+/** Bind only the five trusted running-release modules. No proposal queue, tests or dependency installation. */
 export async function registerBuiltins(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
-  // A private copy: the Nix store hard-links identical files, and proposals refuse hard links.
-  const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-builtin-")));
-  try {
-    await cp(resolve(ports.moduleBuiltinResources), root, { recursive: true });
-    await writable(root);
-    const entries = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory() && !entry.isSymbolicLink());
-    const skipped = await notChosen(ports, workspaceId);
-    for (const entry of entries) {
-      if (skipped(entry.name)) continue;
-      // A customized module keeps its version; the release's built-in is still built so `admin rollback <m> builtin` can choose it.
-      await preserveCustomization(ports, workspaceId, entry.name);
-      const result = await proposeBuiltin(context, root, entry.name);
-      if (result.status === "rejected") {
-        console.error(JSON.stringify({ level: "error", component: "module-builtin", event: "builtin.rejected", module: entry.name, hash: result.hash, errors: result.report.errors?.map(error => error.slice(0, 1000)).slice(0, 10) ?? [] }));
-        throw new Error(`Built-in ${entry.name} rejected: ${JSON.stringify(result.report)}`);
-      }
+  const failures: string[] = [];
+  for (const name of BUILTIN_MODULE_NAMES) {
+    try {
+      const release = await resolveBuiltinRelease(ports, name);
+      const current = await ports.db.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
+      if (current && !current.builtin) throw new StewardError("conflict", `Reserved built-in identity conflicts with external module ${name}`);
+      const errors = await runtimeErrors(ports, release, current);
+      await ports.db.$transaction(async tx => {
+        const module = await tx.module.upsert({ where: { workspaceId_name: { workspaceId, name } }, create: { workspaceId, name, builtin: true, createdAt: ports.now() }, update: {} });
+        if (!module.builtin) throw new StewardError("conflict", `Reserved built-in identity conflicts with external module ${name}`);
+        if (current && (module.activeHash !== current.activeHash || module.dataSchema !== current.dataSchema || module.status !== current.status)) throw new StewardError("conflict", "Built-in changed while checking release compatibility");
+        await tx.moduleVersion.upsert({ where: { moduleId_hash: { moduleId: module.id, hash: release.hash } }, create: {
+          moduleId: module.id, hash: release.hash, manifest: json(release.manifest), intent: { changes: ["Trusted Chrona release"], preserves: [] }, source: "builtin", status: "approved", report: { tests: [], errors }, createdAt: ports.now(),
+        }, update: { manifest: json(release.manifest), source: "builtin", status: "approved", report: { tests: [], errors } } });
+        if (errors.length) {
+          await tx.module.update({ where: { id: module.id }, data: { status: "paused" } });
+          return;
+        }
+        if (module.activeHash !== release.hash) await activateBuiltinReleaseIn(context, tx, release);
+      });
+      if (errors.length) failures.push(`${name}: ${errors.join("; ")}`);
+    } catch (error) {
+      // A bad release must stop this built-in, while the remaining base modules and rescue can recover.
+      await ports.db.module.updateMany({ where: { workspaceId, name, builtin: true }, data: { status: "paused" } });
+      failures.push(`${name}: ${redactSensitiveText(error instanceof Error ? error.message : "Release registration failed").slice(0, 1000)}`);
     }
-  } finally { await rm(root, { recursive: true, force: true }); }
-  // buildPending takes three versions at a time; built-ins must all be ready before modules start.
-  for (let round = 0; round < 10 && await ports.db.moduleVersion.count({ where: { module: { workspaceId }, status: "building" } }); round++) await buildPending(context);
+  }
+  if (failures.length) throw new StewardError("conflict", failures.join("\n"));
 }

@@ -23,17 +23,17 @@ const failed = (id: string, error: unknown): Reply => error instanceof CallError
 
 /** Routed calls: the router checks visibility, records the real caller and refuses waits on itself. */
 async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<ModuleCall, { method: "call" }>): Promise<Reply> {
-  const { args, mode, key, reply, timeoutMs } = call.params, target = call.params.target, now = ports.now();
+  const { args, mode, key, reply, timeoutMs, expectedTarget } = call.params, target = call.params.target, now = ports.now();
   const record = { moduleId: scope.moduleId, hash: scope.hash, moduleRunId: scope.moduleRunId, eventKey: scope.eventKey, method: "call", createdAt: now };
   try {
     if (mode === "sync") {
-      const result = await callSync(ports, originOf(scope), target, args, timeoutMs ? { timeoutMs } : {});
+      const result = await callSync(ports, originOf(scope), target, args, { timeoutMs, expectedTarget });
       await ports.db.moduleCall.create({ data: { ...record, key: result.callId, status: "executed" } });
       return { id: call.id, result: { output: result.output } };
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
     // A notification is stored even while the built-in notify module is not running (e.g. rebuilding); it is delivered later.
-    const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, lenient: target === NOTIFY_INTERFACE });
+    const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, lenient: target === NOTIFY_INTERFACE, expectedTarget });
     await ports.db.moduleCall.create({ data: { ...record, key: queued.callId, status: queued.duplicate ? "duplicate" : "executed" } });
     if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
     return { id: call.id, result: queued };

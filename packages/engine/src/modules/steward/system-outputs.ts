@@ -38,7 +38,7 @@ export const modulesSystemOutput = z.lazy(() => {
 export const modulesPermissionsOutput = z.lazy(() => permissionsSchema);
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
-export const modulesToolsOutput = z.array(z.object({ target: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
+export const modulesToolsOutput = z.array(z.object({ moduleId: z.string().optional(), hash: z.string().optional(), contractHash: z.string().optional(), target: z.string(), description: z.string(), inputSchema: z.record(z.string(), z.json()), outputSchema: z.json().nullable(), examples: z.array(toolExampleOutput).nullable(), sideEffects: z.array(z.string()).nullable(), errors: z.array(toolErrorOutput).nullable(), retry: z.string(), idempotent: z.boolean() }));
 export const modulesContributionsOutput = z.array(z.object({ module: z.string(), hash: z.string(), value: z.json() }));
 export const modulesCheckOutput = z.object({ module: z.string(), hash: z.string(), status: z.string(), active: z.boolean(), report: z.json() });
 export const modulesRollbackOutput = z.discriminatedUnion("status", [

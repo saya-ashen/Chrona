@@ -1,10 +1,10 @@
 import { chrona, on } from "chrona";
-import { createEvents, type Caller, type CallResult } from "./events";
+import { createEvents, type Caller, type CallResult, type Directory } from "./events";
 
 const events = createEvents({
   dataDir: chrona.paths.data,
   contributions: () => chrona.call("modules.contributions", { section: "events" }),
-  reachable: async (query: string) => ((await chrona.call("modules.tools", { query })) as { target: string }[]).map(tool => tool.target),
+  directory: async () => ({ modules: await chrona.call("modules.list", {}), tools: await chrona.call("modules.tools", {}) }) as Directory,
   call: (target, args, options) => chrona.call(target, args, options),
 });
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller }) => {

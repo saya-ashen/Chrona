@@ -6,8 +6,10 @@ type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 import { toApproval } from "./store";
-import { assertBuiltinUpgrade, groupPayloadSchema, isGroupPayload } from "./module-context";
+import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./module-context";
 import { createRuns } from "./runs";
+import { assertExternalModule } from "./module-identity";
+import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { drainCalls, settleWaiting } from "./module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
 async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
@@ -25,7 +27,7 @@ async function approve(tx: Prisma.TransactionClient, context: RecordContext, row
     return null;
   }
   if (row.action === "activate_module") {
-    await assertBuiltinUpgrade(tx, context.workspaceId, row.moduleId, row.payload);
+    await assertDynamicModuleActivation(tx, context.workspaceId, row.moduleId, row.payload);
     return null;
   }
   if ((row.payload as { kind?: unknown } | null)?.kind === "module_remove") return null;
@@ -71,7 +73,15 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       const input = parseInput(inputSchema, raw);
       if (input.moduleId && !await tx.module.findFirst({ where: { workspaceId, id: input.moduleId } })) throw new StewardError("not_found", "Module not found");
       if (input.payload === null) throw new StewardError("invalid", "Approval payload must not be null");
-      if (input.action === "activate_module") await assertActivationTarget(tx, workspaceId, input.moduleId, input.payload);
+      if (input.action === "activate_module") {
+        await assertActivationTarget(tx, workspaceId, input.moduleId, input.payload);
+        await assertDynamicModuleActivation(tx, workspaceId, input.moduleId ?? null, input.payload);
+      }
+      if (input.action === "delete_data" && (input.payload as { kind?: unknown }).kind === "module_remove") {
+        const removal = parseInput(moduleRemovePayloadSchema, input.payload);
+        if (input.moduleId && input.moduleId !== removal.moduleId) throw new StewardError("invalid", "Removal approval must bind the same module");
+        await assertExternalModule(tx, workspaceId, removal.moduleId, "remove");
+      }
       const row = await tx.approval.create({ data: { ...input, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
       return toApproval(row);
