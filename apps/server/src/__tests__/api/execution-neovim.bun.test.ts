@@ -65,6 +65,7 @@ import {createPiProvider} from ${moduleFile("packages/integrations/src/steward/p
 import {callSync} from ${moduleFile("packages/engine/src/modules/steward/module-calls.ts")};
 import {moduleManifestSchema,PREINSTALLED_MODULE_NAMES} from ${moduleFile("packages/contracts/src/steward/index.ts")};
 import {buildExecutionContracts} from ${moduleFile("build/execution-contracts.ts")};
+import {startTestTickPump} from ${moduleFile("apps/server/src/test-tick-pump.ts")};
 const root=process.env.CHRONA_TEST_ROOT;
 const dataDir=join(root,'data');await mkdir(dataDir,{recursive:true});
 const initialization={version:1,status:'complete',packages:Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name=>[name,{requestKey:'host:'+name,attempts:1,status:'skipped',moduleId:null,hash:null,approvalId:null,error:null}]))};
@@ -128,8 +129,8 @@ app=await createServerApp({steward:runtime});
 await runtime.tickOnce();
 await runtime.listener('/api/editor');
 await writeFile(join(root,'ready.json'),JSON.stringify({url:'http://127.0.0.1:'+server.port,pid:process.pid}));
-const timer=setInterval(()=>void runtime.tickOnce(),100);
-process.on('SIGTERM',()=>{void(async()=>{clearInterval(timer);await runtime.stop();server.stop(true);await db.$disconnect();process.exit(0)})()});
+const stopTicks=startTestTickPump(()=>runtime.tickOnce(),100);
+process.on('SIGTERM',()=>{void stopTicks().finally(async()=>{await runtime.stop();server.stop(true);await db.$disconnect()}).then(()=>process.exit(0),error=>{console.error(error);process.exit(1)})});
 `;
 
 const clientSource = `
