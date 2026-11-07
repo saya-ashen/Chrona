@@ -2,7 +2,7 @@ import { z } from "zod";
 import { effectiveSettings, moduleCapabilitiesSchema, moduleOriginSchema, moduleManifestSchema, moduleSettingSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
 import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
 import type { StewardPorts } from "./ports";
-import { CallError, listSystemModules, normalizedToolInputSchema, type Json } from "./module-calls";
+import { CallError, listSystemModules, normalizedToolInputSchema, type Json, type CallOrigin } from "./module-calls";
 import { createSecrets } from "./secrets";
 import { secretView, secretViewSchema } from "./secret-fields";
 import { addedCapabilities } from "./module-capabilities";
@@ -99,8 +99,8 @@ export async function setModuleSettings(ports: StewardPorts, workspaceId: string
   return json(await settingsView(ports, workspaceId, name));
 }
 /** `modules.overview`: everything about one app for its page, in one read (v2-23). */
-export async function moduleOverview(ports: StewardPorts, workspaceId: string, name: string) {
-  const activity = async (module: string) => (await listActivity(ports, workspaceId, { module, limit: 30 })).items;
+export async function moduleOverview(ports: StewardPorts, workspaceId: string, name: string, governance: Pick<CallOrigin, "deadline" | "run"> = {}) {
+  const activity = async (module: string) => (await listActivity(ports, workspaceId, { module, limit: 30 }, governance)).items;
   if (listSystemModules().some(module => module.name === name)) {
     const app = await systemApps(ports, workspaceId, name) as { tools: unknown[] };
     const system = listSystemModules().find(module => module.name === name)!;

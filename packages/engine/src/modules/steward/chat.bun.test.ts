@@ -6,6 +6,12 @@ import { createChat, chatImages } from "./chat";
 import { createRuns, liveRuns } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { conversationState } from "./conversation-state";
+import { conversationOptions } from "./external/qq/conversation";
+const entryOptions = async (key: string, text: string) => {
+  const { rotation, ...options } = await conversationOptions(async (_target, args) => conversationState(ports, workspaceId, String(args.key)), key, text);
+  return { ...options, ...(rotation ? { rotation: JSON.parse(rotation) as { sessionId: string; lastActivityAt: string } } : {}) };
+};
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, chat: ReturnType<typeof createChat>;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "chat" } })).id;
@@ -15,7 +21,8 @@ beforeEach(async () => {
   await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "qq", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
 });
 afterEach(async () => { liveRuns.clear(); await db.$disconnect(); });
-const send = (text: string, extra: Partial<Parameters<typeof chat.handleMessage>[0]> = {}) => chat.handleMessage({ workspaceId, channel: "in_app", text, ...extra });
+const send = async (text: string, extra: Partial<Parameters<typeof chat.handleMessage>[0]> = {}) => chat.handleMessage({ workspaceId, channel: "in_app", text,
+  ...(extra.key && !extra.sessionId ? await entryOptions(extra.key, text) : {}), ...extra });
 test("no address creates independent web sessions", async () => {
   const first = await send("One"), second = await send("Two");
   expect(first.sessionId).not.toBe(second.sessionId);
@@ -28,9 +35,9 @@ test.each([
   ["mcp:owner", "🦊".repeat(41), `${"🦊".repeat(40)}…`],
   ["web:owner", "a".repeat(40), "a".repeat(40)],
 ])("first message titles %s without overwriting later", async (key, text, title) => {
-  await chat.submit({ workspaceId, channel: "in_app", key, text });
+  await chat.submit({ workspaceId, channel: "in_app", key, text, ...await entryOptions(key, text) });
   expect((await db.session.findFirstOrThrow({ where: { key } })).title).toBe(title);
-  await chat.submit({ workspaceId, channel: "in_app", key, text: "另一条消息" });
+  await chat.submit({ workspaceId, channel: "in_app", key, text: "另一条消息", ...await entryOptions(key, "另一条消息") });
   expect((await db.session.findFirstOrThrow({ where: { key } })).title).toBe(title);
 });
 test.each([
@@ -116,6 +123,23 @@ test.each([true, false])("rotation uses an unfamiliar entry's manifest (entry=%p
     lastActivityAt: new Date(ports.now().getTime() - 30 * 60_000) } });
   expect((await send("Next", { key: "transport:dm" })).sessionId !== session.id).toBe(entry);
 });
+test("kernel admission preserves conversations until an entry explicitly requests title or rotation", async () => {
+  const session = await db.session.create({ data: { workspaceId, key: "qq:raw", source: "qq", lastActivityAt: new Date(ports.now().getTime() - 24 * 3600_000) } });
+  await chat.submit({ workspaceId, channel: "in_app", key: session.key, text: "Raw input" });
+  expect(await db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ status: "active", title: null });
+});
+
+test("stale rotation intent cannot end a changed session or busy conversation", async () => {
+  const session = await db.session.create({ data: { workspaceId, key: "qq:dm", source: "qq", lastActivityAt: new Date(ports.now().getTime() - 24 * 3600_000) } });
+  const rotation = { sessionId: session.id, lastActivityAt: session.lastActivityAt.toISOString() };
+  await db.session.update({ where: { id: session.id }, data: { lastActivityAt: ports.now() } });
+  await chat.submit({ workspaceId, channel: "in_app", key: session.key, text: "Changed", rotation });
+  expect((await db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
+  await chat.submit({ workspaceId, channel: "in_app", key: session.key, text: "Busy", rotation: { ...rotation, lastActivityAt: ports.now().toISOString() } });
+  expect((await db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
+  expect(await db.audit.count({ where: { kind: "session_rotated" } })).toBe(0);
+});
+
 test("a conversation with work still queued is not rotated, and owner limits apply", async () => {
   await db.workspace.update({ where: { id: workspaceId }, data: { settings: { sessions: { idleMinutes: 5, minContextTokens: 0, maxContextTokens: 100_000 } } } });
   const session = await db.session.create({ data: { workspaceId, key: "qq:dm", source: "qq", lastActivityAt: new Date(ports.now().getTime() - 30 * 60_000) } });

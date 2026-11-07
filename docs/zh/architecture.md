@@ -18,6 +18,8 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 
 ## 2. 内核、系统模块、内置模块与自定义应用
 
+功能归属优先级：**普通模块 → 预装模块 → 内核模块（system）→ 内核本身**。预装是交付方式，不代表更高权限。内核模块同样必须最小，只提供带身份、校验与治理的原语；只有无法通过这些原语安全实现的信任根、路由和生命周期机制进入内核。业务策略、展示、聚合和工作流程优先归现有应用；复用本身不构成提升层级的理由。验收标准：改变业务策略或新增应用通常只需改模块。既有 immutable builtin 的发行身份不因该原则自动改变，本轮不扩大动态更新权限。
+
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
 - **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `chat`、`modules`、`approvals`、`settings`、`schedules`、`provider`、`executions`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
 - **内置模块**位于 `steward/builtin/*`：`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议，但类别和发行方式按 P0 契约区分。
@@ -63,13 +65,15 @@ manifest 的 `contributes` 保存面向通用模块的声明；`modules.contribu
 
 网页由内置 `web` 入口提供，不存在 Next.js 或单独的 owner HTTP 业务 API。`/api/web` 是该模块自己的适配层，再调用系统与应用工具。web 保存应用经 `web.page-set` 登记的 json-render 页面结构及本应用工具引用，校验组件、动作与引用；用户打开页面时读取业务数据、执行回调。应用无需让 web 硬编码认识自己；未登记时仍有通用工具页，停用应用的页面隐藏，已删除应用的登记按真实 moduleId 清理。页面 revision 与工具契约在读取、内容和动作调用时复核；同名新应用不会继承旧页面，目录读取失败不能当成空目录清理。
 
+Today 的七天范围、排序、通知与应用健康摘要在 web 的 `today.ts` 中经 routed calls 聚合；`chat.today` 是转发到 `web.today` 的兼容入口，web 内部不回调该入口。内核 `chat.runtime` 只返回自身运行事实，`chat.sessions` 提供按入口身份过滤的读取，`schedules.list` 可排除静态轮询。没有可用 web 时 overview 明确失败，不回退到内核再实现一套聚合；独立 `/health` 不依赖该页面。
+
 所有页面（系统页与应用登记页）共用 `pages.js` 的 React/json-render 渲染器，由 `src/pages.tsx` 构建；系统 spec 位于 `src/system/`，仅系统页面获得访问现有数据 API 的 adapter。`app.js` 只负责认证、请求、路由与单一 SSE 等 shell 基础设施，样式统一在 `style.css`；共享显示组件及绑定规则由 `catalog.ts` / `web.catalog` 提供。
 
 代码：`steward/builtin/web/index.ts`、`pages.ts`、`catalog.ts`、`src/pages.tsx`、`build.ts`、`builtin/files/page.ts`。细节：[模块依赖方向 §4](module-dependency-direction.md#4-web应用登记页面规格草案)，具体可用格式以 `web.catalog` 与代码为准。
 
 ## 8. 通知渠道、日程与定时器
 
-**通知**由内置 `notify` 处理 now / digest / web、每日上限、安静时段、队列与送达。内核自己的通知也经 `notify.send`。渠道模块调用 `notify.channel` 登记自己的投递工具，notify 校验回调归属与可见性后统一投递；没有就绪渠道时退到网页，不承诺外部渠道必达。QQ 是登记渠道之一，不是 notify 写死的业务依赖。
+**通知**由内置 `notify` 处理 now / digest / web、每日上限、安静时段、队列与送达。审批事实由内核经 `notify.approval` 投递，摘要、文案和页面引导归 notify；审批决定与幂等记录仍归内核。内核自己的通知也经 `notify.send`。渠道模块调用 `notify.channel` 登记自己的投递工具，notify 校验回调归属与可见性后统一投递；没有就绪渠道时退到网页，不承诺外部渠道必达。QQ 是登记渠道之一，不是 notify 写死的业务依赖。
 
 **调度**由系统 `schedules` 保存与投递。manifest 的静态日程随版本启用安排；模块可用 `schedules.create/cancel/mine` 管理按自身 key 归属的运行时定时器，到时收到带 payload 的 `schedule` 事件。Provider 的 `chrona_schedule` 安排唤起；提醒是预装外置 `remind` 应用，使用同一套模块定时器。日程推进与本次模块投递记录在同一事务提交（`ModuleInvocation.mode = schedule`），投递在 tick 外执行，同一应用串行、最多四个应用同时处理。明确未送达按退避最多尝试六次；处理失败或结果未知不重放，重启后过期的投递标为未知并通知核对。记录绑定版本及激活身份，变更后不投递旧事件；取消或替换定时器会取消尚未送出的记录。
 
@@ -85,7 +89,7 @@ OAuth 由 `secrets.authorize` 发起 PKCE，用户在服务商页面同意；内
 
 ## 10. Memory 与 mind
 
-**memory** 是系统转发接口：把 retain / recall / forget 交给 `settings.memory` 选中的、声明 `contributes.memory` 的应用。启用对应选项后，入口会话首次运行自动召回，每新增四条用户消息自动保留，结束会话时也可保留剩余消息；失败不阻断对话。召回内容是可能过时的数据。可选外置 `memory-local` 提供本地实现，不是内核自建另一套记忆引擎。
+**memory** 是受治理的系统转发接口：把 retain / recall / forget 交给 `settings.memory` 选中的、声明 `contributes.memory` 的应用。应用可在同一 contribution 中声明 `context` 与 `afterRun` 工具名，由该应用决定自动召回查询、保存频率、摘要与提示。可选外置 `memory-local` 目前采用首次召回、每四条用户消息保存、会话轮换时保存剩余消息的策略；改变这些策略只改模块。内核仅核实入口会话、选中模块、脱敏和有界快照，以及回执/水位；模块上下文作为不可信任务数据。未声明这两个工具的既有提供者继续支持手动 retain / recall / forget，不自动获得对话快照；更新适配模块后才启用自动策略。失败不阻断对话。
 
 **mind** 是官方预装外置应用：读取 Chrona 状态、应用的 `contributes.mind.attention` 和自身 agenda，按变化、截止时间与复查时间决定是否 `provider.wake`。可选直觉模型辅助判断，有调用预算和规则回退；agenda、评估与决策日志存于 mind 的数据目录，工作由被唤起的 Provider 用工具推进，不靠通知文字假装已执行。mind 的工作协议作为模块数据随唤起传入，不是内核按模块名添加的系统指令。
 
@@ -103,7 +107,7 @@ OAuth 由 `secrets.authorize` 发起 PKCE，用户在服务商页面同意；内
 
 会话保存交流上下文与入口归属；一次处理是 run，有队列、deadline、能力 token、预算与取消记录。普通运行连续失败三次后停止自动续跑；Provider 不可用或存在结果未知的应用调用时立即停止自动续跑并通知用户。可重试的失败继续使用原会话和文件，并要求先核对已有结果，构建不自动重试。入口经 `chat.send` 进入会话，回复推送到会话所属入口的 reply 工具。模块唤起与构建使用独立会话并向发起会话报告；完成构建可继续唤起原会话，但连续次数有界。持久业务状态仍应保存在应用中，而不是只留聊天记录。
 
-当前适配器是 Pi RPC：Provider 负责推理和原生文件、命令、网页等工具，Chrona 提供 `m_*` 应用工具与运行通道。专用命令、版本、profile 和显式资源由 owner 配置；附件与会话工作目录按运行上下文提供。构建会话与主会话可调用同类应用工具，反思会话保留独立工具边界。
+当前适配器是 Pi RPC：Provider 负责推理和原生文件、命令、网页等工具，Chrona 提供 `m_*` 应用工具与运行通道。Provider 的可信指令与资源范围由内核显式传入，不内置管家业务流程或根据 execution 引用选择编码策略；coding 的工作说明来自模块任务输入，权限、预算、取消和停止核实仍由内核与可信执行点落实。专用命令、版本、profile 和显式资源由 owner 配置；附件与会话工作目录按运行上下文提供。构建会话与主会话可调用同类应用工具，反思会话保留独立工具边界。
 
 owner 操作通过 routed calls，不存在旧 owner REST API：网页用 `/api/web`，内置 MCP 用 `/api/mcp` 对用户自己的 Agent 提供 owner 工具而非 Provider 运行能力；官方预装外置 QQ 入口负责 Bot 私聊、会话与回复。Hono 内核保留 Provider bridge、健康与 OAuth 等路由，其余入口 HTTP 由 manifest `listen` 声明后代理，`/api/*` 在内核验证认证（专用 bridge 使用自己的窄凭据）。
 

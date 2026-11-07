@@ -2,6 +2,8 @@ import { composeDigest, deliveryStatus, foldedBeforeDigest, isDigestDue, localDa
 import type { Format, Row, Store } from "./store";
 import { randomUUID } from "node:crypto";
 import { callbackReady, type Directory } from "./registry";
+import { approvalNoticeBody } from "./approval";
+import { lifecycleNotice } from "./lifecycle";
 
 // Built-in modules run standalone: these mirror Chrona's contract (caller, call replies).
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
@@ -276,10 +278,20 @@ class NotifyRuntime {
     this.store.update(row.id, { status: "queued", attempts: 0, next_attempt_at: now.getTime(), last_error: null, call_id: null });
     return { notification: this.view(this.store.byId(row.id)!) };
   }
+  private approval(args: Args, caller: Caller, now: Date) {
+    if (caller.kind !== "kernel") return { error: "forbidden", message: "Only Chrona may announce an approval" };
+    return this.send({ key: `approval:${args.approval}`, approval: args.approval, module: args.module, scoped: false, level: "now", responds: true,
+      title: `需要你批准：${args.title}`, body: approvalNoticeBody({ action: String(args.action), detail: args.detail as string | null, preview: args.preview as string | null }) }, caller, now);
+  }
+  private lifecycle(args: Args, caller: Caller, now: Date) {
+    if (caller.kind !== "kernel") return { error: "forbidden", message: "Only Chrona may announce runtime facts" };
+    const facts = JSON.parse(String(args.facts)) as Args;
+    return this.send({ key: args.key, module: args.module, app: args.app, session: args.session, ...lifecycleNotice(String(args.kind), facts) }, caller, now);
+  }
   /** One routed tool call. Business errors are results, never throws: a throw counts as a module failure. */
   handle(tool: string, args: Args, caller: Caller, now: Date) {
     const handlers: Record<string, () => unknown> = {
-      send: () => this.send(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args, caller), list: () => this.list(args),
+      send: () => this.send(args, caller, now), lifecycle: () => this.lifecycle(args, caller, now), approval: () => this.approval(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args, caller), list: () => this.list(args),
       status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
     };
     if (!Object.hasOwn(handlers, tool)) throw new Error(`Unknown tool ${tool}`);

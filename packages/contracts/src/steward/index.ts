@@ -598,6 +598,10 @@ export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof
 export type ProviderRunInput = {
   runId: string; token: string; lane: RunLane; cwd: string; sessionDir: string; sessionId: string | null;
   prompt: string; images?: { mime: string; base64: string }[]; deadline: Date;
+  /** Trusted platform instructions; module/user task text belongs in prompt, never here. */
+  systemPrompt: string;
+  /** Kernel-selected resource scope; minimal excludes Chrona tools and configured skills/extensions. */
+  resources: "configured" | "minimal";
   /** Exact provider/model for an owner-authorized build; must be verified before any prompt. */
   model?: string;
   /** Module tool names (m_*) declared up front; Providers with tool allowlists must admit them. */
@@ -616,12 +620,18 @@ export type ProviderRunInput = {
   /** Enforced by the existing Pi extension before native tool execution, never prompt-only. */
   executionBudget?: { maxToolCalls: number };
 };
+export type ProviderTranscriptItem =
+  | { at: string; kind: "text"; text: string }
+  | { at: string; kind: "tool"; tool: string; args: string }
+  | { at: string; kind: "result"; tool: string; text: string; error: boolean };
 export type ProviderAdapter = {
   name: string;
   supportsRunModel?: boolean;
   health(): Promise<{ available: boolean; sandboxed: boolean; error: string | null }>;
   /** One completion with `model`: no tools, session or fallback model (`provider.complete`). Absent: unconfigured. */
   complete?(input: { model: string; thinking?: (typeof THINKING_LEVELS)[number]; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number }): Promise<{ text: string; inputTokens: number | null; outputTokens: number | null }>;
+  /** Read normalized session history without exposing backend file formats to the kernel. */
+  transcript?(input: { sessionDir: string; limit: number }): Promise<ProviderTranscriptItem[]>;
   /** Starts a run; returns a handle that can receive messages while running. */
   start(input: ProviderRunInput): { inject(message: string, images?: { mime: string; base64: string }[]): Promise<void>; abort(): Promise<void>; done: Promise<{ outcome: "finished" | "failed" | "timed_out" | "unavailable"; sessionId: string | null; error: string | null }> };
 };

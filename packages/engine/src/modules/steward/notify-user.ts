@@ -21,6 +21,21 @@ export function notifyUser(tx: Db, ports: StewardPorts, workspaceId: string, not
   const args = Object.fromEntries(Object.entries({ ...notice, title: notice.title.slice(0, 200), body: notice.body.slice(0, 4000) }).filter(entry => isDefined(entry[1])));
   return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: NOTIFY_INTERFACE, raw: args }, { key: `notify:${notice.key}`.slice(0, 200) });
 }
+export type LifecycleFact =
+  | { kind: "module-paused" | "module-build-failed"; app: string }
+  | { kind: "module-activated"; app: string; update: boolean; changes: string[]; preserves: string[]; hash: string }
+  | { kind: "module-migration-failed"; app: string; restore: boolean }
+  | { kind: "schedule-failed"; target: string; status: string; error?: string | null; disconnected?: boolean }
+  | { kind: "run-paused"; uncertain: boolean; status: string; error?: string | null }
+  | { kind: "background-result"; title: string | null; body: string }
+  | { kind: "build-paused"; status: string; outcome: string }
+  | { kind: "reflection-retired"; reflection: boolean; mind: string; healthFixes: boolean | null };
+/** Queue known runtime facts atomically; notify owns wording and level. */
+export function notifyLifecycle(tx: Db, ports: StewardPorts, workspaceId: string, key: string, fact: LifecycleFact & { module?: string; session?: string }) {
+  const { kind, module, session, ...facts } = fact;
+  const links = Object.fromEntries(Object.entries({ module, session, app: "app" in fact ? fact.app : undefined }).filter(([, value]) => value !== undefined));
+  return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.lifecycle`, raw: { kind, facts: JSON.stringify(facts), key, ...links } }, { key: `notify:${key}`.slice(0, 200) });
+}
 /** Withdraws a queued notice that is no longer relevant (e.g. a question that was answered elsewhere). */
 export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string, key: string) {
   return enqueueCall({ tx, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.withdraw`, raw: { key } }, { key: `withdraw:${key}`.slice(0, 200) });
@@ -28,29 +43,9 @@ export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string,
 /** Every open approval is announced once, wherever it was created; the user is waiting on it, so no cap or quiet hours. */
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
   for (const row of await ports.db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" }, take: 50 })) {
-    await notifyUser(ports.db, ports, workspaceId, { ...(row.moduleId ? { module: row.moduleId } : {}), approval: row.id, scoped: false, level: "now", responds: true,
-      title: `需要你批准：${row.title}`, body: approvalNoticeBody(row), key: `approval:${row.id}` });
+    await enqueueCall({ tx: ports.db, ports, origin: kernelOrigin(workspaceId), target: `${NOTIFY}.approval`,
+      raw: { approval: row.id, title: row.title, action: row.action, detail: row.detail, preview: row.preview, ...(row.moduleId ? { module: row.moduleId } : {}) } }, { key: `notify:approval:${row.id}` });
   }
-}
-/**
- * Chat shows the decision, not the review: a module version keeps its capabilities and intended changes,
- * and the manifest/code diff, tests and hash stay on the page. A group (v2-15) lists each module the same way.
- * Other approvals (e.g. data restores) keep their full text.
- */
-export function approvalNoticeBody(row: { action: string; detail: string | null; preview: string | null }) {
-  const full = () => [row.detail, row.preview].filter(Boolean).join("\n\n").slice(0, 1500);
-  if (row.action !== "activate_module" || !row.preview) return full();
-  const sections = row.preview.startsWith("【") ? row.preview.split(/\n\n(?=【[^】\n]+】\n)/) : [row.preview];
-  const summaries = sections.map(section => moduleSummary(section.split("\n")));
-  if (summaries.some(summary => summary === null)) return full();
-  return [row.detail, ...summaries, "完整差异、测试结果和 hash 请在网页「待你决定」中查看。"].filter(Boolean).join("\n\n").slice(0, 1500);
-}
-function moduleSummary(lines: string[]) {
-  const diffAt = lines.findIndex(line => line.startsWith("--- active"));
-  if (diffAt < 0) return null;
-  let changes: string[] = [];
-  try { changes = z.object({ changes: z.string().array() }).parse(JSON.parse(lines.find(line => line.startsWith("意图："))?.slice(3) ?? "")).changes; } catch { /* no readable intent: the page has it */ }
-  return [lines.slice(0, diffAt).join("\n"), changes.length ? `改动：\n${changes.map(change => `• ${change}`).join("\n")}` : null].filter(Boolean).join("\n");
 }
 /** Forwards the user's notification settings (kept in the workspace, where the page edits them) to the notify module. */
 export function forwardSettings(tx: Db, ports: StewardPorts, workspaceId: string, settings: NotificationSettings, at: Date) {

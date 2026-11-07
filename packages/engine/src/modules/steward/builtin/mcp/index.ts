@@ -1,4 +1,5 @@
 import { chrona } from "chrona";
+import { conversationOptions, endIdleConversations } from "./conversation";
 
 // Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
 type Args = Record<string, unknown>;
@@ -6,6 +7,7 @@ const str = (description?: string) => ({ type: "string", ...(description ? { des
 const schema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+setInterval(() => void endIdleConversations(call).catch(error => console.error(JSON.stringify({ component: "mcp", event: "idle_cleanup_failed", error: String(error).slice(0, 300) }))), 3600000);
 const tools: McpTool[] = [
   { name: "chrona_today", description: "What needs the user now: waiting approvals, conversations, today's agenda and open app health problems with next actions (up to 20, newest first).", inputSchema: schema(), run: () => call("chat.today") },
   { name: "chrona_sessions", description: "List conversations, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["web", "qq", "mcp", "rescue", "wake", "module", "build", "reflect"] }, status: { type: "string", enum: ["active", "ended"] } }),
@@ -19,7 +21,11 @@ const tools: McpTool[] = [
   { name: "chrona_session_transcript", description: "What Chrona did in a conversation or module build: its text, tool calls and clipped results.", inputSchema: schema({ sessionId: str() }, ["sessionId"]),
     run: ({ sessionId }) => call("chat.transcript", { session: sessionId }) },
   { name: "chrona_chat", description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: schema({ text: str(), sessionId: str(), key: str() }, ["text"]),
-    run: ({ text, sessionId, key }) => call("chat.ask", { text, session: sessionId, key: sessionId || key ? key : `mcp:${crypto.randomUUID()}` }) },
+    run: async ({ text, sessionId, key }) => {
+      const address = key ? String(key) : `mcp:${crypto.randomUUID()}`;
+      const options = sessionId ? {} : await conversationOptions(call, address, String(text));
+      return call("chat.ask", { text, session: sessionId, key: sessionId ? key : address, ...options });
+    } },
   { name: "chrona_approvals", description: "List approvals; defaults to open ones waiting for the user.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }),
     run: ({ status }) => call("approvals.list", { status }) },
   { name: "chrona_approval_resolve", description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", destructive: true,

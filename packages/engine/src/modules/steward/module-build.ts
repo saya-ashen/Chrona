@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { createRuns, createRunSession } from "./runs";
-import { notifyUser } from "./notify-user";
+import { notifyLifecycle } from "./notify-user";
 import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
 import { isGroupCandidate, recordGroupReview } from "./module-group";
@@ -162,9 +162,9 @@ async function validateBuildManifest(context: ModuleContext, version: ModuleVers
   await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
   return { moduleId: version.moduleId, hash: version.hash, status: "rejected" as const, report };
 }
-export async function activationNotice(context: ModuleContext, tx: Parameters<typeof notifyUser>[0], version: ModuleVersion, update: boolean) {
+export async function activationNotice(context: ModuleContext, tx: Parameters<typeof notifyLifecycle>[0], version: ModuleVersion, update: boolean) {
   const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await notifyUser(tx, context.ports, context.workspaceId, { module: version.moduleId, app: manifest.name, level: "digest", title: `应用 ${manifest.name} 已自动${update ? "更新" : "启用"}`, body: `${[`变更：${intent.changes.join("；")}`, intent.preserves.length ? `保持：${intent.preserves.join("；")}` : ""].filter(Boolean).join("\n").slice(0, 3500)}\n版本 hash: ${version.hash}\n可在应用历史中回滚`, key: `module-auto-activated:${version.id}` });
+  await notifyLifecycle(tx, context.ports, context.workspaceId, `module-auto-activated:${version.id}`, { kind: "module-activated", app: manifest.name, update, changes: intent.changes, preserves: intent.preserves, hash: version.hash, module: version.moduleId });
 }
 /** v2-25: tests run only on an entry that type-checks against the SDK and call contracts. */
 async function typecheckAndTest(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -286,7 +286,7 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
   for (const row of versions) { if (row.status !== "rejected" || superseded(row.report)) break; failures++; }
   if (failures >= 3) {
     // Key streak by preceding successful build; failures may share timestamps.
-    await notifyUser(db, ports, workspaceId, { module: module.id, app: module.name, level: "digest", title: `模块 ${module.name} 构建失败`, body: "连续构建失败，已停止自动重试。请检查测试报告后重新提交。", key: `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}` });
+    await notifyLifecycle(db, ports, workspaceId, `module-build-failed:${module.id}:${versions[failures]?.id ?? "initial"}`, { kind: "module-build-failed", app: module.name, module: module.id });
   } else {
     // Keep continuity diagnostics visible even when successful tests printed a lot.
     const summary = result.report.continuity ? { continuity: result.report.continuity } : result.report;

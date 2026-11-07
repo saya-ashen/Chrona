@@ -36,7 +36,7 @@ Rules that follow from the goals:
   new credentials and app removal ask the user (docs/zh/security-simplification.md).
   Local OS permissions are not constrained by manifest declarations; never describe routed permissions as malicious-code isolation. Chrona supplies scheduling, events, sessions, credentials,
   approvals, run budgets and routed calls; notification budget and delivery are the built-in `notify` module. The kernel holds no
-  notification or channel logic: its own notices are `notify.send` calls (`notifyUser`). No duplicate Chrona web/shell tools for Providers.
+  notification or channel logic: its own notices queue finite runtime/approval facts to kernel-visible `notify.lifecycle` / `notify.approval`; generic data notices still use `notify.send`. `notify` owns wording and level. No duplicate Chrona web/shell tools for Providers.
   External executable modules are submitted via `modules.propose` or official-package installation using the same checked queue; immutable built-ins bind trusted running-release resources. External code is built and checked in the Chrona sandbox
   (tests with a fake kernel, smoke start, key probe, data migration on a copy), activated automatically when checks pass
   (data migrations and new credentials still ask the user), stored under `<dataDir>/platform` (not exposed through Provider tools; OS hiding requires isolation), and rolled back by hash.
@@ -112,6 +112,11 @@ routes validate and delegate; domain has no I/O.
 ## Keep implementations minimal
 
 These rules apply to the coordinator and every delegated worker.
+
+- Place functionality in this order: ordinary application module → preinstalled application module → kernel/system module → kernel itself. Preinstallation is a delivery choice, not extra authority. Both the kernel and its system modules must remain minimal.
+- Prefer existing application owners for business policy, presentation, aggregation and workflow. Move toward a more privileged layer only when a concrete requirement cannot be met through existing routed calls; document that requirement. Reuse alone does not justify promotion.
+- Kernel/system modules expose narrow, governed primitives. The kernel itself contains only the irreducible trust root, routing and lifecycle mechanisms that cannot safely live behind those primitives. Keep caller identity, permission enforcement, budgets, leases, cancellation and actual-stop evidence at their required enforcement boundary.
+- Acceptance check: changing a business strategy or adding an application should normally require only module changes. Do not replace removed business code with a speculative hook framework or duplicate runtime.
 
 - Validate raw external input and persisted data at their actual trust boundary. Within the same operation, pass the parsed value onward; do not repeat schema parsing, enum membership checks, or defensive type conversions on trusted internal values.
 - Read and validate a database identity once per write transaction, then reuse that row. Recheck after a separate approval, queued delivery, or asynchronous lifecycle boundary when the state can actually change; preserve authorization, idempotency and data-loss protections.

@@ -2,11 +2,13 @@ import { z } from "zod";
 import type { Proposal } from "./module-context";
 import type { moduleUpstream } from "./module-upstream";
 import { moduleHealthSummarySchema } from "./module-diagnostics";
-import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
+import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, healthSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { moduleOverviewOutputSchema, permissionsSchema } from "./module-overview";
 
 export const ownerBuildOutput = z.object({ status: z.string(), sessionId: z.string(), runId: z.string(), duplicate: z.boolean(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() });
 export const okOutput = z.object({ ok: z.literal(true) });
+export const chatConversationStateOutput = z.object({ now: z.string(), limits: z.object({ idleMinutes: z.number(), minContextTokens: z.number(), maxContextTokens: z.number() }),
+  session: z.object({ id: z.string(), title: z.string().nullable(), lastActivityAt: z.string(), busy: z.boolean(), contextTokens: z.number() }).nullable() });
 export const chatSendOutput = z.object({ sessionId: z.string(), messageId: z.string(), runId: z.string().nullable() });
 // Small images come back inline (base64) so chat.send can hand them to the model.
 export const chatAttachOutput = attachmentSchema.extend({ base64: z.string().optional() });
@@ -15,6 +17,7 @@ export const chatFileOutput = z.object({ base64: z.string(), mime: z.string() })
 export const chatAskOutput = chatReplySchema;
 export const chatSessionsOutput = z.array(sessionSchema);
 export const chatTodayOutput = todayViewSchema;
+export const chatRuntimeOutput = healthSchema.omit({ queuedNotifications: true, failedNotifications: true }).extend({ at: z.string().datetime() });
 export const chatMessagesOutput = z.array(messageSchema);
 export const chatRunsOutput = z.array(providerRunViewSchema);
 export const chatTranscriptOutput = z.array(z.discriminatedUnion("kind", [

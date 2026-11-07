@@ -1,6 +1,7 @@
 import type { EditorCommandConsumer, ExecutionStart, ExecutionView } from "./contract.js";
 import { readRegistry, serializeWork } from "./work-v2-storage";
 import { reconcileCodingResult } from "./results";
+import { codingGoal } from "./instructions";
 import { codingError, lookupCodingWork, readCodingWork, writeCodingWork, remember, type CodingContext, type CodingWork } from "./storage";
 
 type Input<K extends keyof EditorCommandConsumer> = Parameters<EditorCommandConsumer[K]>[0];
@@ -28,7 +29,7 @@ async function createLegacyWork(context: CodingContext, input: ExecutionStart): 
     work = { start: input, results: [], acceptances: [] };
     await writeCodingWork(context, work);
   }
-  const view = await context.call<ExecutionView>("executions.start", work.start);
+  const view = await context.call<ExecutionView>("executions.start", { ...work.start, goal: codingGoal(work.start.goal) });
   remember(work, view);
   await writeCodingWork(context, work);
   return view;

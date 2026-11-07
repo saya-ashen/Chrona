@@ -2,7 +2,7 @@ import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
 import { randomUUID } from "node:crypto";
-import { notifyUser } from "./notify-user";
+import { notifyLifecycle } from "./notify-user";
 import { latestModuleEvolution } from "./module-evolution";
 
 type Occurrence = { scheduleId: string; moduleId: string | null; hash: string | null; activationId: string | null; triggerId: string | null; firedAt: string; claimedAt: string; payload: Prisma.JsonValue };
@@ -26,7 +26,7 @@ async function settle(ports: StewardPorts, row: Row, token: string, now: Date, o
   await ports.db.$transaction(async tx => {
     const changed = await tx.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: token }, data: { status, error, leaseToken: null, leaseUntil: null, finishedAt: status === "queued" ? null : ports.now(), nextAttemptAt: status === "queued" ? new Date(now.getTime() + Math.min(3600_000, 30_000 * 2 ** row.attempts)) : null } });
     if (!changed.count) return;
-    if (status === "failed" || status === "unknown") await notifyUser(tx, ports, row.workspaceId, { level: "now", title: "日程未完成", body: `${row.target} 的日程${status === "unknown" ? "结果未知，请核对实际结果；不会自动重放" : "投递失败，已停止自动尝试"}。${error ?? ""}`, key: `schedule-delivery:${row.id}` });
+    if (status === "failed" || status === "unknown") await notifyLifecycle(tx, ports, row.workspaceId, `schedule-delivery:${row.id}`, { kind: "schedule-failed", target: row.target, status, error });
     const delay = Date.parse(occurrence.claimedAt) - Date.parse(occurrence.firedAt);
     await tx.schedule.updateMany({ where: { id: occurrence.scheduleId, lastAt: new Date(occurrence.claimedAt) }, data: {
       lastResult: `Module exit ${status === "succeeded" ? 0 : -1}; effects ${effects}; delay ${delay}ms${error ? `; ${error}` : ""}`.slice(0, 2000),
@@ -91,7 +91,7 @@ export function drainSchedules(ports: StewardPorts, workspaceId: string, now = p
         const occurrence = row.args as unknown as Occurrence;
         if (changed.count) {
           await tx.schedule.updateMany({ where: { id: occurrence.scheduleId, lastAt: new Date(occurrence.claimedAt) }, data: { lastResult: "Delivery interrupted; outcome unknown" } });
-          await notifyUser(tx, ports, workspaceId, { level: "now", title: "日程结果待核对", body: `${row.target} 的日程在投递中断开，结果未知；不会自动重放，请核对实际结果。`, key: `schedule-delivery:${row.id}` });
+          await notifyLifecycle(tx, ports, workspaceId, `schedule-delivery:${row.id}`, { kind: "schedule-failed", target: row.target, status: "unknown", disconnected: true });
         }
       });
     }

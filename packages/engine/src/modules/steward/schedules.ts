@@ -83,7 +83,7 @@ export function createSchedules(ports: StewardPorts, workspaceId: string) {
     if (waitForDelivery) await drainSchedules(ports, workspaceId, now);
     return fired;
   }
-  return { create, update, cancel: (id: string) => update(id, { status: "cancelled" }), list: async (originSessionId?: string) => (await db.schedule.findMany({ where: { workspaceId, ...(originSessionId ? { originSessionId } : {}) }, orderBy: { createdAt: "desc" } })).map(toSchedule), fireDue, forModule: (moduleId: string, module: string) => moduleTimers(ports, workspaceId, timezone, moduleId, module) };
+  return { create, update, cancel: (id: string) => update(id, { status: "cancelled" }), list: async (originSessionId?: string, timersOnly = false) => (await db.schedule.findMany({ where: { workspaceId, ...(originSessionId ? { originSessionId } : {}), ...(timersOnly ? { OR: [{ mode: "wake" as const }, { mode: "module" as const, payload: { not: Prisma.DbNull } }] } : {}) }, orderBy: { createdAt: "desc" } })).map(toSchedule), fireDue, forModule: (moduleId: string, module: string) => moduleTimers(ports, workspaceId, timezone, moduleId, module) };
 }
 export const MODULE_SCHEDULE_LIMIT = 500;
 /**

@@ -1,5 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { listActivity } from "./activity";
+import { activityRecords, activityRecordsOutput } from "./activity";
+import { activityView } from "./builtin/notify/activity";
+const listActivity = (ports: StewardPorts, workspaceId: string, args: Parameters<typeof activityView>[1]) => activityView(async (target, input) => {
+  expect(target).toBe("activity.records");
+  return activityRecordsOutput.parse(await activityRecords(ports, workspaceId, input));
+}, args);
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -50,6 +55,19 @@ test.each([
   const subjectId = subject === "approval" ? f.approval.id : subject === "module" ? f.web.id : subject === "version" ? f.version.id : null;
   await f.add(kind, subjectId, details);
   expect((await listActivity(f.ports, f.w, {})).items).toMatchObject([{ kind, text, module }]);
+});
+
+test("audit facts exclude raw details, credentials and other workspaces", async () => {
+  const f = await fixture();
+  await f.add("settings_updated", null, { notifications: { token: "private-notification-credential" }, moduleModel: { apiKey: "private-model-credential" } });
+  await f.add("module_runtime_incident", f.web.id, { id: "safe", status: "retrying", evidence: { reason: "token=private-token", raw: "private-raw" }, request: "private-request", token: "private-token" });
+  const foreign = await f.db.workspace.create({ data: { name: "foreign" } });
+  await f.db.audit.create({ data: { workspaceId: foreign.id, actorKey: "chrona", kind: "secret_set", details: { name: "foreign-name" } } });
+  const facts = activityRecordsOutput.parse(await activityRecords(f.ports, f.w, {}));
+  const encoded = JSON.stringify(facts);
+  for (const value of ["private-notification-credential", "private-model-credential", "private-token", "private-raw", "private-request", "foreign-name"]) expect(encoded).not.toContain(value);
+  expect(facts.rows.find(row => row.kind === "settings_updated")!.details).toEqual({ settingsKeys: ["notifications", "moduleModel"] });
+  expect(facts.rows).toHaveLength(2);
 });
 
 test("activity aggregates nonconsecutive incident snapshots before limiting, preserving the newest row", async () => {

@@ -9,6 +9,7 @@ import { buildPending } from "./module-build";
 import { moduleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { StewardError } from "./errors";
+import { STEWARD_PROMPT } from "./run-instructions";
 
 /** Recovery only, under the CLI's exclusive database lock: no normal tick, built-in upgrades or other jobs. */
 export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, input: unknown) {
@@ -29,7 +30,7 @@ export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, in
   try {
     await runs.authenticate(run.token);
     handle = ports.provider!.start({ runId: run.id, token: run.token, lane: "build", cwd: run.cwd, sessionDir, sessionId: null,
-      model: run.model, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, deadline: run.deadlineAt, events: channel.events,
+      systemPrompt: STEWARD_PROMPT, resources: "configured", model: run.model, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, deadline: run.deadlineAt, events: channel.events,
       extraTools: BUILD_MODULE_TOOLS, searchTools: true, hostPaths: [], content: [] });
     liveRuns.set(run.id, handle);
     let done = false;

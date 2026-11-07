@@ -163,7 +163,7 @@ export const modules: SystemModule = {
     tool("request-group", modulesToolInputSchemas["request-group"].description!, {}, [], provider(modulesToolInputSchemas["request-group"])),
     ...(["stop-build", "revise-build"] as const).map(name => tool(name, modulesToolInputSchemas[name].description!, {}, [], provider(modulesToolInputSchemas[name], { visibility: ["provider", "owner"], output: z.lazy(() => outputs.buildControlOutput) }))),
   ],
-  async handle({ ports, workspaceId, caller, deadline }, name, args) {
+  async handle({ ports, workspaceId, caller, deadline, run }, name, args) {
     const api = createModules(ports, workspaceId);
     const readers: Record<string, () => Promise<unknown>> = {
       list: () => listModules(ports, workspaceId, caller),
@@ -174,7 +174,7 @@ export const modules: SystemModule = {
         return api.health({ open: args.open === "true", cursor: args.cursor === undefined ? undefined : String(args.cursor) }, targets);
       },
       permissions: () => modulePermissions(ports, workspaceId, String(args.module)),
-      overview: () => moduleOverview(ports, workspaceId, String(args.module)),
+      overview: () => moduleOverview(ports, workspaceId, String(args.module), { deadline, run }),
       "settings-set": () => setModuleSettings(ports, workspaceId, String(args.module), parsed(args.values, "values")),
       system: () => systemApps(ports, workspaceId, args.module === undefined ? undefined : String(args.module)),
       reference: () => interfaceReference(ports, workspaceId, args.target === undefined ? undefined : String(args.target)),

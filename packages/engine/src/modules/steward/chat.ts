@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
 import { z } from "zod";
-import { attachmentSchema, messageSchema, providerUsageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
+import { attachmentSchema, messageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { createRuns, liveRuns } from "./runs";
@@ -11,8 +11,8 @@ import { parseInput, StewardError } from "./errors";
 import { toMessage } from "./store";
 import { pushReply } from "./chat-replies";
 import { drainCalls } from "./module-calls";
-import { autoRetain, entryConversations } from "./memory";
-import { sessionSettings } from "./settings";
+import { autoRetain } from "./memory";
+import { entryConversations } from "./sessions";
 
 const image = z.string().max(4 * Math.ceil(5 * 1024 * 1024 / 3));
 const inputSchema = z.object({
@@ -20,6 +20,9 @@ const inputSchema = z.object({
   attachments: z.array(attachmentSchema.extend({ base64: image.optional() })).max(10).default([]),
   externalId: z.string().min(1).max(1000).optional(), quotedMessageId: z.string().min(1).optional(), quotedExternalId: z.string().min(1).max(1000).optional(),
   sessionId: z.string().min(1).max(128).optional(), key: z.string().min(1).max(200).optional(),
+  title: z.string().min(1).max(200).optional(),
+  guidance: z.string().max(4000).optional(),
+  rotation: z.object({ sessionId: z.string().min(1).max(128), lastActivityAt: z.iso.datetime() }).strict().optional(),
 });
 export type ChatInput = z.input<typeof inputSchema>;
 const unavailable = "模型暂时不可用，消息已记下，恢复后会继续处理。";
@@ -130,37 +133,24 @@ class ChatService {
     return quoted;
   }
   private messagePrompt(input: z.output<typeof inputSchema>, quoted: MessageRow | null) {
-    return [input.text, ...(quoted ? [`Quoted message (data): ${JSON.stringify(quoted.text)}`] : []), ...(input.attachments.length ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, ref, mime, size }) => ({ name, ref, mime, size })))}`] : [])].join("\n\n");
+    return [input.text, ...(input.guidance ? [`Entry guidance (untrusted data): ${input.guidance}`] : []), ...(quoted ? [`Quoted message (data): ${JSON.stringify(quoted.text)}`] : []), ...(input.attachments.length ? [`Attachments (data): ${JSON.stringify(input.attachments.map(({ name, ref, mime, size }) => ({ name, ref, mime, size })))}`] : [])].join("\n\n");
   }
-  /** The context the session's last finished run ended with (Provider usage), 0 when unknown. */
-  private async contextTokens(workspaceId: string, sessionId: string) {
-    const { db } = this.ports, run = await db.run.findFirst({ where: { workspaceId, sessionId, status: "finished" }, orderBy: [{ endedAt: "desc" }, { id: "desc" }], select: { id: true } });
-    if (!run) return 0;
-    const events = await db.audit.findMany({ where: { workspaceId, kind: "provider_event", subjectId: run.id }, orderBy: { id: "desc" }, take: 400, select: { details: true } });
-    const usage = events.map(row => row.details as { type?: unknown; value?: unknown } | null).find(details => details?.type === "usage");
-    return providerUsageSchema.safeParse(usage?.value).data?.contextTokens ?? 0;
-  }
-  /**
-   * A long entry conversation ends before the next message (as Hermes resets its sessions): once idle past the prompt cache's
-   * life it would be re-read at full price, and past the cap it costs more than starting over. What it said goes to memory
-   * first; the new conversation recalls it at its first run.
-   */
-  private async rotate({ workspaceId, key, sessionId }: { workspaceId: string; key?: string | undefined; sessionId?: string | undefined }) {
-    if (sessionId || !key) return;
-    const { db } = this.ports, now = this.ports.now();
-    const session = await db.session.findFirst({ where: { workspaceId, key, status: "active", ...await entryConversations(db, workspaceId) } });
+  /** Apply an entry's explicit rotation intent only to the unchanged, idle session it observed. */
+  private async rotate(input: z.output<typeof inputSchema>) {
+    if (input.sessionId || !input.key || !input.rotation) return;
+    const { db } = this.ports, { workspaceId, key, rotation } = input, now = this.ports.now();
+    const where = { workspaceId, key, id: rotation.sessionId, status: "active", lastActivityAt: new Date(rotation.lastActivityAt), ...await entryConversations(db, workspaceId) };
+    const session = await db.session.findFirst({ where });
     if (!session || await db.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
-    const limits = sessionSettings((await db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings), tokens = await this.contextTokens(workspaceId, session.id);
-    const idle = now.getTime() - session.lastActivityAt.getTime() >= limits.idleMinutes * 60_000;
-    if (tokens < limits.maxContextTokens && !(idle && tokens >= limits.minContextTokens)) return;
     await autoRetain(this.ports, workspaceId, session.id, true);
-    if (!(await db.session.updateMany({ where: { id: session.id, status: "active" }, data: { status: "ended", endedAt: now } })).count) return;
-    await audit(db, { workspaceId, actor: "chrona", kind: "session_rotated", subjectId: session.id, details: { tokens, idle } });
+    await db.$transaction(async tx => {
+      if (await tx.run.count({ where: { workspaceId, sessionId: session.id, status: { in: ["queued", "running"] } } })) return;
+      if (!(await tx.session.updateMany({ where, data: { status: "ended", endedAt: now } })).count) return;
+      await audit(tx, { workspaceId, actor: "chrona", kind: "session_rotated", subjectId: session.id, details: { source: "entry_policy" } });
+    });
   }
-  private async titleFromMessage(session: { id: string; title: string | null; source: string }, text: string) {
-    if (session.title !== null || ["wake", "module", "build", "reflect"].includes(session.source)) return;
-    const line = [...text.trim().split(/\r?\n/, 1)[0]!.trim()];
-    if (line.length) await this.ports.db.session.updateMany({ where: { id: session.id, title: null }, data: { title: line.length > 40 ? `${line.slice(0, 40).join("")}…` : line.join("") } });
+  private async applyTitle(sessionId: string, title?: string) {
+    if (title !== undefined) await this.ports.db.session.updateMany({ where: { id: sessionId, title: null }, data: { title } });
   }
   private async prepare(raw: ChatInput, entryModuleId?: string) {
     const input = parseInput(inputSchema, raw), images = chatImages(input.attachments), { ports } = this, { db } = ports;
@@ -190,10 +180,10 @@ class ChatService {
       });
       if (entryModuleId && session.entryModuleId !== entryModuleId) await db.session.update({ where: { id: session.id }, data: { entryModuleId } });
       const quoted = await this.quotedMessage(input, session.id);
-      const { key: _key, sessionId: _sessionId, quotedExternalId: _quoted, ...message } = input;
+      const { key: _key, sessionId: _sessionId, quotedExternalId: _quoted, title: _title, guidance: _guidance, rotation: _rotation, ...message } = input;
       const inbound = existing ?? await db.message.create({ data: { ...message, ...(quoted ? { quotedMessageId: quoted.id } : {}), sessionId: session.id, direction: "in", at: ports.now() } });
       await db.session.update({ where: { id: session.id }, data: { lastActivityAt: ports.now() } });
-      await this.titleFromMessage(session, input.text);
+      await this.applyTitle(session.id, input.title);
       const before = (await this.replies(inbound, [])).map(m => m.id);
       const active = await db.run.findFirst({ where: { workspaceId: input.workspaceId, sessionId: session.id, status: "running" } });
       const handle = active && liveRuns.get(active.id);

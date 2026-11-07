@@ -28,9 +28,9 @@ let inventoryFailure = false;
 const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
 let filesContract = "a".repeat(64);
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
-  stub("chat.today", () => ({ approvals: [] })),
-  stub("chat.session", args => ({ id: args.session, key: "web:k1" })),
-  stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
+  stub("chat.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
+  stub("approvals.list", () => []), stub("chat.sessions", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
+  stub("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), stub("chat.session", args => ({ id: args.session, key: "web:k1" })), stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
   stub("chat.messages", () => []),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.disable", () => ({ status: "paused" })),
@@ -356,7 +356,7 @@ try {
   assert.equal(calls.length, 0);
 
   // The data API answers from routed calls.
-  assert.deepEqual(await (await get("/api/web/today")).json(), { approvals: [] });
+  assert.deepEqual((await (await get("/api/web/today")).json()).approvals, []);
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
@@ -378,7 +378,7 @@ try {
   assert.deepEqual(calls.at(-1), ["modules.settings-set", { module: "okx", values: JSON.stringify({ "max-loss": 50 }) }]);
   assert.deepEqual(await (await get("/api/web/modules/a1/permissions")).json(), { module: "a1", capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] });
   assert.deepEqual(await (await post("/api/web/chat", { text: "hi", session: "s1" })).json(), { sessionId: "s1", messageId: "m1" });
-  assert.deepEqual(calls.at(-1), ["chat.send", { key: "web:k1", text: "hi", channel: "in_app" }]);
+  assert.equal(calls.at(-1)![0], "chat.send"); assert.equal(calls.at(-1)![1].key, "web:k1"); assert.equal(calls.at(-1)![1].title, "hi"); assert.match(String(calls.at(-1)![1].guidance), /personal steward/);
   await post("/api/web/chat", { text: "new" });
   assert.match(String(calls.at(-1)![1].key), /^web:/); assert.notEqual(calls.at(-1)![1].key, "web:k1");
   await post("/api/web/approvals/a1/resolve", { decision: "approve", scope: "once" });

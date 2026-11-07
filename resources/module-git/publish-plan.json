@@ -3,67 +3,78 @@
   "modules": [
     {
       "name": "web",
-      "repository": "https://github.com/chrona-core/chrona-module-web",
+      "proposedRepository": "chrona-core/chrona-module-web",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/web.git",
       "branch": "main",
-      "commit": "3124fcfae4cb3d45d31bd5f52db56e1719d3e08e"
+      "commit": "428b634cd09e76d80e0d6b53043bcd8c7511dbe2"
     },
     {
       "name": "mcp",
-      "repository": "https://github.com/chrona-core/chrona-module-mcp",
+      "proposedRepository": "chrona-core/chrona-module-mcp",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/mcp.git",
       "branch": "main",
-      "commit": "9b2e425aa2073ff3efc5f2945bebcc071bae621f"
+      "commit": "f701d4216cafa115297819fde8b38a1464165a92"
     },
     {
       "name": "files",
-      "repository": "https://github.com/chrona-core/chrona-module-files",
+      "proposedRepository": "chrona-core/chrona-module-files",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/files.git",
       "branch": "main",
       "commit": "f9baa5df32c092ed839a0d933b5ceaff323ea1e7"
     },
     {
       "name": "notify",
-      "repository": "https://github.com/chrona-core/chrona-module-notify",
+      "proposedRepository": "chrona-core/chrona-module-notify",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/notify.git",
       "branch": "main",
-      "commit": "c75e16cc8f0198bc83ab8e22f6d7f175c5ccf98a"
+      "commit": "c0e0b6a2600bbf6001a52d5d78dc0beaa39f1689"
     },
     {
       "name": "events",
-      "repository": "https://github.com/chrona-core/chrona-module-events",
+      "proposedRepository": "chrona-core/chrona-module-events",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/events.git",
       "branch": "main",
       "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425"
     },
     {
       "name": "qq",
-      "repository": "https://github.com/chrona-core/chrona-module-qq",
+      "proposedRepository": "chrona-core/chrona-module-qq",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/qq.git",
       "branch": "main",
-      "commit": "2cb3c4eee9d168c5a4d083bbb096079606dfed8c"
+      "commit": "d4a2d4b26d23eef3f0802767c47860b147892acc"
     },
     {
       "name": "remind",
-      "repository": "https://github.com/chrona-core/chrona-module-remind",
+      "proposedRepository": "chrona-core/chrona-module-remind",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/remind.git",
       "branch": "main",
       "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61"
     },
     {
       "name": "mind",
-      "repository": "https://github.com/chrona-core/chrona-module-mind",
+      "proposedRepository": "chrona-core/chrona-module-mind",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/mind.git",
       "branch": "main",
       "commit": "ac48500a13ea384d1456b43981fb583ea354c1e4"
     },
     {
       "name": "memory-local",
-      "repository": "https://github.com/chrona-core/chrona-module-memory-local",
+      "proposedRepository": "chrona-core/chrona-module-memory-local",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/memory-local.git",
       "branch": "main",
-      "commit": "c2353f20718f1b08756bca10259e979592cde3ca"
+      "commit": "2f9e91afaaf1fdde2842d40a8b082c0f0f86f639"
     },
     {
       "name": "coding",
-      "repository": "https://github.com/chrona-core/chrona-module-coding",
+      "proposedRepository": "chrona-core/chrona-module-coding",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/coding.git",
       "branch": "main",
-      "commit": "086459226c73b6b10894d4d1271f0e298f6ae82d"
+      "commit": "453ae363402e5585f556c23b19ddd91b3c09ad5c"
     },
     {
       "name": "editor",
-      "repository": "https://github.com/chrona-core/chrona-module-editor",
+      "proposedRepository": "chrona-core/chrona-module-editor",
+      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/editor.git",
       "branch": "main",
       "commit": "560d06f9759483ad896b8022ad31e3fafb4d2226"
     }

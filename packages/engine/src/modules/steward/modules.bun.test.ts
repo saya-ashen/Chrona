@@ -18,7 +18,7 @@ import { notice, notices } from "./test-notices";
 import { modulesListOutput } from "./system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
-import { approvalNoticeBody } from "./notify-user";
+import { approvalNoticeBody } from "./builtin/notify/approval";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -204,7 +204,7 @@ async function dataFixture(credentials = false) {
   if (credentials) await f.approve(first.approvalId!);
   else expect(first.status).toBe("approved");
   // Start data tests after setup's activation notice; the auto-activation test covers that notice.
-  await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
+  await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: { in: ["send", "lifecycle"] } } });
   const live = join(f.dataDir, "platform/data", first.moduleId!), original = f.ports.sandbox!.runModule!;
   f.ports.sandbox!.runModule = async input => {
     await mkdir(join(input.dataDir, "nested"));

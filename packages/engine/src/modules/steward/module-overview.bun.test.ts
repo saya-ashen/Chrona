@@ -8,9 +8,11 @@ import { registerSystemModules } from "./system-modules";
 import { listActivity } from "./activity";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
+import { installActivityModule } from "./test-activity-module";
+const cleanups: (() => Promise<void>)[] = [];
 
 const dbs: ReturnType<typeof testDb>[] = [];
-afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
+afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); for (const db of dbs.splice(0)) await db.$disconnect(); });
 const base = { name: "okx-trader", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], keepAlive: true };
 const settings = {
   "max-loss": { type: "number", label: "最大亏损", default: 100, min: 10, max: 500 },
@@ -24,6 +26,7 @@ async function fixture() {
   const w = (await db.workspace.create({ data: { name: "overview" } })).id;
   const module = await db.module.create({ data: { workspaceId: w, name: "okx-trader", activeHash: "h1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h1", manifest: moduleManifestSchema.parse({ ...base, settings, params: { pair: { type: "string", value: "BTC-USDT" } } }), source: "provider", intent: {}, report: {}, status: "active" } });
+  cleanups.push(await installActivityModule(ports, w));
   return { db, ports, w, module };
 }
 

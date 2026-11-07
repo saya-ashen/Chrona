@@ -38,11 +38,11 @@ for (let i = 0; i < 4; i++) await passive(incoming, "reply").catch(() => {});
 assert.equal(await passive(incoming, "reply"), false); assert.equal(reservations, 4);
 
 const calls: any[] = [], notices: any[] = [];
-const relay = createRelay({ publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: async (target, args) => { calls.push({ target, args }); if (target === "approvals.list") return [{ id: "abcdef12-0000", title: "approval" }]; return "attachment-ref"; } });
+const relay = createRelay({ publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: async (target, args) => { calls.push({ target, args }); if (target === "chat.conversation-state") return { now: now.toISOString(), limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null }; if (target === "approvals.list") return [{ id: "abcdef12-0000", title: "approval" }]; return "attachment-ref"; } });
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);
 await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chrona_qqbot", text: "", externalId: parsed.id, attachments: parsed.attachments });
-assert.deepEqual(calls.map(c => c.target), ["chat.attach", "chat.send"]);
+assert.deepEqual(calls.map(c => c.target), ["chat.attach", "chat.conversation-state", "chat.send"]);
 await relay.resolveApproval(binding, { ref: "abcdef12", decision: "approve", scope: "once" });
 assert.equal(calls.at(-1).target, "approvals.resolve");
 await relay.enqueueFinal("event-a", "a", "chrona_qq:owner"); await relay.enqueueFinal("event-b", "b", "chrona_qq:owner");

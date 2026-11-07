@@ -17,7 +17,7 @@ test("loads only reviewed explicit resources, keeping no-discovery and scoped co
   const f = await fixture(), loaded = readPiResources(f.file, f.profile, f.workspace);
   expect(loaded.error).toBeNull(); expect(loaded.resources).toEqual(f.value);
   const config = piLaunchConfig({ command: "/not-run", agentDir: f.profile, chronaExtension: f.extension, resourcesFile: f.file, workspaceRoot: f.workspace, agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
-  const args = piArguments(config, { cwd: f.workspace, sessionDir: join(f.workspace, "sessions"), sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
+  const args = piArguments(config, { cwd: f.workspace, sessionDir: join(f.workspace, "sessions"), sessionId: null, resources: "configured", lane: "foreground" } as ProviderRunInput, "Fixture");
   expect(args).toContain("--no-skills"); expect(args).toContain("--skill"); expect(args).toContain(f.skill); expect(args[args.indexOf("--tools") + 1]).toContain("fixture_tool");
   expect(expectedPiCommands(config, [{ source: "skill", sourceInfo: { path: f.skill } }])).toBe(true);
   expect(expectedPiCommands(config, [{ source: "skill", sourceInfo: { path: join(f.root, "ambient.md") } }])).toBe(false);
@@ -30,7 +30,7 @@ test("bwrap masks data and home before re-exposing only Pi resources and workspa
   const command = join(dataDir, "fake-pi"); await writeFile(command, "synthetic executable");
   const config = piLaunchConfig({ command, agentDir, dataDir, workspaceRoot: workspace,
     chronaExtension: f.extension, resourcesFile: f.file, executionMode: "required-isolation", bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
-  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground", content: [{ name: "files", dir: writable, writable: true }, { name: "calendar", dir: readonly, writable: false }] } as ProviderRunInput, "Fixture");
+  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, resources: "configured", lane: "foreground", content: [{ name: "files", dir: writable, writable: true }, { name: "calendar", dir: readonly, writable: false }] } as ProviderRunInput, "Fixture");
   const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
   for (const path of [dataDir, homedir()]) {
     const mask = mount("--tmpfs", path);
@@ -42,7 +42,7 @@ test("bwrap masks data and home before re-exposing only Pi resources and workspa
   expect(args.slice(mount("--ro-bind", readonly), mount("--ro-bind", readonly) + 3)).toEqual(["--ro-bind", readonly, join(workspace, "content", "calendar")]);
   expect(mount("--bind", dataDir)).toBe(-1);
   expect(mount("--bind", homedir())).toBe(-1);
-  const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground" } as ProviderRunInput, "Fixture");
+  const unsandboxed = piArguments({ ...config, bwrap: null }, { cwd: workspace, sessionDir: sessions, sessionId: null, resources: "configured", lane: "foreground" } as ProviderRunInput, "Fixture");
   expect(unsandboxed).not.toContain("--tmpfs");
 });
 test("bwrap binds approved host paths writable and re-masks the data dir under them", async () => {
@@ -50,7 +50,7 @@ test("bwrap binds approved host paths writable and re-masks the data dir under t
   const agentDir = join(dataDir, "providers", "pi"), granted = await mkdtemp(join(tmpdir(), "chrona-granted-"));
   for (const path of [sessions, agentDir]) await mkdir(path, { recursive: true });
   const config = piLaunchConfig({ command: "/fake-pi", agentDir, dataDir, workspaceRoot: workspace, chronaExtension: f.extension, executionMode: "required-isolation", bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
-  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "foreground", hostPaths: [f.root, granted, join(f.root, "missing")] } as ProviderRunInput, "Fixture");
+  const args = piArguments(config, { cwd: workspace, sessionDir: sessions, sessionId: null, resources: "configured", lane: "foreground", hostPaths: [f.root, granted, join(f.root, "missing")] } as ProviderRunInput, "Fixture");
   const mount = (flag: string, path: string) => args.findIndex((arg, i) => arg === flag && args[i + 1] === path);
   expect(mount("--bind", granted)).toBeGreaterThan(mount("--tmpfs", homedir()));
   expect(mount("--bind", join(f.root, "missing"))).toBe(-1);
@@ -99,7 +99,7 @@ test("a run gets the browser tool only with a browser; one acquired under the ma
   const browserExtension = join(f.root, "browser-tools.ts"), browser = join(shellDir, "chrome-headless-shell");
   await writeFile(browserExtension, ""); await writeFile(browser, "");
   const config = piLaunchConfig({ command: "/fake-pi", agentDir, dataDir, workspaceRoot: workspace, chronaExtension: f.extension, browserExtension, executionMode: "required-isolation", bwrap: "/fake-bwrap", agentUrl: "http://127.0.0.1:1234" });
-  const input = { cwd: workspace, sessionDir: sessions, sessionId: null, lane: "build" } as ProviderRunInput;
+  const input = { cwd: workspace, sessionDir: sessions, sessionId: null, resources: "configured", lane: "build" } as ProviderRunInput;
   const tools = (args: string[]) => args[args.indexOf("--tools") + 1]!.split(",");
   const without = piArguments(config, input, "Fixture");
   expect(without).not.toContain(browserExtension);

@@ -6,6 +6,7 @@ import { parseCodingToolInput, executionResultSchema, type ExecutionStart, type 
 import { createCodingWork, getCodingWork } from "./work";
 import { readCodingWork, type CodingContext } from "./storage";
 import { listCodingResults, acceptCodingResult } from "./results";
+import { codingGoal } from "./instructions";
 // @ts-expect-error Chrona supplies the isolated author test kernel.
 import { startModule } from "chrona/testing";
 
@@ -18,7 +19,8 @@ const changes: NonNullable<ExecutionResultSource["changes"]> = { scope: "baselin
 const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, unknown>): Promise<T> {
   if (target === "executions.start") {
     starts++;
-    assert.deepEqual(args, input);
+    assert.deepEqual(args, { ...input, goal: codingGoal(input.goal) });
+    assert.ok(String(args.goal).includes("Report changes, checks actually run"));
     if (failStart) throw Object.assign(new Error("Lost start receipt"), { code: "unknown" });
     return { ...view } as T;
   }

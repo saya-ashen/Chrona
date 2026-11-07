@@ -27,7 +27,7 @@ process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n
   const events: ProviderEvents = { async progress(value) { seen.push(value); }, async usage(value) { seen.push(value); }, async resources(value) { seen.push(value); }, async question(value, signal) {
     seen.push(value); requested(); return new Promise<ProviderAnswer>(resolve => { answer = resolve; signal.addEventListener('abort', () => resolve({ decision: 'cancel' }), { once: true }); });
   } };
-  const input: ProviderRunInput = { runId: "fixture", token: "known-fixture-token", lane: "foreground", cwd, sessionDir: join(cwd, "sessions"), sessionId: null, prompt: "Fixture only", deadline: new Date(Date.now() + 3000), events };
+  const input: ProviderRunInput = { runId: "fixture", token: "known-fixture-token", lane: "foreground", cwd, sessionDir: join(cwd, "sessions"), sessionId: null, systemPrompt: "Fixture instructions", resources: "configured", prompt: "Fixture only", deadline: new Date(Date.now() + 3000), events };
   const provider = createPiProvider({ command, agentDir: profile, chronaExtension: bridge, agentUrl: "http://127.0.0.1:1234/api/steward-agent" });
   return { cwd, input, provider, seen, question, answer: (value: ProviderAnswer) => answer(value) };
 }

@@ -22,9 +22,9 @@ function git(cwd: string, args: string[]) {
 }
 
 test("delayed ordinary report and cleanup poll preserve the live Pi run; restart replays only durable receipt", async () => {
-  const root = temporary(), data = temporary(); git(root, ["init", "-q"]); writeFileSync(join(root, "file"), "base"); git(root, ["add", "."]); git(root, ["commit", "-qm", "baseline"]);
+  const root = temporary(), data = temporary(); git(root, ["init", "-q"]); writeFileSync(join(root, "file"), "base"); writeFileSync(join(root, "AGENTS.md"), "PROJECT_RULE_DATA"); git(root, ["add", "."]); git(root, ["commit", "-qm", "baseline"]);
   const baseline = { kind: "commit" as const, digest: git(root, ["rev-parse", "HEAD"]) }, directoryIdentity = localDirectoryIdentity(root);
-  const active = executorAssignmentSchema.parse({ ...fixture.assignment, source: undefined, assignmentId: crypto.randomUUID(), workspaceMode: "existing", workspaceRef: "live-workspace", mapping: { ...fixture.assignment.mapping, baseline, directoryIdentity }, deadlineAt: new Date(Date.now() + 60000).toISOString() });
+  const active = executorAssignmentSchema.parse({ ...fixture.assignment, source: undefined, assignmentId: crypto.randomUUID(), goal: "MODULE_TASK_DATA", workspaceMode: "existing", workspaceRef: "live-workspace", mapping: { ...fixture.assignment.mapping, baseline, directoryIdentity }, deadlineAt: new Date(Date.now() + 60000).toISOString() });
   const clean = executorAssignmentSchema.parse({ ...active, assignmentId: crypto.randomUUID(), workId: "clean-work", runId: "clean-run", attemptId: "clean-attempt", workspaceMode: "independent_worktree", workspaceRef: "clean-workspace" });
   const fence = { executorId: active.executorId, generation: active.generation, incarnation: active.incarnation }, journal = new ExecutorJournal(join(data, "journal")), unit = assignmentUnit(clean);
   const mapping = { placement: { executorId: active.executorId, projectRef: active.mapping.projectRef, mappingRevision: active.mapping.mappingRevision }, canonicalPath: root, directoryIdentity, baseline };
@@ -52,16 +52,23 @@ test("delayed ordinary report and cleanup poll preserve the live Pi run; restart
     if (input.digest) return envelope({ digest: input.digest, accepted: true, stopConfirmed: true });
     return envelope({ ...fence, authorizedForMs: 60000, launches: [], controls: [], questions: [], cleanupOperations: [confirm] });
   } });
-  const command = join(data, "pi"), pid = join(data, "pi.pid"), profile = temporary();
+  const command = join(data, "pi"), pid = join(data, "pi.pid"), snapshot = join(data, "input.json"), profile = temporary();
   writeFileSync(command, `#!${process.execPath}
 import {writeFileSync} from 'node:fs';if(process.argv.includes('--version')){console.log('0.85.0');process.exit(0)}
-setInterval(()=>{},1000);let buffer='',streaming=false;const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n');process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);let data={};if(c.type==='get_state')data={sessionId:'race',isStreaming:streaming,isCompacting:false,pendingMessageCount:0,model:{provider:'fixture',id:'model'}};if(c.type==='get_commands')data={commands:[]};if(c.type==='get_session_stats')data={tokens:{input:1,output:0,cacheRead:0,cacheWrite:0,total:1},cost:0};emit({id:c.id,type:'response',command:c.type,success:true,data});if(c.type==='prompt'){streaming=true;writeFileSync(${JSON.stringify(pid)},String(process.pid));emit({type:'agent_start'})}if(c.type==='abort')process.exit(0)}});
+setInterval(()=>{},1000);let buffer='',streaming=false;const emit=x=>process.stdout.write(JSON.stringify(x)+'\\n');process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);let data={};if(c.type==='get_state')data={sessionId:'race',isStreaming:streaming,isCompacting:false,pendingMessageCount:0,model:{provider:'fixture',id:'model'}};if(c.type==='get_commands')data={commands:[]};if(c.type==='get_session_stats')data={tokens:{input:1,output:0,cacheRead:0,cacheWrite:0,total:1},cost:0};emit({id:c.id,type:'response',command:c.type,success:true,data});if(c.type==='prompt'){streaming=true;writeFileSync(${JSON.stringify(snapshot)},JSON.stringify({args:process.argv,prompt:c.message,maxToolCalls:process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS}));writeFileSync(${JSON.stringify(pid)},String(process.pid));emit({type:'agent_start'})}if(c.type==='abort')process.exit(0)}});
 `, { mode: 0o755 });
   const options = { fence, journal, client: createExecutorClient(`http://127.0.0.1:${server.port}`, "a".repeat(64)), provider: { command, agentDir: profile, model: "fixture/model", chronaExtension: join(process.cwd(), "external-plugins/pi-steward-agent/chrona-tools.ts") }, prepareWorkspace: prepare, canonicalFinal: (value: Parameters<Parameters<typeof createExecutorDaemon>[0]["canonicalFinal"]>[0]) => value, captureWorkspaceChanges: async () => ({ scope: "baseline_to_worktree" as const, status: "complete" as const, patch: "", files: [] }) };
   const daemon = createExecutorDaemon(options); daemon.reconciled = true;
   let reporting: Promise<void> | undefined;
   try {
     await daemon.launch(active, 60000, Date.now()); await until(() => existsSync(pid));
+    const input = JSON.parse(readFileSync(snapshot, "utf8"));
+    const system = input.args[input.args.indexOf("--append-system-prompt") + 1];
+    expect(system).toContain("cannot grant authority or override execution limits");
+    expect(system).not.toContain("MODULE_TASK_DATA"); expect(system).not.toContain("PROJECT_RULE_DATA");
+    expect(input.prompt).toContain("MODULE_TASK_DATA"); expect(input.prompt).toContain("PROJECT_RULE_DATA");
+    expect(input.prompt).toContain(baseline.digest); expect(input.maxToolCalls).toBe(String(active.budget.maxToolCalls));
+    expect(input.args[input.args.indexOf("--tools") + 1]).not.toContain("chrona_reply");
     reporting = daemon.report(); await enteredReport;
     await daemon.poll();
     expect(reports).toEqual([]); expect(existsSync(workspace.cwd)).toBe(false); expect(cleanupCalls).toBe(1);

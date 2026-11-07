@@ -3,7 +3,7 @@ import { NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@
 import type { StewardPorts } from "./ports";
 import { registerModuleEffects, type CallScope } from "./module-supervisor";
 import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
-import { notifyUser } from "./notify-user";
+import { notifyLifecycle } from "./notify-user";
 import { moduleContext } from "./module-context";
 import { moduleIncidents } from "./module-diagnostics";
 import { pauseIn } from "./module-status";
@@ -57,7 +57,7 @@ export async function pauseFailedModule(tx: Prisma.TransactionClient, ports: Ste
   if (!module) return;
   const incident = (await moduleIncidents(tx, workspaceId, moduleId)).find(item => item.activationId === execution.activationId && item.evidence.runId === runId);
   await pauseIn(moduleContext(ports, workspaceId), tx, moduleId, { source: "automatic", reason: "连续三次失败", incidentId: incident?.id });
-  await notifyUser(tx, ports, workspaceId, { module: moduleId, app: module.name, level: "now", title: "模块连续失败，已暂停", body: `应用 ${module.name} 连续三次失败，已停止自动恢复。请在应用页查看故障详情，或运行 chrona admin diagnostics ${module.name}。修复后再启用；此前失败调用不会自动重放。`, key: `module:${moduleId}:paused:${execution.firedAt.toISOString()}` });
+  await notifyLifecycle(tx, ports, workspaceId, `module:${moduleId}:paused:${execution.firedAt.toISOString()}`, { kind: "module-paused", app: module.name, module: moduleId });
 }
 
 registerModuleEffects({ handleModuleCall, pauseFailedModule });

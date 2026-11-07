@@ -90,6 +90,7 @@ try {
   assert.equal(child.workspace!.retained, true);
   const goal = String(dispatchInputs.get("b")!.goal);
   assert.ok(goal.startsWith(b.goal));
+  assert.ok(goal.includes("Report changes, checks actually run"));
   assert.ok(goal.includes("a 修改完成"));
   assert.ok(goal.includes(child.dependencyResults[0]!.artifactRef));
   assert.ok(goal.includes('"attemptId":"t-a"'));

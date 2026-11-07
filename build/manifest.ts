@@ -39,6 +39,8 @@ export const buildArtifacts = {
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/build-contract.md", to: "resources/module-sdk/build-contract.md", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/group-build-contract.md", to: "resources/module-sdk/group-build-contract.md", required: true },
     { from: "packages/integrations/src/steward/module-sdk/calls.d.ts", to: "resources/module-sdk/calls.d.ts", required: true },
     // v2-25: the module type check runs with Bun, so it ships TypeScript and Bun's types beside it.
     { from: "packages/integrations/src/steward/module-typecheck/check.ts", to: "resources/module-typecheck/check.ts", required: true },

@@ -19,6 +19,7 @@ import { createApps } from "./apps";
 import { createStewardService } from "./service";
 import { moduleOverview, modulePermissions } from "./module-overview";
 import { createSecrets } from "./secrets";
+import { installActivityModule } from "./test-activity-module";
 import { callSync, enqueueCall, kernelOrigin, moduleCallbackContractHash, runDueCalls } from "./module-calls";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -225,6 +226,9 @@ test("list, overview and kernel projections share lifecycle identity without ove
   const [list] = await createModules(f.ports, f.workspaceId).list();
   expect(list).toMatchObject({ origin: "builtin", capabilities: { build: true, rollback: true, remove: false, install: false } });
   expect((await createApps(f.ports, f.workspaceId).list())[0]!.origin).toBe("builtin");
+  const externalResources = f.ports.moduleExternalResources;
+  cleanups.push(await installActivityModule(f.ports, f.workspaceId));
+  f.ports.moduleExternalResources = externalResources;
   const overview = await moduleOverview(f.ports, f.workspaceId, "web") as { app: { origin: string }; permissions: { capabilities: unknown } };
   expect(overview.app.origin).toBe("builtin"); expect(Array.isArray(overview.permissions.capabilities)).toBe(true);
   expect(await moduleOverview(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });

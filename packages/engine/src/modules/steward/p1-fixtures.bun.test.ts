@@ -92,7 +92,7 @@ test("owner poll cap and abort release without cancellation", async () => {
 });
 test("fake Provider has explicit lifecycle with independent project/log inputs and no model", async () => {
   const fake = createFakeP1Provider();
-  const handle = fake.provider.start({ runId: "r", token: "fixture-only", lane: "background", cwd: "/tmp/project", sessionDir: "/tmp/logs", sessionId: null, prompt: "goal", deadline: new Date() });
+  const handle = fake.provider.start({ runId: "r", token: "fixture-only", lane: "background", cwd: "/tmp/project", sessionDir: "/tmp/logs", sessionId: null, systemPrompt: "Fixture instructions", resources: "minimal", prompt: "goal", deadline: new Date() });
   await handle.inject("follow-up"); expect(fake.injections).toEqual(["follow-up"]);
   expect(fake.starts[0]?.cwd).not.toBe(fake.starts[0]?.sessionDir);
   fake.settle("r"); expect((await handle.done).outcome).toBe("finished");
@@ -153,7 +153,7 @@ test("P1 consumer smoke: routed identity, manifest JSON input, bound Provider si
       expect(txCalls.every(value => value === tx)).toBe(true);
     });
     const project = await ports.resolveExecutionProject!(codingPrincipal, "p");
-    const run: ProviderRunInput = { runId: ref.runId, token: "fixture-only", lane: "background", cwd: project.canonicalPath, sessionDir: "/tmp/independent-log", sessionId: null, prompt: "goal", deadline: new Date(), execution: ref, detail: { append: value => ports.executionEvents!.append(principal, value) } };
+    const run: ProviderRunInput = { runId: ref.runId, token: "fixture-only", lane: "background", cwd: project.canonicalPath, sessionDir: "/tmp/independent-log", sessionId: null, systemPrompt: "Fixture instructions", resources: "minimal", prompt: "goal", deadline: new Date(), execution: ref, detail: { append: value => ports.executionEvents!.append(principal, value) } };
     const handle = ports.provider!.start(run);
     await run.detail!.append(event(1)); provider.settle(ref.runId); await handle.done;
     const view = { ...ref, projectRef: "p", status: "completed", cancelRequested: false, stopConfirmed: true };

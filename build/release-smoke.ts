@@ -164,6 +164,8 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/package.json"), "Module SDK package");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "rescue.html"), "Immutable rescue console");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/testing.ts"), "Module test helper");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/build-contract.md"), "Module build contract");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/group-build-contract.md"), "Module group-build contract");
   await assertModuleTypecheck(resolve(releaseDir, buildArtifacts.resourcesRoot));
 
   if (options.runtime !== false) {

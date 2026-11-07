@@ -6,7 +6,7 @@
   "activated": true,
   "secrets": ["qq_bot"],
   "triggers": [],
-  "uses": ["chat.send", "chat.attach", "chat.new-session", "chat.file", "chat.delivered", "chat.record", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],
+  "uses": ["chat.conversation-state", "chat.send", "chat.attach", "chat.new-session", "chat.file", "chat.delivered", "chat.record", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],
   "tools": [
     { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"],
       "output": { "anyOf": [{ "type": "object", "properties": { "outcome": { "const": "accepted" }, "receiptRef": { "type": ["string", "null"] } }, "required": ["outcome", "receiptRef"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "rejected" }, "retryable": { "type": "boolean" }, "error": { "type": "string" } }, "required": ["outcome", "retryable", "error"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "uncertain" }, "error": { "type": "string" } }, "required": ["outcome", "error"], "additionalProperties": false }] },

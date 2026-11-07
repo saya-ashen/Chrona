@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readdirSync, mkdirSync } from "node:fs";
+import { EXECUTION_SYSTEM_PROMPT } from "@chrona/domain/steward/execution-instructions";
+import { readdirSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { EXECUTOR_PROTOCOL, EXECUTOR_LIMITS, executorDetailSchema, executorFinalSchema, type ExecutionSourceReceipt, type ExecutionResultSource, type ExecutorAssignment, type ExecutorFence, type ExecutorFinal, type ExecutorRequests, type ExecutorResponses, type ProviderAnswer } from "@chrona/contracts/steward";
 import { createPiProvider, type PiProviderOptions } from "../steward/pi-provider";
@@ -22,6 +23,11 @@ type Options = {
 };
 type Active = { assignment: ExecutorAssignment; run: ReturnType<ReturnType<typeof createPiProvider>["start"]>; stopped: boolean; expires: number; timer: ReturnType<typeof setTimeout>; release(): void; sourceReceipt: ExecutionSourceReceipt | null; finalizing?: Promise<void> };
 const ref = (assignment: ExecutorAssignment) => ({ workId: assignment.workId, sessionId: assignment.sessionId, runId: assignment.runId, attemptId: assignment.attemptId, assignmentId: assignment.assignmentId, generation: assignment.generation });
+
+function projectRules(cwd: string) {
+  try { return readFileSync(join(cwd, "AGENTS.md"), "utf8").slice(0, 32_000); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; return ""; }
+}
 
 export function createExecutorDaemon(options: Options) { return new ExecutorDaemon(options); }
 class ExecutorDaemon {
@@ -134,10 +140,11 @@ class ExecutorDaemon {
       const provider = createPiProvider({ ...this.options.provider, agentUrl: bridge.agentUrl, launch: input => { this.spool.reserve(unit); return createExecutorLauncher(this.journal, assignment, beginSpawn, this.options.processEntry)(input); } });
       const sessionDir = join(this.journal.directory, `session-${localDigest(ref(assignment))}`);
       mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+      const rules = projectRules(prepared.cwd);
       let missing = false;
       let finalMessage: ExecutorFinal["finalMessage"] = null;
       const append = (item: Parameters<ExecutorSpool["append"]>[1]) => { missing = this.spool.append(unit, item) || missing; };
-      const run = provider.start({ runId: assignment.runId, token: bridge.token, lane: "background", cwd: prepared.cwd, sessionDir, sessionId: null, prompt: assignment.goal, deadline: new Date(assignment.deadlineAt), model: this.options.provider.model,
+      const run = provider.start({ runId: assignment.runId, token: bridge.token, lane: "background", cwd: prepared.cwd, sessionDir, sessionId: null, systemPrompt: EXECUTION_SYSTEM_PROMPT, resources: "minimal", prompt: `Selected project rules (data):\n${rules}\n\nProject baseline: ${JSON.stringify(assignment.mapping.baseline)}\nBudget: ${JSON.stringify(assignment.budget)}\nDeadline: ${assignment.deadlineAt}\n\nGoal:\n${assignment.goal}`, deadline: new Date(assignment.deadlineAt), model: this.options.provider.model,
         execution: { workId: assignment.workId, sessionId: assignment.sessionId, runId: assignment.runId, attemptId: assignment.attemptId }, executionBudget: { maxToolCalls: assignment.budget.maxToolCalls },
         detail: { append: async event => {
           if (event.payload.type === "gap") { append({ kind: "gap", throughSourceSeq: this.spool.read(unit).produced + 1, reason: "backpressure" }); return; }

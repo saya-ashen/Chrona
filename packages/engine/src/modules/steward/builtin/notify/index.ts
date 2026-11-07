@@ -2,6 +2,7 @@ import { chrona, on } from "chrona";
 import { openStore } from "./store";
 import { createNotify, type Caller, type CallResult } from "./notify";
 import type { Directory } from "./registry";
+import { activityView } from "./activity";
 
 const store = openStore(chrona.paths.data);
 const notify = createNotify({ store, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null,
@@ -21,12 +22,13 @@ async function tick() {
   finally { busy = false; }
 }
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: Caller; now: string }) => {
+  if (event.id === "activity") return { result: await activityView((target, args) => chrona.call(target, args), event.args) };
   if (["channel", "status"].includes(event.id)) {
     try { await notify.refresh(); }
     catch { return { result: { error: "unavailable", message: "Could not check current channels; try again when the module directory is available" } }; }
   }
   const result = notify.handle(event.id, event.args, event.caller ?? { kind: "kernel" }, new Date(event.now));
-  if (["send", "channel", "retry"].includes(event.id)) setTimeout(() => void tick(), 0);
+  if (["send", "approval", "lifecycle", "channel", "retry"].includes(event.id)) setTimeout(() => void tick(), 0);
   return { result };
 });
 on("call_result", async (event: CallResult) => { notify.result(event, new Date()); return {}; });

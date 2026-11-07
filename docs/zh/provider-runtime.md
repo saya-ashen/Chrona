@@ -1,6 +1,12 @@
 # Provider 运行：复用 Pi，补齐宿主接线
 
-Chrona 内核管会话、持久消息、队列/恢复、调度、路由授权与运行预算，内置 `notify` 模块管通知预算与送达，`web` 模块管网页；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。M1 保持现有普通会话与构建语义，已完成开发全组检查；[M1 验收记录](chrona-workbench-m1-acceptance.md)已由协调者签署。项目 cwd/日志分离、执行尝试、持久取消和有界详细聊天流已按[冻结 P1 契约](chrona-workbench-p1-contract.md)进入 M2 开发集成。真实 SDK/host 与 fake Pi 子进程/Neovim 的目标闭环已通过，代码成果捕获和客户端审阅仍待集成；不代表 M2 整体验收或真实模型验收。
+Chrona 内核管会话、持久消息、队列/恢复、调度、路由授权与运行预算，内置 `notify` 模块管通知预算与送达，`web` 模块管网页；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。M1 保持现有普通会话与构建语义，已完成开发全组检查；[M1 验收记录](chrona-workbench-m1-acceptance.md)已由协调者签署。项目 cwd/日志分离、执行尝试、持久取消、有界详细聊天流、成果捕获及客户端审阅已纳入 M1–M3 集成，当前范围与限制见 [M3 验收记录](chrona-workbench-m3-acceptance.md)。真实 SDK/host 与 fake Pi 子进程/Neovim 的闭环证据不代表真实模型或生产部署验收。
+
+## Provider、内核与模块的当前边界
+
+Provider 使用同一个 `ProviderAdapter`，提供单次 `complete` 和 Agent 的 `start/inject/abort/done`。内核在 `ProviderRunInput` 显式传入可信 `systemPrompt` 及 `resources: configured | minimal`；模块/用户任务文本仍通过 `prompt` 传递，不能提升为系统指令或授权。Pi 不再内置管家业务提示，也不根据 execution 引用猜测任务用途；execution 引用仅用于事件关联。configured 使用 owner 已配置的资源，minimal 不加载 Chrona 工具及额外技能/扩展，实际工具限制仍由可信执行点落实。
+
+内核保留身份、权限、预算、租约、取消、问答、持久化和停止证据；coding 在自己的执行请求中提供编码工作说明，并管理依赖和成果接受。`provider.complete/wake` 仍为带身份与预算检查的内核系统工具。服务器与设备端均显式提供通用执行边界和所选项目规则；不开放 raw RPC，也不引入 herdr 或新的执行循环。实施范围与验收见[三层实施计划](provider-kernel-module-plan.md)。
 
 ## 项目编码运行
 

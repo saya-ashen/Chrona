@@ -119,23 +119,26 @@ function optionalExtensions(config: PiLaunchConfig, browser: string | null) {
   ];
 }
 function piTools(config: PiLaunchConfig, input: ProviderRunInput, optional: ReturnType<typeof optionalExtensions>) {
-  return [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...(input.execution ? [] : CHRONA_TOOLS), ...optional.flatMap(extension => extension.tools), ...(input.execution ? [] : config.resources.tools), ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
+  return [...new Set(["read", "edit", "write", "grep", "find", "ls", "bash", ...(input.resources === "configured" ? CHRONA_TOOLS : []), ...optional.flatMap(extension => extension.tools), ...(input.resources === "configured" ? config.resources.tools : []), ...(input.extraTools ?? []).filter(name => /^m_[a-z0-9_]{1,62}$/.test(name)),
     // An exact name declares a tool up front; only the pattern keeps deferred module tools behind tool_search (Pi 1.3).
     ...(input.searchTools ? ["tool_search", "m_*"] : [])])].join(",");
 }
+function configuredResourceFiles(config: PiLaunchConfig, input: ProviderRunInput) {
+  return input.resources === "configured" ? [...config.resources.extensions, ...config.resources.skills] : [];
+}
 /** `browser`: the executable this run's browser tool uses (v2-12), or null for no browser tool. */
 export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, prompt: string, browser: string | null = null) {
-  const optional = optionalExtensions(config, browser);
+  const optional = input.resources === "configured" ? optionalExtensions(config, browser) : [];
   const args = ["--mode", "rpc", "--session-dir", resolve(input.sessionDir), "--session-id", input.sessionId ?? randomUUID(),
     "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "-e", config.extension];
   for (const { extension } of optional) args.push("-e", extension);
   // --no-extensions also drops Pi's built-in tool search; deferred module tools need it.
   if (input.searchTools) args.push("-e", "builtin:tool-search");
-  if (!input.execution) {
+  if (input.resources === "configured") {
     for (const extension of config.resources.extensions) args.push("-e", extension);
     for (const skill of config.resources.skills) args.push("--skill", skill);
   }
-  args.push("--tools", piTools(config, input, optional), "--append-system-prompt", `${prompt}\nThis is a ${input.lane} run.`);
+  args.push("--tools", piTools(config, input, optional), "--append-system-prompt", prompt);
   const model = input.model ?? config.options.model;
   if (model) args.push("--model", model);
   if (!config.bwrap) return args;
@@ -143,7 +146,7 @@ export function piArguments(config: PiLaunchConfig, input: ProviderRunInput, pro
   // Parent masks precede child masks; all masks precede the explicit resource/workspace mounts.
   const hidden = [...new Set([homedir(), config.options.dataDir].filter((p): p is string => !!p).flatMap(both))]
     .sort((a, b) => a.split(sep).length - b.split(sep).length);
-  const resources = [config.command, config.extension, ...optional.flatMap(extension => extension.files), ...config.resources.extensions, ...config.resources.skills]
+  const resources = [config.command, config.extension, ...optional.flatMap(extension => extension.files), ...configuredResourceFiles(config, input)]
     .filter((p): p is string => !!p && isAbsolute(p));
   const visible = [...new Set(resources.flatMap(p => existsSync(p) ? [p, realpathSync(p)] : [p]))]
     .filter(p => hidden.some(root => inside(root, p)));

@@ -4,7 +4,7 @@ import type { z } from "zod";
 import type { Prisma } from "@chrona/db";
 import type { moduleManifestSchema } from "@chrona/contracts/steward";
 import { StewardError } from "./errors";
-import { notifyUser } from "./notify-user";
+import { notifyLifecycle } from "./notify-user";
 import { json, type ModuleContext, type ModuleVersion, type BuildReport, type TestReport, type requireModule } from "./module-context";
 import { prepareData, runOffline, type Restore } from "./module-data";
 import { activateIn } from "./module-generation";
@@ -34,7 +34,7 @@ async function migrationFailed(context: ModuleContext, prepared: PreparedMigrati
     if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json({ ...version.report as BuildReport, migration: { ...output, exitCode: output.exitCode || 1 } }) } });
   });
   if (reason === "rollback" && !restore) throw new StewardError("conflict", "模块回滚未完成：数据迁移失败，旧版本和数据保持不变");
-  await notifyUser(db, ports, workspaceId, { module: module.id, app: module.name, level: "now", title: restore ? `模块 ${module.name} 回滚未完成：数据恢复失败` : `模块 ${module.name} 新版本未启用：数据迁移失败`, body: "旧版本继续运行，请检查迁移报告后重新提交。", key: `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}` });
+  await notifyLifecycle(db, ports, workspaceId, `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}`, { kind: "module-migration-failed", app: module.name, restore: !!restore, module: module.id });
 }
 async function runMigration(context: ModuleContext, prepared: PreparedMigration, next: string) {
   const { manifest, from, to, version } = prepared;

@@ -1,5 +1,6 @@
 import type { ApprovalDecision, QqBinding, QqChatPort, QqReplyItem } from "./bot";
 import type { QqAttachment } from "./official";
+import { conversationOptions } from "./conversation";
 
 /** Everything the QQ module asks of Chrona, as routed calls (`chrona.call`): `chat.*`, `approvals.*`, `notify.send`. */
 export type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -30,6 +31,7 @@ export function createRelay({ call, notify, publicUrl, download }: { call: Call;
       attachments.push(await call("chat.attach", { name: file.name, mime: file.mime, base64: Buffer.from(file.bytes).toString("base64") }));
     }
     await call("chat.send", { key: "qq:dm", channel: "chrona_qqbot", text: input.text, "external-id": input.externalId,
+      ...await conversationOptions(call, "qq:dm", input.text),
       ...(input.quotedExternalId ? { "quoted-external-id": `qq:out:${input.quotedExternalId}` } : {}), ...(attachments.length ? { attachments: JSON.stringify(attachments) } : {}) });
     return {};
   };

@@ -3,7 +3,9 @@ import * as outputs from "../system-outputs";
 import { attachmentSchema, providerAnswerSchema, DELIVERY_CHANNELS, SESSION_SOURCES, SESSION_STATUSES } from "@chrona/contracts/steward";
 import { createChat, readChatFile } from "../chat";
 import { createSessions } from "../sessions";
+import { conversationState } from "../conversation-state";
 import { workspaceToday } from "../today";
+import { runtimeHealth } from "../runtime-health";
 import { createProviderControl } from "../provider-channel";
 import { sessionSettings } from "../settings";
 import { CallError, type Json, type SystemModule } from "../module-calls";
@@ -29,17 +31,20 @@ export const chat: SystemModule = {
   tools: [
     tool("send", "Record the user's message in a conversation and run it; returns at once, replies are pushed to the calling module's reply tool.",
       { key: text("Conversation key, e.g. qq:dm"), text: text(), channel: { type: "string", enum: [...DELIVERY_CHANNELS] }, "external-id": text("Transport message id (deduplicates redelivery)"),
-        "quoted-external-id": text("Transport id of the quoted message"), attachments: text("JSON array of attachments from chat.attach") }, ["key", "text", "channel"], { output: z.lazy(() => outputs.chatSendOutput) }),
+        "quoted-external-id": text("Transport id of the quoted message"), attachments: text("JSON array of attachments from chat.attach"), title: text("Entry-proposed initial title; never replaces an existing title"), guidance: text("Entry-owned conversation guidance, treated as untrusted data"), rotation: text("Optional JSON {sessionId,lastActivityAt} from conversation-state; only an unchanged idle session is ended") }, ["key", "text", "channel"], { output: z.lazy(() => outputs.chatSendOutput) }),
+    tool("conversation-state", "Read the active entry conversation, busy state, last reported context usage and stored owner limits. The entry decides title and rotation policy.", { key: text() }, ["key"], { idempotent: true, output: z.lazy(() => outputs.chatConversationStateOutput) }),
     tool("attach", "Store one received file (base64, at most 20 MiB) and return an attachment for chat.send.", { name: text(), mime: text(), base64: text() }, ["name", "mime", "base64"], { output: z.lazy(() => outputs.chatAttachOutput) }),
     tool("new-session", "End the active conversation for a key; the next message starts a new one.", { key: text() }, ["key"], { idempotent: true, output: z.lazy(() => outputs.chatSessionOutput) }),
     tool("file", "Bytes (base64) of a file attached to a message in one of the caller's conversations.", { message: text("Message id"), ref: text("Attachment ref chat/<file>") }, ["message", "ref"], { idempotent: true, output: z.lazy(() => outputs.chatFileOutput) }),
     tool("delivered", "Record the transport id of a reply the caller delivered (for quotes).", { message: text(), "external-id": text() }, ["message", "external-id"], { idempotent: true, output: z.lazy(() => outputs.okOutput) }),
     tool("record", "Record a message the caller delivered outside a reply (e.g. a notification) into its conversation.", { key: text(), channel: { type: "string", enum: [...DELIVERY_CHANNELS] }, text: text(), "external-id": text() }, ["key", "channel", "text", "external-id"], { idempotent: true, output: z.lazy(() => outputs.okOutput) }),
     // Request/response entries (MCP): the conversation gets no entry module, so nothing is pushed and background results are notified.
-    tool("ask", "Send the user's message by session or key (without either, a new conversation) and wait for this run's replies.", { text: text(), session: text("Session id"), key: text("Conversation key") }, ["text"], { output: z.lazy(() => outputs.chatAskOutput) }),
-    tool("sessions", "The user's conversations, most recent first.", { source: { type: "string", enum: [...SESSION_SOURCES] }, status: { type: "string", enum: [...SESSION_STATUSES] } }, [], { idempotent: true, output: z.lazy(() => outputs.chatSessionsOutput) }),
+    tool("ask", "Send the user's message by session or key (without either, a new conversation) and wait for this run's replies.", { text: text(), session: text("Session id"), key: text("Conversation key"), title: text("Entry-proposed initial title"), guidance: text("Entry-owned conversation guidance, treated as untrusted data"), rotation: text("Optional JSON {sessionId,lastActivityAt}") }, ["text"], { output: z.lazy(() => outputs.chatAskOutput) }),
+    tool("sessions", "The user's conversations, most recent first.", { source: { type: "string", enum: [...SESSION_SOURCES] }, status: { type: "string", enum: [...SESSION_STATUSES] }, entries: { type: "boolean", description: "Only sessions with a recorded entry identity" }, limit: { type: "number", description: "1-200; omitted returns all" } }, [], { idempotent: true, output: z.lazy(() => outputs.chatSessionsOutput) }),
     tool("session", "One conversation.", { session: text() }, ["session"], { idempotent: true, output: z.lazy(() => outputs.chatSessionOutput) }),
+    tool("end-idle", "Conditionally end an unchanged active session with no queued or running work. The calling app decides its idle threshold.", { session: text(), "last-activity-at": text("Exact observed lastActivityAt") }, ["session", "last-activity-at"], { idempotent: true, output: z.object({ ended: z.boolean() }) }),
     tool("session-update", "Rename or end a conversation.", { session: text(), title: text(), status: { type: "string", enum: ["ended"] } }, ["session"], { idempotent: true, output: z.lazy(() => outputs.chatSessionOutput) }),
+    tool("runtime", "Runtime health facts, without application presentation.", {}, [], { idempotent: true, output: z.lazy(() => outputs.chatRuntimeOutput) }),
     tool("today", "The user's overview: approvals waiting, the next 7 days of schedules, recent notifications, apps, recent conversations and health.", {}, [], { idempotent: true, output: z.lazy(() => outputs.chatTodayOutput) }),
     tool("messages", "A conversation's recent messages, oldest first.", { session: text(), limit: { type: "number", description: "1-200, default 50" } }, ["session"], { idempotent: true, output: z.lazy(() => outputs.chatMessagesOutput) }),
     tool("runs", "Recent Provider runs (progress, usage, questions waiting for the user), optionally of one conversation.", { session: text() }, [], { idempotent: true, output: z.lazy(() => outputs.chatRunsOutput) }),
@@ -48,7 +53,7 @@ export const chat: SystemModule = {
     tool("answer", "Answer a question a running Provider asked the user.", { interaction: text(), answer: text('JSON {"decision":"submit","value":…} or {"decision":"cancel"}') }, ["interaction", "answer"], { output: z.lazy(() => outputs.okOutput) }),
     tool("cancel", "Stop a running Provider run.", { run: text() }, ["run"], { idempotent: true, output: z.lazy(() => outputs.okOutput) }),
   ],
-  async handle({ ports, workspaceId, caller }, name, args) {
+  async handle({ ports, workspaceId, caller, deadline, run }, name, args) {
     const module = entry(caller), { db } = ports;
     const service = createChat(ports, async () => { await ports.onQueued?.(); });
     // Only conversations this module brings: another entry's conversation is not its to read or mark.
@@ -62,8 +67,10 @@ export const chat: SystemModule = {
         try { if (args.attachments !== undefined) raw = JSON.parse(String(args.attachments)); } catch { throw new CallError("invalid", "attachments must be a JSON array"); }
         const attachments = parseInput(z.array(attachmentSchema.extend({ base64: z.string().optional() })).max(10), raw);
         return json(await service.accept({ workspaceId, key: String(args.key), text: String(args.text), channel: args.channel as (typeof DELIVERY_CHANNELS)[number], attachments,
-          ...(args["external-id"] ? { externalId: String(args["external-id"]) } : {}), ...(args["quoted-external-id"] ? { quotedExternalId: String(args["quoted-external-id"]) } : {}) }, module.moduleId));
+          ...(args["external-id"] ? { externalId: String(args["external-id"]) } : {}), ...(args["quoted-external-id"] ? { quotedExternalId: String(args["quoted-external-id"]) } : {}),
+          ...(args.title !== undefined ? { title: args.title as string } : {}), ...(args.guidance !== undefined ? { guidance: args.guidance as string } : {}), ...(args.rotation !== undefined ? { rotation: parsed(args.rotation, "rotation") as { sessionId: string; lastActivityAt: string } } : {}) }, module.moduleId));
       },
+      "conversation-state": async () => json(await conversationState(ports, workspaceId, String(args.key))),
       attach: async () => {
         const base64 = String(args.base64);
         if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64) || base64.length > 28_000_000) throw new CallError("invalid", "Attachment must be base64, at most 20 MiB");
@@ -71,10 +78,12 @@ export const chat: SystemModule = {
         return json(result.attachments[0]);
       },
       "new-session": async () => json(await createSessions(ports, workspaceId).new({ key: String(args.key) })),
-      ask: async () => json(await service.handleMessage({ workspaceId, channel: "in_app", text: String(args.text), ...(args.session ? { sessionId: String(args.session) } : {}), ...(args.key ? { key: String(args.key) } : {}) })),
-      today: async () => json(await workspaceToday(ports, workspaceId).get()),
-      sessions: async () => json(await createSessions(ports, workspaceId).list({ ...(args.source ? { source: args.source } : {}), ...(args.status ? { status: args.status } : {}) })),
+      ask: async () => json(await service.handleMessage({ workspaceId, channel: "in_app", text: String(args.text), ...(args.session ? { sessionId: String(args.session) } : {}), ...(args.key ? { key: String(args.key) } : {}), ...(args.title !== undefined ? { title: args.title as string } : {}), ...(args.guidance !== undefined ? { guidance: args.guidance as string } : {}), ...(args.rotation !== undefined ? { rotation: parsed(args.rotation, "rotation") as { sessionId: string; lastActivityAt: string } } : {}) })),
+      today: async () => json(await workspaceToday(ports, workspaceId, { deadline, run }).get()),
+      runtime: async () => json(await runtimeHealth(ports, workspaceId)),
+      sessions: async () => json(await createSessions(ports, workspaceId).list({ ...(args.source ? { source: args.source } : {}), ...(args.status ? { status: args.status } : {}), ...(args.entries !== undefined ? { entries: args.entries } : {}), ...(args.limit !== undefined ? { limit: args.limit } : {}) })),
       session: async () => json(await createSessions(ports, workspaceId).get(String(args.session))),
+      "end-idle": async () => json(await createSessions(ports, workspaceId).endIdle(String(args.session), String(args["last-activity-at"]))),
       "session-update": async () => json(await createSessions(ports, workspaceId).update(String(args.session), { ...(args.title !== undefined ? { title: args.title } : {}), ...(args.status !== undefined ? { status: args.status } : {}) })),
       messages: async () => json(await createSessions(ports, workspaceId).messages(String(args.session), args.limit ?? 50)),
       transcript: async () => {

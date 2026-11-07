@@ -3,19 +3,19 @@
   "modules": [
     {
       "name": "web",
-      "repository": "https://github.com/chrona-core/chrona-module-web",
+      "repository": null,
       "branch": "main",
-      "commit": "3124fcfae4cb3d45d31bd5f52db56e1719d3e08e",
+      "commit": "428b634cd09e76d80e0d6b53043bcd8c7511dbe2",
       "bundle": "web.bundle",
-      "bundleSha256": "fffb7b6b01adfa0cf524c3223791715f55484f13d6de17a74b8bbd3fe0b25545"
+      "bundleSha256": "29f79cf756b8f975e3a703c45ab25f2e7e44b2d28e48ab15edf0a6cd0e78c97a"
     },
     {
       "name": "mcp",
-      "repository": "https://github.com/chrona-core/chrona-module-mcp",
+      "repository": null,
       "branch": "main",
-      "commit": "9b2e425aa2073ff3efc5f2945bebcc071bae621f",
+      "commit": "f701d4216cafa115297819fde8b38a1464165a92",
       "bundle": "mcp.bundle",
-      "bundleSha256": "1c8b711078b6db2ce6c44f7da68808948f03ad57e9dca55439bff0b673d8448d"
+      "bundleSha256": "d1a31b48894d03fc55116b9271e65e0bffea674aae3821f4409b8ff52cb1f754"
     },
     {
       "name": "files",
@@ -27,11 +27,11 @@
     },
     {
       "name": "notify",
-      "repository": "https://github.com/chrona-core/chrona-module-notify",
+      "repository": null,
       "branch": "main",
-      "commit": "c75e16cc8f0198bc83ab8e22f6d7f175c5ccf98a",
+      "commit": "c0e0b6a2600bbf6001a52d5d78dc0beaa39f1689",
       "bundle": "notify.bundle",
-      "bundleSha256": "6ee599cfd08977ed10c2ae5d9af9dea9ad1465259b30b8459eb15a9dec24c886"
+      "bundleSha256": "58559b87a4799ea461958135cb81c4bbe179a586bf641f8a0b9768c3c84434ea"
     },
     {
       "name": "events",
@@ -43,11 +43,11 @@
     },
     {
       "name": "qq",
-      "repository": "https://github.com/chrona-core/chrona-module-qq",
+      "repository": null,
       "branch": "main",
-      "commit": "2cb3c4eee9d168c5a4d083bbb096079606dfed8c",
+      "commit": "d4a2d4b26d23eef3f0802767c47860b147892acc",
       "bundle": "qq.bundle",
-      "bundleSha256": "94503e25877e9888a56cc7b1fb9e092d00002284eb8c9d7bb519ad3c4dfa6c5a"
+      "bundleSha256": "d0efc3b9fe7453e62b658955f6d547cfba5a3b6347e65c7969439731c3aad86a"
     },
     {
       "name": "remind",
@@ -67,19 +67,19 @@
     },
     {
       "name": "memory-local",
-      "repository": "https://github.com/chrona-core/chrona-module-memory-local",
+      "repository": null,
       "branch": "main",
-      "commit": "c2353f20718f1b08756bca10259e979592cde3ca",
+      "commit": "2f9e91afaaf1fdde2842d40a8b082c0f0f86f639",
       "bundle": "memory-local.bundle",
-      "bundleSha256": "97005f2c08b4a407454019a3901a54295571b3f4e81cab1cd2bc001b214fc33d"
+      "bundleSha256": "d941de0d5b6a0672a80e1ad248aa5f688557db7c3757b7c31d81ab6f9072e4ab"
     },
     {
       "name": "coding",
-      "repository": "https://github.com/chrona-core/chrona-module-coding",
+      "repository": null,
       "branch": "main",
-      "commit": "086459226c73b6b10894d4d1271f0e298f6ae82d",
+      "commit": "453ae363402e5585f556c23b19ddd91b3c09ad5c",
       "bundle": "coding.bundle",
-      "bundleSha256": "48dec0e1d0267d60394bcd13fd6f4d5496984c6be163cd59804a9c89bcdf8ecc"
+      "bundleSha256": "4f41eb1ac9afc2517d347488e34180323f2c205aaccab3cdf6d58b9581cd93ee"
     },
     {
       "name": "editor",

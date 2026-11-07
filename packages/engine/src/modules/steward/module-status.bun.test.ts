@@ -46,7 +46,7 @@ test("three failures share the manual pause record, including incident and exact
   const incident = await f.audit("module_runtime_incident");
   expect((await f.audit("module_disabled")).details).toEqual({ source: "automatic", reason: "连续三次失败", schedules: [timer.id], incidentId: (incident.details as { id: string }).id });
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "paused", nextAt: null });
-  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send" } })).toBe(1);
+  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "lifecycle" } })).toBe(1);
   await f.status("active");
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active", nextAt: new Date("2026-11-04T13:00:00Z") });
   expect(await f.db.schedule.findUniqueOrThrow({ where: { id: userPaused.id } })).toMatchObject({ status: "paused", nextAt: null });

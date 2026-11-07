@@ -2,6 +2,8 @@ import { chrona, on } from "chrona";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
+import { todayView } from "./today";
+import { conversationOptions, endIdleConversations } from "./conversation";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
@@ -10,6 +12,7 @@ const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+setInterval(() => void endIdleConversations(call).catch(error => console.error(JSON.stringify({ component: "web", event: "idle_cleanup_failed", error: String(error).slice(0, 300) }))), 3600000);
 const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409, conflict: 409, unavailable: 503 };
 const NO_ROUTE = Symbol("no-route");
 type ApiContext = { request: Request; url: URL; path: string[]; body: Args; route: string };
@@ -44,6 +47,7 @@ const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("mod
 } });
 on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
   // Chrona records the caller of every routed call; only the build's smoke start sends a tool event without one.
+  if (event.id === "today") return { result: event.caller ? await todayView(call) : { ignored: "no caller" } };
   if (event.id !== "reply") return { result: event.caller || event.id === "catalog" ? await pages.tool(event.id, event.args, event.caller) : { ignored: "no caller" } };
   send(`data: ${JSON.stringify({ type: "reply", ...event.args })}\n\n`);
   // Pages read the conversation when they open, so a reply with no page open is not lost.
@@ -121,12 +125,12 @@ async function api(request: Request, path: string[]) {
   const url = new URL(request.url), body = request.method === "POST" ? await request.json() as Args : {};
   const context: ApiContext = { request, url, path, body, route: `${request.method} /${path.join("/")}` };
   const routes: Record<string, ApiHandler> = {
-    "GET /today": () => call("chat.today"),
+    "GET /today": () => todayView(call),
     "GET /sessions": () => getSessions(),
     "POST /chat": async () => {
       // An existing conversation continues under its key; without one the first message starts a new conversation.
       const key = body.session ? (await call("chat.session", { session: body.session }) as { key: string }).key : `web:${crypto.randomUUID()}`;
-      return call("chat.send", { key, text: body.text, channel: "in_app" });
+      return call("chat.send", { key, text: body.text, channel: "in_app", ...await conversationOptions(call, key, String(body.text)) });
     },
     "GET /settings": () => getSettings(),
     "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),

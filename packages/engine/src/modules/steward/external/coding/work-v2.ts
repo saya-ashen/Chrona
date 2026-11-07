@@ -7,6 +7,7 @@ import { codingError, readCodingWork, writeCodingWork, remember, type CodingCont
 import { reconcileCodingResult, acceptCodingResult } from "./results";
 import { installWorkspace } from "./workspaces";
 import { dependencyGoal } from "./dependency-context";
+import { codingGoal } from "./instructions";
 import { readRegistry, saveRegistry, findWork, serializeWork, type WorkRegistry, type WorkRecord } from "./work-v2-storage";
 
 function leaves(start: WorkStart): WorkLeafStart[] {
@@ -133,7 +134,7 @@ async function dispatchLeaf(context: CodingContext, registry: WorkRegistry, reco
     if ((error as { code?: string }).code !== "not_found") throw error;
     const { parentWorkId: _parent, dependsOnWorkIds: _dependencies, ...input } = leaf;
     const goal = await dependencyGoal(context, leaf.goal, view.dependencyResults);
-    const dispatch = { ...input, goal };
+    const dispatch = { ...input, goal: codingGoal(goal) };
     if (!executionStartV2Schema.safeParse(dispatch).success || Buffer.byteLength(JSON.stringify(dispatch)) > WORK_LIMITS.requestBytes) throw codingError("too_large", "User goal and dependency results exceed execution request budget; no dependent execution started");
     // Only a validated network start can leave an uncertain admission receipt.
     if (!record.dispatching.includes(leaf.workId)) record.dispatching.push(leaf.workId);

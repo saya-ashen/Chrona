@@ -64,7 +64,7 @@ process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n
 process.stdin.on('end',()=>{setTimeout(()=>{mark('last-write');process.exit(0)},mode==='late-exit'?70:0)});
 `, { mode: 0o755 });
   const options = { command, agentDir, expectedVersion: "0.85.0", chronaExtension: extension, webExtension: web, agentUrl: "http://127.0.0.1:1234/api/steward-agent" };
-  const input: ProviderRunInput = { runId: "fixture", token: "synthetic-run-token", lane: "foreground", cwd, sessionDir: join(cwd, "sessions"), sessionId: null, prompt: "Synthetic subprocess only", deadline: new Date(Date.now() + 3000) };
+  const input: ProviderRunInput = { runId: "fixture", token: "synthetic-run-token", lane: "foreground", cwd, sessionDir: join(cwd, "sessions"), sessionId: null, systemPrompt: "Fixture instructions", resources: "configured", prompt: "Synthetic subprocess only", deadline: new Date(Date.now() + 3000) };
   const commands = async (): Promise<{ type: string }[]> => { try { return (await readFile(join(cwd, "commands.jsonl"), "utf8")).trim().split("\n").filter(Boolean).map(line => JSON.parse(line)); } catch { return []; } };
   const marked = async (name: string) => { try { await readFile(join(cwd, name)); return true; } catch { return false; } };
   return { cwd, agentDir, options, input, commands, marked, provider: createPiProvider(options) };

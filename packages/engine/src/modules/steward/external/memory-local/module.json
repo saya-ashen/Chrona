@@ -7,8 +7,12 @@
   "effects": ["network"],
   "limits": { "virtualMemoryMb": 4096 },
   "secrets": ["memory_embedding"],
-  "contributes": { "memory": { "interface": 1 } },
+  "contributes": { "memory": { "interface": 1, "context": "conversation-context", "afterRun": "conversation-retain" } },
   "tools": [
+    { "name": "conversation-context", "description": "Apply this memory module's conversation recall policy to a kernel-scoped snapshot.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["snapshot"], "properties": { "snapshot": { "type": "string" } } } },
+    { "name": "conversation-retain", "description": "Apply this memory module's conversation retention policy to a kernel-scoped snapshot.", "visibility": ["kernel"], "idempotent": false,
+      "parameters": { "type": "object", "required": ["snapshot"], "properties": { "snapshot": { "type": "string" } } } },
     { "name": "retain", "description": "Store one memory.", "visibility": ["kernel"], "idempotent": false,
       "parameters": { "type": "object", "required": ["content", "source", "at"], "properties": {
         "content": { "type": "string" }, "source": { "type": "string" }, "at": { "type": "string" } } } },

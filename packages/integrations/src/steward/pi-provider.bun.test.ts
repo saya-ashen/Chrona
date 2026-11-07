@@ -78,7 +78,7 @@ process.stdin.on('end',()=>process.exit(0));
   const agentDir = await mkdtemp(join(tmpdir(), "chrona-pi-profile-"));
   const options = { command, agentDir, expectedVersion: "0.85.0", chronaExtension: join(cwd, "bridge.ts"), agentUrl: "http://127.0.0.1:1234/api/steward-agent" };
   const provider = createPiProvider(options);
-  const input: ProviderRunInput = { runId: "run", token: "private-run-token", lane: "foreground", cwd, sessionDir: join(cwd, ".chrona/sessions"), sessionId: "previous-id", prompt: "hello", deadline: new Date(Date.now() + 4000) };
+  const input: ProviderRunInput = { runId: "run", token: "private-run-token", lane: "foreground", cwd, sessionDir: join(cwd, ".chrona/sessions"), sessionId: "previous-id", systemPrompt: "Fixture platform instructions", resources: "configured", prompt: "hello", deadline: new Date(Date.now() + 4000) };
   const commands = async () => (await readFile(join(cwd, "commands.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
   return { cwd, command, agentDir, options, provider, input, commands };
 }
@@ -87,6 +87,23 @@ async function until(check: () => Promise<boolean>) {
   throw new Error("fixture did not reach expected state");
 }
 describe("Pi RPC provider", () => {
+  test("minimal resources and supplied instructions do not depend on an execution identity", async () => {
+    const f = await fixture();
+    const provider = createPiProvider({ ...f.options, webExtension: join(f.cwd, "web.ts") });
+    expect((await provider.start({ ...f.input, resources: "minimal", systemPrompt: "Perform a bounded document task.", executionBudget: { maxToolCalls: 2 } }).done).outcome).toBe("finished");
+    const { args, executionToolBudget } = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+    expect(executionToolBudget).toBe("2");
+    expect(args[args.indexOf("--append-system-prompt") + 1]).toBe("Perform a bounded document task.");
+    const tools = args[args.indexOf("--tools") + 1].split(",");
+    expect(tools).toContain("bash");
+    expect(tools).not.toContain("chrona_reply");
+    expect(tools).not.toContain("web_search");
+    expect(args).not.toContain(join(f.cwd, "web.ts"));
+    expect((await provider.start({ ...f.input, execution: { workId: "work", sessionId: "session", runId: f.input.runId, attemptId: "attempt" } }).done).outcome).toBe("finished");
+    const configured = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args;
+    expect(configured[configured.indexOf("--tools") + 1].split(",")).toContain("chrona_reply");
+    expect(configured).toContain(join(f.cwd, "web.ts"));
+  });
   test("an exact build model overrides defaults and is verified before prompting; retries are disabled", async () => {
     const f = await fixture();
     await writeFile(join(f.agentDir, "settings.json"), '{"retry":{"enabled":true}}');
@@ -239,7 +256,7 @@ test("execution details are bounded/redacted, recover final after saturation and
   const f = await fixture("details"), records: ExecutionEvent[] = [];
   const ref = { workId: "work", sessionId: "coding-session", runId: "run", attemptId: "attempt" };
   let concurrent = 0, maxConcurrent = 0;
-  const result = await f.provider.start({ ...f.input, execution: ref, executionBudget: { maxToolCalls: 5 }, sessionId: null, detail: { async append(event) {
+  const result = await f.provider.start({ ...f.input, systemPrompt: "Fixture execution instructions", resources: "minimal", execution: ref, executionBudget: { maxToolCalls: 5 }, sessionId: null, detail: { async append(event) {
     concurrent++; maxConcurrent = Math.max(maxConcurrent, concurrent);
     await Bun.sleep(2); records.push(event); concurrent--;
   } } }).done;
@@ -255,7 +272,7 @@ test("execution details are bounded/redacted, recover final after saturation and
   expect(JSON.stringify(records)).not.toContain(f.input.token);
   const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
   const prompt = launch.args[launch.args.indexOf("--append-system-prompt") + 1];
-  expect(prompt).not.toContain("personal steward");
+  expect(prompt).toBe("Fixture execution instructions");
   expect(launch.args[launch.args.indexOf("--tools") + 1]).not.toContain("chrona_remember");
   expect(launch.executionToolBudget).toBe("5");
   expect(existsSync(join(f.cwd, "content"))).toBe(false);

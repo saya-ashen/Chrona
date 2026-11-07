@@ -44,7 +44,7 @@ async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: str
   await service.modules.buildPending();
   expect(await db.approval.count()).toBe(0);
   // Start from the module's own notices: its auto-activation digest is covered in modules.bun.test.ts.
-  await db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
+  await db.moduleInvocation.deleteMany({ where: { target: "notify", tool: { in: ["send", "lifecycle"] } } });
   const schedule = await db.schedule.findFirstOrThrow({ where: { moduleId: proposal.moduleId, status: "active" } });
   const moduleId = proposal.moduleId!;
   async function fire(delay = 0) {

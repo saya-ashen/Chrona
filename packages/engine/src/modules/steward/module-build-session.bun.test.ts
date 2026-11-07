@@ -17,7 +17,7 @@ import { sessionTranscript } from "./transcript";
 import { liveRuns } from "./runs";
 import { moduleSupervisor } from "./module-supervisor";
 import * as chatFiles from "./chat";
-import { approvalNoticeBody } from "./notify-user";
+import { approvalNoticeBody } from "./builtin/notify/approval";
 import { startOwnerBuild } from "./owner-build";
 import { runOwnerBuild } from "./owner-build-run";
 import { controlBuild, queueBuild, startBuild } from "./module-build-session";
@@ -186,14 +186,15 @@ for (const scenario of ["active", "approval", "failed", "empty", "long", "latest
   await f.step();
   const buildRun = await f.db.run.findFirstOrThrow({ where: { sessionId: started.sessionId, lane: "build" } });
   const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${buildRun.id}` } });
-  const body = (notice.args as { body: string }).body;
+  const body = JSON.parse((notice.args as { facts: string }).facts).body as string;
   expect(body.endsWith(expected)).toBe(true);
   expect(body.length).toBeLessThanOrEqual(4000);
   expect(body).toStartWith("尚未启用，仍需你确认");
   const report = await f.db.message.findFirstOrThrow({ where: { sessionId: f.session.id, direction: "out" } });
   expect(report.text).toBe(`${reply}\n\n${expected}`);
   const wake = await f.db.run.findFirstOrThrow({ where: { sessionId: f.session.id, trigger: "build" } });
-  expect(wake.prompt).toContain(`${expected}\n\n如果`);
+  expect(wake.prompt).toContain(JSON.stringify(expected).slice(1, -1));
+  expect(wake.prompt).toContain("no new authorization");
 });
 
 test("multi-module build diagnostics require one declared target and accept its id", async () => {
@@ -372,15 +373,14 @@ test("transcripts: the Provider's text, tool calls and clipped results, credenti
   const f = await fixture(), secret = "sk-live-1234567890abcdefXYZ";
   process.env.CHRONA_TEST_API_KEY = "very-secret-value";
   cleanups.push(async () => { delete process.env.CHRONA_TEST_API_KEY; });
-  const dir = join(f.dataDir, "sessions", f.session.id, ".chrona", "sessions");
-  await mkdir(dir, { recursive: true });
-  const lines = [
-    { type: "session", version: 3, id: "s" },
-    { type: "message", timestamp: "2026-10-25T01:00:00Z", message: { role: "user", content: "the whole prompt" } },
-    { type: "message", timestamp: "2026-10-25T01:00:01Z", message: { role: "assistant", content: [{ type: "thinking", thinking: "private reasoning" }, { type: "text", text: "先看看测试" }, { type: "toolCall", name: "bash", arguments: { command: "bun test" } }] } },
-    { type: "message", timestamp: "2026-10-25T01:00:02Z", message: { role: "toolResult", toolName: "bash", isError: true, content: [{ type: "text", text: `key very-secret-value ${secret} ${"x".repeat(3000)}` }] } },
-  ];
-  await writeFile(join(dir, "2026-10-25_s.jsonl"), lines.map(line => JSON.stringify(line)).join("\n") + "\nnot json\n");
+  f.ports.provider!.transcript = async ({ sessionDir }) => {
+    expect(sessionDir).toBe(join(f.dataDir, "sessions", f.session.id, ".chrona", "sessions"));
+    return [
+      { at: "2026-10-25T01:00:01Z", kind: "text", text: "先看看测试" },
+      { at: "2026-10-25T01:00:01Z", kind: "tool", tool: "bash", args: JSON.stringify({ command: "bun test" }) },
+      { at: "2026-10-25T01:00:02Z", kind: "result", tool: "bash", error: true, text: `key very-secret-value ${secret} ${"x".repeat(3000)}` },
+    ];
+  };
   const items = await sessionTranscript(f.ports, f.session.id);
   expect(items.map(item => item.kind)).toEqual(["text", "tool", "result"]);
   expect(items[0]).toMatchObject({ text: "先看看测试" });
@@ -740,7 +740,7 @@ test("offline recovery executes one bounded build and activates its checks-passi
   const active = await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } });
   expect(active).toMatchObject({ status: "active" });
   const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${f.starts[0]!.runId}` } });
-  expect((notice.args as { body: string }).body).toBe(`ready for approval\n\n已启用：mail-sort 版本 ${active.activeHash!.slice(0, 8)}`);
+  expect(JSON.parse((notice.args as { facts: string }).facts).body).toBe(`ready for approval\n\n已启用：mail-sort 版本 ${active.activeHash!.slice(0, 8)}`);
   expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(0);
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
   expect(f.starts).toHaveLength(1);

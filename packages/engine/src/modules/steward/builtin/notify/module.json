@@ -5,8 +5,20 @@
   "keepAlive": true,
   "triggers": [],
   "effects": [],
-  "uses": ["modules.list", "modules.tools"],
+  "uses": ["modules.list", "modules.tools", "activity.records"],
   "tools": [
+    { "name": "lifecycle", "description": "Present a committed kernel runtime fact as a notification; no runtime actions.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["kind", "facts", "key"], "properties": { "kind": { "type": "string", "enum": ["module-paused", "module-activated", "module-build-failed", "module-migration-failed", "schedule-failed", "run-paused", "build-paused", "reflection-retired", "background-result"] }, "facts": { "type": "string" }, "key": { "type": "string" }, "module": { "type": "string" }, "app": { "type": "string" }, "session": { "type": "string" } } } },
+    { "name": "activity", "description": "User-facing activity history from governed audit facts; owns wording, grouping and scan policy.", "visibility": ["kernel", "owner"], "idempotent": true,
+      "parameters": { "type": "object", "properties": { "module": { "type": "string" }, "before": { "type": "string" }, "limit": { "type": "number" } } },
+      "output": { "type": "object", "properties": { "items": { "type": "array", "items": { "type": "object", "properties": {
+        "id": { "type": "string" }, "at": { "type": "string" }, "kind": { "type": "string" }, "module": { "type": ["string", "null"] }, "text": { "type": "string" },
+        "session": { "type": "object", "properties": { "id": { "type": "string" }, "source": { "type": "string", "enum": ["reflect", "build"] } }, "required": ["id", "source"], "additionalProperties": false }
+      }, "required": ["id", "at", "kind", "module", "text"], "additionalProperties": false } }, "before": { "type": ["string", "null"] } }, "required": ["items", "before"], "additionalProperties": false } },
+    { "name": "approval", "description": "Present a kernel-owned approval as a notification; decisions remain in approvals.", "visibility": ["kernel"], "idempotent": true,
+      "parameters": { "type": "object", "required": ["approval", "title", "action", "detail", "preview"], "properties": {
+        "approval": { "type": "string" }, "title": { "type": "string" }, "action": { "type": "string" }, "module": { "type": "string" },
+        "detail": { "type": "string" }, "preview": { "type": "string" } } } },
     { "name": "send", "description": "Queue a notification for the user. The budget decides now, digest or web; a repeated key is dropped.", "visibility": ["modules", "kernel"], "idempotent": true,
       "output": { "anyOf": [{ "type": "object", "properties": { "id": { "type": "string" }, "status": { "type": "string" }, "duplicate": { "type": "boolean" } }, "required": ["id", "status", "duplicate"], "additionalProperties": false }, { "type": "object", "properties": { "error": { "const": "invalid" }, "message": { "type": "string" } }, "required": ["error", "message"], "additionalProperties": false }] },
       "parameters": { "type": "object", "required": ["key", "level", "title", "body"], "properties": {
@@ -29,7 +41,9 @@
     { "name": "list", "description": "Recent notifications, newest first.", "visibility": ["kernel", "owner"], "idempotent": true,
       "output": { "type": "object", "properties": { "items": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" }, "moduleId": { "type": ["string", "null"] }, "sessionId": { "type": ["string", "null"] }, "level": { "type": "string" }, "channel": { "type": ["string", "null"] }, "status": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "format": { "type": "string", "enum": ["text", "markdown"] }, "link": { "type": ["string", "null"] }, "attempts": { "type": "integer" }, "lastError": { "type": ["string", "null"] }, "createdAt": { "type": "string" }, "sentAt": { "type": ["string", "null"] }, "feedback": { "type": ["string", "null"] } }, "required": ["id", "moduleId", "sessionId", "level", "channel", "status", "title", "body", "format", "link", "attempts", "lastError", "createdAt", "sentAt", "feedback"], "additionalProperties": false } } }, "required": ["items"], "additionalProperties": false },
       "parameters": { "type": "object", "properties": { "limit": { "type": "number" } } } },
-    { "name": "status", "description": "Channel readiness and queue counts.", "visibility": ["kernel"], "idempotent": true, "parameters": { "type": "object" } },
+    { "name": "status", "description": "Channel readiness and queue counts.", "visibility": ["kernel", "owner"], "idempotent": true,
+      "output": { "type": "object", "properties": { "chat": { "type": "object", "properties": { "channel": { "type": "string" }, "bound": { "type": "boolean" }, "sentToday": { "type": "integer" } }, "required": ["channel", "bound", "sentToday"], "additionalProperties": false }, "queued": { "type": "integer" }, "failed": { "type": "integer" } }, "required": ["chat", "queued", "failed"], "additionalProperties": false },
+      "parameters": { "type": "object" } },
     { "name": "feedback", "description": "The user's feedback on a notification.", "visibility": ["kernel", "owner"],
       "output": { "anyOf": [{ "type": "object", "properties": { "notification": { "type": "object", "properties": { "id": { "type": "string" }, "moduleId": { "type": ["string", "null"] }, "sessionId": { "type": ["string", "null"] }, "level": { "type": "string" }, "channel": { "type": ["string", "null"] }, "status": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "format": { "type": "string", "enum": ["text", "markdown"] }, "link": { "type": ["string", "null"] }, "attempts": { "type": "integer" }, "lastError": { "type": ["string", "null"] }, "createdAt": { "type": "string" }, "sentAt": { "type": ["string", "null"] }, "feedback": { "type": ["string", "null"] } }, "required": ["id", "moduleId", "sessionId", "level", "channel", "status", "title", "body", "format", "link", "attempts", "lastError", "createdAt", "sentAt", "feedback"], "additionalProperties": false } }, "required": ["notification"], "additionalProperties": false }, { "type": "object", "properties": { "error": { "type": "string" }, "message": { "type": "string" } }, "required": ["error", "message"], "additionalProperties": false }] },
       "parameters": { "type": "object", "required": ["id", "feedback"], "properties": { "id": { "type": "string" }, "feedback": { "type": "string", "enum": ["useful", "not_useful"] } } } },

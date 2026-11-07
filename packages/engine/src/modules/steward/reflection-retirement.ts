@@ -3,7 +3,7 @@ import type { StewardPorts } from "./ports";
 import { setModuleSettings, settingsView } from "./module-overview";
 import { CallError, callSync, kernelOrigin } from "./module-calls";
 import { latestModuleEvolution } from "./module-evolution";
-import { notifyUser } from "./notify-user";
+import { notifyLifecycle } from "./notify-user";
 import { cancelProviderRun } from "./provider-cancel";
 
 const suggestionSchema = z.object({ key: z.string(), title: z.string(), sessionId: z.string(), modules: z.array(z.string()) });
@@ -13,14 +13,6 @@ const note: Note = async (ports, workspaceId, args) => {
   if (z.object({ error: z.string() }).safeParse(result.output).success) throw new Error("mind.note rejected migration");
   return result.output;
 };
-function noticeBody(reflection: boolean, mind: string, healthFixes: boolean | null) {
-  if (!reflection && mind === "enabled" && healthFixes === null) return "你之前关闭了主动反思；当前 mind 版本没有「自主修复」开关，心智唤醒的 Chrona 仍可能自己启动修复构建。如不希望这样，请关闭 mind 的「主动唤醒」，或让 Chrona 在 mind 里加入「自主修复」开关。";
-  if (!reflection && mind === "enabled") return "你之前关闭了主动反思，所以心智的「自主修复」已设为关闭：发现应用故障时只提醒你，不会自己启动修复构建。需要时可在 mind 应用的设置里打开。";
-  if (!reflection || mind === "enabled") return null;
-  return mind === "disabled"
-    ? "主动反思已并入心智，但心智的主动唤醒当前关闭，Chrona 不会自主发现和修复应用故障。需要时在 mind 应用的设置里打开「主动唤醒」。"
-    : "主动反思已移除；当前没有启用的心智应用，Chrona 不会自主发现和修复应用故障。";
-}
 async function sourceArgs(ports: StewardPorts, workspaceId: string, suggestion: z.infer<typeof suggestionSchema>): Promise<Record<string, string>> {
   const name = suggestion.modules[0];
   if (!name) return {};
@@ -85,9 +77,9 @@ export async function retireReflection(ports: StewardPorts, workspaceId: string,
   const { mind, healthFixes, hasMind } = await transferPreferences(ports, workspaceId, reflection);
   const cancelledRuns = await cancelReflectRuns(ports, workspaceId);
   const ledger = hasMind ? await migrateLedger(ports, workspaceId, writeNote) : 0;
-  const body = noticeBody(reflection, mind, healthFixes);
+  const notify = !reflection && mind === "enabled" || reflection && mind !== "enabled";
   await ports.db.$transaction(async tx => {
-    if (body) await notifyUser(tx, ports, workspaceId, { title: "主动反思已并入心智", body, level: "digest", key: id });
+    if (notify) await notifyLifecycle(tx, ports, workspaceId, id, { kind: "reflection-retired", reflection, mind, healthFixes });
     await tx.audit.create({ data: { id, workspaceId, kind: "reflection_retired", actorKey: "chrona", subjectId: workspaceId,
       details: { reflection, mind, healthFixes, ledger, cancelledRuns } } });
   });

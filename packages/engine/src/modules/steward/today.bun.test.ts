@@ -1,107 +1,74 @@
 import { expect, test } from "bun:test";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { todayViewSchema } from "@chrona/contracts/steward";
+import { todayView } from "./builtin/web/today";
 import { testDb } from "./test-db";
-import { entryConversations, memory } from "./memory";
-import { createToday, workspaceToday } from "./today";
-import { moduleContext } from "./module-context";
-import { recordModuleActivation } from "./module-evolution";
-import { recordModuleFailure, recordModuleRecovery, recordModuleOutputMismatch } from "./module-diagnostics";
-import type { StewardPorts } from "./ports";
+import { entryConversations, createSessions } from "./sessions";
+import { memory } from "./memory";
 import { startOwnerBuildAsCaller } from "./owner-build";
+import type { StewardPorts } from "./ports";
 
-async function healthFixture() {
-  const db = testDb(), workspaceId = (await db.workspace.create({ data: { name: "today health" } })).id;
-  const ports: StewardPorts = { db, dataDir: "/unused", now: () => new Date("2026-10-27T04:00:00Z"), publicUrl: null };
-  async function app(name: string, workspace = workspaceId) {
-    const module = await db.module.create({ data: { workspaceId: workspace, name, activeHash: "h" } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
-    const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace), tx, { moduleId: module.id, previousHash: null, hash: "h", generationId: "fixture" }));
-    return { workspaceId: workspace, moduleId: module.id, activationId: activation.activationId, hash: "h" };
-  }
-  const fail = (input: Awaited<ReturnType<typeof app>>) => recordModuleFailure(db, { ...input, now: ports.now(), retry: false,
-    evidence: { phase: "event", reason: "Disconnected", triggerId: "tool:fetch", runId: "r", delivery: "lost", pid: null, exitCode: null, signal: null, stderr: "", virtualMemoryMb: null } });
-  return { db, workspaceId, ports, app, fail };
+const at = "2026-10-27T04:00:00Z";
+const runtime = { at, provider: { name: "fixture", available: true, sandboxed: false, lastError: null }, moduleSandbox: false,
+  queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null };
+function fixture(overrides: Record<string, unknown> = {}) {
+  const calls: [string, Record<string, unknown> | undefined][] = [];
+  const answers: Record<string, unknown> = { "chat.runtime": runtime, "approvals.list": [], "schedules.list": [], "notify.list": { items: [] },
+    "notify.status": { queued: 2, failed: 1 }, "chat.sessions": [], "modules.list": [], "modules.health": { items: [], nextCursor: null }, ...overrides };
+  return { calls, call: async (target: string, args?: Record<string, unknown>) => { calls.push([target, args]); const result = answers[target]; if (result instanceof Error) throw result; return result; } };
 }
-
-test("today problems share current health facts, exclude recovered and other workspaces, and stay read-only", async () => {
-  const f = await healthFixture();
-  try {
-    const unresolved = await f.app("unresolved"), mismatch = await f.app("mismatch"), recovered = await f.app("recovered");
-    await f.fail(unresolved); await f.fail(recovered);
-    await recordModuleRecovery(f.ports, { ...recovered, triggerId: "tool:fetch", runId: "success" });
-    await recordModuleOutputMismatch(f.db, { ...mismatch, tool: "fetch", callId: "call", issues: ["result"], now: f.ports.now() });
-    const foreign = (await f.db.workspace.create({ data: { name: "foreign" } })).id;
-    await f.fail(await f.app("foreign", foreign));
-    const before = await f.db.audit.count();
-    const problems = (await workspaceToday(f.ports, f.workspaceId).get()).problems;
-    expect(problems).toEqual([
-      { module: "unresolved", moduleId: unresolved.moduleId, incidentStatus: "unresolved", contractFailures: 0, nextAction: expect.any(String), since: f.ports.now().toISOString() },
-      { module: "mismatch", moduleId: mismatch.moduleId, incidentStatus: null, contractFailures: 1, nextAction: null, since: null },
-    ]);
-    expect(await f.db.audit.count()).toBe(before);
-  } finally { await f.db.$disconnect(); }
+test("web owns overview filtering, ordering and horizon, retaining runtime health and hiding wake instructions", async () => {
+  const schedule = { status: "active", mode: "wake", text: "PRIVATE INSTRUCTION", until: null, label: "User label", nextAt: "2026-10-27T05:00:00Z" };
+  const f = fixture({ "schedules.list": [
+    { ...schedule, id: "far", nextAt: "2026-11-10T05:00:00Z" }, { ...schedule, id: "paused", status: "paused" },
+    { ...schedule, id: "past", nextAt: "2026-10-26T05:00:00Z" }, { ...schedule, id: "expired", until: "2026-10-27T04:30:00Z" },
+    { ...schedule, id: "later", nextAt: "2026-10-27T06:00:00Z" }, { ...schedule, id: "first" },
+    { ...schedule, id: "unnamed", label: null, nextAt: "2026-10-27T07:00:00Z" },
+  ] });
+  const result = todayViewSchema.parse(await todayView(f.call));
+  expect(result.upcoming.map(item => item.scheduleId)).toEqual(["first", "later", "unnamed"]);
+  expect(result.upcoming[0]!.label).toBe("User label");
+  expect(result.upcoming[2]!.label).toBeNull();
+  expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
+  expect(result.health).toMatchObject({ queuedNotifications: 2, failedNotifications: 1 });
+  expect(f.calls).toContainEqual(["schedules.list", { timers: true }]);
+  expect(f.calls).toContainEqual(["chat.sessions", { entries: true, limit: 20 }]);
+  expect(f.calls.some(([target]) => target === "chat.today")).toBe(false);
 });
-
-test("today upcoming excludes static polling before the limit, keeping runtime timers and wakes", async () => {
-  const f = await healthFixture();
-  try {
-    const module = await f.app("calendar");
-    const at = f.ports.now(), nextAt = new Date(at.getTime() + 60_000);
-    for (let i = 0; i < 51; i++) await f.db.schedule.create({ data: { workspaceId: f.workspaceId, moduleId: module.moduleId, mode: "module", triggerId: `poll-${i}`, text: "poll", label: "轮询", rule: { kind: "every", minutes: 15 }, nextAt, createdBy: "chrona" } });
-    for (const [mode, label, payload] of [["module", "申请截止前两天", {}], ["wake", "准备申请", undefined]] as const) {
-      await f.db.schedule.create({ data: { workspaceId: f.workspaceId, moduleId: mode === "module" ? module.moduleId : null, mode, text: label, label, ...(payload ? { payload } : {}), rule: { kind: "at", at: new Date(at.getTime() + 120_000).toISOString() }, nextAt: new Date(at.getTime() + 120_000), createdBy: "chrona" } });
-    }
-    const view = await workspaceToday(f.ports, f.workspaceId).get();
-    expect(view.upcoming.map(item => [item.mode, item.label])).toEqual([["module", "申请截止前两天"], ["wake", "准备申请"]]);
-  } finally { await f.db.$disconnect(); }
+test("web follows health cursors, excludes recovered facts and bounds problems", async () => {
+  const f = fixture();
+  const call = async (target: string, args?: Record<string, unknown>) => target === "modules.health" ? {
+    items: [{ module: args?.cursor ? "second" : "first", moduleId: args?.cursor ? "m2" : "m1", open: true, incident: { status: "unresolved", lastAt: args?.cursor ? "2026-10-27T05:00:00Z" : at }, contractFailureCount: 0, nextAction: "检查" },
+      { module: "recovered", moduleId: "m3", open: false, incident: null, contractFailureCount: 0, nextAction: null }],
+    nextCursor: args?.cursor ? null : "next",
+  } : f.call(target, args);
+  expect((await todayView(call)).problems.map(item => item.module)).toEqual(["second", "first"]);
 });
-
-test("today tolerates a failed optional health facts read", async () => {
-  const f = await healthFixture();
-  try {
-    const today = createToday({ ...f.ports, workspaceId: f.workspaceId }, {
-      provider: async () => ({ name: "unconfigured", available: false, sandboxed: false, lastError: null }), moduleSandbox: () => false,
-      notifications: { list: async () => [], status: async () => null },
-    }, async () => [], async () => { throw new Error("health read failed"); });
-    expect((await today.get()).problems).toEqual([]);
-  } finally { await f.db.$disconnect(); }
+test("optional module health failures keep the page available; required reads fail visibly", async () => {
+  const optionalFailure = await todayView(fixture({ "modules.health": new Error("unavailable"), "notify.status": new Error("unavailable"), "notify.list": new Error("unavailable") }).call);
+  expect(optionalFailure.problems).toEqual([]);
+  expect(optionalFailure.updates).toEqual([]);
+  await expect(todayView(fixture({ "approvals.list": new Error("unavailable") }).call)).rejects.toThrow("unavailable");
 });
-
-test("conversation views and memory admission recognize entry manifests, not built-in names", async () => {
+test("conversation reads recognize entry manifests and bound entry sessions without application-name lists", async () => {
   const db = testDb(), workspaceId = (await db.workspace.create({ data: { name: "entries" } })).id;
-  const ports: StewardPorts = { db, dataDir: "/unused", now: () => new Date(), publicUrl: null };
+  const ports: StewardPorts = { db, dataDir: "/unused", now: () => new Date(at), publicUrl: null };
   const included: string[] = [];
   try {
-    for (const [name, uses, entry] of [
-      ["new-entry", ["chat.send", "memory.status"], true],
-      ["agent-entry", ["*"], true],
-      ["approval-entry", ["approvals.resolve", "memory.status"], true],
-      ["web", ["approvals.request", "memory.status"], false],
-      ["qq", ["notify.send", "memory.status"], false],
-      ["mcp", ["memory.status"], false],
-    ] as const) {
-      const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [...uses], tests: ["test.ts"] });
+    for (const [name, uses, entry] of [["new-entry", ["chat.send", "memory.status"], true], ["agent-entry", ["*"], true],
+      ["approval-entry", ["approvals.resolve", "memory.status"], true], ["web", ["approvals.request", "memory.status"], false]] as const) {
       const module = await db.module.create({ data: { workspaceId, name, activeHash: "h" } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest, status: "approved", source: "builtin", intent: {}, report: {} } });
-      // The source contract still has legacy labels; the entryModuleId is authoritative.
+      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
       const session = await db.session.create({ data: { workspaceId, key: `${name}:test`, source: "web", entryModuleId: module.id } });
       if (entry) included.push(session.id);
-      const result = memory.handle({ ports, workspaceId, caller: { kind: "module", module: name, moduleId: module.id, hash: "h" } }, "status", {});
+      const caller = { kind: "module" as const, module: name, moduleId: module.id, hash: "h" };
+      const result = memory.handle({ ports, workspaceId, caller }, "status", {});
       if (entry) expect(await result).toMatchObject({ available: false });
       else await expect(result).rejects.toMatchObject({ code: "forbidden" });
-      // Invalid build input reaches validation only for entries, irrespective of their names.
-      const build = startOwnerBuildAsCaller(ports, workspaceId, { kind: "module", module: name, moduleId: module.id, hash: "h" }, {});
-      await expect(build).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
+      await expect(startOwnerBuildAsCaller(ports, workspaceId, caller, {})).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
     }
-    await expect(startOwnerBuildAsCaller(ports, workspaceId, { kind: "owner", via: null }, {})).rejects.toMatchObject({ name: "ZodError" });
-    await db.session.create({ data: { workspaceId, key: "old", source: "web" } });
     await db.session.create({ data: { workspaceId, key: "build", source: "build" } });
     expect((await db.session.findMany({ where: { workspaceId, ...await entryConversations(db, workspaceId) } })).map(row => row.id).sort()).toEqual(included.sort());
-    const today = createToday({ db, workspaceId, now: ports.now }, {
-      provider: async () => ({ name: "unconfigured", available: false, sandboxed: false, lastError: null }), moduleSandbox: () => false,
-      notifications: { list: async () => [], status: async () => null },
-    });
-    expect((await today.get()).sessions.map(row => row.id).sort()).toEqual(included.sort());
+    expect((await createSessions(ports, workspaceId).list({ entries: true })).map(row => row.id).sort()).toEqual(included.sort());
+    expect(await createSessions(ports, workspaceId).list({ entries: true, limit: 1 })).toHaveLength(1);
   } finally { await db.$disconnect(); }
 });

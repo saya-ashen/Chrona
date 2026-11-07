@@ -2,14 +2,15 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { todayViewSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { createSchedules } from "./schedules";
 import { createRuns } from "./runs";
 import { createTools } from "./tools";
-import { createToday } from "./today";
+import { createSessions } from "./sessions";
 import type { StewardPorts } from "./ports";
 import { notice } from "./test-notices";
+import { endIdleConversations as endBuilds } from "./builtin/web/conversation";
+import { endIdleConversations as endMcp } from "./builtin/mcp/conversation";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "core" } })).id;
@@ -57,8 +58,19 @@ test.each([
 ] as const)("a %s conversation idle %d days (queued run=%p) is %s", async (source, days, queued, expected) => {
   const build = await db.session.create({ data: { workspaceId, key: `${source}:${days}:${queued}`, source, originSessionId: source === "build" ? sessionId : null, lastActivityAt: new Date(ports.now().getTime() - days * 86_400_000) } });
   if (queued) await createRuns(ports, workspaceId).enqueue({ sessionId: build.id, lane: source === "build" ? "build" : "foreground", trigger: source === "build" ? "build" : "message", label: source, prompt: "p" });
-  await createRuns(ports, workspaceId).endIdleBuilds();
+  const sessions = createSessions(ports, workspaceId);
+  await (source === "build" ? endBuilds : endMcp)(async (target, args) => target === "chat.sessions" ? sessions.list(args) : sessions.endIdle(String(args.session), String(args["last-activity-at"])), ports.now());
   expect((await db.session.findUniqueOrThrow({ where: { id: build.id } })).status).toBe(expected);
+});
+test("idle-end intent cannot close stale, foreign, or running conversations", async () => {
+  const sessions = createSessions(ports, workspaceId), observed = (await sessions.get(sessionId)).lastActivityAt;
+  expect(await sessions.endIdle(sessionId, new Date(Date.parse(observed) - 1).toISOString())).toEqual({ ended: false });
+  const foreign = (await db.workspace.create({ data: { name: "foreign" } })).id;
+  expect(await createSessions(ports, foreign).endIdle(sessionId, observed)).toEqual({ ended: false });
+  await createRuns(ports, workspaceId).enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "pending" });
+  await createRuns(ports, workspaceId).claimNext("foreground");
+  expect(await sessions.endIdle(sessionId, observed)).toEqual({ ended: false });
+  expect((await sessions.get(sessionId)).status).toBe("active");
 });
 test("schedules validate origin workspace and list by origin", async () => {
   const schedules = createSchedules(ports, workspaceId), input = { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Future work" };
@@ -69,14 +81,11 @@ test("schedules validate origin workspace and list by origin", async () => {
   await schedules.cancel(schedule.id);
   expect(await schedules.fireDue()).toBe(0);
 });
-test("today projects sessions and agenda without leaking wake instructions", async () => {
+test("entry session reads and explicit timer reads remain available to application projections", async () => {
   // Today lists conversations of entry modules, recognized by manifest.
   const web = await db.module.create({ data: { workspaceId, name: "web", activeHash: "h" } });
   await db.moduleVersion.create({ data: { moduleId: web.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "web", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
   await createSchedules(ports, workspaceId).create(sessionId, { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "PRIVATE INSTRUCTION", label: "User label" });
-  const today = createToday({ db, workspaceId, now: ports.now }, { provider: async () => ({ name: "fixture", available: true, sandboxed: true, lastError: null }), moduleSandbox: () => false,
-    notifications: { list: async () => [], status: async () => null } });
-  const result = todayViewSchema.parse(await today.get());
-  expect(result.sessions[0]?.id).toBe(sessionId); expect(result.upcoming[0]?.label).toBe("User label");
-  expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
+  expect((await createSessions(ports, workspaceId).list({ entries: true, limit: 20 }))[0]?.id).toBe(sessionId);
+  expect((await createSchedules(ports, workspaceId).list(undefined, true))[0]?.label).toBe("User label");
 });

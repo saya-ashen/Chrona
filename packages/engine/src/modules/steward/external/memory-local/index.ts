@@ -1,5 +1,6 @@
 import { chrona, on } from "chrona";
 import { join } from "node:path";
+import { conversationMemory, type ConversationSnapshot } from "./conversation";
 
 /**
  * Chrona's optional external memory provider: the kernel's memory system module calls retain, recall and forget;
@@ -36,6 +37,12 @@ const tools: Record<string, (args: Record<string, unknown>) => Promise<unknown>>
   },
   forget: async args => ({ forgotten: (await memory()).forget(text(args.id, "id", 200)) }),
 };
+const conversation = conversationMemory({
+  recall: args => tools.recall!(args) as Promise<{ items: { id: string; content: string; at?: string }[] }>,
+  retain: args => tools.retain!(args),
+});
+tools["conversation-context"] = args => conversation.context(JSON.parse(String(args.snapshot)) as ConversationSnapshot);
+tools["conversation-retain"] = args => conversation.retain(JSON.parse(String(args.snapshot)) as ConversationSnapshot);
 on("tool", async (event: { id: string; args: Record<string, unknown>; caller?: { kind: string } }) => {
   // Only the kernel's memory module calls these; the build's smoke start sends a tool event without a caller.
   if (!event.caller) return { result: { ignored: "no caller" } };
