@@ -181,18 +181,18 @@ async function checkAdapter() {
 function checkDetailSpecs() {
   assert.equal(selectedTab("unknown"), "overview"); assert.equal(selectedTab("permissions", true), "overview"); assert.equal(selectedTab("settings", true, "session"), "overview");
   for (const [type, value, checked, expected] of [["boolean", "on", true, true], ["boolean", "", false, false], ["number", "2.5", false, 2.5], ["text", "文本", false, "文本"]] as const) assert.equal(settingValue(type, value, checked), expected);
-  const overview = { app: { id: "app/1", name: "example", origin: "external", capabilities: { remove: true, enable: true, disable: true, build: true }, status: "active", health: {}, activeHash: "abc", runs: [], versions: [] }, settings: { declarations: {}, values: {} }, permissions: { capabilities: [], grants: [], approvals: [], secrets: [], model: null }, activity: [] };
+  const overview = { tools: [], app: { id: "app/1", name: "example", origin: "external", capabilities: { remove: true, enable: true, disable: true, build: true }, status: "active", health: {}, activeHash: "abc", runs: [], versions: [] }, settings: { declarations: {}, values: {} }, permissions: { capabilities: [], grants: [], approvals: [], secrets: [], model: null }, activity: [] };
   for (const builtin of [false, true]) for (const status of ["active", "paused", "migrating"]) {
     const spec = detailSpec({ overview: { ...overview, app: { ...overview.app, builtin, status, origin: builtin ? "builtin" : "external", capabilities: { remove: !builtin, disable: true, enable: true, build: !builtin } } } }, { id: "app/1", tab: "overview", session: "" });
     const nodes = Object.values(spec.elements);
-    assert.equal(nodes.some(node => node.type === "AppRemoval"), !builtin && status !== "migrating");
-    const control = nodes.find(node => node.type === "SystemAction");
+    assert.equal(nodes.some(node => node.type === "AppRemoval" || node.type === "SystemAction"), false);
+    const managed = Object.values(appsSpec({ apps: [{ ...overview.app, status, origin: builtin ? "builtin" : "external", capabilities: { remove: !builtin, disable: true, enable: true } }], systemApps: [], catalog: [] }).elements);
+    assert.equal(managed.some(node => node.type === "AppRemoval"), !builtin && status !== "migrating");
+    const control = managed.find(node => node.type === "SystemAction");
     if (status === "migrating") assert.equal(control, undefined);
     else {
-      assert.equal(control!.props.label, status === "active" ? "暂停" : "恢复");
-      assert.equal(control!.props.tool, status === "active" ? "module-disable" : "module-enable");
-      assert.deepEqual(control!.props.args, { id: "example" });
-      assert.match(String(control!.props.confirm), /example/);
+      assert.equal(control!.props.label, status === "active" ? "暂停" : "恢复"); assert.equal(control!.props.tool, status === "active" ? "module-disable" : "module-enable");
+      assert.deepEqual(control!.props.args, { id: "example" }); assert.match(String(control!.props.confirm), /example/);
     }
   }
   const fallback = detailSpec({ overview }, { id: "app/1", tab: "unknown", session: "" });
@@ -220,10 +220,10 @@ function checkListSpecs() {
   for (const systemApps of [[], [{ name: "chat", description: "系统对话" }]]) {
     const spec = appsSpec({ apps: [{ id: "app /", name: "示例", builtin: true, origin: "builtin", description: "应用说明", health: { runtime: { state: "running" }, incident: { status: "unresolved" } } }], systemApps });
     const serialized = JSON.stringify(spec);
-    assert.match(serialized, /内置 · 尚未启用 · 运行中 · 未解决，需要处理 · 应用说明/);
+    assert.match(serialized, /内置 · 尚未启用 · 运行中 · 业务就绪情况：模块尚未报告 · 未解决，需要处理 · 应用说明/);
     assert.ok(serialized.includes("/apps/app%20%2F"));
-    assert.equal(Object.values(spec.elements).some(item => item.props.title === "内核"), !!systemApps.length);
-    if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 自身的一部分"]) assert.ok(serialized.includes(expected));
+    assert.equal(Object.values(spec.elements).some(item => item.props.title === "内核接口"), !!systemApps.length);
+    if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 的系统能力"]) assert.ok(serialized.includes(expected));
   }
   assert.match(JSON.stringify(appsSpec({})), /加载中/);
 }

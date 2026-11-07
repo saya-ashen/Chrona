@@ -101,6 +101,7 @@ const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unkn
   "GET diagnostics": module => call("modules.diagnostics", { module }),
   "GET permissions": module => call("modules.permissions", { module }),
   "GET overview": module => call("modules.overview", { module }),
+  "POST refresh-health": module => call("modules.refresh-health", { module }),
   "POST settings": (module, body) => call("modules.settings-set", { module, values: JSON.stringify(body.values ?? {}) }),
   "POST disable": module => call("modules.disable", { module, reason: "用户在网页操作" }),
   "POST enable": module => call("modules.enable", { module, reason: "用户在网页操作" }),

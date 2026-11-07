@@ -14,7 +14,9 @@ export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleI
   | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
-  | { kind: "activated"; id: "activated"; firedAt: string };
+  | { kind: "activated"; id: "activated"; firedAt: string }
+  /** Diagnostic only: report readiness; do not send messages, modify projects or issue paid requests. */
+  | { kind: "health"; id: "health"; firedAt: string };
 type EventResult = { result?: unknown };
 type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
@@ -39,8 +41,13 @@ export class ModelError extends Error {
 const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
 const socket = createConnection(process.env.CHRONA_SOCKET ?? "/chrona/chrona.sock");
 let stopped = false, queue = Promise.resolve();
+const disconnectHandlers = new Set<() => void>();
+/** Release module-owned resources when the kernel connection is lost; this does not prove cleanup to the kernel. */
+export function onDisconnect(handler: () => void) { disconnectHandlers.add(handler); }
 function fail() {
+  if (stopped) return;
   stopped = true;
+  for (const handler of disconnectHandlers) handler();
   for (const call of pending.values()) call.reject(new Error("Chrona disconnected"));
   pending.clear();
 }
@@ -74,7 +81,8 @@ socket.on("data", (chunk: Buffer) => {
     parts = []; size = 0; start = end + 1;
     try {
       const message = JSON.parse(text);
-      if (message.event) queue = queue.then(() => event(message)).catch(() => { socket.destroy(); });
+      if (message.ping === true && typeof message.id === "string") send({ id: message.id, result: {} });
+      else if (message.event) queue = queue.then(() => event(message)).catch(() => { socket.destroy(); });
       else {
         const call = pending.get(message.id);
         if (!call) continue;
@@ -116,6 +124,9 @@ export const chrona = {
    */
   call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
+  /** Report this process's readiness after a read-only self-check, at startup/config changes and before expiry. Never include credentials or private data. */
+  reportHealth: (report: { status: "ready" | "needs_configuration" | "degraded" | "unknown"; summary: string; nextAction?: string; validForSeconds?: number }) =>
+    chrona.call<{ reportedAt: string; expiresAt: string }>("modules.report-health", report),
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
   /**

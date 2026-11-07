@@ -55,6 +55,8 @@ const proposalOutput = z.object({
   report: z.object({
     tests: z.array(buildTestOutput), git: z.object({ commit: gitCommitOutput, tree: gitCommitOutput }).strict().optional(),
     continuity: z.object({ status: buildStatusOutput, reason: z.string().optional(), fromSchema: z.number().nullable(), toSchema: z.number(), migrated: z.boolean(),
+      tests: z.array(buildTestOutput).optional(),
+      // Historical stored build reports remain readable; current builds never produce synthetic effects/key probes.
       effects: z.array(z.discriminatedUnion("type", [
         z.object({ type: z.literal("notify_user"), key: z.string(), level: z.enum(["now", "digest"]), title: z.string(), body: z.string() }).strict(),
         z.object({ type: z.literal("wake_provider"), key: z.string(), prompt: z.string() }).strict(),

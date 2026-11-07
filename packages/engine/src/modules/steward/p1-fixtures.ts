@@ -41,6 +41,7 @@ export function createFakeExecutionPorts(options: {
     commands.set(key, body); return !!prior;
   }
   const ports: ExecutionPorts = {
+    async admitControl() { throw new Error("Agent control is outside the P1 client fixture"); },
     async start(p, input) {
       const key = JSON.stringify([principalKey(p), "start", input.commandKey]);
       const previous = receipts.get(key);

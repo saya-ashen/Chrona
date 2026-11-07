@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moduleSupervisor } from "./module-supervisor";
 import { effectiveSettings, moduleCapabilitiesSchema, moduleOriginSchema, moduleManifestSchema, moduleSettingSchema, settingValueValid, tierTarget, type ModuleSetting } from "@chrona/contracts/steward";
 import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
 import type { StewardPorts } from "./ports";
@@ -11,6 +12,7 @@ import { createNotificationsView, forwardSettings } from "./notify-user";
 import { createModules } from "./modules";
 import { listActivity } from "./activity";
 import { systemApps } from "./system-apps";
+import { localCapabilities, runtimeCapabilitySchema } from "./local-capability-view";
 import { audit } from "./audit";
 import { moduleCapabilities } from "./module-identity";
 
@@ -61,6 +63,7 @@ async function activeManifest(ports: StewardPorts, workspaceId: string, name: st
 export async function settingsView(ports: StewardPorts, workspaceId: string, name: string) {
   const settings = await workspaceSettings(ports, workspaceId), system = listSystemModules().find(module => module.name === name);
   if (system) return system.settings ? { declarations: system.settings.declarations, values: system.settings.read(settings) } : { declarations: {}, values: {} };
+  if (localCapabilities().some(module => module.name === name)) return { declarations: {}, values: {} };
   const found = await activeManifest(ports, workspaceId, name);
   if (!found) throw new CallError("not_found", `Module ${name} not found`);
   const declarations = found.manifest?.settings ?? {};
@@ -96,25 +99,22 @@ export async function setModuleSettings(ports: StewardPorts, workspaceId: string
     await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...settings, moduleSettings: { ...all, [moduleName]: { ...all[moduleName], ...values } } } as never } });
     await audit(tx, { workspaceId, actor: "user", kind: "module_settings_updated", subjectId: found.module.id, details: { keys: Object.keys(values) } });
   });
+  await moduleSupervisor(ports).refreshHealth(found.module.id).catch(() => {});
   return json(await settingsView(ports, workspaceId, name));
 }
 /** `modules.overview`: everything about one app for its page, in one read (v2-23). */
 export async function moduleOverview(ports: StewardPorts, workspaceId: string, name: string, governance: Pick<CallOrigin, "deadline" | "run"> = {}) {
   const activity = async (module: string) => (await listActivity(ports, workspaceId, { module, limit: 30 }, governance)).items;
-  if (listSystemModules().some(module => module.name === name)) {
-    const app = await systemApps(ports, workspaceId, name) as { tools: unknown[] };
-    const system = listSystemModules().find(module => module.name === name)!;
-    return json({ kind: "system", ...app, tools: system.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: "input" in tool && tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool),
-      outputSchema: tool.output ? z.toJSONSchema(tool.output as z.ZodType) : null, examples: "examples" in tool ? tool.examples ?? null : null,
-      sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null, idempotent: tool.idempotent,
-      retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", visibility: tool.visibility })),
+  if ([...listSystemModules(), ...localCapabilities()].some(module => module.name === name)) {
+    const app = await systemApps(ports, workspaceId, name);
+    return json({ kind: "system", ...app,
       settings: await settingsView(ports, workspaceId, name), activity: await activity(name) });
   }
   const api = createModules(ports, workspaceId), found = await activeManifest(ports, workspaceId, name);
   if (!found) throw new CallError("not_found", `Module ${name} not found`);
   const app = (await api.list() as { id: string }[]).find(item => item.id === found.module.id) ?? null;
   const [diagnostics] = await api.diagnostics(found.module.name) as unknown[];
-  return json({ kind: "app", app, tools: (found.manifest?.tools ?? []).filter(tool => tool.visibility.includes("owner") || tool.visibility.includes("modules")).map(tool => ({ name: tool.name, description: tool.description,
+  return json({ kind: "app", app, tools: (found.manifest?.tools ?? []).map(tool => ({ name: tool.name, description: tool.description,
     inputSchema: normalizedToolInputSchema(tool), outputSchema: tool.output ?? null, examples: tool.examples ?? null, sideEffects: tool.sideEffects ?? null, errors: tool.errors ?? null,
     idempotent: tool.idempotent, retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically.", visibility: tool.visibility })),
     permissions: await modulePermissions(ports, workspaceId, found.module.name), settings: await settingsView(ports, workspaceId, found.module.name), diagnostics: diagnostics ?? null, activity: await activity(found.module.name) });
@@ -137,12 +137,12 @@ export const permissionsSchema = z.object({
 });
 export const moduleOverviewOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("app"), app: z.record(z.string(), z.unknown()).nullable(), tools: z.array(overviewToolSchema), permissions: permissionsSchema, settings: moduleSettingsOutputSchema, diagnostics: moduleDiagnosticsOutputSchema.element.nullable(), activity: z.array(activitySchema).max(30) }),
-  z.object({ kind: z.literal("system"), origin: moduleOriginSchema, capabilities: moduleCapabilitiesSchema, name: z.string(), description: z.string(), sessions: z.string().nullable(),
+  z.object({ kind: z.literal("system"), origin: moduleOriginSchema, capabilities: moduleCapabilitiesSchema, name: z.string(), description: z.string(), sessions: z.string().nullable(), runtime: runtimeCapabilitySchema.optional(),
     tools: z.array(overviewToolSchema),
     work: z.array(z.object({ id: z.string(), title: z.string().nullable(), status: z.string(), createdAt: z.string(), endedAt: z.string().nullable() })),
     settings: moduleSettingsOutputSchema, activity: z.array(activitySchema).max(30) }),
 ]);
-export const MODULE_OVERVIEW_DOCUMENTATION = "One read for an app's page. kind \"app\": app is the modules.list item including origin, lifecycle capabilities and each version's Git provenance (null if not listed), tools are owner-visible declared interfaces with the same schemas and descriptive metadata as modules.reference, permissions is modules.permissions, settings the app's declared settings with effective values, diagnostics the modules.diagnostics entry or null, activity the latest 30 activity.list items. kind \"system\": the system app entry with its tools, work conversations, settings and activity. settings.values hold the stored value when it still fits the active declaration, else the default; both are {} when nothing is declared. Unknown name yields not_found. Examples are synthetic fixtures, never production data.";
+export const MODULE_OVERVIEW_DOCUMENTATION = "One read for an app's page. kind \"app\": app is the modules.list item including origin, lifecycle capabilities and each version's Git provenance (null if not listed), tools are owner-visible declared interfaces with the same schemas and descriptive metadata as modules.reference, permissions is modules.permissions, settings the app's declared settings with effective values, diagnostics the modules.diagnostics entry or null, activity the latest 30 activity.list items. kind \"system\": the system app entry with its tools, work conversations, settings and activity; runtime identifies a release-trusted local capability, with registration/backend configuration facts and configuration guidance only, never execution authority or credentials. settings.values hold the stored value when it still fits the active declaration, else the default; both are {} when nothing is declared. Unknown name yields not_found. Examples are synthetic fixtures, never production data.";
 export const MODULE_SETTINGS_SET_DOCUMENTATION = "values is a JSON object string of setting name to value; a partial object changes only those names. Every name and value is checked against the active version's declarations (system modules: their own) before anything is saved; one bad entry rejects the whole call with invalid (\"Unknown setting X\", \"<label>: value is not allowed\", values not an object, system module without settings). Unknown module or no active version yields not_found. On success returns the settings re-read after saving, same shape as overview.settings; compare it with what was sent. Audited by name only (module_settings_updated).";
 const fixtureSettings = () => moduleSettingsOutputSchema.parse({ declarations: { interval: { type: "number", label: "Interval (minutes)", default: 30, min: 5, max: 1440 }, enabled: { type: "boolean", label: "Enabled", default: true } }, values: { interval: 60, enabled: true } });
 export function moduleSettingsExamples() { return [json(fixtureSettings()), json(moduleSettingsOutputSchema.parse({ declarations: {}, values: {} }))]; }

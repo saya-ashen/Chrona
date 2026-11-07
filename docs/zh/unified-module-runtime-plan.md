@@ -138,7 +138,7 @@ V1 直接实现最终本机结构，不为保持中间状态可用添加桥接�
 - `local-provider.ts` 将本机 Provider 包装为受信任模块。启动在同一事务核对已领取 Run 的 token、workspace、cwd、lane、deadline，并先保存固定 Run ID 的启动 Audit；内存重复请求复用原操作，改变正文拒绝。进程重建或操作释放后保留持久启动记录，重复启动返回 unknown，不重做副作用。问答使用短期 opaque callback 引用，不能把函数或 AbortSignal 装进协议；已取消的信号与问答到达竞态也能中断原 controller。
 - `local-workspace.ts` 负责本机 prepare/release、项目规则、成果捕获／读取和 receipt-first cleanup。物理准备在数据库写事务外完成；锁只通过受治理 release 释放。Run／attempt 授权与停止状态仍由内核验证。
 - `local-content.ts` 负责本机附件 put/read/capture 与受权内容引用读取；调用者显式传递当前 workspace；现有文件边界和大小限制由宿主执行。平台 SQLite、版本／迁移副本和受信启动状态不依赖内容模块。
-- 本机宿主当前使用受信任进程内投递；调用仍经过同一路由。既有应用模块继续使用真实 SDK/socket。未新增远端传输，也不宣称现有设备协议已成为通用宿主。
+- V1 初始实现的本机能力采用受信任进程内投递。2026-11-07 后续拆分已把 `agent` 移为真实内置 SDK/socket 应用，内部持有 Pi 进程控制与回执；内核通过短请求调用并保留授权与治理。`runtime-callback`、workspace/content 能力暂保持进程内。详见 [Agent 内置应用](agent-builtin-application.md)。未新增远端传输，也不宣称现有设备协议已成为通用宿主。
 - 模型正文、run token、附件字节、问答正文和宿主路径使用 unrecorded 通道；通用 Invocation 只保存有界元数据和错误类别。未确认的启动／最终结果记录 unknown；适配器异常正文被替换，模型 timeout 保留可判定类别。
 - 本机能力所有工具声明输入与输出 schema；local 输出不符在生产环境同样拒绝，不仅记录警告。附件读取使用有界 buffer 与 no-follow 文件描述符；外部符号链接、目录逃逸、超量和增长超限拒绝。
 - 首轮开发验证（2026-11-07，最终收口复验见下）：`bun run typecheck`、`bun run lint`、`bun run check:boundaries` 通过；新增能力与 Run 鉴权文件单独 ESLint `--max-warnings 0` 通过。扩展定向 **113 pass / 0 fail / 710 assertions**；完整 Bun **1445 pass / 7 skip / 0 fail**；API **64 pass / 3 skip / 0 fail**。类型／lint／边界保留既有 doctor 复杂度和跨包测试警告，没有新增错误或 lint 债务。

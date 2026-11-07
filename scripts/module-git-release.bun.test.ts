@@ -24,11 +24,11 @@ async function fixture() {
   return { root, resourcesRoot, seedDir, ...base };
 }
 
-test("eleven independent unpublished seeds clone offline at their exact commits and unchanged sources reuse history", async () => {
+test("independent unpublished seeds clone offline at their exact commits and unchanged sources reuse history", async () => {
   const f = await fixture();
   try {
     const first = await prepareModuleGitRelease(f);
-    expect(first.modules).toHaveLength(11);
+    expect(first.modules).toHaveLength(buildArtifacts.moduleGit.modules.length);
     const plan = JSON.parse(await readFile(join(f.seedDir, "publish-plan.json"), "utf8"));
     expect(plan.modules[0].proposedRepository).toBe("chrona-core/chrona-module-web");
     for (const entry of first.modules) {

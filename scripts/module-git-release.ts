@@ -65,7 +65,7 @@ async function writeJson(path: string, value: unknown) {
 function validateReleaseIdentity(entry: ModuleGitReleaseEntry, names: Set<string>) {
   if (!buildArtifacts.moduleGit.modules.some(module => module.name === entry.name) || names.has(entry.name) || entry.branch !== "main" || !oid.test(entry.commit) || entry.bundle !== `${entry.name}.bundle` || !/^[a-f0-9]{64}$/.test(entry.bundleSha256) || (entry.repository !== null && entry.repository !== `https://github.com/chrona-core/chrona-module-${entry.name}`)) throw new Error("Invalid module Git release identity");
 }
-async function readLock(seedDir: string): Promise<ReleaseLock> {
+async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock> {
   const raw: unknown = JSON.parse(await readFile(join(seedDir, "lock.json"), "utf8"));
   if (typeof raw !== "object" || raw === null || !("version" in raw) || raw.version !== 1 || !("modules" in raw) || !Array.isArray(raw.modules)) throw new Error("Invalid module Git release lock");
   const lock = raw as ReleaseLock, names = new Set<string>();
@@ -73,7 +73,7 @@ async function readLock(seedDir: string): Promise<ReleaseLock> {
     validateReleaseIdentity(entry, names);
     names.add(entry.name);
   }
-  if (names.size !== buildArtifacts.moduleGit.modules.length) throw new Error("Module Git release lock is incomplete");
+  if (!preparing && names.size !== buildArtifacts.moduleGit.modules.length) throw new Error("Module Git release lock is incomplete");
   return lock;
 }
 
@@ -141,7 +141,7 @@ export async function prepareModuleGitRelease(input: { root: string; resourcesRo
   await writeFile(join(input.seedDir, "LICENSE"), await readFile(join(input.root, "LICENSE")));
   await writeFile(join(input.seedDir, "THIRD-PARTY-NOTICES.txt"), await readFile(join(input.root, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt")));
   let previous: ReleaseLock | undefined;
-  try { previous = await readLock(input.seedDir); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  try { previous = await readLock(input.seedDir, true); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const modules: ModuleGitReleaseEntry[] = [], plan: PublishPlan = { version: 1, modules: [] };
   for (const module of buildArtifacts.moduleGit.modules) {
     const entry = await prepareModuleSeed({ ...input, hostCommit, hostTimestamp }, module, previous?.modules.find(entry => entry.name === module.name));

@@ -46,7 +46,7 @@ test("identity is a database fact; built-ins update while removal, installation 
   for (const operation of MODULE_OPERATIONS) {
     for (const name of BUILTIN_MODULE_NAMES) {
       const builtin = { ...fixtures.builtin.row, name };
-      if (["remove", "install"].includes(operation)) expect(() => assertModuleOperation(builtin, operation)).toThrow("Built-in");
+      if (["remove", "install"].includes(operation) || name === "agent" && ["build", "propose", "group", "activate", "update", "rollback"].includes(operation)) expect(() => assertModuleOperation(builtin, operation)).toThrow("Built-in");
       else expect(() => assertModuleOperation(builtin, operation)).not.toThrow();
     }
     for (const name of [...KERNEL_MODULE_NAMES, "rescue"]) expect(() => assertModuleOperation({ name, builtin: true }, operation)).toThrow("reserved identity");

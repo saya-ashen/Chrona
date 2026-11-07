@@ -47,6 +47,19 @@ test("channel drops malformed lines, validates calls and event replies, then rec
     expect(f.channel.diagnostics()).toEqual(["Malformed JSON", "Invalid module call", "Invalid module call", "Invalid event reply"]);
   } finally { await f.close(); }
 });
+test.each([true, false])("SDK ping validates protocol without a business event; valid=%s", async valid => {
+  const f = await fixture();
+  try {
+    const response = f.channel.ping(1000);
+    const receipt = response.then(() => "connected", () => "invalid");
+    const message = await f.next() as { id: string; ping: boolean; event?: unknown };
+    expect(message.ping).toBe(true); expect(message.event).toBeUndefined();
+    f.socket.write(JSON.stringify({ id: message.id, result: valid ? {} : { result: "unexpected" } }) + "\n");
+    expect(await receipt).toBe(valid ? "connected" : "invalid");
+    expect(f.calls).toEqual([]);
+  } finally { await f.close(); }
+});
+
 test("channel preserves known typed handler errors and rejects unknown codes", async () => {
   const f = await fixture();
   try {

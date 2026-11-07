@@ -8,7 +8,9 @@ export const isReservedModuleName = (name: string) => kernelNames.has(name) || b
 /** For persisted apps ONLY Module.builtin decides origin; source/manifest/hash never do. */
 export function moduleIdentity(row: { name: string; builtin: boolean }, options: { configurable?: boolean; removable?: boolean } = {}) {
   const origin: ModuleOrigin = row.builtin ? "builtin" : "external";
-  return { origin, capabilities: moduleCapabilities(origin, options) };
+  const capabilities = moduleCapabilities(origin, options);
+  if (row.builtin && row.name === "agent") for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove", "install"] as const) capabilities[operation] = false;
+  return { origin, capabilities };
 }
 export function moduleCapabilities(origin: ModuleOrigin, options: { configurable?: boolean; removable?: boolean } = {}): ModuleCapabilities {
   const external = origin === "external", app = origin !== "kernel";
@@ -25,7 +27,7 @@ const dynamic = new Set<ModuleOperation>(["build", "propose", "group", "activate
 /** Guard again inside the action/approval transaction. Trusted release activation must not call this dynamic guard. */
 export function assertModuleOperation(row: { name: string; builtin: boolean }, operation: ModuleOperation) {
   if (kernelNames.has(row.name) || (LOCAL_CAPABILITY_NAMES as readonly string[]).includes(row.name) || (RESERVED_ENTRY_NAMES as readonly string[]).includes(row.name) || (!row.builtin && builtinNames.has(row.name))) throw new ModuleIdentityError("conflict", "module_identity_conflict", `Module ${row.name} conflicts with a reserved identity`);
-  if (dynamic.has(operation) && row.builtin && (!builtinNames.has(row.name) || operation === "remove" || operation === "install")) throw new ModuleIdentityError("forbidden", "immutable_module", `Built-in ${row.name} cannot ${operation}`);
+  if (dynamic.has(operation) && row.builtin && (row.name === "agent" || !builtinNames.has(row.name) || operation === "remove" || operation === "install")) throw new ModuleIdentityError("forbidden", "immutable_module", `Built-in ${row.name} cannot ${operation}`);
 }
 export async function assertExternalModule(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, operation: ModuleOperation) {
   const row = await tx.module.findFirst({ where: { workspaceId, id: moduleId } });

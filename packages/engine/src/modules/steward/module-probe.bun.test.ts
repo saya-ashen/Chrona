@@ -1,49 +1,22 @@
 import { expect, test } from "bun:test";
-import type { ModuleManifest } from "@chrona/contracts/steward";
-import type { KeyProbe, ModuleContext } from "./module-context";
-import { keyProbePreview, probeKeys, smokeRun } from "./module-probe";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
+import type { ModuleContext } from "./module-context";
+import { smokeRun } from "./module-probe";
 import { testModuleProcess } from "./module-test-process";
 
-const schedule = { id: "daily", schedule: { kind: "daily" as const, time: "09:00" } };
-const manifest = (triggers: ModuleManifest["triggers"]): ModuleManifest => ({ activated: false, content: false, secrets: [], packages: [], name: "reminder", entry: "index.ts", triggers, tools: [], keepAlive: false, effects: [], uses: ["notify.send"], tests: ["test.ts"], params: {}, settings: {}, data: { schema: 1 } });
-function context(keyFor: (firedAt: string) => string[] | null, inputs: unknown[] = []) {
-  const peer = testModuleProcess(async (event, call) => {
-    inputs.push(event);
-    const keys = keyFor(event.trigger.firedAt);
-    if (!keys) throw new Error("boom");
-    for (const key of keys) await call("call", { target: "notify.send", args: { key, level: "now", title: "t", body: "b" }, mode: "async", key } as never);
-    return {};
-  });
-  return { ports: { now: () => new Date("2026-10-21T01:00:00Z"), sandbox: { available: true, isolated: true, startModule: peer.startModule } } } as unknown as ModuleContext;
-}
-test.each<[string, (at: string) => string[] | null, KeyProbe]>([
-  ["constant key", () => ["sent"], { status: "repeated", keys: ["call:notify.send:sent"] }],
-  ["date key", at => [`sent:${at.slice(0, 10)}`], { status: "passed" }],
-  ["no effects", () => [], { status: "skipped", reason: "no effects on both fires" }],
-  ["entry failure", () => null, { status: "skipped", reason: "entry failed or invalid output" }],
-])("schedule probe: %s", async (_name, keyFor, expected) => {
-  const inputs: unknown[] = [];
-  expect(await probeKeys(context(keyFor, inputs), "/staging", manifest([schedule]))).toEqual(expected);
-  if (expected.status !== "skipped" || keyFor("") !== null) expect(inputs).toMatchObject([
-    { trigger: { id: "daily", kind: "schedule", firedAt: "2026-10-21T01:00:00.000Z" } },
-    { trigger: { firedAt: "2026-10-22T01:00:00.000Z" } },
-  ]);
+test("startup check connects without invoking tools or schedules that need configuration", async () => {
+  let invoked = false;
+  const peer = testModuleProcess(async () => { invoked = true; throw new Error("Configuration and caller required"); });
+  const context = { ports: { sandbox: { available: true, startModule: peer.startModule } } } as unknown as ModuleContext;
+  const manifest = moduleManifestSchema.parse({ name: "configured", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [{ name: "send", description: "Requires credentials", parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
+  expect(await smokeRun(context, "/staging", manifest)).toEqual([]);
+  expect(invoked).toBe(false);
+  expect(peer.processes).toHaveLength(1);
+  expect(peer.processes[0]!.socket.destroyed).toBe(true);
 });
-test("modules without schedule triggers are not probed", async () => {
-  expect(await probeKeys(context(() => ["x"]), "/staging", manifest([]))).toEqual({ status: "skipped", reason: "no schedule trigger" });
-});
-test("review card keeps the key-probe shape", () => {
-  expect(keyProbePreview({ status: "repeated", keys: ["notify_user:sent"] })).toContain("⚠ 幂等键检查");
-  expect(keyProbePreview({ status: "passed" })).toBe("幂等键检查：passed\n");
-  expect(keyProbePreview(undefined)).toBe("");
-});
-test.each([false, true])("smoke sends every trigger and tool; failure=%s", async failed => {
-  const inputs: unknown[] = [], m = manifest([schedule, { ...schedule, id: "second" }]);
-  m.tools = [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {}, required: [] }, visibility: ["provider", "owner"], idempotent: false }];
-  const errors = await smokeRun(context(() => failed ? null : [], inputs), "/staging", m);
-  expect(errors).toHaveLength(failed ? 3 : 0);
-  expect(inputs).toMatchObject([
-    { trigger: { kind: "schedule", id: "daily" } }, { trigger: { kind: "schedule", id: "second" } },
-    { trigger: { kind: "tool", id: "lookup", args: {} } },
-  ]);
+
+test("startup check still rejects a module that cannot start", async () => {
+  const context = { ports: { sandbox: { available: true, startModule() { throw new Error("Broken entry"); } } } } as unknown as ModuleContext;
+  const manifest = moduleManifestSchema.parse({ name: "broken", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], triggers: [] });
+  expect(await smokeRun(context, "/staging", manifest)).toEqual(["Module startup or SDK connection failed"]);
 });

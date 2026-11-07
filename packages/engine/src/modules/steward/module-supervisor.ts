@@ -4,7 +4,7 @@ import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, typ
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { moduleModelSettings } from "./settings";
-import { registerBuiltins } from "./module-builtin";
+import { registerBuiltins, upgradeAgentRelease } from "./module-builtin";
 import { createModuleChannel } from "./module-channel";
 import { diagnosticText, recordModuleFailure, recordModuleRecovery, type ModuleFailureEvidence } from "./module-diagnostics";
 import { currentModuleEvolution } from "./module-evolution";
@@ -13,6 +13,8 @@ import { moduleContext } from "./module-context";
 import { rollbackFailedStart } from "./module-generation";
 import { resolveBuiltinRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
+import { isAgentApplication } from "./agent-application";
+import { projectReadiness, type ModuleReadinessReport, type ModuleReadinessRecord } from "./module-readiness";
 
 type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 /** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
@@ -34,6 +36,11 @@ function staged(error: unknown, stage: DeliveryStage) {
   const base: Error & { stage?: DeliveryStage } = error instanceof Error ? error : new Error(String(error));
   return Object.assign(base, { stage: base.stage ?? stage });
 }
+function isHandlerRejection(error: unknown, event: ModuleEvent) {
+  const rejection = error as { stage?: DeliveryStage; code?: string };
+  if (rejection.stage !== "handler") return false;
+  return event.trigger.kind === "health" || !!rejection.code && !["internal", "failed", "unknown"].includes(rejection.code);
+}
 type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
 type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
@@ -46,6 +53,7 @@ type Instance = {
   exit?: { code: number | null; signal: string | null };
   failureEvidence?: ModuleFailureEvidence;
   failureRecorded?: boolean;
+  readiness?: ModuleReadinessRecord;
 };
 const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
 const isClosing = (instance: Instance) => instance.closing;
@@ -180,7 +188,7 @@ class ModuleSupervisor {
     const module = await ports.db.module.findUniqueOrThrow({ where: { id: instance.moduleId } });
     if (module.activeHash !== instance.hash || module.status !== "active") throw new Error("Module identity changed before start");
     let codeDir = join(ports.dataDir, "platform/store", instance.hash);
-    assertModuleOperation(module, "activate");
+    assertModuleOperation(module, "enable");
     const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
     if (version.status !== "approved") throw new Error("Module version is not approved");
     if (module.builtin && version.source === "builtin" && /^[a-f0-9]{64}$/.test(instance.hash)) {
@@ -189,6 +197,11 @@ class ModuleSupervisor {
       codeDir = release.codeDir;
     }
     return codeDir;
+  }
+  private async agentHost(instance: Instance) {
+    if (!this.ports.agentApplication || instance.manifest.name !== "agent") return undefined;
+    if (!await isAgentApplication(this.ports, instance, instance.scope.workspaceId)) return undefined;
+    return this.ports.agentApplication;
   }
   private async spawn(instance: Instance, sandbox: NonNullable<StewardPorts["sandbox"]>) {
     const { ports, timers } = this, codeDir = await this.codeDir(instance);
@@ -204,7 +217,9 @@ class ModuleSupervisor {
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const httpDir = instance.manifest.listen ? join(instance.dir, "http") : undefined;
     if (httpDir) await mkdir(httpDir, { mode: 0o700 });
-    const process = sandbox.startModule!({ codeDir, dataDir, ...(contentDir ? { contentDir } : {}), ...(httpDir ? { httpDir } : {}), ...(ports.publicUrl ? { env: { CHRONA_PUBLIC_URL: ports.publicUrl } } : {}), entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), ...(instance.manifest.limits ? { memoryMb: instance.manifest.limits.virtualMemoryMb } : {}) });
+    const agent = await this.agentHost(instance);
+    const startModule = agent ? agent.startModule : sandbox.startModule!;
+    const process = startModule({ codeDir, dataDir, contentDir, httpDir, env: { CHRONA_PUBLIC_URL: ports.publicUrl ?? "", ...agent?.env }, entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), memoryMb: instance.manifest.limits?.virtualMemoryMb });
     instance.process = process;
     // Install exit observers before yielding after startModule returns.
     return this.connect(instance, process);
@@ -282,6 +297,17 @@ class ModuleSupervisor {
       await this.failure(instance, String(error).slice(0, 2000)); await this.restartCurrent(instance);
     }
     finally { await this.finishBusy(instance); }
+    await this.refreshHealth(moduleId).catch(() => {});
+  }
+  async refreshHealth(moduleId: string) {
+    const module = await this.ports.db.module.findUnique({ where: { id: moduleId } });
+    if (!module?.activeHash || module.status !== "active") return;
+    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
+    if (instance) instance.readiness = undefined;
+    const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
+    if (!moduleManifestSchema.safeParse(version?.manifest).data?.healthCheck) return;
+    const now = this.ports.now().toISOString();
+    await this.deliver(moduleId, module.activeHash, { trigger: { kind: "health", id: "health", firedAt: now }, now, params: {} });
   }
   async reconcile() {
     if (this.stopped) return;
@@ -337,6 +363,9 @@ class ModuleSupervisor {
     if (dynamic) {
       // v2-24: only the module's own timers deliver schedule events.
       if (!await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires its own timer"), "unavailable");
+    } else if (trigger.kind === "health") {
+      if (!manifest.healthCheck) throw staged(new Error("Module has no health handler"), "unavailable");
+      return;
     } else if (trigger.kind === "activated" || trigger.kind === "call_result") return;
     else if (trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
   }
@@ -375,7 +404,8 @@ class ModuleSupervisor {
       await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 1, error: outputError.slice(0, 1000) } });
       return;
     }
-    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: reply.result } });
+    await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: instance.manifest.name === "agent" ? {} : reply.result } });
+    if (event.trigger.kind === "health") return;
     this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
     await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
@@ -405,8 +435,8 @@ class ModuleSupervisor {
       return reply;
     } catch (error) {
       if ((error as { staleActivation?: boolean }).staleActivation) throw error;
-      const rejection = error as { stage?: DeliveryStage; code?: string };
-      if (rejection.stage === "handler" && rejection.code && !["internal", "failed", "unknown"].includes(rejection.code)) {
+      if (event.trigger.kind === "health") instance.readiness = undefined;
+      if (isHandlerRejection(error, event)) {
         // A validated application rejection (invalid input, conflict, permission, capacity)
         // completes this call; the SDK process remains healthy and can serve the next one.
         await this.ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 1, error: diagnosticText(error instanceof Error ? error.message : String(error), 1000) } });
@@ -438,6 +468,19 @@ class ModuleSupervisor {
     }
     return null;
   }
+  reportHealth(moduleId: string, hash: string, report: ModuleReadinessReport) {
+    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
+    if (!instance || instance.hash !== hash || instance.closing || instance.retiring || !instance.channel?.connected()) throw new Error("Module process is not current");
+    const now = this.ports.now();
+    instance.readiness = { ...report, summary: diagnosticText(report.summary, 300), ...(report.nextAction ? { nextAction: diagnosticText(report.nextAction, 300) } : {}), reportedAt: now.toISOString(), expiresAt: new Date(now.getTime() + report.validForSeconds * 1000).toISOString() };
+    return { reportedAt: instance.readiness.reportedAt, expiresAt: instance.readiness.expiresAt };
+  }
+  readiness(moduleId: string, hash: string | null) {
+    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
+    const report = instance?.hash === hash ? instance.readiness : undefined;
+    const available = !this.stopped && !!instance?.channel?.connected() && !instance.closing && !instance.retiring;
+    return projectReadiness(report, available, this.ports.now());
+  }
   status(moduleId: string, hash: string | null, keepAlive: boolean) {
     if (!this.started || this.stopped) return { state: "unobserved" as const, pid: null };
     if (this.restarts.has(moduleId)) return { state: "backoff" as const, pid: null };
@@ -449,7 +492,7 @@ class ModuleSupervisor {
     if (this.started) return;
     this.stopped = false; this.started = true;
     for (const workspace of await this.ports.db.workspace.findMany()) {
-      try { await registerBuiltins(this.ports, workspace.id); }
+      try { await registerBuiltins(this.ports, workspace.id); await upgradeAgentRelease(this.ports, workspace.id); }
       catch (error) { console.error(JSON.stringify({ component: "module-supervisor", event: "builtin.registration_failed", workspaceId: workspace.id, error: diagnosticText(String(error), 1000) })); }
     }
     const loop = async () => { try { await this.reconcile(); } finally { if (!this.stopped) this.poll = this.timers.setTimeout(() => { void loop().catch(() => {}); }, 30_000); } };
@@ -479,5 +522,5 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
   const runtime = new ModuleSupervisor(ports, timers, idleMs, backoffMs);
   // Preserve the closure API: consumers may extract methods without a receiver.
   return { deliver: runtime.deliver.bind(runtime), reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
-    status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
+    status: runtime.status.bind(runtime), refreshHealth: runtime.refreshHealth.bind(runtime), reportHealth: runtime.reportHealth.bind(runtime), readiness: runtime.readiness.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
 }

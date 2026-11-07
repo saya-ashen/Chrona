@@ -1,0 +1,801 @@
+{
+  "name": "agent",
+  "description": "Agent 执行：管理 Pi 进程、执行状态、补充指令与取消。随 Chrona 发行；应用通过普通调用提交工作并管理自己的操作。",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "healthCheck": true,
+  "limits": {
+    "virtualMemoryMb": 8192
+  },
+  "uses": [
+    "runtime-callback.event",
+    "runtime-callback.agent-admit",
+    "runtime-callback.agent-settle",
+    "modules.report-health"
+  ],
+  "triggers": [],
+  "effects": [
+    "network"
+  ],
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test-entry.ts"
+  ],
+  "tools": [
+    {
+      "name": "health",
+      "description": "Agent health: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "supportsRunModel": {
+                "type": "boolean"
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "sandboxed": {
+                "type": "boolean"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "supportsRunModel",
+              "complete",
+              "available",
+              "sandboxed",
+              "error"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "supportsRunModel": {
+                "type": "boolean"
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "sandboxed": {
+                "type": "boolean"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "supportsRunModel",
+              "complete",
+              "available",
+              "sandboxed",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "start",
+      "description": "Agent start: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "work-id": {
+            "type": "string"
+          },
+          "project-ref": {
+            "type": "string"
+          },
+          "command-key": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "timeout-ms": {
+                "type": "number"
+              },
+              "max-tool-calls": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "timeout-ms",
+              "max-tool-calls"
+            ]
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operationId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operationId"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "description": "Agent status: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "finished",
+                          "failed",
+                          "timed_out",
+                          "unavailable"
+                        ]
+                      },
+                      "sessionId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "error": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "outcome",
+                      "sessionId",
+                      "error"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "failure": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "operationId",
+              "outcome",
+              "failure"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              },
+              "execution": {
+                "type": "object",
+                "properties": {
+                  "workId": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "runId": {
+                    "type": "string"
+                  },
+                  "attemptId": {
+                    "type": "string"
+                  },
+                  "projectRef": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  "cancelRequested": {
+                    "type": "boolean"
+                  },
+                  "stopConfirmed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "workId",
+                  "sessionId",
+                  "runId",
+                  "attemptId",
+                  "projectRef",
+                  "status",
+                  "cancelRequested",
+                  "stopConfirmed"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "operationId",
+              "execution"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "inject",
+      "description": "Agent inject: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "command-key": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "accepted"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "accepted"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "abort",
+      "description": "Agent abort: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "command-key": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "requested": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "requested"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "requested": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "requested"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "release",
+      "description": "Agent release: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "released": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "released"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "released": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "released"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "complete",
+      "description": "Agent complete: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command-key": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "max-output-tokens": {
+            "type": "number"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operationId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operationId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operationId"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "completion",
+      "description": "Agent completion: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "outputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "inputTokens",
+                      "outputTokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "failure": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "result",
+              "failure"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "outputTokens": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "inputTokens",
+                      "outputTokens"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "failure": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "result",
+              "failure"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "transcript",
+      "description": "Agent transcript: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "visibility": [
+        "kernel",
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "input": {
+            "type": "string",
+            "description": "Kernel-only encoded request"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "array",
+            "items": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "workId": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    },
+                    "attemptId": {
+                      "type": "string"
+                    },
+                    "seq": {
+                      "type": "integer"
+                    },
+                    "at": {
+                      "type": "string"
+                    },
+                    "payload": {}
+                  },
+                  "required": [
+                    "workId",
+                    "sessionId",
+                    "runId",
+                    "attemptId",
+                    "seq",
+                    "at",
+                    "payload"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "cursor": {
+                "type": "string"
+              },
+              "highWatermark": {
+                "type": "integer"
+              },
+              "gap": {
+                "type": "boolean"
+              },
+              "snapshotRequired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "events",
+              "cursor",
+              "highWatermark",
+              "gap",
+              "snapshotRequired"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  ]
+}

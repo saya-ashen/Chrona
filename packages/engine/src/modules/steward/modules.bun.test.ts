@@ -15,7 +15,7 @@ import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "./test-notices";
-import { modulesListOutput } from "./system-outputs";
+import { modulesListOutput, modulesUpstreamOutput } from "./system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 import { approvalNoticeBody } from "./builtin/notify/approval";
@@ -36,7 +36,7 @@ async function fixture(credentials = true) {
       if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null }; // key probe: module-probe.bun.test.ts
       calls.push(input);
       expect(input.network).toBe(false);
-      expect(await readdir(input.dataDir)).toEqual([]);
+      if (!(await stat(join(input.dataDir, "nested")).catch(() => null))) expect(await readdir(input.dataDir)).toEqual([]);
       expect(await readFile(join(input.codeDir, "module.json"), "utf8")).toContain("price-watch");
       return { status: fail ? "failed" : "succeeded", output: "public stdout", error: fail ? "public stderr" : null, exitCode: fail ? 1 : 0 };
     } },
@@ -475,59 +475,45 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
   }
 });
 
-test("same-schema continuity runs on a disposable copy, previews effects and never executes them", async () => {
-  const f = await dataFixture(true), effects = [
-    { type: "notify_user", key: "copy", level: "now", title: "Would notify", body: "Only a preview" },
-    { type: "wake_provider", key: "copy", prompt: "Must not run" },
-  ];
+test("continuity runs author tests on disposable data without invoking business handlers", async () => {
+  const f = await dataFixture(true);
   let copy = "";
   f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts") return f.original(input);
-    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
+    expect(input.entry).toBe("test.ts");
+    if (!(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
     copy = input.dataDir;
     expect(copy).not.toBe(f.live);
-    expect(input).toMatchObject({ entry: "index.ts", network: false, timeoutMs: 60_000, maxOutputBytes: 64 * 1024, input: { trigger: { id: "daily", kind: "schedule", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: { threshold: 2 } } });
+    expect(input.network).toBe(false);
     expect(await readFile(join(copy, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
-    await writeFile(join(copy, "nested/state"), "new state");
-    return { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
+    await writeFile(join(copy, "nested/state"), "test mutation");
+    return { status: "succeeded", exitCode: 0, output: "author checked copied data", error: null };
   };
   const result = await f.propose();
   expect(result.status).toBe("pending_review");
-  // Previews show the keys as sent: scoped to the event (daily:<firedAt>:<key>), as the SDK does.
-  const scope = `daily:${f.ports.now().toISOString()}:`;
-  expect(result.report).toMatchObject({ continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false, effects: effects.map(effect => ({ ...effect, key: scope + effect.key })) } });
+  expect(result.report).toMatchObject({ continuity: { status: "passed", migrated: false } });
+  expect(JSON.stringify(result.report)).not.toContain('"effects"');
+  expect(JSON.stringify(result.report)).not.toContain("author checked copied data");
+  expect(modulesUpstreamOutput.shape.proposal.safeParse(result).success).toBe(true);
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
-  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
-  expect(preview).toContain("数据 schema：1 → 1；无需迁移");
-  expect(preview).toContain("连续性：passed");
-  expect(preview).toContain("按当前数据新版本会产生的 effects");
-  expect(preview).toContain("Would notify");
   expect(await f.db.run.count()).toBe(0);
-  expect((await notices(f.db)).length).toBe(0);
-  expect(await f.db.moduleRun.count()).toBe(1);
 });
 
-test.each(["crash", "json", "shape", "throw"])("continuity %s rejects and wakes provider with public output only", async kind => {
+test.each([false, true])("author tests rejecting copied data block activation; throws=%s", async throws => {
   const f = await dataFixture();
   let copy = "";
   f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts") return f.original(input);
-    if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
+    expect(input.entry).toBe("test.ts");
+    if (!(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
     copy = input.dataDir;
-    await writeFile(join(copy, "nested/state"), "changed");
-    if (kind === "throw") throw new Error("private host diagnostic");
-    return { status: kind === "crash" ? "failed" : "succeeded", exitCode: kind === "crash" ? 1 : 0, output: kind === "shape" ? '{"effects":[{"type":"invalid"}]}' : "public continuity output", error: kind === "crash" ? "public continuity stderr" : null };
+    await writeFile(join(copy, "nested/state"), "test mutation");
+    if (throws) throw new Error("private host diagnostic");
+    return { status: "failed", exitCode: 1, output: "incompatible copied data", error: null };
   };
   const result = await f.propose();
   expect(result.status).toBe("rejected");
-  expect(result.report).toMatchObject({ continuity: { status: "failed", migrated: false } });
+  expect(result.report).toMatchObject({ continuity: { status: "failed", reason: "author tests failed on copied data" } });
   expect(JSON.stringify(result.report)).not.toContain("private host diagnostic");
-  expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
-  const run = await f.db.run.findFirstOrThrow();
-  expect(run.prompt).toContain("build failed (untrusted test output)");
-  expect(run.prompt).toContain('"status":"failed"');
-  if (kind !== "throw") expect(run.prompt).toContain(kind === "shape" ? "invalid" : "public continuity output");
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
 });
@@ -537,7 +523,7 @@ test.each([false, true])("schema upgrade migrates only the copy; migration failu
   await f.schema(2, "migrate.py");
   let copy = "", entryRan = false;
   f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts") return f.original(input);
+    if (input.entry === "test.ts" && !(await stat(join(input.dataDir, "nested")).catch(() => null))) return f.original(input);
     if (/chrona-module-(probe|smoke)-/.test(input.dataDir)) return f.original(input);
     expect(input.network).toBe(false);
     expect(input.timeoutMs).toBe(60_000);
@@ -550,7 +536,8 @@ test.each([false, true])("schema upgrade migrates only the copy; migration failu
       return { status: failed ? "failed" : "succeeded", exitCode: failed ? 1 : 0, output: "public migration output", error: failed ? "public migration stderr" : null };
     }
     entryRan = true;
-    expect(input.dataDir).toBe(copy);
+    expect(input.entry).toBe("test.ts");
+    expect(input.dataDir).not.toBe(copy);
     expect(await readFile(join(copy, "nested/state"), "utf8")).toBe("schema 2");
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
@@ -622,35 +609,19 @@ test("test, continuity and schema failures share the same streak and budgeted di
   f.fail(false);
   await f.write(3);
   f.ports.sandbox!.runModule = async input => {
-    if (input.entry === "test.ts") return { status: "succeeded", exitCode: 0, output: "x".repeat(64 * 1024), error: null };
+    if (input.entry === "test.ts" && !(await stat(join(input.dataDir, "nested")).catch(() => null))) return { status: "succeeded", exitCode: 0, output: "x".repeat(64 * 1024), error: null };
     return { status: "failed", exitCode: 1, output: "public failure after verbose tests", error: null };
   };
   expect((await f.propose()).status).toBe("rejected");
   const runs = await f.db.run.findMany({ orderBy: { createdAt: "desc" } });
   expect(runs).toHaveLength(2);
-  expect(runs.some(run => run.prompt?.includes("public failure after verbose tests"))).toBe(true);
+  expect(runs.some(run => run.prompt?.includes("author tests failed on copied data"))).toBe(true);
   for (let i = 4; i <= 5; i++) {
     await f.write(i); await f.schema(2);
     expect((await f.propose()).status).toBe("rejected");
   }
   expect(await f.db.run.count()).toBe(2);
   expect((await notices(f.db, { level: "digest" })).length).toBe(1);
-});
-
-test("large effects preview is explicitly truncated without hiding schema, intent or hash", async () => {
-  const f = await dataFixture(true);
-  const effects = Array.from({ length: 3 }, (_, i) => ({ type: "wake_provider", key: `key-${i}`, prompt: "x".repeat(4000) }));
-  f.ports.sandbox!.runModule = async input => input.entry === "test.ts" ? f.original(input) : { status: "succeeded", exitCode: 0, output: JSON.stringify({ effects }), error: null };
-  const result = await f.propose();
-  expect(result.status).toBe("pending_review");
-  expect(result.report).toMatchObject({ continuity: { effects: effects.map(effect => ({ ...effect, key: `daily:${f.ports.now().toISOString()}:${effect.key}` })) } });
-  const { preview } = await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } });
-  expect(preview.length).toBeLessThanOrEqual(20_000);
-  expect(preview).toContain("…effects 过长，已截断");
-  expect(preview).toContain("数据 schema：1 → 1");
-  expect(preview).toContain(JSON.stringify(intent));
-  expect(preview).toContain(result.hash);
-  expect(await f.db.run.count()).toBe(0);
 });
 
 test.each(["migrate.ts", "migrate.py", "migrate.sh"])("declared %s must exist before a proposal is queued", async migrate => {

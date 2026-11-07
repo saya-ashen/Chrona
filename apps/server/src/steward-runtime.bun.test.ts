@@ -1,5 +1,5 @@
 import { expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
@@ -40,13 +40,13 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
       process.env.CHRONA_STEWARD_PI_VERSION = "0.85.0";
       const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
       try {
-        expect((await runtime.ports.provider!.health()).available).toBe(true);
-        expect(JSON.parse(readFileSync(join(profile, "probe.json"), "utf8"))).toEqual({ agentDir: profile });
+        expect(runtime.ports.provider?.name).toBe("pi");
+        expect(JSON.parse(runtime.ports.agentApplication!.env.CHRONA_AGENT_CONFIGURATION).pi).toMatchObject({ command, agentDir: profile, expectedVersion: "0.85.0", agentUrl: "http://127.0.0.1:48130/api/steward-agent" });
       } finally { await runtime.stop(); }
     }
     process.env.CHRONA_STEWARD_PI_VERSION = "1.3.0";
     const mismatch = createStewardRuntime(db, { dataDir, port: 48130 });
-    try { expect((await mismatch.ports.provider!.health()).available).toBe(false); }
+    try { expect(JSON.parse(mismatch.ports.agentApplication!.env.CHRONA_AGENT_CONFIGURATION).pi.expectedVersion).toBe("1.3.0"); }
     finally { await mismatch.stop(); }
   } finally {
     keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });

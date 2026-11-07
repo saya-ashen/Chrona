@@ -242,7 +242,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // Explicit targets in uses do not grant access to Provider or owner-only tools.

@@ -3,14 +3,14 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { smokeRun, probeKeys } from "./module-probe";
+import { smokeRun } from "./module-probe";
 import { checkContinuity, runTests } from "./module-continuity";
 import { moduleContext, type ContinuityReport, type TestReport } from "./module-context";
 import { testDb } from "./test-db";
 import { notices } from "./test-notices";
 
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-(sandbox.health.available ? test : test.skip)("SDK author helper, smoke, key probe and migrated continuity use fake kernels", async () => {
+(sandbox.health.available ? test : test.skip)("SDK author helpers, startup and copied-data continuity run without business probes", async () => {
   const dir = await mkdtemp("/tmp/cb-sdk-"), db = testDb();
   try {
     const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: dir });
@@ -63,14 +63,12 @@ try {
     expect(await runTests(context, code, manifest, tests)).toBe(true);
     expect(tests).toMatchObject([{ exitCode: 0 }]);
     expect(await smokeRun(context, code, manifest)).toEqual([]);
-    // The SDK shorthands scope their keys to the event (as Chrona scoped effect keys), so a fixed shorthand key is not repeated.
-    expect(await probeKeys(context, code, manifest)).toEqual({ status: "passed" });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: "sdk-check", activeHash: "old", dataSchema: 1 } });
     const live = join(dir, "platform/data", module.id); await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "original");
     const continuity: ContinuityReport = { status: "skipped", fromSchema: 1, toSchema: 2, migrated: false };
     expect(await checkContinuity(context, code, module, manifest, continuity)).toEqual({ passed: true, needsMigration: true });
     expect(continuity).toMatchObject({ status: "passed", migrated: true });
-    expect(continuity.effects).toHaveLength(3);
+    expect(continuity.tests).toMatchObject([{ exitCode: 0 }]);
     expect(await readFile(join(live, "state"), "utf8")).toBe("original");
     expect((await notices(db)).length).toBe(0);
     expect(await db.run.count()).toBe(0);

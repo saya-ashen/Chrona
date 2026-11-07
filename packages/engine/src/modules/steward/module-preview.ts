@@ -82,8 +82,7 @@ export function codeDifference(activeFiles: { path: string; bytes: Buffer }[], f
   return code.join("\n") + "\n";
 }
 export function continuityPreview(continuity: ContinuityReport, needsMigration: boolean) {
-  const effects = JSON.stringify(continuity.effects ?? []), effectLimit = 6000;
-  return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n按当前数据新版本会产生的 effects：\n${effects.length > effectLimit ? effects.slice(0, effectLimit) + "\n…effects 过长，已截断；完整列表见构建报告" : effects}\n`;
+  return `数据 schema：${continuity.fromSchema ?? "null"} → ${continuity.toSchema}；${needsMigration ? "需要迁移" : "无需迁移"}\n连续性：${continuity.status}${continuity.reason ? ` (${continuity.reason})` : ""}\n在数据副本上运行模块自带测试，不调用业务工具。\n`;
 }
 export function insertCodeDiff(prefix: string, suffix: string, codeDiff: string, hash: string, limit = 20_000) {
   const available = limit - (prefix.length + suffix.length);

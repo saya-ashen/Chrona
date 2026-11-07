@@ -51,10 +51,10 @@ function configurationError(config: PiLaunchConfig): string | null {
   const extensions = [[config.extension, "Chrona tools extension missing"], [config.web, "Pi web extension missing"], [config.browserExtension, "Pi browser extension missing"]] as const;
   return extensions.find(([path]) => path && !existsSync(path))?.[1] ?? null;
 }
+export const PI_MODEL_ENVIRONMENT_KEYS = ["SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY"] as const;
 /** Chrona/QQ/database secrets are not inherited. Pi's own model credentials remain its responsibility. */
 export function piEnvironment(config: PiLaunchConfig): NodeJS.ProcessEnv {
-  const allowed = ["HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS",
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY"];
+  const allowed = ["HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", ...PI_MODEL_ENVIRONMENT_KEYS];
   return { ...Object.fromEntries(allowed.flatMap(key => process.env[key] === undefined ? [] : [[key, process.env[key]]])), PI_CODING_AGENT_DIR: config.agentDir };
 }
 async function probe(command: string, env: NodeJS.ProcessEnv): Promise<{ ok: boolean; version: string }> {

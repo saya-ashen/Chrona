@@ -8,7 +8,7 @@
 
 当前本机实现统一经 `module-calls.ts` 调用受信任能力：`agent` 负责 Provider 启动、等待、注入、取消、completion 与 transcript；`runtime-callback` 提供绑定 workspace 的短期事件／问答引用；`workspace-local` 负责项目准备、锁释放、规则、成果捕获与清理；`content-local` 负责附件与内容读取。物理适配器、文件 I/O 与进程内 handle 留在能力实现内部，消费端使用 JSON 契约及路由代理。内核保留唯一 Run 队列、授权、事务、预算、停止证据和启动持久化。
 
-受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。本机能力只开放 kernel audience，不赋予普通应用进程／任意路径权限。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
+受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。`agent` 已从进程内能力拆为发行内置 SDK 应用：应用进程持有 Pi Provider、操作状态和启动回执，内核经 `agent.start/status/inject/abort/release` 调用，并保留 Run 授权、预算和持久状态。补全使用短启动请求与结果查询，等待不占住取消通道。Agent 的工具向内核和模块开放，模块通过普通 `chrona.call` 使用结构化参数；操作归属由 SDK 真实 caller 绑定，执行准入与模型额度仍按原模块身份检查；`runtime-callback` 仍在内核进程，除内核外仅接受当前受信任内置 Agent 的真实 moduleId/hash/source。其余本机能力 `runtime-callback`、`workspace-local`、`content-local` 继续以进程内方式实现，目录单列“运行能力”。应用页把 Agent 列在内置应用，复用进程诊断与只读自检；模块执行接口不向 owner 暴露操作表单。配置仍来自现有服务启动参数和全局模型／预算设置；当前不新增宿主配置写入口。详见 [Agent 内置应用](agent-builtin-application.md)。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
 
 ## 当前开发集成边界
 
@@ -38,7 +38,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 
 `modules.build` 仅为外置应用创建独立的 `build` 会话，保存目标、意图、参考文件和当前版本快照；队列有 FIFO、并发、时限与提交次数约束。构建会话可搜索和调用普通会话可见的应用工具，但只能提交内核记录的目标模块。`modules.checkout/reference/propose/check` 分别提供源码、接口契约、候选提交与检查结果；候选从提交目录复制到内核管理的 staging，按文件内容计算 hash，再进入版本 store。
 
-检查包括 manifest 与工具契约、依赖、入口类型检查、作者测试、数据连续性/副本迁移、smoke 启动、重复事件的 key probe，以及受影响调用方的类型检查。失败不会靠人工批准绕过。通过检查的新应用或更新通常自动启用，并经 notify 事后汇总告知；已有数据迁移、新增凭据仍需一次确认，回滚恢复旧数据快照也要确认。内置发行版新增凭据声明不问，实际凭据仍由用户填写。多模块构建逐个检查后由 `modules.request-group` 统一切换；组内需迁移的模块须先单独处理，有新增凭据时整组询问。
+检查包括 manifest 与工具契约、依赖、入口类型检查、作者测试、数据副本迁移及副本上的作者测试、启动/SDK 连接，以及受影响调用方的类型检查。安装不会编造参数、调用业务工具或投递模拟定时事件；幂等键的业务覆盖由作者测试负责，运行时幂等约束仍由原路由执行。失败不会靠人工批准绕过。安装后的业务就绪情况由模块通过 `modules.report-health` 自报，独立于 Chrona 观察的进程、通信与故障记录。声明 `healthCheck: true` 的模块接收独立 `health` 诊断事件；启动、应用设置变更与用户主动刷新触发，缺配置可报告 `needs_configuration`，没有报告、过期或进程不可用显示 `unknown`。自检不执行发送消息、修改项目或付费请求；这些效果仍需独立授权入口。就绪报告和自检成功不证明业务故障已恢复。通过检查的新应用或更新通常自动启用，并经 notify 事后汇总告知；已有数据迁移、新增凭据仍需一次确认，回滚恢复旧数据快照也要确认。内置发行版新增凭据声明不问，实际凭据仍由用户填写。多模块构建逐个检查后由 `modules.request-group` 统一切换；组内需迁移的模块须先单独处理，有新增凭据时整组询问。
 
 `modules.build-owner` / MCP `chrona_build` 则是 owner 明确授权的单模块有界构建：固定 Provider/model、时限、提交上限及单次 request key，重复请求不重跑。它仍走相同检查与启用规则。
 

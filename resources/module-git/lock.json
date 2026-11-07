@@ -5,9 +5,9 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "428b634cd09e76d80e0d6b53043bcd8c7511dbe2",
+      "commit": "1cd81e7f647927ff47b1a2cda8e50c1e329250e5",
       "bundle": "web.bundle",
-      "bundleSha256": "29f79cf756b8f975e3a703c45ab25f2e7e44b2d28e48ab15edf0a6cd0e78c97a"
+      "bundleSha256": "006f1f1877a447266e03df8fad2afed94ad7f34428d049132528f64f44c1f953"
     },
     {
       "name": "mcp",
@@ -40,6 +40,14 @@
       "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425",
       "bundle": "events.bundle",
       "bundleSha256": "88e6babdeacf2ac1c7d6b10d22f8b9f1c3ab3c46e933be499895db02e38590f4"
+    },
+    {
+      "name": "agent",
+      "repository": null,
+      "branch": "main",
+      "commit": "c9b60fd5d6ab5e4df5a97c1a7d3331f836d9b0f3",
+      "bundle": "agent.bundle",
+      "bundleSha256": "abbad41fb3621ef8daaf0e43d134d8aa4eeaed6aadc0ab91b58354acda4871de"
     },
     {
       "name": "qq",
@@ -77,9 +85,9 @@
       "name": "coding",
       "repository": null,
       "branch": "main",
-      "commit": "453ae363402e5585f556c23b19ddd91b3c09ad5c",
+      "commit": "3428eb626455a601761bdcd05afed6d5169409aa",
       "bundle": "coding.bundle",
-      "bundleSha256": "4f41eb1ac9afc2517d347488e34180323f2c205aaccab3cdf6d58b9581cd93ee"
+      "bundleSha256": "c8caafccca56a3d38b5aff12b7b93335c1e67c64d3c81f97e7638d4cf1dfa2e7"
     },
     {
       "name": "editor",

@@ -1,17 +1,14 @@
 import { startRescueListener } from "./rescue";
-import { join, resolve } from "node:path";
-import { createModuleRuntimePorts, stewardDataDir, resourcePath, executionMode } from "../../../packages/integrations/src/steward/module-runtime";
+import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import { installDeviceExecution } from "./execution-device-runtime";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createStewardE2eProvider } from "./steward-e2e-provider";
-import { createPiProvider } from "../../../packages/integrations/src/steward/pi-provider";
-import { createBrowsers } from "../../../packages/integrations/src/steward/browser";
-import { createLogger } from "@chrona/logging";
+import { createAgentApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
 
 type RuntimeOptions = {
   now?: () => Date; onError?: (error: unknown) => void; port?: number; provider?: ProviderAdapter | null;
@@ -19,29 +16,9 @@ type RuntimeOptions = {
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
-/** Where the Provider's browser comes from (v2-12). */
-function providerBrowsers(options: RuntimeOptions) {
-  return createBrowsers({
-    configured: process.env.CHRONA_STEWARD_BROWSER?.trim() || undefined, dir: resolve(options.dataDir ?? stewardDataDir(), "providers/browser"),
-    nix: Bun.which("nix"), nixpkgs: process.env.CHRONA_NIXPKGS?.trim() || undefined,
-    onError: error => createLogger("steward.browser").warn("browser.unavailable", { error }),
-  });
-}
-function configuredProvider(options: RuntimeOptions, bwrap: string | undefined, mode: ReturnType<typeof executionMode>) {
+function injectedProvider(options: RuntimeOptions) {
   if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
-  return options.provider === undefined ? (process.env.CHRONA_STEWARD_AGENT === "pi" && options.port ? createPiProvider({
-    agentUrl: `http://127.0.0.1:${options.port}/api/steward-agent`,
-    chronaExtension: resourcePath(join("external-plugins", "pi-steward-agent", "chrona-tools.ts")),
-    command: process.env.CHRONA_STEWARD_PI_COMMAND, model: process.env.CHRONA_STEWARD_PI_MODEL,
-    agentDir: process.env.CHRONA_STEWARD_PI_AGENT_DIR ?? resolve(options.dataDir ?? stewardDataDir(), "providers/pi"),
-    expectedVersion: process.env.CHRONA_STEWARD_PI_VERSION,
-    resourcesFile: process.env.CHRONA_STEWARD_PI_RESOURCES_FILE,
-    webExtension: process.env.CHRONA_STEWARD_PI_WEB_EXTENSION, bwrap, executionMode: mode,
-    browserExtension: resourcePath(join("external-plugins", "pi-steward-agent", "browser-tools.ts")),
-    browsers: providerBrowsers(options),
-    workspaceRoot: resolve(options.dataDir ?? stewardDataDir(), "sessions"),
-    dataDir: resolve(options.dataDir ?? stewardDataDir()),
-  }) : null) : options.provider;
+  return options.provider;
 }
 function executorOwnerPorts(ports: StewardPorts): NonNullable<StewardPorts["executorOwner"]> {
   const auth = createExecutorAuth(ports);
@@ -78,9 +55,9 @@ function executionInitialization(ports: StewardPorts) {
   })();
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
-  const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const mode = executionMode();
-  const configured = configuredProvider(options, bwrap, mode);
+  const injected = injectedProvider(options);
+  const agentApplication = injected === undefined && options.port ? createAgentApplicationHost({ port: options.port, dataDir: options.dataDir }) : undefined;
+  const configured = injected ?? (injected === undefined && agentApplication && process.env.CHRONA_STEWARD_AGENT === "pi" ? createAgentClient(() => ports, "pi") : null);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
   const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), ...(configured.transcript ? { transcript: configured.transcript } : {}), start(input) {
@@ -90,7 +67,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     return handle;
   } } : undefined;
   const ports: StewardPorts = {
-    ...createModuleRuntimePorts(db, options), provider,
+    ...createModuleRuntimePorts(db, options), provider, agentApplication,
     chatTimeoutMs: options.chatTimeoutMs,
     onQueued: () => tickOnce(), onRunFinished: async () => { wake(); },
   };
@@ -167,6 +144,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
       timer = undefined;
       await running;
       await starting;
+      await stopAgentRuns(ports);
       await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.done; }));
       await service.tick.settled({ includeRuns: true });
       await moduleSupervisor(ports).stop();

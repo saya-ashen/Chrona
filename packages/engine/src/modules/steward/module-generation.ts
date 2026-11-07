@@ -79,12 +79,21 @@ function assertBuiltinSeedVersion(version: ModuleVersion | null, release: Module
   const report = version?.report as { git?: { commit?: unknown } } | null;
   if (version?.status !== "approved" || version.source !== "builtin" || report?.git?.commit !== release.hash || JSON.stringify(version.manifest) !== JSON.stringify(release.manifest)) throw new StewardError("conflict", "Trusted release metadata does not match");
 }
+async function assertAgentReleaseUpgrade(tx: Prisma.TransactionClient, module: { id: string; workspaceId: string; activeHash: string | null; dataSchema: number | null; status: string }, release: ModuleRelease, releaseUpgrade: boolean) {
+  if (!releaseUpgrade || release.name !== "agent") throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
+  if (module.dataSchema !== release.manifest.data.schema || module.status === "migrating") throw new StewardError("conflict", "Agent release requires compatible data");
+  if (await tx.run.count({ where: { workspaceId: module.workspaceId, status: "running" } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
+  const old = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
+  if (old?.source !== "builtin" || old.status !== "approved") throw new StewardError("conflict", "Agent release requires a trusted prior version");
+}
 /** Internal bootstrap only: registrar resolves and exports the trusted seed before this DB transaction; never pass routed input. */
-export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prisma.TransactionClient, release: ModuleRelease) {
+export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prisma.TransactionClient, release: ModuleRelease, releaseUpgrade = false) {
   assertBuiltinSeedRelease(release);
   const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId: context.workspaceId, name: release.name } } });
   if (!module?.builtin) throw new StewardError("conflict", "Trusted release requires a built-in module identity");
-  if (module.activeHash && module.activeHash !== release.hash) throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
+  if (module.activeHash && module.activeHash !== release.hash) {
+    await assertAgentReleaseUpgrade(tx, module, release, releaseUpgrade);
+  }
   const version = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: release.hash } } });
   assertBuiltinSeedVersion(version, release);
   const previous = await tx.generation.findFirst({ where: { workspaceId: context.workspaceId }, orderBy: { seq: "desc" } });

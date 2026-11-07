@@ -5,6 +5,7 @@ import type { StewardPorts } from "./ports";
 import { CallError, callSync, kernelOrigin, registerLocalModule, type Json } from "./module-calls";
 import { tool, json } from "./system/shared";
 import { authenticateRun } from "./run-auth";
+import { isAgentApplication } from "./agent-application";
 
 const operations = new WeakMap<StewardPorts, Map<string, Operation>>();
 const callbacks = new WeakMap<StewardPorts, Map<string, Pick<ProviderRunInput, "events" | "detail">>>();
@@ -101,7 +102,8 @@ async function controlOperation(ports: StewardPorts, workspaceId: string, name: 
   }
   throw new CallError("not_found", "Provider tool not found");
 }
-export function registerProviderModule() {
+/** Explicit in-memory Provider injection for unit tests/embedders; production uses builtin/agent. */
+export function registerProviderModule(ports: StewardPorts) {
   const declarations = [
     ["health", z.object({}).strict(), runtimeHealthSchema], ["start", runtimeStartSchema, runtimeOperationSchema],
     ["status", runtimeOperationSchema, runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean() })], ["wait", runtimeOperationSchema, runtimeOutcomeSchema],
@@ -123,7 +125,7 @@ export function registerProviderModule() {
       if (name === "start") return startOperation(ports, workspaceId, provider, args);
       return controlOperation(ports, workspaceId, name, args);
     },
-  });
+  }, ports.db);
 }
 
 /** Kernel-local subscribers are addressed by an opaque, workspace-bound reference; no callback crosses the wire. */
@@ -135,6 +137,7 @@ export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string
   callbackOwners.set(input, { workspaceId, controllers, interrupted });
   return { id, release() { for (const controller of controllers.values()) controller.abort(); map!.delete(id); callbackOwners.delete(input); } };
 }
+import { agentDelegationTools, delegateAgent } from "./agent-delegation";
 const callbackOwners = new WeakMap<object, { workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> }>();
 async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detail">, owner: NonNullable<ReturnType<typeof callbackOwners.get>>, value: RuntimeEvent): Promise<Json> {
   if (value.kind === "interrupt") {
@@ -155,9 +158,11 @@ async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detai
   return null;
 }
 export function registerProviderCallbacks() {
-  registerLocalModule({ name: "runtime-callback", description: "Run-bound event delivery", unrecorded: ["event"],
-    tools: [tool("event", "Run-bound Provider event", {}, [], { input: z.object({ callbackId: z.string().uuid(), event: runtimeEventSchema }).strict(), output: providerAnswerSchema.nullable(), visibility: ["kernel"] })],
-    async handle({ ports, workspaceId }, _name, args): Promise<Json> {
+  registerLocalModule({ name: "runtime-callback", description: "Run-bound event delivery", unrecorded: ["event", "agent-admit", "agent-settle"],
+    tools: [...agentDelegationTools, tool("event", "Run-bound Provider event", {}, [], { input: z.object({ callbackId: z.string().uuid(), event: runtimeEventSchema }).strict(), output: providerAnswerSchema.nullable(), visibility: ["kernel", "modules"] })],
+    async handle({ ports, workspaceId, caller }, name, args): Promise<Json> {
+      if (name !== "event") return delegateAgent(ports, workspaceId, caller, name, args);
+      if (caller.kind !== "kernel" && (caller.kind !== "module" || !await isAgentApplication(ports, caller, workspaceId))) throw new CallError("forbidden", "Runtime callbacks require the builtin Agent");
       const target = callbacks.get(ports)?.get(String(args.callbackId)), owner = target && callbackOwners.get(target);
       if (!target || owner?.workspaceId !== workspaceId) throw new CallError("not_found", "Run callback ended");
       return dispatchCallback(target, owner, runtimeEventSchema.parse(args.event));

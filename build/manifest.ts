@@ -18,6 +18,7 @@ export const buildArtifacts = {
       { name: "files", source: "builtin/files" },
       { name: "notify", source: "builtin/notify" },
       { name: "events", source: "builtin/events" },
+      { name: "agent", source: "builtin/agent" },
       { name: "qq", source: "external/qq" },
       { name: "remind", source: "external/remind" },
       { name: "mind", source: "external/mind" },

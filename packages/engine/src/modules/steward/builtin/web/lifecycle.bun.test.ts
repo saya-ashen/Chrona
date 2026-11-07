@@ -73,17 +73,46 @@ test("code-only updates preserve contracts, callback changes fail until re-regis
   f.state.tools.delete("read"); await expect(f.pages.get("alpha", "main")).rejects.toThrow("重新登记");
 });
 const app = (builtin: boolean) => { const fixture = builtin ? moduleLifecycleFixtures.builtin : moduleLifecycleFixtures.external; return { ...fixture.row, origin: fixture.origin, capabilities: fixture.capabilities, health: {}, runs: [], versions: [{ hash: "f".repeat(64), status: "approved", createdAt: "2026-11-05" }] }; };
-const overview = (builtin: boolean) => ({ app: app(builtin), permissions: { capabilities: ["联网"], secrets: [], grants: [], approvals: [], model: null }, settings: { declarations: {}, values: {} }, activity: [] });
+const overview = (builtin: boolean) => ({ app: app(builtin), tools: [] as { name: string; visibility: string[]; description: string }[], permissions: { capabilities: ["联网"], secrets: [], grants: [], approvals: [], model: null }, settings: { declarations: {}, values: {} }, activity: [] });
+test("builtin Agent tools are documented without exposing execution forms", () => {
+  const view = overview(true);
+  view.app.name = "agent";
+  view.tools = [{ name: "start", visibility: ["kernel"], description: "启动执行" }];
+  const result = detailSpec({ overview: view }, { id: "id", tab: "overview", session: "" });
+  expect(JSON.stringify(result)).toContain("agent.start · 仅内核可调用");
+  expect(Object.values(result.elements).some(node => node.type === "ToolForm")).toBe(false);
+});
+test("module-visible Agent interfaces remain read-only in the owner application page", () => {
+  const view = overview(true); view.app.name = "agent";
+  view.tools = [{ name: "start", visibility: ["kernel", "modules"], description: "委派执行" }];
+  const spec = detailSpec({ overview: view, tools: [{ target: "agent.start" }] }, { id: "id", tab: "overview", session: "" });
+  expect(JSON.stringify(spec)).toContain("agent.start · 供应用调用");
+  expect(Object.values(spec.elements).some(node => node.type === "ToolForm")).toBe(false);
+});
 test.each([true, false])("capabilities gate lifecycle controls and immutable version actions: builtin=%s", builtin => {
   const view = overview(builtin), route = { id: "id", tab: "overview", session: "" };
   const nodes = Object.values(detailSpec({ overview: view }, route).elements);
-  expect(nodes.some(node => node.type === "AppRemoval")).toBe(!builtin);
+  expect(nodes.some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
+  const managed = Object.values(appsSpec({ apps: [view.app], systemApps: [], catalog: [] }).elements);
+  expect(managed.some(node => node.type === "AppRemoval")).toBe(!builtin);
   view.app.capabilities = { ...view.app.capabilities, remove: false, disable: false, enable: false };
-  const disabled = Object.values(detailSpec({ overview: view }, route).elements);
+  const disabled = Object.values(appsSpec({ apps: [view.app], systemApps: [], catalog: [] }).elements);
   expect(disabled.some(node => node.type === "AppRemoval" || node.type === "SystemAction")).toBe(false);
   const versions = JSON.stringify(detailSpec({ overview: view }, { ...route, tab: "versions" }));
   expect(versions.includes("回滚到此版本")).toBe(!builtin);
   expect(JSON.stringify(detailSpec({ overview: view }, { ...route, tab: "permissions" }))).toContain("联网");
+});
+test.each(["active", "paused", "migrating"])("application list owns lifecycle actions for %s apps", status => {
+  const current = { ...app(false), status };
+  const spec = appsSpec({ apps: [current], systemApps: [], catalog: [] });
+  const nodes = Object.values(spec.elements), removal = nodes.find(node => node.type === "AppRemoval"), control = nodes.find(node => node.type === "SystemAction");
+  expect(!!removal).toBe(status !== "migrating");
+  if (status === "migrating") expect(control).toBeUndefined();
+  else {
+    expect(control?.props).toMatchObject({ label: status === "active" ? "暂停" : "恢复", tool: status === "active" ? "module-disable" : "module-enable", args: { id: current.name } });
+    const header = nodes.find(node => node.props.direction === "horizontal" && node.children?.some(id => spec.elements[id]?.props.label === current.name));
+    expect(header?.children?.some(id => spec.elements[id]?.type === "AppRemoval")).toBe(true);
+  }
 });
 test.each(["pending", "building", "pending_approval", "installed", "failed", "unavailable"])("official installation state %s stays distinct from paused", status => {
   const receipt = { ...moduleLifecycleFixtures.failedInstall, status, error: status === "failed" ? moduleLifecycleFixtures.failedInstall.error : null };
@@ -92,13 +121,84 @@ test.each(["pending", "building", "pending_approval", "installed", "failed", "un
   expect(result.includes("PackageInstall")).toBe(!["pending", "building", "pending_approval"].includes(status));
   if (status === "pending_approval") expect(result).toContain("等待现有请求");
 });
+test.each(["installed", "building", "pending_approval", "failed", "unavailable"])("installed official app keeps %s update state beside its management actions", status => {
+  const current = app(false), failed = ["failed", "unavailable"].includes(status), receipt = { ...moduleLifecycleFixtures.failedInstall, status, error: failed ? moduleLifecycleFixtures.failedInstall.error : null };
+  const result = appsSpec({ apps: [current], systemApps: [], catalog: [
+    { name: current.name, moduleId: current.id, available: true, releaseHash: "new-release", installation: receipt },
+    { name: "another-app", moduleId: null, available: true, releaseHash: "new-release", installation: null },
+  ] });
+  const nodes = Object.values(result.elements), update = nodes.filter(node => node.type === "PackageInstall" && node.props.name === current.name);
+  expect(update.length).toBe(["building", "pending_approval"].includes(status) ? 0 : 1);
+  if (update.length) expect(update[0]?.props.mode).toBe("update");
+  expect(nodes.filter(node => node.type === "AppRemoval")).toHaveLength(1);
+  const available = nodes.find(node => node.props.direction === "horizontal" && node.children?.some(id => result.elements[id]?.props.text === "another-app"));
+  expect(available?.children?.some(id => result.elements[id]?.type === "PackageInstall" && result.elements[id]?.props.mode === "install")).toBe(true);
+  const header = nodes.find(node => node.props.direction === "horizontal" && node.children?.some(id => result.elements[id]?.props.label === current.name));
+  if (update.length) expect(header?.children?.some(id => result.elements[id] === update[0])).toBe(true);
+  expect(nodes.some(node => node.type === "Alert")).toBe(failed);
+});
+test("application regions separate persisted origins, available packages and kernel interfaces", () => {
+  const external = app(false), builtin = app(true);
+  const result = appsSpec({ apps: [builtin, external], systemApps: [{ name: "chat", description: "系统对话" }], catalog: [
+    { name: "available-app", moduleId: null, available: true, installation: null },
+    { name: external.name, moduleId: external.id, available: true, releaseHash: external.activeHash, installation: null },
+  ] });
+  const region = (title: string) => {
+    const card = Object.values(result.elements).find(node => node.type === "Card" && node.props.title === title)!;
+    const descendants = (ids: string[]): string => ids.map(id => { const node = result.elements[id]!; return JSON.stringify(node.props) + descendants(node.children ?? []); }).join("");
+    return descendants(card.children ?? []);
+  };
+  expect(region("外置应用")).toContain(`/apps/${external.id}`);
+  expect(region("外置应用")).not.toContain(`/apps/${builtin.id}`);
+  expect(region("内置应用")).toContain(`/apps/${builtin.id}`);
+  expect(region("内置应用")).not.toContain(`/apps/${external.id}`);
+  expect(region("可安装的官方外置应用")).toContain("available-app");
+  expect(region("可安装的官方外置应用")).not.toContain(external.name);
+  expect(region("内核接口")).toContain("/apps/system/chat");
+  expect(region("内核接口")).not.toContain("删除应用");
+});
+test.each(["configured", "unconfigured", "registered"] as const)("runtime capability %s has a separate region and read-only details", status => {
+  const runtime = { status, backend: status === "configured" ? "pi" : null, responsibility: "包装 Pi Agent", configuration: "修改启动配置后重启" };
+  const directory = appsSpec({ apps: [], systemApps: [{ name: "agent", description: "执行能力", runtime }, { name: "chat", description: "会话接口" }], catalog: [] });
+  const cards = Object.values(directory.elements).filter(node => node.type === "Card");
+  expect(cards.some(node => node.props.title === "运行能力")).toBe(true);
+  expect(cards.some(node => node.props.title === "内核接口")).toBe(true);
+  expect(JSON.stringify(directory)).toContain("/apps/system/agent");
+  for (const tab of ["overview", "settings", "tools"]) {
+    const result = detailSpec({ overview: { description: "执行能力", runtime, settings: { declarations: {}, values: {} }, tools: [{ name: "start", visibility: ["kernel"], description: "启动" }], activity: [] } }, { id: "agent", tab, session: "" }, true);
+    const text = JSON.stringify(result);
+    expect(text).toContain("运行能力");
+    expect(Object.values(result.elements).some(node => ["SystemAction", "AppRemoval", "ToolForm", "SettingsForm"].includes(node.type))).toBe(false);
+    if (tab === "overview") expect(text).toContain(status === "configured" ? "不代表当前运行可用" : status === "unconfigured" ? "后端未配置" : "按需使用");
+    if (tab === "settings") { expect(text).toContain("修改启动配置后重启"); expect(text).toContain("/settings"); }
+    if (tab === "tools") { expect(text).toContain("仅内核可调用"); expect(text).not.toContain("用户入口可调用"); }
+  }
+});
+test("protected external entry remains external with a removal explanation", () => {
+  const current = app(false); current.capabilities = { ...current.capabilities, remove: false };
+  const result = appsSpec({ apps: [current], systemApps: [], catalog: [] });
+  expect(JSON.stringify(result)).toContain("受保护的入口应用，不能删除");
+  expect(Object.values(result.elements).some(node => node.type === "AppRemoval")).toBe(false);
+});
 test("empty, loading, configuration and missing-active states expose next actions", () => {
   expect(JSON.stringify(appsSpec({}))).toContain("加载中");
-  expect(JSON.stringify(appsSpec({ apps: [], systemApps: [], catalog: [] }))).toContain("还没有应用");
+  expect(JSON.stringify(appsSpec({ apps: [], systemApps: [], catalog: [] }))).toContain("还没有外置应用");
   const view = overview(false); view.app.activeHash = ""; view.permissions.secrets = [{ configured: false }] as never;
   const serialized = JSON.stringify(detailSpec({ overview: view }, { id: "id", tab: "overview", session: "" }));
   expect(serialized).toContain("尚未启用"); expect(serialized).toContain("待配置"); expect(serialized).not.toContain("已暂停");
 });
+test.each([
+  ["ready", false, "模块自报：已就绪"], ["needs_configuration", false, "模块自报：待配置"],
+  ["degraded", false, "模块自报：部分可用"], ["unknown", false, "业务就绪情况未知"], ["ready", true, "业务就绪情况未知"],
+] as const)("readiness %s stale=%s stays separate from observed runtime and exposes explicit refresh", (status, stale, label) => {
+  const view = overview(false);
+  view.app.health = { runtime: { state: "running" }, healthCheck: true, readiness: { status, stale, summary: "检查项目配置", nextAction: "配置项目访问权限", reportedAt: "2026-11-07T00:00:00Z" } };
+  const serialized = JSON.stringify(detailSpec({ overview: view }, { id: "id", tab: "overview", session: "" }));
+  expect(serialized).toContain("运行中"); expect(serialized).toContain(label);
+  expect(serialized).toContain("配置项目访问权限"); expect(serialized).toContain("重新自检");
+  expect(serialized).toContain("module-refresh-health");
+});
+
 test("lost installation receipts and pending requests retain a key across reopening; only explicit terminal retry gets a new key", () => {
   const values = new Map<string, string>(), storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
   const first = installationRequest("qq", "install", storage);

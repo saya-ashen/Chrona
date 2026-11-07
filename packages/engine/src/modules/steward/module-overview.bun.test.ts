@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { moduleManifestSchema, moduleRuntimeParams } from "@chrona/contracts/steward";
 import { moduleOverview, moduleOverviewOutputSchema, moduleSettingsOutputSchema, setModuleSettings } from "./module-overview";
 import { registerSystemModules } from "./system-modules";
+import { callSync } from "./module-calls";
+import { systemApps } from "./system-apps";
+import { modulesSystemOutput } from "./system-outputs";
 import { listActivity } from "./activity";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
@@ -80,6 +83,34 @@ test("real overview and settings-set results fit their declared output schemas",
   for (const name of ["memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
 });
 
+
+test("runtime directory is read-only, registered before use and cannot invoke the Provider", async () => {
+  const f = await fixture();
+  const directory = modulesSystemOutput.parse(await systemApps(f.ports, f.w)) as { name: string; runtime?: { status: string } }[];
+  expect(directory.filter(item => item.runtime).map(item => item.name).sort()).toEqual(["content-local", "runtime-callback", "workspace-local"]);
+  for (const name of ["content-local", "runtime-callback", "workspace-local"]) {
+    const view = moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
+    expect(view).toMatchObject({ kind: "system", capabilities: { build: false, configure: false, disable: false, remove: false }, runtime: { status: "registered" }, settings: { declarations: {}, values: {} } });
+    expect(view.tools.every(tool => !tool.visibility.includes("owner"))).toBe(true);
+    expect(view.tools.filter(tool => !tool.name.startsWith("agent-")).every(tool => tool.visibility.includes("kernel"))).toBe(true);
+    for (const tool of view.tools) await expect(callSync(f.ports, { workspaceId: f.w, caller: { kind: "owner", via: null }, chain: [], path: [] }, `${name}.${tool.name}`, {})).rejects.toMatchObject({ code: "forbidden" });
+    await expect(setModuleSettings(f.ports, f.w, name, {})).rejects.toThrow();
+  }
+  const owner = { workspaceId: f.w, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
+  expect((await callSync(f.ports, owner, "modules.overview", { module: "workspace-local" })).output).toMatchObject({ runtime: { status: "registered" } });
+  const exposed = modulesSystemOutput.parse((await callSync(f.ports, owner, "modules.system", {})).output) as { name: string }[];
+  expect(exposed.some(item => item.name === "agent")).toBe(false);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.moduleInvocation.count({ where: { target: { in: ["agent", "content-local", "runtime-callback", "workspace-local"] } } })).toBe(0);
+});
+test("runtime configuration snapshot never executes health checks or exposes Provider diagnostics", async () => {
+  const f = await fixture(); let starts = 0, probes = 0;
+  f.ports.provider = { name: "pi", health: async () => { probes++; throw new Error("private diagnostics"); }, start() { starts++; throw new Error("must not execute"); } };
+  const view = moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "workspace-local"));
+  expect(view).toMatchObject({ runtime: { status: "registered", backend: null } });
+  expect(JSON.stringify(view)).not.toContain("private diagnostics");
+  expect(starts).toBe(0); expect(probes).toBe(0);
+});
 
 test("builtin overview retains origin and protected deletion while exposing checked Git version and update actions", async () => {
   const f = await fixture(), hash = "a".repeat(40), tree = "b".repeat(40);

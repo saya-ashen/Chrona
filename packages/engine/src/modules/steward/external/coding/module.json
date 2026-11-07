@@ -601,6 +601,7 @@
       "idempotent": true
     }
   ],
+  "healthCheck": true,
   "keepAlive": true,
   "activated": true,
   "content": true,
@@ -619,7 +620,8 @@
     "executions.placement",
     "executions.locations",
     "executions.workspace-cleanup",
-    "schedules.create"
+    "schedules.create",
+    "modules.report-health"
   ],
   "packages": [],
   "secrets": [],

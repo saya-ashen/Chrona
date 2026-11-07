@@ -23,6 +23,7 @@ export function systemCall(host: SystemHost) {
     "detail-activity": args => host.web(`/activity?module=${encodeURIComponent(String(args.module))}`).then(result => (result as { items: unknown[] }).items).catch(() => []),
     diagnostics: args => host.web(`/modules/${id(args)}/diagnostics`).then(result => { const view = (result as unknown[])[0]; if (!view) throw new Error("没有诊断记录"); return { view }; }).catch((error: Error) => ({ failure: error.message })),
     "settings-save": args => post(`/modules/${id(args)}/settings`, { values: args.values }),
+    "module-refresh-health": args => post(`/modules/${id(args)}/refresh-health`, {}),
     "module-disable": args => post(`/modules/${id(args)}/disable`, {}),
     "module-enable": args => post(`/modules/${id(args)}/enable`, {}),
     "module-remove": args => post(`/modules/${id(args)}/remove`, {}),

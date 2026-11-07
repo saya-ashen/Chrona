@@ -7,6 +7,7 @@ import { dirname, resolve } from "node:path";
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile } from "../build/portable-elf";
 import { buildExecutionContracts } from "../build/execution-contracts";
+import { buildAgentApplication } from "../packages/engine/src/modules/steward/builtin/agent/build";
 import { copyModuleGitRelease, stageModuleGitLicense } from "./module-git-release";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -71,6 +72,7 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
 /** Generated contract files belong to the exact module commit shipped in its bundle. */
 export async function prepareReleaseModules(resourcesRoot: string) {
   await buildExecutionContracts(resolve(resourcesRoot, "external"));
+  await buildAgentApplication(resolve(resourcesRoot, "builtin/agent"));
   const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
   await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
   await copyModuleGitRelease(seedDir, resourcesRoot);

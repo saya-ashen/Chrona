@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { moduleManifestSchema, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { z } from "zod";
-import { syntheticEvents, withBuildProcess } from "./module-build-process";
 import { copyData, dataEmpty, runOffline } from "./module-data";
 import type { ModuleContext, ContinuityReport, TestReport, requireModule } from "./module-context";
 
@@ -11,12 +10,14 @@ type Manifest = z.output<typeof moduleManifestSchema>;
 type Module = Awaited<ReturnType<typeof requireModule>>;
 /** Author tests get the test allowance, or the module's own higher cap (v2-21). */
 const testMemoryMb = (manifest: Manifest) => Math.max(RUN_LIMITS.moduleTestMemoryMb, manifest.limits?.virtualMemoryMb ?? 0);
+async function copyTestData(source: string | undefined, target: string) { return source ? copyData(source, target) : true; }
 export const moduleParams = (manifest: Manifest) => Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
-async function runOneTest(context: ModuleContext, staging: string, manifest: Manifest, entry: string, tests: TestReport) {
-  const { ports } = context, sandbox = ports.sandbox;
+async function runOneTest(context: ModuleContext, staging: string, manifest: Manifest, entry: string, options: { tests: TestReport; sourceData?: string }) {
+  const { tests, sourceData } = options, { ports } = context, sandbox = ports.sandbox;
   if (!sandbox?.available || !sandbox.runModule) return false;
   const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
   try {
+    if (!await copyTestData(sourceData, data)) return false;
     const contentDir = manifest.content ? join(data, ".build-content") : undefined;
     if (contentDir) await mkdir(contentDir, { recursive: true });
     const result = await sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes, memoryMb: testMemoryMb(manifest) });
@@ -25,10 +26,10 @@ async function runOneTest(context: ModuleContext, staging: string, manifest: Man
   } catch { return false; }
   finally { await rm(data, { recursive: true, force: true }); }
 }
-export async function runTests(context: ModuleContext, staging: string, manifest: Manifest, tests: TestReport) {
+export async function runTests(context: ModuleContext, staging: string, manifest: Manifest, tests: TestReport, sourceData?: string) {
   let passed = true;
   for (const entry of manifest.tests) {
-    if (!await runOneTest(context, staging, manifest, entry, tests)) passed = false;
+    if (!await runOneTest(context, staging, manifest, entry, { tests, sourceData })) passed = false;
   }
   return passed;
 }
@@ -36,24 +37,6 @@ function fail(continuity: ContinuityReport, reason: string) {
   continuity.status = "failed"; continuity.reason = reason;
 }
 type ContinuityCopy = { staging: string; data: string; manifest: Manifest; continuity: ContinuityReport };
-async function checkEntry(context: ModuleContext, copy: ContinuityCopy, now: string) {
-  const { staging, data, manifest, continuity } = copy;
-  await withBuildProcess(context, staging, data, manifest, async send => {
-    continuity.effects = [];
-    for (const event of syntheticEvents(manifest, now)) {
-      const { reply, calls } = await send(event);
-      continuity.output = { stdout: JSON.stringify(reply), stderr: "", exitCode: "error" in reply ? 1 : 0 };
-      if ("error" in reply) { fail(continuity, "entry failed"); return; }
-      for (const call of calls) {
-        if (call.method !== "call" || call.params.mode !== "async") continue;
-        const args = call.params.args as Record<string, string>, key = call.params.key!;
-        if (call.params.target === "notify.send") continuity.effects.push({ type: "notify_user", key, level: args.level as "now", title: args.title!, body: args.body! });
-        else if (call.params.target === "provider.wake") continuity.effects.push({ type: "wake_provider", key, prompt: args.prompt! });
-      }
-    }
-    continuity.status = "passed"; delete continuity.reason;
-  });
-}
 async function checkCopy(context: ModuleContext, live: string, copy: ContinuityCopy) {
   const { staging, data, manifest, continuity } = copy;
   if (!await copyData(live, data)) { continuity.reason = "data too large"; return; }
@@ -64,7 +47,12 @@ async function checkCopy(context: ModuleContext, live: string, copy: ContinuityC
     if (!migration.succeeded) { fail(continuity, "migrate failed"); return; }
     continuity.migrated = true;
   }
-  await checkEntry(context, copy, now);
+  const tests: TestReport = [];
+  const passed = await runTests(context, staging, manifest, tests, data);
+  // Tests can read private live-data copies: keep outcomes, never publish their contents through stdout/stderr.
+  continuity.tests = tests.map(test => ({ exitCode: test.exitCode, stdout: "", stderr: "" }));
+  if (!passed) { fail(continuity, "author tests failed on copied data"); return; }
+  continuity.status = "passed"; delete continuity.reason;
 }
 function schemaFailure(from: number | null, to: number, empty: boolean, manifest: Manifest) {
   if (from !== null && to < from) return "schema 不能降低；降级只能经回滚";

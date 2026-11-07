@@ -53,7 +53,7 @@ test.each([...BUILTIN_MODULE_NAMES, ...KERNEL_MODULE_NAMES, "rescue"])("empty-wo
   expect(await f.db.approval.count()).toBe(0);
 });
 
-test.each([...BUILTIN_MODULE_NAMES])("builtin %s keeps its origin and deletion protection while accepting checked lifecycle updates", async name => {
+test.each(BUILTIN_MODULE_NAMES.filter(name => name !== "agent"))("builtin %s keeps its origin and deletion protection while accepting checked lifecycle updates", async name => {
   const f = await fixture(), app = await f.app(name, true);
   expect(moduleIdentity(app)).toMatchObject({ origin: "builtin", capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: false, install: false } });
   for (const operation of ["build", "propose", "group", "activate", "update", "rollback"] as const) {
@@ -65,6 +65,12 @@ test.each([...BUILTIN_MODULE_NAMES])("builtin %s keeps its origin and deletion p
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: true, activeHash: "next" });
   await rollback(f.context, app.id, "old");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: true, activeHash: "old" });
+});
+
+test("builtin Agent cannot be replaced through dynamic application lifecycle", async () => {
+  const f = await fixture(), app = await f.app("agent", true);
+  expect(moduleIdentity(app)).toMatchObject({ origin: "builtin", capabilities: { build: false, update: false, remove: false } });
+  for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove", "install"] as const) expect(() => assertModuleOperation(app, operation)).toThrow();
 });
 
 test.each([...KERNEL_MODULE_NAMES, "rescue"])("persisted builtin flag cannot grant dynamic authority to %s", async name => {

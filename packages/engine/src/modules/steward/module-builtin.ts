@@ -48,6 +48,25 @@ async function seedSource(context: ModuleContext, moduleId: string, release: Mod
     return { git, ...(dependencies ? { dependencies: dependencies.installed } : {}) };
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
+/** Called before supervisor startup, exclusively from verified resources of the running Chrona release. */
+export async function upgradeAgentRelease(ports: StewardPorts, workspaceId: string) {
+  if (!ports.moduleBuiltinResources || !ports.agentApplication) return;
+  const current = await ports.db.module.findUnique({ where: { workspaceId_name: { workspaceId, name: "agent" } } });
+  if (!current?.activeHash) return;
+  assertSeedIdentity(current);
+  const release = await resolveBuiltinRelease(ports, "agent");
+  if (release.hash === current.activeHash) return;
+  const errors = await runtimeErrors(ports, release, current);
+  if (errors.length) throw new StewardError("conflict", errors.join("; "));
+  const context = moduleContext(ports, workspaceId), source = await seedSource(context, current.id, release);
+  await ports.db.$transaction(async tx => {
+    const latest = await tx.module.findUniqueOrThrow({ where: { id: current.id } });
+    if (latest.activeHash !== current.activeHash || latest.status !== current.status) throw new StewardError("conflict", "Agent changed during release upgrade");
+    await tx.moduleVersion.upsert({ where: { moduleId_hash: { moduleId: current.id, hash: release.hash } }, create: { moduleId: current.id, hash: release.hash, manifest: json(release.manifest), source: "builtin", status: "approved", intent: { changes: ["Trusted Chrona Agent release"] }, report: { tests: [], errors: [], ...source }, createdAt: ports.now() }, update: {} });
+    await recordModuleUpstream(ports, workspaceId, current.id, release.git!, tx);
+    await activateBuiltinReleaseIn(context, tx, release, true);
+  });
+}
 type SeedIdentity = { name: string; builtin: boolean; dataSchema: number | null; status: string };
 function assertSeedIdentity(current: SeedIdentity) {
   if (!current.builtin) throw new StewardError("conflict", `Reserved built-in identity conflicts with external module ${current.name}`);

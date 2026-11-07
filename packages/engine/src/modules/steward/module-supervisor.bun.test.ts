@@ -24,11 +24,11 @@ function clock() {
   return { timers: { setTimeout: ((fn: () => void, ms: number) => { tasks.set(++id, { at: time + ms, fn }); return id; }) as unknown as typeof setTimeout, clearTimeout: ((id: number) => { tasks.delete(id); }) as unknown as typeof clearTimeout },
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
-async function fixture({ keepAlive = false, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
+async function fixture({ keepAlive = false, healthCheck = false, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; healthCheck?: boolean; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, effects: [], uses, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, healthCheck, effects: [], uses, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
@@ -38,6 +38,40 @@ async function fixture({ keepAlive = false, uses = ["notify.send", "provider.wak
   cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   return { db, module, manifest, ports, supervisor, activation, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
 }
+test("module readiness is scoped to the current process, expires and never proves recovery", async () => {
+  const f = await fixture();
+  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown", reportedAt: null });
+  await f.deliver();
+  const report = { status: "needs_configuration" as const, summary: "Select a project", nextAction: "Configure project access", validForSeconds: 60 };
+  f.supervisor.reportHealth(f.module.id, "v1", report);
+  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ source: "module", status: "needs_configuration", stale: false });
+  expect(() => f.supervisor.reportHealth(f.module.id, "old-hash", report)).toThrow("not current");
+  expect(f.supervisor.readiness(f.module.id, "old-hash")).toMatchObject({ status: "unknown", reportedAt: null });
+  f.supervisor.reportHealth(f.module.id, "v1", { status: "ready", summary: "Ready", validForSeconds: 1 });
+  const previous = f.ports.now;
+  f.ports.now = () => new Date(previous().getTime() + 2000);
+  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown", stale: true });
+  f.ports.now = previous;
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
+  await f.supervisor.stop();
+  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown" });
+  expect(() => f.supervisor.reportHealth(f.module.id, "v1", report)).toThrow("not current");
+});
+
+test("diagnostic health errors leave readiness unknown without pausing or verifying business capability", async () => {
+  const f = await fixture({ keepAlive: true, healthCheck: true, handler: async event => {
+    if (event.trigger.kind === "health") throw new Error("Diagnostic unavailable");
+    return {};
+  } });
+  await f.supervisor.reconcile();
+  expect(f.processes).toHaveLength(1);
+  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown" });
+  await expect(f.supervisor.refreshHealth(f.module.id)).rejects.toThrow("Diagnostic unavailable");
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
+  expect((await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
+});
+
 test.each([false, true] as const)("start failure rolls back once before delivery; rollback target failure does not bounce (oldFails=%s)", async oldFails => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });

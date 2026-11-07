@@ -62,7 +62,8 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
         await store.control(tx, principal, ref, { slot: "admission", at: ports.now().toISOString(), status: "confirmed" });
         return { view: executionView(row), queued: true };
       });
-      if (result.queued) await ports.onQueued?.();
+      // Admission must return before the queued Run can call back into the admitting SDK module.
+      if (result.queued) void ports.onQueued?.().catch(error => console.error("Execution queue wake failed", error instanceof Error ? error.name : "unknown"));
       return result.view;
     },
     get: (principal, workId) => read(principal, { workId }),
@@ -94,12 +95,16 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
     async send(principal, input) { await controlExecution(ports, principal, input); },
     async answer(principal, input) { await controlExecution(ports, principal, input); },
     cancel: (principal, input) => controlExecution(ports, principal, input),
+    async admitControl(principal, input) {
+      const admitted = await admitExecutionControl(ports, principal, input);
+      return { perform: !admitted.replay && admitted.row.run.status === "running", operationId: admitted.row.runId };
+    },
   };
 }
 
 type Control = Extract<ExecutionCommand, { op: "send" | "answer" | "cancel" }>;
-async function controlExecution(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
-    const result = await ports.db.$transaction(async tx => {
+async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
+    return ports.db.$transaction(async tx => {
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
       await assertExecutionPrincipal(tx, principal);
       let row = await unique(tx, principal, { id: input.attemptId, workId: input.workId, runId: input.runId });
@@ -117,6 +122,9 @@ async function controlExecution(ports: StewardPorts, principal: ExecutionPrincip
       if (input.op === "cancel" && !row.stopConfirmedAt) row = await cancelExecutionIn(ports, tx, principal, row, now);
       return { row, replay: false };
     });
+}
+async function controlExecution(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
+    const result = await admitExecutionControl(ports, principal, input);
     if (input.op === "cancel" && result.row.executorId !== "server" && result.row.stopConfirmedAt) await ports.remoteCompletion?.committed(principal.workspaceId, result.row.runId);
     if (!result.replay) await deliverExecutionControl(ports, principal, input, result.row);
     return input.op === "cancel" ? ports.db.$transaction(async tx => { await assertExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, { id: result.row.id })); }) : executionView(result.row);

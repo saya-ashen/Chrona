@@ -176,6 +176,8 @@ export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object(
   keepAlive: z.boolean().default(false),
   /** Receive on("activated") once per active version and when a module it `uses` changes version (e.g. to call web.page-set). */
   activated: z.boolean().default(false),
+  /** Opt in to diagnostic-only health events, after startup/configuration and on explicit refresh. */
+  healthCheck: z.boolean().default(false),
   /** A private file directory at `chrona.paths.content`, kept with the module's data (v2-8: no longer shown to the user or the Provider; expose files through tools). */
   content: z.boolean().default(false),
   /**
@@ -243,7 +245,7 @@ export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object(
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length) ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
-  if (grantedUses(manifest).includes("provider.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses provider.complete" });
+  if (grantedUses(manifest).some(target => target === "provider.complete" || target === "agent.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses provider.complete or agent.complete" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
@@ -298,6 +300,7 @@ export const moduleEventSchema = z.object({
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
     /** For manifests with `activated`: once per active version, and again when a module this one `uses` changes version (e.g. to call web.page-set). */
     z.object({ kind: z.literal("activated"), id: z.literal("activated"), firedAt: iso }).strict(),
+    z.object({ kind: z.literal("health"), id: z.literal("health"), firedAt: iso }).strict(),
   ]),
   now: iso,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),

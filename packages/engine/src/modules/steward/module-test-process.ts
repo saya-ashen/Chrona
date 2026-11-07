@@ -53,6 +53,7 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
       let end: number;
       while ((end = buffer.indexOf("\n")) >= 0) {
         const message = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+        if (message.ping === true) { socket.write(JSON.stringify({ id: message.id, result: {} }) + "\n"); continue; }
         if (message.event) {
           void handler(message.event, call, input).then(result => {
             if (!socket.destroyed) socket.write(JSON.stringify({ id: message.id, result: result ?? {} }) + "\n");

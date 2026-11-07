@@ -1,10 +1,11 @@
 import { builder, type Builder } from "./spec";
-import { runtimeText } from "./text";
+import { runtimeText, readinessText } from "./text";
 import { diagnosticNodes } from "./diagnostics";
 import type { ActivityItem } from "./activity";
 import type { App, Diagnostics, Overview, Permissions, Tool } from "./detail-types";
 import type { ModuleInstallResult } from "@chrona/contracts/steward";
 import { installationText } from "./install";
+import { runtimeCapabilityText, runtimeCapabilityBoundary } from "./runtime";
 export const APP_TABS = [["overview", "概览"], ["settings", "设置"], ["permissions", "权限"], ["activity", "活动"], ["versions", "版本"]];
 export const SYSTEM_TABS = [["overview", "概览"], ["settings", "设置"], ["tools", "工具"], ["activity", "活动"]];
 export const selectedTab = (tab: string, system = false, session = "") => session ? "overview" : (system ? SYSTEM_TABS : APP_TABS).some(([key]) => key === tab) ? tab : "overview";
@@ -33,15 +34,6 @@ function permissions(b: Builder, view: Permissions) {
     b.heading("你给过的授权"), b.list(view.grants.map(grant => b.stack([b.text(`${grant.action} · ${grant.mode === "allow" ? "允许" : "先问我"}${grant.once ? " · 一次" : ""}`), b.node("SystemAction", { label: "撤销", tool: "revoke", args: { id: grant.id }, confirm: "撤销这条授权？" })]))),
     b.heading("最近审批"), b.list(view.approvals.map(item => b.stack([b.text(`${item.title} ${status[item.status] ?? item.status}`), b.time(item.createdAt)])))];
 }
-function appControls(b: Builder, app: App) {
-  const rows: string[] = [];
-  if (app.activeHash && (app.status === "active" && app.capabilities.disable || app.status === "paused" && app.capabilities.enable)) {
-    const paused = app.status === "paused", label = paused ? "恢复" : "暂停";
-    rows.push(b.node("SystemAction", { label, tool: paused ? "module-enable" : "module-disable", args: { id: app.name }, confirm: paused ? `恢复 ${app.name}？应用及随暂停停止的日程将恢复运行。` : `暂停 ${app.name}？应用和它的日程会停止，数据和文件会保留。` }));
-  }
-  if (app.activeHash && app.capabilities.remove && app.status !== "migrating") rows.push(b.node("AppRemoval", { name: app.name }));
-  return rows;
-}
 function installationNodes(b: Builder, installation: ModuleInstallResult | null | undefined) {
   if (!installation) return [];
   const rows = [b.text(installationText(installation.status))];
@@ -53,8 +45,19 @@ function installationNodes(b: Builder, installation: ModuleInstallResult | null 
 function appResources(b: Builder, app: App, state: Record<string, unknown>) {
   const pages = (state.pages as { module: string; id: string; title: string }[] | undefined) ?? [];
   const rows = pages.filter(page => page.module === app.name).map(page => b.link(`打开${page.title}`, `/p/${encodeURIComponent(page.module)}/${encodeURIComponent(page.id)}`));
-  const tools = ((state.tools as Tool[] | undefined) ?? []).filter(tool => tool.target.startsWith(`${app.name}.`));
+  const declarations = (state.overview as Overview).tools;
+  const tools = ((state.tools as Tool[] | undefined) ?? []).filter(tool => tool.target.startsWith(`${app.name}.`) && declarations.some(item => `${app.name}.${item.name}` === tool.target && item.visibility.includes("owner")));
   if (tools.length) rows.push(b.heading("操作", "h2"), ...tools.map(tool => b.node("ToolForm", { tool })));
+  const internal = declarations.filter(tool => !tool.visibility.includes("owner"));
+  if (internal.length) rows.push(b.heading("调用接口", "h2"), ...internal.map(tool => b.text(`${app.name}.${tool.name} · ${tool.visibility.includes("modules") ? "供应用调用" : "仅内核可调用"} · ${tool.description}`)));
+  return rows;
+}
+function readinessNodes(b: Builder, app: App) {
+  const health = app.health.readiness, rows = [b.text(readinessText(app.health))];
+  if (health?.summary) rows.push(b.text(health.summary));
+  if (health?.nextAction) rows.push(b.text(health.nextAction));
+  if (health?.reportedAt) rows.push(b.text("模块报告时间"), b.time(health.reportedAt));
+  if (app.health.healthCheck && app.status === "active" && app.activeHash) rows.push(b.node("SystemAction", { label: "重新自检", tool: "module-refresh-health", args: { id: app.name } }));
   return rows;
 }
 function appOverview(b: Builder, app: App, state: Record<string, unknown>) {
@@ -63,12 +66,13 @@ function appOverview(b: Builder, app: App, state: Record<string, unknown>) {
   const missing = (state.overview as Overview).permissions.secrets.some(secret => !secret.configured);
   const rows = [b.text(`${app.origin === "builtin" ? "内置" : "外置"} · ${status} · ${missing ? "待配置 · " : ""}${runtimeText(app.health)}`)];
   const installation = (state.catalog as { moduleId: string | null; installation: ModuleInstallResult | null }[] | undefined)?.find(item => item.moduleId === app.id)?.installation;
+  rows.push(...readinessNodes(b, app));
   rows.push(...installationNodes(b, installation));
   if (missing) rows.push(b.link("完成凭据配置", `/apps/${encodeURIComponent(app.id)}?tab=settings`));
   if (app.origin === "builtin") rows.push(b.text("代码随 Chrona 发版更新；可查看状态、配置和诊断。", "muted"));
   if (app.capabilities.build) rows.push(b.link("向 Chrona 交代外置应用的构建需求", "/chat/new"), b.text("在对话中明确应用与需求，由 Chrona 使用获准的构建接口处理。", "muted"));
   if (app.description) rows.push(b.text(app.description));
-  rows.push(...appControls(b, app), currentVersion(b, app, (state.recent as ActivityItem[] | undefined) ?? []));
+  rows.push(currentVersion(b, app, (state.recent as ActivityItem[] | undefined) ?? []));
   rows.push(...appResources(b, app, state));
   return rows;
 }
@@ -92,28 +96,30 @@ function appPanel(b: Builder, app: App, view: Overview, state: Record<string, un
 function systemPanel(b: Builder, view: Overview, route: DetailRoute, tab: string) {
   const panels: Record<string, () => string[]> = {
     overview: () => {
-      const rows = [b.text(view.description)];
+      const rows = view.runtime ? [b.text(view.runtime.responsibility), b.text(runtimeCapabilityText(view.runtime))] : [b.text(view.description)];
       if (route.id === "memory") rows.push(b.node("MemoryPanel", {}));
       if (view.sessions) rows.push(b.heading("最近的工作", "h2"), b.list(view.work.map(session => b.node("SessionWork", { session, open: session.id === route.session })), "还没有工作记录。"));
       return rows;
     },
-    settings: () => [b.node("SettingsForm", { module: route.id, view: view.settings })],
-    tools: () => [b.list(view.tools.map(tool => b.text(`${route.id}.${tool.name} ${tool.visibility.includes("provider") ? "Chrona" : tool.visibility.includes("modules") ? "其他应用" : "用户入口"}可调用 · ${tool.description}`)))],
+    settings: () => view.runtime ? [b.text(view.runtime.configuration), ...(route.id === "agent" ? [b.link("打开全局模型与预算设置", "/settings")] : [])] : [b.node("SettingsForm", { module: route.id, view: view.settings })],
+    tools: () => [b.list(view.tools.map(tool => b.text(`${route.id}.${tool.name} ${tool.visibility.includes("kernel") ? "仅内核" : tool.visibility.includes("provider") ? "Chrona" : tool.visibility.includes("modules") ? "其他应用" : "用户入口"}可调用 · ${tool.description}`)))],
     activity: () => [b.activity(view.activity, route.id)],
   };
   return panels[tab]!();
 }
 const detailTabs = (system: boolean, app: App | null | undefined) => system ? SYSTEM_TABS : APP_TABS.filter(([key]) => key !== "versions" || app!.origin === "external");
+const systemBoundary = (view: Overview) => view.runtime ? runtimeCapabilityBoundary : "Chrona 自身的一部分：不能构建、更新或停用，随 Chrona 版本更新。";
+const systemTitle = (id: string, view: Overview) => `${id} · ${view.runtime ? "运行能力" : "系统"}`;
 export function detailSpec(state: Record<string, unknown>, route: DetailRoute, system = false) {
   const b = builder(), view = state.overview as Overview | undefined;
   if (!view) return b.finish(system ? `${route.id} · 系统` : "应用", [b.text("加载中……", "muted")]);
   if (!system && !view.app) return b.finish("应用", [b.text("没有这个应用", "error")]);
   const tab = selectedTab(route.tab, system, system ? route.session : ""), app = view.app;
   const base = `/apps/${system ? `system/${encodeURIComponent(route.id)}` : encodeURIComponent(app!.id)}`;
-  const rows = system ? [b.text("Chrona 自身的一部分：不能构建、更新或停用，随 Chrona 版本更新。", "muted")] : [];
+  const rows = system ? [b.text(systemBoundary(view), "muted")] : [];
   const tabs = detailTabs(system, app);
   const currentTab = tabs.some(([key]) => key === tab) ? tab : "overview";
   rows.push(b.node("TabNav", { items: tabs.map(([key, label]) => ({ label, href: `${base}?tab=${key}`, current: key === currentTab })) }));
   rows.push(...(system ? systemPanel(b, view, route, tab) : appPanel(b, app!, view, state, currentTab)));
-  return b.finish(system ? `${route.id} · 系统` : app!.name, rows);
+  return b.finish(system ? systemTitle(route.id, view) : app!.name, rows);
 }

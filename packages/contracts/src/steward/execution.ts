@@ -89,4 +89,6 @@ export interface ExecutionPorts {
   send(principal: ExecutionPrincipal, input: Extract<ExecutionCommand, { op: "send" }>): Promise<void>;
   answer(principal: ExecutionPrincipal, input: Extract<ExecutionCommand, { op: "answer" }>): Promise<void>;
   cancel(principal: ExecutionPrincipal, input: Extract<ExecutionCommand, { op: "cancel" }>): Promise<ExecutionView>;
+  /** Admission only: the Agent already owns the live handle and performs the control after this returns. */
+  admitControl(principal: ExecutionPrincipal, input: Extract<ExecutionCommand, { op: "send" | "cancel" }>): Promise<{ perform: boolean; operationId: string }>;
 }

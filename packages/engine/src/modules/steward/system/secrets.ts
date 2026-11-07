@@ -3,6 +3,7 @@ import * as outputs from "../system-outputs";
 import { isEntryModule, secretNames, moduleManifestSchema } from "@chrona/contracts/steward";
 import { CallError, type SystemModule } from "../module-calls";
 import { createSecrets } from "../secrets";
+import { moduleSupervisor } from "../module-supervisor";
 import { authorizeOAuth, hiddenField, locked, oauthToken } from "../oauth";
 import { kernelField } from "../secret-fields";
 import { audit } from "../audit";
@@ -55,9 +56,16 @@ export const secrets: SystemModule = {
     }
     if (name !== "set" && name !== "remove" && name !== "list") throw new CallError("not_found", `secrets.${name} not found`);
     if (!manifest || !isEntryModule(manifest)) throw new CallError("forbidden", "Only an entry module may manage credentials");
-    return manageSecrets(ports, workspaceId, store, name, args);
+    const result = await manageSecrets(ports, workspaceId, store, name, args);
+    if (name !== "list") await refreshConsumers(ports, workspaceId, String(args.name));
+    return result;
   },
 };
+async function refreshConsumers(ports: StewardPorts, workspaceId: string, name: string) {
+  const consumers = (await declaredSecrets(ports.db, workspaceId)).get(name) ?? [];
+  const modules = await ports.db.module.findMany({ where: { workspaceId, name: { in: consumers } }, select: { id: true } });
+  for (const module of modules) await moduleSupervisor(ports).refreshHealth(module.id).catch(() => {});
+}
 async function readSecret(ports: StewardPorts, store: ReturnType<typeof createSecrets>, manifest: Awaited<ReturnType<typeof callerManifest>>, secret: string) {
   if (!manifest || !secretNames(manifest).includes(secret) || (secret === "qq_bot" && !isEntryModule(manifest))) throw new CallError("forbidden", "Secret not declared");
   // qq_bot comes from the service environment; the others are saved by the user.

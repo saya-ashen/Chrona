@@ -92,7 +92,11 @@ try {
   assert.deepEqual(JSON.parse(boundedText).checks, []);
 } finally { await rm(dir, { recursive: true, force: true }); }
 
+let readiness: Record<string, unknown> | undefined;
+let locations: { online: boolean }[] = [];
 const runtime = await startModule("index.ts", { stubs: {
+  "executions.locations": () => ({ locations, after: null }),
+  "modules.report-health": (args: Record<string, unknown>) => { readiness = args; return { reportedAt: "2026-11-05T00:00:00Z", expiresAt: "2026-11-05T00:10:00Z" }; },
   "executions.list": () => ({ works: [], after: null }), "web.page-set": () => ({ id: "main" }), "schedules.create": () => ({ key: "coding-dependencies" }),
 } });
 try {
@@ -113,4 +117,11 @@ try {
   const badWork = await runtime.send({ trigger: { kind: "tool", id: "work", firedAt: now, args: { input: "{}" }, caller: { kind: "owner", via: null } }, now, params: {} });
   assert.equal((badWork as { errorCode?: string }).errorCode, "invalid");
   assert.equal((await runtime.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
+  assert.equal(readiness?.status, "needs_configuration");
+  assert.ok(readiness.nextAction);
+  for (const [choices, expected] of [[[{ online: false }], "degraded"], [[{ online: false }, { online: true }], "ready"], [[], "needs_configuration"]] as const) {
+    locations = [...choices];
+    assert.equal((await runtime.send({ trigger: { kind: "health", id: "health", firedAt: now }, now, params: {} })).error, undefined);
+    assert.equal(readiness.status, expected);
+  }
 } finally { await runtime.stop(); }

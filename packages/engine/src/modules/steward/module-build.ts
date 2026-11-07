@@ -18,7 +18,7 @@ import { dataEmpty } from "./module-data";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
 import { audit } from "./audit";
-import { probeKeys, keyProbePreview, smokeRun } from "./module-probe";
+import { smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
 import { moduleToolExampleError } from "./module-calls";
@@ -82,7 +82,7 @@ async function reviewPreview(context: ModuleContext, review: Review, active: Awa
   const results = report.tests.map((result, index) => ({ test: manifest.tests[index], exitCode: result.exitCode }));
   const prefix = reviewPrefix(manifest, report, diff);
   const impactPreview = report.outputImpacts?.length ? `依赖这些工具契约的应用需随本次更新一并检查（不会自动修改调用方）：\n${outputImpactSummary(report.outputImpacts).join("\n")}\n` : "";
-  const suffix = `${impactPreview}${continuityPreview(report.continuity!, needsMigration)}${keyProbePreview(report.keyProbe)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
+  const suffix = `${impactPreview}${continuityPreview(report.continuity!, needsMigration)}意图：${JSON.stringify(intent)}\n测试：${JSON.stringify(results)}\nhash: ${hash}`;
   // Fail closed rather than silently hiding manifest or intent being approved.
   let preview: string | null = null, codeDiff = "";
   if ((prefix + suffix).length <= 20_000) preview = insertCodeDiff(prefix, suffix, codeDiff = codeDifference(module.activeHash ? await readVersionSource(context, module.id, module.activeHash) : [], files), hash);
@@ -174,17 +174,6 @@ async function typecheckAndTest(context: ModuleContext, staging: string, manifes
   report.errors = typecheckErrors(typecheck);
   return false;
 }
-/** Versions activate without review, so a failed key probe (repeated effects on a redelivered fire) rejects the build. */
-async function probeAndInstall(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string, report: BuildReport) {
-  const keyProbe = await probeKeys(context, staging, manifest);
-  if (keyProbe.status !== "skipped" || !["no schedule trigger", "no effects on both fires"].includes(keyProbe.reason ?? "")) report.keyProbe = keyProbe;
-  if (report.keyProbe && report.keyProbe.status !== "passed") {
-    report.errors = [keyProbePreview(report.keyProbe).trim()];
-    return false;
-  }
-  await installBuild(context, staging, hash);
-  return true;
-}
 function buildHasErrors(report: BuildReport) { return Boolean(report.errors?.length); }
 async function checkBuildCandidate({ context, module, version, manifest, staging, report }: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; staging: string; report: BuildReport }): Promise<{ passed: boolean; needsMigration: boolean; dependencyFailure: boolean }> {
   const { platform } = context, { hash } = version;
@@ -204,7 +193,7 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (passed) report.errors = await smokeRun(context, staging, manifest);
   if (buildHasErrors(report)) passed = false; else delete report.errors;
   // Only engine-owned immutable copies are tested, hashed and installed.
-  if (passed) passed = await probeAndInstall(context, staging, manifest, hash, report);
+  if (passed) await installBuild(context, staging, hash);
   // shortcut: GC roots of approved versions are kept until the version is deleted; nothing deletes versions yet.
   if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };

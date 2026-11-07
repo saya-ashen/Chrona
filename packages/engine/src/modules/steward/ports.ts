@@ -71,6 +71,8 @@ export type ExecutionEventTransactions = {
 export type StewardPorts = {
   db: PrismaClient; now(): Date; dataDir: string; publicUrl: string | null;
   provider?: ProviderAdapter;
+  /** Release-bound Agent host launcher/configuration, never granted by a manifest or ordinary proposal. */
+  agentApplication?: { env: Record<string, string>; startModule: NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]> };
   /** Host-owned project mapping; resolves and authorizes against the real caller moduleId/hash, never a body path. */
   resolveExecutionProject?: (principal: ExecutionPrincipal, projectRef: string) => Promise<ExecutionProjectGrant>;
   executions?: ExecutionPorts;

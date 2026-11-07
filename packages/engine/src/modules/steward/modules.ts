@@ -46,7 +46,9 @@ async function currentContractFailures(db: StewardPorts["db"], workspaceId: stri
 }
 
 function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | null; status: string }, version: { manifest: unknown } | null) {
-  return row.status !== "active" ? { state: "paused", pid: null } : moduleSupervisor(ports).status(row.id, row.activeHash, moduleManifestSchema.safeParse(version?.manifest).data?.keepAlive ?? false);
+  const manifest = moduleManifestSchema.safeParse(version?.manifest).data, supervisor = moduleSupervisor(ports);
+  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false),
+    readiness: supervisor.readiness(row.id, row.activeHash), healthCheck: manifest?.healthCheck ?? false };
 }
 
 function incidentSummary(current: ModuleIncident | undefined) {
@@ -72,7 +74,7 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
   }
   const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } } }) : null;
   return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
-    runtime: runtimeOf(ports, moduleRow, version),
+    ...runtimeOf(ports, moduleRow, version),
     activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status, activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
     consecutiveFailures: policy?.consecutiveFailures ?? 0,
     incident: incidentSummary(current),

@@ -4,77 +4,84 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/web.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/web.git",
       "branch": "main",
-      "commit": "428b634cd09e76d80e0d6b53043bcd8c7511dbe2"
+      "commit": "1cd81e7f647927ff47b1a2cda8e50c1e329250e5"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/mcp.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mcp.git",
       "branch": "main",
       "commit": "f701d4216cafa115297819fde8b38a1464165a92"
     },
     {
       "name": "files",
       "proposedRepository": "chrona-core/chrona-module-files",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/files.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/files.git",
       "branch": "main",
       "commit": "f9baa5df32c092ed839a0d933b5ceaff323ea1e7"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/notify.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/notify.git",
       "branch": "main",
       "commit": "e3e53c19f8b244ffd4ab84356c95f7268a957c12"
     },
     {
       "name": "events",
       "proposedRepository": "chrona-core/chrona-module-events",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/events.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/events.git",
       "branch": "main",
       "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425"
     },
     {
+      "name": "agent",
+      "proposedRepository": "chrona-core/chrona-module-agent",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/agent.git",
+      "branch": "main",
+      "commit": "c9b60fd5d6ab5e4df5a97c1a7d3331f836d9b0f3"
+    },
+    {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/qq.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/qq.git",
       "branch": "main",
       "commit": "d4a2d4b26d23eef3f0802767c47860b147892acc"
     },
     {
       "name": "remind",
       "proposedRepository": "chrona-core/chrona-module-remind",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/remind.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/remind.git",
       "branch": "main",
       "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/mind.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mind.git",
       "branch": "main",
       "commit": "ac48500a13ea384d1456b43981fb583ea354c1e4"
     },
     {
       "name": "memory-local",
       "proposedRepository": "chrona-core/chrona-module-memory-local",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/memory-local.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/memory-local.git",
       "branch": "main",
       "commit": "2f9e91afaaf1fdde2842d40a8b082c0f0f86f639"
     },
     {
       "name": "coding",
       "proposedRepository": "chrona-core/chrona-module-coding",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/coding.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/coding.git",
       "branch": "main",
-      "commit": "453ae363402e5585f556c23b19ddd91b3c09ad5c"
+      "commit": "3428eb626455a601761bdcd05afed6d5169409aa"
     },
     {
       "name": "editor",
       "proposedRepository": "chrona-core/chrona-module-editor",
-      "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/editor.git",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/editor.git",
       "branch": "main",
       "commit": "560d06f9759483ad896b8022ad31e3fafb4d2226"
     }

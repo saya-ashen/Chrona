@@ -78,7 +78,7 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   await moduleSupervisor(steward.ports).start();
   // Only the five trusted release builtins activate here; external packages are separately queued.
   const unfinished = await db.moduleVersion.findMany({ where: { module: { builtin: true, activeHash: null } }, select: { manifest: true, status: true, report: true } });
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["events", "files", "mcp", "notify", "web"].map(name => [name, "active", true]));
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["agent", "events", "files", "mcp", "notify", "web"].map(name => [name, "active", true]));
   const app = await createServerApp({ steward });
   // The web module serves the page at / (no key needed), while the API it calls stays protected.
   const page = await app.request("/apps/a1?path=README.md");

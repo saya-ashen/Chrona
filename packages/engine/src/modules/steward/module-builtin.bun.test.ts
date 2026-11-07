@@ -41,14 +41,14 @@ test("fixed builtins bind approved trusted release metadata without builds or ex
   await f.start();
   expect((await f.db.module.findMany()).map(m => m.name).sort()).toEqual([...BUILTIN_MODULE_NAMES].sort());
   expect(await f.current()).toMatchObject({ builtin: true, status: "active", dataSchema: 1 });
-  expect(await f.db.moduleVersion.findMany()).toHaveLength(5);
-  expect(await f.db.moduleVersion.count({ where: { status: "approved", source: "builtin" } })).toBe(5);
+  expect(await f.db.moduleVersion.findMany()).toHaveLength(BUILTIN_MODULE_NAMES.length);
+  expect(await f.db.moduleVersion.count({ where: { status: "approved", source: "builtin" } })).toBe(BUILTIN_MODULE_NAMES.length);
   expect(await f.db.approval.count()).toBe(0);
-  expect(await f.db.generation.count()).toBe(5);
+  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
   const hash = (await f.current()).activeHash;
   await f.start();
   expect((await f.current()).activeHash).toBe(hash);
-  expect(await f.db.generation.count()).toBe(5);
+  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
   expect(f.executions()).toBe(0);
 });
 
@@ -66,10 +66,10 @@ test("parallel first registrations share the Git seed and activate each builtin 
     expect(await getModuleUpstreamHead({ ...location, branch: release.git!.branch })).toBe(release.hash);
     expect(await readFile(join(f.ports.dataDir, "platform/store", release.hash, "index.ts"), "utf8")).toBe("// release 1\n");
   }
-  expect(await f.db.moduleVersion.count()).toBe(5);
-  expect(await f.db.generation.count()).toBe(5);
+  expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length);
+  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
   await f.start();
-  expect(await f.db.generation.count()).toBe(5);
+  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
   expect(f.executions()).toBe(0);
 });
 
@@ -83,7 +83,7 @@ test.each(["release", "missing", "schema"])("existing active builtin ignores %s 
   await f.start();
   expect(await f.current()).toMatchObject({ activeHash: first.activeHash, builtin: true, status: "active", dataSchema: 1 });
   expect(await f.db.moduleVersion.findMany({ where: { moduleId: first.id } })).toEqual(versions);
-  expect(await f.db.generation.count()).toBe(5);
+  expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
   expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
   expect(f.executions()).toBe(0);
 });
@@ -98,7 +98,7 @@ test("checked builtin customization survives restart, missing release and unavai
   await rm(f.ports.moduleBuiltinResources!, { recursive: true });
   await f.start();
   expect(await f.current()).toMatchObject({ activeHash: hash, builtin: true, status: "paused" });
-  expect(await f.db.moduleVersion.count()).toBe(6);
+  expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length + 1);
 });
 
 test("missing runtime or host dependency reports a paused builtin without running installer", async () => {
@@ -167,8 +167,8 @@ test.each([false, true])("trusted seed prepares runtime dependencies before appr
     expect(await f.current()).toMatchObject({ activeHash: local, status: "paused" });
     expect(await getModuleLocalHead(location)).toBe(local);
     expect(await getModuleUpstreamHead({ ...location, branch: (await resolveBuiltinRelease(f.ports, "web")).git!.branch })).toBe(local);
-    expect(await f.db.moduleVersion.count()).toBe(5);
-    expect(await f.db.generation.count()).toBe(5);
+    expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length);
+    expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
     expect(installs).toBe(2);
   } else {
     await f.start();
