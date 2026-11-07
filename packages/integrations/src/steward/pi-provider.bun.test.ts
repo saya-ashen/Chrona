@@ -22,6 +22,12 @@ const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
 const reply=(c,data={})=>emit({id:c.id,type:'response',command:c.type,success:true,data});
 function run() {
  streaming=true; cycle++; emit({type:'agent_start'});
+ if(mode==='tool-ids') {
+  for(const id of ['tool1','call_1|fc_1','x'.repeat(200)+'a','x'.repeat(200)+'b',process.env.CHRONA_AGENT_TOKEN]) {
+   emit({type:'tool_execution_start',toolCallId:id,toolName:'bash',args:{command:'raw private arguments'}});
+   emit({type:'tool_execution_end',toolCallId:id,toolName:'bash',result:{content:[]}});
+  }
+ }
  if(mode==='details') {
   emit({type:'message_start',message:{role:'assistant'}});
   for(let i=0;i<300;i++) emit({type:'message_update',assistantMessageEvent:{type:'text_delta',delta:'safe '+process.env.CHRONA_AGENT_TOKEN}});
@@ -252,6 +258,22 @@ test.skipIf(!realBwrap)("real bwrap: content areas appear under content/, writab
   expect({ code: await proc.exited, err }).toEqual({ code: 0, err: "" });
   expect(out.split("\n").filter(Boolean)).toEqual(["hi", "notes-rw", "files-ro", "root-ro"]);
 });
+test("opaque composite and long Provider tool IDs preserve bounded start/end correlation", async () => {
+  const f = await fixture("tool-ids"), records: ExecutionEvent[] = [];
+  const result = await f.provider.start({ ...f.input, resources: "minimal", execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { records.push(event); } } }).done;
+  expect(result.outcome).toBe("finished");
+  const starts = records.flatMap(event => event.payload.type === "tool_started" ? [event.payload.toolCallId] : []);
+  const ends = records.flatMap(event => event.payload.type === "tool_finished" ? [event.payload.toolCallId] : []);
+  expect(starts).toHaveLength(5);
+  expect(ends).toEqual(starts);
+  expect(new Set(starts).size).toBe(5);
+  expect(starts[0]).toBe("tool1");
+  expect(starts.every(id => id.length <= 128 && /^[\w:.-]+$/.test(id))).toBe(true);
+  expect(records.every(event => executionEventSchema.safeParse(event).success)).toBe(true);
+  expect(JSON.stringify(records)).not.toContain("raw private arguments");
+  expect(JSON.stringify(records)).not.toContain(f.input.token);
+});
+
 test("execution details are bounded/redacted, recover final after saturation and omit personal steward context", async () => {
   const f = await fixture("details"), records: ExecutionEvent[] = [];
   const ref = { workId: "work", sessionId: "coding-session", runId: "run", attemptId: "attempt" };

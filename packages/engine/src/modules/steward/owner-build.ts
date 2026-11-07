@@ -22,7 +22,7 @@ export async function buildControl(ports: StewardPorts, workspaceId: string, cal
   if (caller.kind !== "provider") throw new StewardError("forbidden", "Only the Provider may supply build reference files");
   const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId } });
   if (!run) throw new StewardError("not_found", "Run not found");
-  return controlBuild(ports, workspaceId, input.session, input.requirements, await requestFiles(ports, run.cwd, input.files));
+  return controlBuild(ports, workspaceId, input.session, input.requirements, await requestFiles(ports, run.cwd, input.files, workspaceId));
 }
 
 export async function startOwnerBuildAsCaller(ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown) {

@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
@@ -107,13 +108,18 @@ class PiDetail {
   private messageText(content: unknown): string {
     return Array.isArray(content) ? content.map(object).filter(part => part.type === "text").map(part => typeof part.text === "string" ? part.text : "").join("\n") : typeof content === "string" ? content : "";
   }
+  private toolId(value: unknown) {
+    if (typeof value !== "string" || !value) return "";
+    // Provider IDs are opaque; composite IDs must still correlate start and end.
+    return this.text(value, 128) === value && /^[\w:.-]+$/.test(value) ? value : `tool:${createHash("sha256").update(value).digest("hex")}`;
+  }
   private receiveTool(event: RecordValue) {
     if (event.type === "tool_execution_start") {
-      const tool = this.text(event.toolName, 100), toolCallId = this.text(event.toolCallId, 128);
+      const tool = this.text(event.toolName, 100), toolCallId = this.toolId(event.toolCallId);
       if (tool && /^[\w:.-]+$/.test(toolCallId)) this.emit({ type: "tool_started", toolCallId, tool, display: {} });
     }
     if (event.type === "tool_execution_end") {
-      const tool = this.text(event.toolName, 100), toolCallId = this.text(event.toolCallId, 128);
+      const tool = this.text(event.toolName, 100), toolCallId = this.toolId(event.toolCallId);
       if (tool && /^[\w:.-]+$/.test(toolCallId)) {
         const originalBytes = event.result === undefined ? 0 : Buffer.byteLength(JSON.stringify(event.result));
         this.emit({ type: "tool_finished", toolCallId, tool, isError: event.isError === true, summary: event.isError ? "Tool failed" : "Tool completed", truncated: originalBytes > 0, originalBytes });

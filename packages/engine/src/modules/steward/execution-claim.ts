@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Prisma } from "@chrona/db";
 import { EXECUTOR_LIMITS, type ExecutionSource, type ExecutorAssignment, type ExecutionPrincipal, type ExecutionProjectGrantP2, type ExecutorMapping, type WorkPlacement, type RunLane } from "@chrona/contracts/steward";
+import { prepareLocalWorkspace } from "./local-workspace";
 import type { ExecutionClaimSelection, StewardPorts } from "./ports";
 import { assertPreparedServerWorkspace, serverClaimRequest, type ServerClaimPreparation } from "./execution-server-workspace";
 import { sourceReceiptCapacity } from "./execution-source-budget";
@@ -119,5 +120,5 @@ export async function prepareServerClaim(ports: StewardPorts, workspaceId: strin
     return { request: serverClaimRequest(a, grant), admissionDigest: a.requestDigest };
   });
   if (!selected) return null;
-  return { ...selected, prepared: await ports.executionServerWorkspace.prepare(selected.request) };
+  return { ...selected, prepared: await prepareLocalWorkspace(ports, selected.request) };
 }

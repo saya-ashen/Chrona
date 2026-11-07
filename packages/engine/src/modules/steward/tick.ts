@@ -10,13 +10,16 @@ import { createRuns, liveRuns } from "./runs";
 import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
-import { chatFilesDir, chatImages } from "./chat";
+import { chatImages } from "./chat";
+import { chatContentMount } from "./local-content";
 import { announceApprovals, forwardSettings } from "./notify-user";
 import { autoRetain, memoryInput } from "./memory";
 import { callsSettled, drainCalls } from "./module-calls";
 import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
+import { startLocalProvider, runtimeCall } from "./local-runtime";
+import { registerWorkspaceModule } from "./local-workspace";
 import { moduleToolCatalog, moduleToolsets } from "./module-tools";
 import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
 import { EXECUTOR_LIMITS, isEntryModule, moduleManifestSchema, type ProviderAdapter } from "@chrona/contracts/steward";
@@ -26,7 +29,6 @@ import { moduleIdentity } from "./module-identity";
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
-import { captureExecutionChanges } from "./execution-result";
 
 import { STEWARD_PROMPT } from "./run-instructions";
 
@@ -68,7 +70,7 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
     try { await channel.close(); }
     catch { outcome = { ...outcome, outcome: "failed", error: "Execution interaction persistence failed" }; }
     if (execution) {
-      try { await captureExecutionChanges(ports, run.id); }
+      try { registerWorkspaceModule(); await runtimeCall(ports, run.workspaceId, "workspace-local.capture", { runId: run.id }); }
       catch {
         // The Provider has exited even if the result sidecar could not be written.
         await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(() => {});
@@ -130,8 +132,7 @@ export function createTick(ports: StewardPorts) {
         const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name);
         const hostPaths = await focusedHostPaths(ports, workspaceId, run.session?.focus, now);
         // The only directory mounted into runs: the conversations' files, read-only (v2-8).
-        await mkdir(chatFilesDir(ports), { recursive: true });
-        const content = [{ name: "chat", dir: chatFilesDir(ports), writable: false }];
+        const content = [await chatContentMount(ports, workspaceId)];
         // Current app capabilities determine which app can handle a need; built-ins require a release to change code.
         const { self, via } = await moduleContext(ports, workspaceId, now, run.session?.entryModuleId);
         const timezone = notificationSettings(workspace.settings).timezone;
@@ -159,12 +160,13 @@ export function createTick(ports: StewardPorts) {
               await runs.authenticate(run.token);
               if (gate.stopped()) { await channel.close(); return; }
               const input = providerInput(run, lane, sessionDir, execution, ordinary);
-              handle = ports.provider.start({ ...input, events: channel.events });
+              handle = await startLocalProvider(ports, workspaceId, { ...input, events: channel.events });
             } catch (error) { await channel.close(); throw error; }
             gate.attach(handle);
             const finalized = finalizeProvider(ports, run, channel, handle, !!execution);
             finalizers.add(finalized);
             void finalized.finally(() => finalizers.delete(finalized));
+            if (gate.stopped()) await handle.abort();
           } catch (error) {
             gate.fail();
             await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: `Provider could not start: ${String(error).slice(0, 300)}` });

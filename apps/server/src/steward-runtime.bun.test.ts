@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime } from "./steward-runtime";
+import { sessionTranscript } from "../../../packages/engine/src/modules/steward/transcript";
 import { stewardDataDir } from "../../../packages/integrations/src/steward/module-runtime";
 test("E2E provider requires both the explicit test gate and provider selection", async () => {
   const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
@@ -51,6 +52,25 @@ test("runtime forwards a dedicated Pi profile, executable and version pin", asyn
     keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
     await db.$disconnect();
   }
+});
+
+test("runtime preserves routed Provider history through the lifecycle wrapper", async () => {
+  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-runtime-history-"));
+  let selected: { sessionDir: string; limit: number } | undefined;
+  const runtime = createStewardRuntime(db, { dataDir, provider: {
+    name: "history-fixture", health: async () => ({ available: true, sandboxed: false, error: null }),
+    start() { throw new Error("History does not start a model"); },
+    async transcript(input) { selected = input; return [{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]; },
+  } });
+  try {
+    const workspace = await db.workspace.create({ data: { name: "History" } });
+    const session = await db.session.create({ data: { workspaceId: workspace.id, source: "web", key: "web:history" } });
+    expect(await sessionTranscript(runtime.ports, session.id, 10)).toEqual([{ kind: "text", at: "2026-11-07T00:00:00.000Z", text: "Retained conversation" }]);
+    expect(selected).toEqual({ sessionDir: join(dataDir, "sessions", session.id, ".chrona/sessions"), limit: 10 });
+    const invocation = await db.moduleInvocation.findFirstOrThrow({ where: { workspaceId: workspace.id, target: "agent", tool: "transcript" } });
+    expect(invocation.status).toBe("succeeded");
+    expect(JSON.stringify(invocation)).not.toContain("Retained conversation");
+  } finally { await runtime.stop(); await db.$disconnect(); }
 });
 
 test("runtime wires default and explicit execution mode", async () => {

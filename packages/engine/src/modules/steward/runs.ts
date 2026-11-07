@@ -11,6 +11,7 @@ import { pushReply } from "./chat-replies";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
+import { authenticateRun } from "./run-auth";
 import { assertBuildProvider, buildExecution } from "./build-execution";
 import { appendBuildOutcome, buildOutcomeLine } from "./module-build-outcome";
 import { assertExternalName } from "./module-identity";
@@ -27,12 +28,7 @@ export function nextLocalMidnight(now: Date, timezone: string) {
   while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (localDayKey(new Date(mid), timezone) === day) lo = mid; else hi = mid; }
   return new Date(hi);
 }
-export async function authenticateRun(tx: Prisma.TransactionClient, token: string, now: Date, _tool?: string) {
-  const row = await tx.run.findUnique({ where: { tokenHash: hash(token) }, include: { session: true } });
-  if (!row || row.status !== "running" || !row.deadlineAt || row.deadlineAt <= now || !row.leaseUntil || row.leaseUntil <= now || (await tx.executionAttempt.findUnique({ where: { runId: row.id }, select: { capabilityRevokedAt: true } }))?.capabilityRevokedAt || await tx.audit.findUnique({ where: { id: providerCancelKey(row.id) } })) throw new StewardError("forbidden", "Run capability is no longer valid");
-  const { session, ...run } = row;
-  return { run, session, workspaceId: row.workspaceId };
-}
+export { authenticateRun } from "./run-auth";
 /** Consecutive build results that wake their conversation before the user speaks again. */
 const BUILD_WAKES = 5;
 export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigger; prompt: string; label?: string | null };
@@ -184,7 +180,7 @@ class RunService {
         if (claimed) return claimed;
       }
       return null;
-    }); } finally { prepared?.prepared.release(); }
+    }); } finally { await prepared?.prepared.release(); }
   }
   async finish(runId: string, outcome: RunOutcome, options: { stopEvidence?: "provider_exited" | "never_started" } = {}) {
     const finalized = await this.ports.db.$transaction(async tx => {

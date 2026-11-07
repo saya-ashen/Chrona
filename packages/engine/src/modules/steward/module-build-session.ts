@@ -76,9 +76,9 @@ async function authorizedDiagnosticTarget(ports: StewardPorts, workspaceId: stri
 
 type ReferenceFile = { name: string; bytes: Uint8Array };
 /** Resolve every required reference before admitting a new build; never silently omit one. */
-export async function requestFiles(ports: StewardPorts, cwd: string, paths: string[]): Promise<ReferenceFile[]> {
+export async function requestFiles(ports: StewardPorts, cwd: string, paths: string[], workspaceId: string): Promise<ReferenceFile[]> {
   return Promise.all(paths.map(async path => {
-    const file = await runFile(ports, cwd, path), stored = await readChatFile(ports, file.ref);
+    const file = await runFile(ports, cwd, path, workspaceId), stored = await readChatFile(ports, file.ref, workspaceId);
     if (!stored) throw new StewardError("not_found", `Build reference attachment unavailable: ${file.name}`);
     return { name: file.name, bytes: stored.bytes };
   }));
@@ -159,7 +159,7 @@ async function start(ports: StewardPorts, workspaceId: string, runId: string, re
   if (!run?.session || run.session.source === "build") throw new StewardError("forbidden", "Only a conversation can start a module build");
   if (!ports.moduleSdk) throw new StewardError("conflict", "Module build SDK resources are not configured");
   const requestKey = `build-request:${createHash("sha256").update(JSON.stringify([workspaceId, run.session.id, request])).digest("hex")}`;
-  return queueBuild(ports, workspaceId, { key: requestKey, actorKey: `provider:${runId}`, originSessionId: run.session.id, request }, () => requestFiles(ports, run.cwd, request.files));
+  return queueBuild(ports, workspaceId, { key: requestKey, actorKey: `provider:${runId}`, originSessionId: run.session.id, request }, () => requestFiles(ports, run.cwd, request.files, workspaceId));
 }
 
 type BuildReferences = ReferenceFile[] | (() => Promise<ReferenceFile[]>);

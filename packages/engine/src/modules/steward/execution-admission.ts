@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { prepareLocalWorkspace } from "./local-workspace";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { WORK_LIMITS, type ExecutionPlacementView, type ExecutionPrincipal, type ExecutionStartV2, type ExecutionProjectGrantP2 } from "@chrona/contracts/steward";
@@ -71,7 +72,7 @@ async function beginAdmission(ports: StewardPorts, principal: ExecutionPrincipal
   });
 }
 async function completeServerAdmission(ports: StewardPorts, request: ServerWorkspaceRequest) {
-  const prepared = await ports.executionServerWorkspace!.prepare(request);
+  const prepared = await prepareLocalWorkspace(ports, request);
   try {
     return await ports.db.$transaction(async tx => {
       const { principal, input } = request;
@@ -85,7 +86,7 @@ async function completeServerAdmission(ports: StewardPorts, request: ServerWorks
       assertPreparedServerWorkspace(request, prepared, now);
       return { row: await admitExecutionIn(ports, tx, principal, input, { grant, now, request, prepared }), queued: true };
     });
-  } finally { prepared.release(); }
+  } finally { await prepared.release(); }
 }
 export function createExecutionV2Admission(ports: StewardPorts): ExecutionV2Admission {
   return { async start(principal, input) {

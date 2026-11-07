@@ -134,7 +134,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
     expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "model", status: "executed", error: null }),
     expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "call", status: "executed" }),
   ]));
-  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["notify.send", "provider.complete"]);
+  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["agent.complete", "notify.send", "provider.complete"]);
   // provider.complete is unrecorded: neither the prompt nor the completion is stored with the call.
   const invocations = JSON.stringify(await f.db.moduleInvocation.findMany({ where: { target: "ai" } }));
   expect(invocations).not.toContain(prompt); expect(invocations).not.toContain(text);

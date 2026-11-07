@@ -83,7 +83,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   const configured = configuredProvider(options, bwrap, mode);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
   let stopping = false, pending = false;
-  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), start(input) {
+  const provider: ProviderAdapter | undefined = configured ? { name: configured.name, supportsRunModel: configured.supportsRunModel, health: () => configured.health(), ...(configured.complete ? { complete: configured.complete } : {}), ...(configured.transcript ? { transcript: configured.transcript } : {}), start(input) {
     if (stopping) throw new Error("Runtime stopping");
     const handle = configured.start(input); handles.add(handle);
     void handle.done.finally(() => handles.delete(handle)).catch(() => {});

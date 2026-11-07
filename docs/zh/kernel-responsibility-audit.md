@@ -1,6 +1,8 @@
 # 内核与系统模块职责审查
 
-审查范围：`packages/engine/src/modules/steward` 顶层运行时代码、`system/`，以及 Provider 接入和模块交付边界。工作分支 `platform-v2`；源码改动未提交，生产仍暂停。自动验证记录见 [实施计划](provider-kernel-module-plan.md)。
+审查范围：`packages/engine/src/modules/steward` 顶层运行时代码、`system/`，以及 Provider 接入和模块交付边界。工作分支 `platform-v2`；本轮实现已提交并推送至 `31a726c9`，生产仍暂停。自动验证记录见 [实施计划](provider-kernel-module-plan.md)。
+
+本机 V1 更新：本文保留此前的职责审查；[统一模块协议方案](unified-module-runtime-plan.md)已将实际 Provider、执行控制、目录与内容 I/O 经同一路由接入受信任能力模块，验证记录见该方案。内核继续保留准入、事务、权威状态、证据验证和恢复，不能把普通模块自报结果当作停止或存储成功证据。通用远端宿主留到后续版本。
 
 ## 完成标准
 

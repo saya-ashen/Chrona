@@ -51,7 +51,16 @@ export function settleWaiting(db: Db, callId: string, output: Json, now: Date) {
   return db.moduleInvocation.updateMany({ where: { id: callId, mode: "async", status: "waiting" }, data: { status: "succeeded", output: output as Prisma.InputJsonValue, finishedAt: now } });
 }
 const systemModules = new Map<string, SystemModule>();
-export function registerSystemModule(module: SystemModule) { systemModules.set(module.name, module); }
+const localModules = new Map<string, SystemModule>();
+/** Trusted release modules share the router; their state belongs to each runtime, never this registry. */
+export function registerLocalModule(module: SystemModule) {
+  if (systemModules.has(module.name)) throw new Error(`Local module conflicts with kernel interface ${module.name}`);
+  localModules.set(module.name, module);
+}
+export function registerSystemModule(module: SystemModule) {
+  if (localModules.has(module.name)) throw new Error(`Kernel interface conflicts with local module ${module.name}`);
+  systemModules.set(module.name, module);
+}
 /** System modules and their tools, for catalogs (v2-13: the Provider reaches those visible to it). */
 export const listSystemModules = () => [...systemModules.values()];
 type Target = { module: { id: string; name: string; activeHash: string; workspaceId: string }; tool: RoutedTool; system?: SystemModule };
@@ -132,13 +141,16 @@ function splitTarget(target: string) {
   if (!module || !tool) throw new CallError("invalid", "Call target must be <module>.<tool>");
   return { module, tool };
 }
+async function resolveReleaseTarget(db: Db, workspaceId: string, target: string, name: ReturnType<typeof splitTarget>): Promise<Target | CallError | null> {
+  const local = localModules.get(name.module), system = local ?? systemModules.get(name.module);
+  if (!system) return null;
+  if (local && await db.module.findFirst({ where: { workspaceId, name: name.module }, select: { id: true } })) return new CallError("conflict", `Local capability ${name.module} conflicts with an installed application`);
+  const tool = system.tools.find(candidate => candidate.name === name.tool);
+  return tool ? { module: { id: `${local ? "local" : "system"}:${system.name}`, name: system.name, activeHash: "system", workspaceId }, tool, system } : new CallError("not_found", `Tool ${target} not found`);
+}
 async function resolveTarget(db: Db, workspaceId: string, target: string): Promise<Target | CallError> {
-  const name = splitTarget(target);
-  const system = systemModules.get(name.module);
-  if (system) {
-    const tool = system.tools.find(candidate => candidate.name === name.tool);
-    return tool ? { module: { id: `system:${system.name}`, name: system.name, activeHash: "system", workspaceId }, tool, system } : new CallError("not_found", `Tool ${target} not found`);
-  }
+  const name = splitTarget(target), release = await resolveReleaseTarget(db, workspaceId, target, name);
+  if (release) return release;
   const module = await db.module.findFirst({ where: { workspaceId, name: name.module } });
   if (!module) return new CallError("not_found", `Module ${name.module} not found`);
   if (module.status !== "active" || !module.activeHash) return new CallError("unavailable", `Module ${name.module} is not active`);
@@ -283,12 +295,15 @@ async function invokeSystemSync({ ports, origin, resolved, args, rowId, finish, 
   // In-process: no event queue to wait on, so no deadlock to guard against.
   try {
     const output = await resolved.system!.handle({ ports, workspaceId: origin.workspaceId, caller: origin.caller, run: origin.run, deadline: origin.deadline }, resolved.tool.name, args);
+    const schema = (resolved.tool as SystemTool).output;
+    if (resolved.module.id.startsWith("local:") && schema && !schema.safeParse(output).success) throw new CallError("failed", "Local capability output contract mismatch");
     checkSystemOutput(`${resolved.module.name}.${resolved.tool.name}`, resolved.tool as SystemTool, output);
     await finish({ status: "succeeded", output: (quiet ? {} : output) as Prisma.InputJsonValue });
     return { callId: rowId, output };
   } catch (error) {
-    const failure = systemError(error);
-    await finish({ status: "failed", error: `${failure.code}: ${failure.message}`.slice(0, 2000) });
+    const failure = resolved.module.id.startsWith("local:") && !(error instanceof CallError) && !(error instanceof StewardError)
+      ? new CallError("failed", "Local capability failed") : systemError(error);
+    await finish({ status: failure.code === "unknown" ? "unknown" : "failed", error: quiet ? failure.code : `${failure.code}: ${failure.message}`.slice(0, 2000) });
     throw failure;
   }
 }

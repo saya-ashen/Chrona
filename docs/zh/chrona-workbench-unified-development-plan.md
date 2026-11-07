@@ -1,9 +1,11 @@
 # Chrona 最小模块架构与 Agent Workbench：统一开发方案
 
+当前开发入口（2026-11-07）：[统一模块协议实施方案](unified-module-runtime-plan.md)。用户已授权亲自实施完整本机 V1，不调用 worker，允许中间状态暂时不可用；本机 Provider、执行控制、工作目录和内容调用已进入同一路由，最终验证见该方案。通用远端宿主留到后续版本。本文继续保存已验收 M1–M3 的设计、契约、分工和证据，不重写旧冻结记录；历史 ProviderAdapter 专用接口留作本机能力模块内部实现，现有固定设备接线保持其原有边界。
+
 日期：2026-11-05；最终开发签收：2026-11-06。  
 状态：**M1、M2、M3 开发集成验收完成**。[P1](chrona-workbench-p1-contract.md) 与 `P2-20261106` [固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现。最终原树 typecheck、required lint、boundaries、1326 Bun / 61 API、16 个补充测试文件、Workbench 806 successes、实际 Neovim GUI、Linux x64 build/smoke 及 compiled executor 到真实 Hono/runtime/SQLite/fakePi/systemd 的丢 ACK、重启、撤权和原身份 drain 闭环均通过。独立复核发现的八项问题及发布构建环境缺陷均关闭；完整快照、失败历史、29 条既有 lint warnings、环境 skips 与精确边界见 [M3 开发验收记录](chrona-workbench-m3-acceptance.md)。这不代表生产部署、公开发行、真实模型或个人设备安装验收。M1、M2 的历史证据分别保留于其[验收记录](chrona-workbench-m1-acceptance.md)及 [M2 记录](chrona-workbench-m2-acceptance.md)。
 范围：Chrona 架构简化、服务器编码闭环、Neovim 客户端、本机执行器、受控并行编码。  
-授权：用户随后已批准继续 M2，并于 2026-11-05 明确授权整合已完成交付、清理无用任务 worktree、继续后续任务。F/G/H 按冻结文件分工实施；真实模型/个人设备、真实数据库迁移、部署、提交与推送仍未授权。后续执行者以用户实际授权和各包派工为范围。
+授权：用户随后已批准继续 M2，并于 2026-11-05 明确授权整合已完成交付、清理无用任务 worktree、继续后续任务。F/G/H 按冻结文件分工实施；当时真实模型/个人设备、真实数据库迁移、部署、提交与推送未授权。后续用户已授权提交与推送，Provider/内核收窄提交已进入 `platform-v2` 的 `31a726c9`；生产仍暂停。后续执行者以用户实际授权和各包派工为范围，不能把本段历史授权当作当前任务的许可或禁令。
 
 本文接替以下两份文档作为后续开发与派工的统一入口，原文保留为背景，不再独立派工：
 
@@ -42,7 +44,7 @@ M1 不代表 Workbench 已可用，M2 不代表远端设备或多 worker 已可�
 
 ## 2. 核查基础与当前缺口
 
-以下为 2026-11-05 编写方案时的核查基础，保留为决策背景；之后的 M1 完整测试与发行结果见验收记录，不代表真实部署。P1 准备已重新核对当前代码，以下项目执行/详细流缺口仍存在：
+以下为 2026-11-05 编写方案时的核查基础，保留为决策背景；之后的 M1 完整测试与发行结果见验收记录，不代表真实部署。当时 P1 准备核对得到的项目执行/详细流缺口如下；它们是历史问题清单，后续完成情况以 M2/M3 验收为准，当前剩余差距见新方案第 3 节：
 
 - `runs.ts`：入队固定创建 `<dataDir>/sessions/<sessionId>`；同一 workspace/lane 已有 running 时不再领取，同一会话亦受串行约束。
 - `system/provider.ts`：`provider.wake` 只接受 prompt，创建模块会话并排到 background；不是项目/设备可选的通用执行接口。

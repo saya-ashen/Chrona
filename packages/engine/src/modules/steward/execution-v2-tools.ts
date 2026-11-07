@@ -1,4 +1,6 @@
 import type { Prisma } from "@chrona/db";
+import { registerWorkspaceModule } from "./local-workspace";
+import { runtimeCall } from "./local-runtime";
 import { WORK_LIMITS, type ExecutionPrincipal, type ExecutionStartV2, type WorkCleanupInput, type WorkLocation, type WorkPlacement } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { CallError } from "./module-calls";
@@ -49,7 +51,8 @@ async function cleanup(ports: StewardPorts, principal: ExecutionPrincipal, input
   const row = await ports.db.$transaction(tx => scopedAttempt(tx, principal, input.workId));
   if (!row.workspaceRef || row.workspaceMode !== "independent_worktree") throw new CallError("unsupported", "No owned independent workspace");
   // Trusted adapter owns receipt-first replay and fresh physical stop/retain/integration checks.
-  const receipt = await ports.executionWorkspaces.cleanup(principal, input);
+  registerWorkspaceModule();
+  const receipt = await runtimeCall<import("@chrona/contracts/steward").WorkCleanupReceipt>(ports, principal.workspaceId, "workspace-local.cleanup", { principal, input });
   if (receipt.workId !== row.workId || receipt.workspaceRef !== row.workspaceRef) throw new CallError("conflict", "Cleanup receipt belongs to another workspace");
   return receipt;
 }

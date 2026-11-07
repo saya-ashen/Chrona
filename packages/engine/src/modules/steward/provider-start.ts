@@ -21,7 +21,7 @@ export function providerStartGate() {
   // can outlive its consumers. Keep its rejection observable without an unhandled promise.
   void handle.done.catch(() => {});
   return { handle, stopped: () => stopped, fail: () => resolve(null), attach(value: Handle) {
-    if (stopped) throw new Error("Provider launch was cancelled");
-    active = value; resolve(value);
+    active = value;
+    if (!stopped) resolve(value);
   } };
 }

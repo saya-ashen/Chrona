@@ -89,7 +89,7 @@ test("claim rechecks source bytes, not admission receipt; a failed check leaves 
   expect(admitted.placement.workspace.sourceReceipt).toBeNull();
   const before = await f.db.run.findUniqueOrThrow({ where: { id: admitted.execution.runId } });
   await writeFile(join(f.root, "file.txt"), "changed\n");
-  await expect(f.runs.claimNext("background")).rejects.toThrow("Source manifest differs");
+  await expect(f.runs.claimNext("background")).rejects.toMatchObject({ code: "failed", message: "Local capability failed" });
   expect(await f.db.run.findUnique({ where: { id: before.id } })).toMatchObject({ tokenHash: before.tokenHash, startedAt: null, status: "queued" }); expect(f.locks()).toBe(0);
   await writeFile(join(f.root, "file.txt"), "base\n"); expect(await f.runs.claimNext("background")).not.toBeNull();
   const row = await f.db.executionAttempt.findUniqueOrThrow({ where: { id: admitted.execution.attemptId } });

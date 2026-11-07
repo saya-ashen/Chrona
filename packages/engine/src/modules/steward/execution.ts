@@ -10,7 +10,8 @@ import { createProviderControl, validateExecutionAnswer } from "./provider-chann
 import { assertExecutionPrincipal } from "./execution-principal";
 import { reserveDeviceCommandIn } from "./execution-control-budget";
 import { remoteExecutionChanges } from "./execution-remote-completion";
-import { readExecutionChanges } from "./execution-result";
+import { registerWorkspaceModule } from "./local-workspace";
+import { runtimeCall } from "./local-runtime";
 
 import { executionBaseline, executionCallerKey, executionDigest, executionEventStore as events, executionRef, executionScope, executionView, executionNeverOfferedIn } from "./execution-state";
 export async function trustedExecutionProject(ports: StewardPorts, principal: ExecutionPrincipal, projectRef: string) {
@@ -67,12 +68,19 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
     get: (principal, workId) => read(principal, { workId }),
     lookupStart: (principal, commandKey) => read(principal, { commandKey }),
     async resultSource(principal, input) {
-      return ports.db.$transaction(async tx => {
+      const snapshot = await ports.db.$transaction(async tx => {
         await assertExecutionPrincipal(tx, principal);
         const row = await unique(tx, principal, { id: input.attemptId, runId: input.runId, workId: input.workId });
-        const changes = row.stopConfirmedAt ? row.executorId === "server" ? await readExecutionChanges(row) : await remoteExecutionChanges(tx, row.id) : undefined;
-        return { ...executionRef(row), baseline: executionBaseline(row.baseline), ...(changes ? { changes } : {}) };
+        const changes = row.stopConfirmedAt && row.executorId !== "server" ? await remoteExecutionChanges(tx, row.id) : undefined;
+        return { row, changes };
       });
+      const { row } = snapshot;
+      registerWorkspaceModule();
+      const changes = row.stopConfirmedAt && row.executorId === "server"
+        ? await runtimeCall<import("@chrona/contracts/steward").ExecutionResultSource["changes"]>(ports, principal.workspaceId, "workspace-local.result", { attemptId: row.id })
+        : snapshot.changes;
+      await assertExecutionPrincipal(ports.db, principal);
+      return { ...executionRef(row), baseline: executionBaseline(row.baseline), ...(changes ? { changes } : {}) };
     },
     async list(principal, input) {
       return ports.db.$transaction(async tx => {

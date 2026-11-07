@@ -1,5 +1,6 @@
-import { readFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { registerWorkspaceModule } from "./local-workspace";
+import { runtimeCall } from "./local-runtime";
 import type { Prisma } from "@chrona/db";
 import { codingGrant } from "./execution-claim";
 import { EXECUTION_SYSTEM_PROMPT } from "@chrona/domain/steward/execution-instructions";
@@ -23,13 +24,12 @@ export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): P
   const attemptId = row.id;
   const principal = executionPrincipal(row);
   await assertExecutionPrincipal(ports.db, principal);
-  const project = await runProject(ports, row, row.resolvedCwd);
+  await runProject(ports, row, row.resolvedCwd);
   if (row.resolvedCwd !== run.cwd || row.capabilityRevokedAt || row.run.status !== "running") throw new CallError("conflict", "Execution authority changed before launch");
   if (!ports.executionEvents) throw new CallError("unavailable", "Execution event storage unavailable");
   const ref = executionRef(row), budget = row.budget as { timeoutMs: number; maxToolCalls: number };
-  let rules = "";
-  try { rules = (await readFile(join(project.canonicalPath, "AGENTS.md"), "utf8")).slice(0, 32_000); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  registerWorkspaceModule();
+  const { text: rules } = await runtimeCall<{ text: string }>(ports, run.workspaceId, "workspace-local.rules", { runId: run.id });
   await mkdir(row.logDir, { recursive: true });
   await assertExecutionPrincipal(ports.db, principal);
   let providerSequence = 0;

@@ -592,6 +592,8 @@ export const modulesToolInputSchemas = {
 } as const;
 export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof chronaToolInputSchemas)[];
 
+export * from "./local-runtime";
+
 // ---------------------------------------------------------------- ports ----
 
 /** Provider adapter (Pi first). Chrona owns when and where a run happens; the Provider owns how it works. */

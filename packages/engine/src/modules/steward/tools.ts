@@ -60,9 +60,9 @@ export async function searchSessions(db: StewardPorts["db"], workspaceId: string
 }
 /** Working-directory files, received attachments (content/chat/) and app content by reference (content/<module>/<path>, e.g. a generated image). */
 async function replyFile(ctx: ToolContext, path: string) {
-  if (!path.startsWith("content/") || path.startsWith("content/chat/")) return runFile(ctx.ports, ctx.run.cwd, path);
+  if (!path.startsWith("content/") || path.startsWith("content/chat/")) return runFile(ctx.ports, ctx.run.cwd, path, ctx.workspaceId);
   const file = await readContentRef(ctx.ports, ctx.workspaceId, path.slice("content/".length), 20 * 1024 * 1024);
-  return storeChatFile(ctx.ports, file.name, file.bytes);
+  return storeChatFile(ctx.ports, file.name, file.bytes, ctx.workspaceId);
 }
 async function reply(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;

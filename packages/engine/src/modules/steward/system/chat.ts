@@ -107,7 +107,7 @@ export const chat: SystemModule = {
         const ref = parseInput(z.string().max(542), args.ref), files = storedAttachments(message?.attachments ?? []);
         // A page offering everything to the user (`uses: ["*"]`, the web) reads files of every conversation.
         if (!message || !(await own(message.sessionId) || await usesAll(db, module)) || !files.some(file => file.ref === ref)) throw new CallError("not_found", "No such file on a message of yours");
-        const file = await readChatFile(ports, ref);
+        const file = await readChatFile(ports, ref, workspaceId);
         if (!file) throw new CallError("not_found", "File not found");
         if (file.bytes.byteLength > 20 * 1024 * 1024) throw new CallError("invalid", "File larger than 20 MiB");
         return { base64: file.bytes.toString("base64"), mime: file.mime };

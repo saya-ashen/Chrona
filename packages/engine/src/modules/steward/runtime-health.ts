@@ -2,13 +2,14 @@ import type { Health } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import { notificationSettings } from "./settings";
+import { runtimeCall } from "./local-runtime";
 
 /** Facts owned by the runtime; application health and page composition stay with modules. */
 export async function runtimeHealth(ports: StewardPorts, workspaceId: string) {
   const at = ports.now(), settings = notificationSettings((await ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
   let provider: Health["provider"] = { name: "unconfigured", available: false, sandboxed: false, lastError: null };
   if (ports.provider) {
-    try { const h = await ports.provider.health(); provider = { name: ports.provider.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
+    try { const h = await runtimeCall<{ name: string; available: boolean; sandboxed: boolean; error: string | null }>(ports, workspaceId, "agent.health", {}); provider = { name: h.name, available: h.available, sandboxed: h.sandboxed, lastError: h.error?.slice(0, 500) ?? null }; }
     catch { provider = { name: ports.provider.name, available: false, sandboxed: false, lastError: "Provider health check failed" }; }
   }
   const [runs, dueSchedules, state] = await Promise.all([

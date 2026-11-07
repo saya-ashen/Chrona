@@ -10,6 +10,7 @@ import { moduleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { StewardError } from "./errors";
 import { STEWARD_PROMPT } from "./run-instructions";
+import { startLocalProvider } from "./local-runtime";
 
 /** Recovery only, under the CLI's exclusive database lock: no normal tick, built-in upgrades or other jobs. */
 export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, input: unknown) {
@@ -29,7 +30,7 @@ export async function runOwnerBuild(ports: StewardPorts, workspaceId: string, in
   let handle: ReturnType<NonNullable<StewardPorts["provider"]>["start"]> | undefined;
   try {
     await runs.authenticate(run.token);
-    handle = ports.provider!.start({ runId: run.id, token: run.token, lane: "build", cwd: run.cwd, sessionDir, sessionId: null,
+    handle = await startLocalProvider(ports, workspaceId, { runId: run.id, token: run.token, lane: "build", cwd: run.cwd, sessionDir, sessionId: null,
       systemPrompt: STEWARD_PROMPT, resources: "configured", model: run.model, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, deadline: run.deadlineAt, events: channel.events,
       extraTools: BUILD_MODULE_TOOLS, searchTools: true, hostPaths: [], content: [] });
     liveRuns.set(run.id, handle);

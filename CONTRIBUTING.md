@@ -15,6 +15,8 @@ bun run dev
 
 Pi is required for real agent interaction, not mocked automated tests. Startup initializes the database. Do not reuse a pre-rebuild database or migrate real user data as part of development. See [operations](docs/zh/operations.md).
 
+For local capability changes, read [unified module protocol and hosts](docs/zh/unified-module-runtime-plan.md): V1 routes Provider/execution, workspace and content through the existing module protocol, with adapters internal to trusted release modules. Preserve the single Run queue and kernel enforcement. General remote hosts are deferred; the current device protocol remains separate from that future host model.
+
 ## Structure and rules
 
 Hono on Bun, SQLite through Prisma. No Next.js.
