@@ -29,9 +29,9 @@
       "name": "notify",
       "repository": null,
       "branch": "main",
-      "commit": "c0e0b6a2600bbf6001a52d5d78dc0beaa39f1689",
+      "commit": "e3e53c19f8b244ffd4ab84356c95f7268a957c12",
       "bundle": "notify.bundle",
-      "bundleSha256": "58559b87a4799ea461958135cb81c4bbe179a586bf641f8a0b9768c3c84434ea"
+      "bundleSha256": "8a4ab92e4671eabfbd5fcb76bc6b7ee8113183d4970b1b94c7a6286a67525f79"
     },
     {
       "name": "events",

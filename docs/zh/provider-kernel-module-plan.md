@@ -190,4 +190,6 @@ coding 离线 Git 种子沿既有父提交更新为本地候选 `453ae363402e558
 - **11 个**模块发行暂存源码与离线 Git 种子一致，包含生成后的 coding/editor 执行契约：`/tmp/chrona-minimal-closure-seeds.log`。Web `428b634cd09e76d80e0d6b53043bcd8c7511dbe2`、MCP `f701d4216cafa115297819fde8b38a1464165a92`、notify `c0e0b6a2600bbf6001a52d5d78dc0beaa39f1689`、QQ `d4a2d4b26d23eef3f0802767c47860b147892acc`；其余七个种子复用既有提交。候选均未发布。
 - Linux x64 二进制已在 `/tmp/chrona-minimal-release/chrona-linux-x64/chrona` 编译；portable ELF、发行资源、两份 SDK 契约、独立模块类型检查和种子一致性通过：`/tmp/chrona-minimal-verified-release.log`。此项使用 `smokeRelease(..., { runtime: false })`，没有服务启动冒烟；不声称完整运行时发行验收。
 
-本轮没有修改页面布局，未做多尺寸浏览器验证；真实模型四路径冒烟未执行。生产仍暂停，没有主仓库提交、推送或候选发布。
+本轮没有修改页面布局，未做多尺寸浏览器验证；真实模型四路径冒烟未执行。生产仍暂停，模块候选未发布。
+
+用户随后授权提交并推送。首次提交 `a819026` 的 pre-push CI 检出原先未提交新文件的 lint 债务：notify 生命周期分派复杂度和 Pi JSONL 外部输入的 nullable 类型。已将有限通知分派改为静态表，并准确标注可空外部输入；37 项相关测试通过、lint ratchet 通过。重新校验全部 11 个种子，notify 候选更新为 `e3e53c19f8b244ffd4ab84356c95f7268a957c12`，其余提交不变。日志 `/tmp/chrona-push-fix-{seeds,targeted,lint}.log`；推送仍正常执行完整 pre-push CI，不跳过钩子。

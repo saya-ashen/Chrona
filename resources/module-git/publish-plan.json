@@ -27,7 +27,7 @@
       "proposedRepository": "chrona-core/chrona-module-notify",
       "localRepository": "/tmp/chrona-minimal-seed-cache-UIVmy9/repos/notify.git",
       "branch": "main",
-      "commit": "c0e0b6a2600bbf6001a52d5d78dc0beaa39f1689"
+      "commit": "e3e53c19f8b244ffd4ab84356c95f7268a957c12"
     },
     {
       "name": "events",
