@@ -63,11 +63,11 @@ export function Workspace({ props, children, slots, bindings }: Props<WorkspaceP
   </div>;
 }
 
-export type WorkspaceHeaderProps = { title: string; subtitle?: string; status?: string };
+export type WorkspaceHeaderProps = { title: string; subtitle?: string; status?: string; statusTone?: "neutral" | "success" | "warning" | "danger" };
 export function WorkspaceHeader({ props, children }: Props<WorkspaceHeaderProps>) {
   return <div className="renderer-workspace-header">
     <h1>{props.title}</h1>
-    {props.status || props.subtitle ? <div className="workspace-summary">{props.status ? <span className="workspace-status">{props.status}</span> : null}{props.subtitle ? <span>{props.subtitle}</span> : null}</div> : null}
+    {props.status || props.subtitle ? <div className="workspace-summary">{props.status ? <span className={`workspace-status status-${props.statusTone ?? "neutral"}`}>{props.status}</span> : null}{props.subtitle ? <span>{props.subtitle}</span> : null}</div> : null}
     {children}
   </div>;
 }
@@ -91,13 +91,11 @@ export function ViewTabs({ props, bindings }: Props<ViewTabsProps>) {
   </div>;
 }
 
-export type ComposerProps = { hint?: string; footnote?: string };
-export function Composer({ props, children, slots }: Props<ComposerProps>) {
+export type ComposerProps = { hint?: string; footnote?: string; disabled?: boolean };
+export function Composer({ props, children, slots, emit }: Props<ComposerProps>) {
   return <div className="renderer-composer-wrap"><div className="renderer-composer" onKeyDown={event => {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || !(event.target instanceof HTMLTextAreaElement)) return;
-    const send = event.currentTarget.querySelector<HTMLButtonElement>(".composer-actions button.primary");
-    if (!send || send.disabled) return;
-    event.preventDefault(); send.click();
+    if (props.disabled || event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || !(event.target instanceof HTMLTextAreaElement)) return;
+    event.preventDefault(); emit("submit");
   }}>
     <div className="composer-input">{children}</div>
     <div className="composer-tools">{props.hint ? <span className="composer-hint">{props.hint}</span> : null}<div className="composer-actions">{slots?.actions}</div></div>

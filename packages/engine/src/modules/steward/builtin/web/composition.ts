@@ -64,6 +64,12 @@ function substitute(value: unknown, instance: PageElement, definition: Definitio
   }
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, substitute(item, instance, definition)]).filter(([, item]) => item !== undefined));
 }
+function slotTargets(ref: string, names: Map<string, string>, definition: Definition, node: PageElement) {
+  if (!ref.startsWith("$slot:")) return [names.get(ref) ?? invalid(`模板节点 ${ref} 不存在`)];
+  const slot = ref.slice(6);
+  if (!definition.slots.includes(slot)) invalid(`未声明的插槽 ${slot}`);
+  return node.slots?.[slot] ?? (slot === "default" ? node.children ?? [] : []);
+}
 function assertGraph(spec: PageSpec) {
   const active = new Set<string>(), done = new Set<string>();
   const visit = (key: string) => {
@@ -84,11 +90,15 @@ export function expandComponents(raw: unknown, components: unknown, module: stri
   if (!parsed.success) invalid("需要合法的 spec.root、spec.elements 和可选 state");
   const source = parsed.data as PageSpec, templates = definitions(components, module);
   const elements: Record<string, PageElement> = Object.create(null), occupied = new Set(Object.keys(source.elements));
-  let serial = 0;
+  let serial = 0, references = 0, bytes = 0;
+  const sizes = new Map<string, number>();
   const fresh = () => { let key: string; do { key = `__component_${++serial}`; } while (occupied.has(key)); occupied.add(key); return key; };
   const put = (key: string, node: PageElement) => {
-    if (Object.keys(elements).length >= 300) invalid("展开后最多 300 个节点");
-    elements[key] = node;
+    if (!Object.hasOwn(elements, key) && Object.keys(elements).length >= 300) invalid("展开后最多 300 个节点");
+    const size = Buffer.byteLength(JSON.stringify(node));
+    bytes += size - (sizes.get(key) ?? 0);
+    if (bytes > 65_536) invalid("展开后的页面最多 64 KiB");
+    sizes.set(key, size); elements[key] = node;
   };
   const expand = (key: string, node: PageElement, chain: string[]) => {
     if (!record(node) || typeof node.type !== "string") invalid(`节点 ${key} 格式无效`);
@@ -97,12 +107,18 @@ export function expandComponents(raw: unknown, components: unknown, module: stri
     if (chain.includes(node.type) || chain.length >= 8) invalid(`递归或嵌套过深：${node.type}`);
     checkInstance(node.type, definition, node);
     const names = new Map(Object.keys(definition.spec.elements).map(name => [name, name === definition.spec.root && !node.repeat ? key : fresh()]));
-    const children = (refs: string[]) => refs.flatMap(ref => {
-      if (!ref.startsWith("$slot:")) return [names.get(ref) ?? invalid(`模板节点 ${ref} 不存在`)];
-      const slot = ref.slice(6);
-      if (!definition.slots.includes(slot)) invalid(`未声明的插槽 ${slot}`);
-      return node.slots?.[slot] ?? (slot === "default" ? node.children ?? [] : []);
-    });
+    const children = (refs: string[]) => {
+      const result: string[] = [];
+      for (const ref of refs) {
+        const targets = slotTargets(ref, names, definition, node);
+        // Charge before copying: slot forwarding can multiply edges without
+        // introducing distinct nodes, well before the final byte/node check.
+        references += targets.length;
+        if (references > 4096) invalid("展开过程最多 4096 个子节点引用");
+        result.push(...targets);
+      }
+      return result;
+    };
     for (const [name, template] of Object.entries(definition.spec.elements)) {
       const next = substitute(template, node, definition) as PageElement;
       next.children = children(next.children ?? []);
@@ -115,7 +131,7 @@ export function expandComponents(raw: unknown, components: unknown, module: stri
     if (node.repeat) put(key, { type: "Stack", props: { gap: "none" }, ...controls, children: [names.get(definition.spec.root)!] });
     else {
       const root = elements[key]!;
-      elements[key] = { ...root, ...controls, ...(root.visible !== undefined && controls.visible !== undefined ? { visible: { $and: [root.visible, controls.visible] } } : {}) };
+      put(key, { ...root, ...controls, ...(root.visible !== undefined && controls.visible !== undefined ? { visible: { $and: [root.visible, controls.visible] } } : {}) });
     }
   };
   for (const [key, node] of Object.entries(source.elements)) expand(key, node, []);

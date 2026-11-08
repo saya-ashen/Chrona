@@ -1300,6 +1300,15 @@
           },
           "projectPath": {
             "type": "string"
+          },
+          "statusTone": {
+            "type": "string",
+            "enum": [
+              "neutral",
+              "success",
+              "warning",
+              "danger"
+            ]
           }
         },
         "required": [
@@ -1325,7 +1334,8 @@
           "questions",
           "results",
           "projectLabel",
-          "projectPath"
+          "projectPath",
+          "statusTone"
         ],
         "additionalProperties": false
       },
@@ -1538,6 +1548,15 @@
           },
           "projectPath": {
             "type": "string"
+          },
+          "statusTone": {
+            "type": "string",
+            "enum": [
+              "neutral",
+              "success",
+              "warning",
+              "danger"
+            ]
           }
         },
         "required": [
@@ -1563,7 +1582,8 @@
           "questions",
           "results",
           "projectLabel",
-          "projectPath"
+          "projectPath",
+          "statusTone"
         ],
         "additionalProperties": false
       },

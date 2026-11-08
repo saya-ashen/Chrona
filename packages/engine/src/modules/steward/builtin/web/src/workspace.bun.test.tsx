@@ -2,6 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PageView, type Page } from "./pages";
+import { components } from "../catalog";
 
 function render(diff: unknown) {
   const page: Page = { module: "fixture", id: "generic", title: "通用页面", data: {}, spec: { root: "workspace", elements: {
@@ -50,6 +51,29 @@ describe("shared workspace renderer", () => {
     expect(html).toContain("补充到当前工作"); expect(html).toContain("保留草稿");
     expect(html).toContain('class="composer-actions"><button'); expect(html).toContain(">发送</button>");
     expect(html).not.toContain("还不能显示组件");
+  });
+
+  test.each([
+    { statusTone: undefined, expected: "neutral" },
+    { statusTone: "neutral", expected: "neutral" },
+    { statusTone: "success", expected: "success" },
+    { statusTone: "warning", expected: "warning" },
+    { statusTone: "danger", expected: "danger" },
+  ])("workspace status uses the declared tone $expected (input $statusTone)", ({ statusTone, expected }) => {
+    const props = { title: "当前目标", status: "当前状态", statusTone };
+    expect(components.WorkspaceHeader!.props.safeParse(props).success).toBe(true);
+    const page: Page = { module: "fixture", id: "header", title: "状态", data: {}, spec: { root: "header", elements: {
+      header: { type: "WorkspaceHeader", props, children: [] },
+    } } };
+    const html = renderToStaticMarkup(<PageView page={page} deps={{ call: async () => ({}), content: async () => new Blob(), navigate: () => {} }} />);
+    expect(html).toContain(`class="workspace-status status-${expected}">当前状态</span>`);
+  });
+
+  test("catalog exposes the submit event and explicit keyboard disabled prop", () => {
+    expect(components.Composer!.events).toEqual(["submit"]);
+    expect(components.Composer!.props.safeParse({ disabled: true }).success).toBe(true);
+    expect(components.Composer!.props.safeParse({ disabled: "true" }).success).toBe(false);
+    expect(components.WorkspaceHeader!.props.safeParse({ title: "当前目标", statusTone: "green" }).success).toBe(false);
   });
 
   test("unresolved data shows an empty diff until the source loads", () => {

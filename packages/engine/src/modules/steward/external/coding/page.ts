@@ -1,3 +1,4 @@
+import { CODING_COMPONENTS } from "./components";
 // The coding module owns the conversation. Shared components only render its state/actions.
 const state = (path: string) => ({ $state: path });
 const bind = (path: string) => ({ $bindState: path });
@@ -11,7 +12,7 @@ const target = { "session-id": state("/detail/sessionId"), "work-id": state("/de
 const answer = (text: unknown) => ({ ...target, question: item("id"), text });
 const clearDraft = { "/form/message": "", "/form/answer": "", "/form/sidebarOpen": false, "/form/tab": "chat" };
 export const PAGE = {
-  id: "main", title: "编码",
+  id: "main", title: "编码", layout: "workspace", components: CODING_COMPONENTS,
   data: {
     catalog: { tool: "ui-catalog" },
     detail: { tool: "ui-work", args: { "session-id": state("/catalog/selectedSession"), before: state("/detail/historyPage") }, refresh: 5 },
@@ -33,7 +34,7 @@ export const PAGE = {
     emptyHistory: { ...node("Text", { text: "还没有对话。选好项目，就可以开始了。", variant: "muted" }), visible: visible("/catalog/hasSessions", false) },
     sessionList: { ...node("Stack", { gap: "sm" }, ["sessionOption"]), repeat: { statePath: "/catalog/sessions", key: "id" } },
     sessionOption: { ...node("ActionOption", { label: item("title"), description: item("project"), selected: item("selected"), compact: true }), on: { press: { action: "call", params: { tool: "ui-command", args: { action: "select", "request-key": state("/catalog/requestKey"), "session-id": item("id") }, result: "/detail" }, onSuccess: { set: clearDraft } } } },
-    header: node("WorkspaceHeader", { title: state("/detail/goal"), status: state("/detail/status"), subtitle: state("/detail/stop") }, ["projectPath"]),
+    header: node("WorkspaceHeader", { title: state("/detail/goal"), status: state("/detail/status"), statusTone: state("/detail/statusTone"), subtitle: state("/detail/stop") }, ["projectPath"]),
     projectPath: { ...node("Text", { text: state("/detail/projectPath"), variant: "caption" }), visible: { $state: "/detail/projectPath" } },
     tabs: node("ViewTabs", { items: [{ value: "chat", label: "交流" }, { value: "result", label: "成果" }], value: bind("/form/tab") }),
     transcript: { ...node("ScrollArea", { label: "对话消息", follow: true }, ["welcome", "earlier", "latest", "messages", "limited", "questions", "resultEntry", "progress"]), visible: visible("/form/tab", "chat") },
@@ -49,17 +50,12 @@ export const PAGE = {
     limited: { ...node("Text", { text: "部分进度或回复已过期、缺失或省略。已保存的回复仍可阅读，请结合项目文件核对。", variant: "muted" }), visible: visible("/detail/limited") },
     questions: { ...node("Stack", { gap: "md" }, ["questionList"]), visible: visible("/detail/hasQuestions") },
     questionList: { ...node("Stack", { gap: "md" }, ["questionCard"]), repeat: { statePath: "/detail/questions", key: "id" } },
-    questionCard: node("Panel", { tone: "question" }, ["questionTitle", "questionHelp", "confirm", "selectAnswer", "inputAnswer", "submitAnswer"]),
-    questionTitle: node("Heading", { text: item("title"), level: "h3" }),
-    questionHelp: node("Text", { text: item("help"), variant: "muted" }),
-    confirm: { ...node("Stack", { direction: "horizontal", gap: "sm" }, ["yes", "no"]), visible: { $item: "method", eq: "confirm" } },
-    yes: action("是", "answer", answer("是"), {}, { "/form/answer": "" }),
-    no: action("否", "answer", answer("否"), { variant: "secondary" }, { "/form/answer": "" }),
-    selectAnswer: { ...node("Stack", { gap: "sm" }, ["choiceList"]), visible: { $item: "method", eq: "select" } },
-    choiceList: { ...node("Stack", { gap: "sm" }, ["choice"]), repeat: { statePath: item("choices"), key: "label" } },
-    choice: { ...node("ActionOption", { label: item("label") }), on: { press: { action: "call", params: { tool: "ui-command", args: { action: "answer", "request-key": state("/detail/requestKey"), ...target, question: item("questionId"), text: item("label") }, result: "/detail" }, onSuccess: { set: { "/form/answer": "" } } } } },
-    inputAnswer: { ...node("Textarea", { label: "你的答复", name: "answer", value: bind("/form/answer") }), visible: { $or: [{ $item: "method", eq: "input" }, { $item: "method", eq: "editor" }] } },
-    submitAnswer: { ...action("提交答复", "answer", answer(state("/form/answer")), {}, { "/form/answer": "" }), visible: { $or: [{ $item: "method", eq: "input" }, { $item: "method", eq: "editor" }] } },
+    questionCard: { ...node("coding:QuestionCard", { title: item("title"), help: item("help"), confirm: { $item: "method", eq: "confirm" }, select: { $item: "method", eq: "select" }, input: { $or: [{ $item: "method", eq: "input" }, { $item: "method", eq: "editor" }] }, choices: item("choices"), answer: bind("/form/answer") }), on: {
+      yes: action("", "answer", answer("是"), {}, { "/form/answer": "" }).on.press,
+      no: action("", "answer", answer("否"), {}, { "/form/answer": "" }).on.press,
+      choose: { action: "call", params: { tool: "ui-command", args: { action: "answer", "request-key": state("/detail/requestKey"), ...target, question: item("questionId"), text: item("label") }, result: "/detail" }, onSuccess: { set: { "/form/answer": "" } } },
+      answer: action("", "answer", answer(state("/form/answer")), {}, { "/form/answer": "" }).on.press,
+    } },
     resultEntry: { ...node("ActionOption", { label: "查看本轮改动与执行记录", description: "在成果中查看代码差异 ↗" }), visible: { $state: "/detail/results/0/id" }, on: { press: { action: "setState", params: { statePath: "/form/tab", value: "result" } } } },
     progress: { ...node("Collapsible", { title: "查看执行细节", defaultOpen: false }, ["events"]), visible: { $state: "/detail/workId" } },
     events: { ...node("Stack", { gap: "sm" }, ["eventText"]), repeat: { statePath: "/detail/progress", key: "sequence" } },
@@ -74,7 +70,10 @@ export const PAGE = {
     records: node("Collapsible", { title: "执行记录", defaultOpen: false }, ["recordList"]),
     recordList: { ...node("Stack", { gap: "sm" }, ["recordText"]), repeat: { statePath: "/detail/results", key: "id" } },
     recordText: node("Text", { text: item("ref"), variant: "muted" }),
-    composer: { ...node("Composer", { hint: "直接编辑当前对话的项目", footnote: "完成后可以继续对话 · Enter 发送，Shift+Enter 换行" }, ["message", "retry"]), visible: visible("/form/tab", "chat"), slots: { actions: ["stop", "create", "sendInitial", "send"] } },
+    composer: { ...node("Stack", { gap: "none" }, ["composerCreate", "composerInitial", "composerSend"]), visible: visible("/form/tab", "chat") },
+    composerCreate: { ...node("coding:ConversationComposer", { disabled: { $cond: { $state: "/catalog/configured", eq: false }, $then: true, $else: false } }, ["message", "retry"]), visible: { $state: "/detail/sessionId", not: true }, slots: { actions: ["stop", "create"] }, on: { submit: action("", "create", { project: state("/form/project"), text: state("/form/message") }, {}, clearDraft).on.press } },
+    composerInitial: { ...node("coding:ConversationComposer", { disabled: { $cond: { $state: "/detail/canSend", eq: false }, $then: true, $else: false } }, ["message", "retry"]), visible: { $and: [{ $state: "/detail/sessionId" }, { $state: "/detail/workId", not: true }] }, slots: { actions: ["stop", "sendInitial"] }, on: { submit: action("", "send", { "session-id": state("/detail/sessionId"), text: state("/form/message") }, {}, clearDraft).on.press } },
+    composerSend: { ...node("coding:ConversationComposer", { disabled: { $cond: { $state: "/detail/canSend", eq: false }, $then: true, $else: false } }, ["message", "retry"]), visible: { $and: [{ $state: "/detail/sessionId" }, { $state: "/detail/workId" }] }, slots: { actions: ["stop", "send"] }, on: { submit: action("", "send", { ...target, text: state("/form/message") }, {}, clearDraft).on.press } },
     message: node("Textarea", { label: "消息", name: "message", rows: 2, placeholder: "描述你的需求，或继续上一轮对话…", value: bind("/form/message") }),
     stop: { ...action("停止", "stop", target, { variant: "secondary" }), visible: visible("/detail/canStop") },
     create: { ...action("发送", "create", { project: state("/form/project"), text: state("/form/message") }, { disabled: { $cond: { $state: "/catalog/configured", eq: false }, $then: true, $else: false } }, clearDraft), visible: { $state: "/detail/sessionId", not: true } },

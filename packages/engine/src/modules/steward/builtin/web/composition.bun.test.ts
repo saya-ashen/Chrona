@@ -68,6 +68,13 @@ test("expanded byte size is bounded even when compact templates duplicate large 
   const elements = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`n${i}`, { type: "alpha:Large", props: {} }]));
   expect(pageErrors({ spec: { root: "n0", elements }, components: { "alpha:Large": large } }, new Map(), "alpha").join()).toContain("64 KiB");
 });
+test("slot fanout is charged before copying references, independently of distinct node counts", () => {
+  const forward = (type: string) => ({ props: { type: "object", properties: {}, additionalProperties: false }, slots: ["default"], spec: { root: "root", elements: { root: { type, props: {}, children: Array<string>(1000).fill("$slot:default") } } } });
+  const input = { root: "root", elements: { root: { type: "alpha:A", props: {}, children: ["text"] }, text: { type: "Text", props: { text: "safe" }, children: [] } } };
+  const definitions = { "alpha:A": forward("alpha:B"), "alpha:B": forward("alpha:C"), "alpha:C": forward("Stack") };
+  expect(Buffer.byteLength(JSON.stringify({ spec: input, components: definitions }))).toBeLessThan(65_536);
+  expect(() => expandComponents(input, definitions, "alpha")).toThrow("4096");
+});
 const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
 test("registration persists only expanded snapshots, keeps layout and fingerprints callback tools across restart", async () => {

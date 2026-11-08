@@ -72,7 +72,7 @@ function boundProgress(progress: { sequence: number; text: string }[]) {
   return progress.slice().reverse().filter(item => { bytes += Buffer.byteLength(JSON.stringify(item)); return bytes <= 16_000; }).reverse();
 }
 function emptyDetail() {
-  return { sessionId: "", workId: "", goal: "新的编码对话", project: "", projectLabel: "本机项目", projectPath: "", status: "准备开始", canSend: false, canStop: false, canRetry: false, stop: "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; choices: { questionId: string; label: string }[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
+  return { sessionId: "", workId: "", goal: "新的编码对话", project: "", projectLabel: "本机项目", projectPath: "", status: "准备开始", statusTone: "neutral", canSend: false, canStop: false, canRetry: false, stop: "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; choices: { questionId: string; label: string }[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
 }
 async function resolveSession(context: CodingContext, journal: CodingSessions, workId?: string, sessionId?: string) {
   if ([workId, sessionId].some(value => value && !id.safeParse(value).success)) throw codingError("invalid", "请选择有效的对话。");
@@ -116,8 +116,14 @@ function paginate(history: ConversationMessage[], before: string) {
   }
   return { messages: messages.slice(start, end), hasEarlier: start > 0, historyBefore: start > 0 ? messages[start]!.id : "" };
 }
+function executionTone(view?: ExecutionView) {
+  if (!view) return "neutral";
+  if (view.status === "failed") return "danger";
+  if (view.status === "unknown" || view.cancelRequested && !view.stopConfirmed) return "warning";
+  return view.status === "completed" && view.stopConfirmed ? "success" : "neutral";
+}
 function executionState(view?: ExecutionView) {
-  return { status: view ? statuses[view.status] : "发送结果待核对", stop: stopText(view), canSend: !!view && (isStopped(view) || view.status === "running" && !view.cancelRequested), canStop: !!view && !view.stopConfirmed && !view.cancelRequested };
+  return { statusTone: executionTone(view), status: view ? statuses[view.status] : "发送结果待核对", stop: stopText(view), canSend: !!view && (isStopped(view) || view.status === "running" && !view.cancelRequested), canStop: !!view && !view.stopConfirmed && !view.cancelRequested };
 }
 function pendingQuestions(snapshot?: ExecutionSnapshot) {
   // Answer pending questions one at a time so each native input has an unambiguous draft.

@@ -11,7 +11,7 @@ const messages = Array.from({ length: 24 }, (_, i) => ({ id: `message-${i}`, aut
 const initial = { revision: 1, messages };
 const page: Page = {
   module: "fixture", id: "workspace", title: "通用工作区", data: { feed: { tool: "feed", refresh: .2 } },
-  spec: { root: "workspace", state: { draft: "", tab: "chat", sidebarOpen: true, feed: initial, answer: false }, elements: {
+  spec: { root: "workspace", state: { draft: "", tab: "chat", sidebarOpen: true, feed: initial, answer: false, composerDisabled: false }, elements: {
     workspace: { type: "Workspace", props: { title: "编码工作台", description: "把想法交代清楚，把成果带回来。", breadcrumb: "项目 / Chrona", sidebarLabel: "工作列表", mainLabel: "内容", mobileSidebarOpen: { $bindState: "/sidebarOpen" } }, slots: { sidebar: ["list-title", "search", "list-scroll"] }, children: ["title", "tabs", "feed-scroll", "composer"] },
     "list-title": { type: "Heading", props: { text: "最近工作" }, children: [] },
     search: { type: "Input", props: { label: "搜索", name: "search", placeholder: "搜索工作" }, children: [] },
@@ -33,9 +33,11 @@ const page: Page = {
     "diff-details": { type: "Collapsible", props: { title: "查看变更", defaultOpen: true }, children: ["diff"] },
     diff: { type: "CodeDiff", props: { filename: "src/example.ts", diff: `--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,2 +1,2 @@\n-const value = 'before';\n+const value = '${"a".repeat(180)}';\n export { value };` }, children: [] },
     "empty-diff": { type: "CodeDiff", props: { filename: "empty.ts", diff: "" }, children: [] },
-    composer: { type: "Composer", props: { hint: "补充到当前工作", footnote: "输入不会新建工作" }, slots: { actions: ["submit"] }, children: ["draft"] },
+    composer: { type: "Composer", props: { hint: "补充到当前工作", footnote: "输入不会新建工作", disabled: { $state: "/composerDisabled" } }, on: { submit: { action: "call", params: { tool: "send", args: { text: { $state: "/draft" } }, reload: false } } }, slots: { actions: ["pause-submit", "resume-submit", "submit"] }, children: ["draft"] },
+    "pause-submit": { type: "Button", props: { label: "暂停发送" }, visible: { $state: "/composerDisabled", eq: false }, on: { press: { action: "setState", params: { statePath: "/composerDisabled", value: true } } }, children: [] },
+    "resume-submit": { type: "Button", props: { label: "允许发送" }, visible: { $state: "/composerDisabled", eq: true }, on: { press: { action: "setState", params: { statePath: "/composerDisabled", value: false } } }, children: [] },
     draft: { type: "Textarea", props: { name: "draft", label: "继续补充", rows: 2, value: { $bindState: "/draft" } }, children: [] },
-    submit: { type: "Button", props: { label: "发送补充" }, on: { press: { action: "call", params: { tool: "send", args: { text: { $state: "/draft" } }, reload: false } } }, children: [] },
+    submit: { type: "Button", props: { label: "发送补充", variant: "secondary", disabled: { $state: "/composerDisabled" } }, on: { press: { action: "call", params: { tool: "send", args: { text: { $state: "/draft" } }, reload: false } } }, children: [] },
   } },
 };
 
@@ -104,9 +106,17 @@ export function setupWorkspaceTest(element: HTMLElement) {
       draft.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true })); await settle();
       assert(!calls.some(call => call.target === "fixture.send"), "newline and IME composition do not send");
       draft.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await settle();
-      assert(calls.filter(call => call.target === "fixture.send").length === 1, "Enter sends the bound composer once");
+      assert(calls.filter(call => call.target === "fixture.send").length === 1, "Enter emits submit once regardless of button styling or order");
+      Array.from(element.querySelectorAll("button")).find(button => button.textContent === "暂停发送")!.click(); await settle();
+      assert(submit.disabled, "page shares the explicit disabled state with its send button");
+      draft.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await settle();
+      assert(calls.filter(call => call.target === "fixture.send").length === 1 && submit.disabled, "disabled composer neither submits nor clicks another action");
+      Array.from(element.querySelectorAll("button")).find(button => button.textContent === "允许发送")!.click(); await settle();
+      draft.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); await settle();
+      assert(calls.filter(call => call.target === "fixture.send").length === 2, "reenabling the composer restores keyboard submit");
       submit.click(); await settle();
-      assert(calls.some(call => call.target === "fixture.send" && call.args.text === "未发送的补充"), "existing call resolves bound draft at press time");
+      const sends = calls.filter(call => call.target === "fixture.send");
+      assert(sends.length === 3 && sends.every(call => call.args.text === "未发送的补充"), "keyboard submit and button press resolve the bound draft at action time");
       await poll("受控刷新失败");
       assert(element.textContent.includes("受控刷新失败") && element.textContent.includes("已完成验证"), "failed poll keeps previous content and reports failure");
       await poll(); assert(!element.textContent.includes("受控刷新失败"), "successful poll clears source failure");
@@ -125,4 +135,6 @@ export function setupWorkspaceTest(element: HTMLElement) {
     },
   };
 }
+// The fixture host declares the same shell layout class as a registered workspace page.
+document.body.classList.add("web-shell-app", "web-shell-workspace");
 Object.assign(window, { workspaceTest: setupWorkspaceTest(document.querySelector("main") ?? document.body.appendChild(document.createElement("main"))) });
