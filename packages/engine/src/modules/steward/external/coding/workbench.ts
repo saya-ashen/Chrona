@@ -72,7 +72,7 @@ function boundProgress(progress: { sequence: number; text: string }[]) {
   return progress.slice().reverse().filter(item => { bytes += Buffer.byteLength(JSON.stringify(item)); return bytes <= 16_000; }).reverse();
 }
 function emptyDetail() {
-  return { sessionId: "", workId: "", goal: "新的编码对话", project: "", status: "准备开始", canSend: false, canStop: false, canRetry: false, stop: "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
+  return { sessionId: "", workId: "", goal: "新的编码对话", project: "", projectLabel: "本机项目", projectPath: "", status: "准备开始", canSend: false, canStop: false, canRetry: false, stop: "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; choices: { questionId: string; label: string }[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
 }
 async function resolveSession(context: CodingContext, journal: CodingSessions, workId?: string, sessionId?: string) {
   if ([workId, sessionId].some(value => value && !id.safeParse(value).success)) throw codingError("invalid", "请选择有效的对话。");
@@ -122,7 +122,7 @@ function executionState(view?: ExecutionView) {
 function pendingQuestions(snapshot?: ExecutionSnapshot) {
   // Answer pending questions one at a time so each native input has an unambiguous draft.
   const questions = (snapshot?.questions.filter(question => question.status === "pending" && Date.parse(question.expiresAt) > Date.now()) ?? []).slice(0, 1);
-  return questions.map(question => ({ id: question.requestId, title: question.title, method: question.method, options: question.options, help: question.method === "confirm" ? "请选择是或否" : question.method === "select" ? "请选择一个选项" : "填写你的答复" }));
+  return questions.map(question => ({ id: question.requestId, title: question.title, method: question.method, options: question.options, choices: question.options.map(label => ({ questionId: question.requestId, label })), help: question.method === "confirm" ? "请选择是或否" : question.method === "select" ? "请选择一个选项" : "填写你的答复" }));
 }
 async function resultDetails(context: CodingContext, workId: string) {
   try {
@@ -142,8 +142,18 @@ function restoreIdleSession(result: ReturnType<typeof emptyDetail>, session: Cod
   if (!session.selectedWorkId && session.projectRef) Object.assign(result, { canSend: true, status: "准备发送", stop: "上次发送未被接受，可以重新发送。" });
   result.canRetry = (session.turns ?? []).some(pendingTurn); result.canSend &&= !result.canRetry;
 }
+async function conversationProject(context: CodingContext, projectRef?: string) {
+  try {
+    const project = (await projects(context)).find(project => project.projectRef === projectRef);
+    return { projectLabel: project?.label ?? "已保存项目", projectPath: project?.path ?? "" };
+  } catch (error) {
+    // Cached conversations stay readable while the project registry is unavailable.
+    if ((error as { code?: string }).code !== "unavailable") throw error;
+    return { projectLabel: "已保存项目", projectPath: "" };
+  }
+}
 async function detail(context: CodingContext, session: CodingSession, before = "") {
-  const result = { ...emptyDetail(), sessionId: session.id, goal: session.title, project: session.projectRef ?? "", workId: session.selectedWorkId ?? "", historyPage: before };
+  const result = { ...emptyDetail(), ...await conversationProject(context, session.projectRef), sessionId: session.id, goal: session.title, project: session.projectRef ?? "", workId: session.selectedWorkId ?? "", historyPage: before };
   const messages: ConversationMessage[] = [];
   for (const workId of session.workIds) {
     if (rejectedWork(session, workId)) {

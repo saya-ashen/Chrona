@@ -85,6 +85,7 @@ test("coding page uses registered generic conversation components and has no acc
 
 test("completed conversation starts fresh rounds in the same Provider session and restores selection", () => fixture(async fake => {
   const first = await workbenchCommand(fake.context, create);
+  expect(first.projectLabel).toBe("repo"); expect(first.projectPath).toBe("/host/repo");
   await workbenchCommand({ ...fake.context }, create);
   expect(fake.starts).toHaveLength(1);
   const timestamp = (await loadSessions(fake.context)).sessions[0]!.turns![0]!.createdAt;
@@ -149,6 +150,8 @@ test("stop pending and unknown states block a new round; native confirm and sele
   snapshot.questions = [{ requestId: "confirm", title: "允许修改？", method: "confirm", options: [], status: "pending", expiresAt: until }];
   await workbenchCommand(fake.context, { action: "answer", "request-key": "yes", "work-id": first.workId, question: "confirm", text: "是" });
   snapshot.questions = [{ requestId: "select", title: "选择方案", method: "select", options: ["方案一", "方案二"], status: "pending", expiresAt: until }];
+  const choosing = await workbenchDetail(fake.context, first.workId);
+  expect(choosing.questions[0]?.choices).toEqual([{ questionId: "select", label: "方案一" }, { questionId: "select", label: "方案二" }]);
   await workbenchCommand(fake.context, { action: "answer", "request-key": "option", "work-id": first.workId, question: "select", text: "方案二" });
   expect(fake.answers).toEqual([{ decision: "submit", value: true }, { decision: "submit", value: 1 }]);
   const stopping = await workbenchCommand(fake.context, { action: "stop", "request-key": "stop", "work-id": first.workId });

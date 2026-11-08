@@ -30,6 +30,28 @@ describe("shared workspace renderer", () => {
     expect(html).toContain('<textarea name="draft" disabled=""');
   });
 
+  test("workspace header, bound view tabs, panels and composer render through the shared registry", () => {
+    const page: Page = { module: "fixture", id: "composed", title: "通用", data: {}, spec: { root: "workspace", state: { tab: "result", draft: "草稿" }, elements: {
+      workspace: { type: "Workspace", props: { title: "工作区", description: "说明", breadcrumb: "项目 / 示例" }, children: ["header", "tabs", "panel", "composer"] },
+      header: { type: "WorkspaceHeader", props: { title: "当前目标", status: "进行中", subtitle: "当前进展" }, children: [] },
+      tabs: { type: "ViewTabs", props: { items: [{ value: "chat", label: "交流" }, { value: "result", label: "成果" }], value: { $bindState: "/tab" } }, children: [] },
+      panel: { type: "Panel", props: { tone: "question" }, children: ["option"] },
+      option: { type: "ActionOption", props: { label: "当前选择", compact: true, selected: true }, children: [] },
+      composer: { type: "Composer", props: { hint: "补充到当前工作", footnote: "保留草稿" }, children: ["draft"], slots: { actions: ["send"] } },
+      draft: { type: "Textarea", props: { label: "补充要求", name: "message", value: { $bindState: "/draft" } }, children: [] },
+      send: { type: "Button", props: { label: "发送" }, children: [] },
+    } } };
+    const html = renderToStaticMarkup(<PageView page={page} deps={{ call: async () => ({}), content: async () => new Blob(), navigate: () => {} }} />);
+    expect(html).toContain("项目 / 示例"); expect(html).toContain("说明");
+    expect(html).toContain("<h1>当前目标</h1>"); expect(html).toContain("当前进展");
+    expect(html).toContain('role="tab" aria-selected="true" tabindex="0">成果</button>');
+    expect(html).toContain('<label><strong>补充要求 </strong><textarea');
+    expect(html).toContain('name="message"'); expect(html).toContain('>草稿</textarea>');
+    expect(html).toContain("补充到当前工作"); expect(html).toContain("保留草稿");
+    expect(html).toContain('class="composer-actions"><button'); expect(html).toContain(">发送</button>");
+    expect(html).not.toContain("还不能显示组件");
+  });
+
   test("unresolved data shows an empty diff until the source loads", () => {
     const html = render({ $state: "/pending/diff" });
     expect(html).toContain("暂无变更"); expect(html).not.toContain("Something went wrong");

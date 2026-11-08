@@ -10,7 +10,7 @@ import { SystemContext } from "./system/action";
 import { systemComponents } from "./system/components";
 import { systemPage, type SystemParams } from "./system/page";
 import { ChatHost } from "./system/chat-stream";
-import { Workspace, ScrollArea, Message, CodeDiff, ActionOption } from "./workspace";
+import { Workspace, WorkspaceHeader, ViewTabs, Composer, Panel, ScrollArea, Message, CodeDiff, ActionOption } from "./workspace";
 import rendererStyles from "./pages.css" with { type: "text" };
 
 type Args = Record<string, unknown>;
@@ -97,7 +97,7 @@ const gap = (value?: string | null) => ({ none: "0", sm: ".4rem", md: ".6rem", l
 /** Only what this page draws in its own style is offered; the catalog's other components render as a notice. */
 const { registry } = defineRegistry(catalog, {
   components: {
-    Workspace, ScrollArea, Message, CodeDiff, ActionOption,
+    Workspace, WorkspaceHeader, ViewTabs, Composer, Panel, ScrollArea, Message, CodeDiff, ActionOption,
     Card: ({ props, children }: Props<{ title?: string | null; description?: string | null }>) => <section>{props.title ? <h2>{props.title}</h2> : null}{props.description ? <p className="muted">{props.description}</p> : null}{children}</section>,
     Stack: ({ props, children }: Props<{ direction?: string | null; gap?: string | null; align?: string | null }>) => <div style={{ display: "flex", flexDirection: props.direction === "horizontal" ? "row" : "column", flexWrap: props.direction === "horizontal" ? "wrap" : undefined, gap: gap(props.gap), alignItems: props.align ?? undefined }}>{children}</div>,
     Grid: ({ props, children }: Props<{ columns?: number | null; gap?: string | null }>) => <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${Math.max(8, 48 / (props.columns ?? 2))}rem), 1fr))`, gap: gap(props.gap) }}>{children}</div>,
