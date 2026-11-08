@@ -8,7 +8,9 @@ function render(diff: unknown) {
     workspace: { type: "Workspace", props: { sidebarLabel: "记录", mainLabel: "详情" }, slots: { sidebar: ["sidebar"] }, children: ["scroll"] },
     sidebar: { type: "Text", props: { text: "最近记录" }, children: [] },
     scroll: { type: "ScrollArea", props: { label: "阅读记录", follow: true }, children: ["message"] },
-    message: { type: "Message", props: { author: "助手", tone: "notice" }, children: ["diff", "option"] },
+    message: { type: "Message", props: { author: "助手", tone: "notice" }, children: ["diff", "option", "project", "draft"] },
+    project: { type: "Select", props: { label: "项目", name: "project", value: "local-id", options: [{ value: "local-id", label: "已有目录" }, "legacy"] }, children: [] },
+    draft: { type: "Textarea", props: { label: "消息", name: "draft", value: "", disabled: true }, children: [] },
     diff: { type: "CodeDiff", props: { filename: "src/example.ts", diff }, children: [] },
     option: { type: "ActionOption", props: { label: "继续", description: "保留当前选择", selected: true, disabled: true }, children: [] },
   } } };
@@ -23,6 +25,9 @@ describe("shared workspace renderer", () => {
     expect(html).toContain('<article'); expect(html).toContain('aria-label="助手"');
     expect(html).toContain('aria-pressed="true" disabled=""'); expect(html).toContain("保留当前选择");
     expect(html).toContain("暂无变更"); expect(html).not.toContain("还不能显示组件");
+    expect(html).toContain('<option value="local-id" selected="">已有目录</option>');
+    expect(html).toContain('<option value="legacy">legacy</option>');
+    expect(html).toContain('<textarea name="draft" disabled=""');
   });
 
   test("unresolved data shows an empty diff until the source loads", () => {

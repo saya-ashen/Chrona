@@ -114,7 +114,7 @@ const { registry } = defineRegistry(catalog, {
     Textarea: ({ props, bindings }: Props<{ label: string; name: string; value?: string | null }>) => <Field label={props.label}><Bound kind="textarea" name={props.name} value={props.value} binding={bindings?.value} element={props as Args} /></Field>,
     Select: ({ props, bindings, emit }: Props<{ label: string; name: string; options?: unknown[] | null; value?: string | null; placeholder?: string | null }>) => {
       const [value, setValue] = useBoundProp<string>(props.value ?? undefined, bindings?.value);
-      return <Field label={props.label}><select name={props.name} value={text(value)} onChange={event => { setValue(event.target.value); emit("change"); }}>{props.placeholder ? <option value="">{props.placeholder}</option> : null}{(props.options ?? []).map(option => <option key={text(option)} value={text(option)}>{text(option)}</option>)}</select></Field>;
+      return <Field label={props.label}><select name={props.name} value={text(value)} onChange={event => { setValue(event.target.value); emit("change"); }}>{props.placeholder ? <option value="">{props.placeholder}</option> : null}{(props.options ?? []).map(option => { const value = record(option) ? text(option.value) : text(option), label = record(option) ? text(option.label) : text(option); return <option key={value} value={value}>{label}</option>; })}</select></Field>;
     },
     Checkbox: Toggle,
     Switch: Toggle,

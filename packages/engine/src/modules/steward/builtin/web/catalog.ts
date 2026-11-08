@@ -12,6 +12,9 @@ const SHADCN = ["Card", "Stack", "Grid", "Separator", "Heading", "Text", "Badge"
 type Definition = { props: z.ZodObject<Record<string, z.ZodType>>; events?: string[]; slots?: string[]; description: string };
 export const components: Record<string, Definition> = {
   ...Object.fromEntries(SHADCN.map(name => [name, (shadcnComponentDefinitions as Record<string, Definition>)[name]!])),
+  Input: { ...shadcnComponentDefinitions.Input, props: shadcnComponentDefinitions.Input.props.extend({ disabled: z.boolean().optional() }) },
+  Textarea: { ...shadcnComponentDefinitions.Textarea, props: shadcnComponentDefinitions.Textarea.props.extend({ disabled: z.boolean().optional() }) },
+  Select: { ...shadcnComponentDefinitions.Select, props: shadcnComponentDefinitions.Select.props.extend({ options: z.array(z.union([z.string(), z.object({ value: z.string(), label: z.string() })])) }), description: "下拉选项可为字符串或 {value,label}；value 支持双向绑定" },
   Workspace: { props: z.object({ sidebarLabel: z.string().optional(), mainLabel: z.string().optional(), sidebarOpen: z.boolean().optional() }), slots: ["default", "sidebar"], events: [], description: "响应式侧栏和内容工作区；sidebar 为侧栏，children 为内容；sidebarOpen 可双向绑定" },
   ScrollArea: { props: z.object({ label: z.string().optional(), follow: z.boolean().optional() }), slots: ["default"], events: [], description: "独立滚动区域；保留阅读位置，follow 仅在靠近底部时自动跟随" },
   Message: { props: z.object({ author: z.string(), time: z.string().optional(), tone: z.enum(["default", "user", "notice"]).optional() }), slots: ["default"], events: [], description: "带作者、可选 ISO 时间和正文子组件的消息" },
