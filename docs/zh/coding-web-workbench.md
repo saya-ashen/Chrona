@@ -32,6 +32,6 @@
 
 首版支持本机目录和 v1 连续工作。v2 固定设备、独立 worktree、父子工作图与跨入口完整对话接续尚未接到此页；现有底层接口不等于这些页面场景已验收。完整编辑器、交互终端和通用远端宿主不在首版范围。
 
-页面继续使用共享 json-render。web 提供通用 Workspace、ScrollArea、Message、CodeDiff、ActionOption 和表单组件，coding 管理项目选择、会话、回复与业务动作；没有另建执行队列或直接连接 Pi。
+页面继续使用共享 json-render。web 提供通用 Workspace、ScrollArea、Message、CodeDiff、ActionOption 和表单组件，coding 管理项目选择、会话、回复与业务动作；没有另建执行队列或直接连接 Pi。问题卡片和输入区现在通过 `web.page-set` 的应用私有组合定义登记，Web 提供明确的 submit 与 statusTone 契约；全站外壳统一管理主题与导航，详见[Web 外壳与应用组合组件](web-components-and-shell.md)。
 
 下一步先在明确授权的隔离项目中验证真实模型的两轮直接编辑、问题答复、完成/停止与离开返回，再据观察修复产品阻塞。全项目后续顺序以[开发路线](development-roadmap.md)为准；通用调用上下文与 Run 改造不是此页的前置条件。

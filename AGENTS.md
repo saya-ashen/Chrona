@@ -140,6 +140,7 @@ These rules apply to the coordinator and every delegated worker.
 ## Web page principles
 
 - The web page is Chinese-first and all pages share the json-render components; keep the static page data-free (data comes from `/api/web` with the user's key).
+- Web owns the host shell/theme/navigation for every authenticated page. Pages declare `layout: document|workspace`; never infer host styling from child components. App-private declarative `components` travel with `web.page-set`, expand before normal catalog/tool checks, and carry no extra authority or browser code. Use explicit `Composer.on.submit` and application-provided `WorkspaceHeader.statusTone`; see [Web composition contracts](docs/zh/web-components-and-shell.md).
 - Validate desktop `1440x900`, tablet `1024x768`, mobile `390x844`; mobile must not scroll horizontally.
 - What needs the user's decision, and the primary action, must be visually obvious.
 - Copy speaks the user's language (apps, files, conversations, notifications), not internal names (runs, grants, tokens).

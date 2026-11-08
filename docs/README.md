@@ -12,6 +12,7 @@
 - [开发目标与统一路线](zh/development-roadmap.md): current backlog, priorities, dependencies and documentation status; prioritizes the usable coding Web workbench, records the five-builtin customization decision and tracks release gaps.
 - [编码工作台实现评估](zh/coding-workbench-implementation-assessment.md): approved scope and retained pre-implementation analysis; [开发验证记录](zh/coding-workbench-validation.md) covers the integrated implementation, regression checks and browser evidence.
 - [编码工作台参考项目调研](zh/workbench-reference-research.md): primary sources and interaction comparisons behind the approved lightweight conversation page.
+- [Web 外壳与应用组合组件](zh/web-components-and-shell.md): uniform whole-Web theme/navigation, app-private declarative props/events/slots, ownership and validation evidence.
 - [当前架构](zh/architecture.md): implementation map, trust model and module lifecycle.
 - [调用上下文、Run 与产出](zh/call-context-run-artifact-roadmap.md): later architecture work after the usable workbench; freeze the minimum delegation contract when starting that architecture change.
 - [Agent 原语与应用编排](zh/agent-module-orchestration.md) / [基础编码工作台](zh/coding-web-workbench.md): current application ownership, interfaces and product limits.

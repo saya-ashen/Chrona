@@ -82,6 +82,8 @@ Today 的七天范围、排序、通知与应用健康摘要在 web 的 `today.t
 
 所有页面（系统页与应用登记页）共用 `pages.js` 的 React/json-render 渲染器，由 `src/pages.tsx` 构建；系统 spec 位于 `src/system/`，仅系统页面获得访问现有数据 API 的 adapter。`app.js` 只负责认证、请求、路由与单一 SSE 等 shell 基础设施，样式统一在 `style.css`；共享显示组件及绑定规则由 `catalog.ts` / `web.catalog` 提供。
 
+Web 为全部内置页和登记页统一管理导航、主题与响应式外壳；页面显式声明 `layout`，不再从子组件推断全局样式。应用可随 `page-set` 提交本应用命名空间下的声明式 `components`，Web 在登记时展开并复核公共组件、工具与页面版本。组合不加载应用脚本，也不增加权限；详见[Web 外壳与应用组合组件](web-components-and-shell.md)。
+
 代码：`steward/builtin/web/index.ts`、`pages.ts`、`catalog.ts`、`src/pages.tsx`、`build.ts`、`builtin/files/page.ts`。细节：[模块依赖方向 §4](module-dependency-direction.md#4-web应用登记页面规格草案)，具体可用格式以 `web.catalog` 与代码为准。
 
 ## 8. 通知渠道、日程与定时器
