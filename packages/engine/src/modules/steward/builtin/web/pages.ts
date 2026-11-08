@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { BUILTIN_ACTIONS, CATALOG_VERSION, callParams, catalog, components as definitions } from "./catalog";
+import { expandComponents, type PageSpec } from "./composition";
 
 /**
  * Pages apps register with web (module-dependency-direction §4): an app sends a json-render spec plus references to its
@@ -13,7 +14,7 @@ export type Caller = { kind: string; module?: string; moduleId?: string };
 export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
 export type PageTool = { inputSchema: Schema; moduleId: string; contractHash: string };
 /** `keyed`: the app's tools that take a request key (the page sends a fresh one per press); `needs`: each source's required arguments (not read while one is empty). */
-export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string };
+export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace" };
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
@@ -46,7 +47,13 @@ function checkBinding(where: string, binding: unknown, tools: Map<string, Schema
 }
 /** catalog.validate checks only the spec's structure, so components, props and actions are checked here. */
 // eslint-disable-next-line complexity -- Keep app-supplied spec validation and its ordered diagnostics together.
-export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<string, Schema>, module: string) {
+export function pageErrors(input: { spec: unknown; data?: unknown; components?: unknown; layout?: unknown }, tools: Map<string, Schema>, module: string) {
+  if (input.layout !== undefined && input.layout !== "document" && input.layout !== "workspace") return ["layout 须为 document 或 workspace"];
+  if (input.components !== undefined) {
+    try { input = { ...input, spec: expandComponents(input.spec, input.components, module), components: undefined }; }
+    catch (error) { return [(error as Error).message]; }
+  }
+  if (Buffer.byteLength(JSON.stringify({ spec: input.spec, data: input.data })) > MAX_BYTES) return ["展开后的页面最多 64 KiB"];
   const errors: string[] = [], structure = catalog.validate(input.spec);
   if (!structure.success) return [`spec 结构无效：${structure.error?.issues.slice(0, 5).map(issue => `${issue.path.join(".")} ${issue.message}`).join("；")}`];
   const elements = (input.spec as Spec).elements;
@@ -92,7 +99,7 @@ function assertPageIdentity(page: Partial<Page>) {
 function assertRegistration(args: Args) {
   if (typeof args.id !== "string" || !SLUG.test(args.id)) throw invalid("id 须为小写字母开头的 slug");
   if (typeof args.title !== "string" || !args.title.trim() || args.title.length > 80) throw invalid("title 须为 1–80 个字符");
-  if (JSON.stringify({ spec: args.spec, data: args.data }).length > MAX_BYTES) throw invalid("页面最多 64 KiB");
+  if (Buffer.byteLength(JSON.stringify({ spec: args.spec, data: args.data, components: args.components })) > MAX_BYTES) throw invalid("页面最多 64 KiB");
   return { id: args.id, title: args.title };
 }
 const stalePage = () => Object.assign(new Error("页面登记已失效，请应用重新登记页面"), { code: "conflict" });
@@ -122,13 +129,15 @@ export function createPages(deps: Deps) {
     return { modules, pages: kept };
   }
   async function set(module: string, moduleId: string, args: Args) {
-    const { spec, data } = args, { id, title } = assertRegistration(args);
+    const { data } = args, { id, title } = assertRegistration(args);
+    const spec: PageSpec = expandComponents(args.spec, args.components, module);
+    const layout = args.layout === undefined ? "document" : args.layout;
     const { modules } = await knownPages();
     if (!activeOwner(modules, moduleId, module)) throw Object.assign(new Error("应用身份已失效或尚未启用，请启用后重新登记页面"), { code: "conflict" });
     const current = await deps.tools(module);
     if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
     const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
-    const errors = pageErrors({ spec, data }, tools, module);
+    const errors = pageErrors({ spec, data, layout }, tools, module);
     if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
     const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
     if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
@@ -137,7 +146,7 @@ export function createPages(deps: Deps) {
     const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
     const contracts = Object.fromEntries(references(spec as Spec, sources).map(name => [name, current.get(name)!.contractHash]));
     const revision = crypto.randomUUID();
-    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), data: sources, spec: spec as Spec, keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
+    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), data: sources, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
     await save([...others, page]);
     return { id, catalog: CATALOG_VERSION };
   }
@@ -207,7 +216,8 @@ export function describeCatalog() {
       ...(definition.slots?.length ? { children: true, slots: definition.slots } : {}),
     }])),
     rules: [
-      "page-set {id, title, data?, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
+      "page-set {id, title, layout?: document|workspace, components?, data?, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
+      "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Names must use your app prefix; definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",
       "data: {name: {tool, args?, refresh?}} calls one of your own tools when the page opens (and every refresh seconds, 5-3600); the result is state /name. args may use {\"$state\": \"/path\"}; data is re-read when such a value changes.",
       "Props may use {\"$state\": \"/path\"}, {\"$bindState\": \"/path\"} for inputs, {\"$template\": \"${field}/\"}, and repeat/$item for lists. In a top-level action param $item is the item's state path; use {\"$template\": \"${field}\"} for its value (nested call args resolve $item to the value).",
       "on.<event>: {action: \"call\", params: {tool, args?, result?, reload?}, confirm?: {title, message}} calls your tool; a tool with a request-key parameter gets a fresh key unless args sets one. result stores the output at a state path; data is re-read unless reload is false. Built-in actions: setState, pushState, removeState.",
