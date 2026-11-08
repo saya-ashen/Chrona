@@ -77,3 +77,11 @@
 2026-11-08 用户授权更新本机 3111 试用服务，并关闭 4318 静态原型。更新保留现有数据：先在副本验证唯一可空字段增量，再停止服务备份完整 data/release；无历史 ExecutionAttempt，各表行数保持，SQLite 外键及完整性通过。Agent 随发行升级，Web/coding/editor 经过受检激活。原始备份为 `/home/saya/.local/share/chrona-v1-preview/backups/before-continuous-coding-20261108T053409Z`。
 
 实际部署浏览器检查发现并修复两项预览遗漏：CSP 拦截内嵌组件样式，改由同源 style.css 提供；ui-work/ui-command 的严格输出契约同步项目说明与原生问题 choices。更新后实际 `/p/coding/main` 的侧栏272px、页签、目录列表和详情接口200、手机无横向溢出通过，无页面错误。修正定向21测试/404断言及TypeScript通过。未发起模型请求或修改真实项目，项目列表尚为空。
+
+## 2026-11-08：实际服务回复回传修复
+
+一次真实工作台执行中，Pi 已完成项目任务并写下最终回复，但执行详情的 highWatermark 为 0，最终被记录为 `Execution detail is incomplete; recover the final snapshot`。根因是 service 通过 `Object.create(inputPorts)` 包装依赖，而模块 supervisor 保留原对象；回调注册表按 ports 对象身份保存，导致真实 SDK 的回调查不到接收端。此前使用同一个 ports 对象的 SDK 测试，以及直接注入 Provider 的执行测试，均未覆盖这一启动组合。
+
+修复 `f2938d6e` 将回调注册表作用域与 supervisor 对齐为数据库对象和 dataDir。每个注册仍有独立随机引用、工作区校验和释放生命周期。新增真实 SDK/受控 Pi 回归先用原始 ports 建立 supervisor，再以派生 ports 启动执行，验证进度和详情回调；另验证数据库、目录、工作区、释放后以及共享 target 的多个注册互不串扰。
+
+受影响回归 **22 通过、0 失败、225 次断言**；TypeScript、相关 ESLint 和 diff 检查通过。修复已更新本机 3111 服务，数据库结构不变，发布前备份并核对业务行数与 SQLite 完整性。已从所属 Pi 原始记录恢复这轮最终回复至快照和应用缓存；保留失败状态、缺失中间详情标记和审计记录，没有重跑任务或再次修改目标项目。认证浏览器确认回复可见。该检查不代表修复后新增真实模型任务已执行。
