@@ -993,7 +993,7 @@
     },
     {
       "name": "ui-catalog",
-      "description": "编码工作台项目与工作列表",
+      "description": "编码对话与已添加的主机项目目录",
       "output": {
         "type": "object",
         "properties": {
@@ -1003,13 +1003,49 @@
               "type": "string"
             }
           },
-          "workIds": {
+          "projectOptions": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value",
+                "label"
+              ],
+              "additionalProperties": false
             }
           },
-          "works": {
+          "projectDetails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectRef": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "projectRef",
+                "path",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sessions": {
             "type": "array",
             "items": {
               "type": "object",
@@ -1017,20 +1053,30 @@
                 "id": {
                   "type": "string"
                 },
-                "goal": {
+                "title": {
                   "type": "string"
                 },
-                "status": {
+                "project": {
                   "type": "string"
+                },
+                "selected": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "goal",
-                "status"
+                "title",
+                "project",
+                "selected"
               ],
               "additionalProperties": false
             }
+          },
+          "hasSessions": {
+            "type": "boolean"
+          },
+          "selectedSession": {
+            "type": "string"
           },
           "requestKey": {
             "type": "string"
@@ -1040,19 +1086,18 @@
           },
           "notice": {
             "type": "string"
-          },
-          "hasWorks": {
-            "type": "boolean"
           }
         },
         "required": [
           "projects",
-          "workIds",
-          "works",
+          "projectOptions",
+          "projectDetails",
+          "sessions",
+          "hasSessions",
+          "selectedSession",
           "requestKey",
           "configured",
-          "notice",
-          "hasWorks"
+          "notice"
         ],
         "additionalProperties": false
       },
@@ -1068,10 +1113,13 @@
     },
     {
       "name": "ui-work",
-      "description": "编码工作台当前工作与成果",
+      "description": "读取持久编码对话、当前状态与完整回复",
       "output": {
         "type": "object",
         "properties": {
+          "sessionId": {
+            "type": "string"
+          },
           "workId": {
             "type": "string"
           },
@@ -1093,14 +1141,63 @@
           "patch": {
             "type": "string"
           },
+          "requestKey": {
+            "type": "string"
+          },
+          "historyBefore": {
+            "type": "string"
+          },
+          "historyPage": {
+            "type": "string"
+          },
           "canSend": {
             "type": "boolean"
           },
           "canStop": {
             "type": "boolean"
           },
+          "canRetry": {
+            "type": "boolean"
+          },
           "limited": {
             "type": "boolean"
+          },
+          "hasQuestions": {
+            "type": "boolean"
+          },
+          "hasEarlier": {
+            "type": "boolean"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "author",
+                "content",
+                "timestamp",
+                "status"
+              ],
+              "additionalProperties": false
+            }
           },
           "progress": {
             "type": "array",
@@ -1132,6 +1229,15 @@
                 "title": {
                   "type": "string"
                 },
+                "method": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "help": {
                   "type": "string"
                 }
@@ -1139,15 +1245,11 @@
               "required": [
                 "id",
                 "title",
+                "method",
+                "options",
                 "help"
               ],
               "additionalProperties": false
-            }
-          },
-          "questionIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
             }
           },
           "results": {
@@ -1172,18 +1274,10 @@
               ],
               "additionalProperties": false
             }
-          },
-          "resultIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "hasQuestions": {
-            "type": "boolean"
           }
         },
         "required": [
+          "sessionId",
           "workId",
           "goal",
           "project",
@@ -1191,15 +1285,19 @@
           "stop",
           "output",
           "patch",
+          "requestKey",
+          "historyBefore",
+          "historyPage",
           "canSend",
           "canStop",
+          "canRetry",
           "limited",
+          "hasQuestions",
+          "hasEarlier",
+          "messages",
           "progress",
           "questions",
-          "questionIds",
-          "results",
-          "resultIds",
-          "hasQuestions"
+          "results"
         ],
         "additionalProperties": false
       },
@@ -1208,11 +1306,15 @@
         "properties": {
           "work-id": {
             "type": "string"
+          },
+          "session-id": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
           }
         },
-        "required": [
-          "work-id"
-        ]
+        "required": []
       },
       "visibility": [
         "owner"
@@ -1221,10 +1323,13 @@
     },
     {
       "name": "ui-command",
-      "description": "编码工作台创建、补充、答复、停止和验收",
+      "description": "用户编码对话：添加目录、开始、继续、答复、停止、恢复与选择",
       "output": {
         "type": "object",
         "properties": {
+          "sessionId": {
+            "type": "string"
+          },
           "workId": {
             "type": "string"
           },
@@ -1246,14 +1351,63 @@
           "patch": {
             "type": "string"
           },
+          "requestKey": {
+            "type": "string"
+          },
+          "historyBefore": {
+            "type": "string"
+          },
+          "historyPage": {
+            "type": "string"
+          },
           "canSend": {
             "type": "boolean"
           },
           "canStop": {
             "type": "boolean"
           },
+          "canRetry": {
+            "type": "boolean"
+          },
           "limited": {
             "type": "boolean"
+          },
+          "hasQuestions": {
+            "type": "boolean"
+          },
+          "hasEarlier": {
+            "type": "boolean"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "author",
+                "content",
+                "timestamp",
+                "status"
+              ],
+              "additionalProperties": false
+            }
           },
           "progress": {
             "type": "array",
@@ -1285,6 +1439,15 @@
                 "title": {
                   "type": "string"
                 },
+                "method": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "help": {
                   "type": "string"
                 }
@@ -1292,15 +1455,11 @@
               "required": [
                 "id",
                 "title",
+                "method",
+                "options",
                 "help"
               ],
               "additionalProperties": false
-            }
-          },
-          "questionIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
             }
           },
           "results": {
@@ -1325,18 +1484,10 @@
               ],
               "additionalProperties": false
             }
-          },
-          "resultIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "hasQuestions": {
-            "type": "boolean"
           }
         },
         "required": [
+          "sessionId",
           "workId",
           "goal",
           "project",
@@ -1344,15 +1495,19 @@
           "stop",
           "output",
           "patch",
+          "requestKey",
+          "historyBefore",
+          "historyPage",
           "canSend",
           "canStop",
+          "canRetry",
           "limited",
+          "hasQuestions",
+          "hasEarlier",
+          "messages",
           "progress",
           "questions",
-          "questionIds",
-          "results",
-          "resultIds",
-          "hasQuestions"
+          "results"
         ],
         "additionalProperties": false
       },
@@ -1366,7 +1521,10 @@
               "send",
               "stop",
               "answer",
-              "accept"
+              "select",
+              "new",
+              "retry",
+              "register-project"
             ]
           },
           "request-key": {
@@ -1375,16 +1533,19 @@
           "work-id": {
             "type": "string"
           },
+          "session-id": {
+            "type": "string"
+          },
           "project": {
+            "type": "string"
+          },
+          "path": {
             "type": "string"
           },
           "text": {
             "type": "string"
           },
           "question": {
-            "type": "string"
-          },
-          "result": {
             "type": "string"
           }
         },
@@ -1417,7 +1578,9 @@
     "agent.cleanup",
     "schedules.create",
     "modules.report-health",
-    "agent.stream"
+    "agent.stream",
+    "projects.list",
+    "projects.register"
   ],
   "packages": [],
   "secrets": [],

@@ -116,9 +116,11 @@ try {
 } finally { await rm(dir, { recursive: true, force: true }); }
 
 let readiness: Record<string, unknown> | undefined;
-let locations: { online: boolean }[] = [];
+let projects: { projectRef: string; path: string; label: string }[] = [];
+const registrations: Record<string, unknown>[] = [];
 const runtime = await startModule("index.ts", { stubs: {
-  "agent.locations": () => ({ locations, after: null }),
+  "projects.list": () => ({ projects }),
+  "projects.register": (args: Record<string, unknown>) => { registrations.push(args); return { projectRef: "registered", path: String(args.path), label: "registered" }; },
   "modules.report-health": (args: Record<string, unknown>) => { readiness = args; return { reportedAt: "2026-11-05T00:00:00Z", expiresAt: "2026-11-05T00:10:00Z" }; },
   "web.page-set": () => ({ id: "main" }), "schedules.create": () => ({ key: "coding-dependencies" }),
 } });
@@ -142,9 +144,16 @@ try {
   assert.equal((await runtime.send({ trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} })).error, undefined);
   assert.equal(readiness?.status, "needs_configuration");
   assert.ok(readiness.nextAction);
-  for (const [choices, expected] of [[[{ online: false }], "degraded"], [[{ online: false }, { online: true }], "ready"], [[], "needs_configuration"]] as const) {
-    locations = [...choices];
+  for (const [choices, expected] of [[[{ projectRef: "repo", path: "/host/repo", label: "repo" }], "ready"], [[], "needs_configuration"]] as const) {
+    projects = [...choices];
     assert.equal((await runtime.send({ trigger: { kind: "health", id: "health", firedAt: now }, now, params: {} })).error, undefined);
     assert.equal(readiness.status, expected);
   }
+  const register = { action: "register-project", "request-key": "directory", path: "/host/new project" };
+  const providerRegister = await runtime.send({ trigger: { kind: "tool", id: "ui-command", firedAt: now, args: register, caller: { kind: "provider", runId: "p" } }, now, params: {} });
+  assert.equal((providerRegister as { errorCode?: string }).errorCode, "forbidden");
+  assert.equal(registrations.length, 0);
+  const ownerRegister = await runtime.send({ trigger: { kind: "tool", id: "ui-command", firedAt: now, args: register, caller: { kind: "owner", via: null } }, now, params: {} });
+  assert.equal(ownerRegister.error, undefined);
+  assert.deepEqual(registrations, [{ path: "/host/new project" }]);
 } finally { await runtime.stop(); }

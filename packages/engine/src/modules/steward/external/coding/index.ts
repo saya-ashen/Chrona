@@ -15,15 +15,15 @@ const context: CodingContext = { dir: chrona.paths.data, content: chrona.paths.c
 export { PAGE } from "./page";
 async function reportReadiness() {
   try {
-    const result = await chrona.call("agent.locations", { limit: 100 }) as { locations: { online: boolean }[] };
-    const available = result.locations.length > 0, online = result.locations.some(location => location.online);
-    await chrona.reportHealth({ status: !available ? "needs_configuration" : online ? "ready" : "degraded",
-      summary: !available ? "尚未配置已授权的编码位置" : online ? "编码位置已配置；具体执行仍需检查基线与预算" : "已配置的编码位置当前均离线",
-      nextAction: !available ? "配置项目访问权限和执行位置后再创建编码工作" : online ? "创建编码工作时选择已授权项目" : "恢复执行位置连接后重新自检", validForSeconds: 600 });
+    const result = await chrona.call("projects.list", {}) as { projects: { projectRef: string }[] };
+    const available = result.projects.length > 0;
+    await chrona.reportHealth({ status: available ? "ready" : "needs_configuration",
+      summary: available ? "已有主机项目目录，可开始编码对话" : "尚未添加编码项目目录",
+      nextAction: available ? "选择项目并发送编码需求" : "在编码页面添加主机上已有的项目目录", validForSeconds: 600 });
   } catch (error) {
     const unavailable = (error as { code?: string }).code === "unavailable";
-    await chrona.reportHealth({ status: unavailable ? "needs_configuration" : "unknown", summary: unavailable ? "编码位置服务尚不可用" : "暂时无法读取编码位置",
-      nextAction: unavailable ? "配置项目访问权限和执行位置；已配置时检查服务运行状态" : "查看运行诊断后重试", validForSeconds: 600 });
+    await chrona.reportHealth({ status: unavailable ? "needs_configuration" : "unknown", summary: unavailable ? "项目目录服务尚不可用" : "暂时无法读取项目目录",
+      nextAction: unavailable ? "检查项目目录服务后重试" : "查看运行诊断后重试", validForSeconds: 600 });
   }
 }
 on("health", async () => { await reportReadiness(); return {}; });
@@ -84,13 +84,15 @@ async function readScopedExecution(name: "events" | "snapshot", args: { workId: 
   return callAgent(context, name, args);
 }
 
+async function uiCommand(event: Parameters<typeof admit>[0]) {
+  if (!["owner", "module"].includes(event.caller?.kind ?? "")) throw codingError("forbidden", "网页操作仅向用户开放。");
+  if (event.id === "ui-catalog") return { result: await workbenchCatalog(context) };
+  if (event.id === "ui-work") return { result: await workbenchDetail(context, String(event.args["work-id"] ?? ""), String(event.args["session-id"] ?? ""), String(event.args.before ?? "")) };
+  if (event.id === "ui-command") return { result: await workbenchCommand(context, event.args) };
+  return null;
+}
 async function specialCommand(event: Parameters<typeof admit>[0]) {
-  if (event.id.startsWith("ui-")) {
-    if (!["owner", "module"].includes(event.caller?.kind ?? "")) throw codingError("forbidden", "网页操作仅向用户开放。");
-    if (event.id === "ui-catalog") return { result: await workbenchCatalog(context) };
-    if (event.id === "ui-work") return { result: await workbenchDetail(context, String(event.args["work-id"] ?? "")) };
-    if (event.id === "ui-command") return { result: await workbenchCommand(context, event.args) };
-  }
+  if (event.id.startsWith("ui-")) return uiCommand(event);
   if (event.id === "sessions") return sessionCommand(event);
   if (["work", "workspace-cleanup", "reconcile"].includes(event.id)) return { result: await handleWorkTool(context, event) };
   return null;

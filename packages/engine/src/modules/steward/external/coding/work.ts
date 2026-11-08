@@ -17,7 +17,7 @@ async function createLegacyWork(context: CodingContext, input: ExecutionStart): 
   try {
     work = await readCodingWork(context, input.workId);
     if (JSON.stringify(work.start) !== JSON.stringify(input)) throw codingError("conflict", "Work already has a different start command");
-    if (work.ref) return getCodingWork(context, { workId: input.workId });
+    if (work.ref) return getCodingWorkState(context, { workId: input.workId });
     // A lost receipt must be looked up before the original command can be explicitly resubmitted.
     try {
       const view = await callAgent<ExecutionView>(context, "lookup-start", { commandKey: work.start.commandKey });
@@ -32,6 +32,12 @@ async function createLegacyWork(context: CodingContext, input: ExecutionStart): 
   }
   const view = await callAgent<ExecutionView>(context, "start", { ...work.start, goal: codingGoal(work.start.goal) });
   remember(work, view);
+  await writeCodingWork(context, work);
+  return view;
+}
+/** Execution state is usable independently of optional result capture. */
+export async function getCodingWorkState(context: CodingContext, input: Input<"get">): Promise<ExecutionView> {
+  const { work, view } = await lookupCodingWork(context, input);
   await writeCodingWork(context, work);
   return view;
 }
