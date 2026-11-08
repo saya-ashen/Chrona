@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, realpath, rename, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createAgentConversations } from "./agent-conversations";
@@ -13,6 +14,25 @@ function parseDeliveryJournal(text: string): State {
     || Object.values(state.routes).some(route => !route || typeof route.owner !== "string" || typeof route.workspace !== "string")
     || Object.values(state.deliveries).some(value => !["pending", "accepted", "withheld"].includes(value))) throw new Error("Invalid QQ conversation delivery journal");
   return state as State;
+}
+async function readAttachment(contentDir: string, ref: string) {
+  if (!/^qq\/attachments\/[a-f0-9]{64}-[\p{L}\p{N}_.-]{1,120}$/u.test(ref)) throw new Error("Invalid QQ attachment reference");
+  const root = await realpath(contentDir), directory = join(contentDir, "attachments"), path = join(contentDir, ref.slice(3));
+  if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== join(root, "attachments")) throw new Error("Invalid QQ attachment directory");
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 20 * 1024 * 1024 || await realpath(path) !== join(root, ref.slice(3))) throw new Error("Invalid QQ attachment file");
+    const bytes = Buffer.alloc(stat.size + 1);
+    let size = 0;
+    while (size < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, size, bytes.length - size, size);
+      if (!bytesRead) break;
+      size += bytesRead;
+    }
+    if (size !== stat.size) throw new Error("QQ attachment changed while reading");
+    return bytes.subarray(0, size);
+  } finally { await handle.close(); }
 }
 export function createQqConversations(options: { dataDir: string; contentDir: string; call: Call; binding: () => Promise<QqBinding | null>; deliver: (item: QqReplyItem) => Promise<unknown> }) {
   const app = createAgentConversations({ source: "qq", dataDir: options.dataDir, call: (target, args = {}) => options.call(target, args), reply: () => {} });
@@ -53,12 +73,10 @@ export function createQqConversations(options: { dataDir: string; contentDir: st
       return { name: file.name.slice(0, 200), ref: `qq/${relative}`, mime: file.mime, size: file.bytes.byteLength };
     },
     file: async (messageId: string, ref: string) => {
-      const sessions = await app.list();
-      for (const session of sessions) {
-        const message = (await app.messages(session.id)).find(message => message.id === messageId);
-        if (message?.attachments.some(file => file && typeof file === "object" && "ref" in file && file.ref === ref)) return options.call("content.read", { ref });
-      }
-      throw new Error("Attachment does not belong to this QQ message");
+      const attachment = await app.attachment(messageId, ref);
+      if (!attachment) throw new Error("Attachment does not belong to this QQ message");
+      const bytes = await readAttachment(options.contentDir, ref), file = attachment as { mime?: unknown };
+      return { base64: bytes.toString("base64"), mime: typeof file.mime === "string" ? file.mime : "application/octet-stream" };
     },
     externalId: app.externalId,
     record: async (text: string, externalId: string) => { const binding = await bound(); return app.record(key(binding.openid), text.slice(0, 8000), externalId); },

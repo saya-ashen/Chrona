@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, symlink, truncate, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { workStartSchema, workRequestSchema, workViewSchema, type WorkLeafStart, type WorkView, type ExecutionView, type ExecutionPlacementView } from "./contract.js";
@@ -9,6 +9,7 @@ import { cleanupWorkspace, installWorkspace } from "./workspaces";
 import { readRegistry, saveRegistry } from "./work-v2-storage";
 import { readCodingWork, type CodingContext } from "./storage";
 import { dependencyGoal } from "./dependency-context";
+import { readCodingResult } from "./result-reader";
 
 function camel(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(camel);
@@ -149,6 +150,38 @@ try {
   releaseEvents({ events: [] }); await history;
   const aResult = (await readCodingWork(context, "a")).results[0]!;
   const bResult = (await readCodingWork(context, "b")).results[0]!;
+  const publicRef = `coding/${aResult.artifactRef}.json`;
+  const canonical = join(dir, "artifacts", `${aResult.artifactRef}.json`);
+  const original = await readFile(canonical);
+  assert.deepEqual(await readCodingResult(context, publicRef), { base64: original.toString("base64"), mime: "application/json" });
+  for (const ref of ["../a.json", "coding/../a.json", `/coding/${aResult.artifactRef}.json`, `other/${aResult.artifactRef}.json`, `coding/${aResult.artifactRef}.json/extra`, "coding/works-v2.json", null]) {
+    await assert.rejects(readCodingResult(context, ref), { code: "invalid" });
+  }
+  await assert.rejects(readCodingResult(context, `coding/coding-result-${"0".repeat(64)}.json`), { code: "not_found" });
+  await writeFile(canonical, "tampered");
+  await assert.rejects(readCodingResult(context, publicRef), { code: "conflict" });
+  await truncate(canonical, 20 * 1024 * 1024 + 1);
+  await assert.rejects(readCodingResult(context, publicRef), { code: "too_large" });
+  await rm(canonical);
+  await symlink(join(context.content, `${aResult.artifactRef}.json`), canonical);
+  await assert.rejects(readCodingResult(context, publicRef), { code: "invalid" });
+  await rm(canonical);
+  await mkdir(canonical);
+  await assert.rejects(readCodingResult(context, publicRef), { code: "invalid" });
+  await rm(canonical, { recursive: true });
+  await writeFile(canonical, original);
+  const ownedWork = await readFile(join(dir, "a.json"));
+  await rm(join(dir, "a.json"));
+  await assert.rejects(readCodingResult(context, publicRef), { code: "not_found" });
+  const foreign = JSON.parse(ownedWork.toString());
+  foreign.ref.runId = "foreign-run";
+  await writeFile(join(dir, "a.json"), JSON.stringify(foreign));
+  await assert.rejects(readCodingResult(context, publicRef), { code: "conflict" });
+  foreign.ref.runId = aResult.runId; foreign.results = [];
+  await writeFile(join(dir, "a.json"), JSON.stringify(foreign));
+  await assert.rejects(readCodingResult(context, publicRef), { code: "not_found" });
+  await writeFile(join(dir, "a.json"), ownedWork);
+  assert.equal((await readCodingResult(context, publicRef)).base64, original.toString("base64"));
   const refs = [aResult, bResult].map(({ workId, sessionId, runId, attemptId, resultId, artifactRef, baseline }) => ({ workId, sessionId, runId, attemptId, resultId, artifactRef, baseline }));
   const combined = await dependencyGoal(context, "review both", refs);
   assert.equal(combined, await dependencyGoal(context, "review both", [...refs].reverse()), "dependency data order deterministic");

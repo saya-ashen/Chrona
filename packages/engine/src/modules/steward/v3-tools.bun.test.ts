@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
+import webManifest from "./builtin/web/module.json";
 import { createRuns } from "./runs";
 import { createApprovals } from "./approvals";
 import { announceApprovals } from "./notify-user";
@@ -66,7 +67,10 @@ test("tool policy approvals, service approvals and legacy backfill persist facts
   expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${gated.approvalId}` } } });
   expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
 });
-test("reply files are copied from the run's directory into chat's store; links out of it and unknown attachments are refused", async () => {
+test("reply files go to their recipient, never a shared attachment store or arbitrary app ref", async () => {
+  const app = await db.module.create({ data: { workspaceId, name: "web", activeHash: "web" } });
+  await db.moduleVersion.create({ data: { moduleId: app.id, hash: "web", status: "approved", source: "user", intent: {}, report: {}, manifest: webManifest } });
+  await db.session.update({ where: { id: sessionId }, data: { source: "build", entryModuleId: app.id } });
   const run = await capability(), tools = createTools(ports);
   await mkdir(run.cwd, { recursive: true });
   await writeFile(join(run.cwd, "report.txt"), "done");
@@ -75,19 +79,8 @@ test("reply files are copied from the run's directory into chat's store; links o
   const { messageId } = await tools.call(run.token, "chrona_reply", { text: "Here", files: ["report.txt"] }) as { messageId: string };
   const [file] = (await db.message.findUniqueOrThrow({ where: { id: messageId } })).attachments as { name: string; ref: string }[];
   expect(file!.name).toBe("report.txt");
-  expect(await readFile(join(ports.dataDir, "platform/data", file!.ref), "utf8")).toBe("done");
-  // A received attachment is attached again by its path under content/chat/.
-  await tools.call(run.token, "chrona_reply", { text: "Again", files: [`content/${file!.ref}`] });
+  expect(file!.ref).toStartWith("web/outputs/");
+  expect(await readFile(join(ports.dataDir, "platform/content", app.id, file!.ref.slice(4)), "utf8")).toBe("done");
   await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["link.txt"] })).rejects.toMatchObject({ code: "forbidden" });
-  await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/chat/missing.txt"] })).rejects.toMatchObject({ code: "not_found" });
-  // An app's content by reference (e.g. a generated image): attached without passing through a tool result.
-  const app = await db.module.create({ data: { workspaceId, name: "image-generation", activeHash: "i1" } });
-  await mkdir(join(ports.dataDir, "platform/content", app.id), { recursive: true });
-  await writeFile(join(ports.dataDir, "platform/content", app.id, "cat.png"), "png-bytes");
-  const sent = await tools.call(run.token, "chrona_reply", { text: "图", files: ["content/image-generation/cat.png"] }) as { messageId: string };
-  const [image] = (await db.message.findUniqueOrThrow({ where: { id: sent.messageId } })).attachments as { name: string; ref: string }[];
-  expect([image!.name, await readFile(join(ports.dataDir, "platform/data", image!.ref), "utf8")]).toEqual(["cat.png", "png-bytes"]);
-  await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/image-generation/missing.png"] })).rejects.toMatchObject({ code: "not_found" });
-  await symlink(outside, join(ports.dataDir, "platform/content", app.id, "escape.txt"));
-  await expect(tools.call(run.token, "chrona_reply", { text: "No", files: ["content/image-generation/escape.txt"] })).rejects.toMatchObject({ code: "not_found" });
+  for (const path of ["content/chat/missing.txt", "content/image-generation/cat.png"]) await expect(tools.call(run.token, "chrona_reply", { text: "No", files: [path] })).rejects.toMatchObject({ code: "not_found" });
 });

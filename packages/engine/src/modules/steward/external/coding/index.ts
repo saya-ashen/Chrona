@@ -10,6 +10,7 @@ import { codingError, type CodingContext } from "./storage";
 import { reconcileWorks } from "./work-v2";
 import { handleWorkTool } from "./work-v2-tools";
 import { listCodingResults, acceptCodingResult } from "./results";
+import { readCodingResult } from "./result-reader";
 
 const context: CodingContext = { dir: chrona.paths.data, content: chrona.paths.content, call: (target, args) => chrona.call(target, args) };
 export { PAGE } from "./page";
@@ -92,6 +93,11 @@ async function uiCommand(event: Parameters<typeof admit>[0]) {
   return null;
 }
 async function specialCommand(event: Parameters<typeof admit>[0]) {
+  if (event.id === "read-result") {
+    // The router applies owner visibility, including admitted uses:* entries and Providers.
+    if (!["owner", "provider", "module"].includes(event.caller?.kind ?? "")) throw codingError("forbidden", "Coding result requires an admitted caller");
+    return { result: await readCodingResult(context, event.args.ref) };
+  }
   if (event.id.startsWith("ui-")) return uiCommand(event);
   if (event.id === "sessions") return sessionCommand(event);
   if (["work", "workspace-cleanup", "reconcile"].includes(event.id)) return { result: await handleWorkTool(context, event) };

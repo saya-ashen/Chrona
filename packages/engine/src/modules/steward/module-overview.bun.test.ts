@@ -62,8 +62,8 @@ test("a system module keeps its settings-set behavior and settings-get declarati
 test("interfaces are read-only declarations and local metadata grants no execution authority", async () => {
   const f = await fixture();
   const directory = moduleInterfacesOutputSchema.parse(await moduleInterfaces(f.ports, f.w)) as { name: string; runtime?: { status: string } }[];
-  expect(directory.filter(item => item.runtime).map(item => item.name).sort()).toEqual(["content-local", "runtime-callback", "workspace-local"]);
-  for (const name of ["content-local", "runtime-callback", "workspace-local"]) {
+  expect(directory.filter(item => item.runtime).map(item => item.name).sort()).toEqual(["runtime-callback", "workspace-local"]);
+  for (const name of ["runtime-callback", "workspace-local"]) {
     const view = await moduleInterfaces(f.ports, f.w, name);
     expect(view).toMatchObject({ capabilities: { build: false, configure: false, disable: false, remove: false }, runtime: { status: "registered" } });
     if (Array.isArray(view)) throw new Error("Expected one interface");
@@ -76,7 +76,7 @@ test("interfaces are read-only declarations and local metadata grants no executi
   expect((await callSync(f.ports, owner, "modules.settings-get", { module: "workspace-local" })).output).toEqual({ declarations: {}, values: {} });
   const exposed = moduleInterfacesOutputSchema.parse((await callSync(f.ports, owner, "modules.interfaces", {})).output) as { name: string }[];
   expect(exposed.some(item => item.name === "agent")).toBe(false);
-  for (const retired of ["modules.system", "modules.overview"]) await expect(callSync(f.ports, owner, retired, {})).rejects.toMatchObject({ code: "not_found" });
+  for (const retired of ["modules.system", "modules.overview", "content.read", "history.file"]) await expect(callSync(f.ports, owner, retired, {})).rejects.toMatchObject({ code: "not_found" });
   await expect(moduleInterfaces(f.ports, f.w, "reflection")).rejects.toMatchObject({ code: "not_found" });
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.moduleInvocation.count({ where: { target: { in: ["agent", "content-local", "runtime-callback", "workspace-local"] } } })).toBe(0);

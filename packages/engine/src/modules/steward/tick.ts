@@ -11,7 +11,6 @@ import { notificationSettings } from "./settings";
 import { audit } from "./audit";
 import { hostPathsFor } from "./grants";
 import { chatImages } from "./chat";
-import { chatContentMount } from "./local-content";
 import { announceApprovals, forwardSettings } from "./notify-user";
 import { autoRetain, memoryInput } from "./memory";
 import { callsSettled, drainCalls } from "./module-calls";
@@ -135,13 +134,11 @@ export function createTick(ports: StewardPorts) {
         const catalog = (await moduleToolCatalog(ports, run)).filter(tool => !memory.hidden.includes(tool.name)), toolsets = moduleToolsets(catalog);
         const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name);
         const hostPaths = await focusedHostPaths(ports, workspaceId, run.session?.focus, now);
-        // The only directory mounted into runs: the conversations' files, read-only (v2-8).
-        const content = [await chatContentMount(ports, workspaceId)];
         // Current app capabilities determine which app can handle a need; built-ins require a release to change code.
         const { self, via } = await moduleContext(ports, workspaceId, now, run.session?.entryModuleId);
         const timezone = notificationSettings(workspace.settings).timezone;
         const prompt = `${memory.text}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
-        return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: inboundImages(inbound) };
+        return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content: [], systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: inboundImages(inbound) };
       }
       function providerInput(run: ClaimedRun, lane: "foreground" | "background" | "build", sessionDir: string, execution: Awaited<ReturnType<typeof executionRunInput>>, ordinary: Awaited<ReturnType<typeof runInput>> | null) {
         if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);

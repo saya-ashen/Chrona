@@ -8,6 +8,7 @@ import { CallError, registerLocalModule } from "./module-calls";
 import { json, tool } from "./system/shared";
 import { runtimeCall } from "./local-runtime";
 import { captureExecutionChanges, readExecutionChanges } from "./execution-result";
+import { captureRunFile } from "./workspace-files";
 
 const principalSchema = z.object({ workspaceId: z.string().min(1), ownerId: z.string().min(1), caller: z.discriminatedUnion("kind", [z.object({ kind: z.literal("owner") }).strict(), z.object({ kind: z.literal("module"), moduleId: z.string().min(1), hash: z.string().min(1) }).strict()]) }).strict();
 const requestSchema = z.object({ principal: principalSchema, input: executionStartV2Schema, grant: executionProjectGrantP2Schema, attemptId: z.string().uuid(), workspaceRef: z.string().uuid(), phase: z.enum(["admission", "claim"]) }).strict().refine(value => value.grant.executor === "server", "Server grant required");
@@ -56,16 +57,18 @@ function release(ports: StewardPorts, workspaceId: string, lockId: string) {
 }
 /** Preparation I/O is outside the writer transaction; the module retains its lock until explicit release. */
 export function registerWorkspaceModule() {
-  registerLocalModule({ name: "workspace-local", description: "Local execution workspace", unrecorded: ["prepare", "release", "cleanup", "capture", "result", "rules"],
+  registerLocalModule({ name: "workspace-local", description: "Local execution workspace", unrecorded: ["prepare", "release", "cleanup", "capture", "capture-file", "result", "rules"],
     tools: [
       tool("prepare", "Prepare an authorized workspace", {}, [], { visibility: ["kernel"], input: z.object({ request: requestSchema }).strict(), output: preparedSchema }),
       tool("release", "Release a preparation lock", {}, [], { visibility: ["kernel"], input: z.object({ lockId: z.string().uuid() }).strict(), output: z.object({ released: z.literal(true) }).strict() }),
       tool("cleanup", "Receipt-first workspace cleanup", {}, [], { visibility: ["kernel"], input: z.object({ principal: principalSchema, input: workCleanupInputSchema }).strict(), output: workCleanupReceiptSchema }),
       tool("rules", "Read selected project rules", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1) }).strict(), output: z.object({ text: z.string().max(32_000) }).strict() }),
       tool("capture", "Capture stopped execution files", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1) }).strict(), output: z.object({ captured: z.literal(true) }).strict() }),
+      tool("capture-file", "Copy a Run output into its receiving application's content area", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1), path: z.string().min(1).max(8192) }).strict(), output: z.object({ name: z.string(), ref: z.string(), size: z.number().int().nonnegative(), mime: z.string(), sha256: z.string() }).strict() }),
       tool("result", "Read immutable execution capture", {}, [], { visibility: ["kernel"], input: z.object({ attemptId: z.string().min(1) }).strict(), output: executionChangesSchema.nullable() }),
     ],
     async handle({ ports, workspaceId }, name, args) {
+      if (name === "capture-file") return captureRunFile(ports, workspaceId, String(args.runId), String(args.path));
       if (name === "rules") return projectRules(ports, workspaceId, String(args.runId));
       if (name === "capture" || name === "result") return executionCapture(ports, workspaceId, name, args);
       if (name === "cleanup") return cleanup(ports, workspaceId, args);

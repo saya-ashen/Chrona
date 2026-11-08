@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Offline author test: drives the untyped fake kernel and fetch stubs. */
 import { strict as assert } from "node:assert";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rmdir, symlink, unlink, writeFile, truncate } from "node:fs/promises";
 import { join } from "node:path";
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule, paths } from "chrona/testing";
@@ -48,7 +48,38 @@ await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chr
 assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.tools", "agent.run"]);
 assert.match(calls[2].args.prompt, /qq\/attachments\//);
 const session = (await conversations.app.list())[0]!;
-assert.equal((await conversations.app.messages(session.id))[0]!.attachments.length, 1);
+const message = (await conversations.app.messages(session.id))[0]!;
+assert.equal(message.attachments.length, 1);
+const attachment = message.attachments[0] as { ref: string };
+const callsBeforeFile = calls.length;
+assert.deepEqual(await conversations.file(message.id, attachment.ref), { base64: "AQ==", mime: "image/png" });
+assert.equal(calls.length, callsBeforeFile); // Local owned read, never a kernel content call.
+await assert.rejects(conversations.file("foreign-message", attachment.ref), /does not belong/);
+await assert.rejects(conversations.file(message.id, "web/attachments/private"), /does not belong/);
+const attachmentPath = join(paths.content, attachment.ref.slice(3));
+await rename(attachmentPath, `${attachmentPath}.saved`);
+await symlink(`${attachmentPath}.saved`, attachmentPath);
+await assert.rejects(conversations.file(message.id, attachment.ref));
+await unlink(attachmentPath);
+await mkdir(attachmentPath);
+await assert.rejects(conversations.file(message.id, attachment.ref), /Invalid QQ attachment file/);
+await rmdir(attachmentPath);
+await writeFile(attachmentPath, ""); await truncate(attachmentPath, 20 * 1024 * 1024 + 1);
+await assert.rejects(conversations.file(message.id, attachment.ref), /Invalid QQ attachment file/);
+await unlink(attachmentPath); await rename(`${attachmentPath}.saved`, attachmentPath);
+const journalPath = join(paths.data, "conversations/state.json"), journalText = await readFile(journalPath, "utf8");
+for (const ref of ["qq/attachments/../../private", "other/attachments/private", "qq/attachments/invalid"]) {
+  const journal = JSON.parse(journalText);
+  journal.sessions[0].messages[0].attachments = [{ ref }];
+  await writeFile(journalPath, JSON.stringify(journal));
+  await assert.rejects(conversations.file(message.id, ref), /Invalid QQ attachment reference/);
+}
+await writeFile(journalPath, journalText);
+await rename(join(paths.content, "attachments"), join(paths.content, "saved-attachments"));
+await symlink(join(paths.content, "saved-attachments"), join(paths.content, "attachments"));
+await assert.rejects(conversations.file(message.id, attachment.ref), /Invalid QQ attachment directory/);
+await unlink(join(paths.content, "attachments"));
+await rename(join(paths.content, "saved-attachments"), join(paths.content, "attachments"));
 await relay.resolveApproval(binding, { ref: "abcdef12", decision: "approve", scope: "once" });
 assert.equal(calls.at(-1).target, "approvals.resolve");
 await relay.enqueueFinal("event-a", "a", "chrona_qq:owner"); await relay.enqueueFinal("event-b", "b", "chrona_qq:owner");

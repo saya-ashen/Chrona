@@ -111,8 +111,8 @@ const server=Bun.serve({hostname:'127.0.0.1',port:0,idleTimeout:30,async fetch(r
   });
   if(url.pathname==='/__test/owner'){
    const input=await request.json();
-   if(!['coding.answer','coding.get'].includes(input.target))return new Response('forbidden',{status:403});
-   try{return Response.json({data:await callSync(runtime.ports,{workspaceId:'host-workspace',caller:{kind:'owner',via:null},chain:[],path:[]},input.target,{input:JSON.stringify(input.input)})})}
+   if(!['coding.answer','coding.get','coding.read-result'].includes(input.target))return new Response('forbidden',{status:403});
+   try{return Response.json({data:(await callSync(runtime.ports,{workspaceId:'host-workspace',caller:{kind:'owner',via:null},chain:[],path:[]},input.target,input.target==='coding.read-result'?input.input:{input:JSON.stringify(input.input)})).output})}
    catch(error){return Response.json({error:{code:error.code,message:error.message}},{status:409})}
   }
   return new Response('not found',{status:404});
@@ -170,23 +170,9 @@ local ok,err=pcall(function()
    local accepted,read_error=client:read_result_artifact(result,function(value,e)artifact,failure,done=value,e,true end)
    assert(accepted,read_error)
    assert(vim.wait(15000,function()return done end,10),'real owner MCP artifact callback timeout')
-   assert(not failure,vim.inspect(failure))
-   receipt.artifact=artifact
-   local Chat=require('agent-workbench.ui.chat')
-   local cleanup
-   -- Only the surrounding UI owner is a stub; client/MCP/protocol/rendering are the original code.
-   local remote={is_running=function()return true end,set_result_view=function(_,callback)if cleanup then cleanup()end;cleanup=callback end}
-   local chat=setmetatable({_agent={remote=remote}},{__index=Chat})
-   chat:_show_chrona_result(artifact,result)
-   local buf=vim.api.nvim_get_current_buf()
-   local function text()return table.concat(vim.api.nvim_buf_get_lines(buf,0,-1,false),'\\n')end
-   local function key(value)for _,map in ipairs(vim.api.nvim_buf_get_keymap(buf,'n'))do if map.lhs==value then map.callback();return end end;error('missing result view key '..value)end
-   receipt.resultView={summary=text(),readonly=vim.bo[buf].readonly,modifiable=vim.bo[buf].modifiable,buftype=vim.bo[buf].buftype,name=vim.api.nvim_buf_get_name(buf)}
-   assert(receipt.resultView.readonly and not receipt.resultView.modifiable)
-   key('p');receipt.resultView.patch=text()
-   assert(vim.bo[buf].readonly and not vim.bo[buf].modifiable)
-   assert(vim.bo[buf].filetype=='diff')
-   key('q');assert(not vim.api.nvim_buf_is_valid(buf))
+   -- The external client still calls removed content.read; do not silently restore that API.
+   assert(failure,'old client unexpectedly read removed content.read')
+   receipt.artifactError=vim.inspect(failure)
   end
   if action=='cancel' then receipt.cancel=request(vim.tbl_extend('force',target,{op='cancel',commandKey='cancel:'..work})) end
  end
@@ -204,7 +190,7 @@ type HostState = {
   traffic: { op: string; workId?: string; tool?: string; target?: string; ref?: string }[];
   captureBeforeRelease: { attemptId: string; scope: string; status: string; patchSha256: string }[];
 };
-type Receipt = { pid: number; view: ExecutionView; artifact?: ExecutionResultSource; resultView?: { summary: string; patch: string; readonly: boolean; modifiable: boolean; buftype: string; name: string };  snapshot?: { status: string; stopConfirmed: boolean; finalMessage: { text: string } | null }; events?: { events: { payload: { type: string } }[] }; results?: { results: { artifactRef: string; baseline: { kind: string; digest: string } }[] } };
+type Receipt = { pid: number; view: ExecutionView; artifactError?: string;  snapshot?: { status: string; stopConfirmed: boolean; finalMessage: { text: string } | null }; events?: { events: { payload: { type: string } }[] }; results?: { results: { artifactRef: string; baseline: { kind: string; digest: string } }[] } };
 
 function alive(pid: number) {
   try {
@@ -347,17 +333,15 @@ test("real Neovim detaches while Pi writes and asks; owner answers, reopened cli
     const artifactText = await readFile(artifactPath, "utf8");
     const artifact = JSON.parse(artifactText) as ExecutionResultSource;
     expect(result.artifactRef).toBe(`coding-result-${createHash("sha256").update(artifactText).digest("hex")}`);
-    expect(review.artifact).toEqual(artifact);
+    expect(review.artifactError).toContain("Chrona content.read failed");
+    const ownedResult = await f.owner("coding.read-result", { ref: `coding/${result.artifactRef}.json` }) as { base64: string; mime: string };
+    expect(ownedResult.mime).toBe("application/json");
+    expect(JSON.parse(Buffer.from(ownedResult.base64, "base64").toString("utf8"))).toEqual(artifact);
     expect((await f.state()).traffic).toEqual(expect.arrayContaining([
       expect.objectContaining({ op: "mcp:initialize" }),
       expect.objectContaining({ op: "mcp:notifications/initialized" }),
       expect.objectContaining({ op: "mcp:tools/call", tool: "chrona_module_call", target: "content.read", ref: `coding/${result.artifactRef}.json` }),
     ]));
-    expect(review.resultView).toMatchObject({ readonly: true, modifiable: false, buftype: "nofile", name: "" });
-    expect(review.resultView!.summary).toContain("Changes: complete");
-    expect(review.resultView!.summary).toContain(f.baseline);
-    expect(review.resultView!.summary).toContain("tracked: answer.txt");
-    expect(review.resultView!.patch).toContain("+confirmed by another owner entry");
     expect(artifact).toMatchObject({ workId: first.view.workId, sessionId: first.view.sessionId, runId: first.view.runId, attemptId: first.view.attemptId, baseline: { kind: "commit", digest: f.baseline } });
     expect(artifact.changes).toMatchObject({ scope: "baseline_to_worktree", status: "complete", files: [{ path: "answer.txt", kind: "tracked" }] });
     expect(artifact.changes!.patch).toContain("diff --git a/answer.txt b/answer.txt");
@@ -367,8 +351,8 @@ test("real Neovim detaches while Pi writes and asks; owner answers, reopened cli
     // Released projects may change; the published artifact must retain the captured final version.
     await writeFile(join(f.project, "answer.txt"), "later checkout edit after directory release\n");
     const immutable = await f.client("review-again", "detached");
-    expect(immutable.artifact).toEqual(artifact);
-    expect(immutable.resultView!.patch).toBe(review.resultView!.patch);
+    expect(immutable.artifactError).toContain("Chrona content.read failed");
+    expect(await f.owner("coding.read-result", { ref: `coding/${result.artifactRef}.json` })).toEqual(ownedResult);
     expect(await readFile(artifactPath, "utf8")).toBe(artifactText);
     const second = await f.client("start", "cancelled");
     const writingPid = await f.piPid();

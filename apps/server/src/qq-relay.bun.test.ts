@@ -67,7 +67,7 @@ test("/new refuses active work and rotates only a stopped QQ business session", 
 });
 
 test("file links open the conversation on the web; without a public URL the reply says so", () => {
-  const message = { text: "Ready", attachments: [{ name: "a b.pdf", ref: "chat/x-a_b.pdf", mime: "application/pdf", size: 3 }] };
+  const message = { text: "Ready", attachments: [{ name: "a b.pdf", ref: "qq/attachments/a_b.pdf", mime: "application/pdf", size: 3 }] };
   expect(qqReplyText(message, "https://chrona.example/", "s 1")).toContain("a b.pdf：https://chrona.example/sessions/s%201");
   expect(qqReplyText(message, null, "s1")).toContain("请在 Chrona 网页查看附件");
   expect(qqReplyText({ ...message, attachments: [{ ...message.attachments[0]!, ref: null }] }, "https://chrona.example", "s1")).toContain("请在 Chrona 网页查看附件");

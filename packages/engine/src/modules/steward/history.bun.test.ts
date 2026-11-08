@@ -20,7 +20,7 @@ test("historical reads stay scoped and cannot expose new Agent contexts or resto
     await expect(read("history.file", { message: "missing", ref: "chat/foreign" })).rejects.toMatchObject({ code: "not_found" });
     for (const target of ["chat.send", "provider.wake", "provider.complete", "executions.start", "history.send", "history.cancel"])
       await expect(read(target)).rejects.toMatchObject({ code: "not_found" });
-    expect(listSystemModules().find(module => module.name === "history")?.tools.map(tool => tool.name)).toEqual(["sessions", "session", "messages", "transcript", "file"]);
+    expect(listSystemModules().find(module => module.name === "history")?.tools.map(tool => tool.name)).toEqual(["sessions", "session", "messages", "transcript"]);
     expect(listSystemModules().some(module => ["chat", "provider", "executions"].includes(module.name))).toBe(false);
     expect(await f.ports.db.run.count()).toBe(1);
   } finally { await f.close(); }

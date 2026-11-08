@@ -5,14 +5,14 @@ import { hasLiveProviderInteraction } from "./provider-channel";
 import { providerCancelKey } from "./provider-journal";
 import { liveRuns } from "./runs";
 import { z } from "zod";
-import { readContentRef } from "./content";
+import { readRunContent } from "./run-content";
 
 export async function contextRunImages(ports: StewardPorts, run: { id: string; workspaceId: string }) {
   const receipt = await ports.db.audit.findUniqueOrThrow({ where: { id: `agent-tools:${run.id}` } });
   const { content } = z.object({ content: z.array(z.string().max(1000)).max(10).default([]) }).parse(receipt.details);
   const images: { mime: string; base64: string }[] = []; let bytes = 0;
   for (const ref of content) {
-    const file = await readContentRef(ports, run.workspaceId, ref, 20 * 1024 * 1024); bytes += file.bytes.byteLength;
+    const file = await readRunContent(ports, run.workspaceId, receipt.actorKey, ref); bytes += file.bytes.byteLength;
     if (bytes > 20 * 1024 * 1024) throw new Error("Agent content exceeds 20 MiB");
     if (["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) images.push({ mime: file.mime, base64: Buffer.from(file.bytes).toString("base64") });
   }

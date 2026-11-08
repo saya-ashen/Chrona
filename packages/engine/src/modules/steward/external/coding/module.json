@@ -5,6 +5,27 @@
   "triggers": [],
   "tools": [
     {
+      "name": "read-result",
+      "description": "读取本应用已发布且身份与 SHA256 匹配的不可变编码成果 JSON，最多 20 MiB。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "coding/coding-result-<sha256>.json" }
+        },
+        "required": ["ref"]
+      },
+      "visibility": ["owner"],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "base64": { "type": "string" },
+          "mime": { "type": "string", "enum": ["application/json"] }
+        },
+        "required": ["base64", "mime"]
+      }
+    },
+    {
       "name": "create",
       "description": "Coding create; input is JSON matching execution start",
       "parameters": {

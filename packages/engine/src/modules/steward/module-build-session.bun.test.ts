@@ -1,4 +1,4 @@
-import { afterEach, expect, spyOn, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readModuleFiles } from "./module-preview";
 import { cp, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -17,7 +17,6 @@ import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
 import { liveRuns } from "./runs";
 import { moduleSupervisor } from "./module-supervisor";
-import * as chatFiles from "./chat";
 import { approvalNoticeBody } from "./builtin/notify/approval";
 import { startOwnerBuild } from "./owner-build";
 import { runOwnerBuild } from "./owner-build-run";
@@ -503,12 +502,6 @@ test("missing required references reject before admitting or charging a build", 
   for (const file of ["missing.txt", "content/chat/missing.txt"]) {
     await expect(f.call("m_modules_build", { ...request, files: [file] })).rejects.toMatchObject({ code: "not_found" });
   }
-  await writeFile(join(f.requester.cwd, "selected.txt"), "required reference bytes");
-  // Reproduce an attachment disappearing after selection; the old copy loop silently skipped it.
-  const reader = spyOn(chatFiles, "readChatFile").mockResolvedValue(null);
-  try {
-    await expect(f.call("m_modules_build", { ...request, files: ["selected.txt"] })).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining("Build reference attachment unavailable") });
-  } finally { reader.mockRestore(); }
   expect(await f.db.session.count({ where: { workspaceId: f.workspaceId, source: "build" } })).toBe(0);
   expect(await f.db.run.count({ where: { workspaceId: f.workspaceId, lane: "build" } })).toBe(0);
   expect((await f.api.settings.get()).buildUsage.used).toBe(0);

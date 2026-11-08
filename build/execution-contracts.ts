@@ -5,7 +5,7 @@ import { executionContractDeclarations, executorContractDeclarations } from "./e
 
 /** Single source for H's manifest tools; caller supplies the rest of its real product manifest. */
 export function codingPackageManifest(manifest: ModuleManifest): ModuleManifest {
-  const productTools = manifest.tools.filter(tool => ["work", "workspace-cleanup", "reconcile", "sessions", "ui-catalog", "ui-work", "ui-command"].includes(tool.name));
+  const productTools = manifest.tools.filter(tool => ["work", "workspace-cleanup", "reconcile", "sessions", "ui-catalog", "ui-work", "ui-command", "read-result"].includes(tool.name));
   return { ...manifest, tools: [...codingToolDeclarations(), ...productTools] };
 }
 

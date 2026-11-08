@@ -1,13 +1,13 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtemp, open, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, open, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { runtimeCall, startLocalProvider } from "./local-runtime";
 import { callSync, kernelOrigin } from "./module-calls";
-import { storeChatFile, readChatFile, runFile, chatContentMount } from "./local-content";
+import { readWorkspaceFile } from "./workspace-files";
 
 async function fixture(provider?: ProviderAdapter) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-local-modules-");
@@ -142,7 +142,7 @@ test.skipIf(process.platform === "win32")("capturing a named pipe rejects withou
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     expect(Bun.spawnSync(["mkfifo", path]).exitCode).toBe(0);
-    const result = runFile(f.ports, f.ports.dataDir, "pipe", f.workspaceId).then(() => "accepted", error => error.code);
+    const result = readWorkspaceFile(f.ports.dataDir, "pipe").then(() => "accepted", error => error.code);
     const timeout = new Promise<string>(resolve => { timer = setTimeout(() => resolve("blocked"), 1000); });
     const outcome = await Promise.race([result, timeout]);
     if (outcome === "blocked") {
@@ -152,23 +152,4 @@ test.skipIf(process.platform === "win32")("capturing a named pipe rejects withou
     }
     expect(outcome).toBe("invalid");
   } finally { clearTimeout(timer); await f.close(); }
-});
-
-test("attachment bytes traverse the same router and capture rejects escaping paths", async () => {
-  const f = await fixture();
-  try {
-    const mount = await chatContentMount(f.ports, f.workspaceId);
-    expect(mount).toMatchObject({ name: "chat", writable: false });
-    await writeFile(`${f.ports.dataDir}/private.txt`, "secret outside content");
-    await symlink(`${f.ports.dataDir}/private.txt`, `${mount.dir}/escape.txt`);
-    expect(await readChatFile(f.ports, "chat/escape.txt", f.workspaceId)).toBeNull();
-    const stored = await storeChatFile(f.ports, "../report.txt", Buffer.from("private attachment"), f.workspaceId);
-    expect(stored.name).toBe("report.txt");
-    expect((await readChatFile(f.ports, stored.ref, f.workspaceId))?.bytes.toString()).toBe("private attachment");
-    await expect(runFile(f.ports, f.ports.dataDir, "../outside-file", f.workspaceId)).rejects.toBeDefined();
-    expect(await readChatFile(f.ports, "chat/../secret", f.workspaceId)).toBeNull();
-    const rows = await f.ports.db.moduleInvocation.findMany({ where: { target: "content-local" } });
-    expect(rows.map(row => row.tool)).toEqual(expect.arrayContaining(["put", "read", "capture"]));
-    expect(JSON.stringify(rows)).not.toContain(Buffer.from("private attachment").toString("base64"));
-  } finally { await f.close(); }
 });

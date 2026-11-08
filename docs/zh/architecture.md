@@ -8,9 +8,9 @@
 
 ## V1 本机统一与后续远端宿主
 
-当前本机实现统一经 `module-calls.ts` 调用受信任能力：`agent` 负责 Provider 启动、等待、注入、取消、completion 与 transcript；`runtime-callback` 提供绑定 workspace 的短期事件／问答引用；`workspace-local` 负责项目准备、锁释放、规则、成果捕获与清理；`content-local` 负责附件与内容读取。物理适配器、文件 I/O 与进程内 handle 留在能力实现内部，消费端使用 JSON 契约及路由代理。内核保留唯一 Run 队列、授权、事务、预算、停止证据和启动持久化。
+当前本机实现统一经 `module-calls.ts` 调用受信任能力：`agent` 负责 Provider 启动、等待、注入、取消、completion 与 transcript；`runtime-callback` 提供绑定 workspace 的短期事件／问答引用；`workspace-local` 负责项目准备、锁释放、规则、成果捕获与清理；对话附件由入口应用私有内容区持有；Agent 输入按真实发起方的准入回执读取，运行输出由 `workspace-local.capture-file` 捕获进实际接收应用；不再有全局内容读取接口。物理适配器、文件 I/O 与进程内 handle 留在能力实现内部，消费端使用 JSON 契约及路由代理。内核保留唯一 Run 队列、授权、事务、预算、停止证据和启动持久化。
 
-受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。`agent` 已从进程内能力拆为发行内置 SDK 应用：应用进程持有 Pi Provider、操作状态和启动回执，内核经 `agent.start/status/inject/abort/release` 调用，并保留 Run 授权、预算和持久状态。补全使用短启动请求与结果查询，等待不占住取消通道。Agent 的工具向内核和模块开放，模块通过普通 `chrona.call` 使用结构化参数；操作归属由 SDK 真实 caller 绑定，执行准入与模型额度仍按原模块身份检查；`runtime-callback` 仍在内核进程，除内核外仅接受当前受信任内置 Agent 的真实 moduleId/hash/source。其余本机能力 `runtime-callback`、`workspace-local`、`content-local` 继续以进程内方式实现，目录单列“运行能力”。应用页把 Agent 列在内置应用，复用进程诊断与只读自检；模块执行接口不向 owner 暴露操作表单。配置仍来自现有服务启动参数和全局模型／预算设置；当前不新增宿主配置写入口。详见 [Agent 内置应用](agent-builtin-application.md)。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
+受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。`agent` 已从进程内能力拆为发行内置 SDK 应用：应用进程持有 Pi Provider、操作状态和启动回执，内核经 `agent.start/status/inject/abort/release` 调用，并保留 Run 授权、预算和持久状态。补全使用短启动请求与结果查询，等待不占住取消通道。Agent 的工具向内核和模块开放，模块通过普通 `chrona.call` 使用结构化参数；操作归属由 SDK 真实 caller 绑定，执行准入与模型额度仍按原模块身份检查；`runtime-callback` 仍在内核进程，除内核外仅接受当前受信任内置 Agent 的真实 moduleId/hash/source。其余本机能力 `runtime-callback`、`workspace-local` 继续以进程内方式实现，目录单列“运行能力”。应用页把 Agent 列在内置应用，复用进程诊断与只读自检；模块执行接口不向 owner 暴露操作表单。配置仍来自现有服务启动参数和全局模型／预算设置；当前不新增宿主配置写入口。详见 [Agent 内置应用](agent-builtin-application.md)。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
 
 ## Agent 原语与应用编排
 
@@ -33,7 +33,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 功能归属优先级：**普通模块 → 预装模块 → 内核模块（system）→ 内核本身**。预装是交付方式，不代表更高权限。内核模块同样必须最小，只提供带身份、校验与治理的原语；只有无法通过这些原语安全实现的信任根、路由和生命周期机制进入内核。业务策略、展示、聚合和工作流程优先归现有应用；复用本身不构成提升层级的理由。验收标准：改变业务策略或新增应用通常只需改模块。发行身份与代码可定制性分开：五个内置应用允许受检定制，但不能据此取得 Agent 或内核身份。
 
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
-- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `history`、`modules`、`approvals`、`settings`、`schedules`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
+- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `history`、`modules`、`approvals`、`settings`、`schedules`、`secrets`、`activity`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
 - **受信任本机能力模块**位于 `steward/local-*`，通过独立 local registry 注册到同一路由，发行身份为 `local:<name>`。工具输入与输出均有 schema，失败输出校验会拒绝调用；敏感输入／输出及适配器错误正文不落通用日志。它们不由应用提案替换，保留名称发生安装冲突时拒绝解析。
 - **内置模块**位于 `steward/builtin/*`：`agent`、`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议；内置类别和保留名不因定制而改变。
 - **外置应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。外置应用及 web/mcp/files/notify/events 支持受检更新和显式回滚到已批准版本。五个内置应用禁止动态删除及 install 重装；首次可信 seed 后不因新发行覆盖已有 active 定制，上游更新需显式提出并检查。Agent 禁止普通 build/propose/group/activate/update/rollback/remove/install，只走可信发行更新；内核、运行能力及救援入口同样不由应用替换。参见 [Git 工作流](module-git.md)。

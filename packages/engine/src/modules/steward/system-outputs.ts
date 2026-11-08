@@ -105,4 +105,3 @@ export const memoryRecallOutput = z.object({ items: z.array(z.object({ id: z.str
 export const memoryRetainOutput = z.json();
 export const memoryForgetOutput = z.json();
 export const memoryStatusOutput = memorySettingsSchema.extend({ available: z.boolean(), last24h: z.object({ retained: z.number(), recalled: z.number(), forgotten: z.number() }) });
-export const contentReadOutput = z.object({ ref: z.string(), name: z.string(), mime: z.string(), bytes: z.number().int(), sha256: z.string(), base64: z.string() });

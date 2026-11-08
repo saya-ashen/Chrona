@@ -8,7 +8,6 @@ import { settings } from "./system/settings";
 import { schedules } from "./system/schedules";
 import { secrets } from "./system/secrets";
 import { activity } from "./system/activity";
-import { content } from "./system/content";
 import { memory } from "./memory";
 import { projects } from "./system/projects";
 
@@ -17,5 +16,5 @@ let registered = false;
 export function registerSystemModules() {
   if (registered) return;
   installAgentDelegation(delegateAgent);
-  registered = true; [history, approvals, modules, settings, schedules, secrets, activity, content, memory, projects].forEach(registerSystemModule);
+  registered = true; [history, approvals, modules, settings, schedules, secrets, activity, memory, projects].forEach(registerSystemModule);
 }

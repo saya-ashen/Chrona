@@ -5,6 +5,7 @@ import { createPages, type Caller, type ModuleState, type PageTool } from "./pag
 import { todayView } from "./today";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
 import { appOverview, systemApps } from "./app-overview";
+import { attachmentBody, createAttachments, decodeBase64 } from "./attachments";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
@@ -25,6 +26,7 @@ let ping: ReturnType<typeof setInterval> | undefined;
 function send(chunk: string) {
   for (const stream of streams) try { stream.enqueue(encoder.encode(chunk)); } catch { streams.delete(stream); }
 }
+const attachments = createAttachments(chrona.paths.content);
 const conversations = createAgentConversations({ dataDir: chrona.paths.data, call, reply: event => send(`data: ${JSON.stringify({ type: "reply", ...event })}\n\n`) });
 let polling = false;
 setInterval(() => {
@@ -146,7 +148,7 @@ async function api(request: Request, path: string[]) {
     "POST /chat": async () => {
       // Historical kernel conversations stay readable. New execution belongs to Web's Agent context.
       if (body.session && !isAgentConversation(String(body.session))) throw Object.assign(new Error("历史会话只供查看，请新建会话继续。"), { code: "conflict" });
-      return conversations.send({ session: typeof body.session === "string" ? body.session : undefined, text: body.text, requestKey: typeof body.requestKey === "string" ? body.requestKey : undefined });
+      return conversations.send({ session: typeof body.session === "string" ? body.session : undefined, text: body.text, requestKey: typeof body.requestKey === "string" ? body.requestKey : undefined, attachments: await attachments.accept(body.attachments) });
     },
     "GET /settings": () => getSettings(),
     "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),
@@ -188,11 +190,29 @@ async function fileResponse(request: Request) {
   // A conversation's attachment, served as a download: never rendered as a page of this origin.
   const url = new URL(request.url);
   try {
-    const file = await call("history.file", { message: url.searchParams.get("message") ?? "", ref: url.searchParams.get("ref") ?? "" }) as { base64: string; mime: string };
-    return new Response(Buffer.from(file.base64, "base64"), { headers: { "content-type": file.mime, "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'" } });
+    const messageId = url.searchParams.get("message"), ref = url.searchParams.get("ref");
+    const file = messageId && ref ? await conversations.attachment(messageId, ref) : undefined;
+    if (file && typeof file === "object" && "ref" in file && typeof file.ref === "string") {
+      return new Response(await attachments.read(file.ref), { headers: { "content-type": "application/octet-stream", "content-disposition": "attachment", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'" } });
+    }
+    throw Object.assign(new Error("附件不属于这条 Web 消息"), { code: "not_found" });
   } catch (error) {
     return apiError(error);
   }
+}
+function validPageContentRef(ref: string, module: string) {
+  return ref.startsWith(`${module}/`) && !ref.split("/").some(part => !part || part === "." || part === "..") && !ref.includes("\\") && !Array.from(ref).some(char => char < " ");
+}
+function rasterResponse(file: { base64: string; mime: string } | null, imageHeaders: Record<string, string>) {
+  if (!file) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
+  if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) return new Response("不支持的图片类型", { status: 403, headers: imageHeaders });
+  const bytes = decodeBase64(file.base64, 8 * 1024 * 1024);
+  const raster = file.mime === "image/png" ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    : file.mime === "image/jpeg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
+    : file.mime === "image/gif" ? ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString())
+    : bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
+  if (!raster) return new Response("图片内容无效", { status: 403, headers: imageHeaders });
+  return new Response(bytes, { headers: { ...imageHeaders, "content-type": file.mime } });
 }
 /** Only the registering app's raster images may be displayed on its page. Auth is the /api/* entry's. */
 async function pageContentResponse(request: Request, module: string, id: string) {
@@ -201,11 +221,9 @@ async function pageContentResponse(request: Request, module: string, id: string)
     const page = await pages.get(module, id);
     if (!page) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
     const ref = new URL(request.url).searchParams.get("ref") ?? "";
-    if (!ref.startsWith(`${page.module}/`)) return new Response("只能读取本应用的图片", { status: 403, headers: imageHeaders });
-    const file = await call("content.read", { ref }) as { base64: string; mime: string } | null;
-    if (!file) return new Response("没有这张图片", { status: 404, headers: imageHeaders });
-    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.mime)) return new Response("不支持的图片类型", { status: 403, headers: imageHeaders });
-    return new Response(Buffer.from(file.base64, "base64"), { headers: { ...imageHeaders, "content-type": file.mime } });
+    if (!page.content || !validPageContentRef(ref, page.module)) return new Response("只能读取本应用声明的图片", { status: 403, headers: imageHeaders });
+    const file = await chrona.call(`${page.module}.${page.content.tool}`, { ref }, { expectedTarget: { moduleId: page.moduleId, contractHash: page.contracts[page.content.tool]! } }) as { base64: string; mime: string } | null;
+    return rasterResponse(file, imageHeaders);
   } catch (error) {
     const { code } = error as { code?: string };
     const status = code === "conflict" ? 409 : code === "not_found" ? 404 : 502;
@@ -218,10 +236,15 @@ function apiError(error: unknown) {
 }
 async function apiResponse(request: Request, path: string[]) {
   const parts = path.join("/");
-  if (request.method === "GET" && parts === "events") return events();
-  if (request.method === "GET" && parts === "file") return fileResponse(request);
-  if (request.method === "GET" && path.length === 4 && path[0] === "pages" && path[3] === "content") return pageContentResponse(request, path[1]!, path[2]!);
-  try { return Response.json(await api(request, path) ?? null); }
+  if (request.method === "GET") {
+    if (parts === "events") return events();
+    if (parts === "file") return fileResponse(request);
+    if (path.length === 4 && path[0] === "pages" && path[3] === "content") return pageContentResponse(request, path[1]!, path[2]!);
+  }
+  try {
+    if (request.method === "POST" && parts === "attachments") return Response.json(await attachments.upload(await attachmentBody(request)));
+    return Response.json(await api(request, path) ?? null);
+  }
   catch (error) { return apiError(error); }
 }
 async function serve(request: Request) {

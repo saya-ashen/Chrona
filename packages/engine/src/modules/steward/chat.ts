@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { storeChatFile } from "./local-content";
-export { readChatFile, storeChatFile, runFile } from "./local-content";
 import { z } from "zod";
 import { attachmentSchema, messageSchema, SESSION_SOURCES, type ChatReply } from "@chrona/contracts/steward";
 import type { Message as MessageRow } from "@chrona/db";
@@ -44,7 +42,7 @@ async function serial<T>(key: string, action: () => Promise<T>): Promise<T> {
 }
 export function createChat(ports: StewardPorts, wake: () => Promise<unknown>) {
   const chat = new ChatService(ports, wake);
-  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), accept: chat.accept.bind(chat), intakeAttachments: chat.intakeAttachments.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
+  return { handleMessage: chat.handleMessage.bind(chat), submit: chat.submit.bind(chat), accept: chat.accept.bind(chat), runFinished: chat.runFinished.bind(chat), messages: chat.messages.bind(chat),
     recordMessage: chat.recordMessage.bind(chat), setExternalId: chat.setExternalId.bind(chat) };
 }
 class ChatService {
@@ -180,19 +178,6 @@ class ChatService {
       if (!await db.audit.findFirst({ where: { workspaceId: inbound.workspaceId, kind: "chat_result", subjectId: inbound.id } })) await audit(db, { workspaceId: inbound.workspaceId, actor: "chrona", kind: "chat_result", subjectId: inbound.id, details: { runId, messageIds: rows.map(m => m.id) } });
       return { runId, sessionId: inbound.sessionId, messages: rows.map(toMessage) };
     });
-  }
-  /** Trusted transport bytes only; paths are generated, never supplied by consumers. */
-  async intakeAttachments(input: Pick<ChatInput, "workspaceId" | "channel" | "quotedMessageId">, files: { name: string; mime: string; bytes: Uint8Array }[]) {
-    if (files.length > 10) throw new StewardError("invalid", "Too many attachments");
-    const attachments: NonNullable<ChatInput["attachments"]> = [];
-    let images = 0;
-    for (const file of files) {
-      const stored = await storeChatFile(this.ports, file.name, file.bytes, input.workspaceId);
-      const inline = file.mime.startsWith("image/") && file.bytes.byteLength <= 5 * 1024 * 1024 && images < 4;
-      if (inline) images++;
-      attachments.push({ name: stored.name, ref: stored.ref, mime: file.mime, size: stored.size, ...(inline ? { base64: Buffer.from(file.bytes).toString("base64") } : {}) });
-    }
-    return { attachments };
   }
   /** Outbound only: an entry module records what it delivered outside a chat reply, or the transport id of a reply. */
   async recordMessage(workspaceId: string, input: { key: string; channel: MessageRow["channel"]; text: string; externalId: string }) {

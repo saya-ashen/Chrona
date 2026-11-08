@@ -14,7 +14,7 @@ export type Caller = { kind: string; module?: string; moduleId?: string };
 export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
 export type PageTool = { inputSchema: Schema; moduleId: string; contractHash: string };
 /** `keyed`: the app's tools that take a request key (the page sends a fresh one per press); `needs`: each source's required arguments (not read while one is empty). */
-export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace" };
+export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace"; content?: { tool: string } };
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
@@ -47,7 +47,7 @@ function checkBinding(where: string, binding: unknown, tools: Map<string, Schema
 }
 /** catalog.validate checks only the spec's structure, so components, props and actions are checked here. */
 // eslint-disable-next-line complexity -- Keep app-supplied spec validation and its ordered diagnostics together.
-export function pageErrors(input: { spec: unknown; data?: unknown; components?: unknown; layout?: unknown }, tools: Map<string, Schema>, module: string) {
+export function pageErrors(input: { spec: unknown; data?: unknown; components?: unknown; layout?: unknown; content?: unknown }, tools: Map<string, Schema>, module: string) {
   if (input.layout !== undefined && input.layout !== "document" && input.layout !== "workspace") return ["layout 须为 document 或 workspace"];
   if (input.components !== undefined) {
     try { input = { ...input, spec: expandComponents(input.spec, input.components, module), components: undefined }; }
@@ -55,6 +55,14 @@ export function pageErrors(input: { spec: unknown; data?: unknown; components?: 
   }
   if (Buffer.byteLength(JSON.stringify({ spec: input.spec, data: input.data })) > MAX_BYTES) return ["展开后的页面最多 64 KiB"];
   const errors: string[] = [], structure = catalog.validate(input.spec);
+  if (input.content !== undefined) {
+    if (!record(input.content) || Object.keys(input.content).some(key => key !== "tool") || typeof input.content.tool !== "string" || !SLUG.test(input.content.tool)) errors.push("content 须为 {tool: 本应用工具名}");
+    else {
+      checkArgs("content", input.content.tool, { ref: `${module}/image.png` }, tools, errors);
+      const schema = tools.get(input.content.tool);
+      if (schema && (!schema.properties?.ref || schema.required?.some(key => key !== "ref"))) errors.push("content 工具须接受 {ref}，不得要求其他参数");
+    }
+  }
   if (!structure.success) return [`spec 结构无效：${structure.error?.issues.slice(0, 5).map(issue => `${issue.path.join(".")} ${issue.message}`).join("；")}`];
   const elements = (input.spec as Spec).elements;
   if (Object.keys(elements).length > MAX_ELEMENTS) errors.push(`元素最多 ${MAX_ELEMENTS} 个`);
@@ -94,7 +102,7 @@ function activeOwner(modules: ModuleState[], moduleId: string, name: string) {
   return modules.find(item => item.id === moduleId && item.name === name && item.status === "active" && item.activeHash);
 }
 function assertPageIdentity(page: Partial<Page>) {
-  if (!page.moduleId || !page.contracts || !page.revision) throw stalePage();
+  if (!page.moduleId || !page.contracts || !page.revision || (page.content && !/^[a-f0-9]{64}$/.test(page.contracts[page.content.tool] ?? ""))) throw stalePage();
 }
 function assertRegistration(args: Args) {
   if (typeof args.id !== "string" || !SLUG.test(args.id)) throw invalid("id 须为小写字母开头的 slug");
@@ -129,24 +137,26 @@ export function createPages(deps: Deps) {
     return { modules, pages: kept };
   }
   async function set(module: string, moduleId: string, args: Args) {
-    const { data } = args, { id, title } = assertRegistration(args);
+    const { data, content } = args, { id, title } = assertRegistration(args);
     const spec: PageSpec = expandComponents(args.spec, args.components, module);
     const layout = args.layout === undefined ? "document" : args.layout;
     const { modules } = await knownPages();
     if (!activeOwner(modules, moduleId, module)) throw Object.assign(new Error("应用身份已失效或尚未启用，请启用后重新登记页面"), { code: "conflict" });
     const current = await deps.tools(module);
     if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
+    // Discovery includes only tools Web may actually call, with the real caller's visibility.
     const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
-    const errors = pageErrors({ spec, data, layout }, tools, module);
+    const errors = pageErrors({ spec, data, layout, content }, tools, module);
     if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
     const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
     if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
     const keyed = [...tools].filter(([, schema]) => schema.properties && Object.hasOwn(schema.properties, "request-key")).map(([name]) => name);
     const sources = (data ?? {}) as Record<string, Source>;
     const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
-    const contracts = Object.fromEntries(references(spec as Spec, sources).map(name => [name, current.get(name)!.contractHash]));
+    const provider = content as Page["content"];
+    const contracts = Object.fromEntries([...references(spec as Spec, sources), ...(provider ? [provider.tool] : [])].map(name => [name, current.get(name)!.contractHash]));
     const revision = crypto.randomUUID();
-    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), data: sources, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
+    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), data: sources, content: provider, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
     await save([...others, page]);
     return { id, catalog: CATALOG_VERSION };
   }
@@ -216,8 +226,9 @@ export function describeCatalog() {
       ...(definition.slots?.length ? { children: true, slots: definition.slots } : {}),
     }])),
     rules: [
-      "page-set {id, title, layout?: document|workspace, components?, data?, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
+      "page-set {id, title, layout?: document|workspace, components?, data?, content?: {tool}, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
       "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Names must use your app prefix; definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",
+      "content: {tool} explicitly declares your own readable tool for Image. Web calls it with {ref}, restricted to your app/ prefix, pinned to the registered module identity and tool contract. Return null or {base64, mime}; only bounded PNG/JPEG/GIF/WebP raster images (max 8 MiB) are accepted. Without content, images cannot be read. Tool visibility must admit Web; no global content reader.",
       "data: {name: {tool, args?, refresh?}} calls one of your own tools when the page opens (and every refresh seconds, 5-3600); the result is state /name. args may use {\"$state\": \"/path\"}; data is re-read when such a value changes.",
       "Props may use {\"$state\": \"/path\"}, {\"$bindState\": \"/path\"} for inputs, {\"$template\": \"${field}/\"}, and repeat/$item for lists. In a top-level action param $item is the item's state path; use {\"$template\": \"${field}\"} for its value (nested call args resolve $item to the value).",
       "on.<event>: {action: \"call\", params: {tool, args?, result?, reload?}, confirm?: {title, message}} calls your tool; a tool with a request-key parameter gets a fresh key unless args sets one. result stores the output at a state path; data is re-read unless reload is false. Built-in actions: setState, pushState, removeState.",

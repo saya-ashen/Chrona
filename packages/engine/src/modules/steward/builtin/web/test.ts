@@ -12,6 +12,8 @@ import { activitySpec } from "./src/system/activity";
 import { appsSpec } from "./src/system/apps";
 import { settingsSpec, liveGrant, scheduleActions } from "./src/system/settings";
 import { checkModelValues } from "./test-model-settings";
+import { checkAttachments } from "./test-attachments";
+import { checkRasterContent } from "./test-content";
 import { chatSpec, selectedSession, openMessages, type Message } from "./src/system/chat";
 import type { ReplyEvent } from "./src/system/adapter";
 import { localTime, Time } from "./src/display";
@@ -46,7 +48,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("notify.activity", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
   stub("modules.tools", args => (args.query === "files"
-    ? [{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true }, { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
+    ? [{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true }, { target: "files.read-image", description: "Read image", inputSchema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] }, idempotent: true }, { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
     : [{ target: "planning.get", description: "Get", inputSchema: { type: "object", properties: {}, required: [] }, idempotent: true }]).map(tool => ({ ...tool, moduleId: args.query === "files" ? "m-files" : "m-p", hash: "h", contractHash: args.query === "files" ? filesContract : "b".repeat(64) }))),
   stub("modules.list", () => inventoryFailure ? null : inventory),
   stub("modules.catalog", () => []),
@@ -58,11 +60,13 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
   stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
   stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
-  stub("content.read", args => {
+  stub("files.read-image", args => {
     if (args.ref === "files/missing.png") return null;
+    if (args.ref === "files/bad.png") return { base64: "<script>", mime: "image/png" };
+    if (args.ref === "files/pretend.png") return { base64: Buffer.from("not an image").toString("base64"), mime: "image/png" };
+    if (args.ref === "files/large.png") return { base64: "A".repeat(12 * 1024 * 1024), mime: "image/png" };
     return { base64: png.toString("base64"), mime: args.ref === "files/no.svg" ? "image/svg+xml" : "image/png", size: png.length, sha256: "fixture" };
   }),
-  stub("history.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
 async function get(path: string, init: RequestInit = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -413,11 +417,7 @@ try {
   await post("/api/web/schedules/s1", { status: "paused" });
   assert.deepEqual(calls.at(-1), ["schedules.update", { schedule: "s1", status: "paused" }]);
   assert.equal((await post("/api/web/call", { target: "settings.update", args: {} })).status, 404);
-  // Attachments come from history.file and are served as downloads, never as pages of this origin.
-  const file = await get("/api/web/file?message=m1&ref=chat%2Fx-a.txt");
-  assert.equal(await file.text(), "file chat/x-a.txt");
-  assert.match(file.headers.get("content-security-policy")!, /sandbox/);
-  assert.deepEqual(calls.at(-1), ["history.file", { message: "m1", ref: "chat/x-a.txt" }]);
+  await checkAttachments(get, post, calls);
 
   // A pushed reply reaches an open page.
   const stream = await get("/api/web/events");
@@ -480,33 +480,28 @@ try {
     const imageSpec = { root: "image", elements: { image: { type: "Image", props: { ref, alt: "生成的图片", width: 640, height: null }, children: [] } } };
     assert.equal(catalog.validate(imageSpec).success, true);
     assert.deepEqual(pageErrors({ spec: imageSpec }, new Map(), "files"), []);
-    assert.match(JSON.stringify(await tool("page-set", { id: "images", title: "图片", spec: imageSpec }, files)), /json-render@/);
+    assert.match(JSON.stringify(await tool("page-set", { id: "images", title: "图片", spec: imageSpec, content: { tool: "read-image" } }, files)), /json-render@/);
   }
   const foreignSpec = { root: "image", elements: { image: { type: "Image", props: { ref: "planning/private.png", alt: "越权" }, children: [] } } };
   assert.match(pageErrors({ spec: foreignSpec }, new Map(), "files").join(), /只能引用本应用/);
   assert.match(JSON.stringify(await tool("page-set", { id: "bad-image", title: "图片", spec: foreignSpec }, files)), /只能引用本应用/);
   const imageUrl = "/api/web/pages/files/images/content?ref=";
-  const before = calls.filter(([target]) => target === "content.read").length;
-  for (const ref of ["planning/private.png", "files-other/a.png", ""]) assert.equal((await get(imageUrl + encodeURIComponent(ref))).status, 403);
-  assert.equal(calls.filter(([target]) => target === "content.read").length, before); // Rejected before content.read.
-  assert.equal((await get(imageUrl + "files%2Fno.svg")).status, 403);
-  const missing = await get(imageUrl + "files%2Fmissing.png");
-  assert.equal(missing.status, 404); assert.doesNotMatch(await missing.text(), /private internal/);
-  assert.equal((await get("/api/web/pages/files/absent/content?ref=files%2Fa.png")).status, 404);
-  const image = await get(imageUrl + "files%2Fpicture.png");
-  assert.equal(image.status, 200);
-  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
-  assert.equal(image.headers.get("content-type"), "image/png");
-  assert.equal(image.headers.get("x-content-type-options"), "nosniff");
-  assert.equal(image.headers.get("content-security-policy"), "sandbox; default-src 'none'");
-  assert.equal(image.headers.get("cache-control"), "private, no-cache");
-  assert.deepEqual(calls.at(-1), ["content.read", { ref: "files/picture.png" }]);
+  const before = calls.filter(([target]) => target === "files.read-image").length;
+  assert.equal((await get("/api/web/pages/files/main/content?ref=files%2Fpicture.png")).status, 403);
+  assert.match(JSON.stringify(await tool("page-set", { id: "bad-content", title: "图片", spec, content: { tool: "planning.get" } }, files)), /content/);
+  assert.match(JSON.stringify(await tool("page-set", { id: "bad-content", title: "图片", spec, content: { tool: "invisible" } }, files)), /没有工具/);
+  for (const ref of ["planning/private.png", "files-other/a.png", "files/../planning/private.png", "files/\\private.png", ""])  assert.equal((await get(imageUrl + encodeURIComponent(ref))).status, 403);
+  assert.equal(calls.filter(([target]) => target === "files.read-image").length, before); // Rejected before the owner's tool.
+  await checkRasterContent(get, png);
+  assert.deepEqual(calls.at(-1), ["files.read-image", { ref: "files/picture.png" }]);
+  assert.deepEqual(module.calls.findLast((call: { method: string; params: Args }) => call.method === "call" && call.params.target === "files.read-image")?.params.expectedTarget, { moduleId: "m-files", contractHash: "a".repeat(64) });
   inventory[0]!.status = "paused";
   assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
   assert.equal((await get("/api/web/pages/files/main")).status, 409);
   inventory[0]!.status = "active";
   filesContract = "c".repeat(64);
   assert.equal((await get("/api/web/pages/files/main")).status, 409);
+  assert.equal((await get(imageUrl + "files%2Fpicture.png")).status, 409);
   filesContract = "a".repeat(64);
   inventoryFailure = true;
   assert.equal((await get("/api/web/pages")).status, 502);

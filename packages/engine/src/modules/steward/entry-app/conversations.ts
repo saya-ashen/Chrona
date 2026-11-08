@@ -152,6 +152,13 @@ export function createAgentConversations(inputOptions: Options) {
     }),
     owns: (id: string) => serial(async () => (await load(dataDir)).sessions.some(session => session.id === id)),
     messages: (id: string) => serial(async () => owned(await load(dataDir), id).messages.slice(-100)),
+    attachment: (messageId: string, ref: string) => serial(async () => {
+      for (const session of (await load(dataDir)).sessions) {
+        const message = session.messages.find(item => item.id === messageId);
+        if (message) return message.attachments.find(file => file && typeof file === "object" && "ref" in file && file.ref === ref);
+      }
+      return undefined;
+    }),
     transcript: (id: string) => serial(async () => owned(await load(dataDir), id).turns.at(-1)?.transcript ?? []),
     send: (input: SendInput) => serial(async () => {
       validateText(input);

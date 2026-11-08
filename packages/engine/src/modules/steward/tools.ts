@@ -15,8 +15,8 @@ import { notifyUser } from "./notify-user";
 import { recordApprovalFact } from "./notification-facts";
 import { drainCalls } from "./module-calls";
 import { pushReply } from "./chat-replies";
-import { runFile, storeChatFile } from "./chat";
-import { readContentRef } from "./content";
+import { registerWorkspaceModule } from "./local-workspace";
+import { runtimeCall } from "./local-runtime";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
@@ -61,11 +61,10 @@ export async function searchSessions(db: StewardPorts["db"], workspaceId: string
     }) }] : [];
   });
 }
-/** Working-directory files, received attachments (content/chat/) and app content by reference (content/<module>/<path>, e.g. a generated image). */
+/** Only actual files in the authorized working directory; cross-app reads use their owner's tools. */
 async function replyFile(ctx: ToolContext, path: string) {
-  if (!path.startsWith("content/") || path.startsWith("content/chat/")) return runFile(ctx.ports, ctx.run.cwd, path, ctx.workspaceId);
-  const file = await readContentRef(ctx.ports, ctx.workspaceId, path.slice("content/".length), 20 * 1024 * 1024);
-  return storeChatFile(ctx.ports, file.name, file.bytes, ctx.workspaceId);
+  registerWorkspaceModule();
+  return runtimeCall<{ name: string; ref: string; mime: string; size: number }>(ctx.ports, ctx.workspaceId, "workspace-local.capture-file", { runId: ctx.run.id, path });
 }
 async function reply(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_reply, raw), { run, db, workspaceId, now, session } = ctx;
@@ -73,7 +72,7 @@ async function reply(ctx: ToolContext, raw: unknown) {
   const target = session.originSessionId ?? session.id;
   const conversation = await db.message.findFirst({ where: { workspaceId, sessionId: target }, orderBy: [{ at: "desc" }, { id: "desc" }] });
   const files = await Promise.all(input.files.map(path => replyFile(ctx, path)));
-  const attachments = files.map(file => ({ name: file.name, ref: file.ref, mime: "application/octet-stream", size: file.size }));
+  const attachments = files.map(file => ({ name: file.name, ref: file.ref, mime: file.mime, size: file.size }));
   const message = await db.$transaction(async tx => {
     const message = await tx.message.create({ data: { workspaceId, direction: "out", channel: conversation?.channel ?? "in_app", sessionId: session.id, text: input.text, attachments, at: now() } });
     await audit(tx, { workspaceId, actor: "chrona", kind: "run_reply", subjectId: run.id, details: { messageId: message.id } });

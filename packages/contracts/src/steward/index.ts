@@ -395,8 +395,8 @@ export const runSchema = z.object({
   label: z.string().max(80).nullable(),
 }).strict();
 
-/** A file reference `<owner>/<path>`; attachments are `chat/<file>` (the Provider sees them under content/chat/ in its working directory). */
-export const contentRefSchema = z.string().trim().min(3).max(542).regex(/^[a-z][a-z0-9-]{1,40}\//, "starts with a module name")
+/** A file reference belongs to an application's content area; the retired shared attachment prefix is rejected. */
+export const contentRefSchema = z.string().trim().min(3).max(542).regex(/^(?!chat\/)[a-z][a-z0-9-]{1,40}\//, "starts with an application name")
   .refine(ref => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
 export const attachmentSchema = z.object({ name: short, ref: contentRefSchema.nullable(), mime: z.string().max(100), size: z.number().int().min(0) }).strict();
 export const messageSchema = z.object({
