@@ -7475,6 +7475,7 @@ var executionStartSchema = object({
   projectRef: id2,
   commandKey: id2,
   goal: string2().trim().min(1).max(20000),
+  resumeFrom: object({ workId: id2, runId: id2, attemptId: id2 }).strict().optional(),
   budget: object({ timeoutMs: number2().int().min(1000).max(1200000), maxToolCalls: number2().int().min(1).max(60) }).strict()
 }).strict();
 var executionStatusSchema = _enum(["queued", "running", "completed", "failed", "cancelled", "unknown"]);

@@ -7473,6 +7473,7 @@ var executionStartSchema = object({
   projectRef: id2,
   commandKey: id2,
   goal: string2().trim().min(1).max(20000),
+  resumeFrom: object({ workId: id2, runId: id2, attemptId: id2 }).strict().optional(),
   budget: object({ timeoutMs: number2().int().min(1000).max(1200000), maxToolCalls: number2().int().min(1).max(60) }).strict()
 }).strict();
 var executionStatusSchema = _enum(["queued", "running", "completed", "failed", "cancelled", "unknown"]);
@@ -8522,7 +8523,7 @@ var modulesToolInputSchemas = {
 var CHRONA_TOOLS = Object.keys(chronaToolInputSchemas);
 
 // packages/integrations/src/steward/pi-provider.ts
-import { join as join4, resolve as resolve2 } from "path";
+import { join as join5, resolve as resolve3 } from "path";
 import { createHash } from "crypto";
 import { copyFileSync, existsSync as existsSync2, mkdtempSync, rmSync, symlinkSync as symlinkSync2 } from "fs";
 import { stripVTControlCharacters } from "util";
@@ -8709,9 +8710,56 @@ class PiEvents {
   }
 }
 
+// packages/integrations/src/steward/pi-session-resume.ts
+import { open, readdir } from "fs/promises";
+import { isAbsolute, join, resolve } from "path";
+var HEADER_LIMIT = 1024 * 1024;
+async function sessionHeader(path) {
+  const file = await open(path, "r");
+  try {
+    const buffer = Buffer.alloc(HEADER_LIMIT);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, Math.min(4096, buffer.length - length), null);
+      if (!bytesRead)
+        return JSON.parse(buffer.subarray(0, length).toString("utf8"));
+      const newline = buffer.subarray(length, length + bytesRead).indexOf(10);
+      if (newline !== -1)
+        return JSON.parse(buffer.subarray(0, length + newline).toString("utf8"));
+      length += bytesRead;
+    }
+    throw new Error("Pi session header exceeds the read limit");
+  } finally {
+    await file.close();
+  }
+}
+async function validatePiSessionResume(input) {
+  let entries;
+  try {
+    entries = await readdir(input.sessionDir, { withFileTypes: true });
+  } catch {
+    return "Pi resume context is missing or unreadable";
+  }
+  let mismatchedCwd = false;
+  for (const entry of entries.filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))) {
+    let header;
+    try {
+      header = await sessionHeader(join(input.sessionDir, entry.name));
+    } catch {
+      continue;
+    }
+    if (header?.type !== "session" || header.id !== input.sessionId)
+      continue;
+    if (typeof header.cwd === "string" && isAbsolute(header.cwd) && resolve(header.cwd) === resolve(input.cwd))
+      return null;
+    mismatchedCwd = true;
+  }
+  return mismatchedCwd ? "Pi resume context cwd does not match the authorized working directory" : "Pi resume context is missing or invalid for the requested session ID";
+}
+
 // packages/integrations/src/steward/pi-transcript.ts
-import { readdir, readFile } from "fs/promises";
-import { join } from "path";
+import { readdir as readdir2, readFile } from "fs/promises";
+import { join as join2 } from "path";
 function items(entry) {
   const message = entry.message, at = entry.timestamp ?? "";
   if (entry.type !== "message" || !message)
@@ -8731,14 +8779,14 @@ function items(entry) {
 `), error: message.isError === true }];
 }
 async function piTranscript({ sessionDir, limit }) {
-  const files = (await readdir(sessionDir, { recursive: true }).catch((error) => {
+  const files = (await readdir2(sessionDir, { recursive: true }).catch((error) => {
     if (error.code === "ENOENT")
       return [];
     throw error;
   })).filter((name) => name.endsWith(".jsonl")).sort();
   const result = [];
   for (const file of files)
-    for (const line of (await readFile(join(sessionDir, file), "utf8")).split(`
+    for (const line of (await readFile(join2(sessionDir, file), "utf8")).split(`
 `)) {
       let entry;
       try {
@@ -8755,7 +8803,7 @@ async function piTranscript({ sessionDir, limit }) {
 // packages/integrations/src/steward/pi-model-gateway.ts
 import { spawn as spawn2 } from "child_process";
 import { mkdtemp, rm, writeFile } from "fs/promises";
-import { join as join3 } from "path";
+import { join as join4 } from "path";
 import { tmpdir } from "os";
 
 // packages/integrations/src/steward/pi-launch.ts
@@ -8763,11 +8811,11 @@ import { spawn, spawnSync } from "child_process";
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readdirSync, realpathSync as realpathSync2, statSync as statSync2, symlinkSync, unlinkSync } from "fs";
 import { homedir } from "os";
-import { dirname, isAbsolute as isAbsolute2, join as join2, relative as relative2, resolve, sep as sep2 } from "path";
+import { dirname, isAbsolute as isAbsolute3, join as join3, relative as relative2, resolve as resolve2, sep as sep2 } from "path";
 
 // packages/integrations/src/steward/pi-resources.ts
 import { readFileSync, realpathSync, statSync } from "fs";
-import { isAbsolute, relative, sep } from "path";
+import { isAbsolute as isAbsolute2, relative, sep } from "path";
 var name = string2().regex(/^[\w:.-]{1,100}$/);
 var piResourcesSchema = object({
   skills: array(string2().min(1).max(2000)).max(30).default([]),
@@ -8778,10 +8826,10 @@ var builtins = new Set(["builtin:mcp", "builtin:codemode", "builtin:tool-search"
 var empty = () => ({ skills: [], extensions: [], tools: [] });
 function within(parent, file) {
   const path = relative(parent, file);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute2(path);
 }
 function entry(path, roots) {
-  if (!isAbsolute(path) || realpathSync(path) !== path || roots.some((root) => within(root, path)))
+  if (!isAbsolute2(path) || realpathSync(path) !== path || roots.some((root) => within(root, path)))
     throw new Error("Unsafe Pi resource path");
   const stat = statSync(path);
   if (!stat.isFile() || process.platform !== "win32" && (stat.mode & 18) !== 0)
@@ -8791,7 +8839,7 @@ function readPiResources(file, profile, workspace) {
   if (file === undefined)
     return { resources: empty(), error: null };
   try {
-    const roots = [profile, workspace].filter((root) => !!root && isAbsolute(root));
+    const roots = [profile, workspace].filter((root) => !!root && isAbsolute2(root));
     entry(file, roots);
     if (process.platform !== "win32" && (statSync(file).mode & 63) !== 0 || statSync(file).size > 32000)
       throw new Error("Manifest must be private and bounded");
@@ -8824,7 +8872,7 @@ function resourceCommand(resources, source, path, baseExtensions) {
   if (source === "extension" && builtins.has(path))
     return resources.extensions.includes(path);
   try {
-    if (!isAbsolute(path))
+    if (!isAbsolute2(path))
       return false;
     const candidates = source === "extension" ? [...baseExtensions, ...resources.extensions.filter((value) => !builtins.has(value))] : source === "skill" ? resources.skills : [];
     const canonical = realpathSync(path);
@@ -8837,12 +8885,12 @@ function resourceCommand(resources, source, path, baseExtensions) {
 // packages/integrations/src/steward/pi-launch.ts
 var inside = (parent, child) => {
   const path = relative2(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep2}`) && !isAbsolute2(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep2}`) && !isAbsolute3(path);
 };
 var profileOverlaps = (profile, work) => inside(profile, work) || inside(work, profile);
 function piLaunchConfig(options) {
   const selected = readPiResources(options.resourcesFile, options.agentDir ?? "", options.workspaceRoot);
-  const configuredBwrap = options.bwrap ? options.bwrap.includes("/") ? resolve(options.bwrap) : options.bwrap : null;
+  const configuredBwrap = options.bwrap ? options.bwrap.includes("/") ? resolve2(options.bwrap) : options.bwrap : null;
   return {
     options,
     command: options.command ?? "",
@@ -8850,9 +8898,9 @@ function piLaunchConfig(options) {
     version: options.expectedVersion ?? "0.85.0",
     resources: selected.resources,
     resourceError: selected.error,
-    extension: resolve(options.chronaExtension),
-    web: options.webExtension ? resolve(options.webExtension) : null,
-    browserExtension: options.browserExtension ? resolve(options.browserExtension) : null,
+    extension: resolve2(options.chronaExtension),
+    web: options.webExtension ? resolve2(options.webExtension) : null,
+    browserExtension: options.browserExtension ? resolve2(options.browserExtension) : null,
     bwrap: options.executionMode === "required-isolation" ? configuredBwrap : null
   };
 }
@@ -8865,11 +8913,11 @@ function privateProfile(path) {
   }
 }
 function configurationError(config) {
-  if (!isAbsolute2(config.command))
+  if (!isAbsolute3(config.command))
     return "Configure an absolute, service-specific Pi executable";
-  if (!isAbsolute2(config.agentDir) || !privateProfile(config.agentDir))
+  if (!isAbsolute3(config.agentDir) || !privateProfile(config.agentDir))
     return "Pi profile must be an existing private canonical directory";
-  if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve(config.options.workspaceRoot)))
+  if (config.options.workspaceRoot && profileOverlaps(config.agentDir, resolve2(config.options.workspaceRoot)))
     return "Pi profile must be separate from the session workspace";
   if (config.version !== "0.85.0" && !modernPi(config.version))
     return "Unsupported Pi version pin";
@@ -8925,36 +8973,36 @@ async function inspectPiLaunch(config) {
   return null;
 }
 var both = (p) => {
-  const path = resolve(p);
+  const path = resolve2(p);
   return existsSync(path) ? [path, realpathSync2(path)] : [path];
 };
 function hostMounts(config, input) {
-  const granted = (input.hostPaths ?? []).filter((p) => isAbsolute2(p) && existsSync(p)).flatMap((p) => ["--bind", p, p]);
+  const granted = (input.hostPaths ?? []).filter((p) => isAbsolute3(p) && existsSync(p)).flatMap((p) => ["--bind", p, p]);
   const data = granted.length && config.options.dataDir ? [...new Set(both(config.options.dataDir))] : [];
   return [...granted, ...data.flatMap((p) => ["--tmpfs", p])];
 }
 function workspaceMounts(input, cwd) {
-  if (realpathSync2(cwd) !== cwd || realpathSync2(resolve(input.sessionDir)) !== resolve(input.sessionDir))
+  if (realpathSync2(cwd) !== cwd || realpathSync2(resolve2(input.sessionDir)) !== resolve2(input.sessionDir))
     throw new Error("Unsafe session directory");
-  return ["--bind", cwd, cwd, "--bind", resolve(input.sessionDir), resolve(input.sessionDir)];
+  return ["--bind", cwd, cwd, "--bind", resolve2(input.sessionDir), resolve2(input.sessionDir)];
 }
 function contentAreas(input) {
   return (input.content ?? []).map((area) => {
-    if (!/^[a-z][a-z0-9-]{1,40}$/.test(area.name) || !isAbsolute2(area.dir) || realpathSync2(area.dir) !== area.dir)
+    if (!/^[a-z][a-z0-9-]{1,40}$/.test(area.name) || !isAbsolute3(area.dir) || realpathSync2(area.dir) !== area.dir)
       throw new Error("Unsafe content mount");
     return area;
   });
 }
 function prepareContent(input, link) {
-  const root = join2(resolve(input.cwd), "content"), areas = contentAreas(input);
+  const root = join3(resolve2(input.cwd), "content"), areas = contentAreas(input);
   mkdirSync(root, { recursive: true });
   for (const entry of readdirSync(root, { withFileTypes: true }))
     if (entry.isSymbolicLink())
-      unlinkSync(join2(root, entry.name));
+      unlinkSync(join3(root, entry.name));
   if (link) {
     for (const area of areas)
-      if (!existsSync(join2(root, area.name)))
-        symlinkSync(area.dir, join2(root, area.name));
+      if (!existsSync(join3(root, area.name)))
+        symlinkSync(area.dir, join3(root, area.name));
   }
 }
 function optionalExtensions(config, browser) {
@@ -8988,7 +9036,7 @@ function piArguments(config, input, prompt, browser = null) {
     "--mode",
     "rpc",
     "--session-dir",
-    resolve(input.sessionDir),
+    resolve2(input.sessionDir),
     "--session-id",
     input.sessionId ?? randomUUID(),
     "--no-approve",
@@ -9016,9 +9064,9 @@ function piArguments(config, input, prompt, browser = null) {
     args.push("--model", model);
   if (!config.bwrap)
     return args;
-  const cwd = resolve(input.cwd);
+  const cwd = resolve2(input.cwd);
   const hidden = [...new Set([homedir(), config.options.dataDir].filter((p) => !!p).flatMap(both))].sort((a, b) => a.split(sep2).length - b.split(sep2).length);
-  const resources = [config.command, config.extension, ...optional.flatMap((extension) => extension.files), ...configuredResourceFiles(config, input)].filter((p) => !!p && isAbsolute2(p));
+  const resources = [config.command, config.extension, ...optional.flatMap((extension) => extension.files), ...configuredResourceFiles(config, input)].filter((p) => !!p && isAbsolute3(p));
   const visible = [...new Set(resources.flatMap((p) => existsSync(p) ? [p, realpathSync2(p)] : [p]))].filter((p) => hidden.some((root) => inside(root, p)));
   const root = readdirSync("/").filter((name) => !["proc", "dev", "tmp"].includes(name)).flatMap((name) => ["--ro-bind", `/${name}`, `/${name}`]);
   return [
@@ -9036,7 +9084,7 @@ function piArguments(config, input, prompt, browser = null) {
     "/proc",
     ...visible.flatMap((p) => ["--ro-bind", p, p]),
     ...workspaceMounts(input, cwd),
-    ...contentAreas(input).flatMap((area) => [area.writable ? "--bind" : "--ro-bind", area.dir, join2(cwd, "content", area.name)]),
+    ...contentAreas(input).flatMap((area) => [area.writable ? "--bind" : "--ro-bind", area.dir, join3(cwd, "content", area.name)]),
     "--bind",
     config.agentDir,
     config.agentDir,
@@ -9092,7 +9140,7 @@ function parseLine(text, input, fail, setResult) {
 function runPiProcess(config, input, dir, state, isExpired) {
   const args = ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-approve", "--mode", "json", "--model", input.model, ...input.thinking ? ["--thinking", input.thinking] : []];
   if (input.system !== undefined)
-    args.push("--system-prompt", join3(dir, "system.txt"));
+    args.push("--system-prompt", join4(dir, "system.txt"));
   return new Promise((resolve, reject) => {
     const process2 = spawn2(config.command, args, { cwd: dir, env: piEnvironment(config), stdio: ["pipe", "pipe", "ignore"], shell: false });
     state.child = process2;
@@ -9141,9 +9189,9 @@ async function work(config, input, state, isExpired) {
     throw failure("provider_error");
   if (isExpired())
     throw failure("timeout");
-  state.dir = await mkdtemp(join3(tmpdir(), "chrona-model-"));
+  state.dir = await mkdtemp(join4(tmpdir(), "chrona-model-"));
   if (input.system !== undefined)
-    await writeFile(join3(state.dir, "system.txt"), input.system, { mode: 384 });
+    await writeFile(join4(state.dir, "system.txt"), input.system, { mode: 384 });
   if (isExpired())
     throw failure("timeout");
   return runPiProcess(config, input, state.dir, state, isExpired);
@@ -9206,12 +9254,12 @@ function launchPiProcess(input) {
 function buildProfile(config, input) {
   if (!input.model && input.resources !== "minimal")
     return null;
-  const profile = mkdtempSync(join4(config.agentDir, "build-"));
+  const profile = mkdtempSync(join5(config.agentDir, "build-"));
   for (const name of ["auth.json", "models.json"])
-    if (existsSync2(join4(config.agentDir, name)))
-      symlinkSync2(join4(config.agentDir, name), join4(profile, name));
-  if (existsSync2(join4(config.agentDir, "settings.json")))
-    copyFileSync(join4(config.agentDir, "settings.json"), join4(profile, "settings.json"));
+    if (existsSync2(join5(config.agentDir, name)))
+      symlinkSync2(join5(config.agentDir, name), join5(profile, name));
+  if (existsSync2(join5(config.agentDir, "settings.json")))
+    copyFileSync(join5(config.agentDir, "settings.json"), join5(profile, "settings.json"));
   return profile;
 }
 var object2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -9402,6 +9450,7 @@ class PiRun {
   detail;
   secrets = [];
   sessionId;
+  resumeSessionId;
   sequence = 0;
   epoch = 0;
   streaming = false;
@@ -9432,6 +9481,7 @@ class PiRun {
     this.input = input;
     this.idleMs = idleMs;
     this.sessionId = input.sessionId;
+    this.resumeSessionId = input.execution ? input.sessionId : null;
   }
   touch(event) {
     if (event?.type === "tool_execution_start") {
@@ -9696,6 +9746,8 @@ class PiRun {
   }
   async loadResources(config) {
     const state = await this.send("get_state");
+    if (this.resumeSessionId !== null && state.sessionId !== this.resumeSessionId)
+      throw new Error("Pi resumed a different session than the requested execution context");
     if (this.input.model) {
       const model = object2(state.model);
       if (`${model.provider}/${model.id}` !== this.input.model)
@@ -9736,6 +9788,15 @@ class PiRun {
   }
   async prepare(config) {
     try {
+      if (this.resumeSessionId !== null) {
+        const error = await validatePiSessionResume({ sessionDir: this.input.sessionDir, sessionId: this.resumeSessionId, cwd: this.input.cwd });
+        if (this.inactive())
+          return;
+        if (error) {
+          this.stop("failed", error);
+          return;
+        }
+      }
       const invalid = await inspectPiLaunch(config);
       if (this.inactive())
         return;
@@ -9743,7 +9804,7 @@ class PiRun {
         this.stop("unavailable", invalid);
         return;
       }
-      if (profileOverlaps(config.agentDir, resolve2(this.input.cwd))) {
+      if (profileOverlaps(config.agentDir, resolve3(this.input.cwd))) {
         this.stop("unavailable", "Pi profile must be separate from the working directory");
         return;
       }
@@ -9764,7 +9825,7 @@ class PiRun {
     return (config.options.launch ?? launchPiProcess)({
       file: config.bwrap ?? config.command,
       args: piArguments(config, this.input, this.input.systemPrompt, browser),
-      cwd: resolve2(this.input.cwd),
+      cwd: resolve3(this.input.cwd),
       env: { ...piEnvironment(config), PI_CODING_AGENT_DIR: this.runProfile ?? config.agentDir, CHRONA_AGENT_URL: config.options.agentUrl, CHRONA_AGENT_TOKEN: this.input.token, ...this.input.executionBudget ? { CHRONA_EXECUTION_MAX_TOOL_CALLS: String(this.input.executionBudget.maxToolCalls) } : {}, ...browser ? { CHRONA_BROWSER: browser } : {} }
     });
   }
@@ -9831,7 +9892,7 @@ import { spawn as spawn4 } from "child_process";
 import { createHash as createHash2 } from "crypto";
 import { chmod, mkdir, rename, rm as rm2, writeFile as writeFile2 } from "fs/promises";
 import { existsSync as existsSync3, realpathSync as realpathSync3 } from "fs";
-import { join as join5 } from "path";
+import { join as join6 } from "path";
 var NAMES = ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome"];
 var HEADLESS_SHELL = {
   version: "155.0.8059.39",
@@ -9865,11 +9926,11 @@ async function unzip(zip, target) {
     throw new Error(`Unpacking the browser failed: ${result.output}`);
 }
 function createBrowsers(options) {
-  const pinned = options.pinned ?? HEADLESS_SHELL, nixLink = join5(options.dir, "nix");
-  const shell = join5(options.dir, pinned.version, "chrome-headless-shell-linux64", "chrome-headless-shell");
+  const pinned = options.pinned ?? HEADLESS_SHELL, nixLink = join6(options.dir, "nix");
+  const shell = join6(options.dir, pinned.version, "chrome-headless-shell-linux64", "chrome-headless-shell");
   let acquiring = null, failed = false;
   function find() {
-    const candidates = [options.configured, ...NAMES.map((name) => Bun.which(name, options.path === undefined ? undefined : { PATH: options.path })), join5(nixLink, "bin", "chromium"), shell];
+    const candidates = [options.configured, ...NAMES.map((name) => Bun.which(name, options.path === undefined ? undefined : { PATH: options.path })), join6(nixLink, "bin", "chromium"), shell];
     for (const candidate of candidates)
       if (candidate && existsSync3(candidate))
         return realpathSync3(candidate);
@@ -9892,14 +9953,14 @@ function createBrowsers(options) {
     }))(pinned.url));
     if (createHash2("sha256").update(bytes).digest("hex") !== pinned.sha256)
       throw new Error("Browser download does not match the pinned SHA-256");
-    const staging = join5(options.dir, `${pinned.version}.partial`), zip = `${staging}.zip`;
+    const staging = join6(options.dir, `${pinned.version}.partial`), zip = `${staging}.zip`;
     await rm2(staging, { recursive: true, force: true });
     await mkdir(staging, { recursive: true });
     try {
       await writeFile2(zip, bytes, { mode: 384 });
       await unzip(zip, staging);
-      await chmod(join5(staging, "chrome-headless-shell-linux64", "chrome-headless-shell"), 493);
-      await rename(staging, join5(options.dir, pinned.version));
+      await chmod(join6(staging, "chrome-headless-shell-linux64", "chrome-headless-shell"), 493);
+      await rename(staging, join6(options.dir, pinned.version));
     } finally {
       await rm2(zip, { force: true });
       await rm2(staging, { recursive: true, force: true });
@@ -9926,7 +9987,7 @@ function createBrowsers(options) {
 // packages/engine/src/modules/steward/builtin/agent/operations.ts
 import { createHash as createHash3 } from "crypto";
 import { mkdir as mkdir2, readFile as readFile2, writeFile as writeFile3, rename as rename2 } from "fs/promises";
-import { join as join6 } from "path";
+import { join as join7 } from "path";
 class AgentError extends Error {
   code;
   constructor(code, message) {
@@ -9936,7 +9997,7 @@ class AgentError extends Error {
 }
 function createAgentOperations(provider, data, input) {
   const rows = new Map;
-  const path = (id) => join6(data, "operations", createHash3("sha256").update(id).digest("hex") + ".json");
+  const path = (id) => join7(data, "operations", createHash3("sha256").update(id).digest("hex") + ".json");
   async function owned(id) {
     const live = rows.get(id);
     if (live)
@@ -9974,7 +10035,7 @@ function createAgentOperations(provider, data, input) {
     }
     if (rows.size >= 64)
       throw new AgentError("capacity", "Agent operations full");
-    await mkdir2(join6(data, "operations"), { recursive: true, mode: 448 });
+    await mkdir2(join7(data, "operations"), { recursive: true, mode: 448 });
     await writeFile3(path(id), JSON.stringify({ digest }), { flag: "wx", mode: 384 });
     const row = { digest };
     rows.set(id, row);
@@ -10054,7 +10115,7 @@ function agentInput(name, raw) {
 // packages/engine/src/modules/steward/builtin/agent/module-operations.ts
 import { createHash as createHash4 } from "crypto";
 import { mkdir as mkdir3, readFile as readFile3, writeFile as writeFile4, rename as rename3 } from "fs/promises";
-import { join as join7 } from "path";
+import { join as join8 } from "path";
 
 // packages/engine/src/modules/steward/builtin/agent/module-contracts.ts
 var operation = object({ operationId: string2().regex(/^[a-f0-9]{64}$/) }).strict();
@@ -10104,7 +10165,7 @@ function moduleAgentInput(name, raw) {
 var receipt = object({ owner: string2(), hash: string2(), digest: string2(), kind: _enum(["execution", "completion"]), execution: executionViewSchema.optional(), result: runtimeCompletionSchema.optional(), failure: boolean2().optional(), released: boolean2().optional() }).strict();
 function createModuleAgentOperations(data, call, complete, controlRun) {
   const hash = (value) => createHash4("sha256").update(JSON.stringify(value)).digest("hex");
-  const file = (id) => join7(data, "module-operations", id + ".json");
+  const file = (id) => join8(data, "module-operations", id + ".json");
   const active = new Map;
   const admit = (request, execution) => call("runtime-callback.agent-admit", { callId: request.callId, operation: request.name, ...execution ? { execution } : {} });
   async function save(id, row) {
@@ -10152,7 +10213,7 @@ function createModuleAgentOperations(data, call, complete, controlRun) {
     if (name === "complete" && active.size >= 64)
       throw new Error("capacity: Agent completions full");
     const row = { owner: caller.moduleId, hash: caller.hash, digest, kind: name === "start" ? "execution" : "completion" };
-    await mkdir3(join7(data, "module-operations"), { recursive: true, mode: 448 });
+    await mkdir3(join8(data, "module-operations"), { recursive: true, mode: 448 });
     await writeFile4(file(id), JSON.stringify(row), { mode: 384, flag: "wx" });
     try {
       if (name === "start") {

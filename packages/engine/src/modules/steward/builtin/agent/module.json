@@ -146,6 +146,25 @@
           "goal": {
             "type": "string"
           },
+          "resume-from": {
+            "type": "object",
+            "properties": {
+              "work-id": {
+                "type": "string"
+              },
+              "run-id": {
+                "type": "string"
+              },
+              "attempt-id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "work-id",
+              "run-id",
+              "attempt-id"
+            ]
+          },
           "budget": {
             "type": "object",
             "properties": {
@@ -860,6 +879,25 @@
           },
           "project-ref": {
             "type": "string"
+          },
+          "resume-from": {
+            "type": "object",
+            "properties": {
+              "work-id": {
+                "type": "string"
+              },
+              "run-id": {
+                "type": "string"
+              },
+              "attempt-id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "work-id",
+              "run-id",
+              "attempt-id"
+            ]
           },
           "budget": {
             "type": "object",
