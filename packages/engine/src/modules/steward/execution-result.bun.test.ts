@@ -132,12 +132,12 @@ test("device results and missing local cwd never capture server files or replace
   const f = await fixture();
   try {
     await captureExecutionChanges(f.ports, "r");
-    const retained = await readFile(join(f.logDir, "execution-changes.json"), "utf8");
+    const retained = await readFile(join(f.logDir, `execution-changes-${f.row.id}.json`), "utf8");
     await writeFile(join(f.cwd, "tracked.txt"), "must-not-capture\n");
     for (const identity of [{ executorId: "device", resolvedCwd: f.cwd }, { executorId: "server", resolvedCwd: null }]) {
       Object.assign(f.row, identity);
       await expect(captureExecutionChanges(f.ports, "r")).rejects.toThrow("verified remote final");
-      expect(await readFile(join(f.logDir, "execution-changes.json"), "utf8")).toBe(retained);
+      expect(await readFile(join(f.logDir, `execution-changes-${f.row.id}.json`), "utf8")).toBe(retained);
     }
   } finally { await f.cleanup(); }
 });
@@ -147,13 +147,28 @@ test("disk write failures propagate; invalid retained data does not trigger live
     f.row.heldDirectory = "released";
     await captureExecutionChanges(f.ports, "r");
     expect((await readExecutionChanges(f.row))?.reason).toBe("capture_failed");
-    await writeFile(join(f.logDir, "execution-changes.json"), "{}");
+    await writeFile(join(f.logDir, `execution-changes-${f.row.id}.json`), "{}");
     await expect(readExecutionChanges(f.row)).rejects.toThrow();
-    await writeFile(join(f.logDir, "execution-changes.json"), "x".repeat(LIMITS.bytes + 4097));
+    await writeFile(join(f.logDir, `execution-changes-${f.row.id}.json`), "x".repeat(LIMITS.bytes + 4097));
     await expect(readExecutionChanges(f.row)).rejects.toThrow("exceeds limit");
     await rm(f.logDir, { recursive: true });
     await writeFile(f.logDir, "not a directory");
     await expect(captureExecutionChanges(f.ports, "r")).rejects.toThrow();
     expect(await readFile(f.logDir, "utf8")).toBe("not a directory");
+  } finally { await f.cleanup(); }
+});
+
+test("successive rounds sharing a Provider directory retain separate result evidence", async () => {
+  const f = await fixture();
+  try {
+    await writeFile(join(f.cwd, "tracked.txt"), "first-round\n");
+    await captureExecutionChanges(f.ports, "r");
+    const previous = { ...f.row, run: { ...f.row.run } }, first = await readExecutionChanges(previous);
+    Object.assign(f.row, { id: "a2", runId: "r2", workId: "w2" });
+    await writeFile(join(f.cwd, "tracked.txt"), "second-round\n");
+    await captureExecutionChanges(f.ports, "r2");
+    expect((await readExecutionChanges(f.row))?.patch).toContain("second-round");
+    expect(await readExecutionChanges(previous)).toEqual(first);
+    expect(first?.patch).toContain("first-round");
   } finally { await f.cleanup(); }
 });

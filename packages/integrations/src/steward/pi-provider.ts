@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node
 import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
 import { PiEvents } from "./pi-events";
+import { validatePiSessionResume } from "./pi-session-resume";
 import { piTranscript } from "./pi-transcript";
 import { EXECUTION_EVENT_LIMITS, executionEventSchema, executionJsonBytes, type ExecutionEvent, type ExecutionPayload, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createPiModelGateway } from "./pi-model-gateway";
@@ -160,6 +161,7 @@ class PiRun {
   private detail: PiDetail | undefined;
   private secrets: string[] = [];
   private sessionId: ProviderRunInput["sessionId"];
+  private readonly resumeSessionId: ProviderRunInput["sessionId"];
   private sequence = 0;
   private epoch = 0;
   private streaming = false;
@@ -184,7 +186,10 @@ class PiRun {
   readonly done = new Promise<Result>((resolveDone, rejectDone) => { this.complete = resolveDone; this.rejectDone = rejectDone; });
   private pending = new Map<string, { resolve(value: RecordValue): void; reject(error: Error): void }>();
 
-  constructor(private input: ProviderRunInput, private idleMs = 5 * 60_000) { this.sessionId = input.sessionId; }
+  constructor(private input: ProviderRunInput, private idleMs = 5 * 60_000) {
+    this.sessionId = input.sessionId;
+    this.resumeSessionId = input.execution ? input.sessionId : null;
+  }
   /** A stalled model request otherwise holds the run until its deadline (20 min in background). */
   private touch(event?: RecordValue) {
     if (event?.type === "tool_execution_start") {
@@ -363,6 +368,7 @@ class PiRun {
   }
   private async loadResources(config: PiLaunchConfig) {
     const state = await this.send("get_state");
+    if (this.resumeSessionId !== null && state.sessionId !== this.resumeSessionId) throw new Error("Pi resumed a different session than the requested execution context");
     if (this.input.model) {
       const model = object(state.model);
       if (`${model.provider}/${model.id}` !== this.input.model) throw new Error("Pi selected a different model than the authorized build");
@@ -393,6 +399,11 @@ class PiRun {
   }
   private async prepare(config: PiLaunchConfig) {
     try {
+      if (this.resumeSessionId !== null) {
+        const error = await validatePiSessionResume({ sessionDir: this.input.sessionDir, sessionId: this.resumeSessionId, cwd: this.input.cwd });
+        if (this.inactive()) return;
+        if (error) { this.stop("failed", error); return; }
+      }
       const invalid = await inspectPiLaunch(config);
       if (this.inactive()) return;
       if (invalid) { this.stop("unavailable", invalid); return; }

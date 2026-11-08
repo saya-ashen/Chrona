@@ -13,10 +13,15 @@ async function fixture(mode = "normal") {
   const cwd = await mkdtemp(join(tmpdir(), "chrona-pi-rpc-"));
   const command = join(cwd, "pi");
   await writeFile(command, `#!${process.execPath}
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 if (process.argv.includes('--version')) {console.log('0.85.0');process.exit(0);}
 writeFileSync('launch.json', JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),profile:process.env.PI_CODING_AGENT_DIR,executionToolBudget:process.env.CHRONA_EXECUTION_MAX_TOOL_CALLS,hasChronaDatabaseSecret:'CHRONA_DATABASE_SECRET' in process.env,tokenMatches:process.env.CHRONA_AGENT_TOKEN==='private-run-token'}));
 const mode=${JSON.stringify(mode)};
+const sessionId=process.argv[process.argv.indexOf('--session-id')+1];
+const sessionDir=process.argv[process.argv.indexOf('--session-dir')+1];
+const sessionFile=join(sessionDir,'fixture_'+sessionId+'.jsonl');
+if(mode==='resume') writeFileSync('loaded-context.txt',existsSync(sessionFile)?readFileSync(sessionFile,'utf8'):'');
 let streaming=false, queue=0, cycle=0, retried=false;
 const emit = x => process.stdout.write(JSON.stringify(x)+'\\r\\n');
 const reply=(c,data={})=>emit({id:c.id,type:'response',command:c.type,success:true,data});
@@ -60,12 +65,17 @@ process.stdin.on('data',chunk=>{
      emit({type:'agent_end'});emit({type:'agent_settled'});
     },60);
    }
-   reply(c,{sessionId:'retained-session',model:{provider:'openai',id:mode==='wrong-model'?'other':'gpt-6.1-sol'},isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
+   reply(c,{sessionId:mode==='resume'?sessionId:mode==='missing-session-id'?undefined:'retained-session',model:{provider:'openai',id:mode==='wrong-model'?'other':'gpt-6.1-sol'},isStreaming:streaming,isCompacting:false,pendingMessageCount:queue});
   }
   if(c.type==='get_commands') reply(c,{commands:[]});
   if(c.type==='set_auto_retry'||c.type==='set_auto_compaction') reply(c);
   if(c.type==='clear_queue') {queue=0;reply(c,{steering:[],followUp:[]});}
   if(c.type==='prompt') {
+   if(mode==='resume') {
+    mkdirSync(sessionDir,{recursive:true});
+    if(!existsSync(sessionFile)) writeFileSync(sessionFile,JSON.stringify({type:'session',version:3,id:sessionId,cwd:process.cwd()})+'\\n');
+    appendFileSync(sessionFile,JSON.stringify({type:'message',message:{role:'user',content:c.message}})+'\\n');
+   }
    reply(c);
    if(streaming&&c.streamingBehavior){queue++;continue;}
    if(mode==='crash'){process.stderr.write('crash '+process.env.CHRONA_AGENT_TOKEN);process.exit(7);}
@@ -105,7 +115,7 @@ describe("Pi RPC provider", () => {
     expect(tools).not.toContain("chrona_reply");
     expect(tools).not.toContain("web_search");
     expect(args).not.toContain(join(f.cwd, "web.ts"));
-    expect((await provider.start({ ...f.input, execution: { workId: "work", sessionId: "session", runId: f.input.runId, attemptId: "attempt" } }).done).outcome).toBe("finished");
+    expect((await provider.start({ ...f.input, sessionId: null, execution: { workId: "work", sessionId: "session", runId: f.input.runId, attemptId: "attempt" } }).done).outcome).toBe("finished");
     const configured = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8")).args;
     expect(configured[configured.indexOf("--tools") + 1].split(",")).toContain("chrona_reply");
     expect(configured).toContain(join(f.cwd, "web.ts"));
@@ -260,7 +270,7 @@ test.skipIf(!realBwrap)("real bwrap: content areas appear under content/, writab
 });
 test("opaque composite and long Provider tool IDs preserve bounded start/end correlation", async () => {
   const f = await fixture("tool-ids"), records: ExecutionEvent[] = [];
-  const result = await f.provider.start({ ...f.input, resources: "minimal", execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { records.push(event); } } }).done;
+  const result = await f.provider.start({ ...f.input, sessionId: null, resources: "minimal", execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { records.push(event); } } }).done;
   expect(result.outcome).toBe("finished");
   const starts = records.flatMap(event => event.payload.type === "tool_started" ? [event.payload.toolCallId] : []);
   const ends = records.flatMap(event => event.payload.type === "tool_finished" ? [event.payload.toolCallId] : []);
@@ -301,7 +311,7 @@ test("execution details are bounded/redacted, recover final after saturation and
 });
 test("detail append failure is surfaced after process exit and final delivery still attempted", async () => {
   const f = await fixture("details"); let finalAttempted = false;
-  const result = await f.provider.start({ ...f.input, execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { if (event.payload.type === "message" && event.payload.complete) finalAttempted = true; throw new Error("Disk unavailable"); } } }).done;
+  const result = await f.provider.start({ ...f.input, sessionId: null, execution: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt" }, detail: { async append(event) { if (event.payload.type === "message" && event.payload.complete) finalAttempted = true; throw new Error("Disk unavailable"); } } }).done;
   expect(result.outcome).toBe("failed"); expect(finalAttempted).toBe(true);
 });
 test("without bwrap content areas are symlinks under content/ and stale links are replaced", async () => {
@@ -312,4 +322,46 @@ test("without bwrap content areas are symlinks under content/ and stale links ar
   prepareContent({ ...f.input, content: [{ name: "files", dir: files, writable: false }] }, true);
   expect(await readFile(join(f.input.cwd, "content", "files", "a.md"), "utf8")).toBe("hi\n");
   expect(existsSync(join(f.input.cwd, "content", "old"))).toBe(false);
+});
+
+describe("Pi execution resume", () => {
+  const execution = { workId: "work", sessionId: "technical-session", runId: "run", attemptId: "attempt" };
+  test.each(["missing", "wrong-id", "wrong-cwd", "malformed"])("%s disk context fails visibly before launch", async kind => {
+    const f = await fixture();
+    if (kind !== "missing") {
+      await mkdir(f.input.sessionDir, { recursive: true });
+      await writeFile(join(f.input.sessionDir, "saved.jsonl"), kind === "malformed" ? "invalid\n" : JSON.stringify({ type: "session", id: kind === "wrong-id" ? "other-id" : f.input.sessionId, cwd: kind === "wrong-cwd" ? join(f.cwd, "other-project") : f.cwd }) + "\n");
+    }
+    const records: ExecutionEvent[] = [];
+    const result = await f.provider.start({ ...f.input, execution, detail: { async append(event) { records.push(event); } } }).done;
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toContain("Pi resume context");
+    expect(existsSync(join(f.cwd, "launch.json"))).toBe(false);
+    expect(existsSync(join(f.cwd, "commands.jsonl"))).toBe(false);
+    expect(records.at(-1)?.payload).toMatchObject({ type: "state", status: "failed", stopConfirmed: true });
+  });
+  test.each(["normal", "missing-session-id"])("%s RPC session identity fails before prompting", async mode => {
+    const f = await fixture(mode);
+    await mkdir(f.input.sessionDir, { recursive: true });
+    await writeFile(join(f.input.sessionDir, "saved.jsonl"), JSON.stringify({ type: "session", id: f.input.sessionId, cwd: f.cwd }) + "\n");
+    const result = await f.provider.start({ ...f.input, execution }).done;
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toContain("different session");
+    expect(result.sessionId).toBe(f.input.sessionId);
+    expect((await f.commands()).map(c => c.type)).toEqual(["get_state"]);
+  });
+  test("a fresh execution persists context and a later execution resumes it before prompting", async () => {
+    const f = await fixture("resume");
+    const first = await f.provider.start({ ...f.input, execution, sessionId: null, prompt: "Remember the first instruction." }).done;
+    expect(first.outcome).toBe("finished");
+    expect(first.sessionId).toBeString();
+    const saved = await readFile(join(f.input.sessionDir, `fixture_${first.sessionId}.jsonl`), "utf8");
+    const second = await f.provider.start({ ...f.input, execution: { ...execution, attemptId: "attempt-2" }, sessionId: first.sessionId, prompt: "Continue using the saved instruction." }).done;
+    expect(second).toEqual({ outcome: "finished", sessionId: first.sessionId, error: null });
+    expect(await readFile(join(f.cwd, "loaded-context.txt"), "utf8")).toBe(saved);
+    expect(saved).toContain("Remember the first instruction.");
+    const launch = JSON.parse(await readFile(join(f.cwd, "launch.json"), "utf8"));
+    expect(launch.args[launch.args.indexOf("--session-id") + 1]).toBe(first.sessionId);
+    expect((await f.commands()).filter(c => c.type === "prompt").map(c => c.message)).toEqual(["Remember the first instruction.", "Continue using the saved instruction."]);
+  });
 });

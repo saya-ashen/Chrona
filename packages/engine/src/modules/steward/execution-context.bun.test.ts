@@ -73,3 +73,13 @@ test("one sequence spans normalized Pi details and actual channel question IDs; 
   expect(snapshot.finalMessage!.text).toBe("Final result");
   expect(snapshot.missing).toBe(true);
 });
+
+test("execution launch restores only its own technical session's saved Provider context", async () => {
+  const f = await fixture();
+  await f.db.session.update({ where: { id: f.ref.sessionId }, data: { providerSessionId: "saved-coding-context" } });
+  const run = { ...f.run, session: { ...f.run.session!, providerSessionId: "saved-coding-context" } };
+  const input = (await executionRunInput(f.ports, run))!;
+  expect(input.sessionId).toBe("saved-coding-context");
+  expect(input.sessionDir).toBe(join(f.ports.dataDir, "sessions", f.ref.sessionId));
+  expect(input.execution?.runId).toBe(f.ref.runId);
+});

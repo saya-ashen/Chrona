@@ -11,6 +11,7 @@ import { secrets } from "./system/secrets";
 import { activity } from "./system/activity";
 import { content } from "./system/content";
 import { memory } from "./memory";
+import { projects } from "./system/projects";
 
 let registered = false;
 /** Called by the service: Chrona's system modules become routable call targets. */
@@ -18,5 +19,5 @@ export function registerSystemModules() {
   if (registered) return;
   installAgentDelegation(delegateAgent);
   installInjectedAgent(injectedAgentTools, injectedAgentPrimitive);
-  registered = true; [history, approvals, modules, settings, schedules, secrets, activity, content, memory].forEach(registerSystemModule);
+  registered = true; [history, approvals, modules, settings, schedules, secrets, activity, content, memory, projects].forEach(registerSystemModule);
 }

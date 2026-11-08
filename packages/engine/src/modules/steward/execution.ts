@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { access, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, normalize } from "node:path";
 import type { Prisma } from "@chrona/db";
-import type { ExecutionCommand, ExecutionPorts, ExecutionPrincipal } from "@chrona/contracts/steward";
+import type { ExecutionCommand, ExecutionPorts, ExecutionPrincipal, ExecutionProjectGrant, ExecutionStart } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { CallError } from "./module-calls";
 import { createRuns, createRunSession, liveRuns } from "./runs";
@@ -31,6 +31,26 @@ async function unique(tx: Prisma.TransactionClient, principal: ExecutionPrincipa
   if (rows.length !== 1) throw new CallError("conflict", "Execution reference is ambiguous");
   return rows[0]!;
 }
+/** Bind a fresh context or the exact caller's stopped context; owner read authority alone cannot resume it. */
+async function executionSessionIn(ports: StewardPorts, tx: Prisma.TransactionClient, principal: ExecutionPrincipal, ref: ExecutionStart["resumeFrom"], project: ExecutionProjectGrant) {
+  if (!ref) {
+    const session = await createRunSession(tx, principal.workspaceId, "module", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
+    return { sessionId: session.id, logDir: join(ports.dataDir, "sessions", session.id) };
+  }
+  const source = await unique(tx, principal, { id: ref.attemptId, runId: ref.runId, workId: ref.workId,
+    callerKey: executionCallerKey(principal), callerHash: principal.caller.kind === "module" ? principal.caller.hash : null });
+  if (!source.stopConfirmedAt || !["finished", "failed", "timed_out", "cancelled", "provider_unavailable"].includes(source.run.status)) throw new CallError("conflict", "Resume source has not confirmed a terminal stop");
+  if (source.executorId !== "server" || source.projectRef !== project.projectRef || source.resolvedCwd !== project.canonicalPath || source.run.cwd !== project.canonicalPath) throw new CallError("conflict", "Resume source belongs to a different project");
+  const sessionId = executionRef(source).sessionId;
+  await assertLatestContext(tx, sessionId, source.id);
+  return { sessionId, logDir: source.logDir };
+}
+async function assertLatestContext(tx: Prisma.TransactionClient, sessionId: string, attemptId: string) {
+  const latest = await tx.executionAttempt.findFirst({ where: { run: { sessionId } }, orderBy: [{ run: { createdAt: "desc" } }, { id: "desc" }], select: { id: true } });
+  if (latest?.id !== attemptId) throw new CallError("conflict", "Resume source is no longer the latest conversation round");
+  const session = await tx.session.findUnique({ where: { id: sessionId }, select: { providerSessionId: true } });
+  if (!session?.providerSessionId) throw new CallError("conflict", "Previous Provider context is unavailable; start a new conversation explicitly");
+}
 export function createExecutions(ports: StewardPorts): ExecutionPorts {
   async function read(principal: ExecutionPrincipal, where: Prisma.ExecutionAttemptWhereInput) {
     return ports.db.$transaction(async tx => { await assertExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, where)); });
@@ -50,13 +70,13 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
         const project = await trustedExecutionProject(ports, principal, input.projectRef);
         if (await tx.executionAttempt.count({ where: { OR: [{ heldDirectory: project.canonicalPath }, { executorId: "server", resolvedCwd: project.canonicalPath, stopConfirmedAt: null }] } })) throw new CallError("conflict", "Project directory is occupied");
         if (await tx.executionAttempt.count({ where: { ...executionScope(principal), callerKey, workId: input.workId } })) throw new CallError("conflict", "Work already has an execution");
-        const session = await createRunSession(tx, principal.workspaceId, "module", ports.now(), principal.caller.kind === "module" ? { moduleId: principal.caller.moduleId } : {});
-        const run = await createRuns(ports, principal.workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", prompt: input.goal }, tx);
+        const session = await executionSessionIn(ports, tx, principal, input.resumeFrom, project);
+        const run = await createRuns(ports, principal.workspaceId).enqueue({ sessionId: session.sessionId, lane: "background", trigger: "source", prompt: input.goal }, tx);
         await tx.run.update({ where: { id: run.id }, data: { cwd: project.canonicalPath } });
         const row = await tx.executionAttempt.create({ data: { workspaceId: principal.workspaceId, ownerId: principal.ownerId, callerKey,
           moduleId: principal.caller.kind === "module" ? principal.caller.moduleId : null, callerHash: principal.caller.kind === "module" ? principal.caller.hash : null,
           workId: input.workId, commandKey: input.commandKey, requestDigest, runId: run.id, projectRef: project.projectRef, projectDigest: executionDigest(project),
-          resolvedCwd: project.canonicalPath, logDir: join(ports.dataDir, "sessions", session.id), baseline: project.baseline, budget: input.budget, heldDirectory: project.canonicalPath }, include: { run: true } });
+          resolvedCwd: project.canonicalPath, logDir: session.logDir, baseline: project.baseline, budget: input.budget, heldDirectory: project.canonicalPath }, include: { run: true } });
         const ref = executionRef(row);
         await store.admit(tx, principal, ref);
         await store.control(tx, principal, ref, { slot: "admission", at: ports.now().toISOString(), status: "confirmed" });

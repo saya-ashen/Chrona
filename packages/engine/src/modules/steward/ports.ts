@@ -75,6 +75,11 @@ export type StewardPorts = {
   agentApplication?: { env: Record<string, string>; startModule: NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]> };
   /** Host-owned project mapping; resolves and authorizes against the real caller moduleId/hash, never a body path. */
   resolveExecutionProject?: (principal: ExecutionPrincipal, projectRef: string) => Promise<ExecutionProjectGrant>;
+  /** Host directory grants, scoped to the admitted owner/module; no business session state. */
+  executionProjects?: {
+    list(principal: ExecutionPrincipal): Promise<{ projects: { projectRef: string; path: string; label: string }[] }>;
+    register(principal: ExecutionPrincipal, path: string): Promise<{ projectRef: string; path: string; label: string }>;
+  };
   executions?: ExecutionPorts;
   /** P2 host snapshot; tx is used only for fresh identity/authorization reads, never remote filesystem I/O. */
   resolveExecutionPlacement?: (principal: ExecutionPrincipal, placement: WorkPlacement, tx: Prisma.TransactionClient) => Promise<ExecutionProjectGrantP2>;

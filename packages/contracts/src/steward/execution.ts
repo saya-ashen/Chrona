@@ -8,6 +8,7 @@ const id = executionIdSchema;
 export const executionRefSchema = z.object({ workId: id, sessionId: id, runId: id, attemptId: id }).strict();
 export const executionStartSchema = z.object({
   workId: id, projectRef: id, commandKey: id, goal: z.string().trim().min(1).max(20_000),
+  resumeFrom: z.object({ workId: id, runId: id, attemptId: id }).strict().optional(),
   budget: z.object({ timeoutMs: z.number().int().min(1000).max(1_200_000), maxToolCalls: z.number().int().min(1).max(60) }).strict(),
 }).strict();
 export const executionStatusSchema = z.enum(["queued", "running", "completed", "failed", "cancelled", "unknown"]);

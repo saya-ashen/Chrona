@@ -3,6 +3,7 @@ import { createModuleRuntimePorts, resourcePath } from "../../../packages/integr
 import type { PrismaClient } from "@chrona/db";
 import { registerInjectedProvider, createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
+import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import { installDeviceExecution } from "./execution-device-runtime";
@@ -76,7 +77,11 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   ports.executorOwner = executorOwnerPorts(ports);
   const initialize = executionInitialization(ports);
   let projects: ReturnType<typeof loadExecutionProjects> | undefined;
+  const registry = createExecutionProjectRegistry(ports.dataDir);
+  ports.executionProjects = registry;
   ports.resolveExecutionProject = async (principal, projectRef) => {
+    const registered = await registry.resolve(principal, projectRef);
+    if (registered) return registered;
     const resolveProject = await (projects ??= loadExecutionProjects(ports.dataDir));
     if (!resolveProject) throw new CallError("forbidden", "Execution projects are not configured");
     return resolveProject(principal, projectRef);

@@ -147,15 +147,15 @@ export async function captureExecutionChanges(ports: Pick<StewardPorts, "db">, r
   const changes = ownsDirectory ? await captureWorkspaceChanges(row.resolvedCwd, source.baseline) : unavailable("capture_failed");
   const sidecar = executionResultSourceSchema.parse({ ...source, changes });
   await mkdir(row.logDir, { recursive: true });
-  const path = join(row.logDir, "execution-changes.json");
+  const path = join(row.logDir, `execution-changes-${row.id}.json`);
   await writeFile(`${path}.tmp`, JSON.stringify(sidecar));
   await rename(`${path}.tmp`, path);
 }
-/** Authorization happens in resultSource before this fixed-file read; never re-open the released project. */
+/** Authorization happens in resultSource before this attempt-specific file read; never re-open the released project. */
 export async function readExecutionChanges(row: ResultRow): Promise<ExecutionResultSource["changes"]> {
   let text: string;
   try {
-    const handle = await open(join(row.logDir, "execution-changes.json"), constants.O_RDONLY | constants.O_NOFOLLOW);
+    const handle = await open(join(row.logDir, `execution-changes-${row.id}.json`), constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
       const bytes = Buffer.alloc(LIMITS.bytes + 4097);
       const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
