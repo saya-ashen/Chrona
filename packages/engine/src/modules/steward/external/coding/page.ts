@@ -12,7 +12,7 @@ const target = { "session-id": state("/detail/sessionId"), "work-id": state("/de
 const answer = (text: unknown) => ({ ...target, question: item("id"), text });
 const clearDraft = { "/form/message": "", "/form/answer": "", "/form/sidebarOpen": false, "/form/tab": "chat" };
 export const PAGE = {
-  id: "main", title: "编码", layout: "workspace", components: CODING_COMPONENTS,
+  id: "main", title: "编码", layout: "workspace" as const, components: CODING_COMPONENTS,
   data: {
     catalog: { tool: "ui-catalog" },
     detail: { tool: "ui-work", args: { "session-id": state("/catalog/selectedSession"), before: state("/detail/historyPage") }, refresh: 5 },
