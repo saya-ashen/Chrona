@@ -1,5 +1,7 @@
 # Chrona 当前架构
 
+2026-11-08 盘点提示：当前待办与证据范围见[统一开发路线](development-roadmap.md)。用户已确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；旧 M1 的全部内置不可变规则在这五项上被本次决策取代。当前优先交付编码 Web 工作台，通用调用治理后置。
+
 本文是当前仓库实现的阅读入口，不是新规格，也不表示这些代码已部署。产品意图见[设计目标](steward-goals.md)；执行与审批规则见[安全机制简化](security-simplification.md)，依赖与登记模式见[模块依赖方向](module-dependency-direction.md)，启动、配置和备份见[运维说明](operations.md)。[历史设计](history/README.md)仅供追溯，冲突时以本文和当前实现为准。
 
 下文路径均相对仓库根目录；`steward/` 简指 `packages/engine/src/modules/steward/`。
@@ -16,9 +18,9 @@
 
 ## 当前开发集成边界
 
-[M1 P0 契约](chrona-workbench-p0-contract.md) 冻结当前开发接口。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。内置为 agent/web/mcp/files/notify/events；这些名字由发行身份保留。服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行已进入开发集成树。
+[M1 P0 契约](chrona-workbench-p0-contract.md) 保存当时冻结的开发接口；其中全部内置不可变规则已由 2026-11-08 的五应用受检定制决策修订。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。内置为 agent/web/mcp/files/notify/events；这些名字由发行身份保留。服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行已进入开发集成树。
 
-A–E 已进入开发集成树：内置 registrar 从可信发行资源恢复并逐项诊断，不通过普通提案更新内置；动态构建、审批和领取事务均复核外置身份。官方安装适配器复用受检提案/构建，固定 request key 的持久回执在构建、审批、迁移恢复后刷新；首次初始化仅入队三个预装外置包，不等待作者测试，删除后不自动复活。未配置适配器仍明确 unavailable。M1 运行时集成、完整 Bun/API、typecheck/lint、三尺寸浏览器及 Linux x64 真实发行 smoke 已完成开发验证；协调者已签署 M1 开发验收，未部署。[P1 契约](chrona-workbench-p1-contract.md)与 [P2 固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现；[M2](chrona-workbench-m2-acceptance.md)、[M3](chrona-workbench-m3-acceptance.md)均已完成开发集成签收，包含真实 Hono/SDK/SQLite、受控 fake Pi、Neovim、独立工作树与设备协议恢复证据。真实模型、个人设备安装、生产部署和公开发行不在该验收范围。历史冻结树与逐项证据保留于各阶段记录，接线细节见[共享接线记录](chrona-workbench-m1-shared-integration.md)。
+M1 当时的 A–E 集成证据如下，内置生命周期以第 2 节当前规则为准：当时 registrar 从可信发行资源恢复并逐项诊断；动态构建、审批和领取事务复核应用身份。官方安装适配器复用受检提案/构建，固定 request key 的持久回执在构建、审批、迁移恢复后刷新；首次初始化仅入队三个预装外置包，不等待作者测试，删除后不自动复活。未配置适配器仍明确 unavailable。M1 运行时集成、完整 Bun/API、typecheck/lint、三尺寸浏览器及 Linux x64 真实发行 smoke 已完成开发验证；协调者已签署 M1 开发验收，未部署。[P1 契约](chrona-workbench-p1-contract.md)与 [P2 固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现；[M2](chrona-workbench-m2-acceptance.md)、[M3](chrona-workbench-m3-acceptance.md)均已完成开发集成签收，包含真实 Hono/SDK/SQLite、受控 fake Pi、Neovim、独立工作树与设备协议恢复证据。真实模型、个人设备安装、生产部署和公开发行不在该验收范围。历史冻结树与逐项证据保留于各阶段记录，接线细节见[共享接线记录](chrona-workbench-m1-shared-integration.md)。
 
 ## 1. 用途与信任模型
 
@@ -28,19 +30,19 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 
 ## 2. 内核、系统模块、内置模块与自定义应用
 
-功能归属优先级：**普通模块 → 预装模块 → 内核模块（system）→ 内核本身**。预装是交付方式，不代表更高权限。内核模块同样必须最小，只提供带身份、校验与治理的原语；只有无法通过这些原语安全实现的信任根、路由和生命周期机制进入内核。业务策略、展示、聚合和工作流程优先归现有应用；复用本身不构成提升层级的理由。验收标准：改变业务策略或新增应用通常只需改模块。既有 immutable builtin 的发行身份不因该原则自动改变，本轮不扩大动态更新权限。
+功能归属优先级：**普通模块 → 预装模块 → 内核模块（system）→ 内核本身**。预装是交付方式，不代表更高权限。内核模块同样必须最小，只提供带身份、校验与治理的原语；只有无法通过这些原语安全实现的信任根、路由和生命周期机制进入内核。业务策略、展示、聚合和工作流程优先归现有应用；复用本身不构成提升层级的理由。验收标准：改变业务策略或新增应用通常只需改模块。发行身份与代码可定制性分开：五个内置应用允许受检定制，但不能据此取得 Agent 或内核身份。
 
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
 - **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `history`、`modules`、`approvals`、`settings`、`schedules`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
 - **受信任本机能力模块**位于 `steward/local-*`，通过独立 local registry 注册到同一路由，发行身份为 `local:<name>`。工具输入与输出均有 schema，失败输出校验会拒绝调用；敏感输入／输出及适配器错误正文不落通用日志。它们不由应用提案替换，保留名称发生安装冲突时拒绝解析。
-- **内置模块**位于 `steward/builtin/*`：`agent`、`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议，但类别和发行方式按 P0 契约区分。
-- **外置应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。外置受检更新和回滚；内置代码只随 Chrona 发行变更，禁止定制内置双轨。
+- **内置模块**位于 `steward/builtin/*`：`agent`、`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议；内置类别和保留名不因定制而改变。
+- **外置应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。外置应用及 web/mcp/files/notify/events 支持受检更新和显式回滚到已批准版本。五个内置应用禁止动态删除及 install 重装；首次可信 seed 后不因新发行覆盖已有 active 定制，上游更新需显式提出并检查。Agent 禁止普通 build/propose/group/activate/update/rollback/remove/install，只走可信发行更新；内核、运行能力及救援入口同样不由应用替换。参见 [Git 工作流](module-git.md)。
 
 代码：`steward/system-modules.ts`、`module-calls.ts`、`module-builtin.ts`、`module-supervisor.ts`、`module-build.ts`。细节：[模块依赖方向](module-dependency-direction.md)、[模块恢复](module-recovery.md)。
 
 ## 3. 版本、构建会话与启用
 
-`modules.build` 仅为外置应用创建独立的 `build` 会话，保存目标、意图、参考文件和当前版本快照；队列有 FIFO、并发、时限与提交次数约束。构建会话可搜索和调用普通会话可见的应用工具，但只能提交内核记录的目标模块。`modules.checkout/reference/propose/check` 分别提供源码、接口契约、候选提交与检查结果；候选从提交目录复制到内核管理的 staging，按文件内容计算 hash，再进入版本 store。
+`modules.build` 为外置应用及五个允许受检定制的内置应用创建独立的 `build` 会话，保存目标、意图、参考文件和当前版本快照；队列有 FIFO、并发、时限与提交次数约束。构建会话可搜索和调用普通会话可见的应用工具，但只能提交内核记录的目标模块。`modules.checkout/reference/propose/check` 分别提供源码、接口契约、候选提交与检查结果；候选从提交目录复制到内核管理的 staging，按文件内容计算 hash，再进入版本 store。
 
 检查包括 manifest 与工具契约、依赖、入口类型检查、作者测试、数据副本迁移及副本上的作者测试、启动/SDK 连接，以及受影响调用方的类型检查。安装不会编造参数、调用业务工具或投递模拟定时事件；幂等键的业务覆盖由作者测试负责，运行时幂等约束仍由原路由执行。失败不会靠人工批准绕过。安装后的业务就绪情况由模块通过 `modules.report-health` 自报，独立于 Chrona 观察的进程、通信与故障记录。声明 `healthCheck: true` 的模块接收独立 `health` 诊断事件；启动、应用设置变更与用户主动刷新触发，缺配置可报告 `needs_configuration`，没有报告、过期或进程不可用显示 `unknown`。自检不执行发送消息、修改项目或付费请求；这些效果仍需独立授权入口。就绪报告和自检成功不证明业务故障已恢复。通过检查的新应用或更新通常自动启用，并经 notify 事后汇总告知；已有数据迁移、新增凭据仍需一次确认，回滚恢复旧数据快照也要确认。内置发行版新增凭据声明不问，实际凭据仍由用户填写。多模块构建逐个检查后由 `modules.request-group` 统一切换；组内需迁移的模块须先单独处理，有新增凭据时整组询问。
 
@@ -50,7 +52,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 
 ## 4. 回滚与故障恢复
 
-外置版本以 hash 保留，可显式回滚到已批准版本；内置无动态代码回滚。外置普通更新保留暂停，显式回滚恢复启用。新激活外置版本在任何事件投递前启动失败时，内核评估一次自动代码回滚：当前激活身份/hash 未变、尚无成功验证能力、前后版本均已批准且 manifest 有效，数据 schema 一致，无迁移/恢复记录，也无不兼容日程等阻碍。符合条件则切回前一版本，保留当前数据与兼容日程，不重放工作；恢复目标不会继续自动回滚。不能安全回滚时保留诊断，交由人工恢复。
+外置应用与五个可定制内置应用的版本以 hash 保留，可显式回滚到已批准版本；Agent 无动态代码回滚。以下自动恢复描述保留外置范围，不因允许五应用定制而推断其自动恢复路径也已验收。外置普通更新保留暂停，显式回滚恢复启用。新激活外置版本在任何事件投递前启动失败时，内核评估一次自动代码回滚：当前激活身份/hash 未变、尚无成功验证能力、前后版本均已批准且 manifest 有效，数据 schema 一致，无迁移/恢复记录，也无不兼容日程等阻碍。符合条件则切回前一版本，保留当前数据与兼容日程，不重放工作；恢复目标不会继续自动回滚。不能安全回滚时保留诊断，交由人工恢复。
 
 supervisor 另有 keepAlive 进程退避重启与连续失败暂停；三败暂停由当前 activationId 的实际执行结果经唯一持久化策略判断（Audit.module_execution_result），supervisor 重建不丢次数，同 hash 再激活不继承次数。成功事件清零；通过结构校验的业务拒绝（例如输入、权限、目录冲突）仅结束该调用，不重启健康进程；连接及输出契约 mismatch 均不改变连续次数；内存仅负责退避与有限重启执行，incident 与日程累计数不参与暂停判断。新 incident 快照带 activationId 与单调递增的 revision；旧 hash-only 快照保留并标记 legacy-unattributed，不猜测激活。连接恢复只表示待验证，不代表原操作成功，投递结果未知也不会被诊断逻辑偷偷重放。
 

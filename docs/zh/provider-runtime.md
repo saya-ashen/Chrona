@@ -1,5 +1,7 @@
 # Provider 运行：复用 Pi，补齐宿主接线
 
+2026-11-08 阅读提示：应用持有会话、消息和业务提示；内核持有执行治理。下文早期“内核管会话/持久消息”及 M1–M3 范围须结合[当前应用编排](agent-module-orchestration.md)阅读。V1 有后续隔离真实模型验收，但不覆盖其后所有修改；状态与后续任务见[统一开发路线](development-roadmap.md)。
+
 Chrona 内核管会话、持久消息、队列/恢复、调度、路由授权与运行预算，内置 `notify` 模块管通知预算与送达，`web` 模块管网页；Pi 管推理、文件/命令/网页工具、技能、扩展、MCP 与原生执行权限。不另建技能/MCP/模型执行器。整体边界见[当前架构](architecture.md)；以下是 Provider 适配与接线参考，不表示已接入或验收任何真实账户。M1 保持现有普通会话与构建语义，已完成开发全组检查；[M1 验收记录](chrona-workbench-m1-acceptance.md)已由协调者签署。项目 cwd/日志分离、执行尝试、持久取消、有界详细聊天流、成果捕获及客户端审阅已纳入 M1–M3 集成，当前范围与限制见 [M3 验收记录](chrona-workbench-m3-acceptance.md)。真实 SDK/host 与 fake Pi 子进程/Neovim 的闭环证据不代表真实模型或生产部署验收。
 
 本机统一接线见[统一模块协议实施方案](unified-module-runtime-plan.md)：`agent` 能力通过既有路由接受 JSON 启动／操作／completion／history 请求，Pi 适配器及实际 handle 留在能力内部。消费端持有的 handle 是路由代理，问答／进度通过 workspace 绑定的 `runtime-callback` 传递。通用远端宿主属于后续版本；设备专用协议保持原有边界。

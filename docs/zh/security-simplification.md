@@ -1,5 +1,7 @@
 # 安全机制简化：保留可靠性，砍掉假隔离
 
+2026-11-08 阅读提示：M1/P1 状态和生产统计保留当时上下文；P1/P2 后续已实现，Agent 原语与应用会话边界见[应用编排](agent-module-orchestration.md)。用户于同日确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；当前生命周期见[架构](architecture.md)。下节 M1 的全部内置不可变条款已在五项上被取代；受检流程、迁移及凭据确认继续有效。
+
 状态：2026-11-02 讨论、2026-11-03 用户确认方向与顺序（3 → 2 → 5）。§3.1–§3.3 均已实现（2026-11-03）。与 [module-dependency-direction.md](module-dependency-direction.md) 并列。
 
 ## M1 开发集成契约（2026-11-05）

@@ -1,5 +1,7 @@
 # M1 P0 契约与交接
 
+2026-11-08 后续决策：用户确认 web/mcp/files/notify/events 允许受检 build/propose/group/activate/update/rollback，继续禁止动态 remove/install；Agent 不可普通替换。下文保留 M1 冻结时的原始接口与验收背景，全部内置不可变条款不再是这五项的当前规则。参见[当前架构](architecture.md)与[统一路线](development-roadmap.md)。
+
 日期：2026-11-05。版本：`m1-p0-v1`（`MODULE_CONTRACT_VERSION`）。本文件冻结 A–E 消费的接口；P0 编译通过不等于 M1 完成。用户已授权开始实现，统一方案页首“仅编写方案”为历史授权记录；真实模型、账号、设备、迁移、部署、提交和推送仍无授权。
 
 ## 基线

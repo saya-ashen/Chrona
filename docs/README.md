@@ -8,8 +8,13 @@
 ## Product and development
 
 - [设计目标](zh/steward-goals.md): product authority; goals are not a shipped-feature checklist.
+- [开发目标与统一路线](zh/development-roadmap.md): current backlog, priorities, dependencies and documentation status; prioritizes the usable coding Web workbench, records the five-builtin customization decision and tracks release gaps.
+- [编码工作台实现评估](zh/coding-workbench-implementation-assessment.md): confirmed local-directory scope, non-Git support, continuous coding sessions, implementation gaps and validation order.
+- [编码工作台参考项目调研](zh/workbench-reference-research.md): primary sources, interaction comparisons and provisional design choices; research and scenario comparison precede the next page implementation.
 - [当前架构](zh/architecture.md): implementation map, trust model and module lifecycle.
-- [统一模块协议与本地／远端宿主](zh/unified-module-runtime-plan.md): local V1 implementation, routed Provider/workspace/content contracts and U0–U4 roadmap; [本机 V1 最终验收](zh/unified-module-v1-acceptance.md) records review fixes, real-model coding/cancellation/crash recovery and final verification; general remote hosts are deferred. [模块安装与就绪报告](zh/module-installation-readiness.md) records removal of fabricated business probes, module-owned diagnostics and the local preview follow-up. [Agent 内置应用](zh/agent-builtin-application.md) records the subsequent extraction into a real SDK process, short execution/control requests, callback identity and restart receipts.
+- [调用上下文、Run 与产出](zh/call-context-run-artifact-roadmap.md): later architecture work after the usable workbench; freeze the minimum delegation contract when starting that architecture change.
+- [Agent 原语与应用编排](zh/agent-module-orchestration.md) / [基础编码工作台](zh/coding-web-workbench.md): current application ownership, interfaces and product limits.
+- [统一模块协议与本地／远端宿主](zh/unified-module-runtime-plan.md): completed local V1 implementation, routed Provider/workspace/content contracts and U0–U4 roadmap; [本机 V1 最终验收](zh/unified-module-v1-acceptance.md) records review fixes, real-model coding/cancellation/crash recovery and final verification; general remote hosts are deferred. [模块安装与就绪报告](zh/module-installation-readiness.md) records removal of fabricated business probes, module-owned diagnostics and the local preview follow-up. [Agent 内置应用](zh/agent-builtin-application.md) records the subsequent extraction into a real SDK process, short execution/control requests, callback identity and restart receipts.
 - [模块 Git 工作流](zh/module-git.md): per-app source history, checked customization, explicit upstream updates and legacy limits; [发行种子与发布](zh/module-git-release.md) covers offline bundles and public-release gates.
 - [安全机制简化](zh/security-simplification.md) / [模块依赖方向](zh/module-dependency-direction.md): current rules and registration patterns.
 - [服务器编码工作](zh/server-coding.md): server/device placement, project authorization, results, recovery and explicit cleanup.

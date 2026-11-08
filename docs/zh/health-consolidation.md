@@ -1,5 +1,7 @@
 # 应用健康机制整合提案
 
+文档归类（2026-11-08）：2026-11-04 的历史整合方案与逐步记录。页首已记录步骤 1–7 实施，后文“步骤 4–7 未实施”等属于先前快照，不再独立派工；不据此追加新的验收结论。当前安装/就绪规则见[模块安装与就绪](module-installation-readiness.md)，后续产品验证见[统一开发路线](development-roadmap.md)。
+
 状态：2026-11-04 用户确认（第 4 节各项均选推荐项 A：mind 唤醒 Provider 普通构建自主修复；暂停/回滚失败保留确定性最小通知、mind 只补充；沿用 mind 6 次/24h 与公共构建日预算；仅旧 reflection 与 mind 都启用时自动接管；诊断详情保持模块可读；输出 mismatch 不计入三败熔断）。按第 4 节步骤实施中。步骤 4 已实施（2026-11-04）：mind 读取 modules.health 分页，关注关联来源/revision、静默/拒绝/构建与恢复关闭，decision/report 保留来源及会话关联；data.schema 保持 1。步骤 5 已实施（2026-11-04）：公共 build admission 在串行区按 cause 复用同工作区 queued/running 构建，不读重复请求参考文件、不新增审计或计费；终态允许新建，owner execution 禁带 cause、key 重放不变；cause 写入审计与 request.json，mind 协议关联返回的构建会话。步骤 6 已实施（2026-11-04）：一次性迁移反思偏好与建议记录、取消在途反思，移除独立反思运行、工具与设置入口，保留历史会话和活动读取。
 
 步骤 7 已实施（2026-11-04）：activity 按 incident 聚合并区分出错/重连/部分验证/已验证恢复、暂停/恢复与自动回滚措辞；today 增 problems（当前激活的未解决健康问题与下一步）；网页故障面板先给当前摘要（版本与验证状态、连续失败、待验证能力、契约不符、保护动作、截断提示），历史按当前版本/更早的启用/旧记录区分；mind 自行经 web.page-set 登记只读页面。真实浏览器 1440×900、1024×768、390×844 截图无横向滚动。
@@ -8,7 +10,7 @@
 
 步骤 2 已实施（2026-11-04，工作区待验收）：实际执行结果按 activationId 写入唯一连续失败策略，supervisor 重建保留次数，同 hash 再激活从零开始；删除 ModuleRun.error 回看暂停判断，mismatch 不计失败且不算恢复。内存仅保留退避/有限重启执行状态；incident 累计与单日程统计不决定暂停。新 incident 快照带 activationId 与逐次 revision，旧 hash-only 快照只读标记 legacy-unattributed，禁止猜测激活；进程/socket 重复观察及同 runId 重记均幂等。未更改自动回滚门槛、未知结果/不重放语义或共享契约。步骤 2 已验收提交（b709d72c）。
 
-步骤 3 已实施（2026-11-04）：`moduleHealthSummary`（`E/modules.ts`）是唯一的当前健康投影，不含 stderr：observedAt、runtime、当前 activation 与已观测能力、策略连续失败数、当前激活的 incident（原因截 300 字）、当前激活的契约失败数、open、nextAction、truncated（有界扫描未能证明完整）。`modules.list` 以 `health` 字段替换原 `runtime`/`incident`；`modules.diagnostics` 在摘要上附历史（incidents/contractFailures/evolution）；新增只读 `modules.health` 按名称分页（每页 50，`open=true` 只列未解决），构建会话的 Provider 只见授权目标。输出 mismatch 记录 activationId，旧 hash-only 记录不计入当前激活。步骤 4–7 未实施。
+步骤 3 已实施（2026-11-04）：`moduleHealthSummary`（`E/modules.ts`）是唯一的当前健康投影，不含 stderr：observedAt、runtime、当前 activation 与已观测能力、策略连续失败数、当前激活的 incident（原因截 300 字）、当前激活的契约失败数、open、nextAction、truncated（有界扫描未能证明完整）。`modules.list` 以 `health` 字段替换原 `runtime`/`incident`；`modules.diagnostics` 在摘要上附历史（incidents/contractFailures/evolution）；新增只读 `modules.health` 按名称分页（每页 50，`open=true` 只列未解决），构建会话的 Provider 只见授权目标。输出 mismatch 记录 activationId，旧 hash-only 记录不计入当前激活。当时步骤 4–7 未实施；后续实施更新见页首。
 
 ## 1. 现状：代码中的事实、判断与动作
 

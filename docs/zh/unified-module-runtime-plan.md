@@ -3,7 +3,7 @@
 日期：2026-11-07。状态：**V1 本机统一实现、最终审查与隔离真实模型验收完成；未部署**。最终证据见[本机 V1 验收](./unified-module-v1-acceptance.md)。远端通用宿主属于后续版本，不是 V1 交付条件。
 核查基线：`platform-v2` / `31a726c9c1dc58a7a989a6beca57d573c59d7629`，文档修改前工作树干净。
 
-本文是后续架构开发入口，接替此前把 Provider、执行后端、存储适配器作为独立对外调用类别的目标设计。[当前架构](architecture.md)继续描述现有实现；[M1–M3 方案](chrona-workbench-unified-development-plan.md)、冻结的 P0/P1/P2 契约和各阶段验收记录保留历史与兼容依据；[Provider 分离计划](provider-kernel-module-plan.md)记录已完成的边界收窄。本文不表示通用远端模块已实现，不修改既有验收结果。
+本文保存本机 V1 实施和后续远端 U3/U4 专题，接替此前把 Provider、执行后端、存储适配器作为独立对外调用类别的目标设计。全项目待办与优先级见[统一开发路线](development-roadmap.md)，近期调用治理详见[调用上下文路线](call-context-run-artifact-roadmap.md)。[当前架构](architecture.md)继续描述现有实现；[M1–M3 方案](chrona-workbench-unified-development-plan.md)、冻结的 P0/P1/P2 契约和各阶段验收记录保留历史与兼容依据；[Provider 分离计划](provider-kernel-module-plan.md)记录已完成的边界收窄。本文不表示通用远端模块已实现，不修改既有验收结果。
 
 用户已授权本机协议、执行接线和文件边界的实现，允许重构期间暂时不可用；不要求维持中间版本或引入兼容桥。由当前 Agent 亲自实现，不派 worker。连接真实设备、迁移用户数据和生产部署不在本次授权内。后续收口明确授权使用已配置模型完成隔离真实验收，以及提交、推送本机 V1；模型调用不扩大到其他私人账户操作。
 

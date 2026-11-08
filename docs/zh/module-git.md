@@ -1,6 +1,8 @@
 # 模块源码与 Git 工作流
 
-本文描述当前开发实现，不代表 Chrona 已正式发布或部署。十一项应用的官方仓库已发布到 GitHub `chrona-core` 组织；固定提交、完整离线 bundle 和许可通知保存在 `resources/module-git/`，构建默认使用这些固定输入。发布与核验方式详见[模块 Git 种子与官方发布](module-git-release.md)。
+2026-11-08 核对：当前锁文件共十二项，新增 Agent；仅 files/events/remind 的 repository 非空，其余九项为 null。这是锁定元数据状态，不是远端实时核验。用户于同日确认下文五个内置应用允许受检定制；旧 M1 全部不可变规则在这五项上被取代。Agent 仍不可普通替换，见[当前架构](architecture.md)。
+
+本文描述当前开发实现，不代表 Chrona 已正式发布或部署。应用的固定提交、完整离线 bundle 和许可通知保存在 `resources/module-git/`，构建默认使用这些固定输入；是否具有可更新的官方来源按当前 lock 的非空 repository 和发布核验结果判断。发布与核验方式详见[模块 Git 种子与官方发布](module-git-release.md)。
 
 ## 源码、运行版本与数据
 

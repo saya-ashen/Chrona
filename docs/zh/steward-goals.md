@@ -1,6 +1,6 @@
 # Chrona 设计目标：随需求生长的个人工具
 
-本文是 Chrona 产品目标的**最高依据**，不是已交付功能清单。当前实现、执行与审批机制见[当前架构](architecture.md)和[安全机制简化](security-simplification.md)；早期平台设计见[历史记录](history/README.md)。产品方向按本文收敛，不以目标描述冒充实现或验收结果。M1 已由协调者签署的开发验收与环境边界见 [M1 验收记录](chrona-workbench-m1-acceptance.md)；服务器项目编码、Neovim 与设备执行仍按[统一方案](chrona-workbench-unified-development-plan.md)分阶段交付。
+本文是 Chrona 产品目标的**最高依据**，不是已交付功能清单。当前实现、执行与审批机制见[当前架构](architecture.md)和[安全机制简化](security-simplification.md)；早期平台设计见[历史记录](history/README.md)。产品方向按本文收敛，不以目标描述冒充实现或验收结果。已完成阶段与当前待办统一见[开发路线](development-roadmap.md)；M1–M3 的开发验收和本机 V1 的真实模型验收各自保留证据与环境边界，不能据此宣称后续变更或生产部署已验收。
 
 ## 1. 定位
 
@@ -21,7 +21,7 @@ Chrona 的形态 = 当前启用的应用（模块）集合：日历、文件、�
 
 - 用户看到的是**应用**：每个应用有自己的页面（内容区）、数据和工具；文件、调研成果放在 `files` 等应用里。
 - 和 Chrona 的对话是**会话**，只是交流的上下文；结论、文档和配置落在应用里，不靠翻聊天记录。
-- 持续关注要么是定时唤起 Provider，要么固化成外置应用；不再需要时可停用或在确认后删除外置应用。web、mcp、files、notify、events 是不可变内置，代码随 Chrona 发行；qq、remind、mind 是官方预装外置，memory-local 可选，业务能力的按需演化不通过修改内置代码实现。
+- 持续关注要么是定时唤起 Provider，要么固化成外置应用；不再需要时可停用或在确认后删除外置应用。web、mcp、files、notify、events、agent 是发行内置；Agent 不可动态替换；web、mcp、files、notify、events 按 2026-11-08 用户决策允许受检定制，保留内置身份且不允许动态删除或 install 重装；qq、remind、mind 是官方预装外置，memory-local 可选，业务能力优先由普通应用按需演化；修改五个通用内置应用仍须符合依赖方向并通过检查。
 - Run、ModuleRun 等是内部执行记录，只在技术详情中出现，不作为一级概念暴露。
 - 不是每句话都要产生东西：简单问答、闲聊直接回答。
 

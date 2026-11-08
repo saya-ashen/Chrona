@@ -1,6 +1,8 @@
 # Chrona 最小模块架构与 Agent Workbench：统一开发方案
 
-当前开发入口（2026-11-07）：[统一模块协议实施方案](unified-module-runtime-plan.md)。用户已授权亲自实施完整本机 V1，不调用 worker，允许中间状态暂时不可用；本机 Provider、执行控制、工作目录和内容调用已进入同一路由，最终验证见该方案。通用远端宿主留到后续版本。本文继续保存已验收 M1–M3 的设计、契约、分工和证据，不重写旧冻结记录；历史 ProviderAdapter 专用接口留作本机能力模块内部实现，现有固定设备接线保持其原有边界。
+2026-11-08 生命周期修订：用户已确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；本文关于全部内置不可变的 M1 设计保留为历史。当前开发先做可使用的编码 Web 工作台，之后再按需要推进调用治理，见[统一路线](development-roadmap.md)。
+
+文档状态更新（2026-11-08）：本文是已完成 M1–M3 的阶段方案，不再是新任务派工入口。当前目标、差异与顺序见[统一开发路线](development-roadmap.md)；后续本机 V1 记录见[统一模块协议实施方案](unified-module-runtime-plan.md)。用户已授权亲自实施完整本机 V1，不调用 worker，允许中间状态暂时不可用；本机 Provider、执行控制、工作目录和内容调用已进入同一路由，最终验证见该方案。通用远端宿主留到后续版本。本文继续保存已验收 M1–M3 的设计、契约、分工和证据，不重写旧冻结记录；历史 ProviderAdapter 专用接口留作本机能力模块内部实现，现有固定设备接线保持其原有边界。
 
 日期：2026-11-05；最终开发签收：2026-11-06。  
 状态：**M1、M2、M3 开发集成验收完成**。[P1](chrona-workbench-p1-contract.md) 与 `P2-20261106` [固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现。最终原树 typecheck、required lint、boundaries、1326 Bun / 61 API、16 个补充测试文件、Workbench 806 successes、实际 Neovim GUI、Linux x64 build/smoke 及 compiled executor 到真实 Hono/runtime/SQLite/fakePi/systemd 的丢 ACK、重启、撤权和原身份 drain 闭环均通过。独立复核发现的八项问题及发布构建环境缺陷均关闭；完整快照、失败历史、29 条既有 lint warnings、环境 skips 与精确边界见 [M3 开发验收记录](chrona-workbench-m3-acceptance.md)。这不代表生产部署、公开发行、真实模型或个人设备安装验收。M1、M2 的历史证据分别保留于其[验收记录](chrona-workbench-m1-acceptance.md)及 [M2 记录](chrona-workbench-m2-acceptance.md)。
