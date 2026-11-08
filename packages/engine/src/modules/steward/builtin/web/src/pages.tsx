@@ -10,6 +10,8 @@ import { SystemContext } from "./system/action";
 import { systemComponents } from "./system/components";
 import { systemPage, type SystemParams } from "./system/page";
 import { ChatHost } from "./system/chat-stream";
+import { Workspace, ScrollArea, Message, CodeDiff, ActionOption } from "./workspace";
+import rendererStyles from "./pages.css" with { type: "text" };
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
@@ -41,8 +43,8 @@ function Bound({ name, value, binding, kind, element }: { name: string; value: u
   const [local, setLocal] = useState(text(value));
   const current = binding ? text(bound) : local, set = binding ? setBound : setLocal;
   return kind === "textarea"
-    ? <textarea name={name} rows={Number(element.rows ?? 4)} placeholder={text(element.placeholder)} value={current} onChange={event => set(event.target.value)} />
-    : <input name={name} type={text(element.type) || "text"} placeholder={text(element.placeholder)} value={current} onChange={event => set(event.target.value)} />;
+    ? <textarea name={name} disabled={!!element.disabled} rows={Number(element.rows ?? 4)} placeholder={text(element.placeholder)} value={current} onChange={event => set(event.target.value)} />
+    : <input name={name} disabled={!!element.disabled} type={text(element.type) || "text"} placeholder={text(element.placeholder)} value={current} onChange={event => set(event.target.value)} />;
 }
 function Toggle({ props, bindings, emit }: Props<{ label: string; name: string; checked?: boolean | null }>) {
   const [checked, setChecked] = useBoundProp<boolean>(props.checked ?? undefined, bindings?.checked);
@@ -95,6 +97,7 @@ const gap = (value?: string | null) => ({ none: "0", sm: ".4rem", md: ".6rem", l
 /** Only what this page draws in its own style is offered; the catalog's other components render as a notice. */
 const { registry } = defineRegistry(catalog, {
   components: {
+    Workspace, ScrollArea, Message, CodeDiff, ActionOption,
     Card: ({ props, children }: Props<{ title?: string | null; description?: string | null }>) => <section>{props.title ? <h2>{props.title}</h2> : null}{props.description ? <p className="muted">{props.description}</p> : null}{children}</section>,
     Stack: ({ props, children }: Props<{ direction?: string | null; gap?: string | null; align?: string | null }>) => <div style={{ display: "flex", flexDirection: props.direction === "horizontal" ? "row" : "column", flexWrap: props.direction === "horizontal" ? "wrap" : undefined, gap: gap(props.gap), alignItems: props.align ?? undefined }}>{children}</div>,
     Grid: ({ props, children }: Props<{ columns?: number | null; gap?: string | null }>) => <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${Math.max(8, 48 / (props.columns ?? 2))}rem), 1fr))`, gap: gap(props.gap) }}>{children}</div>,
@@ -199,9 +202,10 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   }, refresh } : null;
   return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={deps.navigate}>
     <div className={system ? "registered-page system-page" : "registered-page"}>
+      <style>{rendererStyles}</style>
       {!system ? <h2>{page.title}</h2> : null}
-      {loading ? <p role="status" aria-live="polite" className="muted">正在读取应用数据……</p> : null}
-      {feedback ? <p role="status" className={feedback.failed ? "error" : "muted"}>{feedback.text}</p> : null}
+      {loading ? <p role="status" aria-live="polite" className="page-loading muted">正在读取应用数据……</p> : null}
+      {feedback ? <p role="status" className={`page-feedback ${feedback.failed ? "error" : "muted"}`}>{feedback.text}</p> : null}
       <SystemContext.Provider value={systemContext}><ImageContext.Provider value={{ page, deps }}><Renderer spec={spec} registry={currentRegistry} fallback={fallback} /></ImageContext.Provider></SystemContext.Provider>
     </div>
   </JSONUIProvider>;

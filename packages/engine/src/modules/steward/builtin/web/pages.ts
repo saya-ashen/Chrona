@@ -60,6 +60,10 @@ export function pageErrors(input: { spec: unknown; data?: unknown }, tools: Map<
       else if (!dynamic(value) && !prop.safeParse(value).success) errors.push(`${where}.props.${name}: 值不符合 ${element.type} 的定义`);
     }
     if (element.type === "Image" && typeof element.props?.ref === "string" && !element.props.ref.startsWith(`${module}/`)) errors.push(`${where}.props.ref: 图片只能引用本应用 ${module}/ 的内容`);
+    if (record(element.slots)) for (const [slot, keys] of Object.entries(element.slots)) {
+      if (!definition.slots?.includes(slot)) errors.push(`${where}.slots.${slot}: ${element.type} 没有这个插槽`);
+      if (!Array.isArray(keys) || keys.some(child => typeof child !== "string" || !Object.hasOwn(elements, child))) errors.push(`${where}.slots.${slot}: 需要存在的子组件键`);
+    }
     for (const [event, binding] of Object.entries(element.on ?? {})) {
       if (definition.events && !definition.events.includes(event)) errors.push(`${where}.on.${event}: ${element.type} 没有这个事件`);
       checkBinding(`${where}.on.${event}`, binding, tools, errors);
@@ -200,10 +204,10 @@ export function describeCatalog() {
     components: Object.fromEntries(Object.entries(definitions).map(([name, definition]) => [name, {
       props: Object.fromEntries(Object.entries(definition.props.shape).map(([prop, type]) => [prop, compact(z.toJSONSchema(type, { unrepresentable: "any" }))])),
       ...(definition.events?.length ? { events: definition.events } : {}),
-      ...(definition.slots?.length ? { children: true } : {}),
+      ...(definition.slots?.length ? { children: true, slots: definition.slots } : {}),
     }])),
     rules: [
-      "page-set {id, title, data?, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], on?}}}.",
+      "page-set {id, title, data?, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
       "data: {name: {tool, args?, refresh?}} calls one of your own tools when the page opens (and every refresh seconds, 5-3600); the result is state /name. args may use {\"$state\": \"/path\"}; data is re-read when such a value changes.",
       "Props may use {\"$state\": \"/path\"}, {\"$bindState\": \"/path\"} for inputs, {\"$template\": \"${field}/\"}, and repeat/$item for lists. In a top-level action param $item is the item's state path; use {\"$template\": \"${field}\"} for its value (nested call args resolve $item to the value).",
       "on.<event>: {action: \"call\", params: {tool, args?, result?, reload?}, confirm?: {title, message}} calls your tool; a tool with a request-key parameter gets a fresh key unless args sets one. result stores the output at a state path; data is re-read unless reload is false. Built-in actions: setState, pushState, removeState.",

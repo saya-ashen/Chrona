@@ -12,6 +12,11 @@ const SHADCN = ["Card", "Stack", "Grid", "Separator", "Heading", "Text", "Badge"
 type Definition = { props: z.ZodObject<Record<string, z.ZodType>>; events?: string[]; slots?: string[]; description: string };
 export const components: Record<string, Definition> = {
   ...Object.fromEntries(SHADCN.map(name => [name, (shadcnComponentDefinitions as Record<string, Definition>)[name]!])),
+  Workspace: { props: z.object({ sidebarLabel: z.string().optional(), mainLabel: z.string().optional(), sidebarOpen: z.boolean().optional() }), slots: ["default", "sidebar"], events: [], description: "响应式侧栏和内容工作区；sidebar 为侧栏，children 为内容；sidebarOpen 可双向绑定" },
+  ScrollArea: { props: z.object({ label: z.string().optional(), follow: z.boolean().optional() }), slots: ["default"], events: [], description: "独立滚动区域；保留阅读位置，follow 仅在靠近底部时自动跟随" },
+  Message: { props: z.object({ author: z.string(), time: z.string().optional(), tone: z.enum(["default", "user", "notice"]).optional() }), slots: ["default"], events: [], description: "带作者、可选 ISO 时间和正文子组件的消息" },
+  CodeDiff: { props: z.object({ filename: z.string().optional(), diff: z.string() }), slots: [], events: [], description: "安全显示 unified diff、行号和增删统计；长行在区域内横向滚动" },
+  ActionOption: { props: z.object({ label: z.string(), description: z.string().optional(), selected: z.boolean().optional(), disabled: z.boolean().optional() }), slots: [], events: ["press"], description: "可选择的操作选项；通过 on.press 使用现有动作" },
   List: { props: z.object({}), slots: ["default"], description: "带分隔线的列表；每个子组件作为一个列表项" },
   Link: { ...shadcnComponentDefinitions.Link, props: shadcnComponentDefinitions.Link.props.extend({ label: z.string().optional(), current: z.boolean().optional() }), slots: ["default"], description: "链接；label 或子组件作为内容，current 标记当前页" },
   TabNav: { props: z.object({ items: z.array(z.object({ label: z.string(), href: z.string(), current: z.boolean() })) }), description: "页面标签导航；current 标记当前页，包含 aria-current" },
