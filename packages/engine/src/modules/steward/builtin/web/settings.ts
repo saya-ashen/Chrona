@@ -23,7 +23,7 @@ function memoryValues(value: unknown) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [names[key]!, key === "provider" && item === null ? "" : item]));
 }
 export async function updateSettings(call: Call, body: unknown) {
-  const shapes: Record<string, (value: unknown) => boolean> = { timezone: value => typeof value === "string", moduleModel: value => value === null || object(value), builds: object, notifications: object, memory: object };
+  const shapes: Partial<Record<string, (value: unknown) => boolean>> = { timezone: value => typeof value === "string", moduleModel: value => value === null || object(value), builds: object, notifications: object, memory: object };
   if (!object(body) || Object.entries(body).some(([key, value]) => !shapes[key]?.(value))) throw invalid();
   const memory = Object.hasOwn(body, "memory") ? memoryValues(body.memory) : undefined;
   const kernel = Object.fromEntries(Object.entries(body).filter(([key]) => key === "timezone" || key === "moduleModel"));

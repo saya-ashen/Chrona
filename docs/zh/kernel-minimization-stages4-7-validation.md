@@ -28,13 +28,13 @@
 | 检查 | 最终结果 | 日志（`.tmp/kernel-minimization/` 下） |
 | --- | --- | --- |
 | `bun run typecheck` | 通过 | `stages4-7-typecheck-final.log` |
-| `bun run lint` | 通过；仅既有允许的 doctor complexity 提示 | `stages4-7-lint-final.log` |
+| `bun run lint` | 通过；仅既有允许的 doctor complexity 提示 | `stages4-7-lint-committed.log` |
 | `bun run test:bun` | 165 文件，1664 pass / 0 fail / 7 skip | `stages4-7-final-test-bun.log` |
 | `bun run test:api` | 21 文件，76 pass / 0 fail / 3 skip | `stages4-7-final-test-api.log` |
-| Linux x64 发布构建 | 通过，12 个模块种子与源码严格一致 | `stages4-7-build-local.log` |
+| Linux x64 发布构建 | 通过，12 个模块种子与源码严格一致 | `stages4-7-build-committed.log` |
 | 构建认证回归 | 6 pass / 0 fail；无/错误 Bearer 为 401，正确 Bearer 为 200 | 同发布构建日志 |
 
-重型命令使用共享锁串行执行、8 GiB 内存上限、1 GiB swap 上限；全量测试并发为 1。skip 为已有隔离/环境条件，不代表该环境通过。发布构建使用任务本地种子副本延续现有模块历史，没有覆写已发布种子或放松源码校验。Bun 输出过非致命的 directory mismatch 内部提示，构建退出码为 0。
+全量通过后，纳入版本控制的新文件检查补正了 Web 设置校验器稀疏键表的 TypeScript 声明，并清理一个生成文件的尾空白；业务逻辑未变化，设置专项、最终 lint/typecheck 及发布构建重新验证。重型命令使用共享锁串行执行、8 GiB 内存上限、1 GiB swap 上限；全量测试并发为 1。skip 为已有隔离/环境条件，不代表该环境通过。发布构建使用任务本地种子副本延续现有模块历史，没有覆写已发布种子或放松源码校验。Bun 输出过非致命的 directory mismatch 内部提示，构建退出码为 0。
 
 已完成的专项验证包括：记忆贡献权限边界、旧审批不再恢复退休聊天、导出/摘要/共享引用/容量与删除边界、CLI 独占锁、wake 重试及 unknown-stop、OAuth 定义和共享刷新竞争、可选应用删除/重装、不自动重装、实际 SDK 与临时 SQLite 集成。
 
