@@ -10,7 +10,7 @@ export const projects: SystemModule = {
   tools: [
     tool("list", "List this caller's registered project directories", {}, [], { visibility: ["owner", "modules"], idempotent: true, output: z.object({ projects: z.array(project).max(100) }).strict() }),
     tool("register", "Authorize an existing local directory for this caller", { path: text("Absolute host directory path") }, ["path"], { visibility: ["owner", "modules"], idempotent: true, input: z.object({ path: z.string().trim().min(1).max(4096) }).strict(), output: project }),
-    tool("default", "Get or provision this caller's default project, or set it to an existing local directory", { path: text("Optional absolute host directory path") }, [], { visibility: ["owner", "modules"], idempotent: true, input: z.object({ path: z.string().trim().min(1).max(4096).optional() }).strict(), output: project }),
+    tool("create", "Create a caller-scoped project under the host-managed root", { name: text("Safe logical project name, not a host path") }, ["name"], { visibility: ["owner", "modules"], idempotent: true, input: z.object({ name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/) }).strict(), output: project }),
   ],
   async handle({ ports, workspaceId, caller }, name, args) {
     if (caller.kind === "module") {
@@ -21,7 +21,7 @@ export const projects: SystemModule = {
     if (!ports.executionProjects) throw new CallError("unavailable", "Local project registration is unavailable");
     if (name === "list") return json(await ports.executionProjects.list(principal));
     if (name === "register") return json(await ports.executionProjects.register(principal, args.path as string));
-    if (name === "default") return json(await ports.executionProjects.default(principal, args.path as string | undefined));
+    if (name === "create") return json(await ports.executionProjects.create(principal, args.name as string));
     throw new CallError("not_found", "Project tool not found");
   },
 };

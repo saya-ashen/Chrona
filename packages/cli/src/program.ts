@@ -49,6 +49,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   const admin = program.command("admin").description("Local recovery administration (only build invokes the Provider)");
   admin.command("build <request-file>").description("Run one explicitly authorized bounded module build while the service is stopped; never activates it")
     .action(async (file: string) => { const { adminBuild } = await import("./admin-build"); await adminBuild(file); });
+  admin.command("legacy <request-file>").description("Export, verify or explicitly delete selected legacy conversations while the service is stopped")
+    .action(async (file: string) => { const { adminLegacy } = await import("./admin-legacy"); await adminLegacy(file); });
   admin.command("modules").description("List modules and versions").action(async () => { await (await import("./admin")).runAdmin("modules"); });
   admin.command("catalog").description("List official external packages and saved installation receipts").action(async () => { await (await import("./admin")).runAdmin("catalog"); });
   admin.command("install <package>").description("Explicitly install an official external package while the service is stopped")

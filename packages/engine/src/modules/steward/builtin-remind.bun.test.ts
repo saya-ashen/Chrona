@@ -69,7 +69,7 @@ sandboxTest("m_remind_create uses explicit external installation and author test
     expect(module).toMatchObject({ builtin: false, status: "active" });
     expect(await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ report: { tests: [{ exitCode: 0 }] } });
     expect(await f.db.approval.count()).toBe(0);
-    const session = await f.db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
+    const session = await f.db.session.create({ data: { workspaceId: "w", key: "build:reminder-tools", source: "build" } });
     await f.api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture" });
     const run = (await f.api.runs.claimNext("foreground"))!;
     await expect(f.service.tools.call(run.token, "chrona_schedule", { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "喝水", label: "Drink water" })).rejects.toThrow();

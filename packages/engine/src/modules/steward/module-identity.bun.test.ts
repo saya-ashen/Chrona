@@ -67,6 +67,15 @@ test.each(BUILTIN_MODULE_NAMES.filter(name => name !== "agent"))("builtin %s kee
   expect(await f.db.module.findUniqueOrThrow({ where: { id: app.id } })).toMatchObject({ builtin: true, activeHash: "old" });
 });
 
+test.each(["mcp", "files", "events"])("optional official %s has external lifecycle rights without reviving builtin identity", async name => {
+  const f = await fixture(), app = await f.app(name, false, "builtin");
+  expect(moduleIdentity(app, { removable: name !== "mcp" })).toMatchObject({ origin: "external", capabilities: { build: true, propose: true, group: true, update: true, rollback: true, remove: true } });
+  for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove"] as const) expect(() => assertModuleOperation(app, operation)).not.toThrow();
+  expect(await assertExternalName(f.db, f.workspace.id, name, "propose")).toMatchObject({ id: app.id });
+  expect(moduleIdentity({ name, builtin: true }, { removable: false }).capabilities.remove).toBe(false);
+  expect(moduleIdentity({ name: "other-entry", builtin: false }, { removable: false }).capabilities.remove).toBe(false);
+});
+
 test("builtin Agent cannot be replaced through dynamic application lifecycle", async () => {
   const f = await fixture(), app = await f.app("agent", true);
   expect(moduleIdentity(app)).toMatchObject({ origin: "builtin", capabilities: { build: false, update: false, remove: false } });
@@ -110,12 +119,12 @@ test("version source does not grant builtin identity and external activation pre
 test("trusted Git seed is idempotent and rejects untrusted metadata or replacing active code", async () => {
   const f = await fixture();
   f.ports.moduleBuiltinResources = join(f.dataDir, "release");
-  await mkdir(join(f.ports.moduleBuiltinResources, "files"), { recursive: true });
-  const app = await f.app("files", true);
-  await writeFile(join(f.ports.moduleBuiltinResources, "files/module.json"), JSON.stringify(app.manifest));
-  await writeFile(join(f.ports.moduleBuiltinResources, "files/index.ts"), "export {};");
-  const git = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "files");
-  const release = await resolveBuiltinRelease(f.ports, "files");
+  await mkdir(join(f.ports.moduleBuiltinResources, "notify"), { recursive: true });
+  const app = await f.app("notify", true);
+  await writeFile(join(f.ports.moduleBuiltinResources, "notify/module.json"), JSON.stringify(app.manifest));
+  await writeFile(join(f.ports.moduleBuiltinResources, "notify/index.ts"), "export {};");
+  const git = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "notify");
+  const release = await resolveBuiltinRelease(f.ports, "notify");
   await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "builtin", status: "approved", intent: {}, report: { git: { commit: git.commit, tree: git.tree } } } });
   await requestStatus(f.context, app.id, "paused", "maintenance");
   await f.db.module.update({ where: { id: app.id }, data: { activeHash: null } });

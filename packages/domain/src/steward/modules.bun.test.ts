@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
+import { moduleScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
@@ -88,16 +88,14 @@ describe("module channel contract", () => {
   });
 });
 
-test("public schedule creation accepts only wake (reminders are the remind module's tools) and no command; stored module schedules remain readable", () => {
-  const input = { rule: { kind: "every", minutes: 5 }, text: "Check", label: "Check" };
-  for (const mode of ["wake", "remind", "module"]) {
-    const allowed = mode === "wake";
-    expect(createScheduleSchema.safeParse({ ...input, mode }).success).toBe(allowed);
-    expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode }).success).toBe(allowed);
-    expect(createScheduleSchema.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
-    expect(chronaToolInputSchemas.chrona_schedule.safeParse({ ...input, mode, command: "echo test" }).success).toBe(false);
+test("module-owned timers validate bounded payloads without native scheduling tools; stored schedules remain readable", () => {
+  const input = { key: "check:daily", rule: { kind: "every" as const, minutes: 5 }, label: "Check", payload: { task: "Check" } };
+  expect(moduleScheduleSchema.parse(input)).toEqual(input);
+  for (const patch of [{ key: "bad key" }, { payload: "Check" }, { payload: { text: "x".repeat(4000) } }, { label: "" }, { command: "echo test" }, { mode: "wake" }, { text: "Check" }]) {
+    expect(moduleScheduleSchema.safeParse({ ...input, ...patch }).success).toBe(false);
   }
-  expect(scheduleSchema.safeParse({ ...input, id: "module-schedule", originSessionId: null, moduleId: null, mode: "module", until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
+  expect(Object.keys(chronaToolInputSchemas)).toEqual(["chrona_reply"]);
+  for (const mode of ["module", "wake"]) expect(scheduleSchema.safeParse({ rule: input.rule, text: "Check", label: input.label, id: "stored-schedule", originSessionId: null, moduleId: null, mode, until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
 });
 
 test("module activation defaults to ask with its policy label", () => {

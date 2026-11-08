@@ -12,7 +12,7 @@ test.each(["web", "notify", "mcp", "qq", "mind"])("%s author tests preserve appl
   try {
     const code = join(dataDir, "platform", "store", name);
     await mkdir(code, { recursive: true });
-    await cp(join(import.meta.dirname, ["qq", "mind"].includes(name) ? "external" : "builtin", name), code, { recursive: true });
+    await cp(join(import.meta.dirname, ["qq", "mind", "mcp"].includes(name) ? "external" : "builtin", name), code, { recursive: true });
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
     const reports: TestReport = [];

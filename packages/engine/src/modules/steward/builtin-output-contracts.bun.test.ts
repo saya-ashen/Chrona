@@ -3,10 +3,12 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
-import { createFiles } from "./builtin/files/files";
-import { createEvents, type Caller } from "./builtin/events/events";
+import { createFiles } from "./external/files/files";
+import { createEvents, type Caller } from "./external/events/events";
 import { createNotify, type Caller as NotifyCaller } from "./builtin/notify/notify";
 import { openStore } from "./builtin/notify/store";
+import { conversationMemory } from "./external/memory-local/conversation";
+import { preferences } from "./external/memory-local/preferences";
 
 const manifests = await Promise.all([
   ...BUILTIN_MODULE_NAMES.map(name => ({ name, directory: "builtin" })),
@@ -87,6 +89,46 @@ test("actual notify handler results satisfy contracts for success, errors, empty
     check("notify.channel", notify.handle("channel", { channel: "chrona_qqbot", ready: false, at: "invalid" }, owner, now));
     check("notify.channel", notify.handle("channel", { channel: "chrona_qqbot", ready: false, at: "2020-01-01T00:00:00.000Z" }, owner, now));
   } finally { store.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test("memory-local outputs match conversation and preference handlers and reject malformed results", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chrona-memory-contracts-"));
+  const at = "2026-11-08T12:00:00.000Z";
+  const check = (name: string, output: unknown, valid = true) => {
+    const validator = compileModuleOutput(moduleOutputSchema.parse(tools.get(`memory-local.${name}`)?.output));
+    expect(validator.safeParse(output).success, `${name}: ${JSON.stringify(output)}`).toBe(valid);
+  };
+  try {
+    const store = preferences(dir);
+    check("preferences", await store.list());
+    const preference = await store.remember("简短中文", "ui", at);
+    check("remember", preference);
+    check("preferences", await store.list());
+    check("forget", await store.forget(preference.id));
+    // Missing preferences throw; SDK errors are not tool output values.
+    await expect(store.forget(preference.id)).rejects.toThrow("Preference not found");
+    const policy = conversationMemory({ recall: async () => ({ items: [{ id: "m1", content: "choice", at }] }), retain: async () => ({ id: "m2" }) });
+    const snapshot = { session: { id: "s1", source: "web" }, messages: [{ direction: "in", text: "choice", at }], now: at, autoRecall: true, autoRetain: true, ending: true, recalled: false, retainedThrough: null };
+    check("conversation-context", await policy.context(snapshot));
+    check("conversation-context", await policy.context({ ...snapshot, autoRecall: false }));
+    check("conversation-retain", await policy.retain(snapshot));
+    check("conversation-retain", await policy.retain({ ...snapshot, autoRetain: false }));
+    check("retain", { id: "m1" });
+    check("recall", { items: [] });
+    check("recall", { items: [{ id: "m1", content: "choice", score: 0.5 }, { id: "m2", content: "other", at, score: 1 }] });
+    check("forget", { forgotten: false });
+    check("conversation-retain", { retained: true }, false);
+    check("conversation-retain", { retained: false, through: at, chars: 1 }, false);
+    check("recall", { items: [{ id: "m1", content: "choice" }] }, false);
+    check("remember", { ...preference, topic: "invalid" }, false);
+    check("remember", { ...preference, lastUsedAt: at }, false);
+    for (const name of ["conversation-context", "conversation-retain", "retain", "recall", "forget", "preferences", "remember"]) {
+      check(name, { ignored: "no caller" });
+      check(name, {}, false);
+      check(name, { error: "Preference not found" }, false);
+      check(name, { ignored: "unknown" }, false);
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 test("QQ and web output contracts accept success, error, empty, and nullable shapes", () => {

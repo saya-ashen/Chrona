@@ -60,8 +60,13 @@ export function deliveryStatus(outcome: DeliveryOutcome, attempts: number) {
   return outcome.outcome === "accepted" ? "sent" : outcome.outcome === "uncertain" ? "uncertain" : outcome.retryable && attempts < 6 ? "queued" : "failed";
 }
 export const retryDelayMs = (attempts: number) => Math.min(21_600_000, 60_000 * 2 ** (attempts - 1));
+const validTime = (text: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(text);
+function validQuietHours(value: Settings["quietHours"]) {
+  if (value === null) return true;
+  return typeof value === "object" && Object.keys(value).sort().join(",") === "end,start" && validTime(value.start) && validTime(value.end);
+}
 export function validSettings(value: Settings) {
+  if (typeof value.timezone !== "string" || value.timezone.length === 0 || value.timezone.length > 80) return false;
   try { new Intl.DateTimeFormat("en", { timeZone: value.timezone }).format(new Date()); } catch { return false; }
-  const time = (text: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(text);
-  return Number.isInteger(value.dailyCap) && value.dailyCap >= 0 && value.dailyCap <= 50 && time(value.digestAt) && (!value.quietHours || (time(value.quietHours.start) && time(value.quietHours.end)));
+  return Number.isInteger(value.dailyCap) && value.dailyCap >= 0 && value.dailyCap <= 50 && validTime(value.digestAt) && validQuietHours(value.quietHours);
 }

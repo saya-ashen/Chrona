@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { moduleSupervisor } from "@chrona/engine";
@@ -42,15 +42,15 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
 
 (sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which makes routed calls", async () => {
   const { workspaceId } = await seedWorkspace("Listen");
-  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], uses: ["chat.today"], keepAlive: true, listen: "/api/echo" });
+  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], uses: ["modules.list"], keepAlive: true, listen: "/api/echo" });
   const module = await db.module.create({ data: { workspaceId, name: "echo", activeHash: "v1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/v1");
   await mkdir(code, { recursive: true });
   await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
-  const today = await chrona.call("chat.today") as { apps?: unknown };
-  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), apps: Array.isArray(today.apps) });
+  const apps = await chrona.call("modules.list");
+  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), apps: Array.isArray(apps) });
 });`);
   const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
   stop = () => steward.stop();
@@ -62,8 +62,8 @@ chrona.serve(async request => {
   expect((await app.request("/api/nothing/x", { headers: { authorization: "Bearer listen-test" } })).status).toBe(404);
 }, 30_000);
 
-for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? test.skip : test)(`the built-in mcp module serves owner tools at /api/mcp (${isolated ? "bwrap" : "no sandbox"})`, async () => {
-  await seedWorkspace("Mcp");
+for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? test.skip : test)(`the explicitly activated external mcp module serves owner tools at /api/mcp (${isolated ? "bwrap" : "no sandbox"})`, async () => {
+  const { workspaceId } = await seedWorkspace("Mcp");
   const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   if (isolated) process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!; else delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
   const steward = createStewardRuntime(db, { provider: null, dataDir });
@@ -76,9 +76,17 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   stop = () => steward.stop();
   expect(steward.ports.sandbox?.isolated).toBe(isolated);
   await moduleSupervisor(steward.ports).start();
-  // Only the five trusted release builtins activate here; external packages are separately queued.
+  // Optional external apps are not seeded with the trusted builtins.
   const unfinished = await db.moduleVersion.findMany({ where: { module: { builtin: true, activeHash: null } }, select: { manifest: true, status: true, report: true } });
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["agent", "events", "files", "mcp", "notify", "web"].map(name => [name, "active", true]));
+  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["agent", "notify", "web"].map(name => [name, "active", true]));
+  for (const name of ["mcp", "files"]) {
+    expect(await db.module.count({ where: { workspaceId, name } })).toBe(0);
+    const hash = `approved-${name}`, code = join(dataDir, "platform/store", hash);
+    await cp(join(import.meta.dirname, "../../../packages/engine/src/modules/steward/external", name), code, { recursive: true });
+    const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
+    const module = await db.module.create({ data: { workspaceId, name, activeHash: hash, status: "active", dataSchema: manifest.data.schema } });
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  }
   const app = await createServerApp({ steward });
   // The web module serves the page at / (no key needed), while the API it calls stays protected.
   const page = await app.request("/apps/a1?path=README.md");

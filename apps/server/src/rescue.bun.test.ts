@@ -7,6 +7,7 @@ import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { builtinEntry, createRelay, qqEntry } from "@chrona/engine/test-support";
 import { buildArtifacts } from "../../../build/manifest";
+import webManifest from "../../../packages/engine/src/modules/steward/builtin/web/module.json";
 
 const dbs: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -16,13 +17,13 @@ async function fixture() {
   await db.workspace.create({ data: { id: "ws_default", name: "Personal" } });
   const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-rescue-test-")), now: () => new Date(), publicUrl: null, chatTimeoutMs: 2000 };
   const service = createStewardService(ports);
-  const app = createRescueApp(ports, service, "test-rescue-key", readFileSync(htmlPath, "utf8"));
+  const app = createRescueApp(service, "test-rescue-key", readFileSync(htmlPath, "utf8"));
   const request = (path: string, data?: unknown, key = "test-rescue-key") => app.request(path, { headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(data ? { method: "POST", body: JSON.stringify(data) } : {}) });
   return { db, ports, service, app, request };
 }
 test("rescue auth fails closed, including page; CSP forbids external resources and cookies are absent", async () => {
   const f = await fixture();
-  for (const path of ["/", "/api/messages", "/api/approvals"]) {
+  for (const path of ["/", "/api/modules", "/api/approvals"]) {
     expect((await f.app.request(path)).status).toBe(401);
     expect((await f.request(path, undefined, "wrong-key")).status).toBe(401);
   }
@@ -38,7 +39,7 @@ test("rescue auth fails closed, including page; CSP forbids external resources a
 });
 test("rescue listener refuses to start without a key", async () => {
   const f = await fixture(), logs: string[] = [];
-  expect(startRescueListener(f.ports, f.service, htmlPath, { CHRONA_RESCUE_PORT: "3199" }, message => logs.push(message))).toBeUndefined();
+  expect(startRescueListener(f.service, htmlPath, { CHRONA_RESCUE_PORT: "3199" }, message => logs.push(message))).toBeUndefined();
   expect(logs).toEqual(["Rescue listener not started: RESCUE_KEY is required"]);
 });
 test("rescue approvals and kernel tick work with both web and notify disabled", async () => {
@@ -56,17 +57,18 @@ test("rescue approvals and kernel tick work with both web and notify disabled", 
   expect(await f.db.audit.count({ where: { workspaceId: "ws_default", kind: "kernel_fact_pending" } })).toBeGreaterThanOrEqual(4);
   expect(await f.db.moduleInvocation.count({ where: { workspaceId: "ws_default", target: { in: ["web", "notify"] } } })).toBe(0);
 });
-test("rescue chat uses only session rescue; Provider failure points to chrona admin", async () => {
+test("rescue exposes governed recovery controls, never conversations", async () => {
   const f = await fixture();
-  const result = await f.request("/api/chat", { text: "Repair the web" });
-  expect(result.status).toBe(200);
-  const reply = await result.json();
-  expect(await f.db.session.findUnique({ where: { id: reply.sessionId } })).toMatchObject({ key: "rescue", source: "rescue" });
-  expect(reply.messages[0].text).toContain("chrona admin");
-  const messages = await (await f.request("/api/messages")).json();
-  expect(messages.items.map((m: { text: string }) => m.text)).toContain("Repair the web");
-  expect(messages.items.at(-1).text).toContain("chrona admin");
-  expect((await f.request("/api/chat", { text: "hi", attachments: [] })).status).toBe(400);
+  expect((await f.request("/api/chat", { text: "Repair the web" })).status).toBe(404);
+  expect((await f.request("/api/messages")).status).toBe(404);
+  expect(await f.db.session.count()).toBe(0);
+  const module = await f.db.module.create({ data: { workspaceId: "ws_default", name: "example", activeHash: "approved", status: "active" } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "approved", status: "approved", source: "user", manifest: { ...webManifest, name: "example" }, intent: {}, report: {} } });
+  expect((await (await f.request("/api/modules")).json()).items).toContainEqual(expect.objectContaining({ id: module.id }));
+  expect((await f.request(`/api/modules/${module.id}/pause`, {})).status).toBe(200);
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: module.id } })).status).toBe("paused");
+  expect((await f.request(`/api/modules/${module.id}/rollback`, { hash: "missing" })).status).toBe(409);
+  expect((await f.request(`/api/modules/${module.id}/rollback`, { hash: "approved", disableAuth: true })).status).toBe(400);
 });
 // The mcp module resolves through this same owner HTTP route.
 test("the web page and QQ resolve policy approvals like any other entry", async () => {

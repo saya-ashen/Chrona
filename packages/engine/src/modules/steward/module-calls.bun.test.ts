@@ -44,7 +44,7 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
 const output = (reply: unknown) => (reply as { result: { result: unknown } }).result.result;
 
 test("shipped files capability examples match its input and output contracts", async () => {
-  const raw = JSON.parse(await readFile(new URL("./builtin/files/module.json", import.meta.url), "utf8"));
+  const raw = JSON.parse(await readFile(new URL("./external/files/module.json", import.meta.url), "utf8"));
   const manifest = moduleManifestSchema.parse(raw);
   expect(manifest.tools.map(moduleToolExampleError)).toEqual(manifest.tools.map(() => null));
 });

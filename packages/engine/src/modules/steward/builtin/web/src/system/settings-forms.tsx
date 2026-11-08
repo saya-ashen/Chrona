@@ -13,7 +13,7 @@ function useSaveSettings() {
   const action = useAction(), store = useStateStore(), [message, setMessage] = useState("");
   const save = (settings: Record<string, unknown>, success = "已保存") => {
     setMessage("正在保存……");
-    void action.act(async () => { const saved = await action.call("settings-update", { settings }); store.set("/settingsView/settings", saved); setMessage(success); });
+    void action.act(async () => { const saved = await action.call("settings-update", { settings }); store.set("/settingsView", saved); setMessage(success); });
   };
   const fail = (message: string) => void action.act(async () => { throw new Error(message); });
   return { ...action, message, fail, save };
@@ -24,6 +24,17 @@ function NumberField({ name, label, value, min, max }: { name: string; label: st
   return <label>{label} <input name={name} type="number" min={min} max={max} step={1} required defaultValue={value} /></label>;
 }
 export function NotificationSettings({ props: { settings } }: { props: { settings: GlobalSettings } }) {
+  return <><BudgetTimezone settings={settings} /><NotificationRouting settings={settings} /></>;
+}
+function BudgetTimezone({ settings }: { settings: GlobalSettings }) {
+  const save = useSaveSettings();
+  return <form onSubmit={event => { event.preventDefault(); save.save({ timezone: values(event.currentTarget).timezone }); }}>
+    <label>内核预算时区<input name="timezone" defaultValue={settings.timezone} required /></label>
+    <p className="muted">模型与应用构建的每日额度按此时区重置，与通知的免打扰时段分开。</p>
+    <div className="row"><button disabled={save.pending}>保存预算时区</button><Status save={save} /></div>
+  </form>;
+}
+function NotificationRouting({ settings }: { settings: GlobalSettings }) {
   const save = useSaveSettings(), n = settings.notifications;
   return <form onSubmit={event => {
     event.preventDefault(); const f = values(event.currentTarget);

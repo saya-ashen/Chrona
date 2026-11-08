@@ -7,7 +7,7 @@
   "activated": true,
   "secrets": ["qq_bot"],
   "triggers": [],
-  "uses": ["*", "agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond", "modules.tools", "approvals.list", "approvals.resolve", "notify.channel", "notify.send"],
+  "uses": ["*", "agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond", "modules.tools", "approvals.list", "approvals.resolve", "notify.channel", "notify.send", "modules.contributions", "modules.settings-get"],
   "tools": [
     { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"],
       "output": { "anyOf": [{ "type": "object", "properties": { "outcome": { "const": "accepted" }, "receiptRef": { "type": ["string", "null"] } }, "required": ["outcome", "receiptRef"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "rejected" }, "retryable": { "type": "boolean" }, "error": { "type": "string" } }, "required": ["outcome", "retryable", "error"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "uncertain" }, "error": { "type": "string" } }, "required": ["outcome", "error"], "additionalProperties": false }] },
@@ -21,6 +21,25 @@
         "attachments": { "type": "string", "description": "JSON array of the reply's files, with appId" }, "in-reply-to": { "type": "string" } } } }
   ],
   "effects": ["network"],
+  "settings": {
+    "memory-provider": {
+      "type": "string",
+      "label": "记忆应用",
+      "description": "应用名；留空关闭记忆。不自动安装应用。",
+      "default": "",
+      "maxLength": 41
+    },
+    "memory-auto-recall": {
+      "type": "boolean",
+      "label": "自动召回记忆",
+      "default": true
+    },
+    "memory-auto-retain": {
+      "type": "boolean",
+      "label": "自动保存记忆",
+      "default": true
+    }
+  },
   "data": { "schema": 1 },
   "tests": ["test.ts", "format-test.ts", "regression-test.ts", "approval-test.ts"]
 }

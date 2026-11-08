@@ -6,6 +6,8 @@ import { moduleManifestSchema, PREINSTALLED_MODULE_NAMES } from "@chrona/contrac
 import { testDb } from "./test-db";
 import { createExternalModuleInstaller, externalPackageCatalog, installExternal, installationId, refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
+import { registerBuiltins } from "./module-builtin";
+import { requestRemove, removeApproved } from "./module-remove";
 import { resolveExternalRelease } from "./module-release";
 import { moduleContext } from "./module-context";
 import { buildPending } from "./module-build";
@@ -42,6 +44,47 @@ test("coding/editor catalog reports missing products unavailable without adding 
   for (const name of ["coding", "editor"]) expect(catalog.find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, moduleId: null });
   expect([...PREINSTALLED_MODULE_NAMES]).toEqual(["qq", "remind", "mind"]);
   expect(await f.db.module.count()).toBe(0);
+});
+
+test.each(["mcp", "files", "events"] as const)("optional %s installs, stays removed on restart and explicitly reinstalls through checks", async name => {
+  const f = await fixture(); await f.resource(name, name === "mcp" ? { uses: ["*"] } : {});
+  await f.db.module.createMany({ data: PREINSTALLED_MODULE_NAMES.map(name => ({ workspaceId: f.workspaceId, name })) });
+  await ensureWorkspaceInitialized(f.ports, f.workspaceId);
+  expect(await f.db.module.findUnique({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } } })).toBeNull();
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === name)).toMatchObject({ available: true, moduleId: null });
+  const request = { package: name, mode: "install" as const, requestKey: `first-${name}` };
+  const first = await installExternal(f.ports, f.workspaceId, request);
+  expect(first.status).toBe("building");
+  expect(typeof first.moduleId).toBe("string");
+  expect(f.executions()).toBe(0);
+  const context = moduleContext(f.ports, f.workspaceId);
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", moduleId: first.moduleId });
+  if (name === "mcp") {
+    const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, moduleId: first.moduleId, source: "module", key: "retained-context", title: "Ended private MCP conversation" } });
+    await expect(requestRemove(context, first.moduleId!, "unmarked active session")).rejects.toMatchObject({ code: "conflict" });
+    await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: first.moduleId!, kind: "agent_context", subjectId: session.id, details: {} } });
+    const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "foreground", trigger: "module", provider: "fixture", tokenHash: `mcp-${session.id}`, prompt: "fixture", cwd: f.ports.dataDir } });
+    await expect(requestRemove(context, first.moduleId!, "queued context")).rejects.toMatchObject({ code: "conflict" });
+    await f.db.run.update({ where: { id: run.id }, data: { status: "failed", error: "Execution stop is unconfirmed" } });
+    await expect(requestRemove(context, first.moduleId!, "unknown context stop")).rejects.toMatchObject({ code: "conflict" });
+    await f.db.run.update({ where: { id: run.id }, data: { status: "succeeded", error: null, endedAt: f.ports.now() } });
+    expect((await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
+  }
+  const removal = await requestRemove(context, first.moduleId!, "remove optional app");
+  const approval = await f.db.approval.update({ where: { id: removal.approvalId }, data: { status: "approved" } });
+  await removeApproved(context, { workspaceId: f.workspaceId, approvalId: approval.id, payload: approval.payload! });
+  await registerBuiltins(f.ports, f.workspaceId);
+  await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
+  expect(await f.db.module.findUnique({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } } })).toBeNull();
+  const executions = f.executions();
+  const second = await installExternal(f.ports, f.workspaceId, { ...request, requestKey: `reinstall-${name}` });
+  expect(second).toMatchObject({ status: "building" });
+  expect(second.moduleId).not.toBe(first.moduleId);
+  expect(f.executions()).toBe(executions);
+  await buildPending(context); await refreshInstallationReceipts(f.ports, f.workspaceId);
+  expect(await installExternal(f.ports, f.workspaceId, { ...request, requestKey: `reinstall-${name}` })).toMatchObject({ status: "installed", moduleId: second.moduleId });
+  expect(f.executions()).toBeGreaterThan(executions);
 });
 
 test("real adapter copies read-only hardlinked official resources and only queues once", async () => {

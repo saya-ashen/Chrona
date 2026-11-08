@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { settingsOutput } from "./system-outputs";
+import { buildGovernanceSchema } from "@chrona/contracts/steward";
+import { createBuildGovernance } from "./build-governance";
 import { createSettings } from "./settings";
 import { createRuns } from "./runs";
 import { testDb } from "./test-db";
@@ -13,23 +15,25 @@ async function fixture(at = "2026-10-25T16:00:00Z") {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspaceId = (await db.workspace.create({ data: { name: "build-settings", settings: { custom: "preserve" } } })).id;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(at), publicUrl: null };
-  const settings = () => createSettings({ ...ports, workspaceId }, { forward: async () => null });
-  return { db, ports, workspaceId, settings };
+  const settings = () => createSettings({ ...ports, workspaceId });
+  const builds = () => createBuildGovernance(ports, workspaceId);
+  return { db, ports, workspaceId, settings, builds };
 }
 
 test("existing workspaces get 20/60/5; partial owner edits persist without losing unrelated settings", async () => {
-  const f = await fixture(), before = await f.settings().get();
+  const f = await fixture(), before = await f.builds().get();
   expect(before.builds).toEqual({ dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 });
-  expect(settingsOutput.safeParse(before).success).toBe(true);
-  const saved = await f.settings().update({ builds: { dailyLimit: 30 } });
+  expect(buildGovernanceSchema.safeParse(before).success).toBe(true);
+  expect(settingsOutput.safeParse(await f.settings().get()).success).toBe(true);
+  const saved = await f.builds().update({ dailyLimit: 30 });
   expect(saved.builds).toEqual({ dailyLimit: 30, timeoutMinutes: 60, maxSubmissions: 5 });
-  expect((await f.settings().get()).builds).toEqual(saved.builds);
+  expect((await f.builds().get()).builds).toEqual(saved.builds);
   expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toMatchObject({ custom: "preserve" });
-  await f.settings().update({ notifications: { timezone: "UTC" } });
-  expect((await f.settings().get()).builds).toEqual(saved.builds);
-  await f.settings().update({ builds: { timeoutMinutes: 90, maxSubmissions: 2 } });
-  expect((await f.settings().get()).builds).toEqual({ dailyLimit: 30, timeoutMinutes: 90, maxSubmissions: 2 });
-  expect((await f.settings().get()).notifications.timezone).toBe("UTC");
+  await f.settings().update({ timezone: "UTC" });
+  expect((await f.builds().get()).builds).toEqual(saved.builds);
+  await f.builds().update({ timeoutMinutes: 90, maxSubmissions: 2 });
+  expect((await f.builds().get()).builds).toEqual({ dailyLimit: 30, timeoutMinutes: 90, maxSubmissions: 2 });
+  expect((await f.settings().get()).timezone).toBe("UTC");
   expect(await f.db.audit.findFirst({ where: { kind: "settings_updated" } })).not.toBeNull();
 });
 
@@ -40,8 +44,8 @@ for (const builds of [
   { memoryMb: 8192 }, { autoRetry: true },
 ]) test(`reject invalid build settings ${JSON.stringify(builds)} atomically`, async () => {
   const f = await fixture();
-  await expect(f.settings().update({ builds, notifications: { timezone: "UTC" } })).rejects.toMatchObject({ code: "invalid" });
-  expect((await f.settings().get()).notifications.timezone).toBe("Asia/Shanghai");
+  await expect(f.builds().update(builds)).rejects.toMatchObject({ code: "invalid" });
+  expect((await f.settings().get()).timezone).toBe("Asia/Shanghai");
   expect(await f.db.audit.count({ where: { kind: "settings_updated" } })).toBe(0);
 });
 
@@ -51,7 +55,8 @@ for (const c of [
   { at: "2026-10-25T16:00:00Z", timezone: "UTC", date: "2026-10-25", used: 2 },
 ]) test(`usage at ${c.at} in ${c.timezone} counts new sessions, not continuations`, async () => {
   const f = await fixture(c.at);
-  await f.settings().update({ notifications: { timezone: c.timezone }, builds: { dailyLimit: 3 } });
+  await f.settings().update({ timezone: c.timezone });
+  await f.builds().update({ dailyLimit: 3 });
   for (const [i, at] of ["2026-10-25T15:59:00Z", "2026-10-25T16:00:00Z"].entries()) {
     const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: `build:${i}`, source: "build", status: "ended", createdAt: new Date(at) } });
     // Even failed continuations do not consume another new-session allowance.
@@ -60,9 +65,9 @@ for (const c of [
   await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web", source: "web", createdAt: f.ports.now() } });
   const other = await f.db.workspace.create({ data: { name: "other" } });
   await f.db.session.create({ data: { workspaceId: other.id, key: "build:other", source: "build", createdAt: f.ports.now() } });
-  expect((await f.settings().get()).buildUsage).toEqual({ date: c.date, timezone: c.timezone, used: c.used, remaining: 3 - c.used });
-  await f.settings().update({ builds: { dailyLimit: 0 } });
-  expect((await f.settings().get()).buildUsage.remaining).toBe(0);
+  expect((await f.builds().get()).buildUsage).toEqual({ date: c.date, timezone: c.timezone, used: c.used, remaining: 3 - c.used });
+  await f.builds().update({ dailyLimit: 0 });
+  expect((await f.builds().get()).buildUsage.remaining).toBe(0);
 });
 
 test("build claim snapshots owner budgets, leaves running work unchanged and informs the model", async () => {
@@ -71,14 +76,14 @@ test("build claim snapshots owner budgets, leaves running work unchanged and inf
   await f.db.audit.create({ data: { id: `build-targets:${session.id}`, workspaceId: f.workspaceId, subjectId: session.id, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
   const runs = createRuns(f.ports, f.workspaceId);
   await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Build" });
-  await f.settings().update({ builds: { timeoutMinutes: 17, maxSubmissions: 3 } });
+  await f.builds().update({ timeoutMinutes: 17, maxSubmissions: 3 });
   const first = (await runs.claimNext("build"))!;
   expect(first.deadlineAt.getTime() - f.ports.now().getTime()).toBe(17 * 60_000);
   expect(first.leaseUntil).toEqual(first.deadlineAt);
   expect(first.prompt).toContain("at most 3 candidate submissions");
   const snapshot = await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: first.id } });
   expect(snapshot.details).toMatchObject({ builds: { timeoutMinutes: 17, maxSubmissions: 3 } });
-  await f.settings().update({ builds: { timeoutMinutes: 90, maxSubmissions: 7 } });
+  await f.builds().update({ timeoutMinutes: 90, maxSubmissions: 7 });
   expect((await f.db.run.findUniqueOrThrow({ where: { id: first.id } })).deadlineAt).toEqual(first.deadlineAt);
   expect((await f.db.audit.findUniqueOrThrow({ where: { id: snapshot.id } })).details).toEqual(snapshot.details);
   await f.db.run.update({ where: { id: first.id }, data: { status: "finished" } });
@@ -90,7 +95,7 @@ test("build claim snapshots owner budgets, leaves running work unchanged and inf
 
 for (const [lane, minutes] of [["foreground", 5], ["background", 20]] as const) test(`build settings do not change ${lane}`, async () => {
   const f = await fixture();
-  await f.settings().update({ builds: { timeoutMinutes: 120 } });
+  await f.builds().update({ timeoutMinutes: 120 });
   const runs = createRuns(f.ports, f.workspaceId);
   const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "web" } });
   await runs.enqueue({ sessionId: session.id, lane, trigger: "message", prompt: "Other work" });

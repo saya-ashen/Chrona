@@ -45,8 +45,8 @@ const relay = createRelay({ conversations, publicUrl: null, download: async a =>
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);
 await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chrona_qqbot", text: "", externalId: parsed.id, attachments: parsed.attachments });
-assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.tools", "agent.run"]);
-assert.match(calls[2].args.prompt, /qq\/attachments\//);
+assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.tools", "modules.settings-get", "agent.run"]);
+assert.match(calls.find(c => c.target === "agent.run").args.prompt, /qq\/attachments\//);
 const session = (await conversations.app.list())[0]!;
 const message = (await conversations.app.messages(session.id))[0]!;
 assert.equal(message.attachments.length, 1);

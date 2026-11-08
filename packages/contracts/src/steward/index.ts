@@ -151,6 +151,10 @@ export function effectiveSettings(declared: Record<string, ModuleSetting>, store
 const SECRET_NAME_SCHEMA = z.string().regex(/^[a-z][a-z0-9_]{1,40}$/);
 const SECRET_FIELD_NAME = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
 const secretLabel = z.string().min(1).max(80);
+const oauthEndpoint = z.string().url().refine(value => {
+  try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password && !url.hash && !url.search; }
+  catch { return false; }
+});
 /** v2-16 §2.1: what the page asks the user for. Field names are shown, values never. */
 export const secretSpecSchema = z.object({
   name: SECRET_NAME_SCHEMA,
@@ -162,7 +166,11 @@ export const secretSpecSchema = z.object({
   /** Keys the user names, e.g. one password per account id. */
   extraFields: z.object({ label: secretLabel, valueLabel: secretLabel, description: z.string().max(300).optional() }).strict().optional(),
   /** v2-30 §4: the page offers "authorize" with these scopes; clientId/clientSecret are asked for unless listed in fields. */
-  oauth: z.object({ provider: z.enum(["google", "microsoft"]), scopes: z.array(z.string().min(1).max(200)).min(1).max(20), accounts: z.boolean().optional() }).strict().optional(),
+  oauth: z.object({
+    provider: z.enum(["google", "microsoft"]), scopes: z.array(z.string().min(1).max(200)).min(1).max(20), accounts: z.boolean().optional(),
+    authorizationUrl: oauthEndpoint, tokenUrl: oauthEndpoint,
+    authorizationParams: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/), z.string().max(2000)).refine(value => !Object.keys(value).some(key => ["response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method"].includes(key))).optional(),
+  }).strict().optional(),
 }).strict();
 export type SecretSpec = z.infer<typeof secretSpecSchema>;
 export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object({
@@ -323,7 +331,7 @@ export function grantedUses(manifest: { uses?: readonly string[]; secrets?: read
 /** The interface `chrona.notify` and Chrona's own notifications go to. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "memory"] as const;
+export const SYSTEM_MODULES = ["approvals", "modules", "settings", "schedules", "secrets", "activity", "projects"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 /** A saved registration may only call this exact app identity and tool contract; this grants no access. */
@@ -466,17 +474,16 @@ export const memorySettingsSchema = z.object({ provider: slug.nullable(), autoRe
 /** Rotation of a QQ or web conversation before the next message: idle past the prompt cache's life with at least minContextTokens, or past maxContextTokens. */
 export const sessionSettingsSchema = z.object({ idleMinutes: z.number().int().min(5).max(1440), minContextTokens: z.number().int().min(0).max(1_000_000), maxContextTokens: z.number().int().min(10_000).max(1_000_000) }).strict();
 export const DEFAULT_SESSION_SETTINGS = { idleMinutes: 60, minContextTokens: 30_000, maxContextTokens: 100_000 } as const;
-export const settingsSchema = z.object({
-  notifications: notificationSettingsSchema,
-  memory: memorySettingsSchema,
-  sessions: sessionSettingsSchema,
+export const buildGovernanceSchema = z.object({
   builds: buildSettingsSchema,
   buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
+}).strict();
+export const settingsSchema = z.object({
+  timezone: z.string().min(1).max(80),
   /** v2-17: today's module model calls (local day), per module. */
   modelUsage: z.array(z.object({ module: z.string(), calls: z.number().int().min(0), inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) }).strict()),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
   moduleModel: moduleModelSettingsSchema.nullable(),
-  chat: z.object({ channel: notificationChannelSchema, bound: z.boolean(), sentToday: z.number().int().min(0) }).strict(),
 }).strict();
 export const healthSchema = z.object({
   provider: z.object({ name: short, available: z.boolean(), sandboxed: z.boolean(), lastError: z.string().max(500).nullable() }).strict(),
@@ -518,7 +525,7 @@ export const moduleScheduleSchema = z.object({
 export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), memory: memorySettingsSchema.partial().optional(), sessions: sessionSettingsSchema.partial().optional() }).strict();
+export const updateSettingsSchema = z.object({ timezone: z.string().min(1).max(80).optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
 // ------------------------------------------------------------ HTTP map -----
 /**
@@ -539,21 +546,8 @@ export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
  * Everything else (files, shell, web) is the Provider's own.
  */
 export const chronaToolInputSchemas = {
-  /** Reply to the user in the current conversation (foreground runs). May be called several times. */
-  chrona_reply: z.object({ text: text.max(8000), files: z.array(relativePathSchema).max(10).default([]).describe("Files to attach: paths in your working directory (write them there first), received attachments under content/chat/, or an app's content by reference content/<module>/<path> (e.g. a generated image; at most 20 MiB)") }).strict(),
-  /** Proactive message outside a conversation (background runs). Subject to the notification budget. */
-  chrona_notify: z.object({ level: z.enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
-  chrona_schedule: createScheduleSchema.extend({ label: z.string().trim().min(1).max(80).describe("Short user-facing name shown on pages, in the user's language, e.g. 准备第2天材料") })
-    .describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model; when an app offers reminders or a calendar (see its tools), use that app instead so the user sees and edits them there."),
-  chrona_schedules: z.object({}).strict(),
-  chrona_schedule_cancel: z.object({ scheduleId: id }).strict(),
-  /** Full-text search over past sessions' messages; returns matching sessions with snippets. */
-  chrona_session_search: z.object({ query: text.max(200), limit: z.number().int().min(1).max(10).default(3) }).strict(),
-  chrona_request_approval: z.object({ action: z.enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20_000) }).strict(),
-  chrona_request_path_access: z.object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to authorize read-write access to an absolute host directory or file. In required-isolation, approved paths are mounted into later runs; trusted-local uses host OS permissions and does not hide paths. After the decision Chrona continues this conversation in a new run."),
-  chrona_remember: z.object({ text: text.max(500), topic: z.enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
-  chrona_forget: z.object({ preferenceId: id }).strict(),
-  chrona_preferences: z.object({}).strict(),
+  /** Internal build result; application conversations use their own routed tools. */
+  chrona_reply: z.object({ text: text.max(8000), files: z.array(relativePathSchema).max(10).default([]).describe("Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.") }).strict(),
 } as const;
 const moduleIntent = z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict()
   .describe("What this version changes and what it keeps (shown on the approval card)");
@@ -571,7 +565,7 @@ export const modulesToolInputSchemas = {
     .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
     .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; it can be customized through the checked module lifecycle. Returns the exact source version; does not submit or activate it."),
   propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
-    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration and new credentials require the owner decision.'),
+    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,authorizationUrl:HTTPS-without-query,tokenUrl:HTTPS-without-query,scopes:[...],accounts?,authorizationParams?:{key:value}}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration, new credentials and changed OAuth definitions require the owner decision. OAuth URLs and authorization extras are declared by the application; Google offline authorization uses authorizationParams:{access_type:"offline",prompt:"consent"}, and Microsoft refresh authorization includes offline_access in scopes.'),
   rollback: z.object({ module: slug, hash: moduleVersionHashSchema }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": z.object({ versions: z.array(z.object({ module: slug, hash: moduleVersionHashSchema }).strict()).min(2).max(4) }).strict()
@@ -615,7 +609,7 @@ export type ProviderRunInput = {
   searchTools?: boolean;
   /** Absolute host paths the user approved for this run (read-write). */
   hostPaths?: string[];
-  /** Directories mounted at <cwd>/content/<name> (v2-8: only `chat`, the conversations' attachments, read-only). */
+  /** Provider-owned read-only content snapshots mounted at <cwd>/content/<name>. */
   content?: { name: string; dir: string; writable: boolean }[];
   /** Safe summaries and explicit, run-bound UI requests; never raw thinking or tool payloads. */
   events?: ProviderEvents;

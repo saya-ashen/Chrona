@@ -4,7 +4,7 @@ import { tierTarget } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { StewardPorts } from "./ports";
 import type { CallScope } from "./module-supervisor";
-import { moduleModelSettings, notificationSettings } from "./settings";
+import { moduleModelSettings, budgetTimezone } from "./settings";
 import { audit } from "./audit";
 import { CallError } from "./module-call-error";
 
@@ -21,7 +21,7 @@ async function completionBudgetError({ tx, ports, scope, params, workspace, sett
   if (!scope.manifest.model) return "undeclared";
   if (!settings || !Object.hasOwn(settings.models, scope.manifest.model.tier) || !ports.provider?.complete) return "unconfigured";
   const eventCalls = scope.moduleRunId ? await tx.moduleCall.count({ where: { moduleRunId: scope.moduleRunId, method: "model" } }) : Infinity;
-  const timezone = notificationSettings(workspace.settings).timezone, day = localDayKey(now, timezone);
+  const timezone = budgetTimezone(workspace.settings), day = localDayKey(now, timezone);
   const recent = await tx.moduleCall.findMany({ where: { module: { workspaceId: scope.workspaceId }, method: "model", createdAt: { gte: new Date(now.getTime() - 48 * 3600_000), lte: now } }, select: { createdAt: true, moduleId: true } });
   const todays = recent.filter(row => localDayKey(row.createdAt, timezone) === day);
   return eventCalls >= Math.min(scope.manifest.model.maxCalls, settings.maxCallsPerEvent) || overDaily(settings, scope, todays)

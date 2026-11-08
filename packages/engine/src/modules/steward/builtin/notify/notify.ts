@@ -202,6 +202,15 @@ class NotifyRuntime {
     this.store.set("settings", JSON.stringify(settings)); this.store.set("settings_at", String(at));
     return { settings };
   }
+  private settings(args: Args, now: Date) {
+    if (args.settings === undefined) return { settings: this.store.settings() };
+    let value: unknown;
+    try { value = JSON.parse(String(args.settings)); } catch { return { error: "invalid", message: "settings must be JSON" }; }
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== "dailyCap,digestAt,quietHours,timezone" || !validSettings(value as Settings)) return { error: "invalid", message: "Invalid notification settings" };
+    this.store.set("settings", JSON.stringify(value));
+    this.store.set("settings_at", String(now.getTime()));
+    return { settings: value as Settings };
+  }
   private insertImported(raw: ImportedArgs, leased: boolean) {
     const time = (value: unknown) => typeof value === "string" ? Date.parse(value) : null;
     this.store.insert({ id: String(raw.id), key: raw.idempotencyKey, module_id: text(raw.moduleId), app: text(raw.app), session_id: text(raw.sessionId), approval_id: text(raw.approvalId), scoped: raw.moduleId && raw.approvalId ? 1 : 0,
@@ -292,7 +301,7 @@ class NotifyRuntime {
   handle(tool: string, args: Args, caller: Caller, now: Date) {
     const handlers: Record<string, () => unknown> = {
       send: () => this.send(args, caller, now), lifecycle: () => this.lifecycle(args, caller, now), approval: () => this.approval(args, caller, now), withdraw: () => this.withdraw(args, now), channel: () => this.channel(args, caller), list: () => this.list(args),
-      status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
+      settings: () => this.settings(args, now), status: () => this.status(now), feedback: () => this.feedback(args), retry: () => this.retry(args, now), configure: () => this.configure(args), import: () => this.importRows(args),
     };
     if (!Object.hasOwn(handlers, tool)) throw new Error(`Unknown tool ${tool}`);
     return handlers[tool]!();

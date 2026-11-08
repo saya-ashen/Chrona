@@ -30,6 +30,12 @@ export async function attachmentBody(request: Request) {
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown; }
   catch { throw invalid("附件 JSON 无效"); }
 }
+function uploadInput(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw invalid("附件格式无效");
+  const { name, mime, base64 } = input as Record<string, unknown>;
+  if (typeof name !== "string" || !name.trim() || name.length > 200 || typeof mime !== "string" || !/^[\w.+-]+\/[\w.+-]+$/.test(mime) || mime.length > 100) throw invalid("附件名称或类型无效");
+  return { name, mime, bytes: decodeBase64(base64) };
+}
 export function createAttachments(contentDir: string) {
   const directory = join(contentDir, "attachments");
   async function read(ref: string, metadata = false) {
@@ -64,10 +70,7 @@ export function createAttachments(contentDir: string) {
   return {
     read,
     async upload(input: unknown) {
-      if (!input || typeof input !== "object" || Array.isArray(input)) throw invalid("附件格式无效");
-      const { name, mime, base64 } = input as Record<string, unknown>;
-      if (typeof name !== "string" || !name.trim() || name.length > 200 || typeof mime !== "string" || !/^[\w.+-]+\/[\w.+-]+$/.test(mime) || mime.length > 100) throw invalid("附件名称或类型无效");
-      const bytes = decodeBase64(base64), ref = `web/attachments/${crypto.randomUUID()}${imageExtension[mime] ?? ""}`;
+      const { name, mime, bytes } = uploadInput(input), ref = `web/attachments/${crypto.randomUUID()}${imageExtension[mime] ?? ""}`;
       await mkdir(directory, { recursive: true });
       const root = await realpath(contentDir);
       if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== join(root, "attachments")) throw invalid("附件目录无效");

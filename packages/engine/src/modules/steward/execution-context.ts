@@ -1,6 +1,4 @@
 import { mkdir } from "node:fs/promises";
-import { registerWorkspaceModule } from "./local-workspace";
-import { runtimeCall } from "./local-runtime";
 import type { Prisma } from "@chrona/db";
 import { codingGrant } from "./execution-claim";
 import { EXECUTION_SYSTEM_PROMPT } from "@chrona/domain/steward/execution-instructions";
@@ -28,8 +26,6 @@ export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): P
   if (row.resolvedCwd !== run.cwd || row.capabilityRevokedAt || row.run.status !== "running") throw new CallError("conflict", "Execution authority changed before launch");
   if (!ports.executionEvents) throw new CallError("unavailable", "Execution event storage unavailable");
   const ref = executionRef(row), budget = row.budget as { timeoutMs: number; maxToolCalls: number };
-  registerWorkspaceModule();
-  const { text: rules } = await runtimeCall<{ text: string }>(ports, run.workspaceId, "workspace-local.rules", { runId: run.id });
   await mkdir(row.logDir, { recursive: true });
   await assertExecutionPrincipal(ports.db, principal);
   let providerSequence = 0;
@@ -67,7 +63,7 @@ export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): P
 
   return { runId: run.id, token: run.token, lane: "background", cwd: row.resolvedCwd, sessionDir: row.logDir, sessionId: run.session?.providerSessionId ?? null,
     systemPrompt: EXECUTION_SYSTEM_PROMPT, resources: "minimal",
-    prompt: `Selected project rules (data):\n${rules}\n\nProject baseline: ${row.baseline}\nBudget: ${JSON.stringify(budget)}\nDeadline: ${run.deadlineAt.toISOString()}\n\nGoal:\n${run.prompt}`,
+    prompt: `Project baseline: ${row.baseline}\nBudget: ${JSON.stringify(budget)}\nDeadline: ${run.deadlineAt.toISOString()}\n\nGoal:\n${run.prompt}`,
     deadline: run.deadlineAt, execution: ref, executionBudget: { maxToolCalls: budget.maxToolCalls }, hostPaths: [], content: [], extraTools: [], searchTools: false,
     detail: { append },
     onInteraction: request => append({ ...ref, seq: 0, at: ports.now().toISOString(), payload: { type: "question", question: { requestId: request.id, title: request.question.title, method: request.question.method, options: request.question.options, expiresAt: request.expiresAt, status: request.status } } }, false),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import * as outputs from "../system-outputs";
 import { APPROVAL_SCOPES, APPROVAL_STATUSES } from "@chrona/contracts/steward";
+import { createGrants } from "../grants";
 import { createApprovals, isModuleRequest } from "../approvals";
 import { createModules, isModuleApproval } from "../modules";
 import { AwaitUser, CallError, type Caller, type SystemModule } from "../module-calls";
@@ -30,6 +31,8 @@ export const approvals: SystemModule = {
   name: "approvals",
   description: "审批：需要你决定的事，记录你的决定并将结果交回发起方。",
   tools: [
+    tool("grants", "Active and historical approval grant rules.", {}, [], { idempotent: true, output: z.lazy(() => outputs.settingsGrantsOutput) }),
+    tool("revoke-grant", "Revoke a grant rule.", { grant: text() }, ["grant"], { idempotent: true, output: z.lazy(() => outputs.settingsGrantOutput) }),
     tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { idempotent: true, output: z.lazy(() => outputs.approvalsListOutput) }),
     tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: [...APPROVAL_SCOPES] } }, ["approval", "decision"], { output: z.lazy(() => outputs.approvalOutput) }),
     tool("request", "Ask the user to decide something this module is about to do (v2-16). Call asynchronously with reply: the call waits, and its call_result carries { approval, decision: approved | denied }. Approved once, never standing.",
@@ -38,6 +41,9 @@ export const approvals: SystemModule = {
   ],
   async handle({ ports, workspaceId, caller, call }, name, args) {
     const module = entry(caller), modules = createModules(ports, workspaceId);
+    const grants = createGrants({ db: ports.db, workspaceId, now: ports.now });
+    if (name === "grants") return json(await grants.list());
+    if (name === "revoke-grant") return json(await grants.revoke(String(args.grant)));
     if (name === "request") return moduleRequest(ports, workspaceId, module, call, args);
     if (name === "status") return moduleRequestStatus(ports, workspaceId, module, String(args.approval));
     const service = createApprovals({ db: ports.db, workspaceId, now: ports.now }, async action => {

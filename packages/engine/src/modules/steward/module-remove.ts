@@ -10,7 +10,7 @@ import { requireModule, type ModuleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
-import { assertModuleOperation } from "./module-identity";
+import { assertModuleOperation, isRemovableMcp } from "./module-identity";
 import { moduleGitPath } from "./module-git";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
@@ -27,7 +27,7 @@ async function assertRemovable(db: Db, module: Row) {
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
   const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, hash: module.activeHash ?? "" } });
   const manifest = moduleManifestSchema.safeParse(versions[0]?.manifest).data;
-  if (manifest && isEntryModule(manifest)) throw new StewardError("conflict", `${module.name} 是入口应用，不能删除；可以停用`);
+  if (manifest && isEntryModule(manifest) && !isRemovableMcp(module)) throw new StewardError("conflict", `${module.name} 是入口应用，不能删除；可以停用`);
   await assertNoDependents(db, module);
   await assertNoPendingWork(db, module);
 }
@@ -39,9 +39,18 @@ async function assertNoDependents(db: Db, module: Row) {
   }
   if (users.length) throw new StewardError("conflict", `${users.join("、")} 正在调用 ${module.name}，先修改或删除它们`);
 }
+async function removalSessions(db: Db, module: Row) {
+  const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true, source: true, moduleId: true } });
+  const contexts = isRemovableMcp(module) ? await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } }) : [];
+  const retainedContexts = new Set(contexts.map(row => row.subjectId));
+  // Agent contexts retain continuation, not an application's private conversation state.
+  // Their Runs and unknown-stop evidence still participate in every execution guard.
+  const active = sessions.filter(session => session.status === "active");
+  if (active.some(session => session.source !== "module" || session.moduleId !== module.id || !retainedContexts.has(session.id))) throw new StewardError("conflict", "应用仍有关联的活动会话，请先结束会话并核对结果");
+  return sessions;
+}
 async function assertNoPendingWork(db: Db, module: Row) {
-  const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true } });
-  if (sessions.some(session => session.status === "active")) throw new StewardError("conflict", "应用仍有关联的活动会话，请先结束会话并核对结果");
+  const sessions = await removalSessions(db, module);
   if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: sessions.map(session => session.id) }, status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "关联会话仍有排队或运行中的工作，请先停止并核对结果");
   const builds = await db.audit.findMany({ where: { workspaceId: module.workspaceId, kind: { in: ["build_request", "build_targets"] } }, select: { subjectId: true, details: true } });
   const targets = builds.filter(row => {

@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 import { todayView } from "./today";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
+import { memoryView, memoryForget } from "./memory";
+import { settingsView, updateSettings } from "./settings";
 import { appOverview, systemApps } from "./app-overview";
 import { attachmentBody, createAttachments, decodeBase64 } from "./attachments";
 
@@ -28,6 +30,7 @@ function send(chunk: string) {
 }
 const attachments = createAttachments(chrona.paths.content);
 const conversations = createAgentConversations({ dataDir: chrona.paths.data, call, reply: event => send(`data: ${JSON.stringify({ type: "reply", ...event })}\n\n`) });
+on("schedule", async event => ({ result: await conversations.legacyWake(event) }));
 let polling = false;
 setInterval(() => {
   if (polling) return;
@@ -56,7 +59,7 @@ const pages = createPages({ dataDir: chrona.paths.data, modules: () => call("mod
 } });
 on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
   // Chrona records the caller of every routed call; only the build's smoke start sends a tool event without one.
-  if (event.id === "today") return { result: event.caller ? await todayView(call) : { ignored: "no caller" } };
+  if (event.id === "today") return { result: event.caller ? await todayView(call, getSessions) : { ignored: "no caller" } };
   if (event.id !== "reply") return { result: event.caller || event.id === "catalog" ? await pages.tool(event.id, event.args, event.caller) : { ignored: "no caller" } };
   send(`data: ${JSON.stringify({ type: "reply", ...event.args })}\n\n`);
   // Pages read the conversation when they open, so a reply with no page open is not lost.
@@ -64,14 +67,11 @@ on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
 });
 
 async function getSessions() {
-  // Web conversations and module builds (v2-13), newest first.
-  const lists = await Promise.all(["web", "build"].map(source => call("history.sessions", { source, status: "active" }) as Promise<{ lastActivityAt: string }[]>));
-  return [...await conversations.list(), ...lists.flat()].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+  const builds = await call("modules.build-sessions", { limit: 50 }) as { id: string; targets: string[]; lastActivityAt: string }[];
+  return [...await conversations.list(), ...builds.map(build => ({ ...build, source: "build", title: `构建模块 ${build.targets.join("、")}` }))].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
 }
 async function getSettings() {
-  // Settings page (v2-9): settings, grant rules, preferences, schedules and credentials (v2-16, names only) in one read.
-  const [settings, grants, preferences, schedules, secrets] = await Promise.all([call("settings.get"), call("settings.grants"), call("settings.preferences"), call("schedules.list"), call("secrets.list")]);
-  return { settings, grants, preferences, schedules, secrets };
+  return settingsView(call);
 }
 async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (path[0] !== "sessions") return NO_ROUTE;
@@ -80,8 +80,8 @@ async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiRes
   return NO_ROUTE;
 }
 function readConversation(session: string, part: string): Promise<ApiResult> | typeof NO_ROUTE {
-  if (part === "transcript") return isAgentConversation(session) ? conversations.transcript(session) : call("history.transcript", { session });
-  if (part === "messages") return isAgentConversation(session) ? conversations.messages(session) : call("history.messages", { session, limit: 100 });
+  if (part === "transcript") return isAgentConversation(session) ? conversations.transcript(session) : call("modules.build-transcript", { session });
+  if (part === "messages") return isAgentConversation(session) ? conversations.messages(session) : call("modules.build-session", { session }).then(() => []);
   return NO_ROUTE;
 }
 async function approvalRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
@@ -89,8 +89,8 @@ async function approvalRoute({ request, path, body }: ApiContext): Promise<ApiRe
   return NO_ROUTE;
 }
 async function settingsRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
-  if (request.method === "POST" && path[0] === "grants" && path[2] === "revoke" && path.length === 3) return call("settings.revoke-grant", { grant: path[1] });
-  if (request.method === "POST" && path[0] === "preferences" && path[2] === "forget" && path.length === 3) return call("settings.forget", { preference: path[1] });
+  if (request.method === "POST" && path[0] === "grants" && path[2] === "revoke" && path.length === 3) return call("approvals.revoke-grant", { grant: path[1] });
+  if (request.method === "POST" && path[0] === "preferences" && path[2] === "forget" && path.length === 3) return memoryForget(call, "web", path[1]);
   if (request.method === "POST" && path[0] === "schedules" && path.length === 2) return call("schedules.update", { schedule: path[1], status: body.status });
   return NO_ROUTE;
 }
@@ -143,15 +143,15 @@ async function api(request: Request, path: string[]) {
   const url = new URL(request.url), body = request.method === "POST" ? await request.json() as Args : {};
   const context: ApiContext = { request, url, path, body, route: `${request.method} /${path.join("/")}` };
   const routes: Record<string, ApiHandler> = {
-    "GET /today": () => todayView(call),
+    "GET /today": () => todayView(call, getSessions),
     "GET /sessions": () => getSessions(),
     "POST /chat": async () => {
-      // Historical kernel conversations stay readable. New execution belongs to Web's Agent context.
-      if (body.session && !isAgentConversation(String(body.session))) throw Object.assign(new Error("历史会话只供查看，请新建会话继续。"), { code: "conflict" });
+      // Only this entry's conversations accept new messages; builds have separate controls.
+      if (body.session && !isAgentConversation(String(body.session))) throw Object.assign(new Error("此记录不能继续对话，请新建会话。"), { code: "conflict" });
       return conversations.send({ session: typeof body.session === "string" ? body.session : undefined, text: body.text, requestKey: typeof body.requestKey === "string" ? body.requestKey : undefined, attachments: await attachments.accept(body.attachments) });
     },
     "GET /settings": () => getSettings(),
-    "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),
+    "POST /settings": () => updateSettings(call, body),
     "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs") as unknown[]],
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("notify.activity", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
@@ -160,10 +160,10 @@ async function api(request: Request, path: string[]) {
     "POST /install": () => call("modules.install", body),
     "GET /credentials": () => call("secrets.list"),
     "GET /pages": () => listPages(),
-    // v2-20: Chrona's own modules, read-only; with ?module=, also the conversations it works in.
-    // v2-21: the user's own memory search and deletion, through the memory system module.
-    "GET /memory": () => call(url.searchParams.get("query") ? "memory.recall" : "memory.status", url.searchParams.get("query") ? { query: url.searchParams.get("query") } : {}),
-    "POST /memory/forget": () => call("memory.forget", { id: body.id }),
+    // Kernel interfaces are read-only; only modules includes bounded build facts.
+    // Memory discovery and selection belong to this entry application.
+    "GET /memory": () => memoryView(call, "web", url.searchParams.get("query") ?? undefined),
+    "POST /memory/forget": () => memoryForget(call, "web", body.id),
     "GET /system-apps": () => systemApps(call, url.searchParams.get("module") ?? undefined),
     "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined }),
     "POST /call": () => moduleCall(body),

@@ -103,12 +103,12 @@ test("owner cancel blocks tools immediately, retains input and never retries the
   await expect(api.runs.authenticate(f.run.token)).rejects.toMatchObject({ code: "forbidden" });
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
 });
-test("progress is safe, deduplicated and bounded; request notices go through notify.send", async () => {
-  const f = await fixture(); await api.settings.update({ notifications: { dailyCap: 0 } });
+test("progress is safe, deduplicated and bounded; requests publish durable notification facts", async () => {
+  const f = await fixture();
   for (let i = 0; i < 350; i++) await f.channel.events.progress({ phase: i % 2 ? "reading" : "writing", tool: null });
   expect(await db.audit.count({ where: { kind: "provider_event" } })).toBe(300);
   const result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  // The budget (folded under dailyCap 0) is the notify module's; Chrona queues a normal, non-responding notice.
+  // Notification budgets belong to notify; the kernel publishes a normal request fact.
   expect(await notice(db)).toMatchObject({ level: "now", idempotencyKey: `provider-input:${f.run.id}` });
   await api.provider.answer(request.id, { decision: "cancel" }); expect(await result).toEqual({ decision: "cancel" });
 });
@@ -131,14 +131,14 @@ test("a pending launch publishes cancellation before it can start work", async (
   await gate.handle.abort(); expect(gate.stopped()).toBe(true); expect(await injection).toBe(true);
   expect((await gate.handle.done).outcome).toBe("failed");
 });
-test("a recorded late cancel stops only linked automatic retries, not unrelated work or schedules", async () => {
+test("a failed run creates no kernel retry and late cancellation leaves app timers and unrelated work alone", async () => {
   const f = await fixture(); await api.runs.finish(f.run.id, { outcome: "failed", sessionId: null, error: "Synthetic" });
-  const retry = await db.run.findFirstOrThrow({ where: { status: "queued" } });
+  expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
   const unrelated = await api.runs.enqueue({ sessionId: f.session.id, lane: "background", trigger: "schedule", prompt: "Separate work" });
-  const schedule = await api.schedules.create(f.session.id, { mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Future arrangement" });
+  const module = await db.module.create({ data: { workspaceId, name: "timer-owner" } });
+  const schedule = await api.schedules.forModule(module.id, module.name).create({ key: "future", label: "Future arrangement", rule: { kind: "every", minutes: 60 }, payload: {} });
   await db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: f.run.id, details: {} } });
   await api.provider.cancel(f.run.id);
-  expect((await db.run.findUniqueOrThrow({ where: { id: retry.id } })).status).toBe("cancelled");
   expect((await db.run.findUniqueOrThrow({ where: { id: unrelated.id } })).status).toBe("queued");
   expect((await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).status).toBe("active");
 });

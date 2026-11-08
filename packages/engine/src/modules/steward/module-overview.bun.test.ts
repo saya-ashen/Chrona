@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { moduleManifestSchema, moduleRuntimeParams } from "@chrona/contracts/steward";
 import { settingsView, moduleSettingsOutputSchema, setModuleSettings } from "./module-overview";
 import { registerSystemModules } from "./system-modules";
+import { createSettings } from "./settings";
 import { callSync } from "./module-calls";
 import { moduleInterfaces, moduleInterfacesOutputSchema } from "./system-apps";
 import { testDb } from "./test-db";
@@ -51,13 +52,17 @@ test("settings-get uses defaults for obsolete values and no declarations for loc
   await f.db.module.create({ data: { workspaceId: f.w, name: "inactive" } });
   for (const name of ["workspace-local", "inactive", "activity"]) expect(await settingsView(f.ports, f.w, name)).toEqual({ declarations: {}, values: {} });
 });
-test("a system module keeps its settings-set behavior and settings-get declarations", async () => {
+test("kernel settings expose only governance; retired memory has no system settings", async () => {
   const f = await fixture();
-  expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "memory-local", autoRetain: false })).toMatchObject({ values: { provider: "memory-local", autoRecall: true, autoRetain: false } });
-  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.w } })).settings).toMatchObject({ memory: { provider: "memory-local", autoRetain: false } });
-  expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "" })).toMatchObject({ values: { provider: "" } });
+  const owner = { workspaceId: f.w, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
+  const updated = await createSettings({ ...f.ports, workspaceId: f.w }).update({ timezone: "Asia/Shanghai" });
+  expect(Object.keys(updated).sort()).toEqual(["modelUsage", "moduleModel", "timezone"]);
+  expect(updated).toMatchObject({ timezone: "Asia/Shanghai" });
+  expect((await callSync(f.ports, owner, "modules.build-settings", {})).output).toHaveProperty("builds");
   await expect(setModuleSettings(f.ports, f.w, "activity", {})).rejects.toThrow("has no settings");
-  expect(await settingsView(f.ports, f.w, "memory")).toMatchObject({ declarations: { autoRecall: { type: "boolean" } } });
+  await expect(setModuleSettings(f.ports, f.w, "memory", { provider: "memory-local" })).rejects.toMatchObject({ code: "not_found" });
+  await expect(settingsView(f.ports, f.w, "memory")).rejects.toMatchObject({ code: "not_found" });
+  for (const target of ["memory.get", "content.read", "history.file"]) await expect(callSync(f.ports, owner, target, {})).rejects.toMatchObject({ code: "not_found" });
 });
 test("interfaces are read-only declarations and local metadata grants no execution authority", async () => {
   const f = await fixture();

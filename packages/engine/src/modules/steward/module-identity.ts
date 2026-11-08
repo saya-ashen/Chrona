@@ -8,10 +8,12 @@ export const isReservedModuleName = (name: string) => kernelNames.has(name) || b
 /** For persisted apps ONLY Module.builtin decides origin; source/manifest/hash never do. */
 export function moduleIdentity(row: { name: string; builtin: boolean }, options: { configurable?: boolean; removable?: boolean } = {}) {
   const origin: ModuleOrigin = row.builtin ? "builtin" : "external";
-  const capabilities = moduleCapabilities(origin, options);
+  const capabilities = moduleCapabilities(origin, { ...options, ...(isRemovableMcp(row) ? { removable: true } : {}) });
   if (row.builtin && row.name === "agent") for (const operation of ["build", "propose", "group", "activate", "update", "rollback", "remove", "install"] as const) capabilities[operation] = false;
   return { origin, capabilities };
 }
+/** Only the official external MCP name is exempt from entry-app removal protection. */
+export const isRemovableMcp = (row: { name: string; builtin: boolean }) => row.name === "mcp" && !row.builtin;
 export function moduleCapabilities(origin: ModuleOrigin, options: { configurable?: boolean; removable?: boolean } = {}): ModuleCapabilities {
   const external = origin === "external", app = origin !== "kernel";
   return {

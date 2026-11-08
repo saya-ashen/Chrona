@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { executionStartV2Schema, executionProjectGrantP2Schema, workCleanupInputSchema, workCleanupReceiptSchema, workWorkspaceSchema, executionSourceReceiptSchema, executionChangesSchema } from "@chrona/contracts/steward";
 import { z } from "zod";
 import type { StewardPorts, ServerWorkspaceRequest, PreparedServerWorkspace } from "./ports";
@@ -18,12 +16,6 @@ function held(ports: StewardPorts) {
   let map = locks.get(ports);
   if (!map) { map = new Map(); locks.set(ports, map); }
   return map;
-}
-async function projectRules(ports: StewardPorts, workspaceId: string, runId: string) {
-  const row = await ports.db.executionAttempt.findFirst({ where: { workspaceId, runId, executorId: "server" }, include: { run: true } });
-  if (!row?.resolvedCwd || row.capabilityRevokedAt || row.run.status !== "running") throw new CallError("forbidden", "Project rules require an active execution");
-  try { return { text: (await readFile(join(row.resolvedCwd, "AGENTS.md"), "utf8")).slice(0, 32_000) }; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { text: "" }; throw error; }
 }
 async function executionCapture(ports: StewardPorts, workspaceId: string, name: string, args: Record<string, unknown>) {
   const row = await ports.db.executionAttempt.findFirst({ where: { workspaceId, ...(name === "capture" ? { runId: String(args.runId) } : { id: String(args.attemptId) }) }, include: { run: true } });
@@ -57,19 +49,17 @@ function release(ports: StewardPorts, workspaceId: string, lockId: string) {
 }
 /** Preparation I/O is outside the writer transaction; the module retains its lock until explicit release. */
 export function registerWorkspaceModule() {
-  registerLocalModule({ name: "workspace-local", description: "Local execution workspace", unrecorded: ["prepare", "release", "cleanup", "capture", "capture-file", "result", "rules"],
+  registerLocalModule({ name: "workspace-local", description: "Local execution workspace", unrecorded: ["prepare", "release", "cleanup", "capture", "capture-file", "result"],
     tools: [
       tool("prepare", "Prepare an authorized workspace", {}, [], { visibility: ["kernel"], input: z.object({ request: requestSchema }).strict(), output: preparedSchema }),
       tool("release", "Release a preparation lock", {}, [], { visibility: ["kernel"], input: z.object({ lockId: z.string().uuid() }).strict(), output: z.object({ released: z.literal(true) }).strict() }),
       tool("cleanup", "Receipt-first workspace cleanup", {}, [], { visibility: ["kernel"], input: z.object({ principal: principalSchema, input: workCleanupInputSchema }).strict(), output: workCleanupReceiptSchema }),
-      tool("rules", "Read selected project rules", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1) }).strict(), output: z.object({ text: z.string().max(32_000) }).strict() }),
       tool("capture", "Capture stopped execution files", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1) }).strict(), output: z.object({ captured: z.literal(true) }).strict() }),
       tool("capture-file", "Copy a Run output into its receiving application's content area", {}, [], { visibility: ["kernel"], input: z.object({ runId: z.string().min(1), path: z.string().min(1).max(8192) }).strict(), output: z.object({ name: z.string(), ref: z.string(), size: z.number().int().nonnegative(), mime: z.string(), sha256: z.string() }).strict() }),
       tool("result", "Read immutable execution capture", {}, [], { visibility: ["kernel"], input: z.object({ attemptId: z.string().min(1) }).strict(), output: executionChangesSchema.nullable() }),
     ],
     async handle({ ports, workspaceId }, name, args) {
       if (name === "capture-file") return captureRunFile(ports, workspaceId, String(args.runId), String(args.path));
-      if (name === "rules") return projectRules(ports, workspaceId, String(args.runId));
       if (name === "capture" || name === "result") return executionCapture(ports, workspaceId, name, args);
       if (name === "cleanup") return cleanup(ports, workspaceId, args);
       if (name === "release") return release(ports, workspaceId, String(args.lockId));

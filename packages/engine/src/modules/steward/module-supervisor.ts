@@ -11,7 +11,7 @@ import { currentModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
 import { rollbackFailedStart } from "./module-generation";
-import { resolveBuiltinRelease } from "./module-release";
+import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
 import { isAgentApplication } from "./agent-application";
 import { projectReadiness, type ModuleReadinessReport, type ModuleReadinessRecord } from "./module-readiness";
@@ -191,8 +191,8 @@ class ModuleSupervisor {
     assertModuleOperation(module, "enable");
     const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
     if (version.status !== "approved") throw new Error("Module version is not approved");
-    if (module.builtin && version.source === "builtin" && /^[a-f0-9]{64}$/.test(instance.hash)) {
-      const release = await resolveBuiltinRelease(ports, module.name, instance.hash);
+    if (version.source === "builtin" && /^[a-f0-9]{64}$/.test(instance.hash) && (module.builtin || ["mcp", "files", "events"].includes(module.name))) {
+      const release = module.builtin ? await resolveBuiltinRelease(ports, module.name, instance.hash) : await resolveExternalRelease(ports, module.name, instance.hash);
       if (JSON.stringify(release.manifest) !== JSON.stringify(instance.manifest)) throw new Error("Built-in release manifest differs from registered metadata");
       codeDir = release.codeDir;
     }

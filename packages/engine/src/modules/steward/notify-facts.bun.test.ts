@@ -15,6 +15,17 @@ async function fixture() {
   const create = () => createNotify({ store, publicUrl: null, directory: async () => ({ modules: [], tools: [] }), call: async () => { throw new Error("No external channel"); }, status: async () => { throw new Error("No pending delivery"); } });
   return { store, now, create, notify: create() };
 }
+test("notification preferences persist privately and reject malformed changes without publishing facts", async () => {
+  const { store, notify, now, create } = await fixture(), caller = { kind: "owner" as const, via: null };
+  const settings = { dailyCap: 8, timezone: "UTC", digestAt: "18:30", quietHours: null };
+  expect(notify.handle("settings", { settings: JSON.stringify(settings) }, caller, now)).toEqual({ settings });
+  expect(create().handle("settings", {}, caller, now)).toEqual({ settings });
+  for (const value of ["{", JSON.stringify({ ...settings, timezone: "invalid/zone" }), JSON.stringify({ ...settings, dailyCap: -1 }), JSON.stringify({ ...settings, quietHours: { start: "25:00", end: "08:00" } }), JSON.stringify({ ...settings, arbitrary: true })]) {
+    expect(notify.handle("settings", { settings: value }, caller, now)).toMatchObject({ error: "invalid" });
+    expect(store.settings()).toEqual(settings);
+  }
+  expect(store.rows("SELECT * FROM notifications")).toEqual([]);
+});
 function notice(id: string, key = id): Fact { return { id, at: "2026-11-08T12:00:00Z", type: "notice", data: { key, title: "完成", body: "正文", level: "now", responds: true } }; }
 test("lost ACK reply retains private staging and recovery never duplicates delivery", async () => {
   const { store, notify, now, create } = await fixture(), fact = notice("one");

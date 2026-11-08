@@ -5,12 +5,13 @@ import { tmpdir } from "node:os";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
 import type { ProviderAnswer, ProviderRunView } from "@chrona/contracts";
+import { queueBuild } from "../../../packages/engine/src/modules/steward/module-build-session";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, service: ReturnType<typeof createStewardService>;
-let workspaceId: string, sessionId: string;
+let workspaceId: string;
 let answers: ProviderAnswer[];
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = [];
-  ports = { db, now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
+  ports = { db, moduleSdk: join(import.meta.dirname, "../../../packages/integrations/src/steward/module-sdk"), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
       const controller = new AbortController();
       const done = (async () => {
@@ -20,7 +21,9 @@ beforeEach(async () => {
       })();
       return { done, inject: async () => {}, abort: async () => { controller.abort(); await done; } };
     } } };
-  service = createStewardService(ports); sessionId = (await db.session.create({ data: { workspaceId, key: "web:fixture", source: "web", title: "Fixture" } })).id;
+  service = createStewardService(ports);
+  await queueBuild(ports, workspaceId, { key: "provider-fixture", actorKey: "owner", originSessionId: null,
+    request: { name: "fixture-app", goal: "Fixture only", examples: [], files: [], intent: { changes: ["Fixture"], preserves: [] } } });
 
 });
 afterEach(async () => {
@@ -29,7 +32,7 @@ afterEach(async () => {
 });
 // Internal channel regression. Public Agent SDK question/control behavior is covered in agent-module-calls.
 async function start() {
-  await service.forWorkspace(workspaceId).runs.enqueue({ sessionId, lane: "background", trigger: "schedule", prompt: "Fixture only" }); await service.tick();
+  await service.tick();
   for (let i = 0; i < 100; i++) {
     const run = (await service.forWorkspace(workspaceId).provider.list() as ProviderRunView[])[0];
     if (run?.interactions.length) return run; await Bun.sleep(5);

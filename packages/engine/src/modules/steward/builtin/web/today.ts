@@ -16,10 +16,10 @@ async function problems(call: Call) {
   })).sort((a, b) => (b.since ?? "").localeCompare(a.since ?? "")).slice(0, 20);
 }
 /** Web owns the overview horizon, ordering and presentation. Reads use existing governed module APIs. */
-export async function todayView(call: Call) {
+export async function todayView(call: Call, sessionsView: () => Promise<unknown[]>) {
   const [runtime, approvals, schedules, notifications, sessions, apps, issues, notificationStatus] = await Promise.all([
     call("activity.runtime"), call("approvals.list"), call("schedules.list", { timers: true }), call("notify.list", { limit: 20 }).catch(() => ({ items: [] })),
-    call("history.sessions", { entries: true, limit: 20 }), call("modules.list"), problems(call).catch(() => []), call("notify.status").catch(() => null),
+    sessionsView().then(items => items.slice(0, 20)), call("modules.list"), problems(call).catch(() => []), call("notify.status").catch(() => null),
   ]) as [{ at: string; [key: string]: unknown }, unknown[], Schedule[], { items: { format?: string; [key: string]: unknown }[] }, unknown[], App[], Awaited<ReturnType<typeof problems>>, { queued: number; failed: number } | null];
   const { at, ...health } = runtime, now = Date.parse(at), end = now + 7 * 86400000;
   const upcoming = schedules.filter(schedule => schedule.status === "active" && schedule.nextAt && Date.parse(schedule.nextAt) >= now && Date.parse(schedule.nextAt) <= end && (!schedule.until || schedule.nextAt <= schedule.until))

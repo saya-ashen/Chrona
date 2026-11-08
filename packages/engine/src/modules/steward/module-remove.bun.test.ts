@@ -11,13 +11,13 @@ import type { StewardPorts } from "./ports";
 
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
-async function fixture() {
+async function fixture(name = "example", entry = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-remove-");
   const workspace = await db.workspace.create({ data: { name: "remove" } });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
   closes.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "version" } });
-  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "version" } });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], ...(entry ? { uses: ["*"] } : {}) });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "version", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const context = moduleContext(ports, workspace.id);
   const data = join(context.platform, "data", module.id);
@@ -51,6 +51,38 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
   expect(await f.db.approval.count()).toBe(0);
   expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).not.toBeNull();
+});
+
+test.each(["other-entry", "files", "events"])("entry removal exception does not extend to %s", async name => {
+  const f = await fixture(name, true);
+  await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.approval.count()).toBe(0);
+});
+
+test("official MCP entry can be removed only after the explicit data deletion approval", async () => {
+  const f = await fixture("mcp", true);
+  const request = await requestRemove(f.context, f.module.id, "remove MCP");
+  const approval = await f.db.approval.findUniqueOrThrow({ where: { id: request.approvalId } });
+  expect(approval).toMatchObject({ action: "delete_data", status: "open", moduleId: null, payload: { kind: "module_remove", moduleId: f.module.id, name: "mcp" } });
+  await expect(removeApproved(f.context, { workspaceId: f.workspace.id, approvalId: approval.id, payload: approval.payload! })).rejects.toMatchObject({ code: "conflict" });
+  expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
+  await f.db.approval.update({ where: { id: approval.id }, data: { status: "approved" } });
+  await removeApproved(f.context, { workspaceId: f.workspace.id, approvalId: approval.id, payload: approval.payload! });
+  expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
+  const audit = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
+  expect(await readFile(join((audit.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
+});
+
+test.each(["unknown", "dependency"])("MCP removal rechecks %s after approval", async kind => {
+  const f = await fixture("mcp", true), action = await f.approved();
+  if (kind === "unknown") await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "owner", target: "mcp", tool: "read", args: {}, key: "unknown", mode: "sync", status: "unknown" } });
+  else {
+    const other = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "consumer", activeHash: "consumer" } });
+    await f.db.moduleVersion.create({ data: { moduleId: other.id, hash: "consumer", manifest: { ...f.manifest, name: "consumer", uses: ["mcp.read"] }, source: "user", status: "approved", intent: {}, report: {} } });
+  }
+  await expect(removeApproved(f.context, action)).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ status: "active" });
+  expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
 });
 
 test("approval restoration rechecks identity and unknown results", async () => {

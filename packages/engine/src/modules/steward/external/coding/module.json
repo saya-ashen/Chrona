@@ -1747,7 +1747,7 @@
     "agent.stream",
     "projects.list",
     "projects.register",
-    "projects.default"
+    "projects.create"
   ],
   "packages": [],
   "secrets": [],

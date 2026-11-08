@@ -42,6 +42,11 @@ async function reportReady(ready: boolean) {
     return true;
   } catch { log("qq.channel_report_failed"); return false; }
 }
+let conversationBinding = async (): Promise<QqBinding | null> => null;
+const conversations = createQqConversations({ dataDir: chrona.paths.data, contentDir: chrona.paths.content, call: (target, args) => chrona.call(target, args), binding: () => conversationBinding(), deliver: item => reply(item) });
+on("schedule", async event => ({ result: await conversations.app.legacyWake(event) }));
+let pollConversations = async () => { await conversations.app.poll(); }, polling = false;
+setInterval(() => { if (!polling) { polling = true; void pollConversations().catch(() => log("qq.conversation_poll_failed")).finally(() => { polling = false; }); } }, 1000);
 const credentials = async () => (await chrona.secret({ name: "qq_bot" })).value as { appId?: string; clientSecret?: string };
 const appId = await credentials().then(value => /^\d{5,20}$/.test(value.appId ?? "") && value.clientSecret ? value.appId! : null, () => null);
 
@@ -55,7 +60,8 @@ if (!appId) {
 } else {
   const tokens = createQqTokenSource({ appId, readSecret: async () => (await credentials()).clientSecret!, log });
   const state = createQqBotState(chrona.paths.data, appId);
-  const conversations = createQqConversations({ dataDir: chrona.paths.data, contentDir: chrona.paths.content, call: (target, args) => chrona.call(target, args), binding: () => state.binding(), deliver: item => reply(item) });
+  conversationBinding = () => state.binding();
+  pollConversations = async () => { await conversations.poll(); };
   const relay = createRelay({ conversations, call: (target, args) => chrona.call(target, args), notify: args => chrona.call("notify.send", args, { mode: "async", key: `final:${String(args.key)}` }),
     publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, download: downloadQqAttachment });
   let recipients = new Set<string>(), ready: boolean | null = null;
@@ -110,7 +116,5 @@ if (!appId) {
   await refreshBinding();
   gateway.start();
   setInterval(() => void writeStatus(), 30_000);
-  let polling = false;
-  setInterval(() => { if (!polling) { polling = true; void conversations.poll().catch(() => log("qq.conversation_poll_failed")).finally(() => { polling = false; }); } }, 1000);
   await writeStatus();
 }

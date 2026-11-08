@@ -7354,7 +7354,7 @@ var moduleToolSchema = preprocess(withoutCallers, object({
 }).strict());
 // packages/contracts/src/steward/module-lifecycle.ts
 var PREINSTALLED_MODULE_NAMES = ["qq", "remind", "mind"];
-var OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor"];
+var OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor", "mcp", "files", "events"];
 var OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES];
 var moduleVersionHashSchema = string2().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 var moduleOriginSchema = _enum(["kernel", "builtin", "external"]);
@@ -8121,6 +8121,14 @@ function settingValueValid(setting, value) {
 var SECRET_NAME_SCHEMA = string2().regex(/^[a-z][a-z0-9_]{1,40}$/);
 var SECRET_FIELD_NAME = string2().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
 var secretLabel = string2().min(1).max(80);
+var oauthEndpoint = string2().url().refine((value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.hash && !url.search;
+  } catch {
+    return false;
+  }
+});
 var secretSpecSchema = object({
   name: SECRET_NAME_SCHEMA,
   label: secretLabel.optional(),
@@ -8133,7 +8141,14 @@ var secretSpecSchema = object({
     plain: boolean2().optional()
   }).strict()).max(20).default([]),
   extraFields: object({ label: secretLabel, valueLabel: secretLabel, description: string2().max(300).optional() }).strict().optional(),
-  oauth: object({ provider: _enum(["google", "microsoft"]), scopes: array(string2().min(1).max(200)).min(1).max(20), accounts: boolean2().optional() }).strict().optional()
+  oauth: object({
+    provider: _enum(["google", "microsoft"]),
+    scopes: array(string2().min(1).max(200)).min(1).max(20),
+    accounts: boolean2().optional(),
+    authorizationUrl: oauthEndpoint,
+    tokenUrl: oauthEndpoint,
+    authorizationParams: record(string2().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/), string2().max(2000)).refine((value) => !Object.keys(value).some((key) => ["response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method"].includes(key))).optional()
+  }).strict().optional()
 }).strict();
 var moduleManifestSchema = preprocess(withoutRemovedFields, object({
   name: slug,
@@ -8272,7 +8287,7 @@ var SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
 function grantedUses(manifest) {
   return [...new Set([...manifest.uses ?? [], ...manifest.secrets?.length ? SECRET_TARGETS : []])];
 }
-var SYSTEM_MODULES = ["chat", "approvals", "modules", "settings", "schedules", "provider", "secrets", "activity", "memory"];
+var SYSTEM_MODULES = ["approvals", "modules", "settings", "schedules", "secrets", "activity", "projects"];
 var expectedModuleTargetSchema = object({ moduleId: string2().min(1), contractHash: string2().regex(/^[a-f0-9]{64}$/) }).strict();
 var moduleCallSchema = discriminatedUnion("method", [
   object({ id: channelId, method: literal("call"), params: object({
@@ -8344,7 +8359,7 @@ var runSchema = object({
   createdAt: iso3,
   label: string2().max(80).nullable()
 }).strict();
-var contentRefSchema = string2().trim().min(3).max(542).regex(/^[a-z][a-z0-9-]{1,40}\//, "starts with a module name").refine((ref) => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
+var contentRefSchema = string2().trim().min(3).max(542).regex(/^(?!chat\/)[a-z][a-z0-9-]{1,40}\//, "starts with an application name").refine((ref) => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
 var attachmentSchema = object({ name: short, ref: contentRefSchema.nullable(), mime: string2().max(100), size: number2().int().min(0) }).strict();
 var messageSchema = object({
   id: id5,
@@ -8421,15 +8436,14 @@ var buildSettingsSchema = object({
 }).strict();
 var memorySettingsSchema = object({ provider: slug.nullable(), autoRecall: boolean2(), autoRetain: boolean2() }).strict();
 var sessionSettingsSchema = object({ idleMinutes: number2().int().min(5).max(1440), minContextTokens: number2().int().min(0).max(1e6), maxContextTokens: number2().int().min(1e4).max(1e6) }).strict();
-var settingsSchema = object({
-  notifications: notificationSettingsSchema,
-  memory: memorySettingsSchema,
-  sessions: sessionSettingsSchema,
+var buildGovernanceSchema = object({
   builds: buildSettingsSchema,
-  buildUsage: object({ date: string2(), timezone: string2(), used: number2().int().min(0), remaining: number2().int().min(0) }).strict(),
+  buildUsage: object({ date: string2(), timezone: string2(), used: number2().int().min(0), remaining: number2().int().min(0) }).strict()
+}).strict();
+var settingsSchema = object({
+  timezone: string2().min(1).max(80),
   modelUsage: array(object({ module: string2(), calls: number2().int().min(0), inputTokens: number2().int().min(0), outputTokens: number2().int().min(0) }).strict()),
-  moduleModel: moduleModelSettingsSchema.nullable(),
-  chat: object({ channel: notificationChannelSchema, bound: boolean2(), sentToday: number2().int().min(0) }).strict()
+  moduleModel: moduleModelSettingsSchema.nullable()
 }).strict();
 var healthSchema = object({
   provider: object({ name: short, available: boolean2(), sandboxed: boolean2(), lastError: string2().max(500).nullable() }).strict(),
@@ -8473,19 +8487,9 @@ var moduleScheduleSchema = object({
 var updateScheduleSchema = object({ status: _enum(["active", "paused", "cancelled"]) }).strict();
 var resolveApprovalSchema = object({ decision: _enum(["approve", "deny"]), scope: _enum(APPROVAL_SCOPES).default("once") }).strict();
 var createGrantSchema = object({ action: _enum(ACTIONS), mode: _enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso3.optional() }).strict();
-var updateSettingsSchema = object({ notifications: notificationSettingsSchema.partial().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional(), builds: buildSettingsSchema.partial().optional(), memory: memorySettingsSchema.partial().optional(), sessions: sessionSettingsSchema.partial().optional() }).strict();
+var updateSettingsSchema = object({ timezone: string2().min(1).max(80).optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 var chronaToolInputSchemas = {
-  chrona_reply: object({ text: text.max(8000), files: array(relativePathSchema).max(10).default([]).describe("Files to attach: paths in your working directory (write them there first), received attachments under content/chat/, or an app's content by reference content/<module>/<path> (e.g. a generated image; at most 20 MiB)") }).strict(),
-  chrona_notify: object({ level: _enum(["now", "digest"]), title: text.max(200), body: text.max(4000) }).strict(),
-  chrona_schedule: createScheduleSchema.extend({ label: string2().trim().min(1).max(80).describe("Short user-facing name shown on pages, in the user's language, e.g. \u51C6\u5907\u7B2C2\u5929\u6750\u6599") }).describe("wake: at the time, a fresh session runs `text` as its whole instruction (write it self-contained: goal, files under content/, what to report) and posts the result back to this session. remind: sends `text` to the user without a model; when an app offers reminders or a calendar (see its tools), use that app instead so the user sees and edits them there."),
-  chrona_schedules: object({}).strict(),
-  chrona_schedule_cancel: object({ scheduleId: id5 }).strict(),
-  chrona_session_search: object({ query: text.max(200), limit: number2().int().min(1).max(10).default(3) }).strict(),
-  chrona_request_approval: object({ action: _enum(ACTIONS), title: text.max(200), detail: text.max(4000), preview: text.max(20000) }).strict(),
-  chrona_request_path_access: object({ path: text.max(4096), reason: text.max(2000) }).strict().describe("Ask the user to authorize read-write access to an absolute host directory or file. In required-isolation, approved paths are mounted into later runs; trusted-local uses host OS permissions and does not hide paths. After the decision Chrona continues this conversation in a new run."),
-  chrona_remember: object({ text: text.max(500), topic: _enum(PREFERENCE_TOPICS).default("general").describe("ui for how the user likes pages laid out") }).strict(),
-  chrona_forget: object({ preferenceId: id5 }).strict(),
-  chrona_preferences: object({}).strict()
+  chrona_reply: object({ text: text.max(8000), files: array(relativePathSchema).max(10).default([]).describe("Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.") }).strict()
 };
 var moduleIntent = object({ changes: array(text.max(500)).min(1).max(20), preserves: array(text.max(500)).max(20).default([]) }).strict().describe("What this version changes and what it keeps (shown on the approval card)");
 var modulesToolInputSchemas = {
@@ -8503,7 +8507,7 @@ var modulesToolInputSchemas = {
     dir: relativePathSchema,
     source: _enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation")
   }).strict().refine((input) => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash").describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; it can be customized through the checked module lifecycle. Returns the exact source version; does not submit or activate it."),
-  propose: object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict().describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync\u2192result; async\u2192{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})\u2192{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})\u2192{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 \xA74): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})\u2192{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration and new credentials require the owner decision.'),
+  propose: object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict().describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync\u2192result; async\u2192{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})\u2192{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})\u2192{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 \xA74): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})\u2192{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,authorizationUrl:HTTPS-without-query,tokenUrl:HTTPS-without-query,scopes:[...],accounts?,authorizationParams?:{key:value}}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration, new credentials and changed OAuth definitions require the owner decision. OAuth URLs and authorization extras are declared by the application; Google offline authorization uses authorizationParams:{access_type:"offline",prompt:"consent"}, and Microsoft refresh authorization includes offline_access in scopes.'),
   rollback: object({ module: slug, hash: moduleVersionHashSchema }).strict().describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": object({ versions: array(object({ module: slug, hash: moduleVersionHashSchema }).strict()).min(2).max(4) }).strict().describe("v2-15, build conversations that declared several modules: once every declared module has a candidate that passed its checks (pending_review), activate them all together; asks the user once only when one adds credentials. Versions needing a data migration are refused; build that module on its own first."),
   "stop-build": object({ session: id5 }).strict().describe("Stop a module build conversation's queued/running work; keep its files and history. Already submitted versions and approvals are not withdrawn."),

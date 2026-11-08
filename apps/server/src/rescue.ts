@@ -4,10 +4,10 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { resolveApprovalSchema } from "@chrona/contracts/steward";
-import { StewardError, type StewardPorts, type StewardService } from "@chrona/engine";
+import { StewardError, type StewardService } from "@chrona/engine";
 
 /** No main-app middleware, cookies, CORS, or module routing on this origin. */
-export function createRescueApp(ports: StewardPorts, service: StewardService, key: string, html: string) {
+export function createRescueApp(service: StewardService, key: string, html: string) {
   const app = new Hono();
   const digest = (value: string) => createHash("sha256").update(value).digest();
   const expected = digest(`Bearer ${key}`);
@@ -32,31 +32,27 @@ export function createRescueApp(ports: StewardPorts, service: StewardService, ke
   });
   const api = () => service.forWorkspace("ws_default");
   app.get("/", c => c.html(html));
-  app.get("/api/messages", async c => {
-    const session = await ports.db.session.findFirst({ where: { workspaceId: "ws_default", key: "rescue", status: "active" } });
-    return c.json({ items: session ? await api().chat.messages(200, session.id) : [] });
+  app.get("/api/modules", async c => c.json({ items: await api().modules.list() }));
+  app.post("/api/modules/:id/pause", async c => {
+    z.object({}).strict().parse(await c.req.json());
+    return c.json(await api().modules.lifecycle("disable", c.req.param("id"), { reason: "rescue" }, true));
   });
-  app.post("/api/chat", async c => {
-    const { text } = z.object({ text: z.string().trim().min(1).max(20000) }).strict().parse(await c.req.json());
-    const reply = await api().chat.handleMessage({ channel: "in_app", key: "rescue", text });
-    const run = reply.runId ? await ports.db.run.findUnique({ where: { id: reply.runId }, select: { status: true } }) : null;
-    if (!ports.provider || run?.status === "provider_unavailable" || run?.status === "failed") {
-      for (const message of reply.messages) message.text = "Provider unavailable. Use chrona admin on the host to repair Chrona; approvals remain available here.";
-    }
-    return c.json(reply);
+  app.post("/api/modules/:id/rollback", async c => {
+    const input = z.object({ hash: z.string().min(1).max(200) }).strict().parse(await c.req.json());
+    return c.json(await api().modules.rollback(c.req.param("id"), input.hash));
   });
   app.get("/api/approvals", async c => c.json({ items: await api().approvals.list("open") }));
   app.post("/api/approvals/:id/resolve", async c => c.json((await api().approvals.resolve(c.req.param("id"), resolveApprovalSchema.parse(await c.req.json()), "rescue")).approval));
   return app;
 }
 
-export function startRescueListener(ports: StewardPorts, service: StewardService, htmlPath: string, env = process.env, log: (message: string) => void = console.error) {
+export function startRescueListener(service: StewardService, htmlPath: string, env = process.env, log: (message: string) => void = console.error) {
   if (!env.CHRONA_RESCUE_PORT) return;
   if (!env.RESCUE_KEY) { log("Rescue listener not started: RESCUE_KEY is required"); return; }
   const port = Number(env.CHRONA_RESCUE_PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65535) { log("Rescue listener not started: invalid CHRONA_RESCUE_PORT"); return; }
   try {
-    const app = createRescueApp(ports, service, env.RESCUE_KEY, readFileSync(htmlPath, "utf8"));
+    const app = createRescueApp(service, env.RESCUE_KEY, readFileSync(htmlPath, "utf8"));
     return Bun.serve({ hostname: env.CHRONA_RESCUE_HOST ?? "127.0.0.1", port, idleTimeout: 120, fetch: app.fetch });
   } catch { log("Rescue listener could not start"); return; }
 }

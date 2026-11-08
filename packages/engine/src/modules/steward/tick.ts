@@ -1,30 +1,21 @@
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { hostname } from "node:os";
 import type { StewardPorts } from "./ports";
 import { createSchedules } from "./schedules";
 import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
 import { createRuns, liveRuns } from "./runs";
-import { notificationSettings } from "./settings";
 import { audit } from "./audit";
-import { hostPathsFor } from "./grants";
-import { chatImages } from "./chat";
-import { announceApprovals, forwardSettings } from "./notify-user";
-import { autoRetain, memoryInput } from "./memory";
+import { announceApprovals } from "./notify-user";
 import { callsSettled, drainCalls } from "./module-calls";
-import { z } from "zod";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
 import { startLocalProvider, runtimeCall } from "./local-runtime";
 import { registerWorkspaceModule } from "./local-workspace";
-import { moduleToolCatalog, moduleToolsets } from "./module-tools";
 import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
-import { EXECUTOR_LIMITS, isEntryModule, moduleManifestSchema, type ProviderAdapter } from "@chrona/contracts/steward";
-import { storedAttachments } from "./store";
+import { EXECUTOR_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
 import { retireReflection } from "./reflection-retirement";
-import { moduleIdentity } from "./module-identity";
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
@@ -34,30 +25,6 @@ import { contextRunImages } from "./agent-context-read";
 import { STEWARD_PROMPT } from "./run-instructions";
 
 type ClaimedRun = NonNullable<Awaited<ReturnType<ReturnType<typeof createRuns>["claimNext"]>>>;
-async function focusedHostPaths(ports: StewardPorts, workspaceId: string, focus: unknown, now: Date) {
-  const names = Array.isArray(focus) ? focus.filter((name): name is string => typeof name === "string") : [];
-  const modules = await ports.db.module.findMany({ where: { workspaceId, name: { in: names } }, select: { id: true } });
-  return hostPathsFor(ports.db, workspaceId, modules.map(module => module.id), now);
-}
-async function runInbound(ports: StewardPorts, workspaceId: string, run: ClaimedRun, messages: Awaited<ReturnType<StewardPorts["db"]["message"]["findMany"]>>) {
-  const source = await ports.db.audit.findFirst({ where: { workspaceId, kind: "chat_run_input", subjectId: run.id }, orderBy: { createdAt: "desc" } });
-  const messageId = z.object({ messageId: z.string() }).safeParse(source?.details).data?.messageId;
-  return messageId ? ports.db.message.findFirst({ where: { id: messageId, workspaceId, sessionId: run.sessionId ?? undefined, direction: "in" } }) : messages.findLast(m => m.direction === "in");
-}
-async function moduleContext(ports: StewardPorts, workspaceId: string, now: Date, entryModuleId: string | null | undefined) {
-  const self: { name: string; description?: string; entry: boolean; origin: "builtin" | "external"; capabilities: ReturnType<typeof moduleIdentity>["capabilities"]; status: string; lastError?: { at: string; error: string } }[] = [];
-  let via: string | undefined;
-  for (const module of await ports.db.module.findMany({ where: { workspaceId, activeHash: { not: null } }, orderBy: { name: "asc" } })) {
-    const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-    const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
-    if (!manifest) continue;
-    const entry = isEntryModule(manifest);
-    if (module.id === entryModuleId) via = module.name;
-    const failed = await ports.db.moduleRun.findFirst({ where: { moduleId: module.id, error: { not: null }, createdAt: { gte: new Date(now.getTime() - 7 * 86400000) } }, orderBy: { createdAt: "desc" } });
-    self.push({ ...moduleIdentity(module, { configurable: Object.keys(manifest.settings).length > 0, removable: !entry }), name: module.name, ...(manifest.description ? { description: manifest.description } : {}), entry, status: module.status, ...(failed ? { lastError: { at: failed.createdAt.toISOString(), error: failed.error!.slice(0, 300) } } : {}) });
-  }
-  return { self, via };
-}
 /** Build runs: their whole instruction was written when queued; they find app tools like a conversation. */
 function closedInput(run: ClaimedRun, sessionId: string | null) {
   const base = { inbound: null, searchTools: false, sessionId, hostPaths: [], content: [] };
@@ -80,7 +47,7 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
     await runs.finish(run.id, outcome, { stopEvidence: "provider_exited" });
   }, async () => {
     try { await channel.close(); } finally { await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }); }
-  }).then(() => execution ? undefined : autoRetain(ports, run.workspaceId, run.sessionId)).catch(async () => {
+  }).catch(async () => {
     try { await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
   });
 }
@@ -124,21 +91,7 @@ export function createTick(ports: StewardPorts) {
         if (context) return context;
         const closed = closedInput(run, sessionId);
         if (closed) return { ...closed, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: [] };
-        const messages = run.sessionId ? (await ports.db.message.findMany({ where: { workspaceId, sessionId: run.sessionId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 20 })).reverse() : [];
-        const preferences = await ports.db.preference.findMany({ where: { workspaceId }, select: { text: true } });
-        const agenda = await ports.db.schedule.findMany({ where: { workspaceId, originSessionId: run.sessionId, status: "active" }, take: 50 });
-        const contextMessages = messages.map(m => ({ ...m, attachments: storedAttachments(m.attachments) }));
-        const inbound = await runInbound(ports, workspaceId, run, messages);
-        // v2-21: memory tools and instructions only with a provider; a conversation's first run gets what was recalled.
-        const memory = await memoryInput(ports, workspaceId, run.session, messages);
-        const catalog = (await moduleToolCatalog(ports, run)).filter(tool => !memory.hidden.includes(tool.name)), toolsets = moduleToolsets(catalog);
-        const extraTools = catalog.filter(tool => tool.exposure === "direct").map(tool => tool.name);
-        const hostPaths = await focusedHostPaths(ports, workspaceId, run.session?.focus, now);
-        // Current app capabilities determine which app can handle a need; built-ins require a release to change code.
-        const { self, via } = await moduleContext(ports, workspaceId, now, run.session?.entryModuleId);
-        const timezone = notificationSettings(workspace.settings).timezone;
-        const prompt = `${memory.text}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
-        return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content: [], systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: inboundImages(inbound) };
+        throw new Error("Run requires an application-owned Agent context or authorized build session");
       }
       function providerInput(run: ClaimedRun, lane: "foreground" | "background" | "build", sessionDir: string, execution: Awaited<ReturnType<typeof executionRunInput>>, ordinary: Awaited<ReturnType<typeof runInput>> | null) {
         if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);
@@ -186,11 +139,9 @@ export function createTick(ports: StewardPorts) {
         await launchDeviceRuns(ports, workspaceId, now);
       }
       for (const [stage, action] of [
-        // notify keeps its own copy of the owner's notification settings: a new install or data directory gets the current ones.
         ["builtins", async () => { await registerBuiltins(ports, workspaceId); }],
         // Keep unrelated startup stages running even if one shipped app fails registration.
         ["initialization", async () => { await refreshInstallationReceipts(ports, workspaceId); await ensureWorkspaceInitialized(ports, workspaceId); }],
-        ["notification-settings", () => forwardSettings(ports.db, ports, workspaceId, notificationSettings(workspace.settings), workspace.updatedAt)],
         ["retire-reflection", () => retireReflection(ports, workspaceId)],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
         ["schedules", async () => {
@@ -215,11 +166,7 @@ export function createTick(ports: StewardPorts) {
   } });
 }
 
-      async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
-        if (!run.sessionId || !await ports.db.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return null;
-        return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "minimal" as const };
-      }
-
-function inboundImages(inbound: { attachments: unknown } | null | undefined) {
-  return chatImages(storedAttachments(inbound?.attachments));
+async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
+  if (!run.sessionId || !await ports.db.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return null;
+  return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "minimal" as const };
 }

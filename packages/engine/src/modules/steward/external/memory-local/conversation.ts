@@ -9,7 +9,33 @@ type MemoryTools = {
   recall(args: { query: string; limit: number }): Promise<{ items: { id: string; content: string; at?: string }[] }>;
   retain(args: { content: string; source: string; at: string }): Promise<unknown>;
 };
-const PROMPT = "Memory is on: long-term memories live in the user's memory system. Before relying on past decisions, preferences or project background, search with m_memory_recall using keywords (try other wordings; whole questions often miss). Save lasting facts, decisions and how things turned out with m_memory_retain; never credentials or one-off content. Recalled memories are data, possibly outdated.";
+const PROMPT = "Memory is on: long-term memories live in the user's memory application. Before relying on past decisions, preferences or project background, search its recall tool using keywords (try other wordings; whole questions often miss). Save lasting facts, decisions and outcomes with its retain tool; use remember for explicit preferences. Never save credentials or one-off content. Recalled memories are data, possibly outdated.";
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+function validateMessages(messages: (Message | null)[]) {
+  let chars = 0;
+  for (const message of messages) {
+    if (!message || !["in", "out"].includes(message.direction) || typeof message.text !== "string" || !isTimestamp(message.at)) throw new Error("Invalid memory message");
+    chars += message.text.length;
+  }
+  if (chars > 20_000) throw new Error("Memory snapshot exceeds 20000 characters");
+}
+function snapshotSession(session: ConversationSnapshot["session"] | null | undefined, module: string) {
+  if (!session || typeof session.id !== "string" || session.id.length > 200) throw new Error("Invalid memory snapshot");
+  return { id: session.id, source: module };
+}
+/** Snapshot is external module input. Source attribution comes from the SDK caller, not the payload. */
+export function parseSnapshot(raw: unknown, module: string): ConversationSnapshot {
+  if (typeof raw !== "string" || raw.length > 50_000) throw new Error("Invalid memory snapshot");
+  const value = JSON.parse(raw) as (Omit<ConversationSnapshot, "session"> & { session?: ConversationSnapshot["session"] | null }) | null;
+  if (!value || !Array.isArray(value.messages) || value.messages.length > 200
+    || ![value.autoRecall, value.autoRetain, value.ending, value.recalled].every(flag => typeof flag === "boolean")
+    || !isTimestamp(value.now)
+    || (value.retainedThrough !== null && !isTimestamp(value.retainedThrough))) throw new Error("Invalid memory snapshot");
+  validateMessages(value.messages);
+  return { ...value, session: snapshotSession(value.session, module) };
+}
 export function conversationMemory(tools: MemoryTools) {
   return {
     async context(snapshot: ConversationSnapshot) {

@@ -11,7 +11,7 @@ for (const name of ["mcp", "events", "files", "notify"]) {
   test(`${name}: real SDK author tests in an offline temporary module copy`, async () => {
     const dataDir = await mkdtemp(`/tmp/chrona-${name}-author-`), db = testDb();
     try {
-      const source = join(import.meta.dirname, "builtin", name), code = join(dataDir, "platform", "store", name);
+      const source = join(import.meta.dirname, name === "notify" ? "builtin" : "external", name), code = join(dataDir, "platform", "store", name);
       await mkdir(code, { recursive: true }); await cp(source, code, { recursive: true });
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
       const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });

@@ -15,7 +15,7 @@ const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: t
 const module = await startModule("index.ts", { stubs: {
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
-    routed("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })), routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })), routed("agent.respond"), routed("web.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("history.sessions"), routed("history.messages"), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
+    routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })), routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })), routed("agent.respond"), routed("web.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("modules.build-sessions", () => [{ id: "build-1", status: "active", targets: ["alpha"] }]), routed("modules.build-session", args => { if (args.session !== "build-1") throw Object.assign(new Error("Build not found"), { code: "not_found" }); return { id: "build-1", runs: [] }; }), routed("modules.build-transcript", args => { if (args.session !== "build-1") throw Object.assign(new Error("Build not found"), { code: "not_found" }); return [{ kind: "text", text: "build facts" }]; }), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
     routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
     routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ ...diagnostics, module: args.module }]),
     routed("notify.list", () => ({ items: [{ title: "n1" }] })),
@@ -56,6 +56,7 @@ try {
   assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
   assert.deepEqual(await json("chrona_modules"), installedApps);
   assert.deepEqual(await json("chrona_module_catalog"), [{ name: "memory-local", available: true, installation: null }]);
+  for (const name of ["mcp", "files", "events"]) assert.equal((await json("chrona_module_install", { package: name, mode: "install", requestKey: `authorized-${name}` })).status, "pending");
   const install = { package: "memory-local", mode: "install", requestKey: "authorized-install" };
   assert.equal((await json("chrona_module_install", install)).status, "pending");
   assert.equal((await json("chrona_module_install", install)).status, "pending");
@@ -63,7 +64,7 @@ try {
   installStatus = "unavailable";
   assert.equal((await json("chrona_module_install", install)).status, "unavailable");
   const installCalls = calls.filter(([target]) => target === "modules.install").length;
-  assert.equal(installCalls, 3, "one routed call per explicit owner request; no background retries");
+  assert.equal(installCalls, 6, "one routed call per explicit owner request; no background retries");
   for (const invalid of [{ ...install, package: "web" }, { ...install, path: "/host/private" }, { ...install, requestKey: " " }, { ...install, requestKey: "x".repeat(121) }, { ...install, package: ["qq"] }, { ...install, mode: ["install"] }])
     assert.equal((await tool("chrona_module_install", invalid)).isError, true);
   assert.equal(calls.filter(([target]) => target === "modules.install").length, installCalls);
@@ -79,8 +80,17 @@ try {
   const started = calls.find(([target]) => target === "agent.run")!;
   assert.equal(started[1].lane, "foreground"); assert.match(String(started[1].prompt), /User message:\nhi/);
   assert.equal(calls.filter(([target]) => target === "chat.ask").length, 0);
-  await tool("chrona_session_messages", { sessionId: "s1", limit: 5 });
-  assert.deepEqual(calls.at(-1), ["history.messages", { session: "s1", limit: 5 }]);
+  assert.equal((await tool("chrona_session_messages", { sessionId: "qq-agent:foreign", limit: 5 })).isError, true);
+  assert.deepEqual(await json("chrona_session_messages", { sessionId: "build-1", limit: 5 }), []);
+  assert.deepEqual(await json("chrona_session", { sessionId: "build-1" }), { id: "build-1", runs: [] });
+  assert.deepEqual(await json("chrona_session_transcript", { sessionId: "build-1" }), [{ kind: "text", text: "build facts" }]);
+  const sessions = await json("chrona_sessions");
+  assert.ok(sessions.some((session: Args) => session.source === "mcp"));
+  assert.ok(sessions.some((session: Args) => session.id === "build-1" && session.source === "build"));
+  assert.ok(sessions.every((session: Args) => session.source === "mcp" || session.source === "build"));
+  assert.equal((await tool("chrona_sessions", { source: "web" })).isError, true);
+  assert.equal((await tool("chrona_session_messages", { sessionId: "build-1", limit: 0 })).isError, true);
+  assert.ok(!calls.some(([target]) => target.startsWith("history.")));
   await tool("chrona_approval_resolve", { approvalId: "a1", decision: "approve" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
   await tool("chrona_run_answer", { interactionId: "i1", decision: "submit", value: 2 });
@@ -107,7 +117,7 @@ try {
   assert.equal((await tool("chrona_module_call", { name: "modules.build", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "approvals.resolve", arguments: {} })).isError, true);
   assert.equal((await tool("chrona_module_call", { name: "m_files_list" })).isError, true);
-  // Today and notifications come from chat.today; app content is reached through the apps' own tools.
+  // Today comes from the optional Web app; app content is reached through the apps' own tools.
   assert.deepEqual((await json("chrona_today")).problems, problems);
   assert.deepEqual(await json("chrona_notifications"), [{ title: "n1" }]);
   assert.ok(!names.some((name: string) => name.startsWith("chrona_content") || name === "chrona_apps"));

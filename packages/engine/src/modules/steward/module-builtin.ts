@@ -92,6 +92,8 @@ async function seedDefaultFactConsumer(ports: StewardPorts, workspaceId: string)
   if (application) await seedFactConsumer(ports.db, workspaceId, application.id, ports.now());
 }
 async function register(ports: StewardPorts, workspaceId: string) {
+  // Category-only migration: never replace accepted code, identities or application data.
+  await ports.db.module.updateMany({ where: { workspaceId, builtin: true, name: { in: ["mcp", "files", "events"] } }, data: { builtin: false } });
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
   const failures: string[] = [];

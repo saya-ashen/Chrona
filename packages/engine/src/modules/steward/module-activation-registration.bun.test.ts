@@ -25,16 +25,10 @@ for (const name of ["files", "remind", "mind"] as const) for (const persistent o
     const workspace = await db.workspace.create({ data: { name: "registration" } });
     const builtinRoot = join(dataDir, "platform", "builtin");
     await mkdir(builtinRoot, { recursive: true });
-    if (name === "files") {
-      await cp(join(import.meta.dirname, "builtin/files"), join(builtinRoot, "files"), { recursive: true });
-      await seedTestModuleRelease(builtinRoot, "files");
-    }
     const externalRoot = join(dataDir, "platform", "external");
-    if (name !== "files") {
-      await mkdir(externalRoot, { recursive: true });
-      await cp(join(import.meta.dirname, "external", name), join(externalRoot, name), { recursive: true });
-      await seedTestModuleRelease(externalRoot, name);
-    }
+    await mkdir(externalRoot, { recursive: true });
+    await cp(join(import.meta.dirname, "external", name), join(externalRoot, name), { recursive: true });
+    await seedTestModuleRelease(externalRoot, name);
     const sdk = resolve(import.meta.dirname, "../../../../integrations/src/steward/module-sdk");
     const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
     let calls = 0, delivered = 0;
@@ -58,9 +52,9 @@ for (const name of ["files", "remind", "mind"] as const) for (const persistent o
     await cp(webRelease.codeDir, webRuntimeDir, { recursive: true });
     const web = await db.module.create({ data: { workspaceId: workspace.id, name: "web", builtin: true, activeHash: webRelease.hash } });
     await db.moduleVersion.create({ data: { moduleId: web.id, hash: webRelease.hash, manifest: webManifest, source: "user", status: "approved", intent: {}, report: {} } });
-    const release = name === "files" ? await resolveBuiltinRelease(ports, name) : await resolveExternalRelease(ports, name);
+    const release = await resolveExternalRelease(ports, name);
     await cp(release.codeDir, join(dataDir, "platform", "store", release.hash), { recursive: true });
-    const app = await db.module.create({ data: { workspaceId: workspace.id, name, builtin: name === "files", activeHash: release.hash } });
+    const app = await db.module.create({ data: { workspaceId: workspace.id, name, builtin: false, activeHash: release.hash } });
     await db.moduleVersion.create({ data: { moduleId: app.id, hash: release.hash, manifest: release.manifest, source: "user", status: "approved", intent: {}, report: {} } });
     const announced = async () => JSON.parse(await readFile(join(dataDir, "platform", "activated.json"), "utf8").catch(() => "{}")) as Record<string, string>;
     for (let attempt = 1; attempt <= (persistent ? 3 : 2); attempt++) {

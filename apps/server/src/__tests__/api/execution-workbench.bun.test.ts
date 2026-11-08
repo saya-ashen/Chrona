@@ -164,7 +164,11 @@ test("real editor/SDK/runtime persists questions, detach, completion and human a
   const { view, run } = await start("complete");
   expect(run.input.cwd).toBe(project);
   expect(run.input.execution).toEqual({ ...target(view), sessionId: view.sessionId });
-  expect(run.input.prompt).toContain("Integration project rule");
+  expect(run.input.cwd).toBe(await realpath(project));
+  expect(run.input.prompt).toContain("use native file tools to read AGENTS.md relative to the actual execution cwd");
+  expect(run.input.prompt).toContain("Read it again each round");
+  expect(run.input.prompt).not.toContain("Integration project rule");
+  expect(await readFile(join(run.input.cwd, "AGENTS.md"), "utf8")).toBe("Integration project rule: preserve the existing file.\n");
   expect(run.input.executionBudget).toEqual({ maxToolCalls: 6 });
   expect(run.input.content).toEqual([]);
   expect(run.input.hostPaths).toEqual([]);

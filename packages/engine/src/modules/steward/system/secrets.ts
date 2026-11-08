@@ -5,6 +5,7 @@ import { CallError, type SystemModule } from "../module-calls";
 import { createSecrets } from "../secrets";
 import { moduleSupervisor } from "../module-supervisor";
 import { authorizeOAuth, hiddenField, locked, oauthToken } from "../oauth";
+import { resolveOAuthDefinition } from "../oauth-definition";
 import { kernelField } from "../secret-fields";
 import { audit } from "../audit";
 import type { StewardPorts } from "../ports";
@@ -52,7 +53,8 @@ export const secrets: SystemModule = {
     if (name === "authorize" || name === "token") {
       const secret = String(args.name), declared = !!manifest && secretNames(manifest).includes(secret);
       if (secret === "qq_bot" || !SECRET_NAME.test(secret) || !(declared || (name === "authorize" && manifest && isEntryModule(manifest)))) throw new CallError("forbidden", "Secret not declared");
-      return json(name === "token" ? await oauthToken(ports, args) : await authorizeOAuth(ports, workspaceId, args));
+      const approved = await resolveOAuthDefinition(ports, workspaceId, secret, String(args.provider), declared ? module.moduleId : undefined);
+      return json(name === "token" ? await oauthToken(ports, workspaceId, args, approved) : await authorizeOAuth(ports, workspaceId, args, approved));
     }
     if (name !== "set" && name !== "remove" && name !== "list") throw new CallError("not_found", `secrets.${name} not found`);
     if (!manifest || !isEntryModule(manifest)) throw new CallError("forbidden", "Only an entry module may manage credentials");
@@ -74,6 +76,15 @@ async function readSecret(ports: StewardPorts, store: ReturnType<typeof createSe
   // Refresh tokens the kernel manages stay in the kernel (v2-30 §4); modules get access tokens from secrets.token.
   return json({ value: Object.fromEntries(Object.entries(value).filter(([field]) => !hiddenField(field, value))) });
 }
+/** Field edits preserve omitted values, but changing a client invalidates its OAuth authorizations. */
+function mergeCredentialFields(current: Record<string, string> | null, value: Record<string, string>) {
+  if (Object.keys(value).some(kernelField)) throw new CallError("invalid", "OAuth token and binding fields are written by Chrona: authorize instead");
+  const changed = current && ["clientId", "clientSecret"].some(field => Object.hasOwn(value, field) && value[field] !== current[field]);
+  const kept = changed ? Object.fromEntries(Object.entries(current).filter(([field]) => !kernelField(field))) : current;
+  const merged = { ...kept, ...value };
+  if (Object.keys(merged).length > 50) throw new CallError("invalid", "A credential holds at most 50 fields");
+  return merged;
+}
 async function manageSecrets(ports: StewardPorts, workspaceId: string, store: ReturnType<typeof createSecrets>, name: "set" | "remove" | "list", args: Record<string, unknown>) {
   if (name === "list") {
     const saved = new Map((await store.list()).map(row => [row.name, row.updatedAt])), declared = await declaredSecrets(ports.db, workspaceId);
@@ -85,10 +96,10 @@ async function manageSecrets(ports: StewardPorts, workspaceId: string, store: Re
   if (name === "remove" && args.field) {
     const field = String(args.field);
     // Under the kernel's lock for this credential, so an OAuth refresh never writes the field back (v2-30 §4).
-    const left = await locked(secret, async () => {
+    const left = await locked(`${ports.dataDir}\0${secret}`, async () => {
       const current = await store.read(secret);
       if (!current || !Object.hasOwn(current, field)) throw new CallError("not_found", `${secret} has no field ${field}`);
-      const { [field]: _, ...rest } = current;
+      const rest = Object.fromEntries(Object.entries(current).filter(([key]) => key !== field && (!(field === "clientId" || field === "clientSecret") || !kernelField(key))));
       if (Object.keys(rest).length) await store.write(secret, rest); else await store.remove(secret);
       return Object.keys(rest).length > 0;
     });
@@ -96,22 +107,19 @@ async function manageSecrets(ports: StewardPorts, workspaceId: string, store: Re
     return json(left ? { name: secret, configured: true } : { name: secret, configured: false });
   }
   if (name === "remove") {
-    await locked(secret, () => store.remove(secret));
+    await locked(`${ports.dataDir}\0${secret}`, () => store.remove(secret));
     await audit(ports.db, { workspaceId, actor: "user", kind: "secret_removed", subjectId: null, details: { name: secret } });
     return json({ name: secret, configured: false });
   }
   const value = secretValue(args.value);
   if (args.merge === true || args.merge === "true") {
-    // The page saves field by field (v2-16 §2.1): fields left blank keep their saved values; kernel fields are not typed.
-    if (Object.keys(value).some(kernelField)) throw new CallError("invalid", "refreshToken, scope and oauthManaged are written by Chrona: authorize instead");
-    await locked(secret, async () => {
-      const merged = { ...await store.read(secret), ...value };
-      if (Object.keys(merged).length > 50) throw new CallError("invalid", "A credential holds at most 50 fields");
-      /* Original suppression (no longer needed after splitting the registry):
-      */
-      await store.write(secret, merged);
+    await locked(`${ports.dataDir}\0${secret}`, async () => {
+      await store.write(secret, mergeCredentialFields(await store.read(secret), value));
     });
-  } else await locked(secret, () => store.write(secret, value));
+  } else {
+    if (Object.keys(value).some(field => /^oauthBinding(_|$)/.test(field))) throw new CallError("invalid", "OAuth bindings are written by Chrona: authorize instead");
+    await locked(`${ports.dataDir}\0${secret}`, () => store.write(secret, value));
+  }
   // The name only: the value never reaches audits, call records or logs.
   await audit(ports.db, { workspaceId, actor: "user", kind: "secret_set", subjectId: null, details: { name: secret } });
   return json({ name: secret, configured: true });

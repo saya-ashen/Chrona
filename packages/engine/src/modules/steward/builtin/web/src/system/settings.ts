@@ -2,6 +2,7 @@ import { builder } from "./spec";
 
 export type ModuleModel = { models: Record<string, string | { model: string; thinking?: string }>; maxCallsPerEvent: number; maxOutputTokens: number; dailyCalls: number; timeoutMs: number; moduleDailyCalls?: Record<string, number> };
 export type GlobalSettings = {
+  timezone: string;
   notifications: { dailyCap: number; quietHours: { start: string; end: string } | null; timezone: string; digestAt: string };
   builds: { dailyLimit: number; timeoutMinutes: number; maxSubmissions: number };
   buildUsage: { date: string; timezone: string; used: number; remaining: number };
@@ -29,9 +30,9 @@ export function settingsSpec(state: Record<string, unknown>) {
   const schedules = view.schedules.filter(schedule => schedule.status === "active" || schedule.status === "paused");
   const spec = b.finish("设置", []);
   spec.elements[spec.root] = { type: "Stack", props: { gap: "md" }, children: [
-    section("设置", [b.node("NotificationSettings", { settings })]),
+    section("通知与预算时区", [b.node("NotificationSettings", { settings })]),
     section("构建设置", [b.text(`${usage.date}（${usage.timezone}）：今日新建 ${usage.used} / ${settings.builds.dailyLimit}，剩余 ${usage.remaining} 个。`, "muted"),
-      b.text("每日额度按上方时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。", "muted"),
+      b.text("每日额度按内核预算时区的零点重置，只计算新建构建会话；手动续作仍受每会话每日24次、全局每日200次运行限制。设为0可暂停新建。", "muted"),
       b.text("修改只影响后续构建，不中断当前构建。失败不自动重试，启用应用仍需遵循审批。提高额度可能增加模型费用。", "muted"), b.node("BuildSettings", { settings })]),
     section("模块模型", [...(!current ? [b.text("尚未配置：模块不能调用模型。", "muted")] : []), b.node("ModuleModelSettings", { settings }), b.heading("今日用量"), b.list((settings.modelUsage ?? []).map(row => b.stack([b.text(`${row.module}：${row.calls} 次`), b.text(`输入 ${row.inputTokens} / 输出 ${row.outputTokens} token${current?.moduleDailyCalls?.[row.module] !== undefined ? ` · 上限 ${current.moduleDailyCalls[row.module]}` : ""}`, "muted")])), "今天还没有模块调用模型。")]),
     section("按应用设置", [b.text("每个应用自己的配置、凭据和模型上限在它的“设置”标签里。", "muted"), b.list(appLinks)]),

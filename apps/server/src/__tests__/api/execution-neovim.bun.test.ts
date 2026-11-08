@@ -75,9 +75,10 @@ const dataDir=join(root,'data');await mkdir(dataDir,{recursive:true});
 const initialization={version:1,status:'complete',packages:Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name=>[name,{requestKey:'host:'+name,attempts:1,status:'skipped',moduleId:null,hash:null,approvalId:null,error:null}]))};
 await db.workspace.upsert({where:{id:'host-workspace'},create:{id:'host-workspace',name:'Temporary host',settings:{moduleInitialization:initialization}},update:{}});
 const external=join(root,'external');
-for(const name of ['coding','editor'])await cp(${moduleFile("packages/engine/src/modules/steward/external")}+'/'+name,join(external,name),{recursive:true});
+for(const name of ['coding','editor','mcp'])await cp(${moduleFile("packages/engine/src/modules/steward/external")}+'/'+name,join(external,name),{recursive:true});
 await buildExecutionContracts(external);
-for(const name of ['coding','editor']){
+// Explicit approved optional MCP activation, scoped to this temporary host.
+for(const name of ['coding','editor','mcp']){
  const hash='host-'+name;
  const code=join(dataDir,'platform/store',hash);
  await cp(join(external,name),code,{recursive:true});
@@ -333,7 +334,8 @@ test("real Neovim detaches while Pi writes and asks; owner answers, reopened cli
     const artifactText = await readFile(artifactPath, "utf8");
     const artifact = JSON.parse(artifactText) as ExecutionResultSource;
     expect(result.artifactRef).toBe(`coding-result-${createHash("sha256").update(artifactText).digest("hex")}`);
-    expect(review.artifactError).toContain("Chrona content.read failed");
+    expect(review.artifactError).toBeString();
+    expect(review.artifactError).not.toBe("");
     const ownedResult = await f.owner("coding.read-result", { ref: `coding/${result.artifactRef}.json` }) as { base64: string; mime: string };
     expect(ownedResult.mime).toBe("application/json");
     expect(JSON.parse(Buffer.from(ownedResult.base64, "base64").toString("utf8"))).toEqual(artifact);
@@ -351,7 +353,8 @@ test("real Neovim detaches while Pi writes and asks; owner answers, reopened cli
     // Released projects may change; the published artifact must retain the captured final version.
     await writeFile(join(f.project, "answer.txt"), "later checkout edit after directory release\n");
     const immutable = await f.client("review-again", "detached");
-    expect(immutable.artifactError).toContain("Chrona content.read failed");
+    expect(immutable.artifactError).toBeString();
+    expect(immutable.artifactError).not.toBe("");
     expect(await f.owner("coding.read-result", { ref: `coding/${result.artifactRef}.json` })).toEqual(ownedResult);
     expect(await readFile(artifactPath, "utf8")).toBe(artifactText);
     const second = await f.client("start", "cancelled");

@@ -2,7 +2,7 @@ import { Prisma } from "@chrona/db/generated/prisma/client";
 import { BUILTIN_MODULE_NAMES, listenPaths, moduleManifestSchema } from "@chrona/contracts/steward";
 import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
-import { notificationSettings } from "./settings";
+import { budgetTimezone } from "./settings";
 import { latestModuleEvolution, recordModuleActivation, updateModuleEvolution } from "./module-evolution";
 import { StewardError } from "./errors";
 import { json, type ModuleContext, type ModuleVersion } from "./module-context";
@@ -65,7 +65,7 @@ export async function switchActiveIn(context: ModuleContext, tx: Prisma.Transact
   const manifest = moduleManifestSchema.parse(version.manifest), now = ports.now();
   await assertListenAvailable(tx, moduleId, manifest);
   if (!preserveSchedules) {
-    const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
+    const zone = budgetTimezone((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
     await replaceModuleSchedules(tx, { workspaceId, moduleId, manifest, now, zone });
   }
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active" } });
@@ -98,7 +98,7 @@ export async function activateBuiltinReleaseIn(context: ModuleContext, tx: Prism
   assertBuiltinSeedVersion(version, release);
   const previous = await tx.generation.findFirst({ where: { workspaceId: context.workspaceId }, orderBy: { seq: "desc" } });
   if (module.activeHash === release.hash && previous) return previous;
-  const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } })).settings).timezone;
+  const zone = budgetTimezone((await tx.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } })).settings);
   await replaceModuleSchedules(tx, { workspaceId: context.workspaceId, moduleId: module.id, manifest: release.manifest, now: context.now(), zone });
   await tx.module.update({ where: { id: module.id }, data: { activeHash: release.hash, dataSchema: release.manifest.data.schema, status: "active" } });
   if (module.status === "paused") await preservePausedStatus(context, tx, module.id);

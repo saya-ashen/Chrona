@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { cp, link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
 import { commitModuleSource } from "./module-git";
 import { snapshotModule } from "./module-files";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
@@ -12,6 +12,7 @@ import type { StewardPorts } from "./ports";
 import { callSync } from "./module-calls";
 import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
 import { callsDeclaration } from "./module-contracts";
+import { queueBuild } from "./module-build-session";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -19,14 +20,15 @@ async function fixture() {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-reference-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleBuiltinResources: join(dataDir, "release"),
+    moduleSdk: join(import.meta.dirname, "../../../../integrations/src/steward/module-sdk"),
     provider: { name: "fake", async health() { return { available: true, sandboxed: false, error: null }; }, start() { throw new Error("Reference must not start a Provider"); } },
     sandbox: { available: true, isolated: false, startModule() { throw new Error("Reference must not start a module"); } } };
   const service = createStewardService(ports);
   const workspace = await db.workspace.create({ data: { name: "reference" } });
   const api = service.forWorkspace(workspace.id);
-  const session = await db.session.create({ data: { workspaceId: workspace.id, key: "web:test", source: "web" } });
-  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Build with references" });
-  const run = (await api.runs.claimNext("foreground"))!;
+  await queueBuild(ports, workspace.id, { key: "reference-build", actorKey: "user", originSessionId: null,
+    request: modulesToolInputSchemas.build.parse({ name: "reference-app", goal: "Build with references", examples: ["Inspect current release contracts"], intent: { changes: ["Inspect references"], preserves: [] } }) });
+  const run = (await api.runs.claimNext("build"))!;
   await mkdir(run.cwd, { recursive: true });
   const call = async (name: string, args: unknown) => (await service.tools.call(run.token, name, args) as { result: unknown }).result;
   return { db, dataDir, ports, service, api, workspace, run, call };

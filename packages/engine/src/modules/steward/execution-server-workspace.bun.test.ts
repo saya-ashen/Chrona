@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecutionPrincipal, ExecutionStartV2 } from "@chrona/contracts/steward";
@@ -60,7 +60,11 @@ test("two real independently prepared Git worktrees claim concurrently and run a
   expect(first).not.toBeNull(); expect(second).not.toBeNull(); expect(first!.cwd).not.toBe(second!.cwd);
   expect(await f.runs.claimNext("background")).toBeNull(); expect(f.locks()).toBe(0);
   for (const run of [first!, second!]) {
-    const context = await executionRunInput(f.ports, run); expect(context?.cwd).toBe(run.cwd); expect(context?.prompt).toContain("TEMP WORKSPACE RULES");
+    const context = await executionRunInput(f.ports, run);
+    expect(context?.cwd).toBe(await realpath(run.cwd));
+    expect(context?.prompt).toContain("Fixture goal");
+    expect(context?.prompt).not.toContain("TEMP WORKSPACE RULES");
+    expect(await readFile(join(context!.cwd, "AGENTS.md"), "utf8")).toBe("TEMP WORKSPACE RULES");
   }
   const code = 'await Bun.write("worker-proof.txt",process.cwd());console.log("ready");for await(const part of Bun.stdin.stream()){if(part.length)break;}await Bun.write("worker-finished.txt","done");';
   const children = [first!, second!].map(run => Bun.spawn([process.execPath, "-e", code], { cwd: run.cwd, stdin: "pipe", stdout: "pipe", stderr: "pipe" }));

@@ -6,6 +6,7 @@ import { assertExternalModule, ModuleIdentityError } from "./module-identity";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
+import { addsOAuthDefinitions } from "./oauth-definition";
 import { join } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
@@ -100,8 +101,9 @@ async function supersedeCandidates(context: ModuleContext, moduleId: string, has
 }
 /** New credential declarations require the owner's confirmation. */
 function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
-  const had = active ? secretNames(moduleManifestSchema.parse(active.manifest)) : [];
-  return secretNames(moduleManifestSchema.parse(version.manifest)).some(name => !had.includes(name));
+  const manifest = moduleManifestSchema.parse(version.manifest), previous = active ? moduleManifestSchema.parse(active.manifest) : null;
+  const had = previous ? secretNames(previous) : [];
+  return secretNames(manifest).some(name => !had.includes(name)) || addsOAuthDefinitions(manifest, previous);
 }
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {

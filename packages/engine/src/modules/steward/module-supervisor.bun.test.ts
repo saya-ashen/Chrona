@@ -455,17 +455,17 @@ test("activated reaches opted-in modules once per version and again when a modul
 
 test.each([false, true])("builtin startup uses trusted release code and never stored fallback (drift=%s)", async drift => {
   const f = await fixture({ keepAlive: true });
-  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "files");
+  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "notify");
   await mkdir(codeDir, { recursive: true });
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "files" });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "notify" });
   await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
   await writeFile(join(codeDir, "index.ts"), "export {};");
   f.ports.moduleBuiltinResources = root;
   const files = await import("./module-preview").then(({ readModuleFiles }) => readModuleFiles(codeDir, "unsafe fixture"));
   const digest = new Bun.CryptoHasher("sha256");
   for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  const release = await resolveBuiltinRelease(f.ports, "files", digest.digest("hex"));
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: release.hash } });
+  const release = await resolveBuiltinRelease(f.ports, "notify", digest.digest("hex"));
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "notify", builtin: true, activeHash: release.hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: null, generationId: "release" }));
   if (drift) await writeFile(join(codeDir, "index.ts"), "changed after registration");
@@ -493,8 +493,8 @@ test("internal delivery fence rejects before execution and never sends an event"
 
 test.each(["user", "build", "builtin"])("approved Git builtin from %s runs from store without release resources", async source => {
   const f = await fixture({ keepAlive: true }), hash = "a".repeat(40);
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "files" });
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: hash } });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "notify" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "notify", builtin: true, activeHash: hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, source, status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "custom" }));
   f.ports.moduleBuiltinResources = join(f.ports.dataDir, "missing-release");

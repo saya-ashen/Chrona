@@ -95,7 +95,7 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(calls).toBe(1);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, dir: "/private" }).success).toBe(false);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(false);
-  expect(modulePackageCatalogSchema.parse(await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor"]);
+  expect(modulePackageCatalogSchema.parse(await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor", "mcp", "files", "events"]);
   // Other packages' history cannot push this package out of a global latest-N window.
   for (let i = 0; i < 205; i++) await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "kernel", kind: "module_installation", details: { request: { package: "mind", mode: "install", requestKey: `noise-${i}` }, result: { ...fixtures.failedInstall, package: "mind", requestKey: `noise-${i}` } } } });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
@@ -201,7 +201,7 @@ test("approval creation accepts built-in updates but refuses forged, kernel and 
   for (const module of [builtin, external]) await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, source: "user", status: "approved", manifest: module.builtin ? fixtures.builtin.manifest : fixtures.external.manifest, intent: {}, report: {} } });
   const common = { title: "Fixture", detail: "", preview: "" };
   await expect(approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: builtin.id, name: builtin.name, hash: builtin.activeHash } })).rejects.toMatchObject({ reason: "immutable_module" });
-  for (const identity of [{ name: "events", builtin: false }, { name: "modules", builtin: true }]) {
+  for (const identity of [{ name: "agent", builtin: false }, { name: "modules", builtin: true }]) {
     const invalid = await f.db.module.create({ data: { workspaceId: f.workspaceId, ...identity, activeHash: "c".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
     for (const request of [
@@ -230,5 +230,5 @@ test("list, interface and kernel projections share lifecycle identity without ov
   expect(Array.isArray((await modulePermissions(f.ports, f.workspaceId, "web") as { capabilities: unknown }).capabilities)).toBe(true);
   expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   const catalog = modulePackageCatalogSchema.parse((await callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).output);
-  expect(catalog.map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor"]);
+  expect(catalog.map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor", "mcp", "files", "events"]);
 });

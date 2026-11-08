@@ -130,7 +130,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
     start() {
       if (timer || (!options.timers && (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test" || process.argv.includes("test")))) return;
       stopping = false;
-      rescue ??= startRescueListener(ports, service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
+      rescue ??= startRescueListener(service, resourcePath("rescue.html", "apps/server/src/static/rescue.html"));
       starting = moduleSupervisor(ports).start().catch(error => options.onError?.(error));
       const seconds = options.tickSeconds ?? Number(process.env.CHRONA_STEWARD_TICK_SECONDS ?? 30);
       if (Number.isFinite(seconds) && seconds > 0) timer = timers.setInterval(wake, seconds * 1000);

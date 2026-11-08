@@ -2,13 +2,12 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import webManifest from "./builtin/web/module.json";
 import { createRuns } from "./runs";
 import { createApprovals } from "./approvals";
 import { announceApprovals } from "./notify-user";
-import { createTools, searchSessions } from "./tools";
+import { createTools } from "./tools";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
 beforeEach(async () => {
@@ -22,49 +21,33 @@ async function capability() {
   await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
   return (await runs.claimNext("foreground"))!;
 }
-test("search groups bounded snippets by session, includes ended history and isolates workspaces", async () => {
-  const ended = await db.session.create({ data: { workspaceId, key: "web:old", source: "web", status: "ended", title: "Old context" } });
-  await db.message.createMany({ data: [
-    { workspaceId, sessionId, direction: "in", channel: "in_app", text: "Remember the telescope" },
-    { workspaceId, sessionId, direction: "out", channel: "in_app", text: "Telescope details" },
-    { workspaceId, sessionId: ended.id, direction: "out", channel: "in_app", text: "An old telescope" },
-  ] });
-  const other = await db.workspace.create({ data: { name: "Other" } });
-  const foreign = await db.session.create({ data: { workspaceId: other.id, key: "web:foreign", source: "web" } });
-  await db.message.create({ data: { workspaceId: other.id, sessionId: foreign.id, direction: "in", channel: "in_app", text: "Secret telescope" } });
-  const results = await searchSessions(db, workspaceId, "telescope", 10);
-  expect(results).toHaveLength(2);
-  expect(results.find(result => result.sessionId === sessionId)?.snippets).toHaveLength(2);
-  expect(results.find(result => result.sessionId === ended.id)?.title).toBe("Old context");
-  expect(JSON.stringify(results)).not.toContain("Secret");
-  expect(await searchSessions(db, workspaceId, "%")).toEqual([]);
-  expect(await searchSessions(db, workspaceId, "telescope", 1)).toHaveLength(1);
-});
-test("session search tool and foreground reply match the contract", async () => {
+test("legacy Provider-native chat tools cannot revive a kernel conversation", async () => {
   const run = await capability(), tools = createTools(ports);
-  expect(CHRONA_TOOLS).toContain("chrona_session_search");
-  const result = await tools.call(run.token, "chrona_reply", { text: "Answer" });
-  expect(result).toHaveProperty("messageId");
-  const messages = await db.message.findMany({ where: { sessionId } });
-  expect(messages[0]?.text).toBe("Answer");
-  expect(await tools.call(run.token, "chrona_session_search", { query: "Answer" })).toHaveLength(1);
+  expect(await tools.catalog(run.token)).toEqual([]);
+  for (const name of ["chrona_reply", "chrona_session_search", "chrona_schedule", "chrona_notify", "chrona_remember"]) {
+    await expect(tools.call(run.token, name, { text: "Answer" })).rejects.toMatchObject({ code: "forbidden" });
+  }
+  expect(await db.message.count()).toBe(0);
+});
+test("build reports stay in their build, and removed native tools stay unavailable", async () => {
+  await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
+  const run = await capability(), tools = createTools(ports);
+  expect(await tools.call(run.token, "chrona_reply", { text: "Answer" })).toHaveProperty("messageId");
+  expect(await db.message.findFirst({ where: { sessionId } })).toMatchObject({ text: "Answer" });
+  for (const name of ["chrona_session_search", "chrona_schedule", "chrona_notify", "chrona_request_approval"]) await expect(tools.call(run.token, name, {})).rejects.toMatchObject({ code: "invalid" });
 });
 
-test("tool policy approvals, service approvals and legacy backfill persist facts without a notification app", async () => {
-  const run = await capability(), tools = createTools(ports);
-  await db.grant.create({ data: { workspaceId, action: "notify_user", mode: "ask", scope: { kind: "global" } } });
-  const gated = await tools.call(run.token, "chrona_notify", { level: "now", title: "通知", body: "正文" }) as { approvalId: string; status: string };
-  expect(gated.status).toBe("awaiting_approval");
+test("service approvals and legacy backfill persist facts without a notification app", async () => {
   const approvals = createApprovals({ ...ports, workspaceId });
   const requested = await approvals.create({ action: "delete_data", title: "请求", detail: "说明", preview: "摘要", payload: { privateArgument: "not-a-fact" } });
   const legacy = await db.approval.create({ data: { workspaceId, action: "delete_data", title: "旧请求", detail: "", preview: "", payload: {} } });
   await announceApprovals(ports, workspaceId);
   await announceApprovals(ports, workspaceId);
   const facts = await db.audit.findMany({ where: { workspaceId, kind: "kernel_fact_pending" } });
-  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([gated.approvalId, requested.id, legacy.id].sort());
+  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([requested.id, legacy.id].sort());
   expect(JSON.stringify(facts)).not.toContain("privateArgument");
-  await approvals.resolve(gated.approvalId, { decision: "deny", scope: "once" });
-  expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${gated.approvalId}` } } });
+  await approvals.resolve(requested.id, { decision: "deny", scope: "once" });
+  expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${requested.id}` } } });
   expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
 });
 test("reply files go to their recipient, never a shared attachment store or arbitrary app ref", async () => {

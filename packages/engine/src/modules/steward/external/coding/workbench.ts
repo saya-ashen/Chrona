@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { executionIdSchema, executionStartSchema, type ExecutionSnapshot, type ExecutionView } from "./contract.js";
 import { codingError, readCodingWork, type CodingContext } from "./storage";
-import { loadSessions, pendingTurn, saveSessions, serializeConversation, type CodingSession, type CodingSessions } from "./sessions";
+import { loadSessions, pendingTurn, saveSessionFile, saveSessions, serializeConversation, type CodingSession, type CodingSessions } from "./sessions";
 import { readConversationWork, type ConversationMessage } from "./conversation-history";
 import { applyConversationCommand, parseConversationCommand, isStopped } from "./conversation-commands";
 
@@ -29,10 +29,36 @@ function validProject(raw: unknown): raw is Project {
   const value = raw as Record<string, unknown>;
   return id.safeParse(value.projectRef).success && typeof value.path === "string" && typeof value.label === "string";
 }
+type ProjectSelection = { version: 1; projectRef: string; automatic: boolean };
+function validProjectSelection(raw: unknown): raw is ProjectSelection {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const value = raw as Record<string, unknown>;
+  return Object.keys(value).length === 3 && value.version === 1 && id.safeParse(value.projectRef).success && typeof value.automatic === "boolean";
+}
+async function readProjectSelection(context: CodingContext): Promise<ProjectSelection | undefined> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(context.dir, "sessions", "project.json"), "utf8"));
+    if (!validProjectSelection(raw)) throw codingError("conflict", "默认项目设置无效，请重新选择目录。");
+    return raw;
+  } catch (error) {
+    if (error instanceof SyntaxError) throw codingError("conflict", "默认项目设置无效，请重新选择目录。");
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
 async function defaultProject(context: CodingContext, path?: string): Promise<Project> {
-  const project = await context.call<unknown>("projects.default", path === undefined ? {} : { path });
+  if (path === undefined) {
+    const selection = await readProjectSelection(context);
+    if (selection) {
+      const project = (await projects(context)).find(project => project.projectRef === selection.projectRef);
+      if (!project) throw codingError("conflict", "默认项目记录不存在，请重新选择目录。");
+      return selection.automatic ? { ...project, label: "默认空间" } : project;
+    }
+  }
+  const automatic = path === undefined;
+  const project = await context.call<unknown>(automatic ? "projects.create" : "projects.register", automatic ? { name: "default" } : { path });
   if (!validProject(project)) throw codingError("conflict", "项目服务返回了无效目录引用。");
-  return project;
+  await saveSessionFile(context, "project.json", { version: 1, projectRef: project.projectRef, automatic });
+  return automatic ? { ...project, label: "默认空间" } : project;
 }
 async function initializeDraft(context: CodingContext, journal: CodingSessions, project?: Project) {
   if (!journal.draftProject) {
@@ -76,7 +102,7 @@ async function catalogProjects(context: CodingContext, journal: CodingSessions) 
   try {
     automatic = await defaultProject(context);
     await initializeDraft(context, journal, automatic);
-    if (!registered.some(project => project.projectRef === automatic!.projectRef)) registered.unshift(automatic);
+    registered = [automatic, ...registered.filter(project => project.projectRef !== automatic!.projectRef)];
   } catch (error) { if (!projectReadError(error)) throw error; notice = "默认空间暂不可用。仍可打开已有项目与对话，或在默认空间设置中指定有效目录。"; }
   return { registered, automatic, notice };
 }
@@ -229,7 +255,11 @@ function restoreIdleSession(result: ReturnType<typeof emptyDetail>, session: Cod
 async function conversationProject(context: CodingContext, projectRef?: string) {
   try {
     const project = (await projects(context)).find(project => project.projectRef === projectRef);
-    return { projectLabel: project?.label ?? "已保存项目", projectPath: project?.path ?? "" };
+    let selection: ProjectSelection | undefined;
+    try { selection = await readProjectSelection(context); }
+    catch (error) { if (!projectReadError(error)) throw error; } // Broken default settings must not hide existing conversations.
+    const label = selection?.automatic && selection.projectRef === projectRef ? "默认空间" : project?.label;
+    return { projectLabel: label ?? "已保存项目", projectPath: project?.path ?? "" };
   } catch (error) {
     // Cached conversations stay readable while the project registry is unavailable.
     if ((error as { code?: string }).code !== "unavailable") throw error;

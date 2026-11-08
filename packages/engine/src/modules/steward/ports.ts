@@ -79,7 +79,7 @@ export type StewardPorts = {
   executionProjects?: {
     list(principal: ExecutionPrincipal): Promise<{ projects: { projectRef: string; path: string; label: string }[] }>;
     register(principal: ExecutionPrincipal, path: string): Promise<{ projectRef: string; path: string; label: string }>;
-    default(principal: ExecutionPrincipal, path?: string): Promise<{ projectRef: string; path: string; label: string }>;
+    create(principal: ExecutionPrincipal, name: string): Promise<{ projectRef: string; path: string; label: string }>;
   };
   executions?: ExecutionPorts;
   /** P2 host snapshot; tx is used only for fresh identity/authorization reads, never remote filesystem I/O. */

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -10,12 +10,12 @@ import type { ExecutionPrincipal, ExecutionProjectGrant } from "@chrona/contract
 
 const exec = promisify(execFile);
 const rowSchema = z.object({ workspaceId: z.string(), ownerId: z.string(), callerKey: z.string(), projectRef: z.string(), path: z.string(), label: z.string(), identity: z.string() }).strict();
-const defaultSchema = rowSchema.pick({ workspaceId: true, ownerId: true, callerKey: true, projectRef: true });
-const registrySchema = z.object({ version: z.literal(1), projects: z.array(rowSchema).max(100), defaults: z.array(defaultSchema).max(100).default([]) }).strict();
+// Discard obsolete default pointers while retaining existing directory grants.
+const registrySchema = z.object({ version: z.literal(1), projects: z.array(rowSchema).max(100), defaults: z.unknown().optional() }).strict().transform(({ defaults: _defaults, ...registry }) => registry);
 type Registry = z.infer<typeof registrySchema>;
 type Row = z.infer<typeof rowSchema>;
 const key = (principal: ExecutionPrincipal) => principal.caller.kind === "owner" ? "owner" : `module:${principal.caller.moduleId}`;
-const matches = (row: z.infer<typeof defaultSchema>, principal: ExecutionPrincipal) => row.workspaceId === principal.workspaceId && row.ownerId === principal.ownerId && row.callerKey === key(principal);
+const matches = (row: Pick<Row, "workspaceId" | "ownerId" | "callerKey">, principal: ExecutionPrincipal) => row.workspaceId === principal.workspaceId && row.ownerId === principal.ownerId && row.callerKey === key(principal);
 const view = ({ projectRef, path, label }: Row) => ({ projectRef, path, label });
 async function directory(path: string) {
   if (!isAbsolute(path)) throw new CallError("invalid", "请输入 Chrona 所在主机的绝对目录路径。");
@@ -51,7 +51,7 @@ export function createExecutionProjectRegistry(dataDir: string): NonNullable<Ste
   let tail: Promise<unknown> = Promise.resolve();
   async function read(): Promise<Registry> {
     try { return registrySchema.parse(JSON.parse(await readFile(file, "utf8"))); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, projects: [], defaults: [] }; throw error; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, projects: [] }; throw error; }
   }
   async function save(registry: Registry) {
     await mkdir(dataDir, { recursive: true });
@@ -64,8 +64,9 @@ export function createExecutionProjectRegistry(dataDir: string): NonNullable<Ste
     tail = operation.catch(() => {});
     return operation;
   }
-  async function registered(registry: Registry, principal: ExecutionPrincipal, path: string) {
+  async function registered(registry: Registry, principal: ExecutionPrincipal, path: string, managed = false) {
     const dir = await directory(path);
+    if (managed && dir.path !== path) throw new CallError("conflict", "受控项目目录发生变化，请核对主机目录。");
     const previous = registry.projects.find(row => matches(row, principal) && row.path === dir.path);
     if (previous) {
       if (previous.identity !== dir.identity) throw new CallError("conflict", "目录已被替换，请先核对原项目。");
@@ -90,26 +91,25 @@ export function createExecutionProjectRegistry(dataDir: string): NonNullable<Ste
         return view(row);
       });
     },
-    default(principal, path) {
+    create(principal, name) {
       return serialized(async () => {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name)) throw new CallError("invalid", "项目名称必须是安全的单段名称。");
         const registry = await read();
-        const pointer = registry.defaults.find(row => matches(row, principal));
-        if (path === undefined && pointer) {
-          const row = registry.projects.find(row => matches(row, principal) && row.projectRef === pointer.projectRef);
-          if (!row) throw new CallError("conflict", "默认项目记录不存在，请重新选择目录。");
-          await checkDirectory(row);
-          return view(row);
+        const scope = createHash("sha256").update(JSON.stringify([principal.workspaceId, principal.ownerId, key(principal)])).digest("hex");
+        const path = join(workspaces, scope, name);
+        const previous = registry.projects.find(row => matches(row, principal) && row.path === path);
+        if (previous) {
+          await checkDirectory(previous);
+          return view(previous);
         }
-        const automatic = path === undefined;
-        if (path === undefined) {
-          const scope = JSON.stringify([principal.workspaceId, principal.ownerId, key(principal)]);
-          path = join(workspaces, createHash("sha256").update(scope).digest("hex"));
-          await mkdir(path, { recursive: true, mode: 0o700 });
+        if (registry.projects.length >= 100) throw new CallError("capacity", "已达到项目数量上限。");
+        // Check each host-owned parent before creating any child; never follow a supplied symlink.
+        for (const parent of [workspaces, join(workspaces, scope), path]) {
+          try { await mkdir(parent, { mode: 0o700 }); }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+          if (!(await lstat(parent)).isDirectory() || await realpath(parent) !== parent) throw new CallError("conflict", "受控项目目录发生变化，请核对主机目录。");
         }
-        const row = await registered(registry, principal, path);
-        if (automatic) row.label = "默认空间";
-        if (pointer) pointer.projectRef = row.projectRef;
-        else registry.defaults.push({ workspaceId: row.workspaceId, ownerId: row.ownerId, callerKey: row.callerKey, projectRef: row.projectRef });
+        const row = await registered(registry, principal, path, true);
         await save(registry);
         return view(row);
       });

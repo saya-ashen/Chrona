@@ -2,9 +2,30 @@
 
 适用于重构后的单一 owner 版本。先读[快速开始与配置表](../../README.zh.md)。所有命令均在仓库根目录执行，或使用对应版本的打包 CLI；不要用旧版本可执行文件操作新库。
 
-## M1 开发集成边界（2026-11-05）
+## 当前最小内核与本地升级（2026-11-08）
 
-当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。内置固定 web/mcp/files/notify/events；qq/remind/mind 是预装外置，memory-local 仅可选。
+固定内置为 `agent/web/notify`。`mcp/files/events` 已转为可选官方外置应用；保留已有身份、批准版本及私有数据，删除后启动不补装。Agent 不允许动态替换。当前开发仅面向本地，不以 chino 数据副本作为门禁；真实旧数据删除仍须单独确认。
+
+- Web 不可用时使用不可变救援页：审批、暂停应用、回滚已批准版本；没有聊天入口。
+- MCP 已删除时，停服后运行 `chrona admin catalog`，再用 `chrona admin install mcp --request-key <唯一键>`。这只是受理受检构建，不代表已安装完成；未知回执用原 key 查询，失败重试须明确使用新 key。
+- 全局 `history/content/memory`、`projects.default` 已删除。附件由所属应用读取；记忆和偏好由应用自己保存；默认项目由 Coding 选择，宿主只提供有界 `projects.create`。
+- OAuth 清单必须声明 HTTPS 授权/令牌端点。改变定义需要审批；没有定义绑定的旧凭据须重新授权，不能把旧 refresh token 自动发给新端点。
+- `agent-workbench.nvim` 本轮未修改，旧客户端依赖的 `content.read` 不再可用。Chrona 提供 `coding.read-result`，但不能据此声称旧客户端成果界面已兼容。
+
+### 旧会话归档与旧定时器交接
+
+先停服并取得数据库运行锁，再使用 `chrona admin legacy <请求文件>`。请求文件严格校验，所有路径必须明确；不会自动选择整个数据库，也不会启动模型或发送通知。请求的 `workspaceId` 必填。
+
+1. `operation: "export"`：明确 `sessionIds` 和 `outputDir`，归档消息、引用附件与 SHA-256 清单。
+2. `operation: "verify"`：使用归档返回的 `manifestSha256` 校验；不要把未验证目录当成可恢复备份。
+3. `operation: "delete"`：相同范围、归档和散列，且显式 `authorizeDelete: true`。重新确认源快照、停止证据与全部归档散列后才删除业务消息和选中旧附件；共用附件、Agent 上下文、Run/执行证据不删除。旧 Session 只保留关联和审计所需元数据，清空标题并改为归档标识，不再作为在线会话服务。
+4. `operation: "migrate-wake"`：显式 `offline: true`、有界 `limit` 与 `owners: [{ moduleId, hash }]`，把旧 wake 交给真实已批准应用的私有后台会话。保留日程身份、规则、状态与下次时间；不从旧会话推断 QQ 收件人，也不即时启动任务。
+
+导出/校验/删除的 CLI 在取得独占锁后内部传入离线状态，请求文件不要额外添加 `offline` 字段。删除不是部署步骤，不得因升级自动执行。当前自动化验证只使用隔离临时数据库；部署真实本地实例时先完整备份、保留旧发行包，不修改迁移校验和绕过旧库拒绝。
+
+## M1 历史开发集成边界（2026-11-05）
+
+当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
 
 ## M2 编码开发集成边界
 

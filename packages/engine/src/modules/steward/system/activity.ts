@@ -26,8 +26,8 @@ export const activity: SystemModule = {
   description: "活动事实：受控审计记录和单个选定应用消费的内核事实；不组织页面或投递通知。",
   unrecorded: ["facts", "ack", "withdrawals"],
   tools: [
-    tool("runtime", "Runtime health facts without application presentation.", {}, [], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.chatRuntimeOutput) }),
-    tool("runs", "Bounded execution status, progress, usage and pending interactions. Read-only runtime facts; no transcript or execution authority.", { session: text("Optional exact session id") }, [], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.chatRunsOutput) }),
+    tool("runtime", "Runtime health facts without application presentation.", {}, [], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.runtimeOutput) }),
+    tool("runs", "Bounded execution status, progress, usage and pending interactions. Read-only runtime facts; no transcript or execution authority.", { session: text("Optional exact session id") }, [], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.runsOutput) }),
     tool("records", "Bounded workspace audit facts, newest first. Only allowlisted metadata; never raw details or credential values.", { before: text("ISO time from the previous page") }, [], { idempotent: true, visibility: ["modules", "owner"], output: activityRecordsOutput }),
     tool("consumer", "Owner selects one active application id to consume kernel facts, or null for none. Pause the previous consumer before switching. Omit module to read the selection. Confirmed facts never replay on a switch.", {}, [], { visibility: ["owner"], input: consumerInput, output: consumerOutput }),
     tool("facts", "Selected application only: up to 50 pending finite kernel facts. Persist privately, then acknowledge before delivery. Not a generic audit or invocation dump.", {}, [], { idempotent: true, visibility: ["modules"], output: z.object({ revision: z.string(), facts: z.array(z.intersection(z.object({ id: z.string(), at: z.string().datetime() }), kernelFactSchema)).max(50) }) }),

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EXECUTOR_PROTOCOL, executorDigest, type ExecutionPrincipal, type ExecutorAssignment, type ExecutorFinal, type ExecutorFence, type ExecutorPrincipal, type ExecutorRequests } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
+import { admitContextPrimitive } from "./agent-context";
 import { createTick } from "./tick";
 import { createExecutionV2Admission } from "./execution-admission";
 import { createExecutionEventStore } from "./execution-event-store";
@@ -92,22 +93,28 @@ test("device/global/module capacity, durable cancel and committed proof wake use
   await tickLaunch(f); expect(await f.db.run.count({ where: { status: "running", execution: { isNot: null } } })).toBe(4);
 }, 20_000);
 
-test("ordinary foreground/background keep their priority while device runs; runtime stop never waits for remote stop", async () => {
+test("application Agent foreground/background keep their priority while device runs; runtime stop never waits for remote stop", async () => {
   const f = await fixture(), completions: (() => void)[] = [], launched: string[] = [];
   f.ports.provider = { name: "test-local", async health() { return { available: true, sandboxed: false, error: null }; }, start(input) {
     launched.push(input.runId);
     return { done: new Promise(resolve => { completions.push(() => resolve({ outcome: "finished", sessionId: null, error: null })); }), async abort() {}, async inject() {} };
   } };
-  const local = createRuns(f.ports, f.w.id), sessions = [];
-  for (const key of ["foreground", "background"]) sessions.push(await f.db.session.create({ data: { workspaceId: f.w.id, key, source: "web" } }));
-  const foreground = await local.enqueue({ lane: "foreground", trigger: "message", sessionId: sessions[0]!.id, prompt: "Ordinary foreground" });
-  const background = await local.enqueue({ lane: "background", trigger: "message", sessionId: sessions[1]!.id, prompt: "Ordinary background" });
+  const local = createRuns(f.ports, f.w.id), queued: { runId: string }[] = [];
+  const module = await f.db.module.create({ data: { workspaceId: f.w.id, name: "priority-app", activeHash: "hash", status: "active" } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "priority-app", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
+  const principal: ExecutionPrincipal = { ...f.owner, caller: { kind: "module", moduleId: module.id, hash: "hash" } };
+  for (const lane of ["foreground", "background"] as const) {
+    const context = await admitContextPrimitive(f.ports, principal, "context", { requestKey: lane }) as { contextId: string };
+    queued.push(await admitContextPrimitive(f.ports, principal, "run", { ...context, requestKey: lane, lane, prompt: `Application ${lane}`, tools: [], content: [] }) as { runId: string });
+  }
+  const [foreground, background] = queued;
+  expect(await local.claimNext("background", f.ports.now(), { kind: "ordinary" })).toBeNull();
   const remote = await f.add("parallel-remote");
   await tickLaunch(f);
-  expect(launched).toContain(foreground.id); expect(launched).toContain(background.id); expect(launched).not.toContain(remote.execution.runId);
+  expect(launched).toEqual([foreground!.runId, background!.runId]); expect(launched).not.toContain(remote.execution.runId);
   expect(liveRuns.has(remote.execution.runId)).toBe(true);
   for (const done of completions.splice(0)) done(); await f.tick.settled({ includeRuns: true });
-  await tickLaunch(f); expect(launched).toContain(background.id);
+  await tickLaunch(f); expect(launched).toContain(background!.runId);
   for (const done of completions.splice(0)) done(); await f.tick.settled({ includeRuns: true });
   const runtime = createStewardRuntime(f.db, { dataDir: f.root, provider: null });
   Object.assign(runtime.ports, f.ports, { provider: undefined });

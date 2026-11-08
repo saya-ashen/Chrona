@@ -14,10 +14,10 @@ export const buildArtifacts = {
     seedDir: "resources/module-git",
     modules: [
       { name: "web", source: "builtin/web" },
-      { name: "mcp", source: "builtin/mcp" },
-      { name: "files", source: "builtin/files" },
+      { name: "mcp", source: "external/mcp" },
+      { name: "files", source: "external/files" },
       { name: "notify", source: "builtin/notify" },
-      { name: "events", source: "builtin/events" },
+      { name: "events", source: "external/events" },
       { name: "agent", source: "builtin/agent" },
       { name: "qq", source: "external/qq" },
       { name: "remind", source: "external/remind" },

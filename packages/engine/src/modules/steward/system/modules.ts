@@ -1,10 +1,11 @@
 import { z } from "zod";
 import * as outputs from "../system-outputs";
-import { buildSettingsSchema, modulesToolInputSchemas, moduleInstallResultSchema, modulePackageCatalogSchema, RUN_LIMITS, moduleManifestSchema, isEntryModule } from "@chrona/contracts/steward";
+import { buildGovernanceSchema, buildSettingsSchema, modulesToolInputSchemas, moduleInstallResultSchema, modulePackageCatalogSchema, RUN_LIMITS, moduleManifestSchema, isEntryModule } from "@chrona/contracts/steward";
 import { createModules } from "../modules";
+import { createBuildGovernance } from "../build-governance";
 import { moduleVersionOutcome, proposedVersionOutcome } from "../module-build-outcome";
 import { admitted, CallError, moduleCallbackContractHash, normalizedToolInputSchema, type Caller, type Json, type SystemModule, type SystemTool, type Tool } from "../module-calls";
-import { buildDiagnostics, buildHealthTargets, declaredModules, startBuild } from "../module-build-session";
+import { buildDiagnostics, buildHealthTargets, declaredModules, startBuild, listBuildFacts, readBuildFacts, readBuildTranscript, buildSessionFactSchema, buildRunFactSchema } from "../module-build-session";
 import { requestGroup } from "../module-group";
 import { buildControl, ownerBuildSchema, startOwnerBuildAsCaller } from "../owner-build";
 import { interfaceReference, checkoutBuiltinReference } from "../module-reference";
@@ -107,13 +108,20 @@ async function proposeFromRun(ports: StewardPorts, workspaceId: string, run: { i
   });
   return { ...proposal, ...await proposedVersionOutcome(ports.db, workspaceId, proposal) };
 }
-/** `modules.contributions` (v2-14): what active modules declared for the calling module, in `contributes.<its name>`. */
+async function memoryContributionReader(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>) {
+  const module = await ports.db.module.findFirst({ where: { id: caller.moduleId, workspaceId, name: caller.module, status: "active", activeHash: caller.hash } });
+  if (!module) return false;
+  const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: caller.hash } } });
+  const manifest = version?.status === "approved" ? moduleManifestSchema.safeParse(version.manifest).data : undefined;
+  return !!manifest && isEntryModule(manifest);
+}
+/** Declarations addressed to the caller; approved active entries additionally discover memory providers. */
 async function contributions(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>, section: string) {
-  if (section !== caller.module) throw new CallError("forbidden", "A module reads only the declarations addressed to it");
+  if (section !== caller.module && (section !== "memory" || !await memoryContributionReader(ports, workspaceId, caller))) throw new CallError("forbidden", "A module reads only its own declarations; active approved entries may discover memory providers");
   const found = [];
   for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
     const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-    const value = moduleManifestSchema.safeParse(version?.manifest).data?.contributes?.[section];
+    const value = version?.status === "approved" ? moduleManifestSchema.safeParse(version.manifest).data?.contributes?.[section] : undefined;
     if (value !== undefined) found.push({ module: module.name, hash: module.activeHash!, value });
   }
   return found;
@@ -172,7 +180,7 @@ export const modules: SystemModule = {
     // v2-14: a module reads the `contributes.<its name>` declarations of the active modules; nobody else reads them.
     tool("refresh-health", "Request the module's declared diagnostic-only self-check. No business tool calls or replay. Unsupported modules remain unknown.", { module: text("Module name") }, ["module"], { visibility: ["modules", "owner"], output: moduleReadinessSchema }),
     tool("report-health", "Report this process's business readiness only. No credentials or private content. Expires unless refreshed; never changes runtime, permissions or recovery.", {}, [], { visibility: ["modules"], input: moduleReadinessReportSchema, output: z.object({ reportedAt: z.string(), expiresAt: z.string() }) }),
-    tool("contributions", "Active modules' declarations in contributes.<section>, where section is the caller's own name: [{ module, hash, value }].", { section: text() }, ["section"], { idempotent: true, output: z.lazy(() => outputs.modulesContributionsOutput) }),
+    tool("contributions", "Active modules' declarations in contributes.<section>, where section is the caller's own name; active approved entries may also discover section memory. Returns [{ module, hash, value }].", { section: text() }, ["section"], { idempotent: true, output: z.lazy(() => outputs.modulesContributionsOutput) }),
     tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["modules", "provider", "owner"], idempotent: true, output: z.lazy(() => outputs.modulesCheckOutput.extend({ reason: z.string() })) })),
     tool("checkout", modulesToolInputSchemas.checkout.description!, {}, [], provider(modulesToolInputSchemas.checkout)),
     tool("propose", modulesToolInputSchemas.propose.description!, {}, [], provider(modulesToolInputSchemas.propose)),
@@ -180,6 +188,10 @@ export const modules: SystemModule = {
     // Pause and resume take effect directly; removal always needs the user's approval.
     ...(["disable", "enable", "remove"] as const).map(name => tool(name, `${{ disable: "Pause an app: it stops running and its schedules pause; data and versions stay.", enable: "Resume a paused app and the schedules pausing stopped.", remove: "Delete an app with its data, files, schedules, grants and settings (backed up first); not built-in or entry apps, nor one another app calls. Always a red approval the user decides on the page." }[name]} Removal returns { status: "pending_approval", approvalId }.`, { module: text("Module name"), reason: text("Why, with the evidence (shown to the user)") }, ["module", "reason"], { visibility: ["provider", "owner"], output: z.lazy(() => outputs.modulesStatusOutput) })),
     tool("build", modulesToolInputSchemas.build.description!, {}, [], provider(modulesToolInputSchemas.build, { visibility: ["modules", "provider"], output: z.lazy(() => outputs.modulesBuildOutput) })),
+    tool("build-sessions", "Bounded authorized build facts, newest first. No legacy chat or Agent contexts.", {}, [], provider(z.object({ limit: z.number().int().min(1).max(100).optional() }).strict(), { visibility: ["owner"], idempotent: true, output: z.array(buildSessionFactSchema) })),
+    tool("build-session", "One authorized build and at most 50 recent run facts; no prompts, host paths or capabilities.", { session: text() }, ["session"], { visibility: ["owner"], idempotent: true, output: buildSessionFactSchema.extend({ runs: z.array(buildRunFactSchema) }) }),
+    tool("build-transcript", "At most 100 normalized redacted transcript items of an authorized build.", { session: text() }, ["session"], { visibility: ["owner"], idempotent: true, output: outputs.buildTranscriptOutput }),
+    tool("build-settings", "Read or update governed build limits and read today's build use. No notification, memory or conversation preferences.", {}, [], provider(z.object({ limits: buildSettingsSchema.partial().optional() }).strict(), { visibility: ["owner"], idempotent: true, output: buildGovernanceSchema })),
     tool("build-owner", "Start one explicitly authorized single-module build with an exact Provider/model, timeout and submission cap. requestKey is single-use: replay returns the original run, never resumes or retries. No host files; normal sandbox checks and approvals still apply.", {}, [], provider(ownerBuildSchema, { visibility: ["modules", "owner"], output: z.lazy(() => outputs.ownerBuildOutput) })),
     tool("request-group", modulesToolInputSchemas["request-group"].description!, {}, [], provider(modulesToolInputSchemas["request-group"])),
     ...(["stop-build", "revise-build"] as const).map(name => tool(name, modulesToolInputSchemas[name].description!, {}, [], provider(modulesToolInputSchemas[name], { visibility: ["provider", "owner"], output: z.lazy(() => outputs.buildControlOutput) }))),
@@ -188,6 +200,10 @@ export const modules: SystemModule = {
     const api = createModules(ports, workspaceId);
     const readers: Record<string, () => Promise<unknown>> = {
       list: () => listModules(ports, workspaceId, caller),
+      "build-settings": () => { const governance = createBuildGovernance(ports, workspaceId); return args.limits === undefined ? governance.get() : governance.update(args.limits); },
+      "build-sessions": () => listBuildFacts(ports, workspaceId, args.limit === undefined ? 50 : z.number().int().min(1).max(100).parse(args.limit)),
+      "build-session": () => readBuildFacts(ports, workspaceId, String(args.session)),
+      "build-transcript": () => readBuildTranscript(ports, workspaceId, String(args.session)),
       "report-health": async () => reportOwnHealth(ports, caller, args),
       catalog: () => api.catalog(),
       upstream: () => api.upstream(modulesToolInputSchemas.upstream.parse(args)),

@@ -1,27 +1,46 @@
-import { expect, test } from "bun:test";
-import { agentFixture } from "./agent-application.fixtures";
-import { callSync, kernelOrigin, listSystemModules } from "./module-calls";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { testDb } from "./test-db";
+import { listBuildFacts, readBuildFacts, readBuildTranscript } from "./module-build-session";
+import type { StewardPorts } from "./ports";
 
-test("historical reads stay scoped and cannot expose new Agent contexts or restore removed public controls", async () => {
-  const f = await agentFixture();
-  try {
-    const origin = { ...kernelOrigin(f.workspaceId), caller: { kind: "owner" as const, via: null } };
-    const read = async (target: string, args: Record<string, unknown> = {}) => (await callSync(f.ports, origin, target, args)).output;
-    const legacy = await f.ports.db.session.create({ data: { workspaceId: f.workspaceId, source: "web", key: "web:historical" } });
-    const context = await f.ports.db.session.create({ data: { workspaceId: f.workspaceId, source: "module", key: "module:private", moduleId: f.module.id } });
-    await f.ports.db.audit.create({ data: { id: `agent-context:${context.id}`, workspaceId: f.workspaceId, actorKey: "test", kind: "agent_context", subjectId: context.id, details: {} } });
-    const other = await f.ports.db.workspace.create({ data: { name: "other-history" } });
-    const foreign = await f.ports.db.session.create({ data: { workspaceId: other.id, source: "web", key: "web:foreign" } });
-    expect((await read("history.sessions") as { id: string }[]).map(row => row.id)).toEqual([legacy.id]);
-    expect(await read("history.session", { session: legacy.id })).toMatchObject({ id: legacy.id });
-    expect(await read("history.messages", { session: legacy.id })).toEqual([]);
-    for (const id of [context.id, foreign.id]) for (const tool of ["session", "messages", "transcript"])
-      await expect(read(`history.${tool}`, { session: id })).rejects.toMatchObject({ code: "not_found" });
-    await expect(read("history.file", { message: "missing", ref: "chat/foreign" })).rejects.toMatchObject({ code: "not_found" });
-    for (const target of ["chat.send", "provider.wake", "provider.complete", "executions.start", "history.send", "history.cancel"])
-      await expect(read(target)).rejects.toMatchObject({ code: "not_found" });
-    expect(listSystemModules().find(module => module.name === "history")?.tools.map(tool => tool.name)).toEqual(["sessions", "session", "messages", "transcript"]);
-    expect(listSystemModules().some(module => ["chat", "provider", "executions"].includes(module.name))).toBe(false);
-    expect(await f.ports.db.run.count()).toBe(1);
-  } finally { await f.close(); }
-}, 30000);
+let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string;
+beforeEach(async () => {
+  db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "build-facts" } })).id;
+  ports = { db, dataDir: "/unused-build-facts", now: () => new Date("2026-11-08T00:00:00Z"), publicUrl: null };
+});
+afterEach(async () => { await db.$disconnect(); });
+async function build(key: string, workspace = workspaceId, source = "build", targets = true) {
+  const session = await db.session.create({ data: { workspaceId: workspace, source, key, title: "private title", providerSessionId: "private-provider-continuation" } });
+  if (targets) await db.audit.create({ data: { id: `build-targets:${session.id}`, workspaceId: workspace, actorKey: "user", kind: "build_targets", subjectId: session.id, details: { name: "sample", modules: ["sample"] } } });
+  return session;
+}
+test("build facts replace legacy reads without exposing entry journals, Agent contexts or foreign builds", async () => {
+  const valid = await build("build:valid");
+  const legacy = await build("web:legacy", workspaceId, "web");
+  const missing = await build("build:missing", workspaceId, "build", false);
+  const context = await build("module:context", workspaceId, "module");
+  const marked = await build("build:marked");
+  for (const session of [context, marked]) await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: "test", kind: "agent_context", subjectId: session.id, details: {} } });
+  const other = await db.workspace.create({ data: { name: "foreign" } });
+  const foreign = await build("build:foreign", other.id);
+  expect((await listBuildFacts(ports, workspaceId)).map(row => row.id)).toEqual([valid.id]);
+  expect(await readBuildFacts(ports, workspaceId, valid.id)).toMatchObject({ id: valid.id, targets: ["sample"], runs: [], queue: null });
+  expect(await readBuildTranscript(ports, workspaceId, valid.id)).toEqual([]);
+  for (const session of [legacy, missing, context, marked, foreign]) {
+    await expect(readBuildFacts(ports, workspaceId, session.id)).rejects.toMatchObject({ code: "not_found" });
+    await expect(readBuildTranscript(ports, workspaceId, session.id)).rejects.toMatchObject({ code: "not_found" });
+  }
+  expect(await db.run.count()).toBe(0);
+});
+test("build facts are bounded and contain no Run authority, prompts, host paths or provider continuation", async () => {
+  const session = await build("build:runs");
+  await db.run.createMany({ data: Array.from({ length: 55 }, (_, index) => ({ workspaceId, sessionId: session.id, lane: "build", trigger: "build", status: "finished", provider: "fixture", tokenHash: `private-token-${index}`, cwd: "/private-host-path", prompt: "private prompt", error: "x".repeat(2000), createdAt: new Date(ports.now().getTime() + index) })) });
+  const result = await readBuildFacts(ports, workspaceId, session.id);
+  expect(result.runs).toHaveLength(50);
+  expect(result.runs.every(run => run.error!.length <= 1000)).toBe(true);
+  const text = JSON.stringify(result);
+  for (const forbidden of ["private-token", "private-host-path", "private prompt", "private-provider-continuation", "private title"]) expect(text).not.toContain(forbidden);
+  await build("build:newer");
+  expect(await listBuildFacts(ports, workspaceId, 1)).toHaveLength(1);
+  await expect(listBuildFacts(ports, workspaceId, 101)).rejects.toThrow();
+});

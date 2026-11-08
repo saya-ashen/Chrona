@@ -33,9 +33,9 @@ async function makeFake() {
     requests.push(target);
     if (target === "projects.list") return { projects: registered } as T;
     if (target === "projects.register") { expect(Object.keys(args)).toEqual(["path"]); return register(String(args.path)) as T; }
-    if (target === "projects.default") {
-      expect(Object.keys(args)).toEqual(args.path === undefined ? [] : ["path"]);
-      if (args.path !== undefined || !automatic) automatic = register(String(args.path ?? "/host/default"));
+    if (target === "projects.create") {
+      expect(args).toEqual({ name: "default" });
+      automatic ??= register("/host/default");
       return automatic as T;
     }
     const workId = String(args["execution-id"]);
@@ -89,7 +89,7 @@ test("coding page uses registered generic conversation components and has no acc
     expect(element.children.length).toBeGreaterThan(0);
     expect(JSON.stringify(element.props)).not.toContain('"$item"');
   }
-  expect(manifest.uses).toContain("projects.list"); expect(manifest.uses).toContain("projects.register"); expect(manifest.uses).toContain("projects.default");
+  expect(manifest.uses).toContain("projects.list"); expect(manifest.uses).toContain("projects.register"); expect(manifest.uses).toContain("projects.create"); expect(manifest.uses).not.toContain("projects.default");
   expect(manifest.tools.find((tool: { name: string }) => tool.name === "ui-command").visibility).toEqual(["owner"]);
   expect(JSON.stringify(PAGE)).not.toContain("验收"); expect(JSON.stringify(PAGE)).not.toContain('"action":"accept"');
 });
@@ -443,9 +443,9 @@ test("fresh catalogs and empty details provision a default draft ready for first
   const catalog = await workbenchCatalog(fake.context);
   const automatic = fake.registered[0]!;
   expect(catalog).toMatchObject({ defaultProject: automatic.projectRef, selectedSession: "", configured: true, sessions: [], hasSessions: false });
-  expect(catalog.projectGroups).toEqual([{ ...automatic, isDefault: true, selected: true, sessions: [], hasSessions: false }]);
+  expect(catalog.projectGroups).toEqual([{ ...automatic, label: "默认空间", isDefault: true, selected: true, sessions: [], hasSessions: false }]);
   const detail = await workbenchDetail({ ...fake.context });
-  expect(detail).toMatchObject({ sessionId: "", workId: "", project: automatic.projectRef, projectLabel: automatic.label, projectPath: "/host/default", canSend: true });
+  expect(detail).toMatchObject({ sessionId: "", workId: "", project: automatic.projectRef, projectLabel: "默认空间", projectPath: "/host/default", canSend: true });
   expect(await loadSessions(fake.context)).toEqual({ version: 1, selected: null, draftProject: automatic.projectRef, sessions: [] });
   await workbenchCatalog({ ...fake.context }); await workbenchDetail(fake.context);
   expect(fake.registered).toHaveLength(1);
@@ -586,7 +586,7 @@ test("strict tool output schemas accept default drafts, grouped catalogs, and ex
 test("an invalid default cannot hide healthy projects or block repairing the default", () => fixture(async fake => {
   const call = fake.context.call;
   fake.context.call = async (target, args) => {
-    if (target === "projects.default" && !(args as { path?: string }).path) throw Object.assign(new Error("default directory moved"), { code: "invalid" });
+    if (target === "projects.create") throw Object.assign(new Error("managed project root unavailable"), { code: "invalid" });
     return call(target, args);
   };
   const catalog = await workbenchCatalog(fake.context);

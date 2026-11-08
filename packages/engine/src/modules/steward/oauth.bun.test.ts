@@ -1,183 +1,275 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { testDb } from "./test-db";
 import { handleModuleCall } from "./module-effects";
 import { completeOAuth, resetOAuth } from "./oauth";
+import { addsOAuthDefinitions, oauthDefinitionIdentity, type OAuthDefinition } from "./oauth-definition";
 import { createSecrets } from "./secrets";
-import { registerSystemModules } from "./system-modules";
+import { secretView } from "./secret-fields";
+import { registerSystemModule } from "./module-calls";
+import { secrets } from "./system/secrets";
 import type { StewardPorts } from "./ports";
-import { testDb } from "./test-db";
 
-const cleanups: (() => Promise<unknown>)[] = [];
-const realFetch = globalThis.fetch;
+const google: OAuthDefinition = { provider: "google", authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: "https://oauth2.googleapis.com/token", scopes: ["https://www.googleapis.com/auth/gmail.readonly"], accounts: true, authorizationParams: { access_type: "offline", prompt: "consent" } };
+const microsoft: OAuthDefinition = { provider: "microsoft", authorizationUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token", scopes: ["IMAP.AccessAsUser.All", "offline_access"], accounts: true };
+const cleanups: (() => Promise<unknown>)[] = [], realFetch = globalThis.fetch;
 afterEach(async () => { globalThis.fetch = realFetch; resetOAuth(); for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-/** v2-30 §4: the kernel authorizes and refreshes; modules only see access tokens. */
-async function fixture(publicUrl: string | null = "https://chrona.example") {
-  registerSystemModules();
-  const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-oauth-"));
+async function fixture(definition = google, publicUrl: string | null = "https://chrona.example") {
+  registerSystemModule(secrets);
+  const db = testDb({ injectedAgent: false });
+  const dataDir = await mkdtemp("/tmp/chrona-oauth-");
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  const w = (await db.workspace.create({ data: { name: "oauth" } })).id;
+  const workspaceId = (await db.workspace.create({ data: { name: "oauth" } })).id;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl };
-  async function moduleNamed(name: string, part: Record<string, unknown>) {
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], ...part });
-    const module = await db.module.create({ data: { workspaceId: w, name, activeHash: `${name}-1` } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-1`, manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
-    let id = 0;
-    return async (target: string, args: Record<string, string>) => {
-      const reply = await handleModuleCall(ports, { workspaceId: w, moduleId: module.id, hash: `${name}-1`, manifest }, { id: String(++id), method: "call", params: { target, args, mode: "sync", reply: false } });
-      if ("error" in reply) throw reply.error;
-      return (reply as { result: { output: Record<string, any> } }).result.output;
-    };
+  const manifest = (oauth: OAuthDefinition) => moduleManifestSchema.parse({ name: "mail", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: ["network"], secrets: [{ name: "mail_google", oauth }] });
+  const initial = manifest(definition);
+  const module = await db.module.create({ data: { workspaceId, name: "mail", activeHash: "v1" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: initial, source: "provider", intent: {}, report: {}, status: "approved" } });
+  let id = 0;
+  async function call(target: string, args: Record<string, unknown>, callerId = module.id) {
+    const row = await db.module.findUniqueOrThrow({ where: { id: callerId } });
+    const version = await db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: callerId, hash: row.activeHash! } } });
+    const reply = await handleModuleCall(ports, { workspaceId, moduleId: callerId, hash: row.activeHash!, manifest: moduleManifestSchema.parse(version.manifest) }, { id: String(++id), method: "call", params: { target, args: args as Record<string, string>, mode: "sync", reply: false } });
+    if ("error" in reply) throw reply.error;
+    return (reply as { result: { output: Record<string, any> } }).result.output;
   }
   const store = createSecrets(dataDir);
-  return { db, ports, store, mail: await moduleNamed("mail", { effects: ["network"], secrets: ["mail_google"] }), other: await moduleNamed("other", { effects: ["network"], secrets: ["else_oauth"] }) };
+  await store.write("mail_google", { clientId: "cid", clientSecret: "cs" });
+  async function update(next: OAuthDefinition, hash = "v2") {
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: manifest(next), source: "provider", intent: {}, report: {}, status: "approved" } });
+    await db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
+  }
+  async function bound(account = "", oauth = definition, token = "r-1") {
+    const suffix = account ? `_${account}` : "";
+    await store.write("mail_google", { clientId: "cid", clientSecret: "cs", [`refreshToken${suffix}`]: token, [`oauthBinding${suffix}`]: oauthDefinitionIdentity("mail_google", oauth), oauthManaged: "1" });
+  }
+  const args = { name: "mail_google", provider: definition.provider };
+  async function authorize(account?: string) {
+    const started = await call("secrets.authorize", { ...args, scopes: definition.scopes.join(" "), ...(account ? { account } : {}) });
+    const url = new URL(started.url);
+    return { started, url, state: url.searchParams.get("state")! };
+  }
+  async function owner() {
+    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["*"] });
+    const page = await db.module.create({ data: { workspaceId, name: "web", activeHash: "page" } });
+    await db.moduleVersion.create({ data: { moduleId: page.id, hash: "page", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
+    return (target: string, args: Record<string, unknown>) => call(target, args, page.id);
+  }
+  return { db, ports, store, module, workspaceId, call, update, bound, args, authorize, owner };
 }
 function provider(replies: (body: URLSearchParams) => { status?: number; json: Record<string, unknown> }) {
   const requests: { url: string; body: URLSearchParams }[] = [];
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     const body = new URLSearchParams(String(init.body)), reply = replies(body);
     requests.push({ url: String(url), body });
+    expect(init.redirect).toBe("error");
     return Response.json(reply.json, { status: reply.status ?? 200 });
   }) as typeof fetch;
   return requests;
 }
 
-test("authorize hands out a PKCE link, the callback saves the refresh token once, and token refreshes and caches", async () => {
-  const f = await fixture();
-  await expect(f.mail("secrets.authorize", { name: "mail_google", provider: "google", scopes: "https://www.googleapis.com/auth/gmail.readonly" })).rejects.toMatchObject({ code: "unavailable" });
-  await expect(f.other("secrets.authorize", { name: "mail_google", provider: "google", scopes: "x" })).rejects.toMatchObject({ code: "forbidden" });
-  await expect(f.mail("secrets.authorize", { name: "mail_google", provider: "yahoo", scopes: "x" })).rejects.toMatchObject({ code: "invalid" });
-  await f.store.write("mail_google", { clientId: "cid", clientSecret: "csecret" });
+test("manifest OAuth definitions require query-free HTTPS endpoints and cannot replace PKCE/state fields", () => {
+  const parse = (oauth: unknown) => moduleManifestSchema.safeParse({ name: "mail", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], keepAlive: true, secrets: [{ name: "mail_google", oauth }] }).success;
+  expect(parse(google)).toBe(true);
+  for (const authorizationUrl of ["http://example.com/auth", "https://u:p@example.com/auth", "https://example.com/auth?state=forged", "https://example.com/auth#fragment"]) expect(parse({ ...google, authorizationUrl })).toBe(false);
+  for (const tokenUrl of ["http://example.com/token", "https://example.com/token?client_secret=x"]) expect(parse({ ...google, tokenUrl })).toBe(false);
+  for (const name of ["state", "redirect_uri", "client_id", "scope", "response_type", "code_challenge", "code_challenge_method"]) expect(parse({ ...google, authorizationParams: { [name]: "forged" } })).toBe(false);
+});
 
-  const started = await f.mail("secrets.authorize", { name: "mail_google", provider: "google", scopes: "https://www.googleapis.com/auth/gmail.readonly", account: "work" });
-  const url = new URL(started.url!);
+test("identity canonicalizes parameter and scope order; changed definitions require activation confirmation", () => {
+  const spec = (oauth: OAuthDefinition) => ({ secrets: [{ name: "mail_google", fields: [], oauth }] });
+  const reordered = { ...google, scopes: [...google.scopes, ...google.scopes], authorizationParams: { prompt: "consent", access_type: "offline" } };
+  expect(oauthDefinitionIdentity("mail_google", google)).toBe(oauthDefinitionIdentity("mail_google", reordered));
+  expect(addsOAuthDefinitions(spec(reordered), spec(google))).toBe(false);
+  for (const changed of [{ ...google, tokenUrl: "https://new.example/token" }, { ...google, authorizationUrl: "https://new.example/auth" }, { ...google, authorizationParams: { prompt: "none" } }, { ...google, scopes: ["other"] }, { ...google, accounts: false }, microsoft]) {
+    expect(addsOAuthDefinitions(spec(changed), spec(google))).toBe(true);
+  }
+  expect(addsOAuthDefinitions(spec(google), { secrets: ["mail_google"] })).toBe(true);
+  expect(addsOAuthDefinitions({ secrets: [] }, spec(google))).toBe(false);
+});
+
+test("PKCE/state, Google offline extras, bound callback, rotation and cache remain functional", async () => {
+  const f = await fixture(), { started, url, state } = await f.authorize("work");
   expect(started.redirectUri).toBe("https://chrona.example/oauth/callback");
-  expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
-  expect(Object.fromEntries(url.searchParams)).toMatchObject({ client_id: "cid", redirect_uri: started.redirectUri, code_challenge_method: "S256", access_type: "offline", response_type: "code" });
-  expect(url.toString()).not.toContain("csecret");
-
-  const requests = provider(body => body.get("grant_type") === "authorization_code"
-    ? { json: { refresh_token: "r-1", access_token: "a-0", expires_in: 3600, scope: "https://www.googleapis.com/auth/gmail.readonly" } }
-    : { json: { access_token: "a-1", expires_in: 3600 } });
+  expect(url.origin + url.pathname).toBe(google.authorizationUrl);
+  expect(Object.fromEntries(url.searchParams)).toMatchObject({ client_id: "cid", access_type: "offline", prompt: "consent", response_type: "code", code_challenge_method: "S256" });
+  const requests = provider(body => body.get("grant_type") === "authorization_code" ? { json: { refresh_token: "r-1", scope: google.scopes[0] } } : { json: { access_token: "a-1", expires_in: 3600, refresh_token: "r-2" } });
   expect((await completeOAuth(f.ports, { state: "forged", code: "c" })).ok).toBe(false);
-  const state = url.searchParams.get("state")!;
-  expect(await completeOAuth(f.ports, { state, code: "c" })).toMatchObject({ ok: true });
+  expect((await completeOAuth(f.ports, { state, code: "c" })).ok).toBe(true);
   expect((await completeOAuth(f.ports, { state, code: "c" })).ok).toBe(false);
   expect(requests[0]!.body.get("code_verifier")).toBeTruthy();
-  expect(await f.store.read("mail_google")).toEqual({ clientId: "cid", clientSecret: "csecret", refreshToken_work: "r-1", scope_work: "https://www.googleapis.com/auth/gmail.readonly", oauthManaged: "1" });
-  // The refresh token and client secret stay in the kernel once it manages the credential.
-  expect(await f.mail("secrets.get", { name: "mail_google" })).toEqual({ value: { clientId: "cid", scope_work: "https://www.googleapis.com/auth/gmail.readonly", oauthManaged: "1" } });
-  expect(await f.db.audit.count({ where: { kind: "secret_set" } })).toBe(1);
-
-  await expect(f.mail("secrets.token", { name: "mail_google", provider: "google" })).rejects.toMatchObject({ code: "reauthorize" });
-  expect(await f.mail("secrets.token", { name: "mail_google", provider: "google", account: "work" })).toMatchObject({ accessToken: "a-1" });
-  expect(await f.mail("secrets.token", { name: "mail_google", provider: "google", account: "work" })).toMatchObject({ accessToken: "a-1" });
-  expect(requests.filter(r => r.body.get("grant_type") === "refresh_token")).toHaveLength(1);
-  expect(requests[1]!.body.get("refresh_token")).toBe("r-1");
-  await expect(f.other("secrets.token", { name: "mail_google", provider: "google", account: "work" })).rejects.toMatchObject({ code: "forbidden" });
-  // Replacing the credential drops the cached token.
-  await f.store.write("mail_google", { clientId: "cid2", refreshToken_work: "r-9" });
-  await f.mail("secrets.token", { name: "mail_google", provider: "google", account: "work" });
-  expect(requests.at(-1)!.body.get("refresh_token")).toBe("r-9");
-  expect(requests.at(-1)!.body.has("client_secret")).toBe(false);
+  expect(await f.store.read("mail_google")).toMatchObject({ refreshToken_work: "r-1", oauthBinding_work: oauthDefinitionIdentity("mail_google", google), oauthManaged: "1" });
+  const visible = await f.call("secrets.get", { name: "mail_google" });
+  expect(visible.value).not.toHaveProperty("oauthBinding_work");
+  expect(visible.value).not.toHaveProperty("refreshToken_work");
+  expect(visible.value).not.toHaveProperty("clientSecret");
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  for (let i = 0; i < 2; i++) expect(await f.call("secrets.token", { ...f.args, account: "work" })).toMatchObject({ accessToken: "a-1" });
+  expect(requests).toHaveLength(2);
+  expect(requests.every(request => request.url === google.tokenUrl)).toBe(true);
+  expect((await f.store.read("mail_google"))!.refreshToken_work).toBe("r-2");
 });
 
-test("token saves a rotated refresh token and asks to reauthorize on invalid_grant", async () => {
-  const f = await fixture();
-  await f.store.write("mail_google", { clientId: "cid", refreshToken: "r-1" });
-  let revoked = false;
-  const requests = provider(body => revoked ? { status: 400, json: { error: "invalid_grant" } }
-    : { json: { access_token: `a-${body.get("refresh_token")}`, expires_in: 3600, refresh_token: "r-2" } });
-  expect(await f.mail("secrets.token", { name: "mail_google", provider: "microsoft" })).toMatchObject({ accessToken: "a-r-1" });
-  expect(requests[0]!.url).toBe("https://login.microsoftonline.com/common/oauth2/v2.0/token");
-  expect((await f.store.read("mail_google"))!.refreshToken).toBe("r-2");
-  expect((await f.mail("secrets.get", { name: "mail_google" })).value).toEqual({ clientId: "cid", oauthManaged: "1" });
-  // The rotation itself does not invalidate the token just issued.
-  expect(await f.mail("secrets.token", { name: "mail_google", provider: "microsoft" })).toMatchObject({ accessToken: "a-r-1" });
-  expect(requests).toHaveLength(1);
-  revoked = true;
-  resetOAuth();
-  await expect(f.mail("secrets.token", { name: "mail_google", provider: "microsoft" })).rejects.toMatchObject({ code: "reauthorize" });
+test("entry authorization uses the approved manifest; credential edits clear bindings and metadata stays private", async () => {
+  const f = await fixture(), owner = await f.owner();
+  const started = await owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") });
+  expect(new URL(started.url).origin).toBe("https://accounts.google.com");
+  await expect(owner("secrets.token", f.args)).rejects.toMatchObject({ code: "forbidden" });
+  await f.bound("work");
+  const spec = { name: "mail_google", fields: [], oauth: google };
+  expect(secretView(spec, await f.store.read("mail_google")).oauth!.authorized).toEqual(["work"]);
+  expect(secretView({ ...spec, oauth: { ...google, tokenUrl: "https://changed.example/token" } }, await f.store.read("mail_google")).oauth!.authorized).toEqual([]);
+  for (const merge of [true, false]) await expect(owner("secrets.set", { name: "mail_google", merge, value: JSON.stringify({ oauthBinding_work: "forged" }) })).rejects.toMatchObject({ code: "invalid" });
+  await owner("secrets.set", { name: "mail_google", merge: true, value: JSON.stringify({ clientId: "new-client" }) });
+  expect(await f.store.read("mail_google")).toEqual({ clientId: "new-client", clientSecret: "cs" });
+  await f.bound();
+  await owner("secrets.remove", { name: "mail_google", field: "clientSecret" });
+  expect(await f.store.read("mail_google")).toEqual({ clientId: "cid" });
 });
 
-test("callback reports denial, expiry and missing public URL without saving", async () => {
-  const f = await fixture(null);
-  await f.store.write("mail_google", { clientId: "cid" });
-  await expect(f.mail("secrets.authorize", { name: "mail_google", provider: "microsoft", scopes: "IMAP.AccessAsUser.All" })).rejects.toMatchObject({ code: "unavailable" });
-  const g = await fixture();
-  await g.store.write("mail_google", { clientId: "cid" });
-  const url = new URL((await g.mail("secrets.authorize", { name: "mail_google", provider: "microsoft", scopes: "IMAP.AccessAsUser.All" })).url!);
+test("entry authorization refuses ambiguous definitions for the same declared secret", async () => {
+  const f = await fixture(), owner = await f.owner();
+  const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], secrets: [{ name: "mail_google", oauth: { ...google, tokenUrl: "https://other.example/token" } }] });
+  const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "v1" } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
+  await expect(owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") })).rejects.toMatchObject({ code: "forbidden" });
+  expect(new URL((await f.authorize()).started.url).origin).toBe("https://accounts.google.com");
+});
+
+test("Microsoft offline_access is declared, not inferred from provider name", async () => {
+  const f = await fixture(microsoft), { url } = await f.authorize();
   expect(url.searchParams.get("scope")).toBe("IMAP.AccessAsUser.All offline_access");
-  expect(await completeOAuth(g.ports, { state: url.searchParams.get("state")!, error: "access_denied" })).toEqual({ ok: false, message: "已取消授权。" });
-  expect(await g.store.read("mail_google")).toEqual({ clientId: "cid" });
+  expect(url.searchParams.has("access_type")).toBe(false);
+  await f.bound();
+  const requests = provider(() => ({ json: { access_token: "a", expires_in: 3600 } }));
+  await f.call("secrets.token", f.args);
+  expect(requests[0]!.url).toBe(microsoft.tokenUrl);
 });
 
-test("legacy credentials stay readable; refreshes are single-flight, keyed by provider, and never overwrite a replaced credential", async () => {
+test("unbound legacy tokens and same-name endpoint changes never send credentials; rollback restores the matching binding", async () => {
   const f = await fixture();
-  await f.store.write("mail_google", { clientId: "cid", clientSecret: "cs", refreshToken: "r-1" });
-  // Saved by the user and never written by the kernel: modules that refresh themselves keep working.
-  expect((await f.mail("secrets.get", { name: "mail_google" })).value).toEqual({ clientId: "cid", clientSecret: "cs", refreshToken: "r-1" });
-  let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  const requests: string[] = [];
-  globalThis.fetch = (async (url: string) => {
-    requests.push(String(url));
-    await gate;
-    return Response.json({ access_token: `a-${requests.length}`, expires_in: 3600, refresh_token: "r-rotated" });
-  }) as typeof fetch;
-  const both = Promise.all([f.mail("secrets.token", { name: "mail_google", provider: "google" }), f.mail("secrets.token", { name: "mail_google", provider: "google" })]);
-  await new Promise(resolve => setTimeout(resolve, 20));
-  // The user replaces the credential while the refresh is in flight.
-  await f.store.write("mail_google", { clientId: "cid", refreshToken: "r-user" });
-  release();
-  const [first, second] = await both;
-  expect(first.accessToken).toBe(second.accessToken!);
+  const requests = provider(() => ({ json: { access_token: "a", expires_in: 3600 } }));
+  await f.store.write("mail_google", { clientId: "cid", refreshToken: "legacy" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
+  await f.bound();
+  await f.call("secrets.token", f.args);
+  await f.update({ ...google, tokenUrl: "https://new.example/token" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
   expect(requests).toHaveLength(1);
-  expect(await f.store.read("mail_google")).toEqual({ clientId: "cid", refreshToken: "r-user" });
-  // Another provider is a different token, not the cached one.
-  const other = await f.mail("secrets.token", { name: "mail_google", provider: "microsoft" });
-  expect(requests.at(-1)).toBe("https://login.microsoftonline.com/common/oauth2/v2.0/token");
-  expect(other.accessToken).not.toBe(first.accessToken!);
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v1" } });
+  await f.call("secrets.token", f.args);
+  expect(requests).toHaveLength(1);
 });
 
-test("the page saves field by field, removes one field, and sees declared fields by name only", async () => {
-  const f = await fixture();
-  const page = await (async () => {
-    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["chat.send", "secrets.set", "secrets.remove", "modules.permissions"] });
-    const module = await f.db.module.create({ data: { workspaceId: (await f.db.workspace.findFirstOrThrow()).id, name: "web", activeHash: "page-1" } });
-    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "page-1", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
-    let id = 0;
-    return async (target: string, args: Record<string, unknown>) => {
-      const reply = await handleModuleCall(f.ports, { workspaceId: module.workspaceId, moduleId: module.id, hash: "page-1", manifest }, { id: String(++id), method: "call", params: { target, args: args as Record<string, string>, mode: "sync", reply: false } });
-      if ("error" in reply) throw reply.error;
-      return (reply as { result: { output: any } }).result.output;
-    };
-  })();
-  await f.store.write("mail_google", { clientId: "cid", refreshToken: "r", oauthManaged: "1" });
-  await page("secrets.set", { name: "mail_google", value: JSON.stringify({ clientSecret: "cs" }), merge: true });
-  expect(await f.store.read("mail_google")).toEqual({ clientId: "cid", refreshToken: "r", oauthManaged: "1", clientSecret: "cs" });
-  await expect(page("secrets.set", { name: "mail_google", value: JSON.stringify({ refreshToken: "typed" }), merge: true })).rejects.toMatchObject({ code: "invalid" });
-  await page("secrets.remove", { name: "mail_google", field: "refreshToken" });
-  expect(await f.store.read("mail_google")).toEqual({ clientId: "cid", oauthManaged: "1", clientSecret: "cs" });
-  await expect(page("secrets.remove", { name: "mail_google", field: "nope" })).rejects.toMatchObject({ code: "not_found" });
-  // Replacing without merge stays available (the command line), and drops what it does not list.
-  await page("secrets.set", { name: "mail_google", value: JSON.stringify({ clientId: "c2" }) });
-  expect(await f.store.read("mail_google")).toEqual({ clientId: "c2" });
+for (const change of ["definition", "client", "paused", "unapproved"] as const) test(`pending callback rejects changed ${change} before exchange`, async () => {
+  const f = await fixture(), { state } = await f.authorize();
+  if (change === "definition") await f.update({ ...google, tokenUrl: "https://new.example/token" });
+  if (change === "client") await f.store.write("mail_google", { clientId: "changed", clientSecret: "cs" });
+  if (change === "paused") await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
+  if (change === "unapproved") await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { status: "pending_review" } });
+  const requests = provider(() => ({ json: { refresh_token: "r" } }));
+  expect((await completeOAuth(f.ports, { state, code: "c" })).ok).toBe(false);
+  expect(requests).toHaveLength(0);
+  expect(await f.store.read("mail_google")).not.toHaveProperty("refreshToken");
+});
 
-  const declared = moduleManifestSchema.parse({ name: "mailer", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: ["network"], secrets: [
-    { name: "mail", label: "邮箱密码", extraFields: { label: "账户 id", valueLabel: "授权码" } },
-    { name: "mail_google", label: "Gmail", oauth: { provider: "google", scopes: ["https://www.googleapis.com/auth/gmail.readonly"], accounts: true } }] });
-  expect(moduleManifestSchema.safeParse({ ...declared, secrets: ["mail", { name: "mail" }] }).success).toBe(false);
-  const module = await f.db.module.create({ data: { workspaceId: (await f.db.workspace.findFirstOrThrow()).id, name: "mailer", activeHash: "mailer-1" } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "mailer-1", manifest: declared, source: "provider", intent: {}, report: {}, status: "approved" } });
-  await f.store.write("mail", { qq: "pw-qq", work: "pw-work" });
-  await f.store.write("mail_google", { clientId: "cid", refreshToken_work: "r", scope_work: "s", oauthManaged: "1" });
-  const view = await page("modules.permissions", { module: "mailer" });
-  expect(view.secrets[0]).toMatchObject({ name: "mail", label: "邮箱密码", configured: true, fields: [], extraFields: { label: "账户 id", saved: ["qq", "work"] }, oauth: null });
-  expect(view.secrets[1]).toMatchObject({ name: "mail_google", fields: [{ name: "clientId", saved: true, plain: true }, { name: "clientSecret", saved: false, optional: true }],
-    oauth: { provider: "google", accounts: true, authorized: ["work"] } });
-  expect(JSON.stringify(view)).not.toContain("pw-qq");
+test("unrelated update and rollback to frozen definition allow callback", async () => {
+  const f = await fixture(), { state } = await f.authorize();
+  await f.update({ ...google, tokenUrl: "https://new.example/token" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v1" } });
+  await f.update(google, "v3");
+  const requests = provider(() => ({ json: { refresh_token: "r" } }));
+  expect((await completeOAuth(f.ports, { state, code: "c" })).ok).toBe(true);
+  expect(requests[0]!.url).toBe(google.tokenUrl);
+});
+
+test("concurrent refreshes coalesce, but credential replacement prevents token return and overwrite", async () => {
+  const f = await fixture();
+  await f.bound();
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; }), entered = new Promise<void>(resolve => { started = resolve; });
+  let requests = 0;
+  globalThis.fetch = (async () => { requests++; started(); await gate; return Response.json({ access_token: "a", expires_in: 3600, refresh_token: "rotated" }); }) as unknown as typeof fetch;
+  const first = f.call("secrets.token", f.args), second = f.call("secrets.token", f.args);
+  const result = Promise.allSettled([first, second]);
+  await entered;
+  await f.store.write("mail_google", { clientId: "new", refreshToken: "user" });
+  release();
+  for (const reply of await result) expect(reply).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+  expect(requests).toBe(1);
+  expect(await f.store.read("mail_google")).toEqual({ clientId: "new", refreshToken: "user" });
+});
+
+for (const changed of ["none", "first", "second"] as const) test(`two modules share one rotating refresh; changed approval: ${changed}`, async () => {
+  const f = await fixture();
+  await f.bound("work");
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.module.id, hash: "v1" } } });
+  const sibling = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "v1" } });
+  await f.db.moduleVersion.create({ data: { moduleId: sibling.id, hash: "v1", manifest: { ...moduleManifestSchema.parse(version.manifest), name: "other" }, source: "provider", intent: {}, report: {}, status: "approved" } });
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; }), entered = new Promise<void>(resolve => { started = resolve; });
+  let requests = 0;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    requests++;
+    expect(new URLSearchParams(String(init.body)).get("refresh_token")).toBe("r-1");
+    started();
+    await gate;
+    return Response.json({ access_token: "shared", expires_in: 3600, refresh_token: "rotated" });
+  }) as typeof fetch;
+  const args = { ...f.args, account: "work" };
+  const result = Promise.allSettled([f.call("secrets.token", args), f.call("secrets.token", args, sibling.id)]);
+  await entered;
+  if (changed !== "none") await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: changed === "first" ? f.module.id : sibling.id, hash: "v1" } }, data: { status: "pending_review" } });
+  release();
+  const replies = await result;
+  for (const [index, reply] of replies.entries()) {
+    if (changed === (index === 0 ? "first" : "second")) expect(reply).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+    else expect(reply).toMatchObject({ status: "fulfilled", value: { accessToken: "shared" } });
+  }
+  expect(requests).toBe(1);
+  expect(await f.store.read("mail_google")).toMatchObject({ refreshToken_work: "rotated" });
+  // A revoked participant cannot poison the credential or the other module's cached token.
+  expect(await f.call("secrets.token", args, changed === "first" ? sibling.id : f.module.id)).toMatchObject({ accessToken: "shared" });
+  expect(requests).toBe(1);
+});
+
+test("definition changes separate in-flight work and reject late responses from the old endpoint", async () => {
+  const f = await fixture();
+  await f.bound();
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; }), entered = new Promise<void>(resolve => { started = resolve; });
+  const urls: string[] = [];
+  globalThis.fetch = (async (url: string) => { urls.push(String(url)); if (String(url) === google.tokenUrl) { started(); await gate; } return Response.json({ access_token: String(url), expires_in: 3600 }); }) as typeof fetch;
+  const old = f.call("secrets.token", f.args);
+  const oldResult = Promise.allSettled([old]);
+  await entered;
+  const next = { ...google, tokenUrl: "https://new.example/token" };
+  await f.update(next);
+  await f.bound("", next);
+  expect(await f.call("secrets.token", f.args)).toMatchObject({ accessToken: next.tokenUrl });
+  release();
+  expect((await oldResult)[0]).toMatchObject({ status: "rejected", reason: { code: "reauthorize" } });
+  expect(urls).toEqual([google.tokenUrl, next.tokenUrl]);
+});
+
+test("callback rechecks definition after exchange before saving", async () => {
+  const f = await fixture(), { state } = await f.authorize();
+  globalThis.fetch = (async () => { await f.update({ ...google, tokenUrl: "https://new.example/token" }); return Response.json({ refresh_token: "r" }); }) as unknown as typeof fetch;
+  expect((await completeOAuth(f.ports, { state, code: "c" })).ok).toBe(false);
+  expect(await f.store.read("mail_google")).not.toHaveProperty("refreshToken");
+});
+
+test("denial, missing URL, undeclared scopes/provider and invalid_grant fail explicitly", async () => {
+  const f = await fixture();
+  await expect(f.call("secrets.authorize", { ...f.args, scopes: "not-declared" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(f.call("secrets.authorize", { ...f.args, provider: "microsoft", scopes: "x" })).rejects.toMatchObject({ code: "forbidden" });
+  const { state } = await f.authorize();
+  expect(await completeOAuth(f.ports, { state, error: "access_denied" })).toMatchObject({ ok: false, message: "已取消授权。" });
+  const missing = await fixture(google, null);
+  await expect(missing.authorize()).rejects.toMatchObject({ code: "unavailable" });
+  await f.bound();
+  provider(() => ({ status: 400, json: { error: "invalid_grant" } }));
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "reauthorize" });
 });

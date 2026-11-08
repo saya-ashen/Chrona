@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { SecretSpec } from "@chrona/contracts/steward";
+import { oauthDefinitionIdentity, type OAuthDefinition } from "./oauth-definition";
 
 /** Written by the kernel (v2-30 §4), never typed on the page. */
-export const kernelField = (field: string) => /^(refreshToken|scope)(_|$)/.test(field) || field === "oauthManaged";
+export const kernelField = (field: string) => /^(refreshToken|scope|oauthBinding)(_|$)/.test(field) || field === "oauthManaged";
 
 /**
  * v2-16 §2.1: what the page needs to ask for one credential — the declared fields, the user-named extras and the
@@ -21,7 +22,8 @@ export function secretView(declared: string | SecretSpec, saved: Record<string, 
     // Without a declaration the page cannot tell fields apart: it lists every saved name.
     savedFields: typeof declared === "string" ? names.filter(name => !kernelField(name)) : null,
     oauth: oauth ? { provider: oauth.provider, scopes: oauth.scopes, accounts: !!oauth.accounts,
-      authorized: names.filter(name => /^refreshToken(_|$)/.test(name)).map(name => name === "refreshToken" ? "" : name.slice("refreshToken_".length)) } : null,
+      authorized: names.filter(name => /^refreshToken(_|$)/.test(name) && saved?.[name.replace(/^refreshToken/, "oauthBinding")] === oauthDefinitionIdentity(spec.name, oauth as OAuthDefinition))
+        .map(name => name === "refreshToken" ? "" : name.slice("refreshToken_".length)) } : null,
   };
 }
 export const secretViewSchema = z.object({

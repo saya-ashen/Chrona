@@ -4,8 +4,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
 import { seedTestModuleRelease, testReleasePackages } from "./module-release-test-fixture";
-import { createFiles } from "./builtin/files/files";
+import { createFiles } from "./external/files/files";
 import { registerBuiltins } from "./module-builtin";
+import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
+import { buildPending } from "./module-build";
+import { moduleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { createStewardService } from "./service";
@@ -18,9 +21,11 @@ const now = new Date("2026-10-22T00:00:00Z");
 
 async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-files-engine-");
-  const resources = join(dataDir, "resources", "builtin");
+  const resources = join(dataDir, "resources", "builtin"), externalResources = join(dataDir, "resources", "external");
   await cp(shippedResources, resources, { recursive: true });
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
+  await cp(join(import.meta.dirname, "external/files"), join(externalResources, "files"), { recursive: true });
+  await seedTestModuleRelease(externalResources, "files");
   const workspaceId = (await db.workspace.create({ data: { name: "files" } })).id;
   const peer = testModuleProcess(async (event, _call, input) => {
     const app = createFiles(input.contentDir!, input.dataDir);
@@ -28,13 +33,22 @@ async function fixture(real = false) {
     throw new Error("Unexpected event");
   });
   const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir }) : null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, packages: testReleasePackages(resources),
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, moduleExternalResources: externalResources, packages: testReleasePackages(resources),
     // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
     sandbox: { available: sandbox?.health.available ?? true, isolated: sandbox?.health.isolated ?? true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
+  ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
   const api = createStewardService(ports).forWorkspace(workspaceId);
   return { db, ports, workspaceId, api,
     async start() {
       await registerBuiltins(ports, workspaceId);
+      const existing = await db.module.findUnique({ where: { workspaceId_name: { workspaceId, name: "files" } } });
+      if (!existing) {
+        for (const name of ["mcp", "files", "events"]) expect(await db.module.count({ where: { workspaceId, name } })).toBe(0);
+        await installExternal(ports, workspaceId, { package: "files", mode: "install", requestKey: "files-fixture" });
+        await buildPending(moduleContext(ports, workspaceId));
+        await refreshInstallationReceipts(ports, workspaceId);
+        expect(await installExternal(ports, workspaceId, { package: "files", mode: "install", requestKey: "files-fixture" })).toMatchObject({ status: "installed" });
+      }
       return db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId, name: "files" } } });
     },
     call: async (tool: string, args: Record<string, unknown> = {}) => (await api.modules.callTool(`m_files_${tool}`, args)).result as any,
@@ -42,14 +56,14 @@ async function fixture(real = false) {
   };
 }
 
-test("files fresh workspace: trusted release activation, owner tools, history and trash", async () => {
+test("files fresh workspace: explicit external installation, owner tools, history and trash", async () => {
   const f = await fixture();
   try {
     const app = await f.start();
-    expect(app).toMatchObject({ builtin: true, status: "active" });
+    expect(app).toMatchObject({ builtin: false, status: "active" });
     expect(await f.db.approval.count()).toBe(0);
-    const version = await f.db.moduleVersion.findFirstOrThrow();
-    expect(version.report).toMatchObject({ tests: [], errors: [] });
+    const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: app.id } });
+    expect(version).toMatchObject({ status: "approved", report: { tests: [{ exitCode: 0 }] } });
     expect(app.activeHash).toBeTruthy();
     expect((await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_files_"))).toEqual(["list", "read", "write", "move", "delete", "history", "restore"].map(name => `m_files_${name}`));
     expect(await f.call("write", { path: "report.txt", content: "one" })).toEqual({ ok: true });
@@ -106,12 +120,12 @@ if (!realSandbox.health.available) console.info("SKIP files real process: module
   const f = await fixture(true);
   try {
     const app = await f.start();
-    const version = await f.db.moduleVersion.findFirstOrThrow();
-    expect(version.report).toMatchObject({ tests: [], errors: [] });
+    const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: app.id } });
+    expect(version).toMatchObject({ status: "approved", report: { tests: [{ exitCode: 0 }] } });
     const sandbox = createScriptSandbox({ dataDir: f.ports.dataDir });
     await mkdir(join(f.ports.dataDir, "platform/data", app.id), { recursive: true });
     await mkdir(join(f.ports.dataDir, "platform/content", app.id), { recursive: true });
-    const author = await sandbox.runModule({ codeDir: join(f.ports.moduleBuiltinResources!, "files"), dataDir: join(f.ports.dataDir, "platform/data", app.id), contentDir: join(f.ports.dataDir, "platform/content", app.id), entry: "test.ts", input: {} });
+    const author = await sandbox.runModule({ codeDir: join(f.ports.moduleExternalResources!, "files"), dataDir: join(f.ports.dataDir, "platform/data", app.id), contentDir: join(f.ports.dataDir, "platform/content", app.id), entry: "test.ts", input: {} });
     expect(author).toMatchObject({ status: "succeeded", exitCode: 0 });
     expect(app.activeHash).toBeTruthy();
     expect(await f.call("write", { path: "real.txt", content: "sandbox" })).toEqual({ ok: true });

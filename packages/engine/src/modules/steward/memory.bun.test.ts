@@ -1,138 +1,178 @@
-import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { afterEach, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { moduleContext } from "./module-context";
-import { propose } from "./module-proposal";
-import { buildPending } from "./module-build";
-import { moduleSupervisor } from "./module-supervisor";
-import { autoRetain, memory, memoryInput } from "./memory";
-import { testDb } from "./test-db";
-import type { StewardPorts } from "./ports";
+import { selectedMemory, conversationMemory, memoryView, memoryForget, type MemoryJournal } from "./entry-app/memory";
+import { createAgentConversations } from "./entry-app/conversations";
+import { parseSnapshot } from "./external/memory-local/conversation";
+import { preferences } from "./external/memory-local/preferences";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 
-const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-const tools: { name: string; description: string; visibility: string[]; parameters: { type: string; properties: Record<string, { type: string }> } }[] = ["retain", "recall", "forget"].map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: {
-  content: { type: "string" }, source: { type: "string" }, at: { type: "string" }, query: { type: "string" }, limit: { type: "number" }, id: { type: "string" } } } }));
-// A stand-in provider: the memory interface over a JSON-lines file; recall matches any query word.
-tools.push(...["conversation-context", "conversation-retain"].map(name => ({ name, description: name, visibility: ["kernel"], parameters: { type: "object", properties: { snapshot: { type: "string" } } } })));
-const fakeProvider = {
-  "conversation.ts": await readFile(new URL("./external/memory-local/conversation.ts", import.meta.url), "utf8"),
-  "module.json": JSON.stringify({ name: "memory-fake", entry: "index.ts", keepAlive: true, triggers: [], effects: [], contributes: { memory: { interface: 1, context: "conversation-context", afterRun: "conversation-retain" } }, tools, tests: ["test.ts"] }),
-  "index.ts": `// @ts-expect-error SDK at run time
-import { chrona, on } from "chrona";
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { conversationMemory } from "./conversation";
-const file = join(chrona.paths.data, "memories.jsonl");
-const all = () => existsSync(file) ? readFileSync(file, "utf8").split("\\n").filter(Boolean).map(line => JSON.parse(line)) : [];
-async function invoke(id, args) {
-  const event = { id };
-  if (event.id === "retain") { const id = "m" + (all().length + 1); appendFileSync(file, JSON.stringify({ id, ...args }) + "\\n"); return { result: { id } }; }
-  if (event.id === "recall") return { result: { items: all().filter(item => String(args.query).split(/\\s+/).some(word => word && item.content.includes(word))).map(item => ({ id: item.id, content: item.content, at: item.at })) } };
-  const rest = all().filter(item => item.id !== args.id);
-  writeFileSync(file, rest.map(item => JSON.stringify(item) + "\\n").join(""));
-  return { result: { forgotten: true } };
+type Args = Record<string, unknown>;
+const dirs: string[] = [];
+afterEach(async () => { for (const path of dirs.splice(0)) await rm(path, { recursive: true, force: true }); });
+async function directory() { const path = await mkdtemp("/tmp/chrona-entry-memory-"); dirs.push(path); return path; }
+const at = "2026-11-08T12:00:00.000Z";
+const provider = { module: "memory-local", hash: "approved", value: { interface: 1, context: "conversation-context", afterRun: "conversation-retain" } };
+function fixture(values: Args = { "memory-provider": "memory-local" }) {
+  const calls: { target: string; args: Args }[] = [];
+  const session: { id: string; source: string; messages: { direction: string; text: string; createdAt: string }[]; memory?: MemoryJournal } = { id: "web-agent:local", source: "web", messages: [{ direction: "in", text: "past choice", createdAt: at }] };
+  const call = async (target: string, args: Args = {}): Promise<unknown> => {
+    calls.push({ target, args });
+    if (target === "modules.settings-get") return { values };
+    if (target === "modules.contributions") return [provider];
+    if (target.endsWith(".conversation-context")) return { text: "Earlier choice: local files", recalled: true };
+    if (target.endsWith(".conversation-retain")) return { retained: true, through: JSON.parse(String(args.snapshot)).messages.at(-1)?.at, chars: 10 };
+    if (target.endsWith(".recall")) return { items: [{ id: "memory-id", content: "remembered" }] };
+    if (target.endsWith(".forget")) return { forgotten: true };
+    throw new Error(`Unexpected call ${target}`);
+  };
+  return { calls, session, call };
 }
-const policy = conversationMemory({ recall: async args => (await invoke("recall", args)).result, retain: args => invoke("retain", args) });
-on("tool", async event => {
-  if (!event.caller) return { result: {} };
-  if (event.id === "conversation-context") return { result: await policy.context(JSON.parse(event.args.snapshot)) };
-  if (event.id === "conversation-retain") return { result: await policy.retain(JSON.parse(event.args.snapshot)) };
-  return invoke(event.id, event.args);
+test("entry selects only its configured approved contribution; discovery is restricted to memory", async () => {
+  const f = fixture();
+  expect((await selectedMemory(f.call, "qq"))?.module).toBe("memory-local");
+  expect(f.calls).toEqual([{ target: "modules.settings-get", args: { module: "qq" } }, { target: "modules.contributions", args: { section: "memory" } }]);
+  const off = fixture({});
+  expect(await selectedMemory(off.call, "web")).toBeNull();
+  expect(off.calls.map(call => call.target)).toEqual(["modules.settings-get"]);
+  const missing = fixture({ "memory-provider": "not-installed" });
+  expect(await selectedMemory(missing.call, "mcp")).toBeNull();
+  expect(missing.calls.some(call => call.target.includes("build") || call.target.startsWith("memory."))).toBe(false);
 });
-`,
-  "test.ts": "// Fake module: the end-to-end test is its check.\n",
-};
-
-if (!sandbox.health.available) console.info("SKIP memory end to end: module sandbox unavailable");
-(sandbox.health.available ? test : test.skip)("memory forwards to the chosen provider; conversations recall once at the start and retain every four user messages", async () => {
-  const dataDir = await mkdtemp("/tmp/chrona-memory-e2e-"), resources = join(dataDir, "external");
-  for (const name of ["memory-fake", "memory-local"]) await mkdir(join(resources, name), { recursive: true });
-  for (const [name, content] of Object.entries(fakeProvider)) await writeFile(join(resources, "memory-fake", name), content);
-  // Optional memory-local remains uninstalled; selecting a provider never triggers an implicit install.
-  await writeFile(join(resources, "memory-local", "module.json"), "{}");
-  const db = testDb(), runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
-  let at = Date.parse("2026-10-27T12:00:00Z");
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(at += 1000), publicUrl: null, moduleExternalResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
-  try {
-    const w = (await db.workspace.create({ data: { name: "memory" } })).id;
-    const context = moduleContext(ports, w);
-    await propose(context, { root: resources, dir: "memory-fake", intent: { changes: ["Install test memory provider"] } }, "user");
-    await buildPending(context);
-    expect(await db.module.findFirst({ where: { name: "memory-local" } })).toBeNull();
-    expect(await db.module.findFirstOrThrow({ where: { name: "memory-fake" } })).toMatchObject({ status: "active" });
-    await moduleSupervisor(ports).reconcile();
-    const entry = await db.module.create({ data: { workspaceId: w, name: "new-entry", status: "active", activeHash: "h" } });
-    await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "h", status: "approved", source: "builtin", intent: {}, report: {}, manifest: { name: "new-entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] } } });
-    const owner = { kind: "module" as const, module: "new-entry", moduleId: entry.id, hash: "h" };
-    const call = (name: string, args: Record<string, unknown>) => memory.handle({ ports, workspaceId: w, caller: owner }, name, args);
-    const session = await db.session.create({ data: { workspaceId: w, key: "new-entry:m", source: "web", entryModuleId: entry.id } });
-    const say = (direction: "in" | "out", text: string) => db.message.create({ data: { workspaceId: w, sessionId: session.id, channel: "in_app", direction, text, at: new Date(at += 1000) } });
-
-    // Off: no tools, no recall, nothing retained.
-    expect((await memoryInput(ports, w, session, [])).hidden).toContain("m_memory_recall");
-    await expect(call("recall", { query: "okx" })).rejects.toThrow("Memory is not enabled");
-    await db.workspace.update({ where: { id: w }, data: { settings: { memory: { provider: "memory-fake" } } } });
-
-    expect(await call("retain", { content: "okx 实验不要自动操作 token=abc123" })).toEqual({ id: "m1" });
-    const found = await call("recall", { query: "okx" }) as { items: { id: string; content: string }[] };
-    // Credentials are redacted before they reach the provider (checked first: toMatchObject rewrites what it matched).
-    expect(found.items[0]!.content).not.toContain("abc123");
-    expect(found.items).toMatchObject([{ id: "m1", content: expect.stringContaining("okx 实验") }]);
-
-    // The first run of a conversation recalls with its latest words; later runs do not.
-    await say("in", "okx 的实验还在跑吗");
-    const input = await memoryInput(ports, w, session, await db.message.findMany({ where: { sessionId: session.id } }));
-    expect(input.hidden).toEqual([]);
-    expect(input.text).toContain("Recalled memories");
-    expect(input.text).toContain("okx 实验不要自动操作");
-    expect((await memoryInput(ports, w, session, [{ direction: "in", text: "okx", at: new Date() }])).text).not.toContain("Recalled memories (data;");
-    // Build conversations are never recalled for.
-    expect((await memoryInput(ports, w, { id: "b", source: "build" }, [{ direction: "in", text: "okx", at: new Date() }])).text).toBe("");
-
-    // Retained every four user messages, from where the last retain stopped.
-    await say("out", "还在跑");
-    for (const text of ["第二条", "第三条"]) await say("in", text);
-    expect(await autoRetain(ports, w, session.id)).toBe(false);
-    await say("in", "第四条 计划工作台");
-    expect(await autoRetain(ports, w, session.id)).toBe(true);
-    expect(await autoRetain(ports, w, session.id)).toBe(false);
-    const retained = await call("recall", { query: "计划工作台" }) as { items: { content: string }[] };
-    expect(retained.items).toHaveLength(1);
-    expect(retained.items[0]!.content).toContain("用户: okx 的实验还在跑吗\n\nChrona: 还在跑");
-
-    expect(await call("forget", { id: "m1" })).toEqual({ forgotten: true });
-    expect(await call("status", {})).toMatchObject({ provider: "memory-fake", available: true, autoRecall: true, autoRetain: true, last24h: { retained: 2, forgotten: 1 } });
-    // Redact before truncation: a long credential must not lose its identifying prefix at the snapshot boundary.
-    await memoryInput(ports, w, session, [{ direction: "in", text: "padding ".repeat(6000), at: new Date() }, { direction: "in", text: `token=${"SYNTHETIC-CREDENTIAL".repeat(2000)}`, at: new Date() }]);
-    const boundedCall = await db.moduleInvocation.findFirstOrThrow({ where: { tool: "conversation-context" }, orderBy: { createdAt: "desc" } });
-    const boundedMessages = JSON.parse((boundedCall.args as { snapshot: string }).snapshot).messages as { text: string }[];
-    expect(boundedMessages.reduce((total, message) => total + message.text.length, 0)).toBeLessThanOrEqual(20_000);
-    expect(JSON.stringify(boundedMessages)).not.toContain("SYNTHETIC-CREDENTIAL");
-    // Disabling automatic operations never discloses conversation text to the selected application.
-    await db.workspace.update({ where: { id: w }, data: { settings: { memory: { provider: "memory-fake", autoRecall: false, autoRetain: false } } } });
-    await memoryInput(ports, w, session, [{ direction: "in", text: "DO NOT DISCLOSE", at: new Date() }]);
-    const contextCall = await db.moduleInvocation.findFirstOrThrow({ where: { tool: "conversation-context" }, orderBy: { createdAt: "desc" } });
-    expect(JSON.parse((contextCall.args as { snapshot: string }).snapshot).messages).toEqual([]);
-    const retainCount = await db.moduleInvocation.count({ where: { tool: "conversation-retain" } });
-    expect(await autoRetain(ports, w, session.id, true)).toBe(false);
-    expect(await db.moduleInvocation.count({ where: { tool: "conversation-retain" } })).toBe(retainCount);
-    // Legacy providers retain their manual API and receive no automatic conversation snapshot.
-    const providerModule = await db.module.findFirstOrThrow({ where: { workspaceId: w, name: "memory-fake" } });
-    const version = await db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: providerModule.id, hash: providerModule.activeHash! } } });
-    await db.moduleVersion.update({ where: { id: version.id }, data: { manifest: { ...JSON.parse(fakeProvider["module.json"]), contributes: { memory: { interface: 1 } } } } });
-    const invocationCount = await db.moduleInvocation.count();
-    expect(await memoryInput(ports, w, session, [{ direction: "in", text: "private new message", at: new Date() }])).toEqual({ hidden: [], text: "" });
-    expect(await autoRetain(ports, w, session.id, true)).toBe(false);
-    expect(await db.moduleInvocation.count()).toBe(invocationCount);
-    expect(await call("recall", { query: "计划工作台" })).toMatchObject({ items: [expect.objectContaining({ content: expect.stringContaining("计划工作台") })] });
-    // A provider that is gone never stops a conversation.
-    await db.module.updateMany({ where: { name: "memory-fake" }, data: { status: "paused" } });
-    expect((await memoryInput(ports, w, session, [])).hidden).toContain("m_memory_recall");
-    expect(await autoRetain(ports, w, session.id)).toBe(false);
-  } finally {
-    await moduleSupervisor(ports).stop();
-    await db.$disconnect();
-    await rm(dataDir, { recursive: true, force: true });
+test.each([null, {}, { interface: 2 }, { interface: 1, context: "other-app.recall" }, { interface: 1, afterRun: 42 }])("entry rejects invalid contributed memory declarations: %j", async value => {
+  const f = fixture();
+  const call = (target: string, args?: Args) => target === "modules.contributions" ? Promise.resolve([{ ...provider, value }]) : f.call(target, args);
+  expect(await selectedMemory(call, "web")).toBeNull();
+});
+test.each(["context", "retain"] as const)("entry honors %s opt-out without sending conversation data", async operation => {
+  const f = fixture({ "memory-provider": "memory-local", "memory-auto-recall": false, "memory-auto-retain": false });
+  expect(await conversationMemory(f.call, "web", f.session, operation, at)).toBe("");
+  expect(f.calls.every(call => call.target.startsWith("modules."))).toBe(true);
+  expect(f.session.memory).toBeUndefined();
+});
+test("entry sanitizes before truncation, bounds snapshots, and advances only validated receipts", async () => {
+  const f = fixture();
+  f.session.messages = Array.from({ length: 205 }, (_, i) => ({ direction: "in", text: i === 204 ? `Bearer ${"x".repeat(25000)} tail` : `msg${i}`, createdAt: at }));
+  const context = await conversationMemory(f.call, "web", f.session, "context", at);
+  expect(context).toContain("not authorization");
+  expect(f.session.memory?.recalled).toBe(true);
+  const snapshot = JSON.parse(String(f.calls.at(-1)!.args.snapshot));
+  expect(snapshot.messages).toHaveLength(200);
+  expect(snapshot.messages.map((message: { text: string }) => message.text).join("")).toContain("[Redacted]");
+  expect(snapshot.messages.map((message: { text: string }) => message.text).join("")).not.toContain("x".repeat(100));
+  expect(snapshot.messages.reduce((n: number, message: { text: string }) => n + message.text.length, 0)).toBeLessThanOrEqual(20_000);
+  await conversationMemory(f.call, "web", f.session, "retain", at);
+  expect(f.session.memory?.retainedThrough).toBe(at);
+  const failed = fixture();
+  const invalid = async (target: string, args?: Args) => target.endsWith(".conversation-retain") ? { retained: true, through: "2099-01-01T00:00:00.000Z", chars: 1 } : failed.call(target, args);
+  await conversationMemory(invalid, "web", failed.session, "retain", at);
+  expect(failed.session.memory?.retainedThrough).toBeNull();
+  const unavailable = async (target: string, args?: Args) => { if (target.startsWith("memory-local.")) throw new Error("unavailable"); return failed.call(target, args); };
+  expect(await conversationMemory(unavailable, "web", failed.session, "context", at)).toBe("");
+  expect(failed.session.memory?.recalled).toBe(false);
+});
+test("Web/MCP manual memory operations route to the selected app with no identity arguments", async () => {
+  const f = fixture();
+  expect(await memoryView(f.call, "mcp")).toMatchObject({ provider: "memory-local", available: true });
+  expect(await memoryView(f.call, "web", "choice")).toEqual({ items: [{ id: "memory-id", content: "remembered" }] });
+  expect(await memoryForget(f.call, "web", "memory-id")).toEqual({ forgotten: true });
+  expect(f.calls.filter(call => call.target.startsWith("memory-local."))).toEqual([{ target: "memory-local.recall", args: { query: "choice" } }, { target: "memory-local.forget", args: { id: "memory-id" } }]);
+  const disabled = fixture({});
+  expect(await memoryView(disabled.call, "web", "choice")).toEqual({ items: [] });
+  await expect(memoryForget(disabled.call, "web", "id")).rejects.toThrow("not enabled");
+});
+test("memory snapshot validates external data and attributes source to the real caller", () => {
+  const snapshot = { session: { id: "s", source: "spoofed" }, messages: [{ direction: "in", text: "choice", at }], now: at, autoRecall: true, autoRetain: true, ending: false, recalled: false, retainedThrough: null };
+  expect(parseSnapshot(JSON.stringify(snapshot), "qq").session).toEqual({ id: "s", source: "qq" });
+  for (const invalid of ["null", "{}", ...[
+    { session: null }, { session: { id: 42 } }, { session: { id: "x".repeat(201) } },
+    { autoRetain: "yes" }, { now: 42 }, { retainedThrough: "invalid" },
+    { messages: [null] }, { messages: [{ direction: "system", text: "x", at }] },
+    { messages: [{ direction: "in", text: "x", at: 42 }] },
+    { messages: [{ direction: "in", text: "x".repeat(20001), at }] },
+  ].map(fields => JSON.stringify({ ...snapshot, ...fields }))]) expect(() => parseSnapshot(invalid, "web")).toThrow();
+});
+test("preferences are private application files, persistent, deduplicated and individually removable", async () => {
+  const dataDir = await directory(), store = preferences(dataDir);
+  expect(await store.list()).toEqual([]);
+  const preference = await store.remember("简短中文", "general", at);
+  expect(await store.remember("简短中文", "general", at)).toEqual(preference);
+  expect(await preferences(dataDir).list()).toEqual([preference]);
+  expect(await store.forget(preference.id)).toEqual({ forgotten: true });
+  expect(await store.list()).toEqual([]);
+  await expect(store.forget(preference.id)).rejects.toThrow("not found");
+  await writeFile(join(dataDir, "preferences.json"), '{"bad":"journal"}');
+  await expect(store.list()).rejects.toThrow("Invalid memory preference journal");
+});
+test.each(["web", "mcp", "qq"] as const)("%s retains its own journal/context and persists memory receipts across restart", async source => {
+  const dataDir = await directory(), f = fixture(), replies: Args[] = [], prompts: string[] = [];
+  let failRun = true, active = true, clock = 0;
+  const call = async (target: string, args: Args = {}): Promise<unknown> => {
+    if (target === "agent.context") return { contextId: "private-context" };
+    if (target === "agent.run") { prompts.push(String(args.prompt)); if (failRun) { failRun = false; throw new Error("lost run receipt"); } return { runId: "run-1", status: "running", active: true }; }
+    if (target === "agent.get") return { status: "finished", active };
+    if (target === "agent.stream") return { transcript: [{ at, kind: "text", text: "done" }], interactions: [] };
+    return f.call(target, args);
+  };
+  const options = { source, dataDir, call, tools: ["memory-local.recall"], reply: (reply: Args) => { replies.push(reply); }, now: () => new Date(Date.parse(at) + clock++ * 1000) };
+  let app = createAgentConversations(options);
+  await expect(app.send({ text: "remember this", requestKey: "one" })).rejects.toThrow("lost run receipt");
+  app = createAgentConversations(options);
+  const sent = await app.send({ text: "remember this", requestKey: "one" });
+  expect(prompts).toHaveLength(2); expect(prompts[0]).toBe(prompts[1]);
+  expect(prompts[0]).toContain("Earlier choice");
+  expect(f.calls.filter(call => call.target.endsWith(".conversation-context"))).toHaveLength(1);
+  active = false; await app.poll();
+  expect(replies).toHaveLength(1);
+  const state = JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
+  expect(state.sessions[0]).toMatchObject({ source, contextId: "private-context", memory: { provider: "memory-local", recalled: true, retainedThrough: state.sessions[0].messages.at(-1).createdAt } });
+  app = createAgentConversations(options); await app.poll();
+  expect(replies).toHaveLength(1);
+  await app.update(sent.sessionId, { status: "ended" });
+  expect(JSON.parse(String(f.calls.filter(call => call.target.endsWith(".conversation-retain")).at(-1)!.args.snapshot)).ending).toBe(true);
+  expect(f.calls.every(call => !call.target.startsWith("memory."))).toBe(true);
+  const persisted = JSON.parse(await readFile(join(dataDir, "conversations/state.json"), "utf8"));
+  for (const memory of [null, { provider: 42, recalled: false, retainedThrough: null }, { provider: "memory-local", recalled: false, retainedThrough: "invalid" }]) {
+    persisted.sessions[0].memory = memory;
+    await writeFile(join(dataDir, "conversations/state.json"), JSON.stringify(persisted));
+    await expect(createAgentConversations(options).list()).rejects.toThrow("Web conversation journal is invalid");
   }
-}, 60_000);
+});
+test("memory-local SDK accepts direct callers and rejects kernel/lifecycle owner calls without opening a memory DB", async () => {
+  const dataDir = await directory(), script = join(dataDir, "audiences.ts");
+  await writeFile(script, `
+    import { strict as assert } from "node:assert";
+    import { startModule } from ${JSON.stringify(join(import.meta.dir, "../../../../integrations/src/steward/module-sdk/testing.ts"))};
+    const app = await startModule(process.env.CHRONA_MODULE + "/index.ts");
+    const now = ${JSON.stringify(at)};
+    async function tool(id, args, caller) { return app.send({ trigger: { kind: "tool", id, args, caller, firedAt: now }, now, params: {} }); }
+    try {
+      const owner = { kind: "owner", via: "mcp" }, module = { kind: "module", module: "web", moduleId: "real-web", hash: "approved" };
+      assert.ok("error" in await tool("preferences", {}, { kind: "kernel" }));
+      assert.ok("error" in await tool("conversation-context", { snapshot: "{}" }, owner));
+      const remembered = await tool("remember", { text: "short Chinese", source: "forged", at: "2099-01-01" }, module);
+      assert.ok(!remembered.error, JSON.stringify(remembered));
+      const preference = remembered.result.result;
+      assert.equal(preference.createdAt, now);
+      const listed = await tool("preferences", {}, owner);
+      assert.equal(listed.result.result[0].id, preference.id);
+      assert.equal((await tool("forget", { id: preference.id }, { kind: "provider", runId: "real-run" })).result.result.forgotten, true);
+      const snapshot = { session: { id: "web-agent:test", source: "forged" }, messages: [], now, autoRecall: false, autoRetain: false, ending: false, recalled: false, retainedThrough: null };
+      assert.equal((await tool("conversation-retain", { snapshot: JSON.stringify(snapshot) }, module)).result.result.retained, false);
+    } finally { await app.stop(); }
+  `);
+  const child = Bun.spawn([process.execPath, "--no-install", script], { env: { ...process.env, CHRONA_MODULE: join(import.meta.dir, "external/memory-local"), CHRONA_DATA: dataDir, CHRONA_CONTENT: dataDir }, stdout: "pipe", stderr: "pipe" });
+  const stderr = await new Response(child.stderr).text();
+  expect(await child.exited, stderr).toBe(0);
+  await expect(access(join(dataDir, "memory.db"))).rejects.toThrow();
+});
+test("memory-local declares direct audiences and entry memory selection is private app configuration", async () => {
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "external/memory-local/module.json"), "utf8")));
+  for (const tool of manifest.tools) expect(tool.visibility).toEqual(tool.name.startsWith("conversation-") ? ["modules"] : ["modules", "owner", "provider"]);
+  for (const app of ["builtin/web", "external/mcp", "external/qq"]) {
+    const entry = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, app, "module.json"), "utf8")));
+    expect(entry.settings["memory-provider"]?.default).toBe("");
+    expect(entry.uses).toContain("modules.contributions");
+    expect(entry.uses).not.toContain("settings.preferences");
+  }
+});

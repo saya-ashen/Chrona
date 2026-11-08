@@ -2,26 +2,15 @@ import { z } from "zod";
 import type { Proposal } from "./module-context";
 import type { moduleUpstream } from "./module-upstream";
 import { moduleHealthSummarySchema } from "./module-diagnostics";
-import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, healthSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
+import { appSchema, approvalSchema, grantSchema, providerRunViewSchema, scheduleSchema, settingsSchema, healthSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { permissionsSchema } from "./module-overview";
 
 export const ownerBuildOutput = z.object({ status: z.string(), sessionId: z.string(), runId: z.string(), duplicate: z.boolean(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() });
 export const modulesBuildOutput = ownerBuildOutput.extend({ reason: z.string().optional() });
 export const okOutput = z.object({ ok: z.literal(true) });
-export const chatConversationStateOutput = z.object({ now: z.string(), limits: z.object({ idleMinutes: z.number(), minContextTokens: z.number(), maxContextTokens: z.number() }),
-  session: z.object({ id: z.string(), title: z.string().nullable(), lastActivityAt: z.string(), busy: z.boolean(), contextTokens: z.number() }).nullable() });
-export const chatSendOutput = z.object({ sessionId: z.string(), messageId: z.string(), runId: z.string().nullable() });
-// Small images come back inline (base64) so chat.send can hand them to the model.
-export const chatAttachOutput = attachmentSchema.extend({ base64: z.string().optional() });
-export const chatSessionOutput = sessionSchema;
-export const chatFileOutput = z.object({ base64: z.string(), mime: z.string() });
-export const chatAskOutput = chatReplySchema;
-export const chatSessionsOutput = z.array(sessionSchema);
-export const chatTodayOutput = todayViewSchema;
-export const chatRuntimeOutput = healthSchema.omit({ queuedNotifications: true, failedNotifications: true }).extend({ at: z.string().datetime() });
-export const chatMessagesOutput = z.array(messageSchema);
-export const chatRunsOutput = z.array(providerRunViewSchema);
-export const chatTranscriptOutput = z.array(z.discriminatedUnion("kind", [
+export const runtimeOutput = healthSchema.omit({ queuedNotifications: true, failedNotifications: true }).extend({ at: z.string().datetime() });
+export const runsOutput = z.array(providerRunViewSchema);
+export const buildTranscriptOutput = z.array(z.discriminatedUnion("kind", [
   z.object({ at: z.string(), kind: z.literal("text"), text: z.string() }),
   z.object({ at: z.string(), kind: z.literal("tool"), tool: z.string(), args: z.string() }),
   z.object({ at: z.string(), kind: z.literal("result"), tool: z.string(), text: z.string(), error: z.boolean() }),
@@ -82,26 +71,17 @@ export const buildControlOutput = z.discriminatedUnion("status", [
   z.object({ status: z.literal("build_stopped"), sessionId: z.string() }),
   z.object({ status: z.literal("build_revised"), sessionId: z.string(), runId: z.string(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() }),
 ]);
-export const settingsOutput = settingsSchema.omit({ chat: true });
+export const settingsOutput = settingsSchema;
 export const settingsGrantsOutput = z.array(grantSchema);
 export const settingsGrantOutput = grantSchema;
-export const settingsPreferencesOutput = z.array(preferenceSchema);
-// The preference deletion service returns undefined; json(undefined) becomes null.
-export const settingsForgetOutput = z.null();
 export const schedulesListOutput = z.array(scheduleSchema);
 export const scheduleOutput = scheduleSchema;
 export const scheduleTimerOutput = z.array(scheduleSchema.extend({ key: z.string(), payload: z.record(z.string(), z.json()) }));
 export const scheduleCancelOutput = z.object({ cancelled: z.boolean() });
 export const providerCompleteOutput = z.object({ text: z.string(), inputTokens: z.number().nullable(), outputTokens: z.number().nullable() });
-export const providerWakeOutput = z.object({ sessionId: z.string() });
 export const secretGetOutput = z.object({ value: z.record(z.string(), z.string()) });
 export const secretSetOutput = z.object({ name: z.string(), configured: z.literal(true) });
 export const secretRemoveOutput = z.object({ name: z.string(), configured: z.boolean() });
 export const secretAuthorizeOutput = z.object({ url: z.string(), redirectUri: z.string(), expiresAt: z.string() });
 export const secretTokenOutput = z.object({ accessToken: z.string(), expiresAt: z.string() });
 export const secretsListOutput = z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable(), modules: z.array(z.string()) }));
-export const memoryRecallOutput = z.object({ items: z.array(z.object({ id: z.string(), content: z.string(), at: z.string().optional() })) });
-// These two results are forwarded unchanged from the user-selected memory provider.
-export const memoryRetainOutput = z.json();
-export const memoryForgetOutput = z.json();
-export const memoryStatusOutput = memorySettingsSchema.extend({ available: z.boolean(), last24h: z.object({ retained: z.number(), recalled: z.number(), forgotten: z.number() }) });

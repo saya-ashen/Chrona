@@ -1,6 +1,6 @@
 type Row = Record<string, unknown>;
 type Call = (target: string, args?: Row) => Promise<unknown>;
-type Interface = Row & { name: string; sessions: string | null };
+type Interface = Row & { name: string };
 
 /** MCP owns its app summary; each source remains a separately authorized routed read. */
 export async function systemApps(call: Call, module?: string) {
@@ -11,8 +11,8 @@ export async function systemApps(call: Call, module?: string) {
   return withWork(call, entry);
 }
 async function withWork(call: Call, entry: Interface) {
-  const work = entry.sessions ? await call("history.sessions", { source: entry.sessions, limit: 20 }) : [];
-  return { ...entry, work };
+  const work = entry.name === "modules" ? await call("modules.build-sessions", { limit: 20 }) : [];
+  return { ...entry, sessions: entry.name === "modules" ? "build" : null, work };
 }
 export async function appOverview(call: Call, module: string) {
   const interfaces = await call("modules.interfaces") as Interface[];

@@ -5,7 +5,7 @@ import { nextOccurrence } from "@chrona/domain/steward/schedule-rule";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { requireModule, type ModuleContext } from "./module-context";
-import { notificationSettings } from "./settings";
+import { budgetTimezone } from "./settings";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
 /** Pausing or resuming an app keeps its data and versions. */
@@ -52,7 +52,7 @@ async function resumeIn(context: ModuleContext, tx: Prisma.TransactionClient, mo
   // Legacy automatic pauses recorded no IDs (and may follow an older manual pause/resume).
   const recorded = latest?.kind === "module_disabled" ? z.object({ schedules: z.array(z.string()) }).safeParse(latest.details).data : undefined;
   const ids = recorded?.schedules ?? [];
-  const zone = notificationSettings((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings).timezone;
+  const zone = budgetTimezone((await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings);
   for (const row of await tx.schedule.findMany({ where: { workspaceId, moduleId, id: { in: ids }, status: "paused" } })) {
     const nextAt = nextResumedOccurrence(row, now, zone);
     // Missed recurring runs are not caught up.

@@ -13,7 +13,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation } from "./module-evolution";
 // Provider-visible system module tools, including diagnostics and development references.
-const MODULES_TOOLS = 15;
+const MODULES_TOOLS = 16;
 import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -33,7 +33,7 @@ async function fixture() {
   cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   const service = createStewardService(ports), api = service.forWorkspace(workspaceId);
-  const session = await db.session.create({ data: { workspaceId, source: "web", key: "web:test", focus: ["mail-sort"] } });
+  const session = await db.session.create({ data: { workspaceId, source: "build", key: "build:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
   const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
@@ -69,7 +69,7 @@ test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
   // Chrona's own tools open to the user (v2-13) come first.
-  expect(tools.map(tool => tool.name)).toEqual(["m_history_sessions", "m_history_session", "m_history_messages", "m_history_transcript", "m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_interfaces", "m_modules_settings_get", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_consumer", "m_memory_recall", "m_memory_retain", "m_memory_forget", "m_memory_status", "m_projects_list", "m_projects_register", "m_projects_default", "m_mail_sort_find_mail"]);
+  expect(tools.map(tool => tool.name)).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_interfaces", "m_modules_settings_get", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_sessions", "m_modules_build_session", "m_modules_build_transcript", "m_modules_build_settings", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_consumer", "m_projects_list", "m_projects_register", "m_projects_create", "m_mail_sort_find_mail"]);
   expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });

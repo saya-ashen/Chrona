@@ -10,7 +10,7 @@ import { systemCall } from "./src/system/adapter";
 import { todaySpec } from "./src/system/today";
 import { activitySpec } from "./src/system/activity";
 import { appsSpec } from "./src/system/apps";
-import { settingsSpec, liveGrant, scheduleActions } from "./src/system/settings";
+import { checkSettingsRules, checkSettingsSpec } from "./test-settings-page";
 import { checkModelValues } from "./test-model-settings";
 import { checkAttachments } from "./test-attachments";
 import { checkRasterContent } from "./test-content";
@@ -31,9 +31,9 @@ const inventory = [{ id: "m-files", name: "files", status: "active", activeHash:
 let filesContract = "a".repeat(64);
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
-  stub("approvals.list", () => []), stub("history.sessions", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
-  stub("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), stub("history.session", args => ({ id: args.session, key: "web:k1" })), stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
-  stub("history.messages", () => []),
+  stub("approvals.list", () => []), stub("modules.build-sessions", () => [{ id: "build-1", targets: ["example"], status: "active", lastActivityAt: "2026-11-08T00:00:00Z" }]), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
+  stub("modules.build-session", args => { if (args.session !== "build-1") throw Object.assign(new Error("Build not found"), { code: "not_found" }); return { id: args.session, runs: [] }; }),
+  stub("modules.build-transcript", args => { if (args.session !== "build-1") throw Object.assign(new Error("Build not found"), { code: "not_found" }); return []; }),
   stub("agent.context", () => ({ contextId: "context-author" })),
   stub("agent.run", () => ({ runId: "run-author", status: "queued", active: true })),
   stub("agent.get", () => ({ status: "queued", active: true })),
@@ -57,9 +57,9 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("planning.get", () => ({ plan: 1 })),
   stub("modules.stop-build", args => ({ status: "build_stopped", sessionId: args.session })),
   stub("modules.revise-build", args => ({ status: "build_revised", sessionId: args.session })),
-  stub("settings.get", () => ({ notifications: {} })), stub("settings.grants", () => []), stub("settings.preferences", () => []), stub("schedules.list", () => []),
+  stub("settings.get", () => ({ timezone: "UTC", moduleModel: null, modelUsage: [] })), stub("approvals.grants", () => []), stub("approvals.revoke-grant", args => args), stub("modules.build-settings", () => ({ builds: {}, buildUsage: {} })), stub("notify.settings", () => ({ settings: {} })), stub("schedules.list", () => []),
   stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
-  stub("settings.update", args => args), stub("chat.answer", args => args), stub("schedules.update", args => args),
+  stub("settings.update", args => args), stub("schedules.update", args => args),
   stub("files.read-image", args => {
     if (args.ref === "files/missing.png") return null;
     if (args.ref === "files/bad.png") return { base64: "<script>", mime: "image/png" };
@@ -259,32 +259,6 @@ async function checkSettingsAdapter() {
     ["/preferences/p%2F1/forget", { method: "POST", body: {} }],
   ]);
 }
-function checkSettingsRules() {
-  const now = Date.parse("2026-11-04T10:00:00Z"), base = { id: "g", action: "read_source", mode: "allow", scope: { kind: "global" } };
-  for (const [patch, expected] of [[{}, true], [{ revokedAt: "2026-11-01" }, false], [{ once: true, consumedAt: "2026-11-01" }, false], [{ once: false, consumedAt: "2026-11-01" }, true], [{ once: true }, true], [{ expiresAt: "2026-11-04T10:00:00Z" }, false], [{ expiresAt: "2026-11-04T09:59:59Z" }, false], [{ expiresAt: "2026-11-04T10:00:01Z" }, true]] as const) assert.equal(liveGrant({ ...base, ...patch }, now), expected);
-  for (const [status, label, next] of [["active", "暂停", "paused"], ["paused", "恢复", "active"]]) {
-    const actions = scheduleActions({ id: "schedule", mode: "cron", status: status! });
-    assert.deepEqual(actions[0], { label, tool: "schedule-update", args: { id: "schedule", status: next } });
-    assert.deepEqual(actions[1], { label: "取消", tool: "schedule-update", args: { id: "schedule", status: "cancelled" }, confirm: "取消这个日程？" });
-  }
-  assert.match(JSON.stringify(settingsSpec({})), /加载中/);
-}
-function checkSettingsSpec() {
-  const settings = { notifications: { dailyCap: 5, quietHours: null, timezone: "UTC", digestAt: "09:00" }, builds: { dailyLimit: 10, timeoutMinutes: 30, maxSubmissions: 3 }, buildUsage: { date: "2026-11-04", timezone: "UTC", used: 2, remaining: 8 } };
-  const settingsView = { settings, schedules: [], grants: [], preferences: [] };
-  const empty = JSON.stringify(settingsSpec({ settingsView }));
-  for (const text of ["2026-11-04（UTC）：今日新建 2 / 10，剩余 8 个。", "尚未配置：模块不能调用模型。", "今天还没有模块调用模型。", "没有日程。", "没有授权规则。", "还没有。"]) assert.ok(empty.includes(text), text);
-  const spec = settingsSpec({ apps: [{ id: "app /", name: "example" }], systemApps: [{ name: "system /" }], settingsView: { ...settingsView,
-    secrets: [{ modules: ["example"], configured: false }],
-    schedules: [{ id: "active", mode: "wake", status: "active", nextAt: "2026-11-05T10:00:00Z" }, { id: "paused", label: "暂停日程", mode: "wake", status: "paused" }, { id: "dead", label: "已结束隐藏", mode: "wake", status: "done" }],
-    grants: [{ id: "g", action: "read_source", mode: "ask", scope: { kind: "global" } }], preferences: [{ id: "p", text: "偏好中文" }],
-  } });
-  const serialized = JSON.stringify(spec);
-  for (const text of ["/apps/app%20%2F?tab=settings", "/apps/system/system%20%2F?tab=settings", "凭据未设置", "已暂停", "Time", "read_source · 先问我", "全部", "偏好中文", "删除这条偏好？"]) assert.ok(serialized.includes(text), text);
-  assert.ok(!serialized.includes("已结束隐藏"));
-  const actions = Object.values(spec.elements).filter(node => node.type === "SystemAction");
-  assert.equal(actions.filter(node => node.props.tool === "schedule-update").length, 4);
-}
 async function checkChat() {
   const mapped: unknown[] = [], call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
   await call("$web.sessions", {}); await call("$web.messages", { id: "a/b 中" });
@@ -359,7 +333,7 @@ try {
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(calls.at(-1), ["notify.activity", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
   assert.equal((await (await get("/api/web/system-apps?module=memory")).json()).name, "memory");
-  assert.deepEqual(calls.at(-1), ["history.sessions", { source: "reflect", limit: 20 }]);
+  assert.deepEqual(calls.at(-1), ["modules.interfaces", {}]);
   const overview = await (await get("/api/web/modules/m-files/overview")).json();
   assert.equal(overview.kind, "app"); assert.equal(overview.app.name, "files"); assert.equal(overview.permissions.module, "files");
   assert.equal((await get("/api/web/modules/missing/overview")).status, 404);
@@ -395,7 +369,7 @@ try {
   await post("/api/web/sessions/b1/revise-build", { requirements: "保留原文件" });
   assert.deepEqual(calls.at(-1), ["modules.revise-build", { session: "b1", requirements: "保留原文件" }]);
   // Settings and Provider questions go to their system interfaces (v2-9).
-  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { notifications: {} }, grants: [], preferences: [], schedules: [], secrets: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }] });
+  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { timezone: "UTC", moduleModel: null, modelUsage: [], builds: {}, buildUsage: {}, notifications: {}, memory: { provider: null, available: false, autoRecall: false, autoRetain: false } }, grants: [], preferences: [], schedules: [], secrets: [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }] });
   // Credentials (v2-16): written through, never echoed; not reachable through the generic call route.
   assert.deepEqual(await (await post("/api/web/secrets/okx_demo", { value: { apiKey: "k" } })).json(), { name: "okx_demo", configured: true });
   // The page merges: fields it leaves out keep their saved values.
@@ -408,9 +382,19 @@ try {
   assert.deepEqual(calls.at(-1), ["secrets.authorize", { name: "okx_demo", provider: "google", scopes: "s1 s2", account: "work" }]);
   assert.equal((await post("/api/web/call", { target: "secrets.set", args: {} })).status, 404);
   await post("/api/web/settings", { notifications: { dailyCap: 3 } });
-  assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
+  assert.ok(calls.some(([target, args]) => target === "notify.settings" && args.settings === JSON.stringify({ dailyCap: 3 })));
   await post("/api/web/settings", { builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } });
-  assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } }) }]);
+  assert.ok(calls.some(([target, args]) => target === "modules.build-settings" && JSON.stringify(args.limits) === JSON.stringify({ dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 })));
+  for (const invalid of [null, [], { sessions: {} }, { notifications: null }, { builds: [] }, { memory: { autoRecall: "yes" } }]) assert.equal((await post("/api/web/settings", invalid)).status, 400);
+  await post("/api/web/grants/g1/revoke", {});
+  assert.deepEqual(calls.at(-1), ["approvals.revoke-grant", { grant: "g1" }]);
+  assert.equal((await get("/api/web/sessions/qq-agent:foreign/messages")).status, 404);
+  assert.deepEqual(await (await get("/api/web/sessions/build-1/messages")).json(), []);
+  assert.deepEqual(await (await get("/api/web/sessions/build-1/transcript")).json(), []);
+  const listed = await (await get("/api/web/sessions")).json();
+  assert.ok(listed.some((item: Args) => item.id === "build-1" && item.source === "build"));
+  assert.ok(listed.every((item: Args) => item.source === "web" || item.source === "build"));
+  assert.ok(!calls.some(([target]) => target.startsWith("history.")));
   const beforeForeignAnswer = calls.length;
   assert.equal((await post("/api/web/interactions/i1/answer", { decision: "submit", value: true })).status, 404);
   assert.equal(calls.slice(beforeForeignAnswer).some(([target]) => target === "chat.answer" || target === "agent.respond"), false);

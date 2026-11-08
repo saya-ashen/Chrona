@@ -1,5 +1,4 @@
 import type { Prisma } from "@chrona/db";
-import type { NotificationSettings } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { recordApprovalFact, recordKernelFact, recordWithdrawal, type LifecycleFact, type KernelFact } from "./notification-facts";
 export type { LifecycleFact } from "./notification-facts";
@@ -19,9 +18,4 @@ export function withdrawNotice(tx: Db, ports: StewardPorts, workspaceId: string,
 /** Backfill preexisting open approvals; new approvals are recorded in their creation transaction. */
 export async function announceApprovals(ports: StewardPorts, workspaceId: string) {
   for (const row of await ports.db.approval.findMany({ where: { workspaceId, status: "open" }, orderBy: { createdAt: "asc" } })) await recordApprovalFact(ports.db, row);
-}
-/** Transitional settings snapshot, removed when settings ownership moves to applications. */
-export function forwardSettings(tx: Db, _ports: StewardPorts, workspaceId: string, settings: NotificationSettings, at: Date) {
-  return recordKernelFact(tx, workspaceId, `settings:${at.toISOString()}:${JSON.stringify(settings)}`, { type: "configure", data: { "daily-cap": settings.dailyCap, timezone: settings.timezone, "digest-at": settings.digestAt, at: at.toISOString(),
-    ...(settings.quietHours ? { "quiet-start": settings.quietHours.start, "quiet-end": settings.quietHours.end } : {}) } }, at);
 }

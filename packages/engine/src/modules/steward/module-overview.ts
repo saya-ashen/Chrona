@@ -7,7 +7,6 @@ import { createSecrets } from "./secrets";
 import { secretView, secretViewSchema } from "./secret-fields";
 import { addedCapabilities } from "./module-capabilities";
 import { createSettings, modelUsage, moduleModelSettings } from "./settings";
-import { forwardSettings } from "./notify-user";
 import { localCapabilities } from "./local-capability-view";
 import { audit } from "./audit";
 
@@ -82,7 +81,7 @@ export async function setModuleSettings(ports: StewardPorts, workspaceId: string
     if (!system.settings) throw new CallError("invalid", `${name} has no settings`);
     const values = validValues(system.settings.declarations, raw);
     // Through the owner's settings service: the same validation and the settings_updated audit.
-    await createSettings(ctx, { forward: (tx, value, at) => forwardSettings(tx, ports, workspaceId, value, at) }).update(system.settings.write(values));
+    await createSettings(ctx).update(system.settings.write(values));
     return json(await settingsView(ports, workspaceId, name));
   }
   const found = await activeManifest(ports, workspaceId, name);

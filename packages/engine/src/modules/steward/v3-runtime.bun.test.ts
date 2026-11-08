@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
-import { createRuns, enqueueModuleWake } from "./runs";
+import { createRuns } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
@@ -46,13 +46,4 @@ for (const scope of ["session", "global"] as const) test(`${scope} daily run lim
   const queued = await runs.enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Limited" });
   expect(await runs.claimNext("foreground")).toBeNull();
   expect((await db.run.findUniqueOrThrow({ where: { id: queued.id } })).leaseUntil?.toISOString()).toBe("2026-10-15T16:00:00.000Z");
-});
-test("module wake seam creates fresh independent sessions and validates ownership", async () => {
-  const module = await db.module.create({ data: { workspaceId, name: "fixture" } });
-  const first = await enqueueModuleWake(ports, workspaceId, module.id, "One");
-  const second = await enqueueModuleWake(ports, workspaceId, module.id, "Two");
-  expect(first.sessionId).not.toBe(second.sessionId);
-  const session = await db.session.findUniqueOrThrow({ where: { id: first.sessionId! } });
-  expect(session.source).toBe("module"); expect(session.moduleId).toBe(module.id); expect(session.providerSessionId).toBeNull();
-  await expect(enqueueModuleWake(ports, workspaceId, "missing", "No")).rejects.toMatchObject({ code: "not_found" });
 });

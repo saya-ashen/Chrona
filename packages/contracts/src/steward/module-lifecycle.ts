@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 /** Reserved independently of database initialization. executions is reserved for P1 only. */
-export const KERNEL_MODULE_NAMES = ["history", "modules", "schedules", "approvals", "settings", "secrets", "activity", "content", "memory"] as const;
+export const KERNEL_MODULE_NAMES = ["modules", "schedules", "approvals", "settings", "secrets", "activity"] as const;
 export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Trusted local capability identities; same router, separate from kernel APIs and application installation. */
-export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local", "content-local"] as const;
-export const BUILTIN_MODULE_NAMES = ["web", "mcp", "files", "notify", "events", "agent"] as const;
+export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
+export const BUILTIN_MODULE_NAMES = ["web", "notify", "agent"] as const;
 export const PREINSTALLED_MODULE_NAMES = ["qq", "remind", "mind"] as const;
-export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor"] as const;
+export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor", "mcp", "files", "events"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
 export const MODULE_CONTRACT_VERSION = "m1-p0-v1";
 export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);

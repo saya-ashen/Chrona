@@ -4,7 +4,7 @@ import { StewardError } from "./errors";
 import { json, type ModuleContext, type ModuleVersion, type BuildReport } from "./module-context";
 import { importLegacyModuleSource, readModuleSource } from "./module-git";
 import { readModuleFiles } from "./module-preview";
-import { resolveBuiltinRelease } from "./module-release";
+import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { snapshotModule } from "./module-files";
 
 const revisionSchema = z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) });
@@ -14,8 +14,8 @@ async function legacyFiles(context: ModuleContext, version: ModuleVersion, dir: 
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" || version.source !== "builtin") throw error;
     const module = await context.db.module.findFirst({ where: { id: version.moduleId, workspaceId: context.workspaceId } });
-    if (!module?.builtin) throw new StewardError("conflict", "Legacy release source requires a built-in module identity");
-    const release = await resolveBuiltinRelease(context.ports, module.name, version.hash);
+    if (!module || (!module.builtin && !["mcp", "files", "events"].includes(module.name))) throw new StewardError("conflict", "Legacy release source requires a release module identity");
+    const release = module.builtin ? await resolveBuiltinRelease(context.ports, module.name, version.hash) : await resolveExternalRelease(context.ports, module.name, version.hash);
     return readModuleFiles(release.codeDir, "Unsafe legacy release source");
   }
 }

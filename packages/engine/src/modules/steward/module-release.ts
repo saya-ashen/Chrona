@@ -57,8 +57,8 @@ async function resolveRelease(rootPath: string | undefined, name: string, origin
 export function resolveBuiltinRelease(ports: Pick<StewardPorts, "moduleBuiltinResources">, name: string, expectedHash?: string): Promise<ModuleRelease> {
   return resolveRelease(ports.moduleBuiltinResources, name, "builtin", expectedHash);
 }
-export function resolveExternalRelease(ports: Pick<StewardPorts, "moduleExternalResources">, name: string): Promise<ModuleRelease> {
-  return resolveRelease(ports.moduleExternalResources, name, "external");
+export function resolveExternalRelease(ports: Pick<StewardPorts, "moduleExternalResources">, name: string, expectedHash?: string): Promise<ModuleRelease> {
+  return resolveRelease(ports.moduleExternalResources, name, "external", expectedHash);
 }
 
 const releaseLockSchema = z.object({ version: z.literal(1), modules: z.array(z.object({

@@ -52,6 +52,28 @@ test("fixed builtins bind approved trusted release metadata without builds or ex
   expect(f.executions()).toBe(0);
 });
 
+test.each(["mcp", "files", "events"])("extracted %s preserves its identity, custom active version and private data across restart", async name => {
+  const f = await fixture();
+  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: true, activeHash: "owner-custom", status: "paused", dataSchema: 7 } });
+  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], data: { schema: 7 } });
+  await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: "owner-custom", manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const dir = join(f.ports.dataDir, "platform/data", row.id); await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
+  const versions = await f.db.moduleVersion.findMany({ where: { moduleId: row.id } });
+  await f.start(); await f.start();
+  expect(await f.current(name)).toMatchObject({ id: row.id, builtin: false, activeHash: "owner-custom", status: "paused", dataSchema: 7 });
+  expect(await f.db.moduleVersion.findMany({ where: { moduleId: row.id } })).toEqual(versions);
+  expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
+  expect(f.executions()).toBe(0);
+});
+
+test("category migration also runs when builtin release resources are absent", async () => {
+  const f = await fixture();
+  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mcp", builtin: true } });
+  f.ports.moduleBuiltinResources = undefined;
+  await f.start();
+  expect(await f.current("mcp")).toMatchObject({ id: row.id, builtin: false });
+});
+
 test("parallel first registrations share the Git seed and activate each builtin once", async () => {
   const f = await fixture();
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(f.ports.moduleBuiltinResources!, name, `https://github.com/chrona-fixture/${name}.git`);
@@ -106,7 +128,7 @@ test("missing runtime or host dependency reports a paused builtin without runnin
   await f.write("web", 2, { packages: ["chrona-fixture-program-does-not-exist"] });
   await expect(f.start()).rejects.toThrow("Required host program unavailable");
   expect(await f.current()).toMatchObject({ status: "paused", activeHash: null });
-  expect(await f.current("files")).toMatchObject({ status: "active" });
+  expect(await f.current("notify")).toMatchObject({ status: "active" });
   expect(f.executions()).toBe(0);
 });
 

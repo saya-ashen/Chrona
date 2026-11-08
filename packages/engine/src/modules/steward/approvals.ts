@@ -8,7 +8,6 @@ import { recordApprovalFact, recordWithdrawal } from "./notification-facts";
 import { parseInput, StewardError } from "./errors";
 import { toApproval } from "./store";
 import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./module-context";
-import { createRuns } from "./runs";
 import { assertExternalModule } from "./module-identity";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { drainCalls, settleWaiting } from "./module-calls";
@@ -34,18 +33,6 @@ async function approve(tx: Prisma.TransactionClient, context: RecordContext, row
   if ((row.payload as { kind?: unknown } | null)?.kind === "module_remove") return null;
   return grantApproval(tx, context, row, scope);
 }
-/** A run that asked does not wait: the decision continues its conversation as a new run, which retries under the new grant. */
-async function resume(tx: Prisma.TransactionClient, ports: StewardPorts, workspaceId: string, row: Parameters<typeof toApproval>[0], { decision, scope }: z.infer<typeof resolveApprovalSchema>) {
-  const payload = row.payload;
-  if (!payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.sessionId !== "string") return false;
-  // A closed conversation is not reopened; the decision still stands.
-  if (!await tx.session.findFirst({ where: { workspaceId, id: payload.sessionId, status: "active" } })) return false;
-  const prompt = decision === "approve"
-    ? `The user approved approval ${row.id} ("${row.title}", scope ${scope}). Continue the task that was waiting for it; the approved action is now allowed.`
-    : `The user denied approval ${row.id} ("${row.title}"). Do not retry it; continue another way or tell the user.`;
-  await createRuns(ports, workspaceId).enqueue({ sessionId: payload.sessionId, lane: payload.lane === "background" ? "background" : "foreground", trigger: "approval", label: row.title, prompt }, tx);
-  return true;
-}
 /** v2-16: something a module asked the user to decide (`approvals.request`); the decision goes back to its waiting call. */
 export const isModuleRequest = (payload: unknown): payload is { kind: "module_request"; hash: string; call: string } =>
   !!payload && typeof payload === "object" && !Array.isArray(payload) && (payload as { kind?: unknown }).kind === "module_request" && typeof (payload as { call?: unknown }).call === "string";
@@ -60,9 +47,8 @@ async function assertActivationTarget(tx: Prisma.TransactionClient, workspaceId:
   if (!moduleId || !payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.hash !== "string") throw new StewardError("invalid", "Module activation must be bound to a version hash");
   if (!await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: payload.hash } } })) throw new StewardError("not_found", "Module version not found");
 }
-async function afterResolve<T extends { payload: Prisma.JsonValue | null; resumed: boolean; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
+async function afterResolve<T extends { payload: Prisma.JsonValue | null; request: boolean }>(result: T, id: string, workspaceId: string, ports: StewardPorts | undefined, onApproved: OnApproved | undefined): Promise<T> {
   if (onApproved && !result.request && result.payload !== null) await onApproved({ workspaceId, approvalId: id, payload: result.payload });
-  if (result.resumed) await ports!.onQueued?.();
   if (ports && result.request) void drainCalls(ports, workspaceId).catch(() => {});
   return result;
 }
@@ -99,8 +85,7 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
       if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: input.decision === "approve" ? "approved" : "denied" }, now());
-      const resumed = ports ? await resume(tx, ports, workspaceId, row, input) : false;
-      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, resumed, request: isModuleRequest(row.payload) };
+      return { approval: toApproval(await tx.approval.findUniqueOrThrow({ where: { id } })), grantId, payload: input.decision === "approve" ? row.payload : null, request: isModuleRequest(row.payload) };
     }).then(result => afterResolve(result, id, workspaceId, ports, onApproved)),
   };
 }

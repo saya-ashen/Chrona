@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
@@ -10,6 +10,9 @@ import { createStewardService } from "@chrona/engine";
 import { removeSecret, runAdmin, setSecret } from "./admin";
 import { createProgram } from "./program";
 import { adminBuild } from "./admin-build";
+import { seedTestModuleRelease } from "../../engine/src/modules/steward/module-release-test-fixture";
+import { registerTestProvider } from "../../engine/src/modules/steward/test-provider";
+import * as stewardRuntime from "@server/steward-runtime";
 
 const dbs: PrismaClient[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -25,14 +28,30 @@ async function fixture() {
   const api = createStewardService(ports).forWorkspace("ws_default");
   return { db, module, api, options: { dataDir, databaseUrl } };
 }
+async function offlineResources(dataDir: string, name: string) {
+  const root = join(dataDir, "resources"), external = join(root, "external"), dir = join(external, name);
+  mkdirSync(dir, { recursive: true });
+  cpSync(resolve("packages/integrations/src/steward/module-sdk"), join(root, "module-sdk"), { recursive: true });
+  writeFileSync(join(dir, "module.json"), JSON.stringify({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], ...(name === "mcp" ? { uses: ["*"] } : {}) }));
+  writeFileSync(join(dir, "index.ts"), "// synthetic offline recovery fixture\n");
+  writeFileSync(join(dir, "test.ts"), "// checked on restart\n");
+  await seedTestModuleRelease(external, name);
+  return root;
+}
 test("admin commands are registered", () => {
   const admin = createProgram().commands.find(c => c.name() === "admin")!;
-  expect(admin.commands.map(c => c.name())).toEqual(["build", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
+  expect(admin.commands.map(c => c.name())).toEqual(["build", "legacy", "modules", "catalog", "install", "diagnostics", "approvals", "rollback", "disable", "approve", "reject", "secret-set", "secret-remove"]);
 });
 test("admin build respects the runtime lock and runs no ordinary tick or built-in upgrades", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   const file = join(f.options.dataDir, "request.json");
   writeFileSync(file, JSON.stringify({ name: "owner-app", goal: "memory only", intent: { changes: ["memory"], preserves: [] }, requestKey: "once", execution: { provider: "pi", model: "openai/gpt-6.1-sol", timeoutMinutes: 10, maxSubmissions: 1 } }));
+  const createRuntime = stewardRuntime.createStewardRuntime;
+  const runtimeFactory = spyOn(stewardRuntime, "createStewardRuntime").mockImplementation((...args) => {
+    const runtime = createRuntime(...args);
+    registerTestProvider(runtime.ports.db);
+    return runtime;
+  });
   const seen: unknown[] = [];
   const provider = { name: "pi", supportsRunModel: true, async health() { return { available: true, sandboxed: true, error: null }; }, start(input: unknown) { seen.push(input); return { async inject() {}, async abort() {}, done: Promise.resolve({ outcome: "finished" as const, sessionId: null, error: null }) }; } };
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
@@ -46,7 +65,7 @@ test("admin build respects the runtime lock and runs no ordinary tick or built-i
     expect(await f.db.module.count()).toBe(modules);
     expect(await f.db.stewardState.count()).toBe(0);
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
-  } finally { log.mockRestore(); }
+  } finally { runtimeFactory.mockRestore(); log.mockRestore(); }
 });
 
 test("admin reads while runtime locked but refuses writes; approval audit source is cli", async () => {
@@ -86,6 +105,8 @@ test("admin rollback uses an external hash, rejects builtin token, and disable p
 
 test("admin install queues trusted official code offline, preserves the lock and deduplicates request keys", async () => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  const previous = process.env.CHRONA_RESOURCE_DIR;
+  process.env.CHRONA_RESOURCE_DIR = await offlineResources(f.options.dataDir, "remind");
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
   try { await expect(runAdmin("install", ["remind", "install", "offline-one"], f.options)).rejects.toThrow("already in use"); }
   finally { lock.release(); }
@@ -100,7 +121,37 @@ test("admin install queues trusted official code offline, preserves the lock and
     expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
     await expect(runAdmin("install", ["../private", "install", "invalid"], f.options)).rejects.toThrow("Invalid");
     const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
-  } finally { log.mockRestore(); }
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    log.mockRestore();
+  }
+});
+
+test.each(["mcp", "files", "events"])("stopped-service official %s recovery needs no Web, MCP, Provider or tick", async name => {
+  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
+  const previous = process.env.CHRONA_RESOURCE_DIR;
+  process.env.CHRONA_RESOURCE_DIR = await offlineResources(f.options.dataDir, name);
+  try {
+    expect(await f.db.module.count({ where: { name: { in: ["web", "mcp"] } } })).toBe(0);
+    expect(await runAdmin("catalog", [], f.options)).toContainEqual(expect.objectContaining({ name, available: true, moduleId: null }));
+    const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
+    try { await expect(runAdmin("install", [name, "install", `recover-${name}`], f.options)).rejects.toThrow("already in use"); }
+    finally { lock.release(); }
+    const receipt = await runAdmin("install", [name, "install", `recover-${name}`], f.options);
+    expect(receipt).toMatchObject({ package: name, status: "building", moduleId: expect.any(String), hash: expect.any(String) });
+    expect(await runAdmin("install", [name, "install", `recover-${name}`], f.options)).toEqual(receipt);
+    expect(await f.db.module.findFirstOrThrow({ where: { name } })).toMatchObject({ builtin: false, activeHash: null });
+    expect(await f.db.moduleVersion.count({ where: { module: { name }, status: "building" } })).toBe(1);
+    expect(await f.db.module.count()).toBe(2);
+    expect(await f.db.stewardState.count()).toBe(0);
+    expect(await f.db.run.count()).toBe(0);
+    expect(await f.db.moduleRun.count()).toBe(0);
+    expect(log.mock.calls.some(call => String(call[0]).includes("Restart Chrona"))).toBe(true);
+    const released = acquireSqliteRuntimeLock(f.options.databaseUrl); released.release();
+  } finally {
+    if (previous === undefined) delete process.env.CHRONA_RESOURCE_DIR; else process.env.CHRONA_RESOURCE_DIR = previous;
+    log.mockRestore();
+  }
 });
 
 test("secret-set saves a module credential from stdin as a private file and never prints it", async () => {
