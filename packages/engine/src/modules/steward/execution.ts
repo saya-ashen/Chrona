@@ -46,10 +46,9 @@ async function executionSessionIn(ports: StewardPorts, tx: Prisma.TransactionCli
   return { sessionId, logDir: source.logDir };
 }
 async function assertLatestContext(tx: Prisma.TransactionClient, sessionId: string, attemptId: string) {
-  const latest = await tx.executionAttempt.findFirst({ where: { run: { sessionId } }, orderBy: [{ run: { createdAt: "desc" } }, { id: "desc" }], select: { id: true } });
-  if (latest?.id !== attemptId) throw new CallError("conflict", "Resume source is no longer the latest conversation round");
-  const session = await tx.session.findUnique({ where: { id: sessionId }, select: { providerSessionId: true } });
-  if (!session?.providerSessionId) throw new CallError("conflict", "Previous Provider context is unavailable; start a new conversation explicitly");
+  const session = await tx.session.findUnique({ where: { id: sessionId }, select: { providerSessionId: true, executionHeadAttemptId: true } });
+  if (session?.executionHeadAttemptId !== attemptId) throw new CallError("conflict", "Resume source is no longer the latest conversation round");
+  if (!session.providerSessionId) throw new CallError("conflict", "Previous Provider context is unavailable; start a new conversation explicitly");
 }
 export function createExecutions(ports: StewardPorts): ExecutionPorts {
   async function read(principal: ExecutionPrincipal, where: Prisma.ExecutionAttemptWhereInput) {
@@ -77,6 +76,7 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
           moduleId: principal.caller.kind === "module" ? principal.caller.moduleId : null, callerHash: principal.caller.kind === "module" ? principal.caller.hash : null,
           workId: input.workId, commandKey: input.commandKey, requestDigest, runId: run.id, projectRef: project.projectRef, projectDigest: executionDigest(project),
           resolvedCwd: project.canonicalPath, logDir: session.logDir, baseline: project.baseline, budget: input.budget, heldDirectory: project.canonicalPath }, include: { run: true } });
+        await tx.session.update({ where: { id: session.sessionId }, data: { executionHeadAttemptId: row.id } });
         const ref = executionRef(row);
         await store.admit(tx, principal, ref);
         await store.control(tx, principal, ref, { slot: "admission", at: ports.now().toISOString(), status: "confirmed" });

@@ -18,6 +18,7 @@ CREATE TABLE "Session" (
     "moduleId" TEXT,
     "originSessionId" TEXT,
     "providerSessionId" TEXT,
+    "executionHeadAttemptId" TEXT,
     "entryModuleId" TEXT,
     "focus" JSONB NOT NULL DEFAULT '["files"]',
     "lastActivityAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -41,6 +41,8 @@ model Session {
   moduleId String?
   originSessionId String?
   providerSessionId String?
+  /// Current bounded execution round for this Provider context; changed atomically at admission.
+  executionHeadAttemptId String?
   /// The entry module (e.g. qq) that brings this conversation's messages and receives its replies.
   entryModuleId String?
   /// Module names whose tools are directly exposed in this session's catalog.

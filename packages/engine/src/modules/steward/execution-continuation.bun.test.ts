@@ -184,6 +184,9 @@ test("a completed newer round prevents resuming a stale ancestor but preserves a
   const second = await service.start(principal, input), runs = createRuns(ports, principal.workspaceId);
   const run = (await runs.claimNext("background"))!;
   await runs.finish(run.id, { outcome: "finished", sessionId: "provider-context", error: null }, { stopEvidence: "provider_exited" });
+  expect((await db.session.findUniqueOrThrow({ where: { id: source.sessionId } })).executionHeadAttemptId).toBe(second.attemptId);
+  // Wall-clock order is not execution order, including a clock adjustment between rounds.
+  await db.run.update({ where: { id: second.runId }, data: { createdAt: new Date(0) } });
   await expect(service.start(principal, { ...input, workId: "stale-branch", commandKey: "stale-branch" })).rejects.toMatchObject({ code: "conflict" });
   expect(await service.start(principal, input)).toMatchObject({ runId: second.runId });
   expect(await service.start(principal, { ...input, workId: "turn-3", commandKey: "start-3", resumeFrom: sourceRef(second) })).toMatchObject({ sessionId: source.sessionId });
