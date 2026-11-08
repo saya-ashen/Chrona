@@ -51,16 +51,14 @@ export async function modelUsage(db: StewardPorts["db"], workspaceId: string, se
   }
   return [...usage.values()].sort((a, b) => a.module.localeCompare(b.module));
 }
-/** `notify` is the notification module: it reports chat readiness and receives the settings it applies. */
+/** Kernel settings facts only; application readiness is composed by the entry application. */
 export function createSettings({ db, workspaceId, now }: RecordContext, notify: {
-  status(): Promise<{ chat: { channel: string; bound: boolean; sentToday: number } } | null>;
   forward(tx: Parameters<Parameters<RecordContext["db"]["$transaction"]>[0]>[0], settings: NotificationSettings, at: Date): Promise<unknown>;
 }) {
   async function get() {
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
-    const status = await notify.status();
-    return { notifications: notificationSettings(row.settings), memory: memorySettings(row.settings), sessions: sessionSettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings), chat: status?.chat ?? { channel: "in_app" as const, bound: false, sentToday: 0 } };
+    return { notifications: notificationSettings(row.settings), memory: memorySettings(row.settings), sessions: sessionSettings(row.settings), builds: buildSettings(row.settings), buildUsage: await buildUsage(db, workspaceId, row.settings, now()), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings) };
   }
   return { get, update: async (raw: unknown) => {
     const input = parseInput(updateSettingsSchema, raw);

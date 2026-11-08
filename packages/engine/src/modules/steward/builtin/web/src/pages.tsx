@@ -1,4 +1,5 @@
 // System and registered app pages share the same json-render components and data lifecycle.
+import "./schema-config";
 import { Children, createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp, type ComponentRenderProps } from "@json-render/react";

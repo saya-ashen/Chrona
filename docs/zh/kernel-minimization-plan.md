@@ -1,6 +1,6 @@
 # 内核最小保留实施方案
 
-状态：2026-11-08 已开始实施。阶段 1 代码清理及用户批准补修的既有门禁已通过全量 `typecheck / lint / test:bun / test:api`；阶段 2 待实施。详见[阶段 1 开发检查记录](kernel-minimization-stage1-validation.md)。用户已确认旧会话与附件导出备份后删除、通知先由单个选定应用消费、MCP 允许删除；技术边界见各阶段及 §5。本文是交给实施 Agent 的工作说明，不表示改动已完成，也不替代真实数据操作和部署授权。旧的阶段性审查见 [内核与系统模块职责审查](kernel-responsibility-audit.md)；两者冲突时以本文为准，但每一步落地前都必须对照源码复核。
+状态：2026-11-08 已开始实施。阶段 1 代码清理及用户批准补修的既有门禁、阶段 2 反向调用解耦均已通过全量 `typecheck / lint / test:bun / test:api`，阶段 2 另通过三种视口真实浏览器检查；阶段 3–7 待实施。详见[阶段 1 开发检查记录](kernel-minimization-stage1-validation.md)、[阶段 2 开发检查记录](kernel-minimization-stage2-validation.md)。用户已确认旧会话与附件导出备份后删除、通知先由单个选定应用消费、MCP 允许删除；技术边界见各阶段及 §5。本文是交给实施 Agent 的工作说明，不表示改动已完成，也不替代真实数据操作和部署授权。旧的阶段性审查见 [内核与系统模块职责审查](kernel-responsibility-audit.md)；两者冲突时以本文为准，但每一步落地前都必须对照源码复核。
 
 ## 1. 目标与判定标准
 

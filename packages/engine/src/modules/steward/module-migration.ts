@@ -28,13 +28,13 @@ async function withMigrationOwner<T>(context: ModuleContext, prepared: PreparedM
   });
 }
 async function migrationFailed(context: ModuleContext, prepared: PreparedMigration, reason: "activate" | "rollback", output: TestReport[number], restore?: Restore) {
-  const { db, workspaceId, ports } = context, { module, version } = prepared;
+  const { workspaceId, ports } = context, { module, version } = prepared;
   await withMigrationOwner(context, prepared, reason, async tx => {
     await tx.module.update({ where: { id: module.id }, data: { status: module.status } });
     if (reason === "activate") await tx.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json({ ...version.report as BuildReport, migration: { ...output, exitCode: output.exitCode || 1 } }) } });
+    if (reason !== "rollback" || restore) await notifyLifecycle(tx, ports, workspaceId, `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}`, { kind: "module-migration-failed", app: module.name, restore: !!restore, module: module.id });
   });
   if (reason === "rollback" && !restore) throw new StewardError("conflict", "模块回滚未完成：数据迁移失败，旧版本和数据保持不变");
-  await notifyLifecycle(db, ports, workspaceId, `${restore ? "module-restore-failed" : "module-migration-failed"}:${version.id}`, { kind: "module-migration-failed", app: module.name, restore: !!restore, module: module.id });
 }
 async function runMigration(context: ModuleContext, prepared: PreparedMigration, next: string) {
   const { manifest, from, to, version } = prepared;

@@ -6,7 +6,7 @@ import { testDirectory } from "./test-directory";
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
 // The registered channel exposes its delivery tool to modules.
 const directory = testDirectory();
-const module = await startModule("index.ts", { stubs: { "modules.list": () => directory.modules, "modules.tools": () => directory.tools } });
+const module = await startModule("index.ts", { stubs: { "modules.list": () => directory.modules, "modules.tools": () => directory.tools, "activity.facts": () => ({ revision: "test", facts: [] }), "activity.withdrawals": () => ({ withdrawn: [] }) } });
 const kernel = { kind: "kernel" };
 // A fixed daytime clock (12:00 in the default Asia/Shanghai zone): the wall clock would fall in quiet hours at night and fold.
 let clock = Date.parse("2026-10-21T04:00:00.000Z");

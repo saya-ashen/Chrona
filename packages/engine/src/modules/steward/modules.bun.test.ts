@@ -204,7 +204,8 @@ async function dataFixture(credentials = false) {
   if (credentials) await f.approve(first.approvalId!);
   else expect(first.status).toBe("approved");
   // Start data tests after setup's activation notice; the auto-activation test covers that notice.
-  await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: { in: ["send", "lifecycle"] } } });
+  await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
+  await f.db.audit.deleteMany({ where: { kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } } });
   const live = join(f.dataDir, "platform/data", first.moduleId!), original = f.ports.sandbox!.runModule!;
   f.ports.sandbox!.runModule = async input => {
     await mkdir(join(input.dataDir, "nested"));

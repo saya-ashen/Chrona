@@ -17,9 +17,9 @@ import { createRuns, createRunSession } from "./runs";
 import { createTick } from "./tick";
 import { createApps } from "./apps";
 import { createStewardService } from "./service";
-import { moduleOverview, modulePermissions } from "./module-overview";
+import { modulePermissions } from "./module-overview";
+import { moduleInterfaces } from "./system-apps";
 import { createSecrets } from "./secrets";
-import { installActivityModule } from "./test-activity-module";
 import { callSync, enqueueCall, kernelOrigin, moduleCallbackContractHash, runDueCalls } from "./module-calls";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -219,19 +219,16 @@ test("approval creation accepts built-in updates but refuses forged, kernel and 
   expect(allowed.status).toBe("open");
 });
 
-test("list, overview and kernel projections share lifecycle identity without overwriting permission descriptions", async () => {
+test("list, interface and kernel projections share lifecycle identity without overwriting permission descriptions", async () => {
   const f = await fixture(); createStewardService(f.ports);
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: "a".repeat(64) } });
   await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
   const [list] = await createModules(f.ports, f.workspaceId).list();
   expect(list).toMatchObject({ origin: "builtin", capabilities: { build: true, rollback: true, remove: false, install: false } });
   expect((await createApps(f.ports, f.workspaceId).list())[0]!.origin).toBe("builtin");
-  const externalResources = f.ports.moduleExternalResources;
-  cleanups.push(await installActivityModule(f.ports, f.workspaceId));
-  f.ports.moduleExternalResources = externalResources;
-  const overview = await moduleOverview(f.ports, f.workspaceId, "web") as { app: { origin: string }; permissions: { capabilities: unknown } };
-  expect(overview.app.origin).toBe("builtin"); expect(Array.isArray(overview.permissions.capabilities)).toBe(true);
-  expect(await moduleOverview(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
+  expect(await moduleInterfaces(f.ports, f.workspaceId, "web")).toMatchObject({ origin: "builtin", capabilities: { build: true, remove: false } });
+  expect(Array.isArray((await modulePermissions(f.ports, f.workspaceId, "web") as { capabilities: unknown }).capabilities)).toBe(true);
+  expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
   const catalog = modulePackageCatalogSchema.parse((await callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).output);
   expect(catalog.map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor"]);
 });

@@ -5,7 +5,7 @@
   "keepAlive": true,
   "triggers": [],
   "effects": [],
-  "uses": ["modules.list", "modules.tools", "activity.records"],
+  "uses": ["modules.list", "modules.tools", "activity.records", "activity.facts", "activity.ack", "activity.withdrawals"],
   "tools": [
     { "name": "lifecycle", "description": "Present a committed kernel runtime fact as a notification; no runtime actions.", "visibility": ["kernel"], "idempotent": true,
       "parameters": { "type": "object", "required": ["kind", "facts", "key"], "properties": { "kind": { "type": "string", "enum": ["module-paused", "module-activated", "module-build-failed", "module-migration-failed", "schedule-failed", "run-paused", "build-paused", "reflection-retired", "background-result"] }, "facts": { "type": "string" }, "key": { "type": "string" }, "module": { "type": "string" }, "app": { "type": "string" }, "session": { "type": "string" } } } },

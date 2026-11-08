@@ -4,6 +4,7 @@ import { approvalSchema, resolveApprovalSchema } from "@chrona/contracts/steward
 import type { OnApproved, StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 import { audit } from "./audit";
+import { recordApprovalFact, recordWithdrawal } from "./notification-facts";
 import { parseInput, StewardError } from "./errors";
 import { toApproval } from "./store";
 import { assertDynamicModuleActivation, groupPayloadSchema, isGroupPayload } from "./module-context";
@@ -83,6 +84,7 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
         await assertExternalModule(tx, workspaceId, removal.moduleId, "remove");
       }
       const row = await tx.approval.create({ data: { ...input, payload: input.payload as Prisma.InputJsonValue, workspaceId, createdAt: now() } });
+      await recordApprovalFact(tx, row);
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: row.id, details: { action: input.action } });
       return toApproval(row);
     }),
@@ -94,6 +96,7 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       const grantId = input.decision === "approve" ? await approve(tx, { db, workspaceId, now }, row, input.scope) : null;
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
+      await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());
       await audit(tx, { workspaceId, actor: "user", kind: "approval_resolved", subjectId: id, details: { ...input, grantId, source } });
       if (isModuleRequest(row.payload)) await settleWaiting(tx, row.payload.call, { approval: id, decision: input.decision === "approve" ? "approved" : "denied" }, now());
       const resumed = ports ? await resume(tx, ports, workspaceId, row, input) : false;

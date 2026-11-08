@@ -12,6 +12,7 @@ import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { createPreferences } from "./preferences";
 import { createApprovals } from "./approvals";
 import { notifyUser } from "./notify-user";
+import { recordApprovalFact } from "./notification-facts";
 import { drainCalls } from "./module-calls";
 import { pushReply } from "./chat-replies";
 import { runFile, storeChatFile } from "./chat";
@@ -38,6 +39,7 @@ async function gate(ctx: ToolContext, action: Action, target: { moduleId?: strin
     const decision = await effectivePolicyIn(tx, workspaceId, action, target, now());
     if (decision.mode === "ask") {
       const approval = await tx.approval.create({ data: { workspaceId, action, title: tool, detail: decision.reason, preview: JSON.stringify(payload).slice(0, 20000), payload: { ...payload, ...resumeIn(ctx) }, createdAt: now() } });
+      await recordApprovalFact(tx, approval);
       await audit(tx, { workspaceId, actor: "chrona", kind: "approval_created", subjectId: approval.id, details: { action } });
       return { approvalId: approval.id, status: "awaiting_approval" };
     }
@@ -87,8 +89,7 @@ async function notify(ctx: ToolContext, raw: unknown) {
   const pending = await gate(ctx, "notify_user", {}, { tool: ctx.tool, ...input });
   if (pending) return pending;
   const queued = await notifyUser(ctx.db, ctx.ports, ctx.workspaceId, { level: input.level, title: input.title, body: input.body, key: `tool:${ctx.run.id}:${ctx.index}` });
-  void drainCalls(ctx.ports, ctx.workspaceId).catch(() => {});
-  return { status: "queued", callId: queued.callId };
+  return { status: "queued", factId: queued.id };
 }
 async function schedule(ctx: ToolContext, raw: unknown) {
   const input = parseInput(schemas.chrona_schedule, raw);

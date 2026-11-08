@@ -78,7 +78,7 @@ manifest 的 `contributes` 保存面向通用模块的声明；`modules.contribu
 
 网页由内置 `web` 入口提供，不存在 Next.js 或单独的 owner HTTP 业务 API。`/api/web` 是该模块自己的适配层，再调用系统与应用工具。web 保存应用经 `web.page-set` 登记的 json-render 页面结构及本应用工具引用，校验组件、动作与引用；用户打开页面时读取业务数据、执行回调。应用无需让 web 硬编码认识自己；未登记时仍有通用工具页，停用应用的页面隐藏，已删除应用的登记按真实 moduleId 清理。页面 revision 与工具契约在读取、内容和动作调用时复核；同名新应用不会继承旧页面，目录读取失败不能当成空目录清理。
 
-Today 的七天范围、排序、通知与应用健康摘要在 web 的 `today.ts` 中经 routed calls 聚合；`chat.today` 是转发到 `web.today` 的兼容入口，web 内部不回调该入口。内核 `chat.runtime` 只返回自身运行事实，`chat.sessions` 提供按入口身份过滤的读取，`schedules.list` 可排除静态轮询。没有可用 web 时 overview 明确失败，不回退到内核再实现一套聚合；独立 `/health` 不依赖该页面。
+Today 的七天范围、排序、通知与应用健康摘要在 web 的 `today.ts` 中经 routed calls 聚合，调用方直接调用 `web.today`；内核不提供 Today 转发或兼容入口。`activity.runtime/runs/records` 只返回内核运行事实，`schedules.list` 可排除静态轮询。应用详情由 web/mcp 自行组合 `modules.list/permissions/diagnostics/settings-get/interfaces` 与 `notify.activity`；内核只保留设置声明/有效值及接口、本地能力元数据，不再提供 `modules.overview/system` 页面聚合。没有可用 web 时其页面调用明确失败，不回退到内核再实现一套聚合；独立 `/health` 不依赖该页面。
 
 所有页面（系统页与应用登记页）共用 `pages.js` 的 React/json-render 渲染器，由 `src/pages.tsx` 构建；系统 spec 位于 `src/system/`，仅系统页面获得访问现有数据 API 的 adapter。`app.js` 只负责认证、请求、路由与单一 SSE 等 shell 基础设施，样式统一在 `style.css`；共享显示组件及绑定规则由 `catalog.ts` / `web.catalog` 提供。
 
@@ -88,7 +88,7 @@ Web 为全部内置页和登记页统一管理导航、主题与响应式外壳�
 
 ## 8. 通知渠道、日程与定时器
 
-**通知**由内置 `notify` 处理 now / digest / web、每日上限、安静时段、队列与送达。审批事实由内核经 `notify.approval` 投递，摘要、文案和页面引导归 notify；审批决定与幂等记录仍归内核。内核自己的通知也经 `notify.send`。渠道模块调用 `notify.channel` 登记自己的投递工具，notify 校验回调归属与可见性后统一投递；没有就绪渠道时退到网页，不承诺外部渠道必达。QQ 是登记渠道之一，不是 notify 写死的业务依赖。
+**通知**由内置 `notify` 处理 now / digest / web、每日上限、安静时段、队列与送达。内核在业务状态事务内向既有 `Audit` 写有限的审批、生命周期、问题及撤回事实，不调用通知应用。每个 workspace 由一个选定应用经 `activity.facts/ack` 持久消费；可信安装仅首次默认选择 notify。确认不表示渠道送达，也不因恢复或切换消费者重放；`activity.withdrawals` 让切回旧应用时仍能核对已消费撤回，避免复活已解决的问题。没有通知应用不影响审批创建和 rescue 决定。摘要、文案和页面引导归应用；审批决定与幂等记录归内核。具体保留、确认及恢复规则见[通知事实契约](kernel-notification-facts.md)。应用自己的通知仍调用 `notify.send`；渠道模块调用 `notify.channel` 登记自己的投递工具，notify 校验回调归属与可见性后统一投递；没有就绪渠道时退到网页，不承诺外部渠道必达。QQ 是登记渠道之一，不是 notify 写死的业务依赖。
 
 **调度**由系统 `schedules` 保存与投递。manifest 的静态日程随版本启用安排；模块可用 `schedules.create/cancel/mine` 管理按自身 key 归属的运行时定时器，到时收到带 payload 的 `schedule` 事件。Provider 的 `chrona_schedule` 安排唤起；提醒是预装外置 `remind` 应用，使用同一套模块定时器。日程推进与本次模块投递记录在同一事务提交（`ModuleInvocation.mode = schedule`），投递在 tick 外执行，同一应用串行、最多四个应用同时处理。明确未送达按退避最多尝试六次；处理失败或结果未知不重放，重启后过期的投递标为未知并通知核对。记录绑定版本及激活身份，变更后不投递旧事件；取消或替换定时器会取消尚未送出的记录。
 

@@ -3,19 +3,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleManifestSchema, moduleRuntimeParams } from "@chrona/contracts/steward";
-import { moduleOverview, moduleOverviewOutputSchema, moduleSettingsOutputSchema, setModuleSettings } from "./module-overview";
+import { settingsView, moduleSettingsOutputSchema, setModuleSettings } from "./module-overview";
 import { registerSystemModules } from "./system-modules";
 import { callSync } from "./module-calls";
-import { systemApps } from "./system-apps";
-import { modulesSystemOutput } from "./system-outputs";
-import { listActivity } from "./activity";
+import { moduleInterfaces, moduleInterfacesOutputSchema } from "./system-apps";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
-import { installActivityModule } from "./test-activity-module";
-const cleanups: (() => Promise<void>)[] = [];
-
 const dbs: ReturnType<typeof testDb>[] = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); for (const db of dbs.splice(0)) await db.$disconnect(); });
+afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
 const base = { name: "okx-trader", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], keepAlive: true };
 const settings = {
   "max-loss": { type: "number", label: "最大亏损", default: 100, min: 10, max: 500 },
@@ -24,99 +19,86 @@ const settings = {
 async function fixture() {
   registerSystemModules();
   const db = testDb(); dbs.push(db);
-  const dataDir = mkdtempSync(join(tmpdir(), "chrona-overview-"));
-  const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-27T15:00:00Z"), publicUrl: null };
-  const w = (await db.workspace.create({ data: { name: "overview" } })).id;
+  const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-settings-read-")), now: () => new Date("2026-10-27T15:00:00Z"), publicUrl: null };
+  const w = (await db.workspace.create({ data: { name: "settings-read" } })).id;
   const module = await db.module.create({ data: { workspaceId: w, name: "okx-trader", activeHash: "h1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h1", manifest: moduleManifestSchema.parse({ ...base, settings, params: { pair: { type: "string", value: "BTC-USDT" } } }), source: "provider", intent: {}, report: {}, status: "active" } });
-  cleanups.push(await installActivityModule(ports, w));
   return { db, ports, w, module };
 }
-
 test("a manifest declares settings within bounds; a name shared with a param is refused", () => {
   expect(moduleManifestSchema.safeParse({ ...base, settings }).success).toBe(true);
   expect(moduleManifestSchema.safeParse({ ...base, settings: { x: { type: "number", label: "x", default: 1000, max: 500 } } }).success).toBe(false);
   expect(moduleManifestSchema.safeParse({ ...base, settings: { x: { type: "boolean", label: "x", default: "yes" } } }).success).toBe(false);
   expect(moduleManifestSchema.safeParse({ ...base, settings: { pair: { type: "string", label: "p", default: "a" } }, params: { pair: { type: "string", value: "b" } } }).success).toBe(false);
   const manifest = moduleManifestSchema.parse({ ...base, settings, params: { pair: { type: "string", value: "BTC-USDT" } } });
-  // Stored values that no longer fit fall back to the default.
   expect(moduleRuntimeParams(manifest, { moduleSettings: { "okx-trader": { "max-loss": 50, mode: "live" } } })).toEqual({ pair: "BTC-USDT", "max-loss": 50, mode: "demo" });
 });
-
-test("settings are changed only within what the active version declares, audited, and reach the overview", async () => {
+test("settings-set validates all entries before writing and settings-get returns effective values by name or id", async () => {
   const f = await fixture();
-  await expect(setModuleSettings(f.ports, f.w, "okx-trader", { unknown: 1 })).rejects.toThrow("Unknown setting unknown");
+  await expect(setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50, unknown: 1 })).rejects.toThrow("Unknown setting unknown");
   await expect(setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 9999 })).rejects.toThrow("最大亏损");
-  expect(await setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50 })).toMatchObject({ values: { "max-loss": 50, mode: "demo" } });
-  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.w } })).settings).toMatchObject({ moduleSettings: { "okx-trader": { "max-loss": 50 } } });
-  expect((await listActivity(f.ports, f.w, { module: "okx-trader" })).items.map(item => item.text)).toContain("你修改了 okx-trader 的设置：max-loss");
-  expect(await moduleOverview(f.ports, f.w, "okx-trader")).toMatchObject({ kind: "app", settings: { values: { "max-loss": 50 } }, permissions: { module: "okx-trader" } });
+  expect(await settingsView(f.ports, f.w, f.module.id)).toMatchObject({ values: { "max-loss": 100, mode: "demo" } });
+  moduleSettingsOutputSchema.parse(await setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50 }));
+  expect(await settingsView(f.ports, f.w, "okx-trader")).toMatchObject({ values: { "max-loss": 50, mode: "demo" } });
+  const audit = await f.db.audit.findFirstOrThrow({ where: { workspaceId: f.w, kind: "module_settings_updated" } });
+  expect(audit.details).toEqual({ keys: ["max-loss"] });
+  await expect(settingsView(f.ports, f.w, "missing")).rejects.toMatchObject({ code: "not_found" });
 });
-
-test("a system module's settings are its own: memory's provider goes through the owner's settings", async () => {
+test("settings-get uses defaults for obsolete values and no declarations for local/unconfigured apps", async () => {
+  const f = await fixture();
+  await f.db.workspace.update({ where: { id: f.w }, data: { settings: { moduleSettings: { "okx-trader": { "max-loss": 5, mode: "paper" } } } } });
+  expect(await settingsView(f.ports, f.w, "okx-trader")).toMatchObject({ values: { "max-loss": 100, mode: "paper" } });
+  await f.db.module.create({ data: { workspaceId: f.w, name: "inactive" } });
+  for (const name of ["workspace-local", "inactive", "activity"]) expect(await settingsView(f.ports, f.w, name)).toEqual({ declarations: {}, values: {} });
+});
+test("a system module keeps its settings-set behavior and settings-get declarations", async () => {
   const f = await fixture();
   expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "memory-local", autoRetain: false })).toMatchObject({ values: { provider: "memory-local", autoRecall: true, autoRetain: false } });
   expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.w } })).settings).toMatchObject({ memory: { provider: "memory-local", autoRetain: false } });
   expect(await setModuleSettings(f.ports, f.w, "memory", { provider: "" })).toMatchObject({ values: { provider: "" } });
   await expect(setModuleSettings(f.ports, f.w, "activity", {})).rejects.toThrow("has no settings");
-  expect(await moduleOverview(f.ports, f.w, "memory")).toMatchObject({ kind: "system", name: "memory", settings: { declarations: { autoRecall: { type: "boolean" } } } });
+  expect(await settingsView(f.ports, f.w, "memory")).toMatchObject({ declarations: { autoRecall: { type: "boolean" } } });
 });
-
-test("retired reflection is not a system app, while its historical activity keeps process links", async () => {
+test("interfaces are read-only declarations and local metadata grants no execution authority", async () => {
   const f = await fixture();
-  await expect(moduleOverview(f.ports, f.w, "reflection")).rejects.toThrow();
-  for (const item of [
-    { kind: "reflection_started", subjectId: "old-reflect", details: { signals: [{ kind: "module_activate", module: "example" }] } },
-    { kind: "reflection_suggested", subjectId: "old-build", details: { title: "历史修复", why: "历史原因", modules: ["example"] } },
-  ]) await f.db.audit.create({ data: { workspaceId: f.w, actorKey: "chrona", ...item } });
-  const { items } = await listActivity(f.ports, f.w, { module: "reflection" });
-  expect(items).toEqual(expect.arrayContaining([
-    expect.objectContaining({ text: "Chrona 反思了一次（example 上线）", session: { id: "old-reflect", source: "reflect" } }),
-    expect.objectContaining({ text: "Chrona 开始构建「历史修复」（example）：历史原因", session: { id: "old-build", source: "build" } }),
-  ]));
-});
-
-test("real overview and settings-set results fit their declared output schemas", async () => {
-  const f = await fixture();
-  moduleSettingsOutputSchema.parse(await setModuleSettings(f.ports, f.w, "okx-trader", { "max-loss": 50 }));
-  moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "okx-trader"));
-  for (const name of ["memory", "activity"]) moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
-});
-
-
-test("runtime directory is read-only, registered before use and cannot invoke the Provider", async () => {
-  const f = await fixture();
-  const directory = modulesSystemOutput.parse(await systemApps(f.ports, f.w)) as { name: string; runtime?: { status: string } }[];
+  const directory = moduleInterfacesOutputSchema.parse(await moduleInterfaces(f.ports, f.w)) as { name: string; runtime?: { status: string } }[];
   expect(directory.filter(item => item.runtime).map(item => item.name).sort()).toEqual(["content-local", "runtime-callback", "workspace-local"]);
   for (const name of ["content-local", "runtime-callback", "workspace-local"]) {
-    const view = moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, name));
-    expect(view).toMatchObject({ kind: "system", capabilities: { build: false, configure: false, disable: false, remove: false }, runtime: { status: "registered" }, settings: { declarations: {}, values: {} } });
+    const view = await moduleInterfaces(f.ports, f.w, name);
+    expect(view).toMatchObject({ capabilities: { build: false, configure: false, disable: false, remove: false }, runtime: { status: "registered" } });
+    if (Array.isArray(view)) throw new Error("Expected one interface");
+    expect(view).not.toHaveProperty("work"); expect(view).not.toHaveProperty("activity"); expect(view).not.toHaveProperty("settings");
     expect(view.tools.every(tool => !tool.visibility.includes("owner"))).toBe(true);
-    expect(view.tools.filter(tool => !tool.name.startsWith("agent-")).every(tool => tool.visibility.includes("kernel"))).toBe(true);
     for (const tool of view.tools) await expect(callSync(f.ports, { workspaceId: f.w, caller: { kind: "owner", via: null }, chain: [], path: [] }, `${name}.${tool.name}`, {})).rejects.toMatchObject({ code: "forbidden" });
     await expect(setModuleSettings(f.ports, f.w, name, {})).rejects.toThrow();
   }
   const owner = { workspaceId: f.w, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
-  expect((await callSync(f.ports, owner, "modules.overview", { module: "workspace-local" })).output).toMatchObject({ runtime: { status: "registered" } });
-  const exposed = modulesSystemOutput.parse((await callSync(f.ports, owner, "modules.system", {})).output) as { name: string }[];
+  expect((await callSync(f.ports, owner, "modules.settings-get", { module: "workspace-local" })).output).toEqual({ declarations: {}, values: {} });
+  const exposed = moduleInterfacesOutputSchema.parse((await callSync(f.ports, owner, "modules.interfaces", {})).output) as { name: string }[];
   expect(exposed.some(item => item.name === "agent")).toBe(false);
+  for (const retired of ["modules.system", "modules.overview"]) await expect(callSync(f.ports, owner, retired, {})).rejects.toMatchObject({ code: "not_found" });
+  await expect(moduleInterfaces(f.ports, f.w, "reflection")).rejects.toMatchObject({ code: "not_found" });
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.moduleInvocation.count({ where: { target: { in: ["agent", "content-local", "runtime-callback", "workspace-local"] } } })).toBe(0);
 });
-test("runtime configuration snapshot never executes health checks or exposes Provider diagnostics", async () => {
+test("selected app metadata preserves declared interfaces without making private tools callable", async () => {
+  const f = await fixture();
+  const output = { type: "object", properties: { saved: { type: "boolean" } }, required: ["saved"], additionalProperties: false };
+  const manifest = moduleManifestSchema.parse({ ...base, settings, tools: [{ name: "private", description: "Private metadata", visibility: ["modules"], idempotent: true, parameters: { type: "object", properties: {} }, output, examples: [{ args: {}, result: { saved: true } }] }] });
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.module.id, hash: "h1" } }, data: { manifest } });
+  const view = moduleInterfacesOutputSchema.parse(await moduleInterfaces(f.ports, f.w, f.module.id));
+  expect(view).toMatchObject({ name: "okx-trader", origin: "external", capabilities: { configure: true }, tools: [{ name: "private", outputSchema: output, examples: [{ args: {}, result: { saved: true } }], visibility: ["modules"] }] });
+  await expect(callSync(f.ports, { workspaceId: f.w, caller: { kind: "owner", via: null }, chain: [], path: [] }, "okx-trader.private", {})).rejects.toMatchObject({ code: "forbidden" });
+  const other = await f.db.workspace.create({ data: { name: "other" } });
+  await expect(moduleInterfaces(f.ports, other.id, f.module.id)).rejects.toMatchObject({ code: "not_found" });
+  await expect(settingsView(f.ports, other.id, f.module.id)).rejects.toMatchObject({ code: "not_found" });
+});
+test("metadata/settings reads never execute health checks or expose Provider diagnostics", async () => {
   const f = await fixture(); let starts = 0, probes = 0;
   f.ports.provider = { name: "pi", health: async () => { probes++; throw new Error("private diagnostics"); }, start() { starts++; throw new Error("must not execute"); } };
-  const view = moduleOverviewOutputSchema.parse(await moduleOverview(f.ports, f.w, "workspace-local"));
+  const view = moduleInterfacesOutputSchema.parse(await moduleInterfaces(f.ports, f.w, "workspace-local"));
   expect(view).toMatchObject({ runtime: { status: "registered", backend: null } });
   expect(JSON.stringify(view)).not.toContain("private diagnostics");
+  await settingsView(f.ports, f.w, "workspace-local");
   expect(starts).toBe(0); expect(probes).toBe(0);
-});
-
-test("builtin overview retains origin and protected deletion while exposing checked Git version and update actions", async () => {
-  const f = await fixture(), hash = "a".repeat(40), tree = "b".repeat(40);
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "files", builtin: true, activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: moduleManifestSchema.parse({ ...base, name: "files" }), source: "user", status: "approved", intent: {}, report: { tests: [], git: { commit: hash, tree } } } });
-  const overview = await moduleOverview(f.ports, f.w, "files");
-  expect(overview).toMatchObject({ kind: "app", app: { origin: "builtin", activeHash: hash, capabilities: { build: true, propose: true, group: true, activate: true, update: true, rollback: true, remove: false, install: false }, versions: expect.arrayContaining([expect.objectContaining({ hash, git: { commit: hash, tree } })]) } });
-  moduleOverviewOutputSchema.parse(overview);
 });

@@ -13,6 +13,7 @@ import { importModuleGitBundle } from "./module-git-upstream";
 import { exportModuleSource } from "./module-git";
 import { recordModuleUpstream } from "./module-upstream";
 import { installDependencies } from "./module-build";
+import { seedFactConsumer } from "./notification-facts";
 
 async function executable(name: string) {
   if (isAbsolute(name)) return access(name, constants.X_OK).then(() => true, () => false);
@@ -86,6 +87,10 @@ export function registerBuiltins(ports: StewardPorts, workspaceId: string): Prom
   active.set(workspaceId, promise);
   return promise;
 }
+async function seedDefaultFactConsumer(ports: StewardPorts, workspaceId: string) {
+  const application = await ports.db.module.findFirst({ where: { workspaceId, name: "notify", activeHash: { not: null } } });
+  if (application) await seedFactConsumer(ports.db, workspaceId, application.id, ports.now());
+}
 async function register(ports: StewardPorts, workspaceId: string) {
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
@@ -124,5 +129,6 @@ async function register(ports: StewardPorts, workspaceId: string) {
       failures.push(`${name}: ${redactSensitiveText(error instanceof Error ? error.message : "Release registration failed").slice(0, 1000)}`);
     }
   }
+  await seedDefaultFactConsumer(ports, workspaceId);
   if (failures.length) throw new StewardError("conflict", failures.join("\n"));
 }

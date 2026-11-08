@@ -80,8 +80,9 @@ test("expiry rejects late approval and returns cancellation; queued notice is su
   await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toMatchObject({ code: "conflict" });
   expect(await result).toEqual({ decision: "cancel" });
   expect((await api.provider.list())[0]!.interactions[0]!.status).toBe("expired");
-  // The notify module drops the queued notice: Chrona withdraws it by key.
-  expect(await db.moduleInvocation.count({ where: { target: "notify", tool: "withdraw", key: `withdraw:provider-input:${f.run.id}` } })).toBe(1);
+  // A durable withdrawal exists even if no notification application is running.
+  expect((await db.audit.findMany({ where: { kind: "kernel_fact_pending" } })).map(row => row.details)).toContainEqual({ type: "withdraw", data: { key: `provider-input:${f.run.id}` } });
+  expect(await db.moduleInvocation.count({ where: { target: "notify", tool: "withdraw" } })).toBe(0);
 });
 test("restart/no live process cannot reuse pending requests", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();

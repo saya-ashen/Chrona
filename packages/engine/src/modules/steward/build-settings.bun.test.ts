@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { settingsSchema } from "@chrona/contracts/steward";
+import { settingsOutput } from "./system-outputs";
 import { createSettings } from "./settings";
 import { createRuns } from "./runs";
 import { testDb } from "./test-db";
@@ -13,14 +13,14 @@ async function fixture(at = "2026-10-25T16:00:00Z") {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspaceId = (await db.workspace.create({ data: { name: "build-settings", settings: { custom: "preserve" } } })).id;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(at), publicUrl: null };
-  const settings = () => createSettings({ ...ports, workspaceId }, { status: async () => null, forward: async () => null });
+  const settings = () => createSettings({ ...ports, workspaceId }, { forward: async () => null });
   return { db, ports, workspaceId, settings };
 }
 
 test("existing workspaces get 20/60/5; partial owner edits persist without losing unrelated settings", async () => {
   const f = await fixture(), before = await f.settings().get();
   expect(before.builds).toEqual({ dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 });
-  expect(settingsSchema.safeParse(before).success).toBe(true);
+  expect(settingsOutput.safeParse(before).success).toBe(true);
   const saved = await f.settings().update({ builds: { dailyLimit: 30 } });
   expect(saved.builds).toEqual({ dailyLimit: 30, timeoutMinutes: 60, maxSubmissions: 5 });
   expect((await f.settings().get()).builds).toEqual(saved.builds);

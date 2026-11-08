@@ -46,7 +46,7 @@ async function buildCandidate(f: Awaited<ReturnType<typeof fixture>>, manifest: 
 
 test("settings moduleModel defaults null, persists owner updates and disabling", async () => {
   const f = await fixture();
-  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { status: async () => null, forward: async () => null });
+  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { forward: async () => null });
   expect((await settings.get()).moduleModel).toEqual(limits);
   expect((await settings.update({ moduleModel: null })).moduleModel).toBeNull();
   expect((await settings.update({ moduleModel: limits })).moduleModel).toEqual(limits);
@@ -115,7 +115,7 @@ test("v2-17: a tier names a model and thinking level; a module's own daily cap s
   const f = await fixture();
   const seen: unknown[] = [];
   f.ports.provider = { ...fakeProvider, async complete(input) { seen.push({ model: input.model, thinking: input.thinking }); return { text, inputTokens: 3, outputTokens: 4 }; } };
-  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { status: async () => null, forward: async () => null });
+  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id }, { forward: async () => null });
   await settings.update({ moduleModel: { ...limits, models: { strong: { model: "fake/exact", thinking: "max" }, fast: "fake/fast:low" }, moduleDailyCalls: { "model-test": 1 } } });
   expect((await f.call()).result).toMatchObject({ text });
   expect(seen).toEqual([{ model: "fake/exact", thinking: "max" }]);

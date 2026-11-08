@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { CHRONA_TOOLS } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
 import { createRuns } from "./runs";
+import { createApprovals } from "./approvals";
+import { announceApprovals } from "./notify-user";
 import { createTools, searchSessions } from "./tools";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
@@ -47,6 +49,23 @@ test("session search tool and foreground reply match the contract", async () => 
   expect(await tools.call(run.token, "chrona_session_search", { query: "Answer" })).toHaveLength(1);
 });
 
+test("tool policy approvals, service approvals and legacy backfill persist facts without a notification app", async () => {
+  const run = await capability(), tools = createTools(ports);
+  await db.grant.create({ data: { workspaceId, action: "notify_user", mode: "ask", scope: { kind: "global" } } });
+  const gated = await tools.call(run.token, "chrona_notify", { level: "now", title: "通知", body: "正文" }) as { approvalId: string; status: string };
+  expect(gated.status).toBe("awaiting_approval");
+  const approvals = createApprovals({ ...ports, workspaceId });
+  const requested = await approvals.create({ action: "delete_data", title: "请求", detail: "说明", preview: "摘要", payload: { privateArgument: "not-a-fact" } });
+  const legacy = await db.approval.create({ data: { workspaceId, action: "delete_data", title: "旧请求", detail: "", preview: "", payload: {} } });
+  await announceApprovals(ports, workspaceId);
+  await announceApprovals(ports, workspaceId);
+  const facts = await db.audit.findMany({ where: { workspaceId, kind: "kernel_fact_pending" } });
+  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([gated.approvalId, requested.id, legacy.id].sort());
+  expect(JSON.stringify(facts)).not.toContain("privateArgument");
+  await approvals.resolve(gated.approvalId, { decision: "deny", scope: "once" });
+  expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${gated.approvalId}` } } });
+  expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
+});
 test("reply files are copied from the run's directory into chat's store; links out of it and unknown attachments are refused", async () => {
   const run = await capability(), tools = createTools(ports);
   await mkdir(run.cwd, { recursive: true });

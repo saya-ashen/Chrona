@@ -4,6 +4,7 @@ import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { assertExternalModule } from "./module-identity";
+import { recordWithdrawal } from "./notification-facts";
 
 export const intentSchema = z.object({ changes: z.array(z.string().trim().min(1).max(500)).min(1).max(20), preserves: z.array(z.string().trim().min(1).max(500)).max(20).default([]) }).strict();
 export type TestReport = { stdout: string; stderr: string; exitCode: number }[];
@@ -37,7 +38,8 @@ export async function assertDynamicModuleActivation(tx: Prisma.TransactionClient
     for (const version of group.data.versions) await assertExternalModule(tx, workspaceId, version.moduleId, "group");
   } else if (moduleId) await assertExternalModule(tx, workspaceId, moduleId, "activate");
 }
-export async function expireModuleApprovals(context: ModuleContext, moduleId: string, db: Prisma.TransactionClient = context.db) {
+export async function expireModuleApprovals(context: ModuleContext, moduleId: string, db?: Prisma.TransactionClient): Promise<void> {
+  if (!db) return context.db.$transaction(tx => expireModuleApprovals(context, moduleId, tx));
   const { workspaceId, ports } = context;
   const open = await db.approval.findMany({ where: { workspaceId, action: "activate_module", status: "open" } });
   // v2-15: a group approval (versions[]) expires with any of its modules.
@@ -45,4 +47,5 @@ export async function expireModuleApprovals(context: ModuleContext, moduleId: st
     && (payload.moduleId === moduleId || (Array.isArray(payload.versions) && payload.versions.some(entry => !!entry && typeof entry === "object" && !Array.isArray(entry) && entry.moduleId === moduleId)));
   const ids = open.filter(row => covers(row.payload)).map(row => row.id);
   await db.approval.updateMany({ where: { id: { in: ids }, status: "open" }, data: { status: "expired", resolvedAt: ports.now() } });
+  for (const id of ids) await recordWithdrawal(db, workspaceId, `approval:${id}`, ports.now());
 }

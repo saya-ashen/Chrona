@@ -18,10 +18,11 @@ const module = await startModule("index.ts", { stubs: {
     routed("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })), routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })), routed("agent.respond"), routed("web.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("history.sessions"), routed("history.messages"), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
     routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
     routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ ...diagnostics, module: args.module }]),
-    routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
+    routed("notify.list", () => ({ items: [{ title: "n1" }] })),
+    routed("notify.activity", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
     routed("modules.permissions", args => ({ module: args.module, capabilities: [] })),
-    routed("modules.system", args => ({ name: args.module, work: [] })),
-    routed("modules.overview", args => ({ kind: "app", module: args.module })), routed("modules.settings-set", args => args),
+    routed("modules.interfaces", args => args.module ? { name: args.module, tools: [] } : [{ name: "memory", sessions: null, tools: [] }]),
+    routed("modules.settings-get", () => ({ declarations: {}, values: {} })), routed("modules.settings-set", args => args),
   ]),
 } });
 async function rpc(method: string, params: unknown = {}, id: number | null = 1) {
@@ -46,8 +47,12 @@ try {
   assert.equal((await json("chrona_activity", { module: "web" })).items[0].text, "web 已切换到版本 5caef53c");
   assert.deepEqual(await json("chrona_module_permissions", { module: "web" }), { module: "web", capabilities: [] });
   assert.deepEqual(calls.at(-1), ["modules.permissions", { module: "web" }]);
-  assert.deepEqual(await json("chrona_system_apps", { module: "memory" }), { name: "memory", work: [] });
-  assert.deepEqual(await json("chrona_app", { module: "okx" }), { kind: "app", module: "okx" });
+  assert.deepEqual(await json("chrona_system_apps", { module: "memory" }), { name: "memory", sessions: null, tools: [], work: [] });
+  const overview = await json("chrona_app", { module: "alpha" });
+  assert.equal(overview.kind, "app");
+  assert.equal(overview.app.id, "alpha-id");
+  assert.deepEqual(overview.settings, { declarations: {}, values: {} });
+  assert.deepEqual(overview.tools, []);
   assert.deepEqual(await json("chrona_app_settings", { module: "okx", values: { "max-loss": 50 } }), { module: "okx", values: JSON.stringify({ "max-loss": 50 }) });
   assert.deepEqual(await json("chrona_modules"), installedApps);
   assert.deepEqual(await json("chrona_module_catalog"), [{ name: "memory-local", available: true, installation: null }]);

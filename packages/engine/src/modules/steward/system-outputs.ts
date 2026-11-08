@@ -3,7 +3,7 @@ import type { Proposal } from "./module-context";
 import type { moduleUpstream } from "./module-upstream";
 import { moduleHealthSummarySchema } from "./module-diagnostics";
 import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSchema, memorySettingsSchema, messageSchema, preferenceSchema, providerRunViewSchema, scheduleSchema, sessionSchema, settingsSchema, todayViewSchema, healthSchema, APPROVAL_STATUSES } from "@chrona/contracts/steward";
-import { moduleOverviewOutputSchema, permissionsSchema } from "./module-overview";
+import { permissionsSchema } from "./module-overview";
 
 export const ownerBuildOutput = z.object({ status: z.string(), sessionId: z.string(), runId: z.string(), duplicate: z.boolean(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() });
 export const modulesBuildOutput = ownerBuildOutput.extend({ reason: z.string().optional() });
@@ -37,11 +37,6 @@ export const modulesListOutput = z.array(appSchema.extend({
     git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).nullable().default(null) })),
   runs: z.array(z.object({ id: z.string(), hash: z.string(), triggerId: z.string(), firedAt: z.string(), exitCode: z.number(), error: z.string().nullable(), createdAt: z.string() })),
 }));
-// Overview's service imports the system registry; defer schema reuse until that registry is initialized.
-export const modulesSystemOutput = z.lazy(() => {
-  const app = moduleOverviewOutputSchema.options[1].omit({ kind: true, settings: true, activity: true });
-  return z.union([z.array(app.omit({ work: true })), app]);
-});
 export const modulesPermissionsOutput = z.lazy(() => permissionsSchema);
 const toolExampleOutput = z.object({ description: z.string().optional(), args: z.record(z.string(), z.json()), result: z.json().optional() });
 const toolErrorOutput = z.object({ code: z.string(), description: z.string(), recovery: z.string() });
@@ -87,7 +82,7 @@ export const buildControlOutput = z.discriminatedUnion("status", [
   z.object({ status: z.literal("build_stopped"), sessionId: z.string() }),
   z.object({ status: z.literal("build_revised"), sessionId: z.string(), runId: z.string(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() }),
 ]);
-export const settingsOutput = settingsSchema;
+export const settingsOutput = settingsSchema.omit({ chat: true });
 export const settingsGrantsOutput = z.array(grantSchema);
 export const settingsGrantOutput = grantSchema;
 export const settingsPreferencesOutput = z.array(preferenceSchema);
@@ -105,7 +100,6 @@ export const secretRemoveOutput = z.object({ name: z.string(), configured: z.boo
 export const secretAuthorizeOutput = z.object({ url: z.string(), redirectUri: z.string(), expiresAt: z.string() });
 export const secretTokenOutput = z.object({ accessToken: z.string(), expiresAt: z.string() });
 export const secretsListOutput = z.array(z.object({ name: z.string(), configured: z.boolean(), updatedAt: z.string().nullable(), modules: z.array(z.string()) }));
-export const activityListOutput = z.lazy(() => z.object({ items: z.array(moduleOverviewOutputSchema.options[1].shape.activity.element), before: z.string().nullable() }));
 export const memoryRecallOutput = z.object({ items: z.array(z.object({ id: z.string(), content: z.string(), at: z.string().optional() })) });
 // These two results are forwarded unchanged from the user-selected memory provider.
 export const memoryRetainOutput = z.json();

@@ -3,6 +3,7 @@ import { openStore } from "./store";
 import { createNotify, type Caller, type CallResult } from "./notify";
 import type { Directory } from "./registry";
 import { activityView } from "./activity";
+import { ingestKernelFacts } from "./facts";
 
 const store = openStore(chrona.paths.data);
 const notify = createNotify({ store, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null,
@@ -14,7 +15,12 @@ let busy = false, again = false;
 async function tick() {
   if (busy) { again = true; return; }
   busy = true;
-  const pass = async () => { again = false; await notify.tick(new Date()); return again; };
+  const pass = async () => {
+    again = false;
+    const now = new Date();
+    if (await ingestKernelFacts(store, notify, (target, args) => chrona.call(target, args), now)) await notify.tick(now);
+    return again;
+  };
   try {
     let rerun = await pass();
     while (rerun) rerun = await pass();

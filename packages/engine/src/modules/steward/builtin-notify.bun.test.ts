@@ -6,7 +6,7 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { moduleSupervisor } from "./module-supervisor";
 import { callSync, kernelOrigin, drainCalls } from "./module-calls";
-import { notificationItems } from "./notify-user";
+import { seedFactConsumer } from "./notification-facts";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease } from "./module-release";
 import { testDb } from "./test-db";
@@ -29,6 +29,7 @@ test("real notify SDK uses two external callbacks, persists target bindings and 
     const release = await resolveBuiltinRelease(ports, "notify");
     const workspaceId = (await db.workspace.create({ data: { name: "notify-routed" } })).id;
     const notify = await db.module.create({ data: { workspaceId, name: "notify", builtin: true, activeHash: release.hash } });
+    await seedFactConsumer(db, workspaceId, notify.id, ports.now());
     await db.moduleVersion.create({ data: { moduleId: notify.id, hash: release.hash, manifest: release.manifest, source: "user", status: "approved", intent: {}, report: {} } });
     await mkdir(join(dataDir, "platform/store", release.hash), { recursive: true }); await cp(release.codeDir, join(dataDir, "platform/store", release.hash), { recursive: true });
     async function transport(name: string, hash: string) {
@@ -68,13 +69,3 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
     for (const invocation of calls) expect(await db.audit.findUnique({ where: { id: `module-invocation-target:${invocation.id}` } })).toMatchObject({ details: { moduleId: invocation.target === "alpha" ? alpha.id : beta.id, contractHash: expect.any(String) } });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);
-
-test("notification owner projection preserves registered channel names and bounds their length", () => {
-  const item = { id: "n1", moduleId: null, sessionId: null, level: "now", channel: "external-mail", status: "sent", title: "Hi", body: "Body", link: null, attempts: 1, lastError: null, createdAt: "2026-10-28T00:00:00.000Z", sentAt: null, feedback: null } as const;
-  expect(notificationItems({ items: [{ ...item, format: "markdown" }, { ...item, id: "n2", status: "unknown" }] })).toEqual([item]);
-  expect(notificationItems({ items: [{ ...item, channel: "new-channel" }] })).toEqual([{ ...item, channel: "new-channel" }]);
-  expect(notificationItems({ items: [{ ...item, channel: "a".repeat(120) }] })).toEqual([{ ...item, channel: "a".repeat(120) }]);
-  expect(notificationItems({ items: [{ ...item, channel: "a".repeat(121) }] })).toEqual([]);
-  expect(notificationItems({ items: [{ ...item, channel: "" }] })).toEqual([]);
-  expect(notificationItems(null)).toEqual([]);
-});

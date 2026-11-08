@@ -6,8 +6,7 @@ import { createTools } from "./tools";
 import { createGrants } from "./grants";
 import { createPreferences } from "./preferences";
 import { createSettings } from "./settings";
-import { createNotificationsView, forwardSettings } from "./notify-user";
-import { workspaceToday } from "./today";
+import { forwardSettings } from "./notify-user";
 import { createSchedules } from "./schedules";
 import { createRuns } from "./runs";
 import { createTick } from "./tick";
@@ -33,9 +32,7 @@ export function createStewardService(inputPorts: StewardPorts) {
       if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
-    const notifications = createNotificationsView(ports, workspaceId);
-    const projection = workspaceToday(ports, workspaceId);
-    return { sessions: createSessions(ports, workspaceId), provider: createProviderControl(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number, sessionId?: string) => chat.messages(workspaceId, limit, sessionId), recordMessage: (input: Parameters<typeof chat.recordMessage>[1]) => chat.recordMessage(workspaceId, input), setExternalId: (id: string, externalId: string) => chat.setExternalId(workspaceId, id, externalId) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, { status: notifications.status, forward: (tx, settings, at) => forwardSettings(tx, ports, workspaceId, settings, at) }), notifications, today: projection.get, health: projection.health };
+    return { sessions: createSessions(ports, workspaceId), provider: createProviderControl(ports, workspaceId), chat: { handleMessage: (input: Omit<import("./chat").ChatInput, "workspaceId">) => chat.handleMessage({ ...input, workspaceId }), messages: (limit?: number, sessionId?: string) => chat.messages(workspaceId, limit, sessionId), recordMessage: (input: Parameters<typeof chat.recordMessage>[1]) => chat.recordMessage(workspaceId, input), setExternalId: (id: string, externalId: string) => chat.setExternalId(workspaceId, id, externalId) }, schedules: createSchedules(ports, workspaceId), runs: createRuns(ports, workspaceId), modules, approvals, grants: createGrants(ctx), preferences: createPreferences(ctx), settings: createSettings(ctx, { forward: (tx, settings, at) => forwardSettings(tx, ports, workspaceId, settings, at) }) };
   } };
 }
 export type StewardService = ReturnType<typeof createStewardService>;

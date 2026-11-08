@@ -3,14 +3,14 @@ import * as outputs from "../system-outputs";
 import { createSettings } from "../settings";
 import { createGrants } from "../grants";
 import { createPreferences } from "../preferences";
-import { createNotificationsView, forwardSettings } from "../notify-user";
+import { forwardSettings } from "../notify-user";
 import { CallError, type SystemModule } from "../module-calls";
 import type { StewardPorts } from "../ports";
 import { tool, text, entry, json, parsed } from "./shared";
 
 async function handleSettings(ports: StewardPorts, workspaceId: string, name: string, args: Record<string, unknown>) {
-  const ctx = { db: ports.db, workspaceId, now: ports.now }, notifications = createNotificationsView(ports, workspaceId);
-  const service = createSettings(ctx, { status: notifications.status, forward: (tx, value, at) => forwardSettings(tx, ports, workspaceId, value, at) });
+  const ctx = { db: ports.db, workspaceId, now: ports.now };
+  const service = createSettings(ctx, { forward: (tx, value, at) => forwardSettings(tx, ports, workspaceId, value, at) });
   switch (name) {
     case "get": return json(await service.get());
     case "update": return json(await service.update(parsed(args.settings, "settings")));

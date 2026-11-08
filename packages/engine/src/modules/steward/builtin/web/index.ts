@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 import { todayView } from "./today";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
+import { appOverview, systemApps } from "./app-overview";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
@@ -114,7 +115,7 @@ async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult>
 const MODULE_ROUTES: Record<string, (module: string, body: Args) => Promise<unknown>> = {
   "GET diagnostics": module => call("modules.diagnostics", { module }),
   "GET permissions": module => call("modules.permissions", { module }),
-  "GET overview": module => call("modules.overview", { module }),
+  "GET overview": module => appOverview(call, module),
   "POST refresh-health": module => call("modules.refresh-health", { module }),
   "POST settings": (module, body) => call("modules.settings-set", { module, values: JSON.stringify(body.values ?? {}) }),
   "POST disable": module => call("modules.disable", { module, reason: "用户在网页操作" }),
@@ -151,7 +152,7 @@ async function api(request: Request, path: string[]) {
     "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),
     "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs") as unknown[]],
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
-    "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
+    "GET /activity": () => call("notify.activity", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
     "GET /catalog": () => call("modules.catalog"),
     "POST /install": () => call("modules.install", body),
@@ -161,7 +162,7 @@ async function api(request: Request, path: string[]) {
     // v2-21: the user's own memory search and deletion, through the memory system module.
     "GET /memory": () => call(url.searchParams.get("query") ? "memory.recall" : "memory.status", url.searchParams.get("query") ? { query: url.searchParams.get("query") } : {}),
     "POST /memory/forget": () => call("memory.forget", { id: body.id }),
-    "GET /system-apps": () => call("modules.system", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}) }),
+    "GET /system-apps": () => systemApps(call, url.searchParams.get("module") ?? undefined),
     "GET /tools": () => call("modules.tools", { query: url.searchParams.get("query") ?? undefined }),
     "POST /call": () => moduleCall(body),
   };

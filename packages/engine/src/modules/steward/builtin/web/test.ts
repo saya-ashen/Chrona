@@ -41,9 +41,9 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.enable", () => ({ status: "active" })),
   stub("modules.remove", () => ({ status: "pending_approval", approvalId: "remove-1" })),
   stub("modules.diagnostics", args => [{ moduleId: args.module, incidents: [] }]),
-  stub("modules.system", args => ({ name: "memory", args })),
-  stub("modules.overview", args => ({ kind: "app", module: args.module })), stub("modules.settings-set", args => args),
-  stub("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
+  stub("modules.interfaces", args => args.module ? { name: args.module, sessions: args.module === "memory" ? "reflect" : null, tools: [] } : [{ name: "memory", sessions: "reflect", tools: [] }]),
+  stub("modules.settings-get", () => ({ declarations: {}, values: {} })), stub("modules.settings-set", args => args),
+  stub("notify.activity", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: "web", text: "web 已切换到版本 5caef53c" }], before: null, args })),
   stub("modules.permissions", args => ({ module: args.module, capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] })),
   stub("modules.tools", args => (args.query === "files"
     ? [{ target: "files.list", description: "List", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: [] }, idempotent: true }, { target: "files.delete", description: "Delete", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, idempotent: false }]
@@ -353,10 +353,12 @@ try {
   assert.deepEqual(await (await get("/api/web/modules/a1/diagnostics")).json(), [{ moduleId: "a1", incidents: [] }]);
   assert.deepEqual(calls.at(-1), ["modules.diagnostics", { module: "a1" }]);
   assert.equal((await (await get("/api/web/activity?module=web&before=2026-10-27T05:00:00.000Z")).json()).items[0].text, "web 已切换到版本 5caef53c");
-  assert.deepEqual(calls.at(-1), ["activity.list", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
+  assert.deepEqual(calls.at(-1), ["notify.activity", { module: "web", before: "2026-10-27T05:00:00.000Z" }]);
   assert.equal((await (await get("/api/web/system-apps?module=memory")).json()).name, "memory");
-  assert.deepEqual(calls.at(-1), ["modules.system", { module: "memory" }]);
-  assert.equal((await (await get("/api/web/modules/okx/overview")).json()).module, "okx");
+  assert.deepEqual(calls.at(-1), ["history.sessions", { source: "reflect", limit: 20 }]);
+  const overview = await (await get("/api/web/modules/m-files/overview")).json();
+  assert.equal(overview.kind, "app"); assert.equal(overview.app.name, "files"); assert.equal(overview.permissions.module, "files");
+  assert.equal((await get("/api/web/modules/missing/overview")).status, 404);
   const lifecycleCalls: unknown[] = [];
   const lifecycle = systemCall({ web: async (...args) => { lifecycleCalls.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
   for (const operation of ["disable", "enable", "remove"]) {

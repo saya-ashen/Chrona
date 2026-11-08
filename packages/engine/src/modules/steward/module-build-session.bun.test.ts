@@ -11,6 +11,7 @@ import { createTick } from "./tick";
 import type { StewardPorts } from "./ports";
 import { testModuleSandbox } from "./module-test-process";
 import { testDb } from "./test-db";
+import { notice } from "./test-notices";
 import { createModules } from "./modules";
 import { handleModuleCall } from "./module-effects";
 import { sessionTranscript } from "./transcript";
@@ -185,8 +186,7 @@ for (const scenario of ["active", "approval", "failed", "empty", "long", "latest
   });
   await f.step();
   const buildRun = await f.db.run.findFirstOrThrow({ where: { sessionId: started.sessionId, lane: "build" } });
-  const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${buildRun.id}` } });
-  const body = JSON.parse((notice.args as { facts: string }).facts).body as string;
+  const { body } = await notice(f.db, { idempotencyKey: `session-result:${buildRun.id}` });
   expect(body.endsWith(expected)).toBe(true);
   expect(body.length).toBeLessThanOrEqual(4000);
   expect(body).toStartWith("尚未启用，仍需你确认");
@@ -242,7 +242,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const proposal = await f.call("m_modules_propose", { dir: "mail-sort", intent }) as { hash: string };
   // The owner gets an explicit bounded-build entry, never Provider propose/checkout/unbounded build.
   const owner = (await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_modules_"));
-  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
+  expect(owner).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_interfaces", "m_modules_settings_get", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build"]);
   expect(await f.api.modules.callTool("m_modules_check", { module: "mail-sort" })).toMatchObject({ result: { hash: proposal.hash, status: "building" } });
   await expect(f.api.modules.callTool("m_modules_propose", { dir: "mail-sort", intent })).rejects.toMatchObject({ code: "not_found" });
   // Explicit targets in uses do not grant access to Provider or owner-only tools.
@@ -739,8 +739,7 @@ test("offline recovery executes one bounded build and activates its checks-passi
   expect(f.starts).toHaveLength(1);
   const active = await f.db.module.findFirstOrThrow({ where: { name: "mail-sort" } });
   expect(active).toMatchObject({ status: "active" });
-  const notice = await f.db.moduleInvocation.findFirstOrThrow({ where: { key: `notify:session-result:${f.starts[0]!.runId}` } });
-  expect(JSON.parse((notice.args as { facts: string }).facts).body).toBe(`ready for approval\n\n已启用：mail-sort 版本 ${active.activeHash!.slice(0, 8)}`);
+  expect((await notice(f.db, { idempotencyKey: `session-result:${f.starts[0]!.runId}` })).body).toBe(`ready for approval\n\n已启用：mail-sort 版本 ${active.activeHash!.slice(0, 8)}`);
   expect(await f.db.approval.count({ where: { workspaceId: f.workspaceId, status: "open" } })).toBe(0);
   expect(await runOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ duplicate: true });
   expect(f.starts).toHaveLength(1);

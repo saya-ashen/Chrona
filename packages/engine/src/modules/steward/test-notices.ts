@@ -1,15 +1,21 @@
 import type { StewardPorts } from "./ports";
 import { lifecycleNotice } from "./builtin/notify/lifecycle";
+import { kernelFactSchema } from "./notification-facts";
 
 export type Notice = { title: string; body: string; level: string; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
-/** Tests: the notices queued for notify.send (by Chrona or by modules), as the notify module will store them. */
+/** Test-only presentation: application sends plus finite kernel facts, without a live notification app. */
 export async function notices(db: StewardPorts["db"], filter: Partial<Notice> = {}) {
-  const rows = await db.moduleInvocation.findMany({ where: { target: "notify", tool: { in: ["send", "lifecycle"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  const calls = await db.moduleInvocation.findMany({ where: { target: "notify", tool: "send" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  const facts = await db.audit.findMany({ where: { kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  const rows = [...calls.map(row => ({ ...row, raw: row.args as Record<string, unknown> })), ...facts.flatMap(row => {
+    const fact = kernelFactSchema.parse(row.details);
+    if (fact.type !== "notice" && fact.type !== "lifecycle") return [];
+    const raw = fact.type === "notice" ? fact.data : { ...fact.data, ...lifecycleNotice(fact.data.fact.kind, fact.data.fact) };
+    return [{ id: row.id, createdAt: row.createdAt, raw, caller: "kernel", callerModuleId: null, status: row.kind === "kernel_fact_pending" ? "pending" : "consumed" }];
+  })].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
   return rows.map(row => {
-    const raw = row.args as Record<string, string | undefined>;
-    const args = row.tool === "lifecycle" ? { ...raw, ...lifecycleNotice(raw.kind!, JSON.parse(raw.facts!)) } : raw;
+    const args = row.raw as Record<string, string | undefined>;
     return { title: args.title!, body: args.body!, level: args.level!, caller: row.caller, status: row.status,
-      // Same key and app the notify module derives: a module's keys are namespaced by its id.
       idempotencyKey: row.callerModuleId ? `module:${row.callerModuleId}:${args.key}` : args.key!, moduleId: row.callerModuleId ?? args.module ?? null,
       sessionId: args.session ?? null, approvalId: args.approval ?? null, recipient: args.recipient ?? null } satisfies Notice;
   }).filter(notice => Object.entries(filter).every(([key, value]) => notice[key as keyof Notice] === value));

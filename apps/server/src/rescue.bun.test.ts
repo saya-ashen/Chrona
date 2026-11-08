@@ -41,8 +41,10 @@ test("rescue listener refuses to start without a key", async () => {
   expect(startRescueListener(f.ports, f.service, htmlPath, { CHRONA_RESCUE_PORT: "3199" }, message => logs.push(message))).toBeUndefined();
   expect(logs).toEqual(["Rescue listener not started: RESCUE_KEY is required"]);
 });
-test("rescue approval list shows previews and resolve allows once/always", async () => {
+test("rescue approvals and kernel tick work with both web and notify disabled", async () => {
   const f = await fixture();
+  await f.db.module.createMany({ data: ["web", "notify"].map(name => ({ workspaceId: "ws_default", name, builtin: true, activeHash: `${name}-hash`, status: "paused" })) });
+  await f.service.tick();
   for (const scope of ["once", "always"]) {
     const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "schedule", title: "Schedule", detail: "Changes", preview: "diff", payload: {} });
     const list = await (await f.request("/api/approvals")).json();
@@ -51,6 +53,8 @@ test("rescue approval list shows previews and resolve allows once/always", async
     expect(result.status).toBe(200);
     expect((await result.json()).status).toBe("approved");
   }
+  expect(await f.db.audit.count({ where: { workspaceId: "ws_default", kind: "kernel_fact_pending" } })).toBeGreaterThanOrEqual(4);
+  expect(await f.db.moduleInvocation.count({ where: { workspaceId: "ws_default", target: { in: ["web", "notify"] } } })).toBe(0);
 });
 test("rescue chat uses only session rescue; Provider failure points to chrona admin", async () => {
   const f = await fixture();

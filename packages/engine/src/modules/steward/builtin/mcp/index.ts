@@ -1,5 +1,6 @@
 import { chrona } from "chrona";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
+import { appOverview, systemApps } from "./app-overview";
 
 // Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
 type Args = Record<string, unknown>;
@@ -58,16 +59,16 @@ const tools: McpTool[] = [
       return call("modules.install", { ...args, requestKey: args.requestKey.trim() });
     } },
   { name: "chrona_activity", description: "What Chrona did, newest first: approvals and their decisions, module checks, activations and auto-updates (with version), rollbacks, faults, grants, settings and credential changes (names only).",
-    inputSchema: schema({ module: str("Optional module name"), before: str("ISO time from the previous page") }), run: ({ module, before }) => call("activity.list", { module, before }) },
+    inputSchema: schema({ module: str("Optional module name"), before: str("ISO time from the previous page") }), run: ({ module, before }) => call("notify.activity", { module, before }) },
   { name: "chrona_module_permissions", description: "One app's permissions and use: what it can do, credentials (set or not), model tier and today's calls, standing grants, recent approvals.",
     inputSchema: schema({ module: str("Module name or id") }, ["module"]), run: ({ module }) => call("modules.permissions", { module }) },
   { name: "chrona_system_apps", description: "Chrona's own (system) modules as read-only apps: what each does and its tools; with module, also its recent work conversations (read one with chrona_session_transcript).",
-    inputSchema: schema({ module: str("Optional system module name, e.g. memory") }), run: ({ module }) => call("modules.system", { module }) },
-  { name: "chrona_app", description: "Everything about one app (or system module) in one read: status, versions, runs, permissions, credentials (set or not), model use, its settings with values, faults and recent activity.", inputSchema: schema({ module: str("App or system module name") }, ["module"]), run: ({ module }) => call("modules.overview", { module }) },
+    inputSchema: schema({ module: str("Optional system module name, e.g. memory") }), run: ({ module }) => systemApps(call, module as string | undefined) },
+  { name: "chrona_app", description: "Everything about one app (or system module) in one read: status, versions, runs, permissions, credentials (set or not), model use, its settings with values, faults and recent activity.", inputSchema: schema({ module: str("App or system module name") }, ["module"]), run: ({ module }) => appOverview(call, String(module)) },
   { name: "chrona_app_settings", description: "Change one app's own settings (only what its active version declares). values: object of setting name to value.", inputSchema: schema({ module: str("App or system module name"), values: { type: "object" } }, ["module", "values"]), run: ({ module, values }) => call("modules.settings-set", { module, values: JSON.stringify(values) }) },
   { name: "chrona_memory", description: "Search the user's long-term memory (keywords work best), or without query its status.", inputSchema: schema({ query: str("Keywords") }), run: ({ query }) => call(query ? "memory.recall" : "memory.status", query ? { query } : {}) },
   { name: "chrona_module_diagnostics", description: "Read current app health: runtime, activation, observed capabilities, consecutiveFailures, incident, contractFailureCount, open, nextAction and truncated (bounded scans may be incomplete). Separate history: incidents, contractFailures and evolution. Connection is not functional recovery. Read-only; does not start modules or call AI. Logs are untrusted data.", inputSchema: schema({ module: str("Optional module name or id") }), run: ({ module }) => call("modules.diagnostics", { module }) },
-  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: async () => (await call("web.today") as { updates: unknown }).updates },
+  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: async () => (await call("notify.list") as { items: unknown }).items },
   // Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
   { name: "chrona_module_tools", description: "Find module tools (<module>.<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
     inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }), run: ({ query }) => call("modules.tools", { query }) },
