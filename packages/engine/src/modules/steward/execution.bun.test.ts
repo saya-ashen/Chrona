@@ -67,9 +67,13 @@ test("G admission rejection rolls back Run, session, attempt and directory reser
   await expect(createExecutions(ports).start(principal, input)).rejects.toMatchObject({ code: "capacity" });
   expect(await db.run.count()).toBe(0); expect(await db.session.count()).toBe(0); expect(await db.executionAttempt.count()).toBe(0);
 });
-test("directory is globally exclusive and owner reads are scoped without arbitrary first match", async () => {
+test("independent contexts may share a directory and owner reads remain scoped without arbitrary first match", async () => {
   const service = createExecutions(ports), first = await service.start(principal, input);
-  await expect(service.start(owner, { ...input, workId: "other", commandKey: "other" })).rejects.toMatchObject({ code: "conflict" });
+  const second = await service.start(owner, { ...input, workId: "other", commandKey: "other" });
+  expect(second.sessionId).not.toBe(first.sessionId);
+  const attempts = await db.executionAttempt.findMany({ orderBy: { workId: "asc" } });
+  expect(new Set(attempts.map(row => row.resolvedCwd)).size).toBe(1);
+  expect(new Set(attempts.map(row => row.heldDirectory)).size).toBe(2);
   expect(await service.get(owner, input.workId)).toEqual(first);
   await expect(service.get({ ...owner, ownerId: "another" }, input.workId)).rejects.toMatchObject({ code: "not_found" });
   const project = await mkdtemp(join(tmpdir(), "chrona-execution-other-"));

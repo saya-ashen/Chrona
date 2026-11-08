@@ -64,7 +64,7 @@ test("two rounds retain provider Session/logs, isolate attempts and receipts, an
   expect(await db.session.count()).toBe(1);
   expect(await db.run.count()).toBe(2);
   expect(await db.executionAttempt.count()).toBe(2);
-  expect(await db.executionAttempt.findUniqueOrThrow({ where: { id: second.attemptId } })).toMatchObject({ logDir, resolvedCwd: project, heldDirectory: project, budget: secondInput.budget, capabilityRevokedAt: null, stopConfirmedAt: null });
+  expect(await db.executionAttempt.findUniqueOrThrow({ where: { id: second.attemptId } })).toMatchObject({ logDir, resolvedCwd: project, heldDirectory: `execution:${second.runId}`, budget: secondInput.budget, capabilityRevokedAt: null, stopConfirmedAt: null });
   expect(await readFile(join(logDir, "provider-log"), "utf8")).toBe("first round context");
   const run2 = (await runs.claimNext("background"))!;
   expect(run2).toMatchObject({ id: second.runId, prompt: "Second round", session: { id: first.sessionId, providerSessionId: "provider-context" } });
@@ -156,11 +156,12 @@ test("continuing a stopped source still requires a fresh work ID", async () => {
   expect(await db.session.count()).toBe(1);
 });
 
-test("a stopped source cannot bypass a later execution's directory lock", async () => {
+test("a stopped context can continue while another context uses the same directory", async () => {
   const service = createExecutions(ports), source = await stoppedSource();
   await service.start(principal, { ...firstInput, workId: "occupying-turn", commandKey: "occupying-start" });
-  await expect(service.start(principal, continuation(source))).rejects.toMatchObject({ code: "conflict" });
-  expect(await db.run.count()).toBe(2);
+  const resumed = await service.start(principal, continuation(source));
+  expect(resumed.sessionId).toBe(source.sessionId);
+  expect(await db.run.count()).toBe(3);
 });
 
 test.each(["workId", "runId", "attemptId"] as const)("resume resolves the complete source tuple: %s mismatch", async field => {

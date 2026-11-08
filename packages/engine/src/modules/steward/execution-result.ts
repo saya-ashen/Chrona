@@ -143,7 +143,7 @@ export async function captureExecutionChanges(ports: Pick<StewardPorts, "db">, r
   if (!row) return;
   if (row.executorId !== "server" || row.resolvedCwd === null) throw new Error("Device changes must come from the verified remote final");
   const source = executionResultSourceSchema.parse(provenance(row));
-  const ownsDirectory = row.queueExpiresAt ? row.heldDirectory !== null : row.heldDirectory === row.resolvedCwd;
+  const ownsDirectory = row.queueExpiresAt ? row.heldDirectory !== null : row.heldDirectory === `execution:${row.runId}` || row.heldDirectory === row.resolvedCwd;
   const changes = ownsDirectory ? await captureWorkspaceChanges(row.resolvedCwd, source.baseline) : unavailable("capture_failed");
   const sidecar = executionResultSourceSchema.parse({ ...source, changes });
   await mkdir(row.logDir, { recursive: true });

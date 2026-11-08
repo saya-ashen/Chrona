@@ -67,15 +67,15 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
           return { view: executionView(existing), queued: false };
         }
         const project = await trustedExecutionProject(ports, principal, input.projectRef);
-        if (await tx.executionAttempt.count({ where: { OR: [{ heldDirectory: project.canonicalPath }, { executorId: "server", resolvedCwd: project.canonicalPath, stopConfirmedAt: null }] } })) throw new CallError("conflict", "Project directory is occupied");
         if (await tx.executionAttempt.count({ where: { ...executionScope(principal), callerKey, workId: input.workId } })) throw new CallError("conflict", "Work already has an execution");
         const session = await executionSessionIn(ports, tx, principal, input.resumeFrom, project);
         const run = await createRuns(ports, principal.workspaceId).enqueue({ sessionId: session.sessionId, lane: "background", trigger: "source", prompt: input.goal }, tx);
         await tx.run.update({ where: { id: run.id }, data: { cwd: project.canonicalPath } });
+        // Track this live attempt for lifecycle/stop evidence without locking the shared project directory.
         const row = await tx.executionAttempt.create({ data: { workspaceId: principal.workspaceId, ownerId: principal.ownerId, callerKey,
           moduleId: principal.caller.kind === "module" ? principal.caller.moduleId : null, callerHash: principal.caller.kind === "module" ? principal.caller.hash : null,
           workId: input.workId, commandKey: input.commandKey, requestDigest, runId: run.id, projectRef: project.projectRef, projectDigest: executionDigest(project),
-          resolvedCwd: project.canonicalPath, logDir: session.logDir, baseline: project.baseline, budget: input.budget, heldDirectory: project.canonicalPath }, include: { run: true } });
+          resolvedCwd: project.canonicalPath, logDir: session.logDir, baseline: project.baseline, budget: input.budget, heldDirectory: `execution:${run.id}` }, include: { run: true } });
         await tx.session.update({ where: { id: session.sessionId }, data: { executionHeadAttemptId: row.id } });
         const ref = executionRef(row);
         await store.admit(tx, principal, ref);
