@@ -1,6 +1,6 @@
 # Web 外壳与应用组合组件
 
-2026-11-08：全站统一外壳与应用私有声明式组件已完成开发集成。以下描述源码能力；本次未更新运行在 3111 端口的部署。页面继续使用共享 json-render，不引入应用脚本加载器。
+2026-11-08：全站统一外壳与应用私有声明式组件已完成开发集成。以下描述源码能力；随后已更新运行在 3111 端口的本机试用部署，见文末。页面继续使用共享 json-render，不引入应用脚本加载器。
 
 ## 职责
 
@@ -85,3 +85,9 @@ Web 拥有登录、导航、路由、主题、字体、控件实现、响应式�
 关键源码：`builtin/web/composition.ts`、`pages.ts`、`catalog.ts`、`app.js`、`shell.css`、`src/workspace.tsx`，以及 `external/coding/components.ts`、`page.ts`。Web 的 `build.ts` 将共享组件样式与全站样式写入同源 `style.css`，不放宽 CSP。
 
 源码提交：`094768c1`（登记展开）、`f2216d8f`（全站外壳、应用组合消费及资源边界修复）。
+
+## 本机试用部署更新
+
+2026-11-08 已更新实际 `chrona-v1-preview.service`（3111）。源码 `5b21907c`，受检激活 Web `f0d0cc93a1d7d4e73e1849b205a2c1d9b169ed36`、Coding `1353d948ccbef466b5dcc465c5303a2d4181cbfb`。首次更新因 Coding 的 layout 被推断成 string、未满足新 Web 枚举契约而拒绝，脚本完整回滚；修正为字面量，并让安装回归使用实际 Web 契约后重新构建和更新通过。
+
+更新前备份：`/home/saya/.local/share/chrona-v1-preview/backups/before-whole-web-20261108T065822Z`。数据库结构无变化；原 8 个 Session、4 个 Message、8 个 Run、0 个 ExecutionAttempt 及模块状态保留，完整性和外键检查通过。健康和就绪正常。实际认证浏览器在三种尺寸检查六条页面路线，共 18 次页面检查，并确认 Coding 登记为 workspace、私有组件已在服务端展开。未调用模型或编辑项目。实例详情与验证引用记录在部署目录的 `deployment.json` 和 README 中。
