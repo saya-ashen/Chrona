@@ -8,7 +8,9 @@ import { authenticateRun } from "./run-auth";
 import { isAgentApplication } from "./agent-application";
 
 const operations = new WeakMap<StewardPorts, Map<string, Operation>>();
-const callbacks = new WeakMap<StewardPorts, Map<string, Pick<ProviderRunInput, "events" | "detail">>>();
+type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> };
+// Match moduleSupervisor's scope: service-derived ports share its original ports' callbacks.
+const callbacks = new WeakMap<StewardPorts["db"], Map<string, Map<string, Callback>>>();
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 type Operation = { workspaceId: string; digest: string; handle: ReturnType<ProviderAdapter["start"]>; outcome?: Outcome; failure?: boolean };
 function state(ports: StewardPorts) {
@@ -133,16 +135,16 @@ export function registerProviderModule(ports: StewardPorts) {
 
 /** Kernel-local subscribers are addressed by an opaque, workspace-bound reference; no callback crosses the wire. */
 export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string, input: Pick<ProviderRunInput, "events" | "detail">) {
-  let map = callbacks.get(ports);
-  if (!map) { map = new Map(); callbacks.set(ports, map); }
+  let scopes = callbacks.get(ports.db);
+  if (!scopes) { scopes = new Map(); callbacks.set(ports.db, scopes); }
+  let map = scopes.get(ports.dataDir);
+  if (!map) { map = new Map(); scopes.set(ports.dataDir, map); }
   const id = randomUUID(), controllers = new Map<string, AbortController>(), interrupted = new Set<string>();
-  map.set(id, input);
-  callbackOwners.set(input, { workspaceId, controllers, interrupted });
-  return { id, release() { for (const controller of controllers.values()) controller.abort(); map!.delete(id); callbackOwners.delete(input); } };
+  map.set(id, { target: input, workspaceId, controllers, interrupted });
+  return { id, release() { for (const controller of controllers.values()) controller.abort(); map.delete(id); } };
 }
 import { agentDelegationTools, dispatchAgentDelegation, injectedAgentTools, dispatchInjectedAgent } from "./agent-delegation-port";
-const callbackOwners = new WeakMap<object, { workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> }>();
-async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detail">, owner: NonNullable<ReturnType<typeof callbackOwners.get>>, value: RuntimeEvent): Promise<Json> {
+async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detail">, owner: Callback, value: RuntimeEvent): Promise<Json> {
   if (value.kind === "interrupt") {
     const controller = owner.controllers.get(value.requestId);
     if (controller) controller.abort();
@@ -166,9 +168,9 @@ export function registerProviderCallbacks() {
     async handle({ ports, workspaceId, caller }, name, args): Promise<Json> {
       if (name !== "event") return dispatchAgentDelegation(ports, workspaceId, caller, name, args);
       if (caller.kind !== "kernel" && (caller.kind !== "module" || !await isAgentApplication(ports, caller, workspaceId))) throw new CallError("forbidden", "Runtime callbacks require the builtin Agent");
-      const target = callbacks.get(ports)?.get(String(args.callbackId)), owner = target && callbackOwners.get(target);
-      if (!target || owner?.workspaceId !== workspaceId) throw new CallError("not_found", "Run callback ended");
-      return dispatchCallback(target, owner, runtimeEventSchema.parse(args.event));
+      const callback = callbacks.get(ports.db)?.get(ports.dataDir)?.get(String(args.callbackId));
+      if (!callback || callback.workspaceId !== workspaceId) throw new CallError("not_found", "Run callback ended");
+      return dispatchCallback(callback.target, callback, runtimeEventSchema.parse(args.event));
     },
   });
 }

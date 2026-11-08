@@ -2,8 +2,12 @@ import { test, expect } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { callSync, kernelOrigin, enqueueCall } from "./module-calls";
-import { runtimeCall, startLocalProvider } from "./local-runtime";
+import { registerLocalRuntime, runtimeCall, startLocalProvider } from "./local-runtime";
 import { createAgentOperations } from "./builtin/agent/operations";
+import type { ExecutionEvent, ProviderRunInput } from "@chrona/contracts/steward";
+import { retainProviderCallbacks } from "./local-provider";
+import { moduleSupervisor } from "./module-supervisor";
+import { testDb } from "./test-db";
 import "./module-effects";
 
 import { agentFixture as fixture } from "./agent-application.fixtures";
@@ -29,6 +33,74 @@ test("real builtin Agent SDK process: controls stay responsive, callback identit
     await expect(callSync(f.ports, { ...kernelOrigin(f.workspaceId), caller: { kind: "module", module: "other", moduleId: f.module.id, hash: "different" } }, "runtime-callback.event", { callbackId: crypto.randomUUID(), event: { kind: "progress", value: { phase: "reading", tool: null } } })).rejects.toMatchObject({ code: "forbidden" });
   } finally { await f.close(); }
 }, 20000);
+
+test("real builtin Agent SDK callbacks reach derived ports when the supervisor owns the original ports", async () => {
+  const f = await fixture();
+  try {
+    const supervisor = moduleSupervisor(f.ports);
+    await runtimeCall(f.ports, f.workspaceId, "agent.health", {});
+    const ports: typeof f.ports = Object.create(f.ports);
+    expect(moduleSupervisor(ports)).toBe(supervisor);
+    const details: ExecutionEvent[] = [], progress: unknown[] = [];
+    const execution = { workId: "callback-work", sessionId: "callback-session", runId: f.input.runId, attemptId: "callback-attempt" };
+    const handle = await startLocalProvider(ports, f.workspaceId, { ...f.input, execution,
+      detail: { async append(value) { details.push(value); } },
+      events: { async progress(value) { progress.push(value); }, async usage() {}, async resources() {}, async question() { return { decision: "cancel" }; } },
+    });
+    for (let i = 0; i < 100 && (!progress.length || !details.some(event => event.payload.type === "tool_started")); i++) await Bun.sleep(20);
+    expect(progress).toContainEqual({ phase: "reading", tool: "read" });
+    expect(details).toContainEqual(expect.objectContaining({ ...execution, payload: { type: "tool_started", toolCallId: "fixture", tool: "read", display: {} } }));
+    await handle.abort();
+    const outcome = await handle.done;
+    expect(outcome.outcome).toBe("failed");
+    expect(outcome.error ?? "").not.toContain("detail is incomplete");
+    expect(details).toContainEqual(expect.objectContaining({ payload: { type: "state", status: "failed", cancelRequested: false, stopConfirmed: true } }));
+    const callbacks = await f.ports.db.moduleInvocation.findMany({ where: { target: "runtime-callback", tool: "event" } });
+    expect(callbacks.length).toBeGreaterThan(0);
+    expect(callbacks.every(row => row.callerModuleId === f.module.id && row.status === "succeeded")).toBe(true);
+  } finally { await f.close(); }
+}, 20000);
+
+test("callback references share only db and dataDir scope and release only their own registration", async () => {
+  const db = testDb(), foreignDb = testDb(), root = await mkdtemp("/tmp/chrona-callback-scope-");
+  const registrations: ReturnType<typeof retainProviderCallbacks>[] = [];
+  try {
+    registerLocalRuntime();
+    const workspace = await db.workspace.create({ data: { name: "callback-owner" } });
+    const other = await db.workspace.create({ data: { name: "callback-other" } });
+    await foreignDb.workspace.create({ data: { id: workspace.id, name: "callback-foreign-db" } });
+    const ports = { db, dataDir: root, now: () => new Date(), publicUrl: null };
+    const derived: typeof ports = Object.create(ports);
+    const foreignDir = { ...ports, dataDir: join(root, "foreign") }, foreignPorts = { ...ports, db: foreignDb };
+    let deliveries = 0;
+    const input: Pick<ProviderRunInput, "events" | "detail"> = { detail: { async append() { deliveries++; } } };
+    const retain = (scope: typeof ports, workspaceId = workspace.id) => {
+      const value = retainProviderCallbacks(scope, workspaceId, input); registrations.push(value); return value;
+    };
+    const first = retain(derived), second = retain(ports), otherWorkspace = retain(ports, other.id), otherDir = retain(foreignDir), otherDb = retain(foreignPorts);
+    expect(new Set(registrations.map(value => value.id)).size).toBe(registrations.length);
+    const event = { kind: "detail", value: { workId: "work", sessionId: "session", runId: "run", attemptId: "attempt", seq: 1, at: new Date().toISOString(), payload: { type: "state", status: "running", cancelRequested: false, stopConfirmed: false } } };
+    const deliver = (scope: typeof ports, callbackId: string, workspaceId = workspace.id) => callSync(scope, kernelOrigin(workspaceId), "runtime-callback.event", { callbackId, event });
+    await deliver(ports, first.id);
+    await deliver(derived, second.id);
+    for (const [scope, callbackId, workspaceId] of [
+      [ports, first.id, other.id], [foreignDir, first.id, workspace.id], [foreignPorts, first.id, workspace.id],
+      [ports, otherWorkspace.id, workspace.id], [ports, otherDir.id, workspace.id], [ports, otherDb.id, workspace.id],
+      [ports, crypto.randomUUID(), workspace.id],
+    ] as const) await expect(deliver(scope, callbackId, workspaceId)).rejects.toMatchObject({ code: "not_found" });
+    first.release(); first.release();
+    await expect(deliver(ports, first.id)).rejects.toMatchObject({ code: "not_found" });
+    await expect(deliver(derived, first.id)).rejects.toMatchObject({ code: "not_found" });
+    await deliver(derived, second.id);
+    await deliver(ports, otherWorkspace.id, other.id);
+    await deliver(foreignDir, otherDir.id);
+    await deliver(foreignPorts, otherDb.id);
+    expect(deliveries).toBe(6);
+  } finally {
+    for (const registration of registrations) registration.release();
+    await db.$disconnect(); await foreignDb.$disconnect(); await rm(root, { recursive: true, force: true });
+  }
+});
 
 test.skipIf(process.platform !== "linux")("losing the builtin Agent process stops its process group without inventing a completion", async () => {
   const f = await fixture();
