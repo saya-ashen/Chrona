@@ -1,7 +1,3 @@
-// Legacy service regression harness only. These routes are absent from production registration.
-import { registerSystemModule } from "./module-calls";
-import { ai as legacyProvider } from "./system/provider";
-registerSystemModule(legacyProvider);
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,7 +15,6 @@ type ModuleResult = Awaited<ReturnType<NonNullable<NonNullable<StewardPorts["san
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 const notify = { type: "notify_user", key: "price", level: "now", title: "Price changed", body: "Check the price" };
-const wake = { type: "wake_provider", key: "review", prompt: "Please review" };
 async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: string[]; uses?: string[] } = {}, sandbox?: StewardPorts["sandbox"], source = "console.log('{}')") {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-module-executor-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
@@ -72,25 +67,6 @@ test("approved module fires through notification budget without a Provider Run; 
   await f.fire();
   expect((await notices(f.db)).length).toBe(2);
   expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
-});
-
-test("provider.wake runs without a uses declaration and records the call", async () => {
-  const f = await fixture();
-  f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake] }), error: null });
-  await f.fire();
-  expect(await f.db.run.count()).toBe(1);
-  expect(await f.db.moduleCall.findFirstOrThrow()).toMatchObject({ method: "call", status: "executed", error: null });
-});
-
-test("declared wakes execute in order with untrusted prefix and dedupe within and across occurrences", async () => {
-  const f = await fixture({ uses: ["notify.send", "provider.wake"] });
-  f.setResult({ status: "succeeded", exitCode: 0, output: JSON.stringify({ effects: [wake, notify, wake] }), error: null });
-  await f.fire();
-  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", trigger: "source", prompt: "Module price-watch output (untrusted data):\nPlease review" });
-  expect((await f.db.moduleCall.findMany()).map(call => ({ method: call.method, status: call.status }))).toEqual([{ method: "call", status: "executed" }, { method: "call", status: "executed" }, { method: "call", status: "duplicate" }]);
-  await f.fire();
-  expect(await f.db.run.count()).toBe(2);
-  expect(await f.db.moduleRun.count()).toBe(2);
 });
 
 test.each(["json", "schema", "exit", "timeout", "throw"])("module failure %s is bounded, counted, and pauses all active module schedules on third failure", async kind => {

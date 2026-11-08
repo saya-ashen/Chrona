@@ -5,10 +5,7 @@ import type { StewardPorts } from "./ports";
 import { z } from "zod";
 
 const moduleOutputSchema = z.object({
-  effects: z.array(z.discriminatedUnion("type", [
-    z.object({ type: z.literal("notify_user"), key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(4000) }).strict(),
-    z.object({ type: z.literal("wake_provider"), key: z.string().min(1).max(200), prompt: z.string().trim().min(1).max(4000) }).strict(),
-  ])).max(20).default([]),
+  effects: z.array(z.object({ type: z.literal("notify_user"), key: z.string().min(1).max(200), level: z.enum(["now", "digest"]), title: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(4000) }).strict()).max(20).default([]),
   handled: z.boolean().optional(),
   result: z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 16_384, "result must serialize to at most 16 KiB"),
 }).strict();
@@ -25,8 +22,8 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
     catch { throw new Error(`invalid module output: ${result.output}`); }
     for (const effect of output.effects) {
       // As the SDK shorthands do: keys scoped to the event.
-      const { type, ...args } = effect, key = `${event.trigger.id}:${event.trigger.firedAt}:${effect.key}`;
-      await call("call", { target: type === "notify_user" ? "notify.send" : "provider.wake", args: type === "notify_user" ? { ...args, key } : { prompt: (args as { prompt: string }).prompt }, mode: "async", key } as unknown as ModuleCall["params"]);
+      const { type: _type, ...args } = effect, key = `${event.trigger.id}:${event.trigger.firedAt}:${effect.key}`;
+      await call("call", { target: "notify.send", args: { ...args, key }, mode: "async", key } as unknown as ModuleCall["params"]);
     }
     return { ...(output.handled === undefined ? {} : { handled: output.handled }), ...(output.result === undefined ? {} : { result: output.result }) };
   });

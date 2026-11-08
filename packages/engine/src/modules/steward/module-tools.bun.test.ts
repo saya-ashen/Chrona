@@ -1,7 +1,3 @@
-// Legacy effect translation regression only; provider is not registered in production.
-import { registerSystemModule } from "./module-calls";
-import { ai as legacyProvider } from "./system/provider";
-registerSystemModule(legacyProvider);
 import { modulesUpstreamOutput } from "./system-outputs";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
@@ -31,7 +27,7 @@ async function fixture() {
     sandbox: testModuleSandbox(async input => {
       calls.push(input);
       return { status: error ? "failed" : "succeeded", exitCode: error ? 1 : 0, error,
-        output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }, { type: "wake_provider", key: "wake", prompt: "Review" }] }) };
+        output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }] }) };
     }),
   };
   cleanups.push(() => moduleSupervisor(ports).stop());
@@ -40,7 +36,7 @@ async function fixture() {
   const session = await db.session.create({ data: { workspaceId, source: "web", key: "web:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
-  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send", "provider.wake"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
+  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash", generationId: "fixture" }));
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
@@ -73,7 +69,7 @@ test("owner tools list every toolset and call as the user", async () => {
   const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
   const { tools, toolsets } = await api.modules.tools();
   // Chrona's own tools open to the user (v2-13) come first.
-  expect(tools.map(tool => tool.name)).toEqual(["m_history_sessions", "m_history_session", "m_history_messages", "m_history_transcript", "m_history_file", "m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_runtime", "m_activity_runs", "m_activity_list", "m_activity_records", "m_content_read", "m_memory_recall", "m_memory_retain", "m_memory_forget", "m_memory_status", "m_mail_sort_find_mail"]);
+  expect(tools.map(tool => tool.name)).toEqual(["m_history_sessions", "m_history_session", "m_history_messages", "m_history_transcript", "m_history_file", "m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_system", "m_modules_overview", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_runtime", "m_activity_runs", "m_activity_list", "m_activity_records", "m_content_read", "m_memory_recall", "m_memory_retain", "m_memory_forget", "m_memory_status", "m_projects_list", "m_projects_register", "m_projects_default", "m_mail_sort_find_mail"]);
   expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
   expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
@@ -110,12 +106,11 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   const f = await fixture(), args = { query: "hello", count: 2, unread: true, folder: "inbox" };
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
-  expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "executed", "duplicate", "duplicate"]);
+  expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "duplicate"]);
   expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);
-  expect(await f.db.run.count({ where: { lane: "background" } })).toBe(1);
-  expect(await f.db.run.findFirstOrThrow({ where: { lane: "background" } })).toMatchObject({ prompt: expect.stringContaining("(untrusted data)") });
+  expect(await f.db.run.count({ where: { lane: "background" } })).toBe(0);
   expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null });
   expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ tool: "m_mail_sort_find_mail", ok: true }, { tool: "m_mail_sort_find_mail", ok: true }]);
   expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(2);

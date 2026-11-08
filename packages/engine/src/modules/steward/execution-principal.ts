@@ -11,7 +11,7 @@ export async function assertExecutionPrincipal(tx: Prisma.TransactionClient, pri
   if (!row) throw new CallError("forbidden", "Execution caller is no longer active");
 }
 
-/** Called by system/executions after routed admission. No body/header can supply this identity. */
+/** Resolves real routed caller authority. No body/header can supply this identity. */
 export async function resolveExecutionPrincipal(ports: StewardPorts, workspaceId: string, caller: Caller): Promise<ExecutionPrincipal> {
   const owner = { workspaceId, ownerId: "owner", caller: { kind: "owner" as const } };
   if (caller.kind === "owner") return owner;

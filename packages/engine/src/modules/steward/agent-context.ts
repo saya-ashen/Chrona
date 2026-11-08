@@ -33,18 +33,20 @@ function view(run: { id: string; sessionId: string | null; status: string; error
   const uncertain = run.error === "Execution stop is unconfirmed";
   return { runId: run.id, contextId: run.sessionId!, status: uncertain ? "unknown" : run.status, active: uncertain || run.status === "queued" || run.status === "running" };
 }
+async function readContextPrimitive(ports: StewardPorts, principal: ModulePrincipal, name: string, args: Record<string, unknown>) {
+  const { workspaceId } = principal;
+  const run = await ownedRun(ports.db, principal, String(args.runId));
+  if (name === "get") return view(run);
+  const after = Number(args.after), limit = Number(args.limit);
+  // Provider channel rows are already normalized and redacted before being committed.
+  const rows = await ports.db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: "provider_event", id: { gt: `provider:${run.id}:${String(after).padStart(8, "0")}` } }, orderBy: { id: "asc" }, take: limit });
+  const items = rows.map(row => ({ sequence: Number(row.id.slice(row.id.lastIndexOf(":") + 1)), at: row.createdAt.toISOString(), kind: row.kind, payload: row.details }));
+  return { items, after: items.at(-1)?.sequence ?? after, ended: !view(run).active, interactions: await contextInteractions(ports, run), transcript: { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit } };
+}
 /** Kernel retains only scoped context identity, admission receipts and durable Run evidence. */
 export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: ExecutionPrincipal, name: string, args: Record<string, unknown>, settle = false) {
   const principal = modulePrincipal(rawPrincipal), { workspaceId } = principal;
-  if (name === "get" || name === "stream") {
-    const run = await ownedRun(ports.db, principal, String(args.runId));
-    if (name === "get") return view(run);
-    const after = Number(args.after), limit = Number(args.limit);
-    // Provider channel rows are already normalized and redacted before being committed.
-    const rows = await ports.db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: "provider_event", id: { gt: `provider:${run.id}:${String(after).padStart(8, "0")}` } }, orderBy: { id: "asc" }, take: limit });
-    const items = rows.map(row => ({ sequence: Number(row.id.slice(row.id.lastIndexOf(":") + 1)), at: row.createdAt.toISOString(), kind: row.kind, payload: row.details }));
-    return { items, after: items.at(-1)?.sequence ?? after, ended: !view(run).active, interactions: await contextInteractions(ports, run), transcript: { sessionDir: join(ports.dataDir, "sessions", run.sessionId!, ".chrona", "sessions"), limit } };
-  }
+  if (name === "get" || name === "stream") return readContextPrimitive(ports, principal, name, args);
   if (name === "run") {
     const selection = await selectContextTools(ports, principal, args.tools as string[]);
     if ((args.content as string[]).some(ref => !ref.startsWith(`${selection.caller.module}/`))) throw new CallError("forbidden", "Agent input content must belong to the originating module");
@@ -58,8 +60,8 @@ export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: E
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
     const key = `agent-command:${digest([workspaceId, principal.caller.moduleId, name, args.requestKey])}`;
     const hash = digest(args), previous = await tx.audit.findUnique({ where: { id: key } });
-    if (previous) {
-      const receipt = previous.details as { hash: string; digest: string; output: unknown; settled?: boolean };
+    async function replayReceipt(details: Prisma.JsonValue) {
+      const receipt = details as { hash: string; digest: string; output: unknown; settled?: boolean };
       if (receipt.hash !== principal.caller.hash) throw new CallError("forbidden", "Agent command belongs to another module version");
       if (receipt.digest !== hash) throw new CallError("conflict", "Agent request identity changed");
       if (settle) {
@@ -67,6 +69,7 @@ export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: E
       } else if (["write", "interrupt", "respond"].includes(name) && !receipt.settled) throw new CallError("unknown", "Agent control outcome requires reconciliation");
       return { output: receipt.output, duplicate: true };
     }
+    if (previous) return replayReceipt(previous.details);
     if (settle) throw new CallError("not_found", "Agent control receipt not found");
     let output: unknown;
     if (name === "context") {
@@ -96,14 +99,20 @@ export async function admitContextPrimitive(ports: StewardPorts, rawPrincipal: E
     await tx.audit.create({ data: { id: key, workspaceId, actorKey: principal.caller.moduleId, kind: "agent_command", subjectId: null, details: { hash: principal.caller.hash, digest: hash, output: output as Prisma.InputJsonValue, settled: !["write", "interrupt", "respond"].includes(name) }, createdAt: ports.now() } });
     return { output, duplicate: false };
   });
-  if (name === "run" && !result.duplicate) void ports.onQueued?.().catch(() => {});
-  if (name === "respond" && !result.duplicate) {
-    await createProviderControl(ports, workspaceId).answer(String(args.questionId), answer!);
-    await admitContextPrimitive(ports, principal, name, args, true);
-    return { accepted: true };
+  if (result.duplicate) {
+    if (name === "respond") return { accepted: true };
+    if (name === "write" || name === "interrupt") return { ...(result.output as object), perform: false };
+    return result.output;
   }
-  if (name === "interrupt" && !result.duplicate && !(result.output as { perform: boolean }).perform) await ports.onRunFinished?.(workspaceId, String(args.runId));
-  if (result.duplicate && name === "respond") return { accepted: true };
-  if (result.duplicate && (name === "write" || name === "interrupt")) return { ...(result.output as object), perform: false };
-  return result.output;
+  async function applyEffects() {
+    if (name === "run") void ports.onQueued?.().catch(() => {});
+    if (name === "respond") {
+      await createProviderControl(ports, workspaceId).answer(String(args.questionId), answer!);
+      await admitContextPrimitive(ports, principal, name, args, true);
+      return { accepted: true };
+    }
+    if (name === "interrupt" && !(result.output as { perform: boolean }).perform) await ports.onRunFinished?.(workspaceId, String(args.runId));
+    return result.output;
+  }
+  return applyEffects();
 }

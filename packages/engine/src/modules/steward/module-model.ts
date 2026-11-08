@@ -9,7 +9,7 @@ import { reserveCompletion, finishCompletion, refused, type ModelError } from ".
 type ModelParams = { system?: string; prompt: string; maxOutputTokens: number };
 type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 /**
- * `provider.complete` (v2-11): one completion for a module, within its manifest's tier and limits and the owner's moduleModel.
+ * One Agent completion for a module, within its manifest's tier and limits and the owner's moduleModel.
  * Reserve in SQLite before leaving the transaction: concurrent modules share the daily budget.
  */
 async function requestCompletion(ports: StewardPorts, workspaceId: string, params: ModelParams, target: { model: string; thinking?: ThinkingLevel }, timeoutMs: number) {

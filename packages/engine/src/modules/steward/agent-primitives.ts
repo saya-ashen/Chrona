@@ -6,6 +6,14 @@ import { CallError } from "./module-call-error";
 import { handleExecutionV2Tool } from "./execution-v2-tools";
 import { primitiveInput, type AgentPrimitive } from "./builtin/agent/primitives";
 
+type ExecutionService = NonNullable<StewardPorts["executions"]>;
+type ExecutionView = Awaited<ReturnType<ExecutionService["get"]>>;
+type ExecutionArgs = { executionId: string; runId?: string; attemptId?: string; requestKey?: string; text?: string; questionId?: string; answer?: unknown; cursor?: string; limit?: number };
+
+function assertOptionalReference(args: ExecutionArgs, view: ExecutionView) {
+  if ((args.runId && args.runId !== view.runId) || (args.attemptId && args.attemptId !== view.attemptId)) throw new CallError("conflict", "Agent execution reference changed");
+}
+
 /** Admission and durable evidence only. Business sessions and result organization belong to callers. */
 export async function admitAgentPrimitive(ports: StewardPorts, principal: ExecutionPrincipal, name: AgentPrimitive, raw: unknown) {
   const input = primitiveInput(name, raw);
@@ -20,10 +28,13 @@ export async function admitAgentPrimitive(ports: StewardPorts, principal: Execut
   }
   if (name === "lookup") return service.lookupStart(principal, (input as { requestKey: string }).requestKey);
   if (name === "locations" || name === "cleanup") return handleExecutionV2Tool(ports, principal, name === "cleanup" ? "workspace-cleanup" : name, input);
-  const args = input as { executionId: string; runId?: string; attemptId?: string; requestKey?: string; text?: string; questionId?: string; answer?: unknown; cursor?: string; limit?: number };
+  return admitExistingExecution(ports, service, principal, name, input as ExecutionArgs);
+}
+
+async function admitExistingExecution(ports: StewardPorts, service: ExecutionService, principal: ExecutionPrincipal, name: AgentPrimitive, args: ExecutionArgs) {
   const view = await service.get(principal, args.executionId);
   if (name === "get") {
-    if ((args.runId && args.runId !== view.runId) || (args.attemptId && args.attemptId !== view.attemptId)) throw new CallError("conflict", "Agent execution reference changed");
+    assertOptionalReference(args, view);
     return view;
   }
   if (name === "placement") return handleExecutionV2Tool(ports, principal, name, { workId: view.workId });
@@ -39,6 +50,10 @@ export async function admitAgentPrimitive(ports: StewardPorts, principal: Execut
     return { accepted: true };
   }
   const command = name === "write" ? { ...ref, op: "send" as const, commandKey: args.requestKey!, text: args.text! } : { ...ref, op: "cancel" as const, commandKey: args.requestKey! };
+  return admitExecutionControl(ports, service, principal, command, view);
+}
+
+async function admitExecutionControl(ports: StewardPorts, service: ExecutionService, principal: ExecutionPrincipal, command: Parameters<ExecutionService["admitControl"]>[1], view: ExecutionView) {
   // Server handles live in Agent. Remote controls use the existing authenticated executor transport.
   const attempt = await ports.db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId }, select: { executorId: true } });
   if (attempt.executorId !== "server") {

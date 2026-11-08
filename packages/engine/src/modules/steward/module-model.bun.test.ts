@@ -1,10 +1,6 @@
-// Legacy service regression harness only. These routes are absent from production registration.
-import { registerSystemModule } from "./module-calls";
-import { ai as legacyProvider } from "./system/provider";
-registerSystemModule(legacyProvider);
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { type CallScope } from "./module-effects";
@@ -13,15 +9,11 @@ import { createSettings } from "./settings";
 import { commitModuleSource } from "./module-git";
 import { buildPending } from "./module-build";
 import { moduleContext } from "./module-context";
-import { createModuleSupervisor } from "./module-supervisor";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { testDb } from "./test-db";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 
 const fakeProvider: ProviderAdapter = { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start() { throw new Error("No runs in model tests"); } };
 import type { StewardPorts } from "./ports";
-import { notices } from "./test-notices";
-import { registerSystemModules } from "./system-modules";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -32,13 +24,13 @@ async function fixture() {
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "model", settings: { moduleModel: limits } } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "model-test", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["provider.complete", "notify.send"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.complete", "notify.send"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
   const now = new Date("2026-10-21T04:00:00Z");
   const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
   let calls = 0;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, provider: { ...fakeProvider, async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
   const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
-  // What provider.complete runs for the calling module; a refusal's message starts with its reason.
+  // Exercise governed completion budgets; refusal messages start with their reason.
   const call = async (maxOutputTokens = 20) => {
     try { return { result: await completeForModule(ports, scope, { prompt, maxOutputTokens }) }; }
     catch (error) { return { error: { code: /^(\w+):/.exec((error as Error).message)?.[1] } }; }
@@ -111,7 +103,7 @@ for (const setting of [null, { ...limits, models: { fast: "fake/fast" } }, { ...
 });
 test("build refuses listen outside entry modules: apps offer tools, the web module shows them (v2-8)", async () => {
   const f = await fixture();
-  for (const [kind, extra] of [["page", {}], ["entry", { uses: ["chat.send"] }]] as const) {
+  for (const [kind, extra] of [["page", {}], ["entry", { uses: ["*"] }]] as const) {
     const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], listen: "/api/page", ...extra });
     const version = await buildCandidate(f, manifest, kind);
     await buildPending(moduleContext(f.ports, f.workspace.id));
@@ -119,38 +111,6 @@ test("build refuses listen outside entry modules: apps offer tools, the web modu
     expect(report.includes("listen is only for entry modules")).toBe(kind === "page");
   }
 });
-const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-(sandbox.health.available ? test : test.skip)("sandbox legacy completion then notify; model audit excludes content", async () => {
-  registerSystemModules();
-  const f = await fixture(), code = join(f.dataDir, "platform/store/v1");
-  await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `import { on, chrona } from 'chrona'; on('schedule', async ev => { const reply = await chrona.call('provider.complete', { prompt: '${prompt}', maxOutputTokens: 20 }); await chrona.notify({ key: ev.firedAt, level: 'now', title: 'Summary', body: reply.text }); });`);
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v1", manifest: f.manifest, intent: {}, source: "user", report: {}, status: "approved" } });
-  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: f.dataDir });
-  f.ports.sandbox = { ...runtime.health, startModule: runtime.startModule };
-  const supervisor = createModuleSupervisor(f.ports); cleanups.push(() => supervisor.stop());
-  await supervisor.deliver(f.module.id, "v1", { trigger: { kind: "schedule", id: "daily", firedAt: f.ports.now().toISOString() }, now: f.ports.now().toISOString(), params: {} });
-  expect((await notices(f.db))[0]).toMatchObject({ body: text });
-  const calls = await f.db.moduleCall.findMany({ orderBy: { createdAt: "asc" } });
-  // The completion record (budgets) plus the two routed calls the SDK made: provider.complete and notify.send.
-  expect(calls).toHaveLength(3);
-  expect(calls).toEqual(expect.arrayContaining([
-    expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "model", status: "executed", error: null }),
-    expect.objectContaining({ moduleId: f.module.id, hash: "v1", method: "call", status: "executed" }),
-  ]));
-  expect((await f.db.moduleInvocation.findMany()).map(row => `${row.target}.${row.tool}`).sort()).toEqual(["agent.complete", "notify.send", "provider.complete"]);
-  // provider.complete is unrecorded: neither the prompt nor the completion is stored with the call.
-  const invocations = JSON.stringify(await f.db.moduleInvocation.findMany({ where: { target: "ai" } }));
-  expect(invocations).not.toContain(prompt); expect(invocations).not.toContain(text);
-  expect(calls.every(call => call.moduleRunId && call.eventKey)).toBe(true);
-  expect(f.calls()).toBe(1);
-  expect(await f.db.run.count()).toBe(0);
-  const audits = await f.db.audit.findMany();
-  expect(audits.find(audit => audit.kind === "module_model_call")?.details).toMatchObject({ callId: calls.find(call => call.method === "model")!.id, model: limits.models.strong, inputTokens: 3, outputTokens: 4, error: null });
-  const logs = JSON.stringify(audits);
-  expect(logs).not.toContain(prompt); expect(logs).not.toContain(text);
-});
-
 test("v2-17: a tier names a model and thinking level; a module's own daily cap stops only it; usage is per module", async () => {
   const f = await fixture();
   const seen: unknown[] = [];

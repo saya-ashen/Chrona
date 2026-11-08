@@ -139,7 +139,7 @@ test.each(["installed", "building", "pending_approval", "failed", "unavailable"]
 });
 test("application regions separate persisted origins, available packages and kernel interfaces", () => {
   const external = app(false), builtin = app(true);
-  const result = appsSpec({ apps: [builtin, external], systemApps: [{ name: "chat", description: "系统对话" }], catalog: [
+  const result = appsSpec({ apps: [builtin, external], systemApps: [{ name: "approvals", description: "审批" }], catalog: [
     { name: "available-app", moduleId: null, available: true, installation: null },
     { name: external.name, moduleId: external.id, available: true, releaseHash: external.activeHash, installation: null },
   ] });
@@ -154,12 +154,12 @@ test("application regions separate persisted origins, available packages and ker
   expect(region("内置应用")).not.toContain(`/apps/${external.id}`);
   expect(region("可安装的官方外置应用")).toContain("available-app");
   expect(region("可安装的官方外置应用")).not.toContain(external.name);
-  expect(region("内核接口")).toContain("/apps/system/chat");
+  expect(region("内核接口")).toContain("/apps/system/approvals");
   expect(region("内核接口")).not.toContain("删除应用");
 });
 test.each(["configured", "unconfigured", "registered"] as const)("runtime capability %s has a separate region and read-only details", status => {
   const runtime = { status, backend: status === "configured" ? "pi" : null, responsibility: "包装 Pi Agent", configuration: "修改启动配置后重启" };
-  const directory = appsSpec({ apps: [], systemApps: [{ name: "agent", description: "执行能力", runtime }, { name: "chat", description: "会话接口" }], catalog: [] });
+  const directory = appsSpec({ apps: [], systemApps: [{ name: "agent", description: "执行能力", runtime }, { name: "approvals", description: "审批接口" }], catalog: [] });
   const cards = Object.values(directory.elements).filter(node => node.type === "Card");
   expect(cards.some(node => node.props.title === "运行能力")).toBe(true);
   expect(cards.some(node => node.props.title === "内核接口")).toBe(true);

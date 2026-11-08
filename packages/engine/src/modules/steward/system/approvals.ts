@@ -28,7 +28,7 @@ async function moduleRequestStatus(ports: StewardPorts, workspaceId: string, mod
 }
 export const approvals: SystemModule = {
   name: "approvals",
-  description: "审批：需要你决定的事，先分级并经 AI 复核，结果交回发起方。",
+  description: "审批：需要你决定的事，记录你的决定并将结果交回发起方。",
   tools: [
     tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { idempotent: true, output: z.lazy(() => outputs.approvalsListOutput) }),
     tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: [...APPROVAL_SCOPES] } }, ["approval", "decision"], { output: z.lazy(() => outputs.approvalOutput) }),

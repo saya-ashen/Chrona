@@ -6,20 +6,24 @@ import type { QqBinding, QqChatPort, QqReplyItem } from "./bot";
 type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
 
 type Route = { owner: string; workspace: string };
-type State = { version: 1; routes: Record<string, Route>; deliveries: Record<string, "pending" | "accepted" | "withheld"> };
+type State = { version: 1; routes: Record<string, Route>; deliveries: Partial<Record<string, "pending" | "accepted" | "withheld">> };
+function parseDeliveryJournal(text: string): State {
+  const state = JSON.parse(text) as { version?: number; routes?: Record<string, Route | null> | null; deliveries?: Record<string, string> | null } | null;
+  if (state?.version !== 1 || !state.routes || !state.deliveries || typeof state.routes !== "object" || typeof state.deliveries !== "object" || Array.isArray(state.routes) || Array.isArray(state.deliveries)
+    || Object.values(state.routes).some(route => !route || typeof route.owner !== "string" || typeof route.workspace !== "string")
+    || Object.values(state.deliveries).some(value => !["pending", "accepted", "withheld"].includes(value))) throw new Error("Invalid QQ conversation delivery journal");
+  return state as State;
+}
 export function createQqConversations(options: { dataDir: string; contentDir: string; call: Call; binding: () => Promise<QqBinding | null>; deliver: (item: QqReplyItem) => Promise<unknown> }) {
   const app = createAgentConversations({ source: "qq", dataDir: options.dataDir, call: (target, args = {}) => options.call(target, args), reply: () => {} });
   const directory = join(options.dataDir, "conversation-delivery"), path = join(directory, "state.json");
   let queue = Promise.resolve<unknown>(undefined);
   function serial<T>(work: () => Promise<T>) { const next = queue.then(work); queue = next.catch(() => {}); return next; }
   async function load(): Promise<State> {
-    try {
-      const state = JSON.parse(await readFile(path, "utf8")) as State;
-      if (state?.version !== 1 || !state.routes || !state.deliveries || typeof state.routes !== "object" || typeof state.deliveries !== "object" || Array.isArray(state.routes) || Array.isArray(state.deliveries)
-        || Object.values(state.routes).some(route => !route || typeof route.owner !== "string" || typeof route.workspace !== "string")
-        || Object.values(state.deliveries).some(value => !["pending", "accepted", "withheld"].includes(value))) throw new Error("Invalid QQ conversation delivery journal");
-      return state;
-    } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, routes: {}, deliveries: {} }; throw error; }
+    let text: string;
+    try { text = await readFile(path, "utf8"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, routes: {}, deliveries: {} }; throw error; }
+    return parseDeliveryJournal(text);
   }
   async function save(state: State) {
     await mkdir(directory, { recursive: true }); await writeFile(`${path}.next`, JSON.stringify(state), { mode: 0o600 }); await rename(`${path}.next`, path);

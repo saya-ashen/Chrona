@@ -27,7 +27,7 @@ const emit=x=>console.log(JSON.stringify(x));
 process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);const data=c.type==='get_state'?{sessionId:'fixture-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:0}:c.type==='get_commands'?{commands:[]}:{};emit({type:'response',id:c.id,command:c.type,success:true,data});if(c.type==='prompt'){streaming=true;writeFileSync('started','yes');writeFileSync('pi.pid',String(process.pid));emit({type:'agent_start'});emit({type:'tool_execution_start',toolCallId:'fixture',toolName:'read'});}if(c.type==='abort'){streaming=false;emit({type:'agent_end'});emit({type:'agent_settled'});process.exit(0);}}});
 process.stdin.on('end',()=>process.exit(0));}
 `, { mode: 0o755 });
-  const db = testDb(), workspace = await db.workspace.create({ data: { name: "agent-app" } });
+  const db = testDb({ injectedAgent: false }), workspace = await db.workspace.create({ data: { name: "agent-app" } });
   const sdk = resolve(import.meta.dir, "../../../../integrations/src/steward/module-sdk");
   const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleBuiltinResources: resources, moduleSdk: sdk,

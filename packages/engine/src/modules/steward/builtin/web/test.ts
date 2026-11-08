@@ -221,13 +221,13 @@ function checkListSpecs() {
   }
   assert.match(JSON.stringify(activitySpec({ activity: { items: [], before: null } })), /还没有活动。/);
   assert.match(JSON.stringify(activitySpec({})), /加载中/);
-  for (const systemApps of [[], [{ name: "chat", description: "系统对话" }]]) {
+  for (const systemApps of [[], [{ name: "approvals", description: "审批" }]]) {
     const spec = appsSpec({ apps: [{ id: "app /", name: "示例", builtin: true, origin: "builtin", description: "应用说明", health: { runtime: { state: "running" }, incident: { status: "unresolved" } } }], systemApps });
     const serialized = JSON.stringify(spec);
     assert.match(serialized, /内置 · 尚未启用 · 运行中 · 业务就绪情况：模块尚未报告 · 未解决，需要处理 · 应用说明/);
     assert.ok(serialized.includes("/apps/app%20%2F"));
     assert.equal(Object.values(spec.elements).some(item => item.props.title === "内核接口"), !!systemApps.length);
-    if (systemApps.length) for (const expected of ["/apps/system/chat", "系统对话", "Chrona 的系统能力"]) assert.ok(serialized.includes(expected));
+    if (systemApps.length) for (const expected of ["/apps/system/approvals", "审批", "Chrona 的系统能力"]) assert.ok(serialized.includes(expected));
   }
   assert.match(JSON.stringify(appsSpec({})), /加载中/);
 }

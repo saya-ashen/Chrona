@@ -54,14 +54,13 @@ export function createAgentPrimitives(call: (target: string, args: Record<string
       return contextStreamOutput.parse({ ...page, transcript: items });
     }
     if (name !== "write" && name !== "interrupt") return result;
-    if (!("executionId" in args)) {
-      const admitted = z.object({ perform: z.boolean(), operationId: z.string(), result: z.unknown() }).parse(result);
-      if (admitted.perform) await control(name === "write" ? "inject" : "abort", { operationId: admitted.operationId, ...(name === "write" ? { message: (args as unknown as { text: string }).text } : {}) });
-      await call("runtime-callback.agent-admit", { callId, operation: name, settle: true });
-      return name === "write" ? { accepted: true } : admitted.result;
-    }
-    const admitted = z.object({ perform: z.boolean(), operationId: z.string(), execution: executionViewSchema }).parse(result);
+    const isContext = !("executionId" in args);
+    const admitted = isContext
+      ? z.object({ perform: z.boolean(), operationId: z.string(), result: z.unknown() }).parse(result)
+      : z.object({ perform: z.boolean(), operationId: z.string(), execution: executionViewSchema }).parse(result);
     if (admitted.perform) await control(name === "write" ? "inject" : "abort", { operationId: admitted.operationId, ...(name === "write" ? { message: (args as z.infer<typeof primitiveInputs.write>).text } : {}) });
-    return name === "write" ? { accepted: true } : admitted.execution;
+    if (isContext) await call("runtime-callback.agent-admit", { callId, operation: name, settle: true });
+    if (name === "write") return { accepted: true };
+    return "execution" in admitted ? admitted.execution : admitted.result;
   };
 }

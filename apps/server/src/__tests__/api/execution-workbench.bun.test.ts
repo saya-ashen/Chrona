@@ -217,7 +217,7 @@ test("real editor/SDK/runtime persists questions, detach, completion and human a
   expect(errors).toEqual([]);
 }, 60_000);
 
-test("owner cancellation retains the directory until actual exit; pause/hash/removal cannot hide a live execution", async () => {
+test("owner cancellation retains the live attempt until actual exit; pause/hash/removal cannot hide it", async () => {
   const { view, run } = await start("cancel");
   const context = moduleContext(runtime.ports, workspaceId);
   await expect(requestStatus(context, coding.id, "paused", "integration pause")).rejects.toMatchObject({ code: "conflict" });
@@ -228,8 +228,8 @@ test("owner cancellation retains the directory until actual exit; pause/hash/rem
   await runtime.service.forWorkspace(workspaceId).provider.cancel(view.runId);
   expect(run.aborted).toBe(1);
   expect(await command({ op: "get", workId: view.workId })).toMatchObject({ status: "unknown", cancelRequested: true, stopConfirmed: false });
-  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(project);
-  const { op: _op, ...occupiedInput } = startInput("occupied");
+  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(`execution:${view.runId}`);
+  const { op: _op, ...occupiedInput } = { ...startInput(view.workId), commandKey: "before-stop" };
   await expect(ownerCall("coding.create", { input: JSON.stringify(occupiedInput) })).rejects.toMatchObject({ code: "conflict" });
   run.finish({ outcome: "failed", sessionId: null, error: "Process exited after cancellation" });
   await until(async () => db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } }), row => row.stopConfirmedAt !== null, "actual process stop");
@@ -252,7 +252,7 @@ test("editor coding.cancel completes while process completion publishes through 
   expect(errors).toEqual([]);
 }, 60_000);
 
-test("disconnected execution stays unknown across a fresh runtime and does not release or restart the project", async () => {
+test("disconnected execution stays unknown across a fresh runtime and does not release or restart its attempt", async () => {
   const { view, run } = await start("restart");
   const before = await command({ op: "events", ...target(view), limit: 100, waitMs: 0 }) as ExecutionEventPage;
   run.disconnect();
@@ -261,7 +261,7 @@ test("disconnected execution stays unknown across a fresh runtime and does not r
   await runtime.stop();
   await boot();
   expect(await command({ op: "attach", workId: view.workId })).toMatchObject({ ...target(view), status: "unknown", stopConfirmed: false });
-  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(project);
+  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(`execution:${view.runId}`);
   expect((await command({ op: "events", ...target(view), cursor: before.cursor, limit: 100, waitMs: 0 }) as ExecutionEventPage).snapshotRequired).toBe(true);
   expect((await storedWork(view.workId)).results).toEqual([]);
   expect(fake.started).toHaveLength(1);

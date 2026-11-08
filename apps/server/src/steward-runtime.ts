@@ -1,14 +1,13 @@
 import { startRescueListener } from "./rescue";
 import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { registerInjectedProvider, createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
 import { installDeviceExecution } from "./execution-device-runtime";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
-import { createStewardE2eProvider } from "./steward-e2e-provider";
 import { createAgentApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
 
 type RuntimeOptions = {
@@ -17,10 +16,6 @@ type RuntimeOptions = {
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
-function injectedProvider(options: RuntimeOptions) {
-  if (options.provider === undefined && process.env.CHRONA_E2E_TEST_ROUTES === "1" && process.env.CHRONA_STEWARD_AGENT === "e2e" && options.port) return createStewardE2eProvider(options.port);
-  return options.provider;
-}
 function executorOwnerPorts(ports: StewardPorts): NonNullable<StewardPorts["executorOwner"]> {
   const auth = createExecutorAuth(ports);
   const owner = async () => {
@@ -56,7 +51,7 @@ function executionInitialization(ports: StewardPorts) {
   })();
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
-  const injected = injectedProvider(options);
+  const injected = options.provider;
   const agentApplication = injected === undefined && options.port ? createAgentApplicationHost({ port: options.port, dataDir: options.dataDir }) : undefined;
   const configured = injected ?? (injected === undefined && agentApplication && process.env.CHRONA_STEWARD_AGENT === "pi" ? createAgentClient(() => ports, "pi") : null);
   const handles = new Set<ReturnType<ProviderAdapter["start"]>>();
@@ -102,7 +97,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   };
   ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
-  registerInjectedProvider(ports, injected);
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;
   let starting: Promise<void> | undefined;

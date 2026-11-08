@@ -9,7 +9,7 @@ export function activitySpec(state: Record<string, unknown>, module = ""): Spec 
   const node = (type: string, props: Record<string, unknown>, children: string[] = [], id = `n${serial++}`) => { elements[id] = { type, props, children }; return id; };
   const link = (label: string, href: string) => node("Link", { label, href });
   const page = state.activity as ActivityPage | undefined;
-  const children = [node("Text", { text: "Chrona 做过的事：审批与你的决定、AI 复核、应用的检查、启用、自动更新、回滚和故障、授权、设置与凭据的改动（只记名称）。", variant: "muted" })];
+  const children = [node("Text", { text: "Chrona 做过的事：审批与你的决定、应用的检查、启用、自动更新、回滚和故障、授权、设置与凭据的改动（只记名称）。", variant: "muted" })];
   if (module) children.push(link("看全部应用", "/activity"));
   if (!page) children.push(node("Spinner", { label: "加载中……" }));
   else {

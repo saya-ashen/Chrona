@@ -6,15 +6,15 @@ import { testDb } from "@chrona/engine/test-support";
 import { createStewardRuntime } from "./steward-runtime";
 import { sessionTranscript } from "../../../packages/engine/src/modules/steward/transcript";
 import { stewardDataDir } from "../../../packages/integrations/src/steward/module-runtime";
-test("E2E provider requires both the explicit test gate and provider selection", async () => {
+test("released runtime never selects a test Provider from environment flags", async () => {
   const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-e2e-gate-"));
   const previousGate = process.env.CHRONA_E2E_TEST_ROUTES, previousAgent = process.env.CHRONA_STEWARD_AGENT;
   try {
-    for (const [gate, agent, expected] of [["0", "e2e", undefined], ["1", "none", undefined], ["1", "e2e", "e2e"]] as const) {
+    for (const [gate, agent] of [["0", "e2e"], ["1", "none"], ["1", "e2e"]] as const) {
       process.env.CHRONA_E2E_TEST_ROUTES = gate;
       process.env.CHRONA_STEWARD_AGENT = agent;
       const runtime = createStewardRuntime(db, { dataDir, port: 48130 });
-      expect(runtime.ports.provider?.name).toBe(expected);
+      expect(runtime.ports.provider).toBeUndefined();
       await runtime.stop();
     }
   } finally {

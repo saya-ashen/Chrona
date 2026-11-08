@@ -1,6 +1,5 @@
 import { delegateAgent } from "./agent-delegation";
-import { injectedAgentTools, injectedAgentPrimitive } from "./agent-injected";
-import { installInjectedAgent, installAgentDelegation } from "./agent-delegation-port";
+import { installAgentDelegation } from "./agent-delegation-port";
 import { registerSystemModule } from "./module-calls";
 import { history } from "./system/history";
 import { approvals } from "./system/approvals";
@@ -18,6 +17,5 @@ let registered = false;
 export function registerSystemModules() {
   if (registered) return;
   installAgentDelegation(delegateAgent);
-  installInjectedAgent(injectedAgentTools, injectedAgentPrimitive);
   registered = true; [history, approvals, modules, settings, schedules, secrets, activity, content, memory, projects].forEach(registerSystemModule);
 }

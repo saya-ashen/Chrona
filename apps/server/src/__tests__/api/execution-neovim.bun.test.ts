@@ -62,6 +62,7 @@ import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 import {db} from ${moduleFile("packages/db/src/db.ts")};
 import {createStewardRuntime} from ${moduleFile("apps/server/src/steward-runtime.ts")};
+import {registerTestProvider} from ${moduleFile("packages/engine/src/modules/steward/test-provider.ts")};
 import {createServerApp} from ${moduleFile("apps/server/src/app.ts")};
 import {createPiProvider} from ${moduleFile("packages/integrations/src/steward/pi-provider.ts")};
 import {callSync} from ${moduleFile("packages/engine/src/modules/steward/module-calls.ts")};
@@ -92,7 +93,7 @@ const observedDb=db.$extends({query:{executionAttempt:{
  async create({args,query}){const row=await query(args);captureDirectories.set(row.id,row.logDir);return row},
  async update({args,query}){
   if(args.data.heldDirectory===null){
-   const source=JSON.parse(await readFile(join(captureDirectories.get(args.where.id),'execution-changes.json'),'utf8'));
+   const source=JSON.parse(await readFile(join(captureDirectories.get(args.where.id),'execution-changes-'+args.where.id+'.json'),'utf8'));
    captureBeforeRelease.push({attemptId:args.where.id,scope:source.changes.scope,status:source.changes.status,patchSha256:createHash('sha256').update(source.changes.patch).digest('hex')});
    await writeFile(join(root,'capture-before-release.json'),JSON.stringify(captureBeforeRelease));
   }
@@ -127,6 +128,7 @@ const server=Bun.serve({hostname:'127.0.0.1',port:0,idleTimeout:30,async fetch(r
  return app?app.fetch(request,{server}):new Response('starting',{status:503});
 }});
 const provider=createPiProvider({command:join(root,'fake-pi'),agentDir:join(root,'profile'),expectedVersion:'0.85.0',chronaExtension:${moduleFile("external-plugins/pi-steward-agent/chrona-tools.ts")},agentUrl:'http://127.0.0.1:'+server.port+'/api/steward-agent',executionMode:'trusted-local'});
+registerTestProvider(observedDb);
 runtime=createStewardRuntime(observedDb,{dataDir,provider,onError:error=>console.error('HOST_RUNTIME',error)});
 runtime.ports.moduleBuiltinResources=join(root,'resources/builtin');
 runtime.ports.packages=testReleasePackages(runtime.ports.moduleBuiltinResources);
@@ -402,7 +404,7 @@ test("actual host death and same-SQLite restart retain unknown ownership without
     expect(review.results?.results).toEqual([]);
     const state = await f.state();
     expect(state.attempts).toHaveLength(1);
-    expect(state.attempts[0]!.heldDirectory).toBe(f.project);
+    expect(state.attempts[0]!.heldDirectory).toBe(`execution:${receipt.view.runId}`);
     const launches = (await readFile(join(f.project, "launches.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
     expect(launches).toEqual([expect.objectContaining({ pid, cwd: f.project })]);
     await Bun.sleep(250);

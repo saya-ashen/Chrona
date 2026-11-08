@@ -2,7 +2,7 @@ import type { ProviderAdapter, ProviderRunInput } from "@chrona/contracts/stewar
 import { runtimeOutcomeSchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { callSync, kernelOrigin } from "./module-calls";
-import { registerProviderModule, registerProviderCallbacks, retainProviderCallbacks } from "./local-provider";
+import { registerProviderCallbacks, retainProviderCallbacks } from "./local-provider";
 import { registerBuiltins } from "./module-builtin";
 import { CallError } from "./module-calls";
 
@@ -13,15 +13,11 @@ export async function stopAgentRuns(ports: StewardPorts) {
 export function registerLocalRuntime() { registerProviderCallbacks(); }
 export async function runtimeCall<T>(ports: StewardPorts, workspaceId: string, target: string, args: Record<string, unknown>): Promise<T> {
   registerLocalRuntime();
-  if (target.startsWith("agent.")) {
-    if (ports.agentApplication) {
-      await registerBuiltins(ports, workspaceId);
-      const result = (await callSync(ports, kernelOrigin(workspaceId), target, { input: JSON.stringify(args) })).output;
-      if (target !== "agent.complete") return result as T;
-      return await waitAgentCompletion(ports, workspaceId, result as { operationId: string }, Number(args.timeoutMs)) as T;
-    }
-    // In-memory Provider injection remains a test/embedding seam; released runtimes always use the SDK application.
-    registerProviderModule(ports);
+  if (target.startsWith("agent.") && ports.agentApplication) {
+    await registerBuiltins(ports, workspaceId);
+    const result = (await callSync(ports, kernelOrigin(workspaceId), target, { input: JSON.stringify(args) })).output;
+    if (target !== "agent.complete") return result as T;
+    return await waitAgentCompletion(ports, workspaceId, result as { operationId: string }, Number(args.timeoutMs)) as T;
   }
   return (await callSync(ports, kernelOrigin(workspaceId), target, args)).output as T;
 }

@@ -131,9 +131,12 @@ test("binding tamper and prepare busy never create Run; exact original key retri
   f.hook(undefined); const admitted = await f.admission.start(f.principal, input); expect(admitted.execution.attemptId).toBe(attemptId);
   expect(await readdir(join(f.managedRoot, "locks"))).toEqual([]);
 });
-test("v1 and server v2 existing workspace holds exclude one another; server adapter absence does not affect v1", async () => {
-  const f = await fixture(), input = f.input("v2", "existing"); await f.admission.start(f.principal, input);
-  await expect(createExecutions(f.ports).start(f.principal, { workId: "v1", commandKey: "v1", goal: "fixture", projectRef: "repo", budget: input.budget })).rejects.toMatchObject({ code: "conflict" });
+test("ordinary local conversations do not inherit v2 directory locks; server adapter absence does not affect v1", async () => {
+  const f = await fixture(), input = f.input("v2", "existing"); const v2 = await f.admission.start(f.principal, input);
+  const v1 = await createExecutions(f.ports).start(f.principal, { workId: "v1", commandKey: "v1", goal: "fixture", projectRef: "repo", budget: input.budget });
+  expect(v1).toMatchObject({ status: "queued" });
+  expect((await f.db.executionAttempt.findUniqueOrThrow({ where: { id: v1.attemptId } })).heldDirectory).toBe(`execution:${v1.runId}`);
+  expect((await f.db.executionAttempt.findUniqueOrThrow({ where: { id: v2.execution.attemptId } })).heldDirectory).not.toBeNull();
   const g = await fixture(); g.ports.executionServerWorkspace = undefined;
   await expect(g.admission.start(g.principal, g.input())).rejects.toMatchObject({ code: "unavailable" });
   expect(await createExecutions(g.ports).start(g.principal, { workId: "v1", commandKey: "v1", goal: "fixture", projectRef: "repo", budget: input.budget })).toMatchObject({ status: "queued" });
