@@ -7,11 +7,12 @@ import { pendingTurn, saveSessions, type CodingSessions, type CodingSession, typ
 
 export type ConversationCommand = { action: string; "request-key": string; "work-id"?: string; "session-id"?: string; project?: string; path?: string; text?: string; question?: string };
 export const isStopped = (view: Pick<ExecutionView, "status" | "stopConfirmed">) => view.stopConfirmed && ["completed", "failed", "cancelled"].includes(view.status);
-const actions = ["create", "send", "stop", "answer", "select", "new", "retry", "register-project"];
+const actions = ["create", "send", "stop", "answer", "select", "new", "retry", "register-project", "default-project"];
 const fields = ["action", "request-key", "work-id", "session-id", "project", "path", "text", "question"];
 function checkField(key: string, value: unknown) {
   const max = key === "text" ? 20_000 : key === "path" ? 4096 : 128;
   if (typeof value !== "string" || value.length > max) throw codingError("invalid", "输入内容过长或格式无效。");
+  if (key === "project" && value === "") return; // Empty UI selection uses the durable draft/default.
   if (!["text", "action", "path"].includes(key) && !executionIdSchema.safeParse(value).success) throw codingError("invalid", "对话引用无效。");
 }
 export function parseConversationCommand(raw: unknown): ConversationCommand {
@@ -105,13 +106,22 @@ async function retry(context: CodingContext, journal: CodingSessions, session: C
 function requireSession(session: CodingSession | undefined): asserts session is CodingSession {
   if (!session) throw codingError("invalid", "请先打开一个对话。");
 }
-export async function applyConversationCommand(context: CodingContext, args: ConversationCommand, journal: CodingSessions, current: CodingSession | undefined, projectRefs: () => Promise<string[]>) {
-  const session = current;
+type ProjectServices = { list: () => Promise<string[]>; default: (path?: string) => Promise<string> };
+async function projectDraft(context: CodingContext, args: ConversationCommand, journal: CodingSessions, projects: ProjectServices) {
   if (args.action === "register-project") {
     if (!args.path?.trim()) throw codingError("invalid", "请填写主机上已有目录的绝对路径。");
-    await context.call("projects.register", { path: args.path }); return session;
+    const project = await context.call<{ projectRef?: unknown } | null>("projects.register", { path: args.path });
+    const ref = executionIdSchema.safeParse(project?.projectRef);
+    if (!ref.success) throw codingError("conflict", "项目服务返回了无效目录引用。");
+    return openDraft(context, journal, ref.data);
   }
-  if (args.action === "new") { journal.selected = null; await saveSessions(context, journal); return undefined; }
+  if (args.action === "default-project") return openDraft(context, journal, await projects.default(args.path));
+  if (args.project && !(await projects.list()).includes(args.project)) throw codingError("invalid", "请选择已添加的项目目录。");
+  return openDraft(context, journal, args.project || await projects.default());
+}
+export async function applyConversationCommand(context: CodingContext, args: ConversationCommand, journal: CodingSessions, current: CodingSession | undefined, projects: ProjectServices) {
+  const session = current;
+  if (["register-project", "default-project", "new"].includes(args.action)) return projectDraft(context, args, journal, projects);
   if (args.action === "select") { requireSession(session); journal.selected = session.id; await saveSessions(context, journal); return session; }
   const previous = journal.sessions.flatMap(item => (item.turns ?? []).map(turn => ({ session: item, turn }))).find(item => item.turn.key === args["request-key"]);
   if (previous) {
@@ -121,19 +131,25 @@ export async function applyConversationCommand(context: CodingContext, args: Con
     return previous.session;
   }
   if (args.action === "retry") return retry(context, journal, session);
-  return appendOrStop(context, args, journal, session, projectRefs);
+  return appendOrStop(context, args, journal, session, projects);
+}
+async function openDraft(context: CodingContext, journal: CodingSessions, projectRef: string) {
+  journal.selected = null; journal.draftProject = projectRef;
+  await saveSessions(context, journal);
+  return undefined;
 }
 async function stop(context: CodingContext, args: ConversationCommand, session: CodingSession) {
   if (!session.selectedWorkId) throw codingError("invalid", "尚无执行可停止。");
   const view = await getCodingWorkState(context, { workId: session.selectedWorkId });
   await callAgent(context, "cancel", { workId: view.workId, runId: view.runId, attemptId: view.attemptId, commandKey: args["request-key"] }); return session;
 }
-async function newSession(args: ConversationCommand, journal: CodingSessions, text: string, projectRefs: () => Promise<string[]>) {
-  if (!args.project || !(await projectRefs()).includes(args.project)) throw codingError("invalid", "请选择已添加的项目目录。");
+async function newSession(args: ConversationCommand, journal: CodingSessions, text: string, projects: ProjectServices) {
+  const projectRef = args.project || journal.draftProject || await projects.default();
+  if (args.project && !(await projects.list()).includes(projectRef)) throw codingError("invalid", "请选择已添加的项目目录。");
   if (journal.sessions.length >= 1000) throw codingError("capacity", "对话数量已达上限。");
-  const session: CodingSession = { id: `chat-${args["request-key"]}`, title: text.slice(0, 200), projectRef: args.project, workIds: [], selectedWorkId: null, turns: [] };
+  const session: CodingSession = { id: `chat-${args["request-key"]}`, title: text.slice(0, 200), projectRef, workIds: [], selectedWorkId: null, turns: [] };
   if (journal.sessions.some(item => item.id === session.id)) throw codingError("conflict", "对话标识已存在。");
-  const turn = startTurn(args, args.project, text); journal.sessions.push(session);
+  const turn = startTurn(args, projectRef, text); journal.sessions.push(session);
   return { session, turn };
 }
 function validateTarget(args: ConversationCommand, existing?: CodingSession) {
@@ -145,12 +161,12 @@ function commandText(args: ConversationCommand) {
   if (typeof text !== "string" || args.action !== "answer" && !text) throw codingError("invalid", "请填写要发送的内容。");
   return text;
 }
-async function appendOrStop(context: CodingContext, args: ConversationCommand, journal: CodingSessions, existing: CodingSession | undefined, projectRefs: () => Promise<string[]>) {
+async function appendOrStop(context: CodingContext, args: ConversationCommand, journal: CodingSessions, existing: CodingSession | undefined, projects: ProjectServices) {
   validateTarget(args, existing);
   if (args.action === "stop") return stop(context, args, existing!);
   if (existing?.turns?.some(pendingTurn)) throw codingError("conflict", "请先核对上次发送结果。");
   const text = commandText(args);
-  const { session, turn } = args.action === "create" ? await newSession(args, journal, text, projectRefs) : { session: existing!, turn: await continuation(context, args, existing!, text) };
+  const { session, turn } = args.action === "create" ? await newSession(args, journal, text, projects) : { session: existing!, turn: await continuation(context, args, existing!, text) };
   if (!session.workIds.includes(turn.workId)) session.workIds.push(turn.workId);
   session.selectedWorkId = turn.workId; (session.turns ??= []).push(turn); journal.selected = session.id;
   // Persist the exact input and binding before any dispatch. Retrying this record cannot mint a new execution.

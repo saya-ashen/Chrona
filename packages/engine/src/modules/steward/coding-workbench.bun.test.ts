@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { providerAnswerSchema } from "@chrona/contracts/steward";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { compileModuleOutput, moduleManifestSchema, providerAnswerSchema } from "@chrona/contracts/steward";
+import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PAGE } from "./external/coding/page";
@@ -23,10 +23,21 @@ async function makeFake() {
   const starts: Record<string, unknown>[] = [], writes: Record<string, unknown>[] = [], answers: unknown[] = [], requests: string[] = [];
   let loseReceipt = false, unavailable = false;
   const registered = [{ projectRef: "repo", path: "/host/repo", label: "repo" }];
+  let automatic: (typeof registered)[number] | undefined;
+  function register(path: string) {
+    let project = registered.find(project => project.path === path);
+    if (!project) { project = { projectRef: `project-${registered.length}`, path, label: path.split("/").filter(Boolean).at(-1)! }; registered.push(project); }
+    return project;
+  }
   const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, unknown>): Promise<T> {
     requests.push(target);
     if (target === "projects.list") return { projects: registered } as T;
-    if (target === "projects.register") { expect(Object.keys(args)).toEqual(["path"]); const project = { projectRef: "added", path: String(args.path), label: "added" }; registered.push(project); return project as T; }
+    if (target === "projects.register") { expect(Object.keys(args)).toEqual(["path"]); return register(String(args.path)) as T; }
+    if (target === "projects.default") {
+      expect(Object.keys(args)).toEqual(args.path === undefined ? [] : ["path"]);
+      if (args.path !== undefined || !automatic) automatic = register(String(args.path ?? "/host/default"));
+      return automatic as T;
+    }
     const workId = String(args["execution-id"]);
     if (target === "agent.run") {
       const journal = await loadSessions(context);
@@ -78,7 +89,7 @@ test("coding page uses registered generic conversation components and has no acc
     expect(element.children.length).toBeGreaterThan(0);
     expect(JSON.stringify(element.props)).not.toContain('"$item"');
   }
-  expect(manifest.uses).toContain("projects.list"); expect(manifest.uses).toContain("projects.register");
+  expect(manifest.uses).toContain("projects.list"); expect(manifest.uses).toContain("projects.register"); expect(manifest.uses).toContain("projects.default");
   expect(manifest.tools.find((tool: { name: string }) => tool.name === "ui-command").visibility).toEqual(["owner"]);
   expect(JSON.stringify(PAGE)).not.toContain("验收"); expect(JSON.stringify(PAGE)).not.toContain('"action":"accept"');
 });
@@ -166,7 +177,8 @@ test("stop pending and unknown states block a new round; native confirm and sele
 test("project registration routes only a path; new/select persists independently and legacy sessions still work", () => fixture(async fake => {
   const first = await workbenchCommand(fake.context, create);
   await workbenchCommand(fake.context, { action: "register-project", "request-key": "directory", path: "/host/new project" });
-  expect((await workbenchCatalog(fake.context)).projectOptions).toContainEqual({ value: "added", label: "added · /host/new project" });
+  const registered = fake.registered.find(project => project.path === "/host/new project")!;
+  expect((await workbenchCatalog(fake.context)).projectOptions).toContainEqual({ value: registered.projectRef, label: "new project · /host/new project" });
   await workbenchCommand(fake.context, { action: "new", "request-key": "new" });
   expect((await workbenchDetail(fake.context)).sessionId).toBe("");
   await workbenchCommand(fake.context, { action: "select", "request-key": "select", "session-id": first.sessionId });
@@ -403,4 +415,199 @@ test("a lost reconciliation response remains pending until exact retry proves re
   expect(proven.canRetry).toBe(false); expect(proven.canSend).toBe(true);
   expect((await loadSessions(fake.context)).sessions[0]!.turns!.at(-1)!.rejected).toEqual({ code: "conflict" });
   expect(fake.starts).toHaveLength(1); expect(fake.writes).toHaveLength(0);
+}));
+
+
+test.each([undefined, ""])("first send resolves omitted/empty project (%s) without changing the exact command signature", project => fixture(async fake => {
+  const args = { action: "create", "request-key": "default-send", text: "keep this draft", ...(project === undefined ? {} : { project }) };
+  fake.loseReceipt();
+  await expect(workbenchCommand(fake.context, args)).rejects.toMatchObject({ code: "unavailable" });
+  const pending = (await loadSessions(fake.context)).sessions[0]!.turns![0]!;
+  expect(JSON.parse(pending.signature)).toEqual(Object.entries(args).sort(([a], [b]) => a.localeCompare(b)));
+  expect(pending.start?.projectRef).toBe(fake.registered.find(project => project.path === "/host/default")!.projectRef);
+  await workbenchCommand(fake.context, { action: "default-project", "request-key": "change-before-retry", path: "/host/custom" });
+  const restored = await workbenchCommand({ ...fake.context }, args);
+  expect(restored.projectPath).toBe("/host/default");
+  expect(fake.starts).toHaveLength(1);
+  await expect(workbenchCommand(fake.context, { ...args, project: "repo" })).rejects.toMatchObject({ code: "conflict" });
+}));
+
+test("unknown explicit projects are rejected before a session or execution is created", () => fixture(async fake => {
+  for (const action of ["new", "create"]) await expect(workbenchCommand(fake.context, { action, "request-key": "invalid-project", project: "unknown-project", text: "keep this draft" })).rejects.toMatchObject({ code: "invalid" });
+  expect(fake.starts).toHaveLength(0);
+  expect((await loadSessions(fake.context)).sessions).toHaveLength(0);
+}));
+
+test("fresh catalogs and empty details provision a default draft ready for first send without executing", () => fixture(async fake => {
+  fake.registered.splice(0);
+  const catalog = await workbenchCatalog(fake.context);
+  const automatic = fake.registered[0]!;
+  expect(catalog).toMatchObject({ defaultProject: automatic.projectRef, selectedSession: "", configured: true, sessions: [], hasSessions: false });
+  expect(catalog.projectGroups).toEqual([{ ...automatic, isDefault: true, selected: true, sessions: [], hasSessions: false }]);
+  const detail = await workbenchDetail({ ...fake.context });
+  expect(detail).toMatchObject({ sessionId: "", workId: "", project: automatic.projectRef, projectLabel: automatic.label, projectPath: "/host/default", canSend: true });
+  expect(await loadSessions(fake.context)).toEqual({ version: 1, selected: null, draftProject: automatic.projectRef, sessions: [] });
+  await workbenchCatalog({ ...fake.context }); await workbenchDetail(fake.context);
+  expect(fake.registered).toHaveLength(1);
+  expect(fake.requests.filter(target => target.startsWith("agent."))).toEqual([]);
+  expect(fake.starts).toHaveLength(0); expect(fake.writes).toHaveLength(0);
+}));
+
+test("empty detail can initialize the default before catalog is read", () => fixture(async fake => {
+  const detail = await workbenchDetail(fake.context);
+  expect(detail).toMatchObject({ sessionId: "", projectPath: "/host/default", canSend: true });
+  expect((await workbenchCatalog(fake.context)).defaultProject).toBe(detail.project);
+  expect(fake.starts).toHaveLength(0);
+}));
+
+test("project new persists an empty draft through polling/reload and first send inherits its project", () => fixture(async fake => {
+  const first = await workbenchCommand(fake.context, create);
+  const draft = await workbenchCommand(fake.context, { action: "new", "request-key": "repo-draft", project: "repo" });
+  expect(draft).toMatchObject({ sessionId: "", project: "repo", projectLabel: "repo", projectPath: "/host/repo", canSend: true });
+  const catalog = await workbenchCatalog({ ...fake.context });
+  expect(catalog.selectedSession).toBe("");
+  expect(catalog.projectGroups.find(group => group.selected)?.projectRef).toBe("repo");
+  expect(catalog.sessions.every(session => !session.selected)).toBe(true);
+  expect(await loadSessions(fake.context)).toMatchObject({ selected: null, draftProject: "repo" });
+  expect((await loadSessions(fake.context)).sessions).toHaveLength(1);
+  expect((await workbenchDetail({ ...fake.context })).project).toBe("repo");
+  expect((await workbenchDetail(fake.context, "", first.sessionId)).sessionId).toBe(first.sessionId);
+  expect((await workbenchDetail(fake.context)).sessionId).toBe(""); // Explicit reads cannot replace a draft.
+  const second = await workbenchCommand({ ...fake.context }, { action: "create", "request-key": "repo-first-send", text: "new project conversation" });
+  expect(second.project).toBe("repo"); expect(second.sessionId).not.toBe(first.sessionId);
+  expect(fake.starts).toHaveLength(2);
+  const global = await workbenchCommand(fake.context, { action: "new", "request-key": "global-draft" });
+  expect(global.projectPath).toBe("/host/default"); expect(global.sessionId).toBe("");
+  expect((await workbenchDetail({ ...fake.context })).project).toBe(global.project);
+  expect((await loadSessions(fake.context)).sessions).toHaveLength(2);
+}));
+
+test("register-project opens the returned project draft without executing", () => fixture(async fake => {
+  await workbenchCommand(fake.context, create);
+  const draft = await workbenchCommand(fake.context, { action: "register-project", "request-key": "register-draft", path: "/host/other" });
+  expect(draft).toMatchObject({ sessionId: "", projectLabel: "other", projectPath: "/host/other", canSend: true });
+  expect((await workbenchCatalog(fake.context)).projectGroups.find(group => group.selected)?.projectRef).toBe(draft.project);
+  expect((await workbenchDetail({ ...fake.context })).project).toBe(draft.project);
+  expect((await loadSessions(fake.context)).sessions).toHaveLength(1); expect(fake.starts).toHaveLength(1);
+  const firstSend = await workbenchCommand(fake.context, { action: "create", "request-key": "other-first-send", project: "", text: "start here" });
+  expect(firstSend.project).toBe(draft.project);
+}));
+
+test("default-project changes only the pointer and draft; existing conversations preserve project/context", () => fixture(async fake => {
+  const first = await workbenchCommand(fake.context, { action: "create", "request-key": "original-default", text: "start in default" });
+  fake.complete(first.workId);
+  const original = (await loadSessions(fake.context)).sessions[0]!;
+  const draft = await workbenchCommand(fake.context, { action: "default-project", "request-key": "custom-default", path: "/host/custom" });
+  expect(draft).toMatchObject({ sessionId: "", projectLabel: "custom", projectPath: "/host/custom", canSend: true });
+  expect(draft.project).not.toBe(first.project);
+  const catalog = await workbenchCatalog(fake.context);
+  expect(catalog.defaultProject).toBe(draft.project);
+  expect(catalog.projectGroups.find(group => group.isDefault)?.projectRef).toBe(draft.project);
+  expect(catalog.projectGroups.find(group => group.projectRef === first.project)?.isDefault).toBe(false);
+  expect((await loadSessions(fake.context)).sessions[0]).toEqual(original);
+  expect(fake.starts).toHaveLength(1);
+  await workbenchCommand(fake.context, { action: "select", "request-key": "old-conversation", "session-id": first.sessionId });
+  const continued = await workbenchCommand(fake.context, { action: "send", "request-key": "continue-original", "session-id": first.sessionId, "work-id": first.workId, project: draft.project, text: "continue in original" });
+  expect(continued.project).toBe(first.project); expect(continued.projectPath).toBe("/host/default");
+  expect(fake.starts.at(-1)?.["project-ref"]).toBe(first.project);
+  expect(fake.starts.at(-1)?.["resume-from"]).toEqual({ "work-id": first.workId, "run-id": `run-${first.workId}`, "attempt-id": `attempt-${first.workId}` });
+  const currentDefault = await workbenchCommand({ ...fake.context }, { action: "default-project", "request-key": "open-default" });
+  expect(currentDefault.project).toBe(draft.project);
+  const second = await workbenchCommand(fake.context, { action: "create", "request-key": "custom-first", text: "use new default" });
+  expect(second.project).toBe(draft.project);
+}));
+
+test("conversation ordering follows the last user turn while model activity and selection leave it stable", () => fixture(async fake => {
+  const first = await workbenchCommand(fake.context, create);
+  const second = await workbenchCommand(fake.context, { ...create, "request-key": "second-chat", text: "second conversation" });
+  const journal = await loadSessions(fake.context);
+  journal.sessions[0]!.turns![0]!.createdAt = "2026-01-01T00:00:00Z";
+  journal.sessions[1]!.turns![0]!.createdAt = "2026-01-02T00:00:00Z";
+  await saveSessions(fake.context, journal);
+  expect((await workbenchCatalog(fake.context)).sessions.map(session => session.id)).toEqual([second.sessionId, first.sessionId]);
+  fake.complete(first.workId, "model output changes without a user turn");
+  await workbenchDetail(fake.context, "", first.sessionId);
+  await workbenchCommand(fake.context, { action: "select", "request-key": "select-older", "session-id": first.sessionId });
+  expect((await workbenchCatalog(fake.context)).sessions.map(session => session.id)).toEqual([second.sessionId, first.sessionId]);
+  await workbenchCommand(fake.context, { action: "send", "request-key": "latest-user-turn", "session-id": first.sessionId, text: "new instruction" });
+  fake.complete(second.workId, "later model completion"); await workbenchDetail(fake.context, "", second.sessionId);
+  const catalog = await workbenchCatalog({ ...fake.context });
+  expect(catalog.sessions.map(session => session.id)).toEqual([first.sessionId, second.sessionId]);
+  expect(catalog.projectGroups.find(group => group.projectRef === "repo")?.sessions).toEqual(catalog.sessions);
+  expect((await workbenchCatalog(fake.context)).sessions).toEqual(catalog.sessions);
+}));
+
+test("legacy journals without draft/project/turns retain unlisted project histories and deterministic ordering", () => fixture(async fake => {
+  const first = await workbenchCommand(fake.context, create);
+  const journal = await loadSessions(fake.context);
+  delete journal.draftProject; delete journal.sessions[0]!.projectRef; delete journal.sessions[0]!.turns;
+  await saveSessions(fake.context, journal);
+  fake.registered.splice(0);
+  const catalog = await workbenchCatalog({ ...fake.context });
+  expect(catalog.sessions).toHaveLength(1);
+  expect(catalog.projectGroups.find(group => group.projectRef === "repo")).toEqual({ projectRef: "repo", label: "repo", path: "", isDefault: false, selected: true, sessions: catalog.sessions, hasSessions: true });
+  expect(catalog.selectedSession).toBe(first.sessionId);
+  const detail = await workbenchDetail(fake.context);
+  expect(detail.project).toBe("repo"); expect(detail.messages.some(message => message.content === create.text)).toBe(true);
+  expect((await loadSessions(fake.context)).draftProject).toBe(catalog.defaultProject);
+  expect(fake.starts).toHaveLength(1);
+  await codingSessions(fake.context, { op: "create", id: "old-empty-a", title: "legacy empty A" });
+  await codingSessions(fake.context, { op: "create", id: "old-empty-b", title: "legacy empty B" });
+  const withEmpty = await workbenchCatalog(fake.context);
+  expect(withEmpty.sessions.map(session => session.id)).toEqual(["old-empty-b", "old-empty-a", first.sessionId]);
+  expect(withEmpty.projectGroups.flatMap(group => group.sessions)).toHaveLength(3);
+  expect((await workbenchCatalog({ ...fake.context })).sessions).toEqual(withEmpty.sessions);
+}));
+
+test("legacy draftless empty journals initialize default and malformed draft refs are rejected", () => fixture(async fake => {
+  await mkdir(join(fake.context.dir, "sessions"));
+  const path = join(fake.context.dir, "sessions", "index.json");
+  await writeFile(path, JSON.stringify({ version: 1, selected: null, sessions: [] }));
+  expect((await workbenchDetail(fake.context)).canSend).toBe(true);
+  await writeFile(path, JSON.stringify({ version: 1, selected: null, draftProject: "../invalid", sessions: [] }));
+  await expect(loadSessions(fake.context)).rejects.toMatchObject({ code: "conflict" });
+  expect(fake.starts).toHaveLength(0);
+}));
+
+test("strict tool output schemas accept default drafts, grouped catalogs, and existing conversations", () => fixture(async fake => {
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dirname, "external/coding/module.json"), "utf8")));
+  const schema = (name: string) => compileModuleOutput(manifest.tools.find(tool => tool.name === name)!.output!);
+  schema("ui-catalog").parse(await workbenchCatalog(fake.context));
+  schema("ui-work").parse(await workbenchDetail(fake.context));
+  const draft = await workbenchCommand(fake.context, { action: "new", "request-key": "schema-draft", project: "repo" });
+  schema("ui-command").parse(draft);
+  expect(schema("ui-command").safeParse({ ...draft, extra: true }).success).toBe(false);
+  schema("ui-command").parse(await workbenchCommand(fake.context, create));
+  const catalog = await workbenchCatalog(fake.context);
+  schema("ui-catalog").parse(catalog);
+  expect(schema("ui-catalog").safeParse({ ...catalog, projectGroups: catalog.projectGroups.map(group => ({ ...group, extra: true })) }).success).toBe(false);
+}));
+
+test("an invalid default cannot hide healthy projects or block repairing the default", () => fixture(async fake => {
+  const call = fake.context.call;
+  fake.context.call = async (target, args) => {
+    if (target === "projects.default" && !(args as { path?: string }).path) throw Object.assign(new Error("default directory moved"), { code: "invalid" });
+    return call(target, args);
+  };
+  const catalog = await workbenchCatalog(fake.context);
+  expect(catalog.projects).toContain("repo"); expect(catalog.notice).toContain("默认空间暂不可用");
+  expect((await workbenchDetail(fake.context)).canSend).toBe(false);
+  const draft = await workbenchCommand(fake.context, { action: "new", project: "repo", "request-key": "healthy-draft" });
+  expect(draft.project).toBe("repo"); expect(draft.canSend).toBe(true);
+  expect((await workbenchCatalog(fake.context)).projectGroups.find(group => group.projectRef === "repo")?.selected).toBe(true);
+  const repaired = await workbenchCommand(fake.context, { action: "default-project", path: "/host/repaired", "request-key": "repair-default" });
+  expect(repaired.projectPath).toBe("/host/repaired"); expect(fake.starts).toHaveLength(0);
+}));
+
+test("large grouped catalogs stay inside the SDK reply limit without deleting stored sessions", () => fixture(async fake => {
+  await mkdir(join(fake.context.dir, "sessions"));
+  const sessions = Array.from({ length: 200 }, (_, index) => ({ id: `saved-${index}`, title: "中".repeat(200), projectRef: "repo", workIds: [], selectedWorkId: null, turns: [] }));
+  await writeFile(join(fake.context.dir, "sessions/index.json"), JSON.stringify({ version: 1, selected: "saved-0", draftProject: "repo", sessions }));
+  const catalog = await workbenchCatalog(fake.context);
+  expect(Buffer.byteLength(JSON.stringify(catalog))).toBeLessThanOrEqual(192_000);
+  expect(catalog.sessions.some(session => session.id === "saved-0" && session.selected)).toBe(true);
+  expect(catalog.sessions.length).toBeLessThan(200);
+  expect(catalog.projectGroups.flatMap(group => group.sessions).length).toBe(catalog.sessions.length);
+  expect(catalog.notice).toContain("全部记录仍保留");
+  expect((await loadSessions(fake.context)).sessions).toHaveLength(200);
 }));

@@ -1086,6 +1086,72 @@
           },
           "notice": {
             "type": "string"
+          },
+          "defaultProject": {
+            "type": "string"
+          },
+          "projectGroups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectRef": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "selected": {
+                  "type": "boolean"
+                },
+                "sessions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "project": {
+                        "type": "string"
+                      },
+                      "selected": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "project",
+                      "selected"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "hasSessions": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "projectRef",
+                "label",
+                "path",
+                "isDefault",
+                "selected",
+                "sessions",
+                "hasSessions"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -1097,7 +1163,9 @@
           "selectedSession",
           "requestKey",
           "configured",
-          "notice"
+          "notice",
+          "defaultProject",
+          "projectGroups"
         ],
         "additionalProperties": false
       },
@@ -1600,7 +1668,8 @@
               "select",
               "new",
               "retry",
-              "register-project"
+              "register-project",
+              "default-project"
             ]
           },
           "request-key": {
@@ -1656,7 +1725,8 @@
     "modules.report-health",
     "agent.stream",
     "projects.list",
-    "projects.register"
+    "projects.register",
+    "projects.default"
   ],
   "packages": [],
   "secrets": [],

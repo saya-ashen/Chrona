@@ -29,10 +29,32 @@ function validProject(raw: unknown): raw is Project {
   const value = raw as Record<string, unknown>;
   return id.safeParse(value.projectRef).success && typeof value.path === "string" && typeof value.label === "string";
 }
+async function defaultProject(context: CodingContext, path?: string): Promise<Project> {
+  const project = await context.call<unknown>("projects.default", path === undefined ? {} : { path });
+  if (!validProject(project)) throw codingError("conflict", "项目服务返回了无效目录引用。");
+  return project;
+}
+async function initializeDraft(context: CodingContext, journal: CodingSessions, project?: Project) {
+  if (!journal.draftProject) {
+    journal.draftProject = (project ?? await defaultProject(context)).projectRef;
+    await saveSessions(context, journal);
+  }
+  return journal.draftProject;
+}
+async function restoreSessionProjects(context: CodingContext, journal: CodingSessions) {
+  let changed = false;
+  for (const session of journal.sessions) {
+    if (session.projectRef || !session.workIds.length) continue;
+    const work = await readCodingWork(context, session.workIds[0]!);
+    const start = executionStartSchema.safeParse(work.start);
+    if (start.success) { session.projectRef = start.data.projectRef; changed = true; }
+  }
+  return changed;
+}
 async function adoptLegacyWorks(context: CodingContext, journal: CodingSessions) {
   let entries: string[];
   try { entries = await readdir(context.dir); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
-  let changed = false;
+  let changed = await restoreSessionProjects(context, journal);
   for (const name of entries.sort()) {
     if (!name.endsWith(".json") || name === "works-v2.json") continue;
     const workId = name.slice(0, -5);
@@ -46,17 +68,63 @@ async function adoptLegacyWorks(context: CodingContext, journal: CodingSessions)
   }
   if (changed) await saveSessions(context, journal);
 }
+const projectReadError = (error: unknown) => ["invalid", "conflict", "not_found", "unavailable"].includes((error as { code?: string }).code ?? "");
+async function catalogProjects(context: CodingContext, journal: CodingSessions) {
+  let registered: Project[] = [], automatic: Project | undefined, notice = "直接编辑所选目录；每轮最多 10 分钟、30 次工具调用。";
+  try { registered = await projects(context); }
+  catch (error) { if (!projectReadError(error)) throw error; notice = "暂时无法读取项目目录。已有对话仍保留，请稍后重试。"; }
+  try {
+    automatic = await defaultProject(context);
+    await initializeDraft(context, journal, automatic);
+    if (!registered.some(project => project.projectRef === automatic!.projectRef)) registered.unshift(automatic);
+  } catch (error) { if (!projectReadError(error)) throw error; notice = "默认空间暂不可用。仍可打开已有项目与对话，或在默认空间设置中指定有效目录。"; }
+  return { registered, automatic, notice };
+}
+function groupedSessions(journal: CodingSessions, registered: Project[], automatic?: Project) {
+  const known = new Map(registered.map(project => [project.projectRef, project]));
+  if (automatic) known.set(automatic.projectRef, automatic);
+  for (const projectRef of [journal.draftProject, ...journal.sessions.map(session => session.projectRef ?? "")]) {
+    if (projectRef !== undefined && !known.has(projectRef)) known.set(projectRef, { projectRef, label: projectRef || "已保存项目", path: "" });
+  }
+  const ordered = journal.sessions.map((session, index) => ({ session, index, at: (session.turns ?? []).reduce((last, turn) => Math.max(last, Date.parse(turn.createdAt)), 0) }))
+    .sort((a, b) => b.at - a.at || b.index - a.index).map(item => item.session);
+  const row = (session: CodingSession) => ({ id: session.id, title: session.title, project: known.get(session.projectRef ?? "")!.label, selected: session.id === journal.selected });
+  const sessions = ordered.map(row);
+  const selectedProject = journal.selected ? journal.sessions.find(session => session.id === journal.selected)?.projectRef ?? "" : journal.draftProject;
+  const projectGroups = [...known.values()].map(project => {
+    const grouped = ordered.filter(session => (session.projectRef ?? "") === project.projectRef).map(row);
+    return { ...project, isDefault: project.projectRef === automatic?.projectRef, selected: project.projectRef === selectedProject, sessions: grouped, hasSessions: grouped.length > 0 };
+  });
+  return { sessions, projectGroups };
+}
+type Catalog = ReturnType<typeof groupedSessions> & { projects: string[]; projectOptions: {value: string; label: string}[]; projectDetails: Project[]; defaultProject: string; hasSessions: boolean; selectedSession: string; requestKey: string; configured: boolean; notice: string };
+function boundedCatalog(catalog: Catalog) {
+  // Keep the selected conversation and most recent user turns inside the SDK reply budget.
+  while (Buffer.byteLength(JSON.stringify(catalog)) > 192_000) {
+    catalog.notice = "侧栏只显示最近的部分对话与项目，全部记录仍保留。";
+    const index = catalog.sessions.findLastIndex(session => !session.selected);
+    if (index >= 0) {
+      const [removed] = catalog.sessions.splice(index, 1);
+      for (const group of catalog.projectGroups) { group.sessions = group.sessions.filter(session => session.id !== removed!.id); group.hasSessions = !!group.sessions.length; }
+    } else {
+      const index = catalog.projectGroups.findLastIndex(group => !group.selected && !group.hasSessions);
+      if (index < 0) throw codingError("too_large", "当前项目显示信息过大，请缩短项目路径或对话标题。");
+      const [group] = catalog.projectGroups.splice(index, 1);
+      catalog.projects = catalog.projects.filter(ref => ref !== group!.projectRef);
+      catalog.projectOptions = catalog.projectOptions.filter(item => item.value !== group!.projectRef);
+      catalog.projectDetails = catalog.projectDetails.filter(item => item.projectRef !== group!.projectRef);
+    }
+  }
+  return catalog;
+}
 export function workbenchCatalog(context: CodingContext) {
   return serializeConversation(async () => {
     const journal = await loadSessions(context);
     await adoptLegacyWorks(context, journal);
-    let registered: Project[] = [], notice = "直接编辑所选目录；每轮最多 10 分钟、30 次工具调用。";
-    try { registered = await projects(context); }
-    catch (error) { if ((error as { code?: string }).code !== "unavailable") throw error; notice = "暂时无法读取项目目录。已有对话仍保留，请稍后重试。"; }
-    if (!registered.length && notice.startsWith("直接")) notice = "先添加主机上已有的项目目录，即可开始编码。";
-    const sessions = journal.sessions.slice().reverse().map(session => ({ id: session.id, title: session.title, project: registered.find(project => project.projectRef === session.projectRef)?.label ?? session.projectRef ?? "尚未选择项目", selected: session.id === journal.selected }));
-    return { projects: registered.map(item => item.projectRef), projectOptions: registered.map(item => ({ value: item.projectRef, label: `${item.label} · ${item.path}` })), projectDetails: registered,
-      sessions, hasSessions: sessions.length > 0, selectedSession: journal.selected ?? "", requestKey: randomUUID(), configured: registered.length > 0, notice };
+    const { registered, automatic, notice } = await catalogProjects(context, journal);
+    const { sessions, projectGroups } = groupedSessions(journal, registered, automatic);
+    return boundedCatalog({ projects: registered.map(item => item.projectRef), projectOptions: registered.map(item => ({ value: item.projectRef, label: `${item.label} · ${item.path}` })), projectDetails: registered,
+      defaultProject: automatic?.projectRef ?? "", projectGroups, sessions, hasSessions: sessions.length > 0, selectedSession: journal.selected ?? "", requestKey: randomUUID(), configured: !!automatic, notice });
   });
 }
 async function latestPatch(context: CodingContext, workId: string) {
@@ -71,8 +139,18 @@ function boundProgress(progress: { sequence: number; text: string }[]) {
   let bytes = 0;
   return progress.slice().reverse().filter(item => { bytes += Buffer.byteLength(JSON.stringify(item)); return bytes <= 16_000; }).reverse();
 }
-function emptyDetail() {
-  return { sessionId: "", workId: "", goal: "新的编码对话", project: "", projectLabel: "本机项目", projectPath: "", status: "准备开始", statusTone: "neutral", canSend: false, canStop: false, canRetry: false, stop: "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; choices: { questionId: string; label: string }[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
+function emptyDetail(project?: Project) {
+  return { sessionId: "", workId: "", goal: "新的编码对话", project: project?.projectRef ?? "", projectLabel: project?.label ?? "本机项目", projectPath: project?.path ?? "", status: "准备开始", statusTone: "neutral", canSend: !!project, canStop: false, canRetry: false, stop: project ? "发送你的需求，即可开始编码。" : "选择项目并发送你的需求。", output: "", patch: "", messages: [] as ConversationMessage[], progress: [] as { sequence: number; text: string }[], limited: false, hasQuestions: false, questions: [] as { id: string; title: string; method: string; options: string[]; choices: { questionId: string; label: string }[]; help: string }[], results: [] as { id: string; ref: string; status: string }[], requestKey: randomUUID(), hasEarlier: false, historyBefore: "", historyPage: "" };
+}
+async function draftDetail(context: CodingContext, journal: CodingSessions) {
+  try {
+    const projectRef = await initializeDraft(context, journal);
+    const project = await conversationProject(context, projectRef);
+    return emptyDetail({ projectRef, label: project.projectLabel, path: project.projectPath });
+  } catch (error) {
+    if (!projectReadError(error)) throw error;
+    return { ...emptyDetail(), stop: "默认空间暂不可用，请在侧栏设置有效目录，或新建其他项目的对话。" };
+  }
 }
 async function resolveSession(context: CodingContext, journal: CodingSessions, workId?: string, sessionId?: string) {
   if ([workId, sessionId].some(value => value && !id.safeParse(value).success)) throw codingError("invalid", "请选择有效的对话。");
@@ -86,7 +164,7 @@ async function resolveSession(context: CodingContext, journal: CodingSessions, w
 export function workbenchDetail(context: CodingContext, workId = "", sessionId = "", before = "") {
   return serializeConversation(async () => {
     const journal = await loadSessions(context), session = await resolveSession(context, journal, workId, sessionId);
-    return session ? detail(context, session, before) : emptyDetail();
+    return session ? detail(context, session, before) : draftDetail(context, journal);
   });
 }
 async function workMessages(context: CodingContext, session: CodingSession, workId: string, assistant: ConversationMessage[]) {
@@ -182,7 +260,7 @@ export function workbenchCommand(context: CodingContext, raw: unknown) {
   return serializeConversation(async () => {
     const args = parseConversationCommand(raw), journal = await loadSessions(context);
     const current = await resolveSession(context, journal, args["work-id"], args["session-id"]);
-    const session = await applyConversationCommand(context, args, journal, current, async () => (await projects(context)).map(project => project.projectRef));
-    return session ? detail(context, session) : emptyDetail();
+    const session = await applyConversationCommand(context, args, journal, current, { list: async () => (await projects(context)).map(project => project.projectRef), default: async path => (await defaultProject(context, path)).projectRef });
+    return session ? detail(context, session) : draftDetail(context, journal);
   });
 }

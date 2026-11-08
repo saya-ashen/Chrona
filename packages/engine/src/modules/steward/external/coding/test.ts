@@ -116,11 +116,22 @@ try {
 } finally { await rm(dir, { recursive: true, force: true }); }
 
 let readiness: Record<string, unknown> | undefined;
-let projects: { projectRef: string; path: string; label: string }[] = [];
+type Project = { projectRef: string; path: string; label: string };
+let projects: Project[] = [], automatic: Project | undefined;
 const registrations: Record<string, unknown>[] = [];
+function registerProject(path: string) {
+  let project = projects.find(project => project.path === path);
+  if (!project) { project = { projectRef: `project-${projects.length}`, path, label: path.split("/").filter(Boolean).at(-1)! }; projects.push(project); }
+  return project;
+}
 const runtime = await startModule("index.ts", { stubs: {
   "projects.list": () => ({ projects }),
-  "projects.register": (args: Record<string, unknown>) => { registrations.push(args); return { projectRef: "registered", path: String(args.path), label: "registered" }; },
+  "projects.register": (args: Record<string, unknown>) => { registrations.push(args); return registerProject(String(args.path)); },
+  "projects.default": (args: Record<string, unknown>) => {
+    assert.deepEqual(Object.keys(args), args.path === undefined ? [] : ["path"]);
+    if (args.path !== undefined || !automatic) automatic = registerProject(String(args.path ?? "/host/default"));
+    return automatic;
+  },
   "modules.report-health": (args: Record<string, unknown>) => { readiness = args; return { reportedAt: "2026-11-05T00:00:00Z", expiresAt: "2026-11-05T00:10:00Z" }; },
   "web.page-set": () => ({ id: "main" }), "schedules.create": () => ({ key: "coding-dependencies" }),
 } });
@@ -149,6 +160,21 @@ try {
     assert.equal((await runtime.send({ trigger: { kind: "health", id: "health", firedAt: now }, now, params: {} })).error, undefined);
     assert.equal(readiness.status, expected);
   }
+  const ui = async (id: string, args: Record<string, unknown> = {}) => {
+    const reply = await runtime.send({ trigger: { kind: "tool", id, firedAt: now, args, caller: { kind: "owner", via: null } }, now, params: {} });
+    assert.equal(reply.error, undefined);
+    return reply.result?.result as Record<string, unknown>;
+  };
+  const catalog = await ui("ui-catalog");
+  assert.equal(catalog.defaultProject, automatic!.projectRef);
+  assert.equal(catalog.selectedSession, "");
+  assert.deepEqual(catalog.sessions, []);
+  assert.deepEqual(catalog.projectGroups, [{ ...automatic, isDefault: true, selected: true, sessions: [], hasSessions: false }]);
+  const initial = await ui("ui-work");
+  assert.equal(initial.project, automatic!.projectRef);
+  assert.equal(initial.projectPath, "/host/default");
+  assert.equal(initial.canSend, true);
+  assert.equal(initial.sessionId, "");
   const register = { action: "register-project", "request-key": "directory", path: "/host/new project" };
   const providerRegister = await runtime.send({ trigger: { kind: "tool", id: "ui-command", firedAt: now, args: register, caller: { kind: "provider", runId: "p" } }, now, params: {} });
   assert.equal((providerRegister as { errorCode?: string }).errorCode, "forbidden");
@@ -156,4 +182,18 @@ try {
   const ownerRegister = await runtime.send({ trigger: { kind: "tool", id: "ui-command", firedAt: now, args: register, caller: { kind: "owner", via: null } }, now, params: {} });
   assert.equal(ownerRegister.error, undefined);
   assert.deepEqual(registrations, [{ path: "/host/new project" }]);
+  const registered = projects.find(project => project.path === register.path)!;
+  const registeredDraft = ownerRegister.result?.result as Record<string, unknown>;
+  assert.equal(registeredDraft.project, registered.projectRef);
+  assert.equal(registeredDraft.sessionId, "");
+  assert.equal(registeredDraft.canSend, true);
+  assert.equal((await ui("ui-work")).project, registered.projectRef);
+  const custom = await ui("ui-command", { action: "default-project", "request-key": "custom-default", path: "/host/custom" });
+  assert.equal(custom.projectPath, "/host/custom");
+  assert.equal((await ui("ui-catalog")).defaultProject, custom.project);
+  assert.equal((await ui("ui-command", { action: "new", "request-key": "scoped-draft", project: registered.projectRef })).project, registered.projectRef);
+  assert.equal((await ui("ui-work")).project, registered.projectRef);
+  assert.equal((await ui("ui-command", { action: "new", "request-key": "global-draft" })).project, custom.project);
+  assert.equal((await ui("ui-command", { action: "default-project", "request-key": "current-default" })).project, custom.project);
+  assert.deepEqual((await ui("ui-catalog")).sessions, []);
 } finally { await runtime.stop(); }

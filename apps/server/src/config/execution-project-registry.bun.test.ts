@@ -42,7 +42,7 @@ test("default projects provision once, persist across restart and appear in conc
     expect(await listing).toEqual({ projects: [project] });
     expect(dirname(project.path)).toBe(await realpath(join(root, "workspaces")));
     expect(basename(project.path)).toMatch(/^[a-f0-9]{64}$/);
-    expect(project.label).toBe(basename(project.path));
+    expect(project.label).toBe("默认空间");
     expect((await stat(project.path)).isDirectory()).toBe(true);
     expect(await readdir(project.path)).toEqual([]);
     expect(await registry.register(principal, project.path)).toEqual(project);

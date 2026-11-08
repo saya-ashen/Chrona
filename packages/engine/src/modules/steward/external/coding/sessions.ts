@@ -13,7 +13,7 @@ export type ConversationTurn = {
   questionId?: string; answer?: { decision: "submit"; value: string | number | boolean };
 };
 export type CodingSession = { id: string; title: string; workIds: string[]; selectedWorkId: string | null; projectRef?: string; turns?: ConversationTurn[] };
-export type CodingSessions = { version: 1; selected: string | null; sessions: CodingSession[] };
+export type CodingSessions = { version: 1; selected: string | null; draftProject?: string; sessions: CodingSession[] };
 const validId = (value: unknown) => executionIdSchema.safeParse(value).success;
 const record = (raw: unknown): raw is Record<string, unknown> => !!raw && typeof raw === "object" && !Array.isArray(raw);
 export const pendingTurn = (turn: ConversationTurn) => !turn.accepted && !turn.rejected;
@@ -43,7 +43,7 @@ function validSession(raw: unknown): raw is CodingSession {
   return (raw.projectRef === undefined || validId(raw.projectRef)) && validTurns(raw.turns, workIds);
 }
 function validJournal(raw: unknown): raw is CodingSessions {
-  if (!record(raw) || raw.version !== 1 || !Array.isArray(raw.sessions) || raw.sessions.length > 1000) return false;
+  if (!record(raw) || raw.version !== 1 || !Array.isArray(raw.sessions) || raw.sessions.length > 1000 || raw.draftProject !== undefined && !validId(raw.draftProject)) return false;
   if (!raw.sessions.every(validSession)) return false;
   const sessions = raw.sessions;
   if (new Set(sessions.map(item => item.id)).size !== sessions.length) return false;

@@ -100,12 +100,14 @@ export function createExecutionProjectRegistry(dataDir: string): NonNullable<Ste
           await checkDirectory(row);
           return view(row);
         }
+        const automatic = path === undefined;
         if (path === undefined) {
           const scope = JSON.stringify([principal.workspaceId, principal.ownerId, key(principal)]);
           path = join(workspaces, createHash("sha256").update(scope).digest("hex"));
           await mkdir(path, { recursive: true, mode: 0o700 });
         }
         const row = await registered(registry, principal, path);
+        if (automatic) row.label = "默认空间";
         if (pointer) pointer.projectRef = row.projectRef;
         else registry.defaults.push({ workspaceId: row.workspaceId, ownerId: row.ownerId, callerKey: row.callerKey, projectRef: row.projectRef });
         await save(registry);
