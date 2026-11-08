@@ -11,7 +11,6 @@ import { systemComponents } from "./system/components";
 import { systemPage, type SystemParams } from "./system/page";
 import { ChatHost } from "./system/chat-stream";
 import { Workspace, WorkspaceHeader, ViewTabs, Composer, Panel, ScrollArea, Message, CodeDiff, ActionOption } from "./workspace";
-import rendererStyles from "./pages.css" with { type: "text" };
 
 type Args = Record<string, unknown>;
 type Source = { tool: string; args?: Args; refresh?: number };
@@ -202,7 +201,6 @@ export function PageView({ page, deps, system }: { page: Page; deps: Deps; syste
   }, refresh } : null;
   return <JSONUIProvider registry={currentRegistry} store={store} handlers={handlers} navigate={deps.navigate}>
     <div className={system ? "registered-page system-page" : "registered-page"}>
-      <style>{rendererStyles}</style>
       {!system ? <h2>{page.title}</h2> : null}
       {loading ? <p role="status" aria-live="polite" className="page-loading muted">正在读取应用数据……</p> : null}
       {feedback ? <p role="status" className={`page-feedback ${feedback.failed ? "error" : "muted"}`}>{feedback.text}</p> : null}

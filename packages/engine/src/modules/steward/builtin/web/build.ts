@@ -4,3 +4,8 @@ const result = await Bun.build({ entrypoints: ["src/pages.tsx"], target: "browse
 if (!result.success) throw new Error(result.logs.join("\n"));
 await Bun.write("pages.js", `// Built from src/pages.tsx by build.ts; do not edit.\n${await result.outputs[0]!.text()}`);
 export {};
+
+// Serve component styles through the existing same-origin stylesheet under the Web CSP.
+const marker = "/* Shared renderer primitives:";
+const shell = (await Bun.file("style.css").text()).split(marker)[0]!.trimEnd();
+await Bun.write("style.css", `${shell}\n\n${await Bun.file("src/pages.css").text()}`);

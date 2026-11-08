@@ -1240,6 +1240,25 @@
                 },
                 "help": {
                   "type": "string"
+                },
+                "choices": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "questionId",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -1247,7 +1266,8 @@
                 "title",
                 "method",
                 "options",
-                "help"
+                "help",
+                "choices"
               ],
               "additionalProperties": false
             }
@@ -1274,6 +1294,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "projectLabel": {
+            "type": "string"
+          },
+          "projectPath": {
+            "type": "string"
           }
         },
         "required": [
@@ -1297,7 +1323,9 @@
           "messages",
           "progress",
           "questions",
-          "results"
+          "results",
+          "projectLabel",
+          "projectPath"
         ],
         "additionalProperties": false
       },
@@ -1450,6 +1478,25 @@
                 },
                 "help": {
                   "type": "string"
+                },
+                "choices": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "questionId",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               },
               "required": [
@@ -1457,7 +1504,8 @@
                 "title",
                 "method",
                 "options",
-                "help"
+                "help",
+                "choices"
               ],
               "additionalProperties": false
             }
@@ -1484,6 +1532,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "projectLabel": {
+            "type": "string"
+          },
+          "projectPath": {
+            "type": "string"
           }
         },
         "required": [
@@ -1507,7 +1561,9 @@
           "messages",
           "progress",
           "questions",
-          "results"
+          "results",
+          "projectLabel",
+          "projectPath"
         ],
         "additionalProperties": false
       },
