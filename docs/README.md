@@ -4,13 +4,14 @@
 
 - [English README](../README.md) / [中文 README](../README.zh.md): purpose, pages, setup, configuration and limits.
 - [运维说明](zh/operations.md): data directories, backups, recovery, health and QQ diagnostics (Chinese).
+- [连续编码工作台](zh/coding-web-workbench.md): add local directories, edit directly, continue conversations, answer questions and stop; development status and current limits.
 
 ## Product and development
 
 - [设计目标](zh/steward-goals.md): product authority; goals are not a shipped-feature checklist.
 - [开发目标与统一路线](zh/development-roadmap.md): current backlog, priorities, dependencies and documentation status; prioritizes the usable coding Web workbench, records the five-builtin customization decision and tracks release gaps.
-- [编码工作台实现评估](zh/coding-workbench-implementation-assessment.md): confirmed local-directory scope, non-Git support, continuous coding sessions, implementation gaps and validation order.
-- [编码工作台参考项目调研](zh/workbench-reference-research.md): primary sources, interaction comparisons and provisional design choices; research and scenario comparison precede the next page implementation.
+- [编码工作台实现评估](zh/coding-workbench-implementation-assessment.md): approved scope and retained pre-implementation analysis; [开发验证记录](zh/coding-workbench-validation.md) covers the integrated implementation, regression checks and browser evidence.
+- [编码工作台参考项目调研](zh/workbench-reference-research.md): primary sources and interaction comparisons behind the approved lightweight conversation page.
 - [当前架构](zh/architecture.md): implementation map, trust model and module lifecycle.
 - [调用上下文、Run 与产出](zh/call-context-run-artifact-roadmap.md): later architecture work after the usable workbench; freeze the minimum delegation contract when starting that architecture change.
 - [Agent 原语与应用编排](zh/agent-module-orchestration.md) / [基础编码工作台](zh/coding-web-workbench.md): current application ownership, interfaces and product limits.

@@ -1,6 +1,6 @@
 # 编码工作台实现评估
 
-日期：2026-11-08。状态：实现前评估，用户已确认下述范围；本文未交付这些运行时能力。界面方向见[交互原型](../prototypes/coding-workbench/index.html)，参考研究见[项目调研](workbench-reference-research.md)，总体顺序见[开发路线](development-roadmap.md)。
+日期：2026-11-08。状态：保留的实现前评估；下文“已有/缺口”描述开发前基线。用户确认的首版现已完成开发集成，当前能力见[工作台使用说明](coding-web-workbench.md)，证据与未覆盖范围见[开发验证记录](coding-workbench-validation.md)。界面方向见[交互原型](../prototypes/coding-workbench/index.html)，参考研究见[项目调研](workbench-reference-research.md)，总体顺序见[开发路线](development-roadmap.md)。
 
 ## 已确认的首版范围
 
