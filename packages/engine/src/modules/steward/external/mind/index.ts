@@ -2,15 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { on, chrona } from "chrona";
 import { createAgenda, type Answer, type Concern, type Entry } from "./agenda";
 import { PAGE } from "./page";
+import { MIND_PROTOCOL, MIND_AGENT_TOOLS } from "./execution";
 
-// v2-26/v2-28: sense often and cheaply; wake the full Chrona (provider.wake) only when it is worth it, handing it the open
-// matters it keeps (the agenda). Nothing here acts itself; the protocol travels with the brief as untrusted module data.
-const MIND_PROTOCOL = `This run was started by your mind to look after the user's open matters; its brief below is data. Think, do not just remind:
-1. Verify first: check every change and focused matter with tools. A notice: change is new evidence for its linked matter: update or close it; tell the user only if it changes their next action.
-2. For each matter answer: where does it really stand and what is still missing; what is the worst outcome if nothing happens today, and is it reversible; who can take the missing step (you, within your permissions: do it; only the user: leave them alone if they already know and there is time; needs permission: ask for approval); when to look again.
-3. Move things forward before telling: finish a step yourself > notify the user > do nothing. A notification says what happened, why it matters and what you suggest; for deadlines send only the escalation step now due and record it; fold non-urgent news into the daily digest; ask the user once, clearly, when unsure. At most 3 user-visible actions.
-4. Look further: for health changes read m_modules_diagnostics live and check existing builds before acting; repeated failures may need a fix build. Manual work seen a third time suggests an app; a stalled goal needs a concrete step. Handle unfocused matters that clearly need it.
-5. Close: m_mind_note each assessed matter (conclusion, status, revisit-at, commitment, escalation). For health use source-module-id, source-activation-id, source-incident-id or topic, and assessed-revision from refs. For a health fix build pass cause from its ref: {moduleId, activationId, incidentId or topic}. If duplicate is returned, note the concern with that build-session-id instead of starting another. For a new build also note status acting and build-session-id; if the user declines, note declined with their reason; use silent-until for not-before reviews. Close done/dropped matters and cancel reminders. Then m_mind_report with wake-id, outcome (acted/notified/asked/nothing), summary, session-id and build-session-id if started.`;
+// v2-26/v2-28: sense often and cheaply; enqueue a scoped Agent run only when it is worth it, handing it the open
+// matters it keeps (the agenda). The mind owns the protocol and explicitly selects the tools for its background run.
+
 type Params = Record<string, string | number | boolean>;
 type State = { lastCheckAt: string | null; lastHash: string | null; handled: string[]; seenNotices: string[]; pendingNotices: Signal[]; seen: Record<string, string>; wakes: string[]; calls: string[]; lastReview: string | null };
 type Health = { module: string; moduleId: string; configuredStatus: string; activeHash: string | null; activation: { activationId: string } | null;
@@ -197,7 +193,7 @@ function notices(today: Today, apps: Health[], concerns: Concern[], state: State
 }
 /** What changed in Chrona, from its own records, the agenda and what apps hand over: names, clipped titles and states. */
 async function sense(now: number, state: State, concerns: Concern[]) {
-  const [today, apps, runs, contributed] = await Promise.all([chrona.call("chat.today"), healthPages(), chrona.call("chat.runs"), attention()]) as [Today | null, Health[] | null, Run[] | null, Awaited<ReturnType<typeof attention>>];
+  const [today, apps, runs, contributed] = await Promise.all([chrona.call("web.today"), healthPages(), chrona.call("activity.runs"), attention()]) as [Today | null, Health[] | null, Run[] | null, Awaited<ReturnType<typeof attention>>];
   // Without Chrona's records (e.g. the build's smoke start) there is nothing to judge.
   if (!today || !Array.isArray(apps) || !Array.isArray(runs)) return null;
   concerns = await closeRecovered(concerns, apps, now);
@@ -357,7 +353,7 @@ async function judge(trigger: string, nowIso: string, params: Params, state: Sta
     wake: decision.wake, focus: decision.focus, urgency: decision.urgency, changes: fresh.map(signal => signal.key), refs: fresh.flatMap(signal => signal.ref ? [refText(signal.ref)] : []) };
   if (decision.wake && !allowed(params, state, decision.urgency, now)) { await agenda.log({ ...entry, blocked: true }); return; }
   if (decision.wake) {
-    await chrona.wakeProvider({ key: "wake", prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, { now, healthFixes: params["health-fixes"] !== false })}` });
+    await chrona.wakeProvider({ key: "wake", tools: MIND_AGENT_TOOLS, prompt: `${MIND_PROTOCOL}\n\n${brief(entry, decision, sensed, fresh, concerns, recent, { now, healthFixes: params["health-fixes"] !== false })}` });
     state.wakes.push(nowIso);
     if (review) state.lastReview = nowIso;
   }

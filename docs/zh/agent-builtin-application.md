@@ -1,5 +1,7 @@
 # Agent 内置应用
 
+当前业务调用方优先使用 context/run/get/stream/write/interrupt/respond 原语，应用自己管理会话和业务流程。下文 start/status/inject/abort 等接口保留底层和既有调用说明；完整当前边界见[Agent 原语与应用编排](agent-module-orchestration.md)。
+
 2026-11-07 开发变更。本文区分实现、验证和试用状态；生产部署不在范围。
 
 ## 职责

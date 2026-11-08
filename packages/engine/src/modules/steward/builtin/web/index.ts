@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 import { todayView } from "./today";
-import { conversationOptions, endIdleConversations } from "./conversation";
+import { createAgentConversations, isAgentConversation } from "./agent-conversations";
 
 // "/" serves the static page (no data). "/api/web/*" is the page's data API: Chrona checks the user's key before it
 // forwards a request here, and every answer comes from routed calls (v2-8).
@@ -12,7 +12,6 @@ const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
   "content-security-policy": "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
-setInterval(() => void endIdleConversations(call).catch(error => console.error(JSON.stringify({ component: "web", event: "idle_cleanup_failed", error: String(error).slice(0, 300) }))), 3600000);
 const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409, conflict: 409, unavailable: 503 };
 const NO_ROUTE = Symbol("no-route");
 type ApiContext = { request: Request; url: URL; path: string[]; body: Args; route: string };
@@ -25,6 +24,13 @@ let ping: ReturnType<typeof setInterval> | undefined;
 function send(chunk: string) {
   for (const stream of streams) try { stream.enqueue(encoder.encode(chunk)); } catch { streams.delete(stream); }
 }
+const conversations = createAgentConversations({ dataDir: chrona.paths.data, call, reply: event => send(`data: ${JSON.stringify({ type: "reply", ...event })}\n\n`) });
+let polling = false;
+setInterval(() => {
+  if (polling) return;
+  polling = true;
+  void conversations.poll().catch(error => console.error(JSON.stringify({ component: "web", event: "conversation_poll_failed", error: String(error).slice(0, 300) }))).finally(() => { polling = false; });
+}, 1000);
 function events() {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const body = new ReadableStream<Uint8Array>({
@@ -56,8 +62,8 @@ on("tool", async (event: { id: string; args: Args; caller?: Caller }) => {
 
 async function getSessions() {
   // Web conversations and module builds (v2-13), newest first.
-  const lists = await Promise.all(["web", "build"].map(source => call("chat.sessions", { source, status: "active" }) as Promise<{ lastActivityAt: string }[]>));
-  return lists.flat().sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
+  const lists = await Promise.all(["web", "build"].map(source => call("history.sessions", { source, status: "active" }) as Promise<{ lastActivityAt: string }[]>));
+  return [...await conversations.list(), ...lists.flat()].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
 }
 async function getSettings() {
   // Settings page (v2-9): settings, grant rules, preferences, schedules and credentials (v2-16, names only) in one read.
@@ -66,9 +72,13 @@ async function getSettings() {
 }
 async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
   if (path[0] !== "sessions") return NO_ROUTE;
-  if (request.method === "GET" && path[2] === "transcript" && path.length === 3) return call("chat.transcript", { session: path[1] });
-  if (request.method === "GET" && path[2] === "messages" && path.length === 3) return call("chat.messages", { session: path[1], limit: 100 });
+  if (request.method === "GET" && path.length === 3) return readConversation(path[1]!, path[2]!);
   if (request.method === "POST" && path.length === 3 && ["stop-build", "revise-build"].includes(path[2]!)) return call(`modules.${path[2]}`, { session: path[1], ...(path[2] === "revise-build" ? { requirements: body.requirements } : {}) });
+  return NO_ROUTE;
+}
+function readConversation(session: string, part: string): Promise<ApiResult> | typeof NO_ROUTE {
+  if (part === "transcript") return isAgentConversation(session) ? conversations.transcript(session) : call("history.transcript", { session });
+  if (part === "messages") return isAgentConversation(session) ? conversations.messages(session) : call("history.messages", { session, limit: 100 });
   return NO_ROUTE;
 }
 async function approvalRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
@@ -92,8 +102,12 @@ async function secretRoute({ request, path, body }: ApiContext): Promise<ApiResu
   return NO_ROUTE;
 }
 async function runRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
-  if (request.method === "POST" && path[0] === "interactions" && path[2] === "answer" && path.length === 3) return call("chat.answer", { interaction: path[1], answer: JSON.stringify(body) });
-  if (request.method === "POST" && path[0] === "runs" && path[2] === "cancel" && path.length === 3) return call("chat.cancel", { run: path[1] });
+  if (request.method === "POST" && path[0] === "interactions" && path[2] === "answer" && path.length === 3) {
+    return conversations.answer(path[1]!, body);
+  }
+  if (request.method === "POST" && path[0] === "runs" && path[2] === "cancel" && path.length === 3) {
+    return conversations.interrupt(path[1]!);
+  }
   return NO_ROUTE;
 }
 // /modules/<module>/<view>: read-only views, and (v2-23) one app's page in one read and its own settings.
@@ -129,13 +143,13 @@ async function api(request: Request, path: string[]) {
     "GET /today": () => todayView(call),
     "GET /sessions": () => getSessions(),
     "POST /chat": async () => {
-      // An existing conversation continues under its key; without one the first message starts a new conversation.
-      const key = body.session ? (await call("chat.session", { session: body.session }) as { key: string }).key : `web:${crypto.randomUUID()}`;
-      return call("chat.send", { key, text: body.text, channel: "in_app", ...await conversationOptions(call, key, String(body.text)) });
+      // Historical kernel conversations stay readable. New execution belongs to Web's Agent context.
+      if (body.session && !isAgentConversation(String(body.session))) throw Object.assign(new Error("历史会话只供查看，请新建会话继续。"), { code: "conflict" });
+      return conversations.send({ session: typeof body.session === "string" ? body.session : undefined, text: body.text, requestKey: typeof body.requestKey === "string" ? body.requestKey : undefined });
     },
     "GET /settings": () => getSettings(),
     "POST /settings": () => call("settings.update", { settings: JSON.stringify(body) }),
-    "GET /runs": () => call("chat.runs"),
+    "GET /runs": async () => [...await conversations.runs(), ...await call("activity.runs") as unknown[]],
     // v2-18: the kernel's activity trail, worded by the kernel; the page only shows it.
     "GET /activity": () => call("activity.list", { ...(url.searchParams.get("module") ? { module: url.searchParams.get("module") } : {}), ...(url.searchParams.get("before") ? { before: url.searchParams.get("before") } : {}) }),
     "GET /modules": () => call("modules.list"),
@@ -173,7 +187,7 @@ async function fileResponse(request: Request) {
   // A conversation's attachment, served as a download: never rendered as a page of this origin.
   const url = new URL(request.url);
   try {
-    const file = await call("chat.file", { message: url.searchParams.get("message") ?? "", ref: url.searchParams.get("ref") ?? "" }) as { base64: string; mime: string };
+    const file = await call("history.file", { message: url.searchParams.get("message") ?? "", ref: url.searchParams.get("ref") ?? "" }) as { base64: string; mime: string };
     return new Response(Buffer.from(file.base64, "base64"), { headers: { "content-type": file.mime, "x-content-type-options": "nosniff", "content-security-policy": "sandbox; default-src 'none'" } });
   } catch (error) {
     return apiError(error);

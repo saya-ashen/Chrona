@@ -23,7 +23,7 @@ export type Json = z.output<ReturnType<typeof z.json>>;
  * `run`: the module event being handled, for system modules that budget per event (provider.complete).
  */
 /** `deadline` (ms since epoch, v2-13): when the caller stops waiting; system tools that wait finish by then. */
-export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string }; deadline?: number };
+export type CallOrigin = { workspaceId: string; caller: Caller; chain: string[]; path: string[]; run?: { moduleRunId?: string; eventKey?: string; executionRunId?: string }; deadline?: number };
 type Db = StewardPorts["db"] | Prisma.TransactionClient;
 export type Tool = ModuleManifest["tools"][number];
 import { CallError, type CallErrorCode } from "./module-call-error";

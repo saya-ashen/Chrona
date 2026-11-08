@@ -95,8 +95,8 @@ for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? te
   expect(apps.find(row => row.name === "web")?.versions.length).toBeGreaterThan(0);
   // Startup and each page may refresh the app list; every page read still uses attributed routed calls.
   const web = await db.module.findFirstOrThrow({ where: { builtin: true, name: "web" } });
-  const reads = await db.moduleInvocation.findMany({ where: { callerModuleId: web.id, target: { in: ["chat", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true } });
-  expect(reads).toEqual(expect.arrayContaining([{ target: "chat", tool: "runtime", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]));
+  const reads = await db.moduleInvocation.findMany({ where: { callerModuleId: web.id, target: { in: ["activity", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true } });
+  expect(reads).toEqual(expect.arrayContaining([{ target: "activity", tool: "runtime", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]));
   expect(reads.every(read => read.status === "succeeded")).toBe(true);
   let id = 0;
   const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {

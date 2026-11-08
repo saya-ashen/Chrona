@@ -56,7 +56,7 @@ socket.on("close", fail);
 function send(message: unknown) { socket.write(JSON.stringify(message) + "\n"); }
 // Events run one at a time; the shorthands below scope their keys to the event being handled, so a redelivered event
 // repeats them and another event does not (routed calls keep the caller's key as given).
-let current: string | null = null;
+let current: string | null = null, modelSequence = 0;
 const scoped = (key: string) => (current ? `${current}:${key}` : key);
 async function event(message: { id: string; event: { trigger: Trigger; now: string; params: Record<string, string | number | boolean> } }) {
   try {
@@ -65,6 +65,7 @@ async function event(message: { id: string; event: { trigger: Trigger; now: stri
     if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
     current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
+    modelSequence = 0;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code } : {}) }); }
@@ -209,19 +210,36 @@ export const chrona = {
   /** Serves the manifest's `listen` path. Long-poll entries use { idleTimeout: 30 }; omitted keeps Bun's default. */
   // @ts-expect-error Installed bun-types rejects Unix idleTimeout; the real SDK 15s proxy probe verifies runtime support.
   serve: (fetch: (request: Request) => Response | Promise<Response>, options: { idleTimeout?: number } = {}) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch, ...options }),
-  /**
-   * One completion: a routed call to `provider.complete` (uses ["provider.complete"] and the manifest's `model` tier and limits).
-   * Rejects with ModelError code unconfigured, budget_exceeded, provider_error, timeout or undeclared.
-   */
-  model: (params: { system?: string; prompt: string; maxOutputTokens: number }) => chrona.call<ModelResult>("provider.complete", params).catch((error: ModelError) => {
-    throw new ModelError(/^(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(error.message)?.[1] ?? error.code, error.message);
-  }),
+  /** One completion through Agent, charged to this module's event and declared model limits. */
+  model: async (params: { system?: string; prompt: string; maxOutputTokens: number }): Promise<ModelResult> => {
+    try {
+      const started = await chrona.call<{ operationId: string }>("agent.complete", {
+        "command-key": current ? scoped(`model:${++modelSequence}`) : `model:${randomUUID()}`, prompt: params.prompt,
+        ...(params.system === undefined ? {} : { system: params.system }), "max-output-tokens": params.maxOutputTokens,
+      });
+      const deadline = Date.now() + 360_000;
+      while (Date.now() < deadline) {
+        const status = await chrona.call<{ result: ModelResult | null; failure: boolean }>("agent.completion", { "operation-id": started.operationId });
+        if (status.failure) throw new ModelError("provider_error", "Agent completion failed or remains unconfirmed");
+        if (status.result) return status.result;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      throw new ModelError("timeout", "Agent completion remains unconfirmed");
+    } catch (error) {
+      const failure = error as ModelError;
+      throw new ModelError(/(?:^|: )(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(failure.message)?.[1] ?? failure.code, failure.message);
+    }
+  },
   /** Shorthand for an async call to `notify.send` (uses ["notify.send"]); `key` is the idempotency key. */
   notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => chrona.call<CallState>("notify.send", { ...params, key: scoped(params.key) }, { mode: "async", key: scoped(params.key) })
     .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
-  /** Shorthand for an async call to `provider.wake` (uses ["provider.wake"]): the Provider runs with `prompt` as untrusted data. */
-  wakeProvider: (params: { key: string; prompt: string }) => chrona.call<CallState>("provider.wake", { prompt: params.prompt }, { mode: "async", key: scoped(params.key) })
-    .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
+  /** Create an event-keyed Agent context and enqueue the module's explicit prompt and selected tools. */
+  wakeProvider: async (params: { key: string; prompt: string; tools?: string[] }) => {
+    const key = scoped(params.key);
+    const context = await chrona.call<{ contextId: string }>("agent.context", { "request-key": key });
+    const run = await chrona.call<{ runId: string }>("agent.run", { "context-id": context.contextId, "request-key": key, prompt: params.prompt, lane: "background", tools: params.tools ?? [] });
+    return { status: "executed" as const, contextId: context.contextId, runId: run.runId };
+  },
   /**
    * Emit an event this module declares in `contributes.events.emits` (v2-14): a sync call to `events.emit` (uses ["events.emit"]).
    * `name` is the event's own name (the module name is added); `key` is the idempotency key, derived from the triggering event.

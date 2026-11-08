@@ -13,7 +13,7 @@ export type EditorCommandConsumer = {
   [K in ExecutionCommand["op"]]: (input: Omit<Extract<ExecutionCommand, { op: K }>, "op">) => Promise<z.infer<(typeof editorResponseDataSchemas)[K]>>;
 };
 /** coding owns work/results; executions owns the single Run-backed execution. */
-export const CODING_TOOL_OPERATIONS = { create: "start", get: "get", list: "list", send: "send", answer: "answer", cancel: "cancel", results: "results", accept: "accept" } as const;
+export const CODING_TOOL_OPERATIONS = { create: "start", get: "get", "lookup-start": "lookup_start", events: "events", snapshot: "snapshot", list: "list", send: "send", answer: "answer", cancel: "cancel", results: "results", accept: "accept" } as const;
 export const EXECUTION_TOOL_OPERATIONS = { start: "start", get: "get", "lookup-start": "lookup_start", list: "list", send: "send", answer: "answer", cancel: "cancel", events: "events", snapshot: "snapshot" } as const;
 export const EXECUTION_UNRECORDED_TOOLS = ["start", "send", "answer", "start-v2", "workspace-cleanup"] as const;
 export const executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map(([name, op]) => ({

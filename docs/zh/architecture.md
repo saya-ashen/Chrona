@@ -10,9 +10,13 @@
 
 受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。`agent` 已从进程内能力拆为发行内置 SDK 应用：应用进程持有 Pi Provider、操作状态和启动回执，内核经 `agent.start/status/inject/abort/release` 调用，并保留 Run 授权、预算和持久状态。补全使用短启动请求与结果查询，等待不占住取消通道。Agent 的工具向内核和模块开放，模块通过普通 `chrona.call` 使用结构化参数；操作归属由 SDK 真实 caller 绑定，执行准入与模型额度仍按原模块身份检查；`runtime-callback` 仍在内核进程，除内核外仅接受当前受信任内置 Agent 的真实 moduleId/hash/source。其余本机能力 `runtime-callback`、`workspace-local`、`content-local` 继续以进程内方式实现，目录单列“运行能力”。应用页把 Agent 列在内置应用，复用进程诊断与只读自检；模块执行接口不向 owner 暴露操作表单。配置仍来自现有服务启动参数和全局模型／预算设置；当前不新增宿主配置写入口。详见 [Agent 内置应用](agent-builtin-application.md)。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
 
+## Agent 原语与应用编排
+
+当前开发树将 Web、MCP、QQ、mind 和 coding/editor 的执行调用接到 Agent 原语。应用拥有会话、提示词、工作流和交付；内核保留 caller、预算、队列与停止证据。生产注册表已移除 chat/provider/executions；旧记录只经 history 读取，运行事实经 activity 读取。详细接口、旧数据边界和当前限制见[Agent 原语与应用编排](agent-module-orchestration.md)。下文既有内部服务路径不表示它们仍是应用可调用的公开系统目标。
+
 ## 当前开发集成边界
 
-[M1 P0 契约](chrona-workbench-p0-contract.md) 冻结当前开发接口。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。内置仅 web/mcp/files/notify/events；内核与这五个名字无 DB 行也保留。服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行已进入开发集成树。
+[M1 P0 契约](chrona-workbench-p0-contract.md) 冻结当前开发接口。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。内置为 agent/web/mcp/files/notify/events；这些名字由发行身份保留。服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行已进入开发集成树。
 
 A–E 已进入开发集成树：内置 registrar 从可信发行资源恢复并逐项诊断，不通过普通提案更新内置；动态构建、审批和领取事务均复核外置身份。官方安装适配器复用受检提案/构建，固定 request key 的持久回执在构建、审批、迁移恢复后刷新；首次初始化仅入队三个预装外置包，不等待作者测试，删除后不自动复活。未配置适配器仍明确 unavailable。M1 运行时集成、完整 Bun/API、typecheck/lint、三尺寸浏览器及 Linux x64 真实发行 smoke 已完成开发验证；协调者已签署 M1 开发验收，未部署。[P1 契约](chrona-workbench-p1-contract.md)与 [P2 固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现；[M2](chrona-workbench-m2-acceptance.md)、[M3](chrona-workbench-m3-acceptance.md)均已完成开发集成签收，包含真实 Hono/SDK/SQLite、受控 fake Pi、Neovim、独立工作树与设备协议恢复证据。真实模型、个人设备安装、生产部署和公开发行不在该验收范围。历史冻结树与逐项证据保留于各阶段记录，接线细节见[共享接线记录](chrona-workbench-m1-shared-integration.md)。
 
@@ -27,9 +31,9 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 功能归属优先级：**普通模块 → 预装模块 → 内核模块（system）→ 内核本身**。预装是交付方式，不代表更高权限。内核模块同样必须最小，只提供带身份、校验与治理的原语；只有无法通过这些原语安全实现的信任根、路由和生命周期机制进入内核。业务策略、展示、聚合和工作流程优先归现有应用；复用本身不构成提升层级的理由。验收标准：改变业务策略或新增应用通常只需改模块。既有 immutable builtin 的发行身份不因该原则自动改变，本轮不扩大动态更新权限。
 
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
-- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `chat`、`modules`、`approvals`、`settings`、`schedules`、`provider`、`executions`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
+- **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `history`、`modules`、`approvals`、`settings`、`schedules`、`secrets`、`activity`、`content`；`memory.ts` 也注册为系统模块。系统模块不是可由 AI 替换的应用进程。
 - **受信任本机能力模块**位于 `steward/local-*`，通过独立 local registry 注册到同一路由，发行身份为 `local:<name>`。工具输入与输出均有 schema，失败输出校验会拒绝调用；敏感输入／输出及适配器错误正文不落通用日志。它们不由应用提案替换，保留名称发生安装冲突时拒绝解析。
-- **内置模块**位于 `steward/builtin/*`：`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议，但类别和发行方式按 P0 契约区分。
+- **内置模块**位于 `steward/builtin/*`：`agent`、`web`、`mcp`、`files`、`notify`、`events`。官方外置 `qq`、`remind`、`mind` 和可选 `memory-local` 位于 `steward/external/*`；可选 `coding/editor` 同在该目录；共用 SDK/路由/独立进程协议，但类别和发行方式按 P0 契约区分。
 - **外置应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。外置受检更新和回滚；内置代码只随 Chrona 发行变更，禁止定制内置双轨。
 
 代码：`steward/system-modules.ts`、`module-calls.ts`、`module-builtin.ts`、`module-supervisor.ts`、`module-build.ts`。细节：[模块依赖方向](module-dependency-direction.md)、[模块恢复](module-recovery.md)。

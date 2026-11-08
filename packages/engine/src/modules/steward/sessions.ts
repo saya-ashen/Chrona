@@ -40,7 +40,7 @@ export function createSessions({ db, now }: StewardPorts, workspaceId: string) {
       return db.$transaction(async tx => {
         await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
         const row = await tx.session.findFirst({ where: { id, workspaceId, status: "active", lastActivityAt: new Date(observed) } });
-        if (!row || await tx.run.count({ where: { workspaceId, sessionId: id, OR: [{ status: { in: ["queued", "running"] } }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return { ended: false };
+        if (!row || await tx.run.count({ where: { workspaceId, sessionId: id, OR: [{ status: { in: ["queued", "running"] } }, { error: "Execution stop is unconfirmed" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return { ended: false };
         const ended = await tx.session.updateMany({ where: { id, workspaceId, status: "active", lastActivityAt: row.lastActivityAt }, data: { status: "ended", endedAt: now() } });
         return { ended: ended.count === 1 };
       });

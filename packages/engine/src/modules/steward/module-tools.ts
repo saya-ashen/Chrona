@@ -7,17 +7,17 @@ import { audit } from "./audit";
 import { CallError, callSync, listSystemModules, normalizedToolInputSchema, type SystemTool } from "./module-calls";
 
 /** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
-type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" };
+type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" | "modules" };
 type Entry = { name: string; module: { id: string; name: string; activeHash: string | null }; manifest: { description?: string; tools: (SystemTool | ModuleTool)[] }; tool: SystemTool | ModuleTool; direct: boolean; system?: true };
 /** Chrona's own interfaces visible to the audience (v2-13): always direct, few, and part of how the Provider works. */
-function systemEntries(audience: "provider" | "owner"): Entry[] {
+function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
   return listSystemModules().flatMap(system => {
     const visible = system.tools.filter(tool => tool.visibility.includes(audience));
     return visible.map(tool => ({ name: `m_${system.name}_${tool.name.replaceAll("-", "_")}`, module: { id: `system:${system.name}`, name: system.name, activeHash: "system" },
       manifest: { tools: visible }, tool, direct: true, system: true as const }));
   });
 }
-async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner", focus: unknown[], catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
+async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", focus: unknown[], catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
   const { db } = ports, { tools, names, toolsets } = catalog;
   for (const module of modules) {
     // One toolset per module name, like one MCP server per name.
@@ -55,7 +55,7 @@ function catalogInput(tool: SystemTool | ModuleTool) {
 function catalogOutput(tool: SystemTool | ModuleTool, system: boolean) {
   return tool.output ? (system ? z.toJSONSchema(tool.output as z.ZodType) : tool.output) : null;
 }
-function catalogEntry(resolved: Resolved) {
+export function catalogEntry(resolved: Resolved) {
   const { tool } = resolved;
   return { name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
     description: tool.description,

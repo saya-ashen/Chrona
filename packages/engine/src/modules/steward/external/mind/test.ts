@@ -27,10 +27,10 @@ const url = `http://127.0.0.1:${server.port}/v1/systemone`;
 const pages = new Map<string, typeof PAGE>();
 const module = await startModule("activation-harness.ts", { stubs: {
   "web.page-set": (args: typeof PAGE) => { pages.set(args.id, args); return { id: args.id }; },
-  "chat.today": () => today, "chat.runs": () => [], "modules.health": async (args: { cursor?: string }) => { await beforeHealth?.(); cursors.push(args.cursor); return { items: args.cursor ? secondPage : apps, nextCursor: !args.cursor && secondPage.length ? "page-2" : null }; }, "secrets.get": () => ({ value: { key: "k1" } }),
+  "web.today": () => today, "activity.runs": () => [], "modules.health": async (args: { cursor?: string }) => { await beforeHealth?.(); cursors.push(args.cursor); return { items: args.cursor ? secondPage : apps, nextCursor: !args.cursor && secondPage.length ? "page-2" : null }; }, "secrets.get": () => ({ value: { key: "k1" } }),
   "modules.contributions": () => contributions, "calendar.attention": () => calendar,
 } });
-const wakes = () => module.calls.filter((call: { params: { target?: string } }) => call.params.target === "provider.wake").map((call: { params: { args: { prompt: string } } }) => call.params.args.prompt);
+const wakes = () => module.calls.filter((call: { params: { target?: string } }) => call.params.target === "agent.run").map((call: { params: { args: { prompt: string } } }) => call.params.args.prompt);
 const sense = async (minutes: number, params: Record<string, string | number | boolean> = {}, id = "sense") => {
   const reply = await module.send({ trigger: { kind: "schedule", id, firedAt: at(minutes) }, now: at(minutes), params: { enabled: true, "interval-minutes": 15, "daily-wakes": 6, "intuition-url": "", "intuition-model": "jev-latest", "intuition-daily-calls": 96, "wake-threshold": 0.75, "sleep-threshold": 0.25, "intuition-detail": "titles", ...params } });
   assert.equal(reply.error, undefined);

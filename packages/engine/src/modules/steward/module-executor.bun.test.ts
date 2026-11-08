@@ -1,3 +1,7 @@
+// Legacy service regression harness only. These routes are absent from production registration.
+import { registerSystemModule } from "./module-calls";
+import { ai as legacyProvider } from "./system/provider";
+registerSystemModule(legacyProvider);
 import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

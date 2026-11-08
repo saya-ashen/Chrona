@@ -1,3 +1,4 @@
+import { callAgent } from "./agent";
 import { isDeepStrictEqual } from "node:util";
 import type { WorkCleanupInput, WorkCleanupReceipt, WorkView, ExecutionPlacementView } from "./contract.js";
 import { codingError, type CodingContext } from "./storage";
@@ -18,7 +19,7 @@ export function installWorkspace(view: WorkView, actual: ExecutionPlacementView)
 export async function cleanupWorkspace(context: CodingContext, view: WorkView, input: WorkCleanupInput): Promise<WorkCleanupReceipt> {
   if (view.kind !== "execution" || !view.workspace || view.workspace.mode !== "independent_worktree") throw codingError("unsupported", "No owned independent workspace");
   // The kernel rechecks stop/holds and reads a stable confirm receipt before inspecting disk.
-  const receipt = await context.call<WorkCleanupReceipt>("executions.workspace-cleanup", input);
+  const receipt = await callAgent<WorkCleanupReceipt>(context, "workspace-cleanup", input);
   if (receipt.workId !== view.workId || receipt.workspaceRef !== view.workspace.workspaceRef) throw codingError("conflict", "Cleanup receipt belongs to another workspace");
   return receipt;
 }

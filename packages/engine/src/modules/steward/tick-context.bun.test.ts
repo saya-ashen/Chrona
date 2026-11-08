@@ -41,7 +41,7 @@ test("run context lists current modules, their recent errors and the entry the m
 });
 
 test("wake protocols stay in module data; the kernel never adds one based on the module name", async () => {
-  const mindSource = await readFile(join(import.meta.dirname, "external/mind/index.ts"), "utf8");
+  const mindSource = await readFile(join(import.meta.dirname, "external/mind/execution.ts"), "utf8");
   const protocol = /const MIND_PROTOCOL = `([\s\S]*?)`;/.exec(mindSource)![1]!;
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-tick-mind-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });

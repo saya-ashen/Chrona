@@ -1,7 +1,7 @@
 import { chrona } from "chrona";
 import { editorEventsQuerySchema, type EditorCommandConsumer, type ExecutionView, type ExecutionCommand } from "./contract.js";
 
-function coding<K extends "create" | "get" | "list" | "send" | "answer" | "cancel" | "results" | "accept", T>(name: K, input: object) {
+function coding<K extends "create" | "get" | "list" | "send" | "answer" | "cancel" | "results" | "accept" | "lookup-start" | "events" | "snapshot", T>(name: K, input: object) {
   return chrona.call<T>(`coding.${name}`, { input: JSON.stringify(input) });
 }
 async function ref(input: { workId: string; runId: string; attemptId: string }): Promise<{ workId: string; runId: string; attemptId: string }> {
@@ -13,15 +13,15 @@ async function ref(input: { workId: string; runId: string; attemptId: string }):
 export const editorCommands: EditorCommandConsumer = {
   start: input => coding("create", input),
   get: input => coding("get", input),
-  lookup_start: input => chrona.call("executions.lookup-start", input),
+  lookup_start: input => coding("lookup-start", input),
   list: input => coding("list", input),
   send: input => coding("send", input),
   answer: input => coding("answer", input),
   cancel: input => coding("cancel", input),
   attach: input => coding("get", { workId: input.workId }),
   detach: async () => ({ accepted: true }),
-  events: async input => chrona.call("executions.events", { ...input, ...await ref(input) }),
-  snapshot: async input => chrona.call("executions.snapshot", await ref(input)),
+  events: async input => coding("events", { ...input, ...await ref(input) }),
+  snapshot: async input => coding("snapshot", await ref(input)),
   results: input => coding("results", input),
   accept: input => coding("accept", input),
 };

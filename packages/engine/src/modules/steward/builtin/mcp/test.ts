@@ -15,7 +15,7 @@ const routed = (target: string, answer: (args: Args) => unknown = () => ({ ok: t
 const module = await startModule("index.ts", { stubs: {
   ...Object.fromEntries([
     routed("modules.tools", args => moduleTools.filter(tool => !args.query || tool.target.includes(String(args.query)))),
-    routed("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), routed("chat.ask"), routed("chat.answer"), routed("chat.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("chat.sessions"), routed("chat.messages"), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
+    routed("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })), routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })), routed("agent.respond"), routed("web.today", () => ({ approvals: [], updates: [{ title: "n1" }], problems })), routed("history.sessions"), routed("history.messages"), routed("approvals.resolve"), routed("modules.list", () => installedApps), routed("modules.catalog", () => [{ name: "memory-local", available: true, installation: null }]), routed("modules.install", installation),
     routed("planning.get", args => ({ plan: args.id })), routed("planning.search", args => ({ filters: args.filters })),
     routed("modules.stop-build"), routed("modules.revise-build"), routed("modules.build-owner", args => args), routed("modules.diagnostics", args => [{ ...diagnostics, module: args.module }]),
     routed("activity.list", args => ({ items: [{ id: "x", at: "2026-10-27T04:42:00.000Z", kind: "module_activate", module: args.module ?? null, text: "web 已切换到版本 5caef53c" }], before: null })),
@@ -70,15 +70,18 @@ try {
   // Conversations, approvals and app records are routed calls with the system modules' argument names.
   calls.length = 0;
   await tool("chrona_chat", { text: "hi" });
-  assert.equal(calls[0]![0], "chat.conversation-state"); assert.equal(calls[1]![0], "chat.ask"); assert.match(String(calls[1]![1].key), /^mcp:/); assert.equal(calls[1]![1].session, undefined); assert.equal(calls[1]![1].title, "hi");
+  assert.equal(calls[0]![0], "agent.context");
+  const started = calls.find(([target]) => target === "agent.run")!;
+  assert.equal(started[1].lane, "foreground"); assert.match(String(started[1].prompt), /User message:\nhi/);
+  assert.equal(calls.filter(([target]) => target === "chat.ask").length, 0);
   await tool("chrona_session_messages", { sessionId: "s1", limit: 5 });
-  assert.deepEqual(calls.at(-1), ["chat.messages", { session: "s1", limit: 5 }]);
+  assert.deepEqual(calls.at(-1), ["history.messages", { session: "s1", limit: 5 }]);
   await tool("chrona_approval_resolve", { approvalId: "a1", decision: "approve" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
   await tool("chrona_run_answer", { interactionId: "i1", decision: "submit", value: 2 });
-  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "submit", value: 2 }) }]);
+  assert.deepEqual(calls.at(-1), ["agent.respond", { "run-id": "run-mcp", "request-key": "mcp-answer:i1", "question-id": "i1", answer: JSON.stringify({ decision: "submit", value: 2 }) }]);
   await tool("chrona_run_answer", { interactionId: "i1", decision: "cancel", value: 2 });
-  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "cancel" }) }]);
+  assert.deepEqual(calls.at(-1), ["agent.respond", { "run-id": "run-mcp", "request-key": "mcp-answer:i1", "question-id": "i1", answer: JSON.stringify({ decision: "cancel" }) }]);
   // A module activated after the client listed its tools is found and callable at once.
   moduleTools.push({ target: "planning.get", description: "Get a plan", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }, outputSchema: null, examples: null, sideEffects: null, errors: null, retry: "Unknown async outcomes are not redelivered automatically.", idempotent: false });
   moduleTools.push({ target: "planning.search", description: "Search plans", inputSchema: {

@@ -8,6 +8,7 @@ import { createAgentOperations, AgentError } from "./operations";
 import { agentInput } from "./contracts";
 import { createModuleAgentOperations } from "./module-operations";
 import type { ModuleAgentTool } from "./module-contracts";
+import { createAgentPrimitives, isAgentPrimitive } from "./primitives";
 import { PI_MODEL_ENVIRONMENT_KEYS } from "../../../../../../integrations/src/steward/pi-launch";
 
 type Configuration = { backend: string; pi: Omit<PiProviderOptions, "browsers" | "launch">; browser: Parameters<typeof createBrowsers>[0] };
@@ -62,6 +63,7 @@ const moduleOperations = createModuleAgentOperations(chrona.paths.data, (target,
   if (!provider?.complete) throw new AgentError("unavailable", "Completion unconfigured");
   return provider.complete(args as unknown as Parameters<NonNullable<typeof provider.complete>>[0]);
 }, (name, args) => operations.control(name, args));
+const primitive = createAgentPrimitives((target, args) => chrona.call(target, args), (name, args) => operations.control(name, args), async input => await provider?.transcript?.(input) ?? []);
 async function health() {
   return { name: provider?.name ?? "unconfigured", supportsRunModel: provider?.supportsRunModel ?? false, complete: !!provider?.complete, ...await (provider?.health() ?? { available: false, sandboxed: false, error: null }) };
 }
@@ -92,6 +94,7 @@ on("tool", async trigger => {
     if (caller?.kind === "kernel") return { result: await kernelTool(trigger.id, trigger.args.input) };
     if (caller?.kind !== "module" || !trigger.call?.id) throw new ModelError("forbidden", "Agent tools require an admitted caller");
     if (trigger.id === "health") { agentInput("health", trigger.args); return { result: await health() }; }
+    if (isAgentPrimitive(trigger.id)) return { result: await primitive(trigger.id, trigger.args, trigger.call.id) };
     return { result: await moduleOperations.handle(trigger.id as ModuleAgentTool, trigger.args, caller, trigger.call.id) };
   } catch (error) { throw toolError(error); }
 });

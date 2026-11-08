@@ -250,7 +250,7 @@ test("module management: Provider tools stay private; owner-only tools require u
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "o" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "o", manifest: other, source: "user", intent: {}, report: {}, status: "approved" } });
   for (const target of ["modules.propose", "modules.build", "modules.checkout", "modules.stop-build", "modules.revise-build"]) {
-    expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
+    expect(await handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: module.id, hash: "o", manifest: other }, { id: "1", method: "call", params: { target, args: target === "modules.build" ? request : {}, mode: "sync", reply: false } })).toMatchObject({ error: { code: "forbidden" } });
   }
 });
 
@@ -396,10 +396,10 @@ test("transcripts: the Provider's text, tool calls and clipped results, credenti
     const manifestOf = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses, ...(name === "web" ? { listen: ["/"] } : {}) });
     const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, activeHash: name } });
     await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: name, manifest: manifestOf, source: "builtin", intent: {}, report: {}, status: "approved" } });
-    return handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: row.id, hash: name, manifest: manifestOf }, { id: "t", method: "call", params: { target: "chat.transcript", args: { session: f.session.id }, mode: "sync", reply: false } });
+    return handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: row.id, hash: name, manifest: manifestOf }, { id: "t", method: "call", params: { target: "history.transcript", args: { session: f.session.id }, mode: "sync", reply: false } });
   };
-  expect(await reader("web", ["chat.transcript"])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
-  expect(await reader("snoop", [])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
+  expect(await reader("web", ["*"])).toMatchObject({ result: { output: [{ kind: "text" }, { kind: "tool" }, { kind: "result" }] } });
+  expect(await reader("snoop", [])).toMatchObject({ error: { code: "forbidden" } });
 });
 
 test("persistent FIFO survives service recreation and tied clocks; waiting has no model calls or running deadline", async () => {
@@ -479,10 +479,10 @@ test("existing React process view receives explicit queue position, updated canc
   const f = await fixture();
   const first = await f.call("m_modules_build", request) as { sessionId: string };
   const second = await f.call("m_modules_build", { ...request, name: "second" }) as { sessionId: string };
-  const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["chat.transcript"], listen: ["/"] });
+  const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: ["*"], listen: ["/"] });
   const web = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", activeHash: "web" } });
   await f.db.moduleVersion.create({ data: { moduleId: web.id, hash: "web", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-  const transcript = (session: string) => handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: web.id, hash: "web", manifest }, { id: "view", method: "call", params: { target: "chat.transcript", args: { session }, mode: "sync", reply: false } });
+  const transcript = (session: string) => handleModuleCall(f.ports, { workspaceId: f.workspaceId, moduleId: web.id, hash: "web", manifest }, { id: "view", method: "call", params: { target: "history.transcript", args: { session }, mode: "sync", reply: false } });
   expect(await transcript(second.sessionId)).toMatchObject({ result: { output: [{ kind: "text", text: expect.stringContaining("排队第 2 位") }] } });
   expect((await f.api.provider.list(second.sessionId))[0]).toMatchObject({ active: false, status: "queued", progress: null });
   await f.call("m_modules_stop_build", { session: first.sessionId });

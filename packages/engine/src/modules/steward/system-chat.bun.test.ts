@@ -1,3 +1,9 @@
+// Internal legacy service regression only; production has no chat router.
+import { registerSystemModule } from "./module-calls";
+import { ai as legacyProvider } from "./system/provider";
+registerSystemModule(legacyProvider);
+import { chat as legacyChat } from "./system/chat";
+registerSystemModule(legacyChat);
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";

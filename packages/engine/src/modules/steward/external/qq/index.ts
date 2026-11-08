@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { createChronaQqDelivery, createQqBotHandler, createQqBotState, parseApprovalDecision, DEDICATED_PLATFORM, type DeliveryMessage, type DeliveryOutcome, type QqBinding, type QqReplyItem } from "./bot";
 import { ackQqInteraction, createQqGateway, createQqTokenSource, downloadQqAttachment, sendQqC2c, uploadQqImage, validateQqFormat, type QqLog } from "./official";
 import { createRelay } from "./relay";
+import { createQqConversations } from "./conversations";
 
 const log: QqLog = (event, fields = {}) => console.error(JSON.stringify({ component: "qq-bot", event, ...fields }));
 type Args = Record<string, string | boolean | undefined>;
@@ -54,7 +55,8 @@ if (!appId) {
 } else {
   const tokens = createQqTokenSource({ appId, readSecret: async () => (await credentials()).clientSecret!, log });
   const state = createQqBotState(chrona.paths.data, appId);
-  const relay = createRelay({ call: (target, args) => chrona.call(target, args), notify: args => chrona.call("notify.send", args, { mode: "async", key: `final:${String(args.key)}` }),
+  const conversations = createQqConversations({ dataDir: chrona.paths.data, contentDir: chrona.paths.content, call: (target, args) => chrona.call(target, args), binding: () => state.binding(), deliver: item => reply(item) });
+  const relay = createRelay({ conversations, call: (target, args) => chrona.call(target, args), notify: args => chrona.call("notify.send", args, { mode: "async", key: `final:${String(args.key)}` }),
     publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, download: downloadQqAttachment });
   let recipients = new Set<string>(), ready: boolean | null = null;
   const delivery = createChronaQqDelivery({ tokens, publicUrl: process.env.CHRONA_PUBLIC_URL ?? null, allowedRecipients: () => recipients });
@@ -108,5 +110,7 @@ if (!appId) {
   await refreshBinding();
   gateway.start();
   setInterval(() => void writeStatus(), 30_000);
+  let polling = false;
+  setInterval(() => { if (!polling) { polling = true; void conversations.poll().catch(() => log("qq.conversation_poll_failed")).finally(() => { polling = false; }); } }, 1000);
   await writeStatus();
 }

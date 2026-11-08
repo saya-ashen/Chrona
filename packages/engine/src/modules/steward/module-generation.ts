@@ -82,7 +82,7 @@ function assertBuiltinSeedVersion(version: ModuleVersion | null, release: Module
 async function assertAgentReleaseUpgrade(tx: Prisma.TransactionClient, module: { id: string; workspaceId: string; activeHash: string | null; dataSchema: number | null; status: string }, release: ModuleRelease, releaseUpgrade: boolean) {
   if (!releaseUpgrade || release.name !== "agent") throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
   if (module.dataSchema !== release.manifest.data.schema || module.status === "migrating") throw new StewardError("conflict", "Agent release requires compatible data");
-  if (await tx.run.count({ where: { workspaceId: module.workspaceId, status: "running" } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
+  if (await tx.run.count({ where: { workspaceId: module.workspaceId, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }] } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
   const old = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
   if (old?.source !== "builtin" || old.status !== "approved") throw new StewardError("conflict", "Agent release requires a trusted prior version");
 }

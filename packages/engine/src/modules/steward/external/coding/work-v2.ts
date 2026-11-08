@@ -1,3 +1,4 @@
+import { callAgent } from "./agent";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { readFile, readdir } from "node:fs/promises";
@@ -90,10 +91,10 @@ function verifySelection(leaf: WorkLeafStart, actual: ExecutionPlacementView) {
 }
 async function refreshLeaf(context: CodingContext, leaf: WorkLeafStart, view: WorkView) {
   if (!view.execution) return;
-  const actual = await context.call<ExecutionView>("executions.get", { workId: leaf.workId });
+  const actual = await callAgent<ExecutionView>(context, "get", { workId: leaf.workId });
   if (actual.runId !== view.execution.runId || actual.attemptId !== view.execution.attemptId || actual.sessionId !== view.execution.sessionId) throw codingError("conflict", "Execution attempt changed");
   await installExecution(context, leaf, view, actual);
-  const placement = await context.call<ExecutionPlacementView>("executions.placement", { workId: leaf.workId });
+  const placement = await callAgent<ExecutionPlacementView>(context, "placement", { workId: leaf.workId });
   verifySelection(leaf, placement);
   installWorkspace(view, placement);
   if (view.phase === "queued" && !placement.online) view.phase = "waiting_device";
@@ -129,7 +130,7 @@ async function dispatchLeaf(context: CodingContext, registry: WorkRegistry, reco
   // Preserve consumed references even when local dispatch validation rejects them.
   await saveRegistry(context, registry);
   let execution: ExecutionView;
-  try { execution = await context.call<ExecutionView>("executions.lookup-start", { commandKey: leaf.commandKey }); }
+  try { execution = await callAgent<ExecutionView>(context, "lookup-start", { commandKey: leaf.commandKey }); }
   catch (error) {
     if ((error as { code?: string }).code !== "not_found") throw error;
     const { parentWorkId: _parent, dependsOnWorkIds: _dependencies, ...input } = leaf;
@@ -139,7 +140,7 @@ async function dispatchLeaf(context: CodingContext, registry: WorkRegistry, reco
     // Only a validated network start can leave an uncertain admission receipt.
     if (!record.dispatching.includes(leaf.workId)) record.dispatching.push(leaf.workId);
     await saveRegistry(context, registry);
-    const admitted = await context.call<{ execution: ExecutionView; placement: ExecutionPlacementView }>("executions.start-v2", dispatch);
+    const admitted = await callAgent<{ execution: ExecutionView; placement: ExecutionPlacementView }>(context, "start-v2", dispatch);
     execution = admitted.execution;
     verifySelection(leaf, admitted.placement);
     installWorkspace(view, admitted.placement);
@@ -153,13 +154,13 @@ async function cancelLeaf(context: CodingContext, record: WorkRecord, leaf: Work
   view.cancelRequested = true;
   // A lost start receipt may exist even though the local view has no execution yet.
   if (!view.execution && record.dispatching.includes(leaf.workId)) {
-    try { await installExecution(context, leaf, view, await context.call<ExecutionView>("executions.lookup-start", { commandKey: leaf.commandKey })); }
+    try { await installExecution(context, leaf, view, await callAgent<ExecutionView>(context, "lookup-start", { commandKey: leaf.commandKey })); }
     catch (error) { if ((error as { code?: string }).code !== "not_found") throw error; }
   }
   if (!view.execution) { view.phase = record.dispatching.includes(leaf.workId) ? "unknown" : "cancelled"; return; }
   if (view.execution.stopConfirmed) return;
   const key = createHash("sha256").update(`${commandKey}:${leaf.workId}`).digest("hex");
-  const actual = await context.call<ExecutionView>("executions.cancel", { workId: leaf.workId, runId: view.execution.runId, attemptId: view.execution.attemptId, commandKey: key });
+  const actual = await callAgent<ExecutionView>(context, "cancel", { workId: leaf.workId, runId: view.execution.runId, attemptId: view.execution.attemptId, commandKey: key });
   await installExecution(context, leaf, view, actual);
 }
 async function applyCancels(context: CodingContext, registry: WorkRegistry, record: WorkRecord) {
@@ -196,7 +197,7 @@ function page<T>(items: T[], limit: number, id: (item: T) => string, make: (rows
   return make(rows, rows.length < items.length ? id(rows.at(-1)!) : null);
 }
 async function listWorks(context: CodingContext, registry: WorkRegistry, command: Extract<WorkCommand, { op: "list" }>) {
-    if (command.resource === "locations") return { resource: "locations", ...await context.call<{ locations: WorkLocation[]; after: string | null }>("executions.locations", { limit: command.limit, ...(command.after ? { after: command.after } : {}) }) };
+    if (command.resource === "locations") return { resource: "locations", ...await callAgent<{ locations: WorkLocation[]; after: string | null }>(context, "locations", { limit: command.limit, ...(command.after ? { after: command.after } : {}) }) };
     const views = registry.records.flatMap(record => record.views).filter(view => command.parentWorkId === undefined ? view.parentWorkId === null : view.parentWorkId === command.parentWorkId).sort((a, b) => (a.workId < b.workId ? -1 : a.workId > b.workId ? 1 : 0)).filter(view => !command.after || view.workId > command.after);
     return page(views, command.limit, view => view.workId, (works, after) => ({ resource: "works", works, after }));
 }
@@ -229,7 +230,7 @@ async function workResults(context: CodingContext, record: WorkRecord, view: Wor
 function forwardExecution(context: CodingContext, view: WorkView, command: WorkCommand) {
   if (!view.execution || !("runId" in command) || command.runId !== view.execution.runId || command.attemptId !== view.execution.attemptId) throw codingError("conflict", "Operation requires the exact leaf execution");
   const { op, ...input } = command;
-  return context.call(`executions.${op}`, input);
+  return callAgent(context, op, input);
 }
 async function commandWork(context: CodingContext, registry: WorkRegistry, command: WorkCommand): Promise<unknown> {
   if (command.op === "start") {

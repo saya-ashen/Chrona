@@ -10,6 +10,11 @@ import { readRegistry, saveRegistry } from "./work-v2-storage";
 import { readCodingWork, type CodingContext } from "./storage";
 import { dependencyGoal } from "./dependency-context";
 
+function camel(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camel);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), camel(child)]));
+}
 const baseline = { kind: "commit" as const, digest: "a".repeat(40) };
 function leaf(workId: string, dependsOnWorkIds: string[] = []): WorkLeafStart {
   return { kind: "execution", workId, commandKey: `start-${workId}`, goal: `修改 ${workId}`, placement: { executorId: "server", projectRef: "repo", mappingRevision: 1 }, workspace: { mode: "independent_worktree", baseline }, queueExpiresAt: new Date(Date.now() + 60_000).toISOString(), budget: { timeoutMs: 1000, maxToolCalls: 1 }, dependsOnWorkIds };
@@ -32,13 +37,16 @@ function placement(workId: string): ExecutionPlacementView {
   return { ...executions.get(workId)!, placement: a.placement, workspace: { workspaceRef: `tree-${workId}`, mode: "independent_worktree", baseline, state: "ready", sourceReceipt: null, retained: true }, queueExpiresAt: String(dispatchInputs.get(workId)!.queueExpiresAt), online: true };
 }
 const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, unknown>): Promise<T> {
+  args = camel(args) as Record<string, unknown>;
+  args = { ...args, workId: args.executionId, commandKey: args.requestKey, goal: args.prompt };
+  delete args.executionId; delete args.requestKey; delete args.prompt;
   const id = String(args.workId);
-  if (target === "executions.lookup-start") {
+  if (target === "agent.lookup") {
     const found = [...executions.values()].find(view => `start-${view.workId}` === args.commandKey);
     if (!found) throw Object.assign(new Error("missing"), { code: "not_found" });
     return { ...found } as T;
   }
-  if (target === "executions.start-v2") {
+  if (target === "agent.run") {
     assert.equal(Object.hasOwn(args, "parentWorkId"), false); assert.equal(Object.hasOwn(args, "dependsOnWorkIds"), false);
     starts.push(id);
     dispatchInputs.set(id, structuredClone(args));
@@ -49,11 +57,10 @@ const context: CodingContext = { dir, content: join(dir, "public"), async call<T
   }
   const view = executions.get(id);
   if (!view) throw Object.assign(new Error("missing"), { code: "not_found" });
-  if (target === "executions.get") return { ...view } as T;
-  if (target === "executions.placement") return placement(id) as T;
-  if (target === "executions.cancel") { cancelled.push(id); view.cancelRequested = true; return { ...view } as T; }
-  if (target === "executions.snapshot") return { ...view, highWatermark: 1, finalMessage: missingFinal ? null : { messageId: "m", text: `${id} 修改完成，未运行测试`, truncated: false }, questions: [], missing: false, expiresAt: new Date(Date.now() + 60_000).toISOString() } as T;
-  if (target === "executions.result-source") return { workId: id, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId, baseline } as T;
+  if (target === "agent.get") return { ...view } as T;
+  if (target === "agent.placement") return placement(id) as T;
+  if (target === "agent.interrupt") { cancelled.push(id); view.cancelRequested = true; return { ...view } as T; }
+  if (target === "agent.inspect") return { snapshot: { ...view, highWatermark: 1, finalMessage: missingFinal ? null : { messageId: "m", text: `${id} 修改完成，未运行测试`, truncated: false }, questions: [], missing: false, expiresAt: new Date(Date.now() + 60_000).toISOString() }, source: { workId: id, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId, baseline } } as T;
   throw new Error(`Unexpected target ${target}`);
 } };
 try {
@@ -124,9 +131,9 @@ try {
   let releaseEvents!: (value: unknown) => void;
   const eventsWaiting = new Set<string>();
   const historyContext: CodingContext = { ...context, call: async <T>(target: string, args: Record<string, unknown>) => {
-    if (target === "executions.answer") { assert.equal(args.runId, "r-b"); return { accepted: true } as T; }
-    if (target !== "executions.events") return context.call<T>(target, args);
-    assert.equal(args.waitMs, 15000);
+    if (target === "agent.respond") { assert.equal(args["run-id"], "r-b"); return { accepted: true } as T; }
+    if (target !== "agent.stream") return context.call<T>(target, args);
+    assert.equal(Object.hasOwn(args, "wait-ms"), false);
     assert.equal(args.cursor, "opaque-cursor");
     eventsWaiting.add("ready");
     return new Promise<T>(resolve => { releaseEvents = value => resolve(value as T); });
@@ -179,7 +186,7 @@ try {
   executions.get("tampered-a")!.status = "completed"; executions.get("tampered-a")!.stopConfirmed = true;
   let tamperedPath = "", untamperedText = "";
   const tamperedContext: CodingContext = { ...context, call: async <T>(target: string, args: Record<string, unknown>) => {
-    if (target === "executions.lookup-start" && args.commandKey === tamperedB.commandKey) {
+    if (target === "agent.lookup" && args["request-key"] === tamperedB.commandKey) {
       const record = (await readRegistry(context)).records.find(item => item.start.workId === "tampered-parent")!;
       tamperedPath = join(dir, "artifacts", `${record.views[2]!.dependencyResults[0]!.artifactRef}.json`);
       untamperedText = await readFile(tamperedPath, "utf8");
@@ -198,7 +205,7 @@ try {
   const lost = leaf("lost-network");
   let attemptedStarts = 0;
   const lostContext: CodingContext = { ...context, call: async <T>(target: string, args: Record<string, unknown>) => {
-    if (target === "executions.start-v2" && args.workId === lost.workId) {
+    if (target === "agent.run" && args["execution-id"] === lost.workId) {
       attemptedStarts++;
       throw Object.assign(new Error("network start receipt lost"), { code: "unavailable" });
     }

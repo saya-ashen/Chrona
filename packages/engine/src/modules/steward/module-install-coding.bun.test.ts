@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import "./module-effects";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { testDb } from "./test-db";
+import { agentFixture } from "./agent-application.fixtures";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
 import { createModules } from "./modules";
@@ -11,13 +10,14 @@ import { moduleSupervisor } from "./module-supervisor";
 import { callSync, CallError } from "./module-calls";
 import { registerSystemModules } from "./system-modules";
 import { setModuleSettings } from "./module-overview";
-import type { StewardPorts } from "./ports";
+
 
 test.each(["coding", "editor"] as const)("actual %s package installs through author tests and startup without configured projects", async name => {
-  const dir = await mkdtemp("/tmp/chrona-coding-install-test-"), db = testDb();
-  const workspace = await db.workspace.create({ data: { name: "Fresh coding installation" } });
-  const sandbox = createScriptSandbox({ dataDir: dir, executionMode: "trusted-local" });
-  const ports: StewardPorts = { db, dataDir: dir, publicUrl: null, now: () => new Date(), moduleExternalResources: join(dir, "external"), moduleTypecheck: resolve(import.meta.dirname, "../../../../integrations/src/steward/module-typecheck"), moduleSdk: resolve(import.meta.dirname, "../../../../integrations/src/steward/module-sdk"), sandbox: { ...sandbox.health, runModule: sandbox.runModule, startModule: sandbox.startModule } };
+  const f = await agentFixture(), ports = f.ports, db = ports.db, dir = ports.dataDir;
+  const workspace = { id: f.workspaceId };
+  await db.run.delete({ where: { id: "agent-run" } });
+  ports.moduleExternalResources = join(dir, "external");
+  ports.moduleTypecheck = resolve(import.meta.dirname, "../../../../integrations/src/steward/module-typecheck");
   registerSystemModules();
   ports.executionLocations = async () => [];
   ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
@@ -43,5 +43,5 @@ test.each(["coding", "editor"] as const)("actual %s package installs through aut
       await expect(callSync(ports, { workspaceId: workspace.id, caller: { kind: "owner", via: "test" }, chain: [], path: [] }, "coding.work", { input: "{}" })).rejects.toMatchObject({ code: "invalid" });
     }
     expect(await db.run.count()).toBe(0);
-  } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dir, { recursive: true, force: true }); }
+  } finally { await f.close(); }
 }, 60_000);

@@ -8500,7 +8500,7 @@ var modulesToolInputSchemas = {
     dir: relativePathSchema,
     source: _enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation")
   }).strict().refine((input) => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash").describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; it can be customized through the checked module lifecycle. Returns the exact source version; does not submit or activate it."),
-  propose: object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict().describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, provider.wake, provider.complete (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync\u2192result; async\u2192{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt}) (uses ["provider.wake"]) / model({system?,prompt,maxOutputTokens})\u2192{text} (uses ["provider.complete"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})\u2192{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 \xA74): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})\u2192{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build smoke-starts every trigger and tool and probes keys; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration and new credentials require the owner decision.'),
+  propose: object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict().describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: chrona_schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync\u2192result; async\u2192{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})\u2192{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})\u2192{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 \xA74): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})\u2192{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,scopes:[...],accounts?}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration and new credentials require the owner decision.'),
   rollback: object({ module: slug, hash: moduleVersionHashSchema }).strict().describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
   "request-group": object({ versions: array(object({ module: slug, hash: moduleVersionHashSchema }).strict()).min(2).max(4) }).strict().describe("v2-15, build conversations that declared several modules: once every declared module has a candidate that passed its checks (pending_review), activate them all together; asks the user once only when one adds credentials. Versions needing a data migration are refused; build that module on its own first."),
   "stop-build": object({ session: id5 }).strict().describe("Stop a module build conversation's queued/running work; keep its files and history. Already submitted versions and approvals are not withdrawn."),
@@ -10210,6 +10210,124 @@ function createModuleAgentOperations(data, call, complete, controlRun) {
   } };
 }
 
+// packages/engine/src/modules/steward/builtin/agent/context-contracts.ts
+var id6 = executionIdSchema;
+var requestKey = string2().min(1).max(200);
+var contextInput = object({ requestKey }).strict();
+var contextRunInput = object({ contextId: id6, requestKey, prompt: string2().trim().min(1).max(200000), content: array(string2().min(1).max(1000)).max(10).default([]), lane: _enum(["foreground", "background"]).default("background"), tools: array(string2().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/)).max(100).default([]) }).strict();
+var contextRunTarget = object({ runId: id6 }).strict();
+var contextWriteInput = contextRunTarget.extend({ requestKey, text: string2().trim().min(1).max(20000) });
+var contextInterruptInput = contextRunTarget.extend({ requestKey });
+var contextRespondInput = contextRunTarget.extend({ requestKey, questionId: id6, answer: string2().min(1).max(1e5) });
+var contextStreamInput = contextRunTarget.extend({ after: number2().int().min(0).default(0), limit: number2().int().min(1).max(100).default(50) });
+var contextOutput = object({ contextId: id6 }).strict();
+var contextRunOutput = object({ runId: id6, contextId: id6, status: string2(), active: boolean2() }).strict();
+var contextStreamOutput = object({ items: array(object({ sequence: number2().int(), at: string2(), kind: string2(), payload: unknown() }).strict()), after: number2().int(), ended: boolean2(), transcript: runtimeTranscriptSchema, interactions: array(providerInteractionSchema).max(12) }).strict();
+
+// packages/logging/src/redaction.ts
+var REDACTED = "[Redacted]";
+var MAX_STRING_LENGTH = 400;
+var SENSITIVE_QUERY_KEY = /^(?:api[\s_-]?key|access[\s_-]?token|refresh[\s_-]?token|token|password|secret|authorization|auth|key|signature|sig)$/i;
+function truncateSafeText(value, maxLength = MAX_STRING_LENGTH) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}\u2026(${value.length - maxLength} more chars)` : value;
+}
+function redactUrl(value) {
+  return value.replace(/\bhttps?:\/\/[^\s"']+/gi, (candidate) => {
+    try {
+      const url = new URL(candidate);
+      let changed = false;
+      if (url.username || url.password) {
+        url.username = "";
+        url.password = "";
+        changed = true;
+      }
+      for (const key of [...url.searchParams.keys()]) {
+        if (SENSITIVE_QUERY_KEY.test(key)) {
+          url.searchParams.set(key, REDACTED);
+          changed = true;
+        }
+      }
+      return changed ? url.toString() : candidate;
+    } catch {
+      return candidate;
+    }
+  });
+}
+function redactSensitiveText(value, maxLength = MAX_STRING_LENGTH) {
+  const redacted = redactUrl(value).replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, `Bearer ${REDACTED}`).replace(/(?:\b|["'])(?:api[\s_-]?key|access[\s_-]?token|refresh[\s_-]?token|client[\s_-]?(?:secret|token|key)|token|password|passphrase|secret|authorization)(?:\b|["'])\s*([:=])\s*(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, (_match, separator) => `credential${separator}${REDACTED}`).replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|sk-ant-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{12,})\b/g, REDACTED);
+  return truncateSafeText(redacted, maxLength);
+}
+
+// packages/integrations/src/steward/transcript-redaction.ts
+var clip = (text, max) => text.length > max ? `${text.slice(0, max)}\u2026\uFF08\u5DF2\u622A\u65AD\uFF09` : text;
+function transcriptRedactor() {
+  const values = Object.entries(process.env).filter(([key, value]) => /(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) && value && value.length >= 8).map(([, value]) => value);
+  return (text, limit) => clip(redactSensitiveText(values.reduce((out, value) => out.replaceAll(value, "[redacted]"), text).replace(/\bxox[abp]-[A-Za-z0-9_-]{16,}/g, "[redacted]"), Number.MAX_SAFE_INTEGER), limit);
+}
+
+// packages/engine/src/modules/steward/builtin/agent/primitives.ts
+var id7 = executionIdSchema;
+var target2 = object({ executionId: id7, runId: id7, attemptId: id7 }).strict();
+var primitiveInputs = {
+  context: contextInput,
+  run: union([contextRunInput, executionStartSchema.omit({ workId: true, commandKey: true, goal: true }).extend({ executionId: id7, requestKey: id7, prompt: executionStartSchema.shape.goal }), executionStartV2Schema.omit({ workId: true, commandKey: true, goal: true }).extend({ executionId: id7, requestKey: id7, prompt: executionStartSchema.shape.goal })]),
+  get: union([contextRunTarget, object({ executionId: id7, runId: id7.optional(), attemptId: id7.optional() }).strict()]),
+  lookup: object({ requestKey: id7 }).strict(),
+  stream: union([contextStreamInput, target2.extend({ cursor: string2().max(1024).optional(), limit: number2().int().min(1).max(100).default(50) })]),
+  write: union([contextWriteInput, target2.extend({ requestKey: id7, text: executionInputSchemas.send.shape.text })]),
+  interrupt: union([contextInterruptInput, target2.extend({ requestKey: id7 })]),
+  respond: union([contextRespondInput, target2.extend({ requestKey: id7, questionId: id7, answer: string2().min(1).max(1e5) })]),
+  inspect: target2,
+  placement: object({ executionId: id7 }).strict(),
+  locations: object({ after: id7.optional(), limit: number2().int().min(1).max(100) }).strict(),
+  cleanup: workCleanupInputSchema
+};
+var primitiveOutputs = {
+  context: contextOutput,
+  run: union([contextRunOutput, object({ execution: executionViewSchema, placement: executionPlacementViewSchema.optional() }).strict()]),
+  get: union([contextRunOutput, executionViewSchema]),
+  lookup: executionViewSchema,
+  stream: union([contextStreamOutput, editorResponseDataSchemas.events]),
+  write: object({ accepted: literal(true) }).strict(),
+  interrupt: union([contextRunOutput, executionViewSchema]),
+  respond: object({ accepted: literal(true) }).strict(),
+  inspect: object({ snapshot: editorResponseDataSchemas.snapshot, source: executionResultSourceSchema }).strict(),
+  placement: executionPlacementViewSchema,
+  locations: object({ locations: array(workLocationSchema).max(100), after: id7.nullable() }).strict(),
+  cleanup: workCleanupReceiptSchema
+};
+function isAgentPrimitive(name) {
+  return Object.hasOwn(primitiveInputs, name);
+}
+function primitiveInput(name, raw) {
+  return primitiveInputs[name].parse(camelArguments(raw));
+}
+function createAgentPrimitives(call, control, transcript = async () => []) {
+  return async (name, raw, callId) => {
+    const args = primitiveInput(name, raw);
+    const result = await call("runtime-callback.agent-admit", { callId, operation: name });
+    if (name === "stream" && !("executionId" in args)) {
+      const { transcript: descriptor, ...page } = object({ transcript: object({ sessionDir: string2(), limit: number2().int().min(1).max(100) }).strict() }).passthrough().parse(result);
+      const redact = transcriptRedactor();
+      const items = runtimeTranscriptSchema.parse(await transcript(descriptor)).slice(-descriptor.limit).map((item) => item.kind === "tool" ? { ...item, args: redact(item.args, 500) } : { ...item, text: redact(item.text, item.kind === "text" ? 4000 : 2000) });
+      return contextStreamOutput.parse({ ...page, transcript: items });
+    }
+    if (name !== "write" && name !== "interrupt")
+      return result;
+    if (!("executionId" in args)) {
+      const admitted = object({ perform: boolean2(), operationId: string2(), result: unknown() }).parse(result);
+      if (admitted.perform)
+        await control(name === "write" ? "inject" : "abort", { operationId: admitted.operationId, ...name === "write" ? { message: args.text } : {} });
+      await call("runtime-callback.agent-admit", { callId, operation: name, settle: true });
+      return name === "write" ? { accepted: true } : admitted.result;
+    }
+    const admitted = object({ perform: boolean2(), operationId: string2(), execution: executionViewSchema }).parse(result);
+    if (admitted.perform)
+      await control(name === "write" ? "inject" : "abort", { operationId: admitted.operationId, ...name === "write" ? { message: args.text } : {} });
+    return name === "write" ? { accepted: true } : admitted.execution;
+  };
+}
+
 // packages/engine/src/modules/steward/builtin/agent/runtime.ts
 var configuration = process.env.CHRONA_AGENT_CONFIGURATION ? JSON.parse(process.env.CHRONA_AGENT_CONFIGURATION) : undefined;
 var modelEnvironment = JSON.parse(process.env.CHRONA_AGENT_MODEL_ENV ?? "{}");
@@ -10289,6 +10407,7 @@ var moduleOperations = createModuleAgentOperations(chrona.paths.data, (target, a
     throw new AgentError("unavailable", "Completion unconfigured");
   return provider2.complete(args);
 }, (name, args) => operations.control(name, args));
+var primitive = createAgentPrimitives((target, args) => chrona.call(target, args), (name, args) => operations.control(name, args), async (input) => await provider2?.transcript?.(input) ?? []);
 async function health() {
   return { name: provider2?.name ?? "unconfigured", supportsRunModel: provider2?.supportsRunModel ?? false, complete: !!provider2?.complete, ...await (provider2?.health() ?? { available: false, sandboxed: false, error: null }) };
 }
@@ -10335,6 +10454,8 @@ on("tool", async (trigger) => {
       agentInput("health", trigger.args);
       return { result: await health() };
     }
+    if (isAgentPrimitive(trigger.id))
+      return { result: await primitive(trigger.id, trigger.args, trigger.call.id) };
     return { result: await moduleOperations.handle(trigger.id, trigger.args, caller, trigger.call.id) };
   } catch (error) {
     throw toolError(error);

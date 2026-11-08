@@ -8,3 +8,5 @@ export { callSync, callsSettled, runDueCalls } from "./modules/steward/module-ca
 export { notices } from "./modules/steward/test-notices";
 export { handleModuleCall } from "./modules/steward/module-effects";
 export { builtinEntry, qqEntry } from "./modules/steward/test-entry";
+
+export { createQqConversations } from "./modules/steward/external/qq/conversations";

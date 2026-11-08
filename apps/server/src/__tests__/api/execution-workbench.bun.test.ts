@@ -236,7 +236,7 @@ test("owner cancellation retains the directory until actual exit; pause/hash/rem
   expect(await command({ op: "get", workId: view.workId })).toMatchObject({ status: "cancelled", stopConfirmed: true });
   expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBeNull();
   await requestStatus(context, coding.id, "paused", "stopped and checked");
-  await expect(callSync(runtime.ports, { workspaceId, caller: { kind: "module", module: "coding", moduleId: coding.id, hash: coding.hash }, chain: [], path: [] }, "executions.get", { workId: view.workId })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(callSync(runtime.ports, { workspaceId, caller: { kind: "module", module: "coding", moduleId: coding.id, hash: coding.hash }, chain: [], path: [] }, "agent.get", { "execution-id": view.workId, "run-id": view.runId, "attempt-id": view.attemptId })).rejects.toMatchObject({ code: "forbidden" });
   expect(errors).toEqual([]);
 }, 60_000);
 
@@ -271,7 +271,7 @@ test("disconnected execution stays unknown across a fresh runtime and does not r
   const replacement = "b".repeat(64);
   await db.moduleVersion.create({ data: { moduleId: coding.id, hash: replacement, manifest: moduleManifestSchema.parse(version.manifest), source: "user", intent: {}, report: {}, status: "approved" } });
   await db.module.update({ where: { id: coding.id }, data: { activeHash: replacement } });
-  await expect(callSync(runtime.ports, { workspaceId, caller: oldCaller, chain: [], path: [] }, "executions.get", { workId: view.workId })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(callSync(runtime.ports, { workspaceId, caller: oldCaller, chain: [], path: [] }, "agent.get", { "execution-id": view.workId, "run-id": view.runId, "attempt-id": view.attemptId })).rejects.toMatchObject({ code: "forbidden" });
   await db.module.update({ where: { id: coding.id }, data: { activeHash: coding.hash } });
   expect(fake.started).toHaveLength(1);
   expect(errors).toEqual([]);

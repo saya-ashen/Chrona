@@ -151,7 +151,7 @@ class RunService {
     const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
     if (admission === "blocked") return "blocked" as const;
     if (admission === "skip") return null;
-    if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
+    if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
     return this.claimQueued(tx, run, lane, now, builds);
   }
   async claimNext(lane: RunLane, now = this.ports.now(), selection?: ExecutionClaimSelection): Promise<(RunRow & { token: string; runId: string; startedAt: Date; deadlineAt: Date; leaseUntil: Date; model?: string }) | null> {
@@ -160,7 +160,7 @@ class RunService {
       const { workspaceId } = this;
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
       const fresh = this.ports.now();
-      const ordinaryBusy = await tx.run.count({ where: { workspaceId, lane, status: "running", execution: null } });
+      const ordinaryBusy = await tx.run.count({ where: { workspaceId, lane, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }], execution: null } });
       const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
       const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
       const timezone = notificationSettings(settings).timezone, builds = lane === "build" ? buildSettings(settings) : null;
@@ -197,8 +197,10 @@ class RunService {
     const run = await tx.run.findFirst({ where: { id: runId, workspaceId }, include: { session: true } });
     if (!run) throw new StewardError("not_found", "Run not found");
     const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
-    if (attempt?.stopConfirmedAt || run.status !== "running" && !(evidence && attempt)) return false;
-    const { status, error } = finalRunOutcome(outcome, { knownStop: !attempt || !!evidence, cancelled: await runWasCancelled(tx, runId, attempt), expired: runExpired(run, now) });
+    const agentContext = await isAgentContext(tx, run.sessionId);
+    if (attempt?.stopConfirmedAt) return false;
+    if (run.status !== "running" && !canReconcileStop(!!evidence, !!attempt, agentContext, run.error)) return false;
+    const { status, error } = finalRunOutcome(outcome, { knownStop: (!attempt && !agentContext) || !!evidence, cancelled: await runWasCancelled(tx, runId, attempt), expired: runExpired(run, now) });
     await tx.run.update({ where: { id: runId }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } });
     if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
     if (attempt) await finishExecution(ports, tx, runId, evidence, now);
@@ -208,6 +210,7 @@ class RunService {
   }
   /** Ordinary runs deliver and follow up inside the same finalization transaction. */
   private async finishOrdinaryRun(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
+    if (run.sessionId && await tx.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return;
     if (status === "finished") await this.deliverResult(tx, run, now);
     await this.followUp(tx, run, status, now, error);
     if (status === "finished") await this.endIfDone(tx, run, now);
@@ -276,7 +279,7 @@ class RunService {
   private async wakeOrigin(tx: Prisma.TransactionClient, run: RunRow, originSessionId: string, result: string) {
     const { workspaceId } = this;
     const origin = await tx.session.findFirst({ where: { id: originSessionId, workspaceId, status: "active" } });
-    if (!origin || ["build", "reflect"].includes(origin.source)) return;
+    if (!origin || ["build", "reflect"].includes(origin.source) || await tx.audit.findUnique({ where: { id: `agent-context:${originSessionId}` } })) return;
     if (await tx.run.count({ where: { workspaceId, sessionId: origin.id, status: "queued" } })) return;
     const lastUser = await tx.message.findFirst({ where: { sessionId: origin.id, direction: "in" }, orderBy: [{ at: "desc" }, { id: "desc" }] });
     // Runs carry Chrona's clock (audits do not): count the wakes since the user last spoke.
@@ -300,6 +303,7 @@ class RunService {
   }
   private async retryFailed(tx: Prisma.TransactionClient, run: RunRow, status: string, now: Date, error: string | null | undefined) {
       const { workspaceId, ports } = this;
+      if (run.sessionId && await tx.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return;
       const history = await tx.run.findMany({ where: { workspaceId, sessionId: run.sessionId, status: { notIn: ["queued", "running"] } }, orderBy: [{ endedAt: "desc" }, { createdAt: "desc" }], take: RUN_LIMITS.maxFailures });
       let failures = 0;
       for (const prior of history) { if (!["failed", "timed_out", "provider_unavailable"].includes(prior.status)) break; failures++; }
@@ -357,4 +361,12 @@ class RunService {
     }
     return rows.length;
   }
+}
+
+function canReconcileStop(evidence: boolean, attempt: boolean, agentContext: boolean, error: string | null) {
+  return evidence && (attempt || agentContext && error === "Execution stop is unconfirmed");
+}
+
+async function isAgentContext(tx: Prisma.TransactionClient, sessionId: string | null) {
+  return !!(sessionId && await tx.audit.findUnique({ where: { id: `agent-context:${sessionId}` } }));
 }

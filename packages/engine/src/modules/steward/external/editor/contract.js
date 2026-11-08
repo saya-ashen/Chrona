@@ -5227,9 +5227,9 @@ function validateExecutionResponseIdentity(command, data) {
 var executionStartV2Schema = workLeafStartSchema.omit({ parentWorkId: true, dependsOnWorkIds: true });
 var executionPlacementViewSchema = executionRefSchema.extend({ placement: workPlacementSchema, workspace: workWorkspaceSchema, queueExpiresAt: string2().datetime({ offset: true }), online: boolean2() }).strict();
 // packages/contracts/src/steward/execution-tools.ts
-var CODING_TOOL_OPERATIONS = { create: "start", get: "get", list: "list", send: "send", answer: "answer", cancel: "cancel", results: "results", accept: "accept" };
+var CODING_TOOL_OPERATIONS = { create: "start", get: "get", "lookup-start": "lookup_start", events: "events", snapshot: "snapshot", list: "list", send: "send", answer: "answer", cancel: "cancel", results: "results", accept: "accept" };
 var EXECUTION_TOOL_OPERATIONS = { start: "start", get: "get", "lookup-start": "lookup_start", list: "list", send: "send", answer: "answer", cancel: "cancel", events: "events", snapshot: "snapshot" };
-var EXECUTION_UNRECORDED_TOOLS = ["start", "send", "answer"];
+var EXECUTION_UNRECORDED_TOOLS = ["start", "send", "answer", "start-v2", "workspace-cleanup"];
 var executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map(([name, op]) => ({
   name,
   description: `Execution ${name}`,
@@ -5246,7 +5246,12 @@ var executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map((
   output: executionResultSourceSchema,
   visibility: ["owner", "modules"],
   idempotent: true
-}];
+}, ...[
+  { name: "start-v2", input: executionStartV2Schema, output: object({ execution: executionViewSchema, placement: executionPlacementViewSchema }).strict() },
+  { name: "placement", input: object({ workId: executionIdSchema }).strict(), output: executionPlacementViewSchema },
+  { name: "locations", input: object({ after: executionIdSchema.optional(), limit: number2().int().min(1).max(100) }).strict(), output: object({ locations: array(workLocationSchema).max(100), after: executionIdSchema.nullable() }).strict() },
+  { name: "workspace-cleanup", input: workCleanupInputSchema, output: workCleanupReceiptSchema }
+].map((tool) => ({ ...tool, description: `Execution ${tool.name}`, parameters: { type: "object", properties: {}, required: [] }, visibility: ["owner", "modules"], idempotent: true }))];
 function manifestOutput(schema) {
   const allowed = new Set(["type", "title", "description", "properties", "required", "additionalProperties", "items", "enum", "const", "anyOf", "allOf"]);
   const output = toJSONSchema(schema, { override: ({ jsonSchema }) => {

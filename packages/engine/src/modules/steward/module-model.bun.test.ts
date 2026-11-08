@@ -1,3 +1,7 @@
+// Legacy service regression harness only. These routes are absent from production registration.
+import { registerSystemModule } from "./module-calls";
+import { ai as legacyProvider } from "./system/provider";
+registerSystemModule(legacyProvider);
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
@@ -116,11 +120,11 @@ test("build refuses listen outside entry modules: apps offer tools, the web modu
   }
 });
 const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-(sandbox.health.available ? test : test.skip)("sandbox schedule calls SDK model then notify; model audit excludes content", async () => {
+(sandbox.health.available ? test : test.skip)("sandbox legacy completion then notify; model audit excludes content", async () => {
   registerSystemModules();
   const f = await fixture(), code = join(f.dataDir, "platform/store/v1");
   await mkdir(code, { recursive: true });
-  await writeFile(join(code, "index.ts"), `import { on, chrona } from 'chrona'; on('schedule', async ev => { const reply = await chrona.model({ prompt: '${prompt}', maxOutputTokens: 20 }); await chrona.notify({ key: ev.firedAt, level: 'now', title: 'Summary', body: reply.text }); });`);
+  await writeFile(join(code, "index.ts"), `import { on, chrona } from 'chrona'; on('schedule', async ev => { const reply = await chrona.call('provider.complete', { prompt: '${prompt}', maxOutputTokens: 20 }); await chrona.notify({ key: ev.firedAt, level: 'now', title: 'Summary', body: reply.text }); });`);
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v1", manifest: f.manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: f.dataDir });
   f.ports.sandbox = { ...runtime.health, startModule: runtime.startModule };

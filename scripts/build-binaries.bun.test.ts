@@ -68,6 +68,8 @@ test("fixed module seeds include generated execution contracts before release ve
     await buildExecutionContracts(join(resourcesRoot, "external"));
     const { buildAgentApplication } = await import("../packages/engine/src/modules/steward/builtin/agent/build");
     await buildAgentApplication(join(resourcesRoot, "builtin/agent"));
+    const { buildEntryConversations } = await import("../build/entry-conversations");
+    await buildEntryConversations(resourcesRoot);
     const lock = await prepareModuleGitRelease({ root, resourcesRoot, seedDir, hostCommit: "a".repeat(40), hostTimestamp: "1735689600" });
     // Recreate a raw resource copy: release preparation must generate these again before comparing trees.
     for (const name of ["coding", "editor"]) for (const file of ["contract.js", "contract.d.ts", "executor-contract.js", "executor-contract.d.ts"]) await rm(join(resourcesRoot, "external", name, file));

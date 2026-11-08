@@ -60,9 +60,9 @@ const stubs = Object.fromEntries(["create", "get", "list", "send", "answer", "ca
 }]));
 const runtime = await startModule("index.ts", { stubs: {
   ...stubs,
-  "executions.lookup-start": (input: Record<string, unknown>) => { calls.push({ target: "executions.lookup-start", input }); return view; },
-  "executions.events": (input: Record<string, unknown>) => { calls.push({ target: "executions.events", input }); executionInputSchemas.events.parse(input); assert.equal(input.waitMs, 0); return empty; },
-  "executions.snapshot": (input: Record<string, unknown>) => { calls.push({ target: "executions.snapshot", input }); executionInputSchemas.snapshot.parse(input); return { workId: "w", sessionId: "actual-session", runId: "r", attemptId: "a", status: "running", cancelRequested: false, stopConfirmed: false, highWatermark: 0, finalMessage: null, questions: [], missing: false, expiresAt: "2026-12-01T00:00:00Z" }; },
+  "coding.lookup-start": (raw: Record<string, unknown>) => { const input = JSON.parse(String(raw.input)); calls.push({ target: "coding.lookup-start", input }); return view; },
+  "coding.events": (raw: Record<string, unknown>) => { const input = JSON.parse(String(raw.input)); calls.push({ target: "coding.events", input }); executionInputSchemas.events.parse(input); assert.equal(input.waitMs, 0); return empty; },
+  "coding.snapshot": (raw: Record<string, unknown>) => { const input = JSON.parse(String(raw.input)); calls.push({ target: "coding.snapshot", input }); executionInputSchemas.snapshot.parse(input); return { workId: "w", sessionId: "actual-session", runId: "r", attemptId: "a", status: "running", cancelRequested: false, stopConfirmed: false, highWatermark: 0, finalMessage: null, questions: [], missing: false, expiresAt: "2026-12-01T00:00:00Z" }; },
 } });
 async function post(command: object, requestId = "req") {
   const response = await fetch(`http://module${EDITOR_HTTP.commands}`, { unix: runtime.httpSocket, method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ v: EXECUTION_PROTOCOL, requestId, command }) });

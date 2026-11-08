@@ -38,7 +38,7 @@ export function systemCall(host: SystemHost) {
     call: args => post("/call", { target: args.target, args: args.args }),
     sessions: () => host.web("/sessions"),
     messages: args => host.web(`/sessions/${id(args)}/messages`),
-    chat: args => post("/chat", { text: args.text, ...(args.session ? { session: args.session } : {}) }),
+    chat: args => post("/chat", { text: args.text, ...(args.session ? { session: args.session } : {}), ...(args.requestKey ? { requestKey: args.requestKey } : {}) }),
     "revise-build": args => post(`/sessions/${id(args)}/revise-build`, { requirements: args.requirements }),
     "stop-build": args => post(`/sessions/${id(args)}/stop-build`, {}),
     file: args => host.web(`/file?message=${encodeURIComponent(String(args.message))}&ref=${encodeURIComponent(String(args.ref))}`, { raw: true }),

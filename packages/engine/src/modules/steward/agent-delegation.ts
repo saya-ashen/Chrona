@@ -1,17 +1,18 @@
-import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import type { CallOrigin } from "./module-calls";
 import { CallError } from "./module-call-error";
 import { isAgentApplication } from "./agent-application";
-import { callerManifest, json, tool } from "./system/shared";
+import { callerManifest, json } from "./system/shared";
 import { reserveCompletion, finishCompletion } from "./module-model-budget";
 import { assertExecutionPrincipal } from "./execution-principal";
 import type { ExecutionPrincipal, ExecutionStart, ExecutionView } from "@chrona/contracts/steward";
 import { moduleAgentInput } from "./builtin/agent/module-contracts";
 import { agentCaller } from "./agent-caller-context";
+import { admitContextPrimitive } from "./agent-context";
+import { primitiveInput } from "./builtin/agent/primitives";
+import { isAgentPrimitive } from "./builtin/agent/primitives";
+import { admitAgentPrimitive } from "./agent-primitives";
 
-export const agentDelegationTools = [tool("agent-admit", "Builtin Agent execution admission for a live module call", {}, [], { visibility: ["modules"], input: z.object({ callId: z.string(), operation: z.enum(["start", "status", "inject", "abort", "release", "transcript", "complete"]), execution: z.unknown().optional() }).strict(), output: z.unknown() }),
-  tool("agent-settle", "Builtin Agent model reservation settlement", {}, [], { visibility: ["modules"], input: z.object({ reservationId: z.string(), result: z.object({ text: z.string(), inputTokens: z.number().nullable(), outputTokens: z.number().nullable() }).strict().optional(), failed: z.boolean() }).strict(), output: z.null() })];
 async function reserveModel(ports: StewardPorts, context: NonNullable<ReturnType<typeof agentCaller>>, input: Record<string, unknown>) {
   const { origin } = context, { caller } = origin;
   const manifest = await callerManifest(ports.db, caller);
@@ -33,6 +34,9 @@ async function executionControl(ports: StewardPorts, principal: ExecutionPrincip
     return { released: true };
   }
   if (name === "transcript") return executionHistory(ports, principal, ref, input);
+  return executionEffect(service, principal, name, input, ref);
+}
+function executionEffect(service: NonNullable<StewardPorts["executions"]>, principal: ExecutionPrincipal, name: string, input: Record<string, unknown>, ref: ExecutionView) {
   const commandKey = String(input.commandKey);
   if (name === "inject" || name === "abort") {
     return service.admitControl(principal, name === "inject" ? { op: "send", ...ref, commandKey, text: String(input.message) } : { op: "cancel", ...ref, commandKey });
@@ -50,12 +54,27 @@ export async function delegateAgent(ports: StewardPorts, workspaceId: string, ca
     return null;
   }
   const context = agentCaller(ports, String(args.callId));
-  if (!context || context.origin.workspaceId !== workspaceId || context.name !== args.operation) throw new CallError("forbidden", "Agent caller context expired or mismatched");
+  if (!context) throw new CallError("forbidden", "Agent caller context expired or mismatched");
+  validateContext(context, workspaceId, args.operation);
   const { caller: original } = context.origin;
   const principal: ExecutionPrincipal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: original.moduleId, hash: original.hash } };
   await assertExecutionPrincipal(ports.db, principal);
+  if (args.settle === true) return settleControl(ports, principal, context);
+  if (isAgentPrimitive(context.name)) return json(await admitAgentPrimitive(ports, principal, context.name, context.args));
   const input = moduleAgentInput(context.name, context.args) as Record<string, unknown>;
   if (context.name === "complete") return reserveModel(ports, context, input);
   if (context.name === "release" && !args.execution) return { released: true };
   return executionControl(ports, principal, context.name, input, args.execution as ExecutionView | undefined);
+}
+
+async function settleControl(ports: StewardPorts, principal: ExecutionPrincipal, context: NonNullable<ReturnType<typeof agentCaller>>) {
+    if (context.name !== "write" && context.name !== "interrupt") throw new CallError("invalid", "Unexpected Agent settlement");
+    const input = primitiveInput(context.name, context.args);
+    if ("executionId" in input) throw new CallError("invalid", "Unexpected execution settlement");
+    await admitContextPrimitive(ports, principal, context.name, input, true);
+    return null;
+  }
+
+function validateContext(context: NonNullable<ReturnType<typeof agentCaller>>, workspaceId: string, operation: unknown) {
+  if (context.origin.workspaceId !== workspaceId || context.name !== operation) throw new CallError("forbidden", "Agent caller context expired or mismatched");
 }

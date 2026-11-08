@@ -4892,19 +4892,31 @@ var executorQuestionReplySchema = discriminatedUnion("state", [
   object({ target: executorTargetSchema, questionKey: id4, requestId: id4, state: literal("answer"), answer: providerAnswerSchema }).strict(),
   object({ target: executorTargetSchema, questionKey: id4, requestId: id4, state: _enum(["pending", "interrupted"]) }).strict()
 ]);
+var executorCleanupOperationSchema = object({
+  target: executorTargetSchema,
+  launchDigest: digest,
+  workspaceRef: id4,
+  mappingRevision: executorMappingSchema.shape.mappingRevision,
+  sourceReceiptDigest: digest.nullable(),
+  input: workCleanupInputSchema,
+  requestDigest: digest
+}).strict().refine((value) => value.target.workId === value.input.workId, "Cleanup work identity mismatch");
+var executorCleanupResultSchema = object({ commandKey: id4, requestDigest: digest, receipt: workCleanupReceiptSchema }).strict();
 var executorPollSchema = object({ ...request, waitMs: count2.max(EXECUTOR_LIMITS.pollMs) }).strict();
 var executorPollReceiptSchema = executorFenceSchema.extend({
   authorizedForMs: count2.max(EXECUTOR_LIMITS.graceMs),
   launches: array(executorLaunchSchema).max(EXECUTOR_LIMITS.codingEnvironment),
   controls: array(executorControlSchema).max(EXECUTOR_LIMITS.controls),
-  questions: array(executorQuestionReplySchema).max(6)
+  questions: array(executorQuestionReplySchema).max(6),
+  cleanupOperations: array(executorCleanupOperationSchema).max(4).optional()
 }).strict().refine(bounded(EXECUTOR_LIMITS.bodyBytes), "Poll receipt exceeds byte budget");
 var executorReportSchema = object({
   ...request,
   target: executorTargetSchema,
   records: array(executorSourceRecordSchema).max(EXECUTOR_LIMITS.records).refine(bounded(EXECUTOR_LIMITS.eventBytes), "Record batch exceeds byte budget"),
   started: object({ launchDigest: digest, identity: executorProcessIdentitySchema, sourceReceipt: executionSourceReceiptSchema.nullable() }).strict().optional(),
-  consumed: array(object({ commandKey: id4, effect: _enum(["delivered", "unknown"]) }).strict()).max(EXECUTOR_LIMITS.controls).optional()
+  consumed: array(object({ commandKey: id4, effect: _enum(["delivered", "unknown"]) }).strict()).max(EXECUTOR_LIMITS.controls).optional(),
+  cleanupResults: array(executorCleanupResultSchema).max(4).optional()
 }).strict().refine(bounded(EXECUTOR_LIMITS.bodyBytes), "Report exceeds byte budget");
 var executorReportReceiptSchema = object({ acceptedThroughSourceSeq: count2, storedHighWatermark: count2 }).strict();
 var executorQuestionSchema = object({ ...request, target: executorTargetSchema, questionKey: id4, value: providerQuestionSchema }).strict();
@@ -4990,6 +5002,8 @@ export {
   executorAssignmentSchema,
   executorBridgeSchema,
   executorCanonicalJson,
+  executorCleanupOperationSchema,
+  executorCleanupResultSchema,
   executorControlSchema,
   executorDetailSchema,
   executorDigest,

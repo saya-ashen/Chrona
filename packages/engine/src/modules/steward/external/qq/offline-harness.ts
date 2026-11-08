@@ -3,13 +3,14 @@
 import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { paths } from "chrona";
+let receipt = 0;
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   const url = String(input);
   if (url === "https://bots.qq.com/app/getAppAccessToken") return Response.json({ access_token: "fake-test-token", expires_in: 7200 });
   if (url === "https://api.sgroup.qq.com/gateway") return Response.json({ url: "wss://offline.invalid" });
   if (url === "https://api.sgroup.qq.com/v2/users/owner/messages") {
     await appendFile(join(paths.data, "offline-payloads.jsonl"), String(init?.body) + "\n");
-    return Response.json({ id: "offline-receipt" });
+    return Response.json({ id: `offline-receipt-${++receipt}` });
   }
   throw new Error("Offline test forbids all other requests");
 }) as typeof fetch;

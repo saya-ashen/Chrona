@@ -100,9 +100,9 @@ export declare const EXECUTION_EVENT_LIMITS: {"eventBytes":32768,"pageEvents":10
 export declare const EXECUTION_CHANGES_LIMITS: {"bytes":131072,"files":100,"fileBytes":65536,"timeoutMs":5000};
 export declare const EXECUTION_HTTP_STATUS: {"invalid":400,"unauthorized":401,"forbidden":403,"not_found":404,"conflict":409,"cursor_expired":410,"too_large":413,"capacity":429,"unavailable":503,"unsupported_version":409,"unsupported":400};
 export declare const EDITOR_HTTP: {"commands":"/api/editor/v1/commands","events":"/api/editor/v1/events"};
-export declare const CODING_TOOL_OPERATIONS: {"create":"start","get":"get","list":"list","send":"send","answer":"answer","cancel":"cancel","results":"results","accept":"accept"};
+export declare const CODING_TOOL_OPERATIONS: {"create":"start","get":"get","lookup-start":"lookup_start","events":"events","snapshot":"snapshot","list":"list","send":"send","answer":"answer","cancel":"cancel","results":"results","accept":"accept"};
 export declare const EXECUTION_TOOL_OPERATIONS: {"start":"start","get":"get","lookup-start":"lookup_start","list":"list","send":"send","answer":"answer","cancel":"cancel","events":"events","snapshot":"snapshot"};
-export declare const EXECUTION_UNRECORDED_TOOLS: ["start","send","answer"];
+export declare const EXECUTION_UNRECORDED_TOOLS: ["start","send","answer","start-v2","workspace-cleanup"];
 export declare const WORK_PROTOCOL: "chrona.execution.v2";
 export declare const WORK_LIMITS: {"children":20,"sourceFiles":100,"sourceBytes":32768,"requestBytes":262144,"responseBytes":262144,"queueMs":86400000};
 export declare const WORK_HTTP: {"method":"POST","commands":"/api/editor/v1/commands"};

@@ -15,7 +15,7 @@ const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined
   try {
     const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: dir });
     const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
-    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "provider.complete"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
+    const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
       triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }],
       tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
@@ -45,16 +45,17 @@ try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await module.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(module.calls.length, 4);
-  assert.equal(module.calls[1].params.args.body, 'Stub summary');
-  assert.equal(module.calls[3].params.target, 'provider.wake');
+  assert.equal(module.calls.length, 6);
+  assert.equal(module.calls[2].params.args.body, 'Stub summary');
+  assert.equal(module.calls[4].params.target, 'agent.context');
+  assert.equal(module.calls[5].params.target, 'agent.run');
 } finally { await module.stop(); }
 const defaultModule = await startModule('index.ts');
 try {
   const now = '2026-10-21T04:00:00.000Z';
   const reply = await defaultModule.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(defaultModule.calls[1].params.args.body, 'Chrona test model response');
+  assert.equal(defaultModule.calls[2].params.args.body, 'Chrona test model response');
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });

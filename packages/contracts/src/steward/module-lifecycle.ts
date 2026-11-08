@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Reserved independently of database initialization. executions is reserved for P1 only. */
-export const KERNEL_MODULE_NAMES = ["chat", "modules", "schedules", "provider", "approvals", "settings", "secrets", "activity", "content", "memory", "executions"] as const;
+export const KERNEL_MODULE_NAMES = ["history", "modules", "schedules", "approvals", "settings", "secrets", "activity", "content", "memory"] as const;
 export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
 /** Trusted local capability identities; same router, separate from kernel APIs and application installation. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local", "content-local"] as const;

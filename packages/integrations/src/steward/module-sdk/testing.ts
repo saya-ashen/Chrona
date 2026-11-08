@@ -29,9 +29,13 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args) ?? null : null } };
 }
-async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, seen: Set<string>): Promise<unknown> {
+async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { secrets?: (string | { name: string })[] }, seen: Set<string>, completions: Map<string, unknown>): Promise<unknown> {
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
   const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
+  if (target.startsWith("agent.") && !findStub(stubs, target)) {
+    const result = await agentReply(target, args, stubs, completions);
+    if (result) return result;
+  }
   if (call.params.mode === "async") {
     // A repeated key returns the stored call, as Chrona does. The request id doubles as the call id (answer it with a call_result event).
     const key = `${target}:${String(call.params.key)}`, duplicate = seen.has(key);
@@ -49,7 +53,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const dir = await mkdtemp("/tmp/ct-");
   await chmod(dir, 0o700);
-  const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>();
+  const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
   let socket: Socket | undefined, closed = false;
   const pending = new Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
   let connect!: () => void, disconnect!: (error: Error) => void;
@@ -67,7 +71,7 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
     if (typeof message.method === "string") {
       const call = message as Call;
       calls.push(call);
-      const reply = await callReply(call, stubs, manifest, seen);
+      const reply = await callReply(call, stubs, manifest, seen, completions);
       socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
       return;
     }
@@ -124,4 +128,22 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       await rm(dir, { recursive: true, force: true });
     },
   };
+}
+
+async function agentReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, completions: Map<string, unknown>) {
+  if ((target === "agent.context" || target === "agent.run")) {
+    const key = `${target}:${String(args["request-key"])}`;
+    return { result: { output: target === "agent.context" ? { contextId: key } : { contextId: args["context-id"], runId: key, status: "queued", active: true } } };
+  }
+  if (target === "agent.complete") {
+    const operationId = String(args["command-key"]), previous = completions.get(operationId);
+    if (!previous) {
+      const stub = findStub(stubs, "model");
+      const input = { prompt: args.prompt, ...(args.system === undefined ? {} : { system: args.system }), maxOutputTokens: args["max-output-tokens"] };
+      completions.set(operationId, stub ? await stub(input) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
+    }
+    return { result: { output: { operationId } } };
+  }
+  if (target === "agent.completion") return { result: { output: { result: completions.get(String(args["operation-id"])) ?? null, failure: !completions.has(String(args["operation-id"])) } } };
+  return null;
 }

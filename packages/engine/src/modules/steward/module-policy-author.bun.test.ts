@@ -7,12 +7,12 @@ import { moduleContext, type TestReport } from "./module-context";
 import { runTests } from "./module-continuity";
 import { testDb } from "./test-db";
 
-test.each(["web", "notify", "mcp", "qq"])("%s author tests preserve application-owned policies", async name => {
+test.each(["web", "notify", "mcp", "qq", "mind"])("%s author tests preserve application-owned policies", async name => {
   const dataDir = await mkdtemp("/tmp/chrona-policy-author-"), db = testDb();
   try {
     const code = join(dataDir, "platform", "store", name);
     await mkdir(code, { recursive: true });
-    await cp(join(import.meta.dirname, name === "qq" ? "external" : "builtin", name), code, { recursive: true });
+    await cp(join(import.meta.dirname, ["qq", "mind"].includes(name) ? "external" : "builtin", name), code, { recursive: true });
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
     const reports: TestReport = [];

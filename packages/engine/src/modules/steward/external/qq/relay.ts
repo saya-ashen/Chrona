@@ -1,6 +1,6 @@
 import type { ApprovalDecision, QqBinding, QqChatPort, QqReplyItem } from "./bot";
 import type { QqAttachment } from "./official";
-import { conversationOptions } from "./conversation";
+import type { QqConversations } from "./conversations";
 
 /** Everything the QQ module asks of Chrona, as routed calls (`chrona.call`): `chat.*`, `approvals.*`, `notify.send`. */
 export type Call = (target: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -17,22 +17,21 @@ const isReplyImage = (file: Attachment | undefined) => Boolean(file?.ref && ["im
 /** `call` is sync (resolves to the tool's result); `notify` is an async call to notify.send. */
 /** What the QQ module asks notify.send for: a final reply to the bound owner. */
 export type FinalNotice = { key: string; level: "now"; title: string; body: string; recipient: string; responds: true; session?: string };
-export function createRelay({ call, notify, publicUrl, download }: { call: Call; notify: (args: FinalNotice) => Promise<unknown>; publicUrl: string | null; download: Download }) {
+export function createRelay({ call, notify, publicUrl, download, conversations }: { conversations?: Pick<QqConversations, "send" | "attach" | "newSession" | "file" | "externalId" | "record">; call: Call; notify: (args: FinalNotice) => Promise<unknown>; publicUrl: string | null; download: Download }) {
+  function app() { if (!conversations) throw new Error("QQ conversation application is unavailable"); return conversations; }
   const send: QqChatPort["send"] = async input => {
     // QQ keeps one conversation; `/new` ends it and the next message starts a fresh one.
     if (input.text.trim() === "/new" && !input.attachments?.length) {
-      await call("chat.new-session", { key: "qq:dm" });
+      await app().newSession();
       return { reply: "【Chrona】已开始新会话。" };
     }
     if ((input.attachments?.length ?? 0) > 10) throw new Error("Too many attachments");
     const attachments = [];
     for (const attachment of input.attachments ?? []) {
       const file = await download(attachment);
-      attachments.push(await call("chat.attach", { name: file.name, mime: file.mime, base64: Buffer.from(file.bytes).toString("base64") }));
+      attachments.push(await app().attach(file));
     }
-    await call("chat.send", { key: "qq:dm", channel: "chrona_qqbot", text: input.text, "external-id": input.externalId,
-      ...await conversationOptions(call, "qq:dm", input.text),
-      ...(input.quotedExternalId ? { "quoted-external-id": `qq:out:${input.quotedExternalId}` } : {}), ...(attachments.length ? { attachments: JSON.stringify(attachments) } : {}) });
+    await app().send({ ...input, attachments, ...(input.quotedExternalId ? { quotedExternalId: `qq:out:${input.quotedExternalId}` } : {}) });
     return {};
   };
   return {
@@ -52,13 +51,13 @@ export function createRelay({ call, notify, publicUrl, download }: { call: Call;
     async replyImage(item: Pick<QqReplyItem, "messageId" | "attachments">) {
       const image = item.attachments.find(isReplyImage);
       if (!image?.ref) return null;
-      const file = await call("chat.file", { message: item.messageId, ref: image.ref }) as { base64?: string };
+      const file = await app().file(item.messageId, image.ref) as { base64?: string };
       return file.base64 ? Buffer.from(file.base64, "base64") : null;
     },
-    setExternalId: (messageId: string, externalId: string) => call("chat.delivered", { message: messageId, "external-id": externalId }),
+    setExternalId: (messageId: string, externalId: string) => app().externalId(messageId, externalId),
     /** The normal budget may fold this into a digest; never bypass quiet hours/caps. Pinned to its sender. */
     enqueueFinal: (key: string, text: string, recipient: string, sessionId?: string | null) => notify({ key: `response:qq-final:${key}`, level: "now", title: "Chrona", body: text.slice(0, 4000), recipient, responds: true, ...(sessionId ? { session: sessionId } : {}) }),
     /** A notification QQ accepted joins the QQ conversation, so quoting it works. */
-    recordDelivered: (text: string, externalId: string) => call("chat.record", { key: "qq:dm", channel: "chrona_qqbot", text: text.slice(0, 8000), "external-id": externalId }),
+    recordDelivered: (text: string, externalId: string) => app().record(text.slice(0, 8000), externalId),
   };
 }

@@ -1,7 +1,7 @@
 import { startRescueListener } from "./rescue";
 import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { registerInjectedProvider, createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
@@ -97,6 +97,7 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   };
   ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
+  registerInjectedProvider(ports, injected);
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;
   let rescue: ReturnType<typeof startRescueListener>;
   let starting: Promise<void> | undefined;

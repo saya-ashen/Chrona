@@ -64,7 +64,11 @@ async function checkoutSource(ports: StewardPorts, workspaceId: string, cwd: str
 }
 
 /** `modules` tools that read or write the calling run's working directory: the Provider's only (v2-13). */
-async function workspaceTool(ports: StewardPorts, workspaceId: string, caller: Caller, name: string, args: Record<string, unknown>) {
+async function workspaceTool(scope: { ports: StewardPorts; workspaceId: string; caller: Caller; executionRunId?: string }, name: string, args: Record<string, unknown>) {
+  const { ports, workspaceId, caller, executionRunId } = scope;
+  if (caller.kind === "module" && name === "build" && executionRunId) {
+    return buildFromContext(ports, workspaceId, caller, executionRunId, args);
+  }
   if (caller.kind !== "provider") throw new CallError("forbidden", "Only the Provider may call this");
   const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId } });
   if (!run) throw new CallError("not_found", "Run not found");
@@ -75,6 +79,12 @@ async function workspaceTool(ports: StewardPorts, workspaceId: string, caller: C
   }
   if (name === "propose") return proposeFromRun(ports, workspaceId, run, args);
   return startBuild(ports, workspaceId, run.id, args as z.output<typeof modulesToolInputSchemas.build>);
+}
+async function buildFromContext(ports: StewardPorts, workspaceId: string, caller: Extract<Caller, { kind: "module" }>, executionRunId: string, args: Record<string, unknown>) {
+    const context = await ports.db.run.findFirst({ where: { id: executionRunId, workspaceId, status: "running", session: { moduleId: caller.moduleId, source: "module" } } });
+    const grant = context?.sessionId && await ports.db.audit.findUnique({ where: { id: `agent-context:${context.sessionId}` } });
+    if (!context || !grant || (grant.details as { hash?: string }).hash !== caller.hash) throw new CallError("forbidden", "A live module Agent context is required");
+    return startBuild(ports, workspaceId, context.id, args as z.output<typeof modulesToolInputSchemas.build>);
 }
 /** `modules.propose` from the calling run's directory, within its submission budget (and, for a build, its declared modules). */
 async function proposeFromRun(ports: StewardPorts, workspaceId: string, run: { id: string; lane: string; sessionId: string | null; cwd: string }, args: Record<string, unknown>) {
@@ -117,19 +127,21 @@ async function searchBuildControls(ports: StewardPorts, caller: Caller, words: s
     const target = `modules.${candidate.name}`;
     if (await searchMatch(ports, caller, words, target, candidate)) found.push(searchSystemResult(target, candidate)); }
 }
-async function searchActiveModuleTools(ports: StewardPorts, workspaceId: string, caller: Caller, words: string[], found: ToolSearchResult[]) {
+async function searchActiveModuleTools(ports: StewardPorts, options: { workspaceId: string; caller: Caller; words: string[]; userTools: boolean }, found: ToolSearchResult[]) {
+  const { workspaceId, caller, words } = options;
   for (const module of await ports.db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null } }, orderBy: { name: "asc" } })) {
     const version = await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
     for (const candidate of moduleManifestSchema.safeParse(version?.manifest).data?.tools ?? []) {
+      if (options.userTools && !candidate.visibility.some(audience => audience === "owner" || audience === "provider")) continue;
       const target = `${module.name}.${candidate.name}`;
       if (await searchMatch(ports, caller, words, target, candidate)) found.push({ ...searchModuleResult(target, candidate), moduleId: module.id, hash: module.activeHash!, contractHash: moduleCallbackContractHash(candidate) }); }
   }
 }
 /** `modules.tools`: module tools the calling module may reach; every word of the query must match a name or description. */
-async function toolSearch(ports: StewardPorts, workspaceId: string, caller: Caller, query: unknown) {
+async function toolSearch(ports: StewardPorts, workspaceId: string, caller: Caller, query: unknown, userTools = false) {
   const words = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean), found: ToolSearchResult[] = [];
   await searchBuildControls(ports, caller, words, found);
-  await searchActiveModuleTools(ports, workspaceId, caller, words, found);
+  await searchActiveModuleTools(ports, { workspaceId, caller, words, userTools }, found);
   return found;
 }
 const provider = (input: z.ZodType, extra: Partial<SystemTool> = {}) => ({ visibility: ["provider" as const], input, ...extra });
@@ -156,18 +168,18 @@ export const modules: SystemModule = {
       output: moduleSettingsOutputSchema, documentation: MODULE_SETTINGS_SET_DOCUMENTATION, examples: moduleSettingsExamples() }),
     tool("permissions", "One app's permissions and use (v2-17): what its active version can do, standing grants, credentials (set or not, never values), model tier and today's calls, recent approvals.", { module: text("Module name or id") }, ["module"], { idempotent: true, visibility: ["modules", "owner"], output: z.lazy(() => outputs.modulesPermissionsOutput) }),
     tool("reference", modulesToolInputSchemas.reference.description!, {}, [], provider(modulesToolInputSchemas.reference, { idempotent: true })),
-    tool("tools", "Module tools the caller may call (<module>.<tool>, description, input schema); query matches every word against names and descriptions.", { query: text() }, [], { idempotent: true, output: z.lazy(() => outputs.modulesToolsOutput) }),
+    tool("tools", "Module tools the caller may call (<module>.<tool>, description, input schema); query matches every word against names and descriptions.", { query: text(), audience: { type: "string", enum: ["caller", "user"], description: "user excludes transport and other module-only interfaces; caller admission still applies" } }, [], { idempotent: true, output: z.lazy(() => outputs.modulesToolsOutput) }),
     // v2-14: a module reads the `contributes.<its name>` declarations of the active modules; nobody else reads them.
     tool("refresh-health", "Request the module's declared diagnostic-only self-check. No business tool calls or replay. Unsupported modules remain unknown.", { module: text("Module name") }, ["module"], { visibility: ["modules", "owner"], output: moduleReadinessSchema }),
     tool("report-health", "Report this process's business readiness only. No credentials or private content. Expires unless refreshed; never changes runtime, permissions or recovery.", {}, [], { visibility: ["modules"], input: moduleReadinessReportSchema, output: z.object({ reportedAt: z.string(), expiresAt: z.string() }) }),
     tool("contributions", "Active modules' declarations in contributes.<section>, where section is the caller's own name: [{ module, hash, value }].", { section: text() }, ["section"], { idempotent: true, output: z.lazy(() => outputs.modulesContributionsOutput) }),
-    tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["provider", "owner"], idempotent: true, output: z.lazy(() => outputs.modulesCheckOutput.extend({ reason: z.string() })) })),
+    tool("check", modulesToolInputSchemas.check.description!, {}, [], provider(modulesToolInputSchemas.check, { visibility: ["modules", "provider", "owner"], idempotent: true, output: z.lazy(() => outputs.modulesCheckOutput.extend({ reason: z.string() })) })),
     tool("checkout", modulesToolInputSchemas.checkout.description!, {}, [], provider(modulesToolInputSchemas.checkout)),
     tool("propose", modulesToolInputSchemas.propose.description!, {}, [], provider(modulesToolInputSchemas.propose)),
     tool("rollback", modulesToolInputSchemas.rollback.description!, {}, [], provider(modulesToolInputSchemas.rollback, { visibility: ["provider", "owner"], output: z.lazy(() => outputs.modulesRollbackOutput) })),
     // Pause and resume take effect directly; removal always needs the user's approval.
     ...(["disable", "enable", "remove"] as const).map(name => tool(name, `${{ disable: "Pause an app: it stops running and its schedules pause; data and versions stay.", enable: "Resume a paused app and the schedules pausing stopped.", remove: "Delete an app with its data, files, schedules, grants and settings (backed up first); not built-in or entry apps, nor one another app calls. Always a red approval the user decides on the page." }[name]} Removal returns { status: "pending_approval", approvalId }.`, { module: text("Module name"), reason: text("Why, with the evidence (shown to the user)") }, ["module", "reason"], { visibility: ["provider", "owner"], output: z.lazy(() => outputs.modulesStatusOutput) })),
-    tool("build", modulesToolInputSchemas.build.description!, {}, [], provider(modulesToolInputSchemas.build)),
+    tool("build", modulesToolInputSchemas.build.description!, {}, [], provider(modulesToolInputSchemas.build, { visibility: ["modules", "provider"], output: z.lazy(() => outputs.modulesBuildOutput) })),
     tool("build-owner", "Start one explicitly authorized single-module build with an exact Provider/model, timeout and submission cap. requestKey is single-use: replay returns the original run, never resumes or retries. No host files; normal sandbox checks and approvals still apply.", {}, [], provider(ownerBuildSchema, { visibility: ["modules", "owner"], output: z.lazy(() => outputs.ownerBuildOutput) })),
     tool("request-group", modulesToolInputSchemas["request-group"].description!, {}, [], provider(modulesToolInputSchemas["request-group"])),
     ...(["stop-build", "revise-build"] as const).map(name => tool(name, modulesToolInputSchemas[name].description!, {}, [], provider(modulesToolInputSchemas[name], { visibility: ["provider", "owner"], output: z.lazy(() => outputs.buildControlOutput) }))),
@@ -178,6 +190,7 @@ export const modules: SystemModule = {
       list: () => listModules(ports, workspaceId, caller),
       "report-health": async () => reportOwnHealth(ports, caller, args),
       catalog: () => api.catalog(),
+      upstream: () => api.upstream(modulesToolInputSchemas.upstream.parse(args)),
       health: async () => {
         if (args.open !== undefined && args.open !== "true" && args.open !== "false") throw new CallError("invalid", 'open must be "true" or "false"');
         const targets = caller.kind === "provider" && (await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId }, include: { session: { select: { source: true } } } }))?.session?.source === "build" ? await buildHealthTargets(ports, workspaceId, caller) : undefined;
@@ -201,13 +214,13 @@ export const modules: SystemModule = {
     if (["stop-build", "revise-build"].includes(name)) return json(await buildControl(ports, workspaceId, caller, name, args));
     if (name === "build-owner") return json(await startOwnerBuildAsCaller(ports, workspaceId, caller, args));
     if (name === "install") return json(await api.install(modulesToolInputSchemas.install.parse(args)));
-    if (name === "upstream") return json(await api.upstream(modulesToolInputSchemas.upstream.parse(args)));
+
     if (name === "check") return json(await checkVersion(ports, workspaceId, args as z.output<typeof modulesToolInputSchemas.check>, deadline));
     if (["rollback", "disable", "enable", "remove"].includes(name)) return json(await api.lifecycle(name, (await moduleNamed(ports.db, workspaceId, args.module)).id, args, await ownerLifecycle(ports, caller, name)));
-    if (["checkout", "propose", "build", "request-group"].includes(name)) return json(await workspaceTool(ports, workspaceId, caller, name, args));
+    if (["checkout", "propose", "build", "request-group"].includes(name)) return json(await workspaceTool({ ports, workspaceId, caller, executionRunId: run?.executionRunId }, name, args));
     if (caller.kind !== "module") throw new CallError("forbidden", "Only a module may call this");
     if (name === "contributions") return json(await contributions(ports, workspaceId, caller, String(args.section)));
     if (name !== "tools") throw new CallError("not_found", `modules.${name} not found`);
-    return json(await toolSearch(ports, workspaceId, caller, args.query));
+    return json(await toolSearch(ports, workspaceId, caller, args.query, args.audience === "user"));
   },
 };

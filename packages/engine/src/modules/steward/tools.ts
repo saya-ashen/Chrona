@@ -19,6 +19,7 @@ import { readContentRef } from "./content";
 import { consumeOnce, effectivePolicyIn } from "./grants";
 import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
+import { contextRunTools, callContextTool } from "./agent-context-tools";
 import { MEMORY_TOOLS, memoryProvider } from "./memory";
 
 type ToolName = keyof typeof schemas;
@@ -148,6 +149,11 @@ export function createTools(ports: StewardPorts) {
     const deadline = Math.min(now().getTime() + timeoutSeconds * 1000, run.deadlineAt!.getTime());
     let ok = false;
     try {
+      const context = await contextRunTools(ports, run);
+      if (context) {
+        const result = await callContextTool(ports, context, name, raw, deadline);
+        ok = true; return result;
+      }
       if (claim.session?.source === "build" && !allowedInBuild(name)) throw new StewardError("forbidden", "A build conversation reports with chrona_reply and uses app tools only");
       if (name.startsWith("m_")) {
         const result = await callModuleTool(ports, { workspaceId, sessionId: run.sessionId, runId: run.id, deadline }, name, raw);
@@ -167,6 +173,8 @@ export function createTools(ports: StewardPorts) {
   }
   return { catalog: async (token: string) => {
     const { run, session } = await authenticateRun(db, token, now());
+    const context = await contextRunTools(ports, run);
+    if (context) return context.catalog;
     // request-group only means something inside a build conversation (v2-15), memory once there is a provider (v2-21).
     const hidden = await memoryProvider(ports, run.workspaceId) ? [] : MEMORY_TOOLS, build = session?.source === "build";
     const apps = (await moduleToolCatalog(ports, run)).filter(tool => (build || tool.name !== "m_modules_request_group") && !hidden.includes(tool.name));

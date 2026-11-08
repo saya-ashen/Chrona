@@ -1,3 +1,4 @@
+import { callAgent } from "./agent";
 import type { EditorCommandConsumer, ExecutionStart, ExecutionView } from "./contract.js";
 import { readRegistry, serializeWork } from "./work-v2-storage";
 import { reconcileCodingResult } from "./results";
@@ -19,7 +20,7 @@ async function createLegacyWork(context: CodingContext, input: ExecutionStart): 
     if (work.ref) return getCodingWork(context, { workId: input.workId });
     // A lost receipt must be looked up before the original command can be explicitly resubmitted.
     try {
-      const view = await context.call<ExecutionView>("executions.lookup-start", { commandKey: work.start.commandKey });
+      const view = await callAgent<ExecutionView>(context, "lookup-start", { commandKey: work.start.commandKey });
       remember(work, view);
       await writeCodingWork(context, work);
       return view;
@@ -29,7 +30,7 @@ async function createLegacyWork(context: CodingContext, input: ExecutionStart): 
     work = { start: input, results: [], acceptances: [] };
     await writeCodingWork(context, work);
   }
-  const view = await context.call<ExecutionView>("executions.start", { ...work.start, goal: codingGoal(work.start.goal) });
+  const view = await callAgent<ExecutionView>(context, "start", { ...work.start, goal: codingGoal(work.start.goal) });
   remember(work, view);
   await writeCodingWork(context, work);
   return view;
@@ -41,16 +42,16 @@ export async function getCodingWork(context: CodingContext, input: Input<"get">)
   return view;
 }
 export function listCodingWorks(context: CodingContext, input: Input<"list">) {
-  return context.call<Awaited<ReturnType<EditorCommandConsumer["list"]>>>("executions.list", input);
+  return callAgent<Awaited<ReturnType<EditorCommandConsumer["list"]>>>(context, "list", input);
 }
 export function sendCodingWork(context: CodingContext, input: Input<"send">) {
-  return context.call<{ accepted: true }>("executions.send", input);
+  return callAgent<{ accepted: true }>(context, "send", input);
 }
 export function answerCodingWork(context: CodingContext, input: Input<"answer">) {
-  return context.call<{ accepted: true }>("executions.answer", input);
+  return callAgent<{ accepted: true }>(context, "answer", input);
 }
 export async function cancelCodingWork(context: CodingContext, input: Input<"cancel">) {
-  const view = await context.call<ExecutionView>("executions.cancel", input);
+  const view = await callAgent<ExecutionView>(context, "cancel", input);
   await getCodingWork(context, { workId: input.workId });
   return view;
 }

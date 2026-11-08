@@ -7,9 +7,15 @@ import { createCodingWork, getCodingWork } from "./work";
 import { readCodingWork, type CodingContext } from "./storage";
 import { listCodingResults, acceptCodingResult } from "./results";
 import { codingGoal } from "./instructions";
+import { codingSessions } from "./sessions";
 // @ts-expect-error Chrona supplies the isolated author test kernel.
 import { startModule } from "chrona/testing";
 
+function camel(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camel);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()), camel(child)]));
+}
 const input: ExecutionStart = { workId: "w", projectRef: "repo", commandKey: "start-1", goal: "fix the fixture", budget: { timeoutMs: 1000, maxToolCalls: 1 } };
 const view: ExecutionView = { workId: "w", sessionId: "s", runId: "r", attemptId: "a", projectRef: "repo", status: "running", cancelRequested: false, stopConfirmed: false };
 const snapshot: ExecutionSnapshot = { workId: "w", sessionId: "s", runId: "r", attemptId: "a", status: "completed", cancelRequested: false, stopConfirmed: true, highWatermark: 1, finalMessage: { messageId: "m", text: "Changed fixture. Checks not run.", truncated: false }, questions: [], missing: false, expiresAt: "2026-12-01T00:00:00Z" };
@@ -17,21 +23,23 @@ const dir = await mkdtemp(join(tmpdir(), "coding-h-"));
 let starts = 0, lookups = 0, lookupMissing = false, failStart = true;
 const changes: NonNullable<ExecutionResultSource["changes"]> = { scope: "baseline_to_worktree", status: "complete", patch: "diff --git a/f b/f\n+change\n", files: [{ path: "f", kind: "tracked" }, { path: "new", kind: "untracked", text: "created" }] };
 const context: CodingContext = { dir, content: join(dir, "public"), async call<T>(target: string, args: Record<string, unknown>): Promise<T> {
-  if (target === "executions.start") {
+  args = camel(args) as Record<string, unknown>;
+  if (target === "agent.run") {
+    args = { ...args, workId: args.executionId, commandKey: args.requestKey, goal: args.prompt };
+    delete args.executionId; delete args.requestKey; delete args.prompt;
     starts++;
     assert.deepEqual(args, { ...input, goal: codingGoal(input.goal) });
     assert.ok(String(args.goal).includes("Report changes, checks actually run"));
     if (failStart) throw Object.assign(new Error("Lost start receipt"), { code: "unknown" });
-    return { ...view } as T;
+    return { execution: { ...view } } as T;
   }
-  if (target === "executions.lookup-start") {
+  if (target === "agent.lookup") {
     lookups++;
     if (lookupMissing) throw Object.assign(new Error("No receipt"), { code: "not_found" });
     return { ...view } as T;
   }
-  if (target === "executions.get") return { ...view } as T;
-  if (target === "executions.snapshot") return { ...snapshot, status: view.status, stopConfirmed: view.stopConfirmed } as T;
-  if (target === "executions.result-source") return { workId: "w", sessionId: "s", runId: "r", attemptId: "a", baseline: { kind: "commit", digest: "fixture-base" }, changes } as T;
+  if (target === "agent.get") return { ...view } as T;
+  if (target === "agent.inspect") return { snapshot: { ...snapshot, status: view.status, stopConfirmed: view.stopConfirmed }, source: { workId: "w", sessionId: "s", runId: "r", attemptId: "a", baseline: { kind: "commit", digest: "fixture-base" }, changes } } as T;
   throw new Error(`Unexpected target ${target}`);
 } };
 try {
@@ -68,6 +76,21 @@ try {
   assert.equal((await readCodingWork(context, "w")).acceptances.length, 1);
   assert.equal(await readFile(join(dir, "artifacts", `${first.artifactRef}.json`), "utf8"), bytes);
   assert.equal(starts, 1);
+  await codingSessions(context, { op: "create", id: "first", title: "First project" });
+  await codingSessions(context, { op: "bind", id: "first", workId: "w" });
+  await codingSessions(context, { op: "create", id: "second", title: "Second project" });
+  const beforeSwitch = starts;
+  await codingSessions(context, { op: "select", id: "second" });
+  const restored = await codingSessions({ ...context }, { op: "select", id: "first" });
+  assert.equal(restored.selected, "first");
+  assert.equal(restored.sessions[0]!.selectedWorkId, "w");
+  assert.equal(starts, beforeSwitch, "business session selection never launches a new execution");
+  await assert.rejects(codingSessions(context, { op: "create", id: "first", title: "changed" }), { code: "conflict" });
+  await assert.rejects(codingSessions(context, { op: "bind", id: "first", workId: "foreign" }), { code: "not_found" });
+  await assert.rejects(codingSessions(context, { op: "select", id: "unknown" }), { code: "not_found" });
+  await writeFile(join(dir, "sessions", "index.json"), "null");
+  await assert.rejects(codingSessions(context, { op: "list" }), { code: "conflict" });
+  await rm(join(dir, "sessions"), { recursive: true });
   // A changed published file must never be silently overwritten by reconciliation.
   const published = join(context.content, `${first.artifactRef}.json`);
   await writeFile(published, "changed");
@@ -95,9 +118,9 @@ try {
 let readiness: Record<string, unknown> | undefined;
 let locations: { online: boolean }[] = [];
 const runtime = await startModule("index.ts", { stubs: {
-  "executions.locations": () => ({ locations, after: null }),
+  "agent.locations": () => ({ locations, after: null }),
   "modules.report-health": (args: Record<string, unknown>) => { readiness = args; return { reportedAt: "2026-11-05T00:00:00Z", expiresAt: "2026-11-05T00:10:00Z" }; },
-  "executions.list": () => ({ works: [], after: null }), "web.page-set": () => ({ id: "main" }), "schedules.create": () => ({ key: "coding-dependencies" }),
+  "web.page-set": () => ({ id: "main" }), "schedules.create": () => ({ key: "coding-dependencies" }),
 } });
 try {
   const now = "2026-11-05T00:00:00Z";

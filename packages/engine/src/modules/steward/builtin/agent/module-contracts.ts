@@ -24,7 +24,7 @@ export const moduleAgentOutputs = {
   transcript: editorResponseDataSchemas.events,
 };
 export type ModuleAgentTool = keyof typeof moduleAgentInputs;
-function camelArguments(value: unknown): unknown {
+export function camelArguments(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(camelArguments);
   if (!value || typeof value !== "object") return value;
   const result: Record<string, unknown> = {};

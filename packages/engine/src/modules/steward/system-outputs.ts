@@ -6,6 +6,7 @@ import { appSchema, approvalSchema, attachmentSchema, chatReplySchema, grantSche
 import { moduleOverviewOutputSchema, permissionsSchema } from "./module-overview";
 
 export const ownerBuildOutput = z.object({ status: z.string(), sessionId: z.string(), runId: z.string(), duplicate: z.boolean(), queuePosition: z.number().optional(), aheadCount: z.number().optional(), waitUntil: z.string().nullable().optional() });
+export const modulesBuildOutput = ownerBuildOutput.extend({ reason: z.string().optional() });
 export const okOutput = z.object({ ok: z.literal(true) });
 export const chatConversationStateOutput = z.object({ now: z.string(), limits: z.object({ idleMinutes: z.number(), minContextTokens: z.number(), maxContextTokens: z.number() }),
   session: z.object({ id: z.string(), title: z.string().nullable(), lastActivityAt: z.string(), busy: z.boolean(), contextTokens: z.number() }).nullable() });

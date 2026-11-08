@@ -75,7 +75,7 @@ export function createQqBotState(dir: string, appId: string) {
 }
 export type QqBotState = ReturnType<typeof createQqBotState>;
 /** One reply Chrona pushed (`qq.reply`): `inReplyTo` is the QQ message id it answers, when known. */
-export type QqReplyItem = { messageId: string; sessionId: string | null; text: string; workspace: string; inReplyTo: string | null;
+export type QqReplyItem = { owner?: string; messageId: string; sessionId: string | null; text: string; workspace: string; inReplyTo: string | null;
   attachments: { name: string; ref: string | null; mime: string; size: number }[] };
 /** Sends the owner's message to Chrona (`chat.send`); returns at once. `reply` is an immediate answer (e.g. `/new`). */
 export type QqChatPort = { send(input: { workspaceId: string; key: "qq:dm"; channel: "chrona_qqbot"; text: string; externalId: string; quotedExternalId?: string; attachments?: QqC2cMessage["attachments"] }): Promise<{ reply?: string }> };
@@ -192,7 +192,7 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
    */
   async function deliverReply(item: QqReplyItem): Promise<"passive" | "outbox" | "unbound"> {
     const binding = await state.binding();
-    if (!binding) return "unbound";
+    if (!binding || (item.owner !== undefined && item.owner !== binding.openid) || item.workspace !== binding.workspaceId) return "unbound";
     const entry = item.inReplyTo ? asked.get(item.inReplyTo) : undefined;
     if (entry) { entry.answered = true; timers.clearTimeout(entry.timer); }
     if (entry && entry.binding.openid === binding.openid && await passiveSend(entry.message, item.text, item)) return "passive";

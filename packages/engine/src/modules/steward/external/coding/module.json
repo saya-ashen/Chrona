@@ -143,6 +143,318 @@
       }
     },
     {
+      "name": "lookup-start",
+      "description": "Coding lookup-start; input is JSON matching execution lookup_start",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution lookup_start payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "projectRef": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "stopConfirmed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "sessionId",
+          "runId",
+          "attemptId",
+          "projectRef",
+          "status",
+          "cancelRequested",
+          "stopConfirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "events",
+      "description": "Coding events; input is JSON matching execution events",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution events payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "attemptId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer"
+                },
+                "at": {
+                  "type": "string"
+                },
+                "payload": {}
+              },
+              "required": [
+                "workId",
+                "sessionId",
+                "runId",
+                "attemptId",
+                "seq",
+                "at",
+                "payload"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "highWatermark": {
+            "type": "integer"
+          },
+          "gap": {
+            "type": "boolean"
+          },
+          "snapshotRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "events",
+          "cursor",
+          "highWatermark",
+          "gap",
+          "snapshotRequired"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "snapshot",
+      "description": "Coding snapshot; input is JSON matching execution snapshot",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON execution snapshot payload, without op"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "highWatermark": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "stopConfirmed": {
+            "type": "boolean"
+          },
+          "finalMessage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "artifactRef": {
+                    "type": "string"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messageId",
+                  "text",
+                  "truncated"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "select",
+                    "confirm",
+                    "input",
+                    "editor"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expiresAt": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "answered",
+                    "cancelled",
+                    "expired",
+                    "interrupted"
+                  ]
+                }
+              },
+              "required": [
+                "requestId",
+                "title",
+                "method",
+                "options",
+                "expiresAt",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "missing": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workId",
+          "sessionId",
+          "runId",
+          "attemptId",
+          "highWatermark",
+          "status",
+          "cancelRequested",
+          "stopConfirmed",
+          "finalMessage",
+          "questions",
+          "missing",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "list",
       "description": "Coding list; input is JSON matching execution list",
       "parameters": {
@@ -599,29 +911,513 @@
         "modules"
       ],
       "idempotent": true
+    },
+    {
+      "name": "sessions",
+      "description": "Coding business sessions: input JSON {op:list|create|select|bind,id?,title?,workId?}. Selection never launches or interrupts work.",
+      "output": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "workIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "selectedWorkId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "workIds",
+                "selectedWorkId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "version",
+          "selected",
+          "sessions"
+        ]
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "visibility": [
+        "owner",
+        "provider"
+      ],
+      "idempotent": false
+    },
+    {
+      "name": "ui-catalog",
+      "description": "编码工作台项目与工作列表",
+      "output": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "goal": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "goal",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requestKey": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "notice": {
+            "type": "string"
+          },
+          "hasWorks": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projects",
+          "workIds",
+          "works",
+          "requestKey",
+          "configured",
+          "notice",
+          "hasWorks"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true
+    },
+    {
+      "name": "ui-work",
+      "description": "编码工作台当前工作与成果",
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "stop": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "canSend": {
+            "type": "boolean"
+          },
+          "canStop": {
+            "type": "boolean"
+          },
+          "limited": {
+            "type": "boolean"
+          },
+          "progress": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sequence",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "help": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "help"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "questionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "ref",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "resultIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hasQuestions": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "goal",
+          "project",
+          "status",
+          "stop",
+          "output",
+          "patch",
+          "canSend",
+          "canStop",
+          "limited",
+          "progress",
+          "questions",
+          "questionIds",
+          "results",
+          "resultIds",
+          "hasQuestions"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "work-id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "work-id"
+        ]
+      },
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true
+    },
+    {
+      "name": "ui-command",
+      "description": "编码工作台创建、补充、答复、停止和验收",
+      "output": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "stop": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "canSend": {
+            "type": "boolean"
+          },
+          "canStop": {
+            "type": "boolean"
+          },
+          "limited": {
+            "type": "boolean"
+          },
+          "progress": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sequence",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "help": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "help"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "questionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "ref",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "resultIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hasQuestions": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workId",
+          "goal",
+          "project",
+          "status",
+          "stop",
+          "output",
+          "patch",
+          "canSend",
+          "canStop",
+          "limited",
+          "progress",
+          "questions",
+          "questionIds",
+          "results",
+          "resultIds",
+          "hasQuestions"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "send",
+              "stop",
+              "answer",
+              "accept"
+            ]
+          },
+          "request-key": {
+            "type": "string"
+          },
+          "work-id": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "request-key"
+        ]
+      },
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true
     }
   ],
-  "healthCheck": true,
   "keepAlive": true,
   "activated": true,
+  "healthCheck": true,
   "content": true,
   "uses": [
-    "executions.start",
-    "executions.get",
-    "executions.lookup-start",
-    "executions.list",
-    "executions.send",
-    "executions.answer",
-    "executions.cancel",
-    "executions.snapshot",
-    "executions.result-source",
+    "agent.run",
+    "agent.get",
+    "agent.lookup",
+    "agent.write",
+    "agent.respond",
+    "agent.interrupt",
+    "agent.inspect",
     "web.page-set",
-    "executions.start-v2",
-    "executions.placement",
-    "executions.locations",
-    "executions.workspace-cleanup",
+    "agent.placement",
+    "agent.locations",
+    "agent.cleanup",
     "schedules.create",
-    "modules.report-health"
+    "modules.report-health",
+    "agent.stream"
   ],
   "packages": [],
   "secrets": [],

@@ -1,19 +1,11 @@
+import { callAgent } from "./agent";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ModelError } from "chrona";
-import type { ExecutionStart, ExecutionView, ExecutionResult } from "./contract.js";
+import type { ExecutionView } from "./contract.js";
 
-export type CodingContext = {
-  dir: string;
-  content: string;
-  call<T>(target: string, args: Record<string, unknown>): Promise<T>;
-};
-export type CodingWork = {
-  start: ExecutionStart;
-  ref?: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">;
-  results: ExecutionResult[];
-  acceptances: { commandKey: string; resultId: string }[];
-};
+import type { CodingContext, CodingWork } from "./types";
+export type { CodingContext, CodingWork } from "./types";
 export function codingError(code: string, message: string): Error & { code: string } {
   return new ModelError(code, message);
 }
@@ -39,8 +31,8 @@ export function remember(work: CodingWork, view: ExecutionView) {
 export async function lookupCodingWork(context: CodingContext, input: { workId: string }) {
   const work = await readCodingWork(context, input.workId);
   const view = work.ref
-    ? await context.call<ExecutionView>("executions.get", input)
-    : await context.call<ExecutionView>("executions.lookup-start", { commandKey: work.start.commandKey });
+    ? await callAgent<ExecutionView>(context, "get", input)
+    : await callAgent<ExecutionView>(context, "lookup-start", { commandKey: work.start.commandKey });
   remember(work, view);
   return { work, view };
 }

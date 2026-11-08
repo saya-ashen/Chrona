@@ -6,14 +6,14 @@
       "proposedRepository": "chrona-core/chrona-module-web",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/web.git",
       "branch": "main",
-      "commit": "1cd81e7f647927ff47b1a2cda8e50c1e329250e5"
+      "commit": "a641eaa0acc56c12ebc9139ddf355e2ea3b1df84"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mcp.git",
       "branch": "main",
-      "commit": "f701d4216cafa115297819fde8b38a1464165a92"
+      "commit": "6199084d6fad1dd9f47596aa0e1dcc1e824e5e23"
     },
     {
       "name": "files",
@@ -41,14 +41,14 @@
       "proposedRepository": "chrona-core/chrona-module-agent",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/agent.git",
       "branch": "main",
-      "commit": "c9b60fd5d6ab5e4df5a97c1a7d3331f836d9b0f3"
+      "commit": "faf2fe95ac709c78ad757d353575c3c88a934b6b"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/qq.git",
       "branch": "main",
-      "commit": "d4a2d4b26d23eef3f0802767c47860b147892acc"
+      "commit": "6945c37ce2ea47d5ea63eec73f06c464822f0c00"
     },
     {
       "name": "remind",
@@ -62,7 +62,7 @@
       "proposedRepository": "chrona-core/chrona-module-mind",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mind.git",
       "branch": "main",
-      "commit": "ac48500a13ea384d1456b43981fb583ea354c1e4"
+      "commit": "ea4cf602e25e37568c9df1e7e104d016ce0f8fac"
     },
     {
       "name": "memory-local",
@@ -76,14 +76,14 @@
       "proposedRepository": "chrona-core/chrona-module-coding",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/coding.git",
       "branch": "main",
-      "commit": "3428eb626455a601761bdcd05afed6d5169409aa"
+      "commit": "f7da00c2662f942bb24ceda3e597825c1c208f69"
     },
     {
       "name": "editor",
       "proposedRepository": "chrona-core/chrona-module-editor",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/editor.git",
       "branch": "main",
-      "commit": "560d06f9759483ad896b8022ad31e3fafb4d2226"
+      "commit": "608a2812682d45d7f6b5714a2ae90c4041fa6215"
     }
   ]
 }

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { startModule, paths } from "chrona/testing";
 import { createQqBotState, createQqBotHandler, createQqPassiveReplies, parseApprovalDecision } from "./bot";
 import { createRelay } from "./relay";
+import { createQqConversations } from "./conversations";
 import { parseC2cEvent, downloadQqAttachment } from "./official";
 
 const now = new Date("2026-10-25T14:00:00Z"), appId = "123456";
@@ -38,11 +39,16 @@ for (let i = 0; i < 4; i++) await passive(incoming, "reply").catch(() => {});
 assert.equal(await passive(incoming, "reply"), false); assert.equal(reservations, 4);
 
 const calls: any[] = [], notices: any[] = [];
-const relay = createRelay({ publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: async (target, args) => { calls.push({ target, args }); if (target === "chat.conversation-state") return { now: now.toISOString(), limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null }; if (target === "approvals.list") return [{ id: "abcdef12-0000", title: "approval" }]; return "attachment-ref"; } });
+const routedCall = async (target: string, args: Record<string, unknown>) => { calls.push({ target, args }); if (target === "agent.context") return { contextId: "qq-context" }; if (target === "agent.run") return { runId: "qq-run", status: "queued", active: true }; if (target === "modules.tools") return []; if (target === "approvals.list") return [{ id: "abcdef12-0000", title: "approval" }]; return {}; };
+const conversations = createQqConversations({ dataDir: paths.data, contentDir: paths.content, call: routedCall, binding: async () => binding, deliver: async () => {} });
+const relay = createRelay({ conversations, publicUrl: null, download: async a => ({ name: a.name, mime: "image/png", bytes: new Uint8Array([1]) }), notify: async args => { notices.push(args); }, call: routedCall });
 const parsed = parseC2cEvent({ id: "picture", author: { user_openid: "owner" }, content: "", timestamp: now.toISOString(), attachments: [{ url: "https://gchat.qpic.cn/image", filename: "image.png", content_type: "image/png" }] })!;
 assert.equal(parsed.attachments?.length, 1);
 await relay.send({ workspaceId: binding.workspaceId, key: "qq:dm", channel: "chrona_qqbot", text: "", externalId: parsed.id, attachments: parsed.attachments });
-assert.deepEqual(calls.map(c => c.target), ["chat.attach", "chat.conversation-state", "chat.send"]);
+assert.deepEqual(calls.map(c => c.target), ["agent.context", "modules.tools", "agent.run"]);
+assert.match(calls[2].args.prompt, /qq\/attachments\//);
+const session = (await conversations.app.list())[0]!;
+assert.equal((await conversations.app.messages(session.id))[0]!.attachments.length, 1);
 await relay.resolveApproval(binding, { ref: "abcdef12", decision: "approve", scope: "once" });
 assert.equal(calls.at(-1).target, "approvals.resolve");
 await relay.enqueueFinal("event-a", "a", "chrona_qq:owner"); await relay.enqueueFinal("event-b", "b", "chrona_qq:owner");
@@ -65,6 +71,7 @@ try {
   }
   const payloads = (await readFile(join(paths.data, "offline-payloads.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
   assert.equal(payloads.length, 2); assert.equal(payloads[0].msg_type, 2); assert.equal(payloads[0].markdown.content, "Title\n\n**markdown**"); assert.equal(payloads[1].msg_type, 0);
-  const records = mod.calls.filter((c: { params: { target?: unknown } }) => c.params.target === "chat.record"); assert.equal(records.length, 2);
+  const records = JSON.parse(await readFile(join(paths.data, "conversations/state.json"), "utf8")).sessions.flatMap((session: { messages: { direction: string }[] }) => session.messages).filter((message: { direction: string }) => message.direction === "out"); assert.equal(records.length, 2);
+  assert.equal(mod.calls.filter((c: { params: { target?: unknown } }) => String(c.params.target).startsWith("chat.")).length, 0);
 } finally { await mod.stop(); }
 console.log("binding, authorization, replay, approval, images, relay and entry integration passed");

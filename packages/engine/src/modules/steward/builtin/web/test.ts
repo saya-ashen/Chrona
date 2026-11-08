@@ -11,7 +11,7 @@ import { todaySpec } from "./src/system/today";
 import { activitySpec } from "./src/system/activity";
 import { appsSpec } from "./src/system/apps";
 import { settingsSpec, liveGrant, scheduleActions } from "./src/system/settings";
-import { modelValue } from "./src/system/model-settings";
+import { checkModelValues } from "./test-model-settings";
 import { chatSpec, selectedSession, openMessages, type Message } from "./src/system/chat";
 import type { ReplyEvent } from "./src/system/adapter";
 import { localTime, Time } from "./src/display";
@@ -28,10 +28,14 @@ let inventoryFailure = false;
 const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
 let filesContract = "a".repeat(64);
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
-  stub("chat.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
-  stub("approvals.list", () => []), stub("chat.sessions", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
-  stub("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), stub("chat.session", args => ({ id: args.session, key: "web:k1" })), stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
-  stub("chat.messages", () => []),
+  stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
+  stub("approvals.list", () => []), stub("history.sessions", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
+  stub("chat.conversation-state", () => ({ now: "2026-11-07T04:00:00Z", limits: { idleMinutes: 60, minContextTokens: 30000, maxContextTokens: 100000 }, session: null })), stub("history.session", args => ({ id: args.session, key: "web:k1" })), stub("chat.send", () => ({ sessionId: "s1", messageId: "m1" })),
+  stub("history.messages", () => []),
+  stub("agent.context", () => ({ contextId: "context-author" })),
+  stub("agent.run", () => ({ runId: "run-author", status: "queued", active: true })),
+  stub("agent.get", () => ({ status: "queued", active: true })),
+  stub("agent.stream", () => ({ transcript: [], interactions: [], items: [], after: 0, ended: false })),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.disable", () => ({ status: "paused" })),
   stub("modules.enable", () => ({ status: "active" })),
@@ -58,7 +62,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
     if (args.ref === "files/missing.png") return null;
     return { base64: png.toString("base64"), mime: args.ref === "files/no.svg" ? "image/svg+xml" : "image/png", size: png.length, sha256: "fixture" };
   }),
-  stub("chat.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
+  stub("history.file", args => ({ base64: Buffer.from(`file ${args.ref}`).toString("base64"), mime: "text/plain" })),
 ]) });
 async function get(path: string, init: RequestInit = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -251,17 +255,6 @@ async function checkSettingsAdapter() {
     ["/preferences/p%2F1/forget", { method: "POST", body: {} }],
   ]);
 }
-function checkModelValues() {
-  const numbers = { maxCallsPerEvent: "3", maxOutputTokens: "4000", dailyCalls: "30", timeoutSeconds: "123" };
-  assert.deepEqual(modelValue([
-    { tier: " strong ", model: " provider/model ", thinking: "high" },
-    { tier: "fast", model: "provider/fast", thinking: "" },
-    { tier: "", model: "ignored", thinking: "off" }, { tier: "ignored", model: " ", thinking: "" },
-  ], [{ module: " example ", calls: "0" }, { module: "other", calls: "12" }, { module: "", calls: "4" }, { module: "ignored", calls: "" }], numbers), {
-    models: { strong: { model: "provider/model", thinking: "high" }, fast: { model: "provider/fast" } }, maxCallsPerEvent: 3, maxOutputTokens: 4000, dailyCalls: 30, timeoutMs: 123000, moduleDailyCalls: { example: 0, other: 12 },
-  });
-  assert.deepEqual(modelValue([], [], numbers), { models: {}, maxCallsPerEvent: 3, maxOutputTokens: 4000, dailyCalls: 30, timeoutMs: 123000 });
-}
 function checkSettingsRules() {
   const now = Date.parse("2026-11-04T10:00:00Z"), base = { id: "g", action: "read_source", mode: "allow", scope: { kind: "global" } };
   for (const [patch, expected] of [[{}, true], [{ revokedAt: "2026-11-01" }, false], [{ once: true, consumedAt: "2026-11-01" }, false], [{ once: false, consumedAt: "2026-11-01" }, true], [{ once: true }, true], [{ expiresAt: "2026-11-04T10:00:00Z" }, false], [{ expiresAt: "2026-11-04T09:59:59Z" }, false], [{ expiresAt: "2026-11-04T10:00:01Z" }, true]] as const) assert.equal(liveGrant({ ...base, ...patch }, now), expected);
@@ -291,10 +284,10 @@ function checkSettingsSpec() {
 async function checkChat() {
   const mapped: unknown[] = [], call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
   await call("$web.sessions", {}); await call("$web.messages", { id: "a/b 中" });
-  await call("$web.chat", { text: "new" }); await call("$web.chat", { text: "existing", session: "s" });
+  await call("$web.chat", { text: "new" }); await call("$web.chat", { text: "existing", session: "s", requestKey: "stable-message" });
   await call("$web.revise-build", { id: "a/b", requirements: "修改" }); await call("$web.stop-build", { id: "a/b" });
   await call("$web.file", { message: "m /", ref: "chat/a 中.txt" });
-  assert.deepEqual(mapped, [["/sessions"], ["/sessions/a%2Fb%20%E4%B8%AD/messages"], ["/chat", { method: "POST", body: { text: "new" } }], ["/chat", { method: "POST", body: { text: "existing", session: "s" } }], ["/sessions/a%2Fb/revise-build", { method: "POST", body: { requirements: "修改" } }], ["/sessions/a%2Fb/stop-build", { method: "POST", body: {} }], ["/file?message=m%20%2F&ref=chat%2Fa%20%E4%B8%AD.txt", { raw: true }]]);
+  assert.deepEqual(mapped, [["/sessions"], ["/sessions/a%2Fb%20%E4%B8%AD/messages"], ["/chat", { method: "POST", body: { text: "new" } }], ["/chat", { method: "POST", body: { text: "existing", session: "s", requestKey: "stable-message" } }], ["/sessions/a%2Fb/revise-build", { method: "POST", body: { requirements: "修改" } }], ["/sessions/a%2Fb/stop-build", { method: "POST", body: {} }], ["/file?message=m%20%2F&ref=chat%2Fa%20%E4%B8%AD.txt", { raw: true }]]);
   const sessions = [{ id: "newest", title: "最新", source: "web", createdAt: "2026-11-04" }, { id: "a/b", source: "build", createdAt: "2026-11-03" }];
   for (const [path, expected] of [["/chat", "newest"], ["/chat/new", null], ["/sessions/a%2Fb", "a/b"], ["/sessions/missing", "missing"]] as const) {
     assert.equal(selectedSession(path, sessions), expected);
@@ -377,10 +370,14 @@ try {
   await post("/api/web/modules/okx/settings", { values: { "max-loss": 50 } });
   assert.deepEqual(calls.at(-1), ["modules.settings-set", { module: "okx", values: JSON.stringify({ "max-loss": 50 }) }]);
   assert.deepEqual(await (await get("/api/web/modules/a1/permissions")).json(), { module: "a1", capabilities: ["联网"], secrets: [], model: null, grants: [], approvals: [] });
-  assert.deepEqual(await (await post("/api/web/chat", { text: "hi", session: "s1" })).json(), { sessionId: "s1", messageId: "m1" });
-  assert.equal(calls.at(-1)![0], "chat.send"); assert.equal(calls.at(-1)![1].key, "web:k1"); assert.equal(calls.at(-1)![1].title, "hi"); assert.match(String(calls.at(-1)![1].guidance), /personal steward/);
-  await post("/api/web/chat", { text: "new" });
-  assert.match(String(calls.at(-1)![1].key), /^web:/); assert.notEqual(calls.at(-1)![1].key, "web:k1");
+  assert.equal((await post("/api/web/chat", { text: "hi", session: "s1" })).status, 409);
+  const created = await (await post("/api/web/chat", { text: "new", requestKey: "author-new" })).json();
+  assert.match(created.sessionId, /^web-agent:/); assert.ok(created.runId);
+  const agentRun = calls.find(([target]) => target === "agent.run")!;
+  assert.match(String(agentRun[1].prompt), /personal steward[\s\S]*User message:\nnew/);
+  assert.equal(agentRun[1].lane, "foreground");
+  assert.equal(calls.filter(([target]) => target === "chat.send").length, 0);
+  assert.deepEqual(await (await post("/api/web/chat", { text: "new", requestKey: "author-new" })).json(), created);
   await post("/api/web/approvals/a1/resolve", { decision: "approve", scope: "once" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve", scope: "once" }]);
   assert.deepEqual(await (await post("/api/web/call", { target: "planning.get", args: {} })).json(), { plan: 1 });
@@ -408,16 +405,17 @@ try {
   assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ notifications: { dailyCap: 3 } }) }]);
   await post("/api/web/settings", { builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } });
   assert.deepEqual(calls.at(-1), ["settings.update", { settings: JSON.stringify({ builds: { dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 } }) }]);
-  await post("/api/web/interactions/i1/answer", { decision: "submit", value: true });
-  assert.deepEqual(calls.at(-1), ["chat.answer", { interaction: "i1", answer: JSON.stringify({ decision: "submit", value: true }) }]);
+  const beforeForeignAnswer = calls.length;
+  assert.equal((await post("/api/web/interactions/i1/answer", { decision: "submit", value: true })).status, 404);
+  assert.equal(calls.slice(beforeForeignAnswer).some(([target]) => target === "chat.answer" || target === "agent.respond"), false);
   await post("/api/web/schedules/s1", { status: "paused" });
   assert.deepEqual(calls.at(-1), ["schedules.update", { schedule: "s1", status: "paused" }]);
   assert.equal((await post("/api/web/call", { target: "settings.update", args: {} })).status, 404);
-  // Attachments come from chat.file and are served as downloads, never as pages of this origin.
+  // Attachments come from history.file and are served as downloads, never as pages of this origin.
   const file = await get("/api/web/file?message=m1&ref=chat%2Fx-a.txt");
   assert.equal(await file.text(), "file chat/x-a.txt");
   assert.match(file.headers.get("content-security-policy")!, /sandbox/);
-  assert.deepEqual(calls.at(-1), ["chat.file", { message: "m1", ref: "chat/x-a.txt" }]);
+  assert.deepEqual(calls.at(-1), ["history.file", { message: "m1", ref: "chat/x-a.txt" }]);
 
   // A pushed reply reaches an open page.
   const stream = await get("/api/web/events");

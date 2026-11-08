@@ -12,8 +12,8 @@ const runtime = { at, provider: { name: "fixture", available: true, sandboxed: f
   queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null };
 function fixture(overrides: Record<string, unknown> = {}) {
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const answers: Record<string, unknown> = { "chat.runtime": runtime, "approvals.list": [], "schedules.list": [], "notify.list": { items: [] },
-    "notify.status": { queued: 2, failed: 1 }, "chat.sessions": [], "modules.list": [], "modules.health": { items: [], nextCursor: null }, ...overrides };
+  const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": [], "schedules.list": [], "notify.list": { items: [] },
+    "notify.status": { queued: 2, failed: 1 }, "history.sessions": [], "modules.list": [], "modules.health": { items: [], nextCursor: null }, ...overrides };
   return { calls, call: async (target: string, args?: Record<string, unknown>) => { calls.push([target, args]); const result = answers[target]; if (result instanceof Error) throw result; return result; } };
 }
 test("web owns overview filtering, ordering and horizon, retaining runtime health and hiding wake instructions", async () => {
@@ -31,8 +31,8 @@ test("web owns overview filtering, ordering and horizon, retaining runtime healt
   expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
   expect(result.health).toMatchObject({ queuedNotifications: 2, failedNotifications: 1 });
   expect(f.calls).toContainEqual(["schedules.list", { timers: true }]);
-  expect(f.calls).toContainEqual(["chat.sessions", { entries: true, limit: 20 }]);
-  expect(f.calls.some(([target]) => target === "chat.today")).toBe(false);
+  expect(f.calls).toContainEqual(["history.sessions", { entries: true, limit: 20 }]);
+  expect(f.calls.some(([target]) => target === "web.today")).toBe(false);
 });
 test("web follows health cursors, excludes recovered facts and bounds problems", async () => {
   const f = fixture();

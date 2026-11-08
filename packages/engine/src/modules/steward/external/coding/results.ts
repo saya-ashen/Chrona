@@ -1,3 +1,4 @@
+import { callAgent } from "./agent";
 import { createHash } from "node:crypto";
 import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -28,9 +29,9 @@ export async function reconcileCodingResult(context: CodingContext, work: Coding
     return;
   }
   const target = { workId: view.workId, runId: view.runId, attemptId: view.attemptId };
-  const snapshot = await context.call<ExecutionSnapshot>("executions.snapshot", target);
+  const snapshot = await callAgent<ExecutionSnapshot>(context, "snapshot", target);
   if (!snapshot.stopConfirmed || snapshot.status !== view.status || !snapshot.finalMessage) return;
-  const source = await context.call<ExecutionResultSource>("executions.result-source", {
+  const source = await callAgent<ExecutionResultSource>(context, "result-source", {
     workId: view.workId, runId: view.runId, attemptId: view.attemptId,
   });
   if (source.workId !== view.workId || source.runId !== view.runId || source.attemptId !== view.attemptId || source.sessionId !== view.sessionId) throw codingError("conflict", "Result source does not match execution");

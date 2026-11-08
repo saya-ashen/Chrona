@@ -30,6 +30,8 @@ import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
 
+import { contextRunTools } from "./agent-context-tools";
+import { contextRunImages } from "./agent-context-read";
 import { STEWARD_PROMPT } from "./run-instructions";
 
 type ClaimedRun = NonNullable<Awaited<ReturnType<ReturnType<typeof createRuns>["claimNext"]>>>;
@@ -76,7 +78,7 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
         await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(() => {});
       }
     }
-    await runs.finish(run.id, outcome, execution ? { stopEvidence: "provider_exited" } : undefined);
+    await runs.finish(run.id, outcome, { stopEvidence: "provider_exited" });
   }, async () => {
     try { await channel.close(); } finally { await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }); }
   }).then(() => execution ? undefined : autoRetain(ports, run.workspaceId, run.sessionId)).catch(async () => {
@@ -119,8 +121,10 @@ export function createTick(ports: StewardPorts) {
       const workspaceId = workspace.id, runs = createRuns(ports, workspaceId);
       async function runInput(run: NonNullable<Awaited<ReturnType<typeof runs.claimNext>>>) {
         const sessionId = run.session?.providerSessionId ?? null;
+        const context = await genericInput(ports, run, sessionId);
+        if (context) return context;
         const closed = closedInput(run, sessionId);
-        if (closed) return closed;
+        if (closed) return { ...closed, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: [] };
         const messages = run.sessionId ? (await ports.db.message.findMany({ where: { workspaceId, sessionId: run.sessionId }, orderBy: [{ at: "desc" }, { id: "desc" }], take: 20 })).reverse() : [];
         const preferences = await ports.db.preference.findMany({ where: { workspaceId }, select: { text: true } });
         const agenda = await ports.db.schedule.findMany({ where: { workspaceId, originSessionId: run.sessionId, status: "active" }, take: 50 });
@@ -137,12 +141,12 @@ export function createTick(ports: StewardPorts) {
         const { self, via } = await moduleContext(ports, workspaceId, now, run.session?.entryModuleId);
         const timezone = notificationSettings(workspace.settings).timezone;
         const prompt = `${memory.text}\n\nContext (data):\n${JSON.stringify({ messages: contextMessages, preferences, agenda, focus: run.session?.focus, now: now.toISOString(), timezone })}\n\nChrona modules (data; this conversation's source: ${JSON.stringify({ session: run.session?.source ?? null, viaModule: via ?? null })}):\n${JSON.stringify(self)}\n\nModule toolsets (data; load deferred m_* tools with tool_search):\n${JSON.stringify(toolsets.slice(0, 30))}\n\nApproved host paths (data; this host is ${JSON.stringify(hostname())}, so its files are reached with chrona_request_path_access, not SSH):\n${JSON.stringify(hostPaths)}\n\nTrigger: ${run.trigger}\n${run.prompt}`;
-        return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content };
+        return { prompt, inbound, extraTools, searchTools: toolsets.length > 0, sessionId, hostPaths, content, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: inboundImages(inbound) };
       }
       function providerInput(run: ClaimedRun, lane: "foreground" | "background" | "build", sessionDir: string, execution: Awaited<ReturnType<typeof executionRunInput>>, ordinary: Awaited<ReturnType<typeof runInput>> | null) {
         if (execution) return (({ onInteraction: _observer, ...input }) => input)(execution);
         return { runId: run.id, token: run.token, lane, cwd: run.cwd, sessionDir, sessionId: ordinary!.sessionId,
-          prompt: ordinary!.prompt, systemPrompt: STEWARD_PROMPT, resources: "configured" as const, images: chatImages(ordinary!.inbound?.attachments ?? []), deadline: run.deadlineAt,
+          prompt: ordinary!.prompt, systemPrompt: ordinary!.systemPrompt, resources: ordinary!.resources, images: ordinary!.images, deadline: run.deadlineAt,
           model: run.model, extraTools: ordinary!.extraTools, searchTools: ordinary!.searchTools, hostPaths: ordinary!.hostPaths, content: ordinary!.content };
       }
       async function launchLocal(run: ClaimedRun, lane: "foreground" | "background" | "build") {
@@ -153,7 +157,7 @@ export function createTick(ports: StewardPorts) {
             const ordinary = execution ? null : await runInput(run);
             const sessionDir = execution?.sessionDir ?? join(run.cwd, ".chrona", "sessions");
             await mkdir(sessionDir, { recursive: true });
-            if (!ports.provider) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }); return; }
+            if (!ports.provider) { gate.fail(); await runs.finish(run.id, { outcome: "unavailable", sessionId: null, error: "Provider unconfigured" }, { stopEvidence: "never_started" }); return; }
             const channel = createProviderChannel(ports, run, execution?.onInteraction);
             let handle;
             try {
@@ -212,4 +216,13 @@ export function createTick(ports: StewardPorts) {
     await Promise.all([...builds.values(), ...(includeRuns ? finalizers : []), schedulesSettled(ports)]);
     await callsSettled(ports);
   } });
+}
+
+      async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
+        if (!run.sessionId || !await ports.db.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return null;
+        return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "minimal" as const };
+      }
+
+function inboundImages(inbound: { attachments: unknown } | null | undefined) {
+  return chatImages(storedAttachments(inbound?.attachments));
 }
