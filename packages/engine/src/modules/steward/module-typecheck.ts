@@ -1,10 +1,25 @@
-import { chmod, cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ModuleManifest } from "@chrona/contracts/steward";
 import type { ModuleContext, TypecheckReport } from "./module-context";
 import { callsDeclaration } from "./module-contracts";
+import { builtinTypecheckMaterial } from "./module-typecheck-material.macro" with { type: "macro" };
+
+const builtinMaterial = builtinTypecheckMaterial();
+async function builtinCallerMaterial(root: string, staging: string) {
+  // Restore the source layout used by the shipped builtin's host imports. Only the
+  // disposable copy gains host support files; the approved store stays immutable.
+  for (const [path, source] of Object.entries(builtinMaterial)) {
+    const file = join(root, path);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, source);
+  }
+  const caller = join(root, "packages/engine/src/modules/steward/builtin/agent");
+  await cp(staging, caller, { recursive: true });
+  return caller;
+}
 
 const TIMEOUT_MS = 60_000, MEMORY_MB = 4096;
 function parseResult(stdout: string) {
@@ -21,20 +36,22 @@ function typecheckResult(code: number, result: Pick<TypecheckReport, "errors" | 
  * v2-25 §4: the entry (and what it imports) against the SDK and this workspace's call contracts, before tests.
  * check.ts only reads files; it runs in its own process with a time and memory limit.
  */
-export async function typecheckBuild(context: ModuleContext, staging: string, manifest: ModuleManifest, candidate?: { moduleName: string; manifest: ModuleManifest }): Promise<TypecheckReport> {
+export async function typecheckBuild(context: ModuleContext, staging: string, manifest: ModuleManifest, candidate?: { moduleName: string; manifest: ModuleManifest; builtinCaller?: boolean }): Promise<TypecheckReport> {
   const { ports } = context, check = ports.moduleTypecheck && join(ports.moduleTypecheck, "check.ts"), bun = Bun.which("bun");
   if (!/\.(ts|tsx|mts)$/.test(manifest.entry)) return { status: "skipped", reason: "entry is not TypeScript" };
   if (!check || !existsSync(check) || !ports.moduleSdk || !bun) return { status: "skipped", reason: "type check not available" };
-  const sdk = await mkdtemp(join(tmpdir(), "chrona-typecheck-"));
+  const temporary = await mkdtemp(join(tmpdir(), "chrona-typecheck-")), sdk = join(temporary, "sdk");
   try {
+    // builtinCaller comes from the persisted caller identity, never its manifest.
+    const source = candidate?.builtinCaller && manifest.name === "agent" ? await builtinCallerMaterial(join(temporary, "material"), staging) : staging;
     await cp(ports.moduleSdk, sdk, { recursive: true });
     await chmod(join(sdk, "calls.d.ts"), 0o644).catch(() => {});
     await writeFile(join(sdk, "calls.d.ts"), await callsDeclaration(ports, context.workspaceId, candidate));
-    const child = Bun.spawn(["sh", "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "typecheck", String(MEMORY_MB * 1024), bun, "--no-install", check, staging, sdk],
+    const child = Bun.spawn(["sh", "-c", 'ulimit -v "$1" || exit 125; shift; exec "$@"', "typecheck", String(MEMORY_MB * 1024), bun, "--no-install", check, source, sdk],
       { stdout: "pipe", stderr: "pipe", timeout: TIMEOUT_MS, env: { PATH: process.env.PATH ?? "/usr/bin:/bin" } });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     return typecheckResult(code, parseResult(stdout), child.signalCode, stderr);
-  } finally { await rm(sdk, { recursive: true, force: true }); }
+  } finally { await rm(temporary, { recursive: true, force: true }); }
 }
 
 /** Lines for the build report's errors, which the build conversation reads. */

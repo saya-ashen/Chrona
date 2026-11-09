@@ -1,5 +1,7 @@
 # Chrona / Workbench M1 验收记录
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 日期：2026-11-05。状态：**M1 开发验收通过；协调者已复核运行时、文档及发行证据。进入 P1 契约实施，尚未冻结 P1。**
 
 本记录签署 M1 开发验收，保留下面全部环境跳过项与恢复边界。P1 可实施契约与无模型探针；F/G/H/N 仍须等待 P1 冻结，M2/M3 产品实现尚未开始。生产部署、真实数据迁移、账号、模型或设备验收仍未授权。要求来源：[统一方案](chrona-workbench-unified-development-plan.md) §4、§9、§12、§14。

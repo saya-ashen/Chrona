@@ -8,7 +8,7 @@ import { assertDynamicModuleActivation, expireModuleApprovals, isGroupPayload, r
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
-import { activateGroupIn } from "./module-group";
+import { activateFixedCandidateApprovedIn, activateGroupIn } from "./module-group";
 import { removeApproved } from "./module-remove";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { assertExternalModule } from "./module-identity";
@@ -50,6 +50,7 @@ export async function activateApprovedIn(context: ModuleContext, tx: Prisma.Tran
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
+  if (await activateFixedCandidateApprovedIn(context, tx, action)) return;
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
   return prepareApproved(context, tx, action, { moduleId, hash, restore });
 }

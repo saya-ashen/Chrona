@@ -4,9 +4,8 @@ import { $ } from "bun";
 import { chmod, cp, mkdir, rm, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
+import { buildArtifacts, buildTargets, omitPausedRuntimeModules, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 import { normalizeElfInterpreterFile } from "../build/portable-elf";
-import { buildExecutionContracts } from "../build/execution-contracts";
 import { buildAgentApplication } from "../packages/engine/src/modules/steward/builtin/agent/build";
 import { buildEntryConversations } from "../build/entry-conversations";
 import { copyModuleGitRelease, stageModuleGitLicense } from "./module-git-release";
@@ -73,11 +72,12 @@ export function compileArgs(target: BuildTargetName, binaryPath: string) {
 /** Generated contract files belong to the exact module commit shipped in its bundle. */
 export async function prepareReleaseModules(resourcesRoot: string) {
   await buildEntryConversations(resourcesRoot);
-  await buildExecutionContracts(resolve(resourcesRoot, "external"));
+  // Paused application sources are verified as retained materials, without regenerating their retired contracts.
   await buildAgentApplication(resolve(resourcesRoot, "builtin/agent"));
   const seedDir = resolve(process.env.CHRONA_MODULE_GIT_SEEDS ?? resolve(ROOT, buildArtifacts.moduleGit.seedDir));
   await stageModuleGitLicense(resourcesRoot, resolve(ROOT, buildArtifacts.moduleGit.seedDir, "LICENSE"), resolve(ROOT, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
   await copyModuleGitRelease(seedDir, resourcesRoot);
+  await omitPausedRuntimeModules(resourcesRoot);
 }
 
 export async function prepareReleaseResources(releaseDir: string) {

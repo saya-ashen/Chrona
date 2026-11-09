@@ -9,6 +9,7 @@ import { createRuns, createRunSession, liveRuns } from "./runs";
 import { createProviderControl, validateExecutionAnswer } from "./provider-channel";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { reserveDeviceCommandIn } from "./execution-control-budget";
+import { isExecutionControlValidationError, markExecutionControlRejected } from "./execution-control-error";
 import { remoteExecutionChanges } from "./execution-remote-completion";
 import { registerWorkspaceModule } from "./local-workspace";
 import { runtimeCall } from "./local-runtime";
@@ -124,7 +125,9 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
 
 type Control = Extract<ExecutionCommand, { op: "send" | "answer" | "cancel" }>;
 async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
-    return ports.db.$transaction(async tx => {
+  const admission = { consuming: false };
+  try {
+    return await ports.db.$transaction(async tx => {
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
       await assertExecutionPrincipal(tx, principal);
       let row = await unique(tx, principal, { id: input.attemptId, workId: input.workId, runId: input.runId });
@@ -138,10 +141,15 @@ async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPr
       const now = ports.now();
       const command = { attemptId: row.id, commandKey: input.commandKey, operation: input.op, requestDigest: digest, receipt: { accepted: true, effect: "unknown" }, effect: "unknown", createdAt: now };
       if (row.executorId !== "server") await reserveDeviceCommandIn(tx, row.executorId, command);
+      admission.consuming = true;
       await tx.executionCommand.create({ data: command });
       if (input.op === "cancel" && !row.stopConfirmedAt) row = await cancelExecutionIn(ports, tx, principal, row, now);
       return { row, replay: false };
     });
+  } catch (error) {
+    if (!admission.consuming && isExecutionControlValidationError(error)) throw markExecutionControlRejected(error);
+    throw error;
+  }
 }
 async function controlExecution(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
     const result = await admitExecutionControl(ports, principal, input);

@@ -120,7 +120,7 @@ describe("Pi RPC provider", () => {
     expect(configured[configured.indexOf("--tools") + 1].split(",")).toContain("chrona_reply");
     expect(configured).toContain(join(f.cwd, "web.ts"));
   });
-  test("an exact build model overrides defaults and is verified before prompting; retries are disabled", async () => {
+  test("an exact build model overrides defaults and is verified before prompting; finite retries are enabled", async () => {
     const f = await fixture();
     await writeFile(join(f.agentDir, "settings.json"), '{"retry":{"enabled":true}}');
     const provider = createPiProvider({ ...f.options, model: "other/default" });
@@ -132,7 +132,8 @@ describe("Pi RPC provider", () => {
     expect(existsSync(launch.profile)).toBe(false);
     expect(await readFile(join(f.agentDir, "settings.json"), "utf8")).toBe('{"retry":{"enabled":true}}');
     const commands = await f.commands();
-    expect(commands.find(c => c.type === "set_auto_retry")).toMatchObject({ enabled: false });
+    expect(commands.find(c => c.type === "set_auto_retry")).toMatchObject({ enabled: true });
+    expect(commands.find(c => c.type === "set_auto_compaction")).toMatchObject({ enabled: false });
     expect(commands.findIndex(c => c.type === "set_auto_retry")).toBeLessThan(commands.findIndex(c => c.type === "prompt"));
   });
   test("a model mismatch fails closed without sending any prompt or falling back", async () => {

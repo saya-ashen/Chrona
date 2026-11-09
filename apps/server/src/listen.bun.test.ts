@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
-import { moduleSupervisor } from "@chrona/engine";
+import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
 import { createServerApp } from "./app";
 import { createStewardRuntime } from "./steward-runtime";
 import { resetEnvCacheForTests } from "./config/env";
-import { seedTestModuleRelease, testReleasePackages } from "../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import { createScriptSandbox } from "../../../packages/integrations/src/steward/script-sandbox";
 import { db, resetTestDb, seedWorkspace } from "./__tests__/bun-test-helpers";
 
-const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
+const sandbox = createScriptSandbox({ executionMode: "required-isolation", bwrapPath: Bun.which("bwrap") ?? undefined });
 let saved: string | undefined, dataDir: string, stop: (() => Promise<void>) | undefined;
 beforeEach(async () => {
   saved = process.env.API_KEY;
@@ -28,7 +26,7 @@ afterEach(async () => {
 });
 
 test("listen needs keepAlive and a path Chrona does not reserve", () => {
-  const base = { name: "web-x", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], keepAlive: true };
+  const base = { name: "web-x", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true };
   expect(moduleManifestSchema.safeParse({ ...base, listen: "/api/echo" }).success).toBe(true);
   expect(moduleManifestSchema.safeParse({ ...base, keepAlive: false, listen: "/api/echo" }).success).toBe(false);
   expect(moduleManifestSchema.safeParse({ ...base, listen: "/" }).success).toBe(true);
@@ -40,9 +38,10 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   expect(isEntryModule({ listen: ["/api/x"] })).toBe(false);
 });
 
-(sandbox.health.isolated ? test : test.skip)("authenticated requests reach the listening module, which makes routed calls", async () => {
+for (const isolated of [false, true]) (isolated && !sandbox.health.isolated ? test.skip : test)(`authenticated generic listener routes calls and strips credentials (${isolated ? "bwrap" : "trusted-local"})`, async () => {
+  const selected = isolated ? sandbox : createScriptSandbox({ dataDir, executionMode: "trusted-local" });
   const { workspaceId } = await seedWorkspace("Listen");
-  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], uses: ["modules.list"], keepAlive: true, listen: "/api/echo" });
+  const manifest = moduleManifestSchema.parse({ name: "echo", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["modules.list"], keepAlive: true, listen: "/api/echo" });
   const module = await db.module.create({ data: { workspaceId, name: "echo", activeHash: "v1", status: "active" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   const code = join(dataDir, "platform/store/v1");
@@ -50,72 +49,83 @@ test("listen needs keepAlive and a path Chrona does not reserve", () => {
   await writeFile(join(code, "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
   const apps = await chrona.call("modules.list");
-  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), apps: Array.isArray(apps) });
+  return Response.json({ path: new URL(request.url).pathname, query: new URL(request.url).search, auth: request.headers.get("authorization"), cookie: request.headers.get("cookie"), body: await request.text(), apps: Array.isArray(apps) }, { headers: { "set-cookie": "module=must-not-escape" } });
 });`);
-  const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { available: true, isolated: true, startModule: sandbox.startModule } });
+  const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
   stop = () => steward.stop();
   const app = await createServerApp({ steward });
   expect((await app.request("/api/echo/x")).status).toBe(401);
   const response = await app.request("/api/echo/x?y=1", { method: "POST", headers: { authorization: "Bearer listen-test", cookie: "s=1" }, body: "hi" });
+  expect(response.status).toBe(200);
+  expect(response.headers.get("set-cookie")).toBeNull();
   expect(await response.json()).toEqual({ path: "/api/echo/x", query: "?y=1", auth: null, cookie: null, body: "hi", apps: true });
   expect((await (await app.request("/api/echo", { headers: { authorization: "Bearer listen-test" } })).json()).path).toBe("/api/echo");
   expect((await app.request("/api/nothing/x", { headers: { authorization: "Bearer listen-test" } })).status).toBe(404);
 }, 30_000);
 
-for (const isolated of [true, false]) (isolated && !sandbox.health.isolated ? test.skip : test)(`the explicitly activated external mcp module serves owner tools at /api/mcp (${isolated ? "bwrap" : "no sandbox"})`, async () => {
-  const { workspaceId } = await seedWorkspace("Mcp");
-  const bwrap = process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  if (isolated) process.env.CHRONA_STEWARD_SANDBOX_BWRAP = Bun.which("bwrap")!; else delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
-  const steward = createStewardRuntime(db, { provider: null, dataDir });
-  if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP; else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
-  const resources = join(dataDir, "resources", "builtin");
-  await cp(join(import.meta.dirname, "../../../packages/engine/src/modules/steward/builtin"), resources, { recursive: true });
-  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
-  steward.ports.moduleBuiltinResources = resources;
-  steward.ports.packages = testReleasePackages(resources);
+test("current MCP JSON-RPC requires the API key and routes current tools through the real SDK", async () => {
+  const { workspaceId } = await seedWorkspace("MCP listener");
+  const selected = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
+  const source = join(import.meta.dirname, "../../../packages/engine/src/modules/steward/external/mcp");
+  const code = join(dataDir, "platform/store/mcp-listener");
+  await cp(source, code, { recursive: true });
+  const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
+  const module = await db.module.create({ data: { workspaceId, name: "mcp", activeHash: "mcp-listener", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "mcp-listener", manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const targetManifest = moduleManifestSchema.parse({ name: "mcp-target", entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"], tools: [{
+    name: "echo", description: "Offline routed target", visibility: ["owner", "modules"],
+    parameters: { type: "object", properties: { value: { type: "string" } }, required: ["value"] },
+    output: { type: "object", properties: { value: { type: "string" }, caller: { type: "string" }, moduleId: { type: "string" } }, required: ["value", "caller", "moduleId"], additionalProperties: false },
+  }] });
+  const target = await db.module.create({ data: { workspaceId, name: "mcp-target", activeHash: "mcp-target-listener", status: "active" } });
+  await db.moduleVersion.create({ data: { moduleId: target.id, hash: "mcp-target-listener", manifest: targetManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const targetCode = join(dataDir, "platform/store/mcp-target-listener");
+  await mkdir(targetCode, { recursive: true });
+  await writeFile(join(targetCode, "index.ts"), `import { on } from "chrona";
+on("tool", event => {
+  if (event.caller?.kind !== "module") throw new Error("Expected actual module caller");
+  return { result: { value: event.args.value, caller: event.caller.module, moduleId: event.caller.moduleId } };
+});`);
+  const steward = createStewardRuntime(db, { provider: null, dataDir, sandbox: { ...selected.health, startModule: selected.startModule } });
   stop = () => steward.stop();
-  expect(steward.ports.sandbox?.isolated).toBe(isolated);
-  await moduleSupervisor(steward.ports).start();
-  // Optional external apps are not seeded with the trusted builtins.
-  const unfinished = await db.moduleVersion.findMany({ where: { module: { builtin: true, activeHash: null } }, select: { manifest: true, status: true, report: true } });
-  expect((await db.module.findMany({ where: { builtin: true }, orderBy: { name: "asc" } })).map(row => [row.name, row.status, Boolean(row.activeHash)]), JSON.stringify(unfinished)).toEqual(["agent", "notify", "web"].map(name => [name, "active", true]));
-  for (const name of ["mcp", "files"]) {
-    expect(await db.module.count({ where: { workspaceId, name } })).toBe(0);
-    const hash = `approved-${name}`, code = join(dataDir, "platform/store", hash);
-    await cp(join(import.meta.dirname, "../../../packages/engine/src/modules/steward/external", name), code, { recursive: true });
-    const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
-    const module = await db.module.create({ data: { workspaceId, name, activeHash: hash, status: "active", dataSchema: manifest.data.schema } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
-  }
   const app = await createServerApp({ steward });
-  // The web module serves the page at / (no key needed), while the API it calls stays protected.
-  const page = await app.request("/apps/a1?path=README.md");
-  expect(page.status).toBe(200);
-  expect(await page.text()).toContain('<script src="/app.js" type="module">');
-  expect((await app.request("/app.js")).headers.get("content-type")).toBe("text/javascript; charset=utf-8");
-  expect((await app.request("/", { method: "POST" })).status).toBe(404);
-  // The page's data API is the web module's own, behind the user's key, answered by routed calls (v2-8).
-  expect((await app.request("/api/web/today")).status).toBe(401);
-  const view = await app.request("/api/web/today", { headers: { authorization: "Bearer listen-test" } });
-  expect(view.status).toBe(200);
-  expect(await view.json()).toMatchObject({ approvals: [], apps: expect.arrayContaining([expect.objectContaining({ name: "files" })]) });
-  const apps = await (await app.request("/api/web/modules", { headers: { authorization: "Bearer listen-test" } })).json() as { name: string; versions: unknown[] }[];
-  expect(apps.find(row => row.name === "web")?.versions.length).toBeGreaterThan(0);
-  // Startup and each page may refresh the app list; every page read still uses attributed routed calls.
-  const web = await db.module.findFirstOrThrow({ where: { builtin: true, name: "web" } });
-  const reads = await db.moduleInvocation.findMany({ where: { callerModuleId: web.id, target: { in: ["activity", "modules"] }, NOT: { target: "modules", tool: "tools" } }, select: { target: true, tool: true, status: true } });
-  expect(reads).toEqual(expect.arrayContaining([{ target: "activity", tool: "runtime", status: "succeeded" }, { target: "modules", tool: "list", status: "succeeded" }]));
-  expect(reads.every(read => read.status === "succeeded")).toBe(true);
-  let id = 0;
-  const rpc = async (method: string, params: unknown = {}, headers: Record<string, string> = { authorization: "Bearer listen-test" }) => {
-    const response = await app.request("/api/mcp", { method: "POST", headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
-    return { status: response.status, body: response.status === 200 ? await response.json() : null };
-  };
-  expect((await rpc("tools/list", {}, {})).status).toBe(401);
-  expect((await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } })).body.result.instructions).toMatch(/Apps with tools: .*files/);
-  const names = (await rpc("tools/list")).body.result.tools.map((tool: { name: string }) => tool.name);
-  expect(names).toEqual(expect.arrayContaining(["chrona_today", "chrona_chat", "chrona_approval_resolve", "chrona_module_tools", "chrona_module_call"]));
-  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_tools", arguments: { query: "files" } })).body.result.content[0].text).map((tool: { target: string }) => tool.target)).toContain("files.list");
-  expect((await rpc("tools/call", { name: "chrona_today", arguments: {} })).body.result.content[0].text).toContain("approvals");
-  expect(JSON.parse((await rpc("tools/call", { name: "chrona_module_call", arguments: { name: "files.list", arguments: {} } })).body.result.content[0].text)).toHaveProperty("entries");
-}, 120_000);
+  const cases = [
+    { method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "offline-integration", version: "1" } } },
+    { method: "tools/list", params: {} },
+    { method: "tools/call", params: { name: "chrona_modules", arguments: {} } },
+  ];
+  for (const [id, request] of cases.entries()) {
+    for (const key of [undefined, "wrong-key"]) {
+      const response = await app.request("/api/mcp", { method: "POST", headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) }, body: JSON.stringify({ jsonrpc: "2.0", id, ...request }) });
+      expect(response.status).toBe(401);
+    }
+  }
+  expect(await db.moduleRun.count()).toBe(0);
+  async function rpc(id: number, method: string, params: Record<string, unknown>) {
+    const response = await app.request("/api/mcp", { method: "POST", headers: { authorization: "Bearer listen-test", "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method, params }) });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ jsonrpc: "2.0", id });
+    expect(body.error).toBeUndefined();
+    return body.result;
+  }
+  const initialized = await rpc(1, "initialize", cases[0]!.params);
+  expect(initialized).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "chrona" } });
+  const catalog = await rpc(2, "tools/list", {});
+  const names = catalog.tools.map((tool: { name: string }) => tool.name);
+  expect(names).toEqual(expect.arrayContaining(["chrona_module_tools", "chrona_module_reference", "chrona_module_call", "chrona_modules", "chrona_sessions"]));
+  expect(names).not.toContain("chrona_build");
+  async function tool(id: number, name: string, args = {}) {
+    const result = await rpc(id, "tools/call", { name, arguments: args });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.content[0].type).toBe("text");
+    return JSON.parse(result.content[0].text);
+  }
+  expect(await tool(3, "chrona_modules")).toEqual(expect.arrayContaining([expect.objectContaining({ id: module.id, name: "mcp", builtin: false })]));
+  expect(await tool(4, "chrona_sessions")).toEqual([]);
+  const contracts = await tool(5, "chrona_module_tools", { query: "mcp-target.echo" });
+  expect(contracts).toEqual(expect.arrayContaining([expect.objectContaining({ target: "mcp-target.echo", moduleId: target.id, hash: "mcp-target-listener", contractHash: expect.any(String) })]));
+  expect(await tool(6, "chrona_module_call", { name: "mcp-target.echo", arguments: { value: "SDK round trip" } })).toEqual({ value: "SDK round trip", caller: "mcp", moduleId: module.id });
+  expect(await db.run.count()).toBe(0);
+  expect(await db.moduleVersion.count({ where: { moduleId: module.id } })).toBe(1);
+}, 30_000);

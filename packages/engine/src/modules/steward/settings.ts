@@ -1,4 +1,8 @@
-import { RUN_LIMITS, buildSettingsSchema, moduleModelSettingsSchema, settingsSchema, updateSettingsSchema } from "@chrona/contracts/steward";
+import { RUN_LIMITS, buildSettingsSchema, settingsSchema, updateSettingsSchema, moduleModelSettingsSchema } from "@chrona/contracts/steward";
+
+export const kernelModuleModelSettingsSchema = moduleModelSettingsSchema;
+export const kernelSettingsSchema = settingsSchema;
+export const kernelUpdateSettingsSchema = updateSettingsSchema;
 import type { StewardPorts } from "./ports";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
@@ -6,16 +10,16 @@ import { audit } from "./audit";
 import { parseInput, StewardError } from "./errors";
 export function moduleModelSettings(settings: unknown) {
   const value = settings as { moduleModel?: unknown } | null;
-  return moduleModelSettingsSchema.nullable().parse(value?.moduleModel ?? null);
+  return kernelModuleModelSettingsSchema.nullable().parse(value?.moduleModel ?? null);
 }
 export function buildSettings(settings: unknown) {
   const value = settings as { builds?: unknown } | null;
   return buildSettingsSchema.parse(value?.builds ?? { dailyLimit: RUN_LIMITS.maxBuildRunsPerDay, timeoutMinutes: RUN_LIMITS.buildTimeoutMs / 60_000, maxSubmissions: RUN_LIMITS.maxBuildSubmissionsPerRun });
 }
-/** Governance day boundary; old persisted timezone is read only for the local cutover. */
+/** Kernel-owned governance day boundary. */
 export function budgetTimezone(settings: unknown): string {
-  const value = settings as { timezone?: unknown; notifications?: { timezone?: unknown } } | null;
-  return settingsSchema.shape.timezone.parse(value?.timezone ?? value?.notifications?.timezone ?? "Asia/Shanghai");
+  const value = settings as { timezone?: unknown } | null;
+  return settingsSchema.shape.timezone.parse(value?.timezone ?? "Asia/Shanghai");
 }
 /** Same local-day count for both admission and the owner's settings page. */
 export async function buildUsage(db: Pick<StewardPorts["db"], "session">, workspaceId: string, settings: unknown, at: Date) {
@@ -50,7 +54,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext) {
     return { timezone: budgetTimezone(row.settings), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings) };
   }
   return { get, update: async (raw: unknown) => {
-    const input = parseInput(updateSettingsSchema, raw);
+    const input = parseInput(kernelUpdateSettingsSchema, raw);
     await db.$transaction(async tx => {
       const row = await tx.workspace.findUnique({ where: { id: workspaceId } });
       if (!row) throw new StewardError("not_found", "Workspace not found");

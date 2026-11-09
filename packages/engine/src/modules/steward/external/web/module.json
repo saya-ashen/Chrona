@@ -1,0 +1,642 @@
+{
+  "name": "web",
+  "description": "Chrona's web page: today, conversations and apps; its data API at /api/web makes routed calls for the user.",
+  "entry": "index.ts",
+  "keepAlive": true,
+  "listen": [
+    "/",
+    "/api/web"
+  ],
+  "effects": [],
+  "uses": [
+    "agent.context",
+    "agent.run",
+    "agent.get",
+    "agent.stream",
+    "agent.write",
+    "agent.interrupt",
+    "agent.respond",
+    "activity.runtime",
+    "activity.runs",
+    "approvals.list",
+    "approvals.resolve",
+    "modules.health",
+    "notify.list",
+    "notify.status",
+    "settings.get",
+    "settings.update",
+    "secrets.list",
+    "secrets.set",
+    "secrets.remove",
+    "modules.list",
+    "modules.tools",
+    "modules.diagnostics",
+    "notify.activity",
+    "*",
+    "modules.reference"
+  ],
+  "tools": [
+    {
+      "name": "today",
+      "description": "The web application's overview, shared with owner clients.",
+      "visibility": [
+        "kernel",
+        "owner",
+        "modules"
+      ],
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string"
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status",
+                "createdAt"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "at"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "moduleId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "feedback": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "moduleId",
+                "title",
+                "body",
+                "feedback",
+                "createdAt"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "lastActivityAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "status",
+                "lastActivityAt"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "health": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "object",
+                "properties": {
+                  "available": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "available"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "provider"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "generatedAt",
+          "approvals",
+          "upcoming",
+          "updates",
+          "apps",
+          "problems",
+          "sessions",
+          "health"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "reply",
+      "description": "A reply in one of this page's conversations, pushed by Chrona.",
+      "visibility": [
+        "modules"
+      ],
+      "output": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "string"
+          },
+          "in-reply-to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session",
+          "message",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "page-set",
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "catalog": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "catalog"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Register or replace a caller-owned page. Optional declarative components expand before catalog/tool checks; layout controls only content. Register on every start.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Page slug, e.g. main"
+          },
+          "title": {
+            "type": "string"
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "document",
+              "workspace"
+            ],
+            "description": "Content layout; global navigation and theme remain Web-owned."
+          },
+          "components": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "App-private declarative templates keyed app:Name; see web.catalog."
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tool"
+            ],
+            "additionalProperties": false,
+            "description": "Own visible tool accepting {ref}, returning null or {base64,mime} for bounded raster images; see web.catalog."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "{ name: { tool, args?, refresh? } }"
+          },
+          "spec": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "json-render spec { root, elements }"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "settings"
+            ],
+            "description": "Marks this app-owned settings page for navigation; at most one settings page per app."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "spec"
+        ]
+      }
+    },
+    {
+      "name": "page-remove",
+      "output": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Remove one of the calling app's pages.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "pages",
+      "output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The calling app's registered pages.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "catalog",
+      "output": {
+        "type": "object",
+        "properties": {
+          "catalog": {
+            "type": "string"
+          },
+          "components": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "catalog",
+          "components",
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Components, props and rules for page specs (json-render version included).",
+      "visibility": [
+        "modules",
+        "provider"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "settings",
+      "description": "Read or update web owned memory preferences. Omitted fields keep their values; provider null disables memory.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "string",
+            "description": "JSON partial preferences: provider (app slug or null), autoRecall and autoRetain (booleans)."
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "provider",
+              "autoRecall",
+              "autoRetain"
+            ],
+            "properties": {
+              "provider": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "autoRecall": {
+                "type": "boolean"
+              },
+              "autoRetain": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ui-settings",
+      "description": "Read or save Web-owned conversation memory settings.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "auto-recall": {
+            "type": "boolean"
+          },
+          "auto-retain": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "autoRecall": {
+                "type": "boolean"
+              },
+              "autoRetain": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "provider",
+              "autoRecall",
+              "autoRetain"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "required": [
+              "ignored"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ui-preferences",
+      "description": "Read provider-owned saved preferences or delete one preference.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "forget": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "required": [
+              "ignored"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  ],
+  "content": true,
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test.ts"
+  ],
+  "activated": true
+}

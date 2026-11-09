@@ -1,14 +1,13 @@
 import { z } from "zod";
 import * as outputs from "../system-outputs";
-import { APPROVAL_SCOPES, APPROVAL_STATUSES } from "@chrona/contracts/steward";
-import { createGrants } from "../grants";
+import { APPROVAL_STATUSES } from "@chrona/contracts/steward";
 import { createApprovals, isModuleRequest } from "../approvals";
 import { createModules, isModuleApproval } from "../modules";
 import { AwaitUser, CallError, type Caller, type SystemModule } from "../module-calls";
 import type { StewardPorts } from "../ports";
-import { tool, text, entry, json } from "./shared";
+import { tool, text, entry, json, requireOwner } from "./shared";
 
-/** `approvals`: the user's decisions, for entry modules (QQ buttons and text commands). */
+/** `approvals`: owner decisions, plus each module's own requests. */
 /** v2-16: one approval per async call (redeliveries find it); the call waits until the user decides. */
 async function moduleRequest(ports: StewardPorts, workspaceId: string, module: Extract<Caller, { kind: "module" }>, call: { id: string } | undefined, args: Record<string, unknown>) {
   if (!call) throw new CallError("invalid", "approvals.request waits for the user: call it with mode async and reply: true");
@@ -31,29 +30,25 @@ export const approvals: SystemModule = {
   name: "approvals",
   description: "审批：需要你决定的事，记录你的决定并将结果交回发起方。",
   tools: [
-    tool("grants", "Active and historical approval grant rules.", {}, [], { idempotent: true, output: z.lazy(() => outputs.settingsGrantsOutput) }),
-    tool("revoke-grant", "Revoke a grant rule.", { grant: text() }, ["grant"], { idempotent: true, output: z.lazy(() => outputs.settingsGrantOutput) }),
-    tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { idempotent: true, output: z.lazy(() => outputs.approvalsListOutput) }),
-    tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: [...APPROVAL_SCOPES] } }, ["approval", "decision"], { output: z.lazy(() => outputs.approvalOutput) }),
+    tool("list", "Approvals, by status (default open).", { status: { type: "string", enum: [...APPROVAL_STATUSES] } }, [], { visibility: ["owner"], idempotent: true, output: z.lazy(() => outputs.approvalsListOutput) }),
+    tool("resolve", "Approve or deny an approval as the user (only after the user decided).", { approval: text(), decision: { type: "string", enum: ["approve", "deny"] } }, ["approval", "decision"], { visibility: ["owner"], output: z.lazy(() => outputs.approvalOutput) }),
     tool("request", "Ask the user to decide something this module is about to do (v2-16). Call asynchronously with reply: the call waits, and its call_result carries { approval, decision: approved | denied }. Approved once, never standing.",
       { title: text("What the user decides, e.g. 开始模拟实验"), detail: text("Why, and what follows"), preview: text("Exactly what will be done") }, ["title"], { idempotent: true, output: z.lazy(() => outputs.approvalRequestOutput) }),
     tool("status", "A request this module made: { status, hash, resolvedAt }.", { approval: text() }, ["approval"], { idempotent: true, output: z.lazy(() => outputs.approvalStatusOutput) }),
   ],
   async handle({ ports, workspaceId, caller, call }, name, args) {
-    const module = entry(caller), modules = createModules(ports, workspaceId);
-    const grants = createGrants({ db: ports.db, workspaceId, now: ports.now });
-    if (name === "grants") return json(await grants.list());
-    if (name === "revoke-grant") return json(await grants.revoke(String(args.grant)));
-    if (name === "request") return moduleRequest(ports, workspaceId, module, call, args);
-    if (name === "status") return moduleRequestStatus(ports, workspaceId, module, String(args.approval));
+    if (name === "request") return moduleRequest(ports, workspaceId, entry(caller), call, args);
+    if (name === "status") return moduleRequestStatus(ports, workspaceId, entry(caller), String(args.approval));
+    const owner = await requireOwner(ports.db, workspaceId, caller);
+    const modules = createModules(ports, workspaceId);
     const service = createApprovals({ db: ports.db, workspaceId, now: ports.now }, async action => {
       // Same routing as the service: pause/resume and removal approved in chat (QQ, MCP) must take effect too.
       if (isModuleApproval(action.payload)) await modules.onApproved(action);
       else await ports.onApproved?.(action);
     }, ports);
     if (name === "list") return json(await service.list((args.status as (typeof APPROVAL_STATUSES)[number] | undefined) ?? "open"));
-    const source = module.module;
-    if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: args.scope ?? "once" }, source)).approval);
+    const source = owner.kind === "owner" ? owner.via ?? "owner" : owner.module;
+    if (name === "resolve") return json((await service.resolve(String(args.approval), { decision: args.decision, scope: "once" }, source)).approval);
     throw new CallError("not_found", `approvals.${name} not found`);
   },
 };

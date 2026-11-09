@@ -23,7 +23,7 @@ async function fixture() {
   } } };
   const context = moduleContext(ports, workspaceId);
   const module = await db.module.create({ data: { workspaceId, name: "sample", activeHash: "old", dataSchema: 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "sample", entry: "index.ts", keepAlive: true, tests: ["test.ts"], data: { schema: 2, migrate: "migrate.ts" }, effects: [], triggers: [] });
+  const manifest = moduleManifestSchema.parse({ name: "sample", entry: "index.ts", keepAlive: true, tests: ["test.ts"], data: { schema: 2, migrate: "migrate.ts" }, effects: [] });
   const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: "next", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const live = join(dataDir, "platform/data", module.id);
   await mkdir(live, { recursive: true }); await writeFile(join(live, "state"), "original");

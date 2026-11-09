@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { activityRecords, activityRecordsOutput } from "./activity";
-import { activityView } from "./builtin/notify/activity";
+import { activityView } from "./external/notify/activity";
 const listActivity = (ports: StewardPorts, workspaceId: string, args: Parameters<typeof activityView>[1]) => activityView(async (target, input) => {
   expect(target).toBe("activity.records");
   return activityRecordsOutput.parse(await activityRecords(ports, workspaceId, input));

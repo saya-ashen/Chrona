@@ -1,131 +1,59 @@
 import { afterEach, expect, test } from "bun:test";
-import "./module-effects";
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { type CallScope } from "./module-effects";
-import { completeForModule } from "./module-model";
-import { createSettings } from "./settings";
-import { commitModuleSource } from "./module-git";
-import { buildPending } from "./module-build";
-import { moduleContext } from "./module-context";
+import { budgetTimezone, createSettings, kernelModuleModelSettingsSchema, kernelSettingsSchema, moduleModelSettings } from "./settings";
 import { testDb } from "./test-db";
-import type { ProviderAdapter } from "@chrona/contracts/steward";
-
-const fakeProvider: ProviderAdapter = { name: "fake", async health() { return { available: true, sandboxed: true, error: null }; }, start() { throw new Error("No runs in model tests"); } };
-import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-const limits = { models: { fast: "fake/fast", strong: "fake/exact" }, maxCallsPerEvent: 2, maxOutputTokens: 20, dailyCalls: 10, timeoutMs: 5000 };
-const prompt = "PRIVATE_PROMPT", text = "PRIVATE_COMPLETION";
-async function fixture() {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-model-engine-");
-  cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  const workspace = await db.workspace.create({ data: { name: "model", settings: { moduleModel: limits } } });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "model-test", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.complete", "notify.send"], model: { tier: "strong", maxCalls: 2, maxOutputTokens: 20 }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
-  const now = new Date("2026-10-21T04:00:00Z");
-  const run = await db.moduleRun.create({ data: { moduleId: module.id, hash: "v1", triggerId: "daily", firedAt: now, createdAt: now, exitCode: 0 } });
-  let calls = 0;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, provider: { ...fakeProvider, async complete() { calls++; return { text, inputTokens: 3, outputTokens: 4 }; } } };
-  const scope: CallScope = { workspaceId: workspace.id, moduleId: module.id, hash: "v1", manifest, moduleRunId: run.id, eventKey: "event" };
-  // Exercise governed completion budgets; refusal messages start with their reason.
-  const call = async (maxOutputTokens = 20) => {
-    try { return { result: await completeForModule(ports, scope, { prompt, maxOutputTokens }) }; }
-    catch (error) { return { error: { code: /^(\w+):/.exec((error as Error).message)?.[1] } }; }
-  };
-  return { db, dataDir, workspace, module, manifest, ports, scope, call, calls: () => calls };
+const limits = { maxCallsPerEvent: 2, maxOutputTokens: 20, dailyCalls: 10, eventTimeoutMs: 5000 };
+async function fixture(settings = {}) {
+  const db = testDb({ injectedAgent: false });
+  cleanups.push(() => db.$disconnect());
+  const workspace = await db.workspace.create({ data: { name: "settings", settings } });
+  return { db, workspace, service: createSettings({ db, workspaceId: workspace.id, now: () => new Date("2026-10-21T04:00:00Z") }) };
 }
 
-async function buildCandidate(f: Awaited<ReturnType<typeof fixture>>, manifest: ReturnType<typeof moduleManifestSchema.parse>, label: string) {
-  const files = [{ path: "index.ts", bytes: Buffer.from("") }, { path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) }, { path: "test.ts", bytes: Buffer.from("") }];
-  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: f.module.id, versionId: label, files, message: label });
-  return f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: git.commit, manifest, intent: { changes: [label] }, source: "user", report: { tests: [], git }, status: "building" } });
-}
+test("kernel settings default to disabled; owner can configure, preserve, and disable budgets", async () => {
+  const f = await fixture();
+  expect(await f.service.get()).toEqual({ timezone: "Asia/Shanghai", moduleModel: null, modelUsage: [] });
+  expect((await f.service.update({ moduleModel: limits })).moduleModel).toEqual(limits);
+  expect((await f.service.update({ timezone: "UTC" })).moduleModel).toEqual(limits);
+  expect((await f.service.update({ moduleModel: null })).moduleModel).toBeNull();
+  expect(kernelSettingsSchema.safeParse(await f.service.get()).success).toBe(true);
+});
 
-test("settings moduleModel defaults null, persists owner updates and disabling", async () => {
-  const f = await fixture();
-  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id });
-  expect((await settings.get()).moduleModel).toEqual(limits);
-  expect((await settings.update({ moduleModel: null })).moduleModel).toBeNull();
-  expect((await settings.update({ moduleModel: limits })).moduleModel).toEqual(limits);
-  await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: {} } });
-  expect((await settings.get()).moduleModel).toBeNull();
+test("settings writes preserve unrelated application data", async () => {
+  const f = await fixture({ applicationData: { private: "keep" } });
+  await f.service.update({ timezone: "UTC", moduleModel: { ...limits, moduleDailyCalls: { example: 0 } } });
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspace.id } })).settings).toMatchObject({ applicationData: { private: "keep" }, timezone: "UTC", moduleModel: { ...limits, moduleDailyCalls: { example: 0 } } });
 });
-for (const kind of ["undeclared", "unconfigured", "tier", "event", "daily", "tokens", "setting-tokens", "setting-calls", "no-event"] as const) test(`handler enforces ${kind}`, async () => {
+
+for (const input of [
+  { moduleModel: { ...limits, models: { fast: "provider/model" } } },
+  { moduleModel: { ...limits, timeoutMs: 5000 } },
+  { moduleModel: { ...limits, thinking: "high" } },
+  { models: {} },
+  { builds: {} },
+  { timezone: "Invalid/Timezone" },
+  { moduleModel: { ...limits, maxCallsPerEvent: 0 } },
+  { moduleModel: { ...limits, eventTimeoutMs: 4999 } },
+]) test(`settings reject removed policy or invalid values: ${JSON.stringify(input)}`, async () => {
   const f = await fixture();
-  let cap = 20;
-  if (kind === "undeclared") f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, uses: ["notify.send"], model: undefined });
-  if (kind === "unconfigured") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: {} } });
-  if (kind === "tier") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, models: { fast: "fake/fast" } } } } });
-  if (kind === "event") { await f.call(); await f.call(); }
-  if (kind === "daily") { await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, dailyCalls: 1 } } } }); await f.call(); }
-  if (kind === "tokens") cap = 21;
-  if (kind === "setting-tokens") await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, maxOutputTokens: 10 } } } });
-  if (kind === "setting-calls") { await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: { ...limits, maxCallsPerEvent: 1 } } } }); await f.call(); }
-  if (kind === "no-event") delete f.scope.moduleRunId;
-  const before = f.calls();
-  expect(await f.call(cap)).toMatchObject({ error: { code: kind === "tier" ? "unconfigured" : ["undeclared", "unconfigured"].includes(kind) ? kind : "budget_exceeded" } });
-  expect(f.calls()).toBe(before);
-  expect(await f.db.moduleCall.count({ where: { status: "rejected", method: "model" } })).toBe(1);
+  await expect(f.service.update(input)).rejects.toMatchObject({ code: "invalid" });
+  expect((await f.service.get()).moduleModel).toBeNull();
+  expect(await f.db.audit.count()).toBe(0);
 });
-test("daily budget uses workspace timezone midnight and includes failed calls", async () => {
-  const f = await fixture();
-  await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { notifications: { dailyCap: 5, quietHours: null, timezone: "Asia/Shanghai", digestAt: "09:00" }, moduleModel: { ...limits, dailyCalls: 1 } } } });
-  await f.db.moduleCall.create({ data: { moduleId: f.module.id, hash: "v1", method: "model", key: "yesterday", status: "failed", error: "provider_error", createdAt: new Date("2026-10-20T15:59:59Z") } });
-  expect(await f.call()).toHaveProperty("result");
-  expect(await f.call()).toMatchObject({ error: { code: "budget_exceeded" } });
+
+for (const [field, minimum, maximum] of [["maxCallsPerEvent", 1, 20], ["maxOutputTokens", 1, 32000], ["dailyCalls", 1, 10000], ["eventTimeoutMs", 5000, 600000]] as const) test(`kernel budget ${field} boundaries`, () => {
+  for (const value of [minimum, maximum]) expect(kernelModuleModelSettingsSchema.safeParse({ ...limits, [field]: value }).success).toBe(true);
+  for (const value of [minimum - 1, maximum + 1, minimum + 0.5]) expect(kernelModuleModelSettingsSchema.safeParse({ ...limits, [field]: value }).success).toBe(false);
 });
-for (const code of ["timeout", "provider_error"]) test(`records ${code} without prompt or completion`, async () => {
-  const f = await fixture();
-  f.ports.provider = { ...fakeProvider, async complete() { throw Object.assign(new Error(prompt + text), { code }); } };
-  expect(await f.call()).toMatchObject({ error: { code } });
-  expect(await f.db.moduleCall.findFirst()).toMatchObject({ method: "model", status: "failed", error: code });
-  const logs = JSON.stringify(await f.db.audit.findMany());
-  expect(logs).not.toContain(prompt); expect(logs).not.toContain(text);
-  expect(logs).toContain("module_model_call");
+
+test("persisted legacy model settings are rejected rather than translated", () => {
+  expect(() => moduleModelSettings({ moduleModel: { ...limits, models: { fast: "provider/model" }, timeoutMs: 5000 } })).toThrow();
+  expect(moduleModelSettings({})).toBeNull();
 });
-test("success caps output and audits only model and token counts", async () => {
-  const f = await fixture();
-  expect(await f.call(1)).toMatchObject({ result: { text: text.slice(0, 4), inputTokens: 3, outputTokens: 4 } });
-  const audits = await f.db.audit.findMany();
-  expect(audits[0]?.details).toMatchObject({ model: limits.models.strong, inputTokens: 3, outputTokens: 4, error: null });
-  expect(JSON.stringify(audits)).not.toContain(prompt); expect(JSON.stringify(audits)).not.toContain(text);
-});
-for (const setting of [null, { ...limits, models: { fast: "fake/fast" } }, { ...limits, maxCallsPerEvent: 1 }, { ...limits, maxOutputTokens: 10 }]) test(`build rejects unavailable or excessive model limits ${JSON.stringify(setting)}`, async () => {
-  const f = await fixture();
-  await f.db.workspace.update({ where: { id: f.workspace.id }, data: { settings: { moduleModel: setting } } });
-  const version = await buildCandidate(f, f.manifest, "model");
-  await buildPending(moduleContext(f.ports, f.workspace.id));
-  const row = await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
-  expect(row.status).toBe("rejected"); expect(JSON.stringify(row.report)).toContain(!setting ? "configure moduleModel" : "strong" in setting.models ? "limits exceed" : 'tier \\"strong\\" is not configured'); expect(f.calls()).toBe(0);
-});
-test("build refuses listen outside entry modules: apps offer tools, the web module shows them (v2-8)", async () => {
-  const f = await fixture();
-  for (const [kind, extra] of [["page", {}], ["entry", { uses: ["*"] }]] as const) {
-    const manifest = moduleManifestSchema.parse({ name: "model-test", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], listen: "/api/page", ...extra });
-    const version = await buildCandidate(f, manifest, kind);
-    await buildPending(moduleContext(f.ports, f.workspace.id));
-    const report = JSON.stringify((await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).report);
-    expect(report.includes("listen is only for entry modules")).toBe(kind === "page");
-  }
-});
-test("v2-17: a tier names a model and thinking level; a module's own daily cap stops only it; usage is per module", async () => {
-  const f = await fixture();
-  const seen: unknown[] = [];
-  f.ports.provider = { ...fakeProvider, async complete(input) { seen.push({ model: input.model, thinking: input.thinking }); return { text, inputTokens: 3, outputTokens: 4 }; } };
-  const settings = createSettings({ ...f.ports, workspaceId: f.workspace.id });
-  await settings.update({ moduleModel: { ...limits, models: { strong: { model: "fake/exact", thinking: "max" }, fast: "fake/fast:low" }, moduleDailyCalls: { "model-test": 1 } } });
-  expect((await f.call()).result).toMatchObject({ text });
-  expect(seen).toEqual([{ model: "fake/exact", thinking: "max" }]);
-  // Same event allows two calls, but the module's own cap is one a day.
-  expect((await f.call()).error).toEqual({ code: "budget_exceeded" });
-  expect((await settings.get()).modelUsage).toEqual([{ module: "model-test", calls: 1, inputTokens: 3, outputTokens: 4 }]);
-  // Pi's model:level shorthand from before v2-17 is split: Pi reports the bare model id.
-  f.scope.manifest = moduleManifestSchema.parse({ ...f.manifest, model: { tier: "fast", maxCalls: 2, maxOutputTokens: 20 } });
-  await settings.update({ moduleModel: { ...limits, models: { fast: "fake/fast:low" } } });
-  f.scope.moduleRunId = (await f.db.moduleRun.create({ data: { moduleId: f.module.id, hash: "v1", triggerId: "daily", firedAt: f.ports.now(), createdAt: f.ports.now(), exitCode: 0 } })).id;
-  expect((await f.call()).result).toMatchObject({ text });
-  expect(seen.at(-1)).toEqual({ model: "fake/fast", thinking: "low" });
+
+test("governance timezone ignores legacy notification settings", () => {
+  expect(budgetTimezone({ notifications: { timezone: "America/Los_Angeles" } })).toBe("Asia/Shanghai");
+  expect(budgetTimezone({ timezone: "UTC", notifications: { timezone: "America/Los_Angeles" } })).toBe("UTC");
 });

@@ -8,6 +8,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { registerSystemModules } from "./system-modules";
 import { registerLocalRuntime } from "./local-runtime";
 import { resolveBuiltinRelease } from "./module-release";
+import { buildAgentApplication } from "./builtin/agent/build";
 import type { StewardPorts } from "./ports";
 import "./module-effects";
 
@@ -15,13 +16,26 @@ export async function agentFixture() {
   const root = await mkdtemp("/tmp/chrona-agent-app-"), dataDir = join(root, "data"), resources = join(root, "builtin");
   await mkdir(dataDir); await mkdir(resources);
   await cp(resolve(import.meta.dir, "builtin/agent"), join(resources, "agent"), { recursive: true });
+  // Build only the temporary release so the fake and gateway exercise the same current contract.
+  await buildAgentApplication(join(resources, "agent"));
   await seedTestModuleRelease(resources, "agent");
   const cwd = join(root, "work"), profile = join(root, "profile"); await mkdir(cwd); await mkdir(profile, { mode: 0o700 });
   const command = join(root, "pi"), extension = join(root, "extension.ts");
   await writeFile(extension, "");
   await writeFile(command, `#!${process.execPath}\nimport {writeFileSync} from 'node:fs';
-if(process.argv.includes('--version')){console.log('0.85.0');process.exit(0)}
-if(process.argv.includes('--no-session')){let prompt='';process.stdin.on('data',x=>prompt+=x);process.stdin.on('end',()=>{console.log(JSON.stringify({type:'message_end',message:{role:'assistant',provider:'fake',model:'fast',stopReason:'stop',content:[{type:'text',text:'fixture completion'}],usage:{input:3,output:4}}}));});}else{
+import {pathToFileURL} from 'node:url';
+if(process.argv.includes('--version')){console.log('1.5.0');process.exit(0)}
+if(process.argv.includes('--no-session')){
+  for await (const chunk of process.stdin) {};
+  const args=process.argv.slice(2), hooks=new Map();
+  const extension=await import(pathToFileURL(args[args.indexOf('-e')+1]).href);
+  extension.default({on:(name,handler)=>hooks.set(name,handler)});
+  const model=args[args.indexOf('--model')+1], separator=model.indexOf('/');
+  const provider=separator<0?'fake':model.slice(0,separator), id=separator<0?model:model.slice(separator+1);
+  // The real generated token-limit hook bounds the final payload and writes its confirmation.
+  hooks.get('before_provider_request')({payload:{max_completion_tokens:65536}},{model:{provider,id,api:'openai-completions'}});
+  console.log(JSON.stringify({type:'message_end',message:{role:'assistant',provider,model:id,stopReason:'stop',content:[{type:'text',text:'fixture completion'}],usage:{input:3,output:4}}}));
+}else{
 let streaming=false,buffer='';
 const emit=x=>console.log(JSON.stringify(x));
 process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>{buffer+=chunk;let n;while((n=buffer.indexOf('\\n'))>=0){const c=JSON.parse(buffer.slice(0,n));buffer=buffer.slice(n+1);const data=c.type==='get_state'?{sessionId:'fixture-session',isStreaming:streaming,isCompacting:false,pendingMessageCount:0}:c.type==='get_commands'?{commands:[]}:{};emit({type:'response',id:c.id,command:c.type,success:true,data});if(c.type==='prompt'){streaming=true;writeFileSync('started','yes');writeFileSync('pi.pid',String(process.pid));emit({type:'agent_start'});emit({type:'tool_execution_start',toolCallId:'fixture',toolName:'read'});}if(c.type==='abort'){streaming=false;emit({type:'agent_end'});emit({type:'agent_settled'});process.exit(0);}}});
@@ -31,7 +45,7 @@ process.stdin.on('end',()=>process.exit(0));}
   const sdk = resolve(import.meta.dir, "../../../../integrations/src/steward/module-sdk");
   const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleBuiltinResources: resources, moduleSdk: sdk,
-    sandbox: { ...sandbox.health, ...sandbox }, agentApplication: { startModule: sandbox.startModule, env: { CHRONA_AGENT_CONFIGURATION: JSON.stringify({ backend: "pi", pi: { command, agentDir: profile, expectedVersion: "0.85.0", chronaExtension: extension, agentUrl: "http://127.0.0.1:1/api/steward-agent", workspaceRoot: join(dataDir, "sessions") }, browser: { configured: "none", dir: join(root, "browser") } }) } } };
+    sandbox: { ...sandbox.health, ...sandbox }, agentApplication: { startModule: sandbox.startModule, env: { CHRONA_AGENT_CONFIGURATION: JSON.stringify({ backend: "pi", pi: { command, agentDir: profile, expectedVersion: "1.5.0", chronaExtension: extension, agentUrl: "http://127.0.0.1:1/api/steward-agent", workspaceRoot: join(dataDir, "sessions") }, browser: { configured: "none", dir: join(root, "browser") } }) } } };
   registerSystemModules(); registerLocalRuntime();
   const release = await resolveBuiltinRelease(ports, "agent");
   await mkdir(join(dataDir, "platform/store"), { recursive: true });

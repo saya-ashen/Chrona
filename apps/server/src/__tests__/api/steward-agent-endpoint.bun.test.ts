@@ -1,114 +1,95 @@
 import { expect, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { testDb } from "@chrona/engine/test-support";
-import { createStewardService, CallError, type StewardPorts } from "@chrona/engine";
-import { CHRONA_TOOLS, moduleManifestSchema } from "@chrona/contracts/steward";
+import { createStewardService, CallError, moduleSupervisor, type StewardPorts } from "@chrona/engine";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { createScriptSandbox } from "../../../../../packages/integrations/src/steward/script-sandbox";
 import { createStewardAgentRoutes } from "../../routes/steward-agent.routes";
-import { queueBuild } from "../../../../../packages/engine/src/modules/steward/module-build-session";
-function trusted(app: ReturnType<typeof createStewardAgentRoutes>) {
-  return { request: (input: Parameters<typeof app.request>[0], init?: RequestInit) => app.request(input, init, { server: { requestIP: () => ({ address: "127.0.0.1" }) } }) };
-}
-test("agent catalog authenticates live capabilities and dispatches v3 tools", async () => {
-  const db = testDb();
-  try {
-    await db.workspace.create({ data: { id: "w", name: "Test" } });
-    const ports: StewardPorts = { db, dataDir: mkdtempSync(join(tmpdir(), "chrona-v4b-agent-")), now: () => new Date(), publicUrl: null };
-    const service = createStewardService(ports), app = trusted(createStewardAgentRoutes(ports, service));
-    let session = await db.session.create({ data: { workspaceId: "w", key: "web:test", source: "web" } });
-    await service.forWorkspace("w").runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Hi" });
-    let run = (await service.forWorkspace("w").runs.claimNext("foreground"))!;
-    let headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
-    expect((await app.request("http://localhost/catalog")).status).toBe(401);
-    expect((await app.request("http://localhost/catalog", { headers: { authorization: "Bearer invalid" } })).status).toBe(401);
-    expect((await app.request("http://localhost/catalog", { headers: { ...headers, forwarded: "for=127.0.0.1" } })).status).toBe(403);
-    const catalog = await app.request("http://localhost/catalog", { headers });
-    expect(catalog.status).toBe(200); expect((await catalog.json()).tools).toEqual([]);
-    expect((await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: "{}" })).status).toBe(403);
-    await service.forWorkspace("w").runs.finish(run.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "never_started" });
-    await db.module.create({ data: { workspaceId: "w", name: "sample", status: "paused" } });
-    ports.moduleSdk = join(import.meta.dirname, "../../../../../packages/integrations/src/steward/module-sdk");
-    const build = await queueBuild(ports, "w", { key: "endpoint-fixture", actorKey: "owner", originSessionId: session.id,
-      request: { name: "sample", goal: "Fixture only", examples: [], files: [], intent: { changes: ["Fixture"], preserves: [] } } });
-    session = await db.session.findUniqueOrThrow({ where: { id: build.sessionId } });
-    run = (await service.forWorkspace("w").runs.claimNext("build"))!;
-    headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
-    const diagnostics = await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: "{}" });
-    expect(diagnostics.status).toBe(200);
-    expect(await diagnostics.json()).toMatchObject({ ok: true, data: { result: [expect.objectContaining({ module: "sample", configuredStatus: "paused" })] } });
-    await db.module.create({ data: { workspaceId: "w", name: "unrelated", status: "paused" } });
-    const outside = await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: JSON.stringify({ module: "unrelated" }) });
-    expect(outside.status).toBe(403);
-    expect(await outside.json()).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    const call = await app.request("http://localhost/tools/chrona_reply", { method: "POST", headers, body: JSON.stringify({ text: "Build result", files: [] }) });
-    expect(call.status).toBe(200); expect((await call.json()).ok).toBe(true);
-    expect(await db.message.findFirst({ where: { sessionId: session.id, direction: "out" } })).toMatchObject({ text: "Build result" });
-    expect(await db.preference.count()).toBe(0);
-    const invalid = await app.request("http://localhost/tools/chrona_reply", { method: "POST", headers, body: "{}" });
-    expect(invalid.status).toBe(400);
-    expect(await invalid.json()).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("text:") } });
-    const dispatch = spyOn(service.tools, "call");
-    for (const code of ["unknown", "failed", "unavailable"] as const) {
-      dispatch.mockRejectedValueOnce(new CallError(code, `Delivery ${code}`));
-      const response = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
-      expect(response.status).toBe(code === "unavailable" ? 503 : 409);
-      expect(await response.json()).toEqual({ ok: false, error: { code, message: `Delivery ${code}` } });
-    }
-    dispatch.mockRestore();
-    const root = await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" });
-    expect(root.status).toBe(400);
-    const buildCatalog = await (await app.request("http://localhost/catalog", { headers })).json();
-    // A build has the conversation's app tools; of Chrona's own tools only chrona_reply.
-    const buildNames: string[] = buildCatalog.tools.map((t: { name: string }) => t.name);
-    expect(buildNames).toEqual(expect.arrayContaining(["chrona_reply", "m_modules_diagnostics", "m_modules_reference", "m_modules_propose", "m_modules_request_group", "m_modules_list"]));
-    expect(buildNames.filter(name => name.startsWith("chrona_"))).toEqual(["chrona_reply"]);
-    expect((await app.request("http://localhost/tools/chrona_schedules", { method: "POST", headers, body: "{}" })).status).toBe(400);
-    const reference = await app.request("http://localhost/tools/m_modules_reference", { method: "POST", headers, body: JSON.stringify({ target: "modules.diagnostics" }) });
-    expect(reference.status).toBe(200);
-    expect(await reference.json()).toMatchObject({ ok: true, data: { result: { outputSchema: { type: "array" } } } });
-    expect((await app.request("http://localhost/tools/m_modules_diagnostics", { method: "POST", headers, body: "{}" })).status).toBe(200);
-    expect(buildNames.filter(name => name.startsWith("chrona_"))).toEqual([...CHRONA_TOOLS]);
-    await db.run.update({ where: { id: run.id }, data: { status: "finished" } });
-    expect((await app.request("http://localhost/catalog", { headers })).status).toBe(401);
-  } finally { await db.$disconnect(); }
-});
 
-test("routed build refusals retain conflict/409 and actionable detail instead of INTERNAL_ERROR", async () => {
-  const db = testDb(), dataDir = mkdtempSync(join(tmpdir(), "chrona-build-queue-http-"));
+const moduleTools = ["list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove"];
+async function fixture() {
+  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-agent-http-");
+  const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, sandbox: { ...sandbox.health, startModule: sandbox.startModule } };
+  const workspaceId = (await db.workspace.create({ data: { name: "Agent HTTP" } })).id;
+  const service = createStewardService(ports), api = service.forWorkspace(workspaceId), app = createStewardAgentRoutes(ports, service);
+  const peer = { server: { requestIP: () => ({ address: "127.0.0.1" }) } };
+  const entry = await db.module.create({ data: { workspaceId, name: "execution-test-entry", activeHash: "v1" } });
+  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }), source: "user", status: "approved", intent: {}, report: {} } });
+  const authorRoot = join(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/external/author");
+  const authorManifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(authorRoot, "module.json"), "utf8")));
+  const author = await db.module.create({ data: { workspaceId, name: "author", activeHash: "c".repeat(64) } });
+  await db.moduleVersion.create({ data: { moduleId: author.id, hash: "c".repeat(64), manifest: authorManifest, source: "user", status: "approved", intent: {}, report: {} } });
+  await mkdir(join(dataDir, "platform/store"), { recursive: true });
+  await cp(authorRoot, join(dataDir, "platform/store", "c".repeat(64)), { recursive: true });
+  const session = await db.session.create({ data: { workspaceId, source: "module", key: "module:http-test", moduleId: entry.id } });
+  await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
+  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture; never launch a model" });
+  const run = (await api.runs.claimNext("foreground"))!;
+  await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"] } } });
+  const headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
+  const request = (path: string, init?: RequestInit) => app.request(path, init, peer);
+  const post = (name: string, body: unknown) => request(`/tools/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
+  return { db, ports, workspaceId, api, app, service, entry, author, run, headers, request, post,
+    async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
+}
+
+test("live Agent capability exposes the modern 13 module tools and material-only Author through actual HTTP dispatch", async () => {
+  const f = await fixture();
   try {
-    const { id: workspaceId } = await db.workspace.create({ data: { name: "queue-http" } });
-    const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null };
-    const service = createStewardService(ports), api = service.forWorkspace(workspaceId), app = trusted(createStewardAgentRoutes(ports, service));
-    const manifest = moduleManifestSchema.parse({ name: "consumer", entry: "index.ts", tests: ["test.ts"], keepAlive: true, triggers: [], effects: [], uses: ["modules.build", "modules.check"] });
-    const module = await db.module.create({ data: { workspaceId, name: "consumer", status: "active", activeHash: "v1" } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", status: "approved", intent: {}, report: {} } });
-    const session = await db.session.create({ data: { workspaceId, key: "module:http-queue", source: "module", moduleId: module.id } });
-    await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: module.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
-    await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "fixture" });
-    const run = (await api.runs.claimNext("foreground"))!;
-    await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: module.id, kind: "agent_tools", subjectId: run.id, details: { targets: ["modules.build", "modules.check"] } } });
-    const post = (name: string, body: unknown) => app.request(`http://localhost/tools/${name}`, { method: "POST", headers: { authorization: `Bearer ${run.token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-    const request = { name: "sample", goal: "fixture only", intent: { changes: ["fixture"], preserves: [] } };
-    const outside = await post("m_modules_list", {});
-    expect(await outside.json()).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    const unconfigured = await post("m_modules_build", request);
-    expect(unconfigured.status).toBe(409);
-    expect(await unconfigured.json()).toMatchObject({ ok: false, error: { code: "conflict", message: expect.stringContaining("SDK resources") } });
-    ports.moduleSdk = "unused: admission must reject before preparation";
-    for (let i = 0; i < 10; i++) {
-      const build = await db.session.create({ data: { workspaceId, key: `build:fixture-${i}`, source: "build" } });
-      await api.runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "fixture" });
+    expect((await f.request("/catalog")).status).toBe(401);
+    expect((await f.request("/catalog", { headers: { authorization: "Bearer invalid" } })).status).toBe(401);
+    expect((await f.app.request("/catalog", { headers: f.headers })).status).toBe(403);
+    for (const header of ["forwarded", "x-forwarded-for", "x-real-ip"]) expect((await f.request("/catalog", { headers: { ...f.headers, [header]: "127.0.0.1" } })).status).toBe(403);
+    const catalog = await f.request("/catalog", { headers: f.headers });
+    expect(catalog.status).toBe(200); expect(catalog.headers.get("cache-control")).toBe("no-store");
+    const names: string[] = (await catalog.json()).tools.map((tool: { name: string }) => tool.name);
+    expect(names.filter(name => name.startsWith("m_modules_")).sort()).toEqual(moduleTools.map(tool => `m_modules_${tool.replaceAll("-", "_")}`).sort());
+    expect(names).toContain("m_author_prepare");
+    const reference = await f.post("m_modules_reference", {});
+    expect(reference.status).toBe(200);
+    const index: { target: string }[] = (await reference.json()).data.result;
+    expect(index.filter(tool => tool.target.startsWith("modules.")).map(tool => tool.target).sort()).toEqual(moduleTools.map(tool => `modules.${tool}`).sort());
+    const prepare = await f.post("m_author_prepare", { input: JSON.stringify({ requestKey: "draft", submitter: { moduleId: f.author.id, hash: "c".repeat(64) }, targets: [{ name: "ordinary", moduleId: null, expectedActiveHash: null }], goal: "Prepare supplied material", intent: { changes: ["Fixture"], preserves: [] } }) });
+    expect(prepare.status).toBe(200);
+    expect(await prepare.json()).toMatchObject({ ok: true, data: { result: { kind: "material-only", execution: { supported: false, limitation: expect.stringContaining("no model execution was started") } } } });
+    expect(await f.db.run.count()).toBe(1);
+    expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
+    expect(await f.db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);
+    expect((await f.request("/tools/m_modules_tools", { method: "POST", headers: f.headers, body: "{" })).status).toBe(400);
+    const outside = await f.post("m_activity_runtime", {});
+    expect(outside.status).toBe(409);
+    expect(await outside.json()).toMatchObject({ error: { code: "forbidden" } });
+    const dispatch = spyOn(f.service.tools, "call");
+    try {
+      for (const code of ["unknown", "failed", "unavailable"] as const) {
+        dispatch.mockRejectedValueOnce(new CallError(code, `Delivery ${code}`));
+        const response = await f.post("m_modules_list", {});
+        expect(response.status).toBe(code === "unavailable" ? 503 : 409);
+        expect(await response.json()).toEqual({ ok: false, error: { code, message: `Delivery ${code}` } });
+      }
+    } finally { dispatch.mockRestore(); }
+    await f.db.run.update({ where: { id: f.run.id }, data: { status: "finished" } });
+    expect((await f.request("/catalog", { headers: f.headers })).status).toBe(401);
+  } finally { await f.close(); }
+}, 20_000);
+
+test("retired modules.build/check routes are not_found and never queue a build", async () => {
+  const f = await fixture();
+  try {
+    // A stored internal build session exercises the legacy Provider bridge without creating a build request.
+    const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, source: "build", key: "build:retired-route" } });
+    const token = "historical-build-token", expires = new Date(Date.now() + 60_000);
+    await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "build", trigger: "build", prompt: "Historical fixture only", provider: "historical-fixture", cwd: "/tmp/unused-historical-build", status: "running", tokenHash: createHash("sha256").update(token).digest("hex"), deadlineAt: expires, leaseUntil: expires } });
+    for (const tool of ["build", "check", "propose", "request_group"]) {
+      const response = await f.request(`/tools/m_modules_${tool}`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ ok: false, error: { code: "not_found" } });
     }
-    const full = await post("m_modules_build", request);
-    expect(full.status).toBe(409);
-    expect(await full.json()).toMatchObject({ error: { code: "conflict", message: expect.stringContaining("queue is full (10 waiting)") } });
-    expect(await db.session.count()).toBe(11);
-    const invalid = await post("m_modules_build", { ...request, name: "../escape" });
-    expect(invalid.status).toBe(409); // Routed CallError responses retain their semantic code.
-    expect(await invalid.json()).toMatchObject({ ok: false, error: { code: "invalid" } });
-    const missing = await post("m_modules_check", { module: "missing" });
-    expect(missing.status).toBe(409);
-    expect(await missing.json()).toMatchObject({ ok: false, error: { code: "not_found" } });
-  } finally { await db.$disconnect(); rmSync(dataDir, { recursive: true, force: true }); }
+    expect(await f.db.session.count({ where: { source: "build" } })).toBe(1);
+    expect(await f.db.run.count({ where: { lane: "build" } })).toBe(1);
+    expect(await f.db.moduleVersion.count({ where: { status: "building" } })).toBe(0);
+  } finally { await f.close(); }
 });

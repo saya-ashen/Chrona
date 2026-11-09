@@ -20,10 +20,10 @@ function lines(socket: Socket) {
   });
   return () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve));
 }
-async function fixture() {
+async function fixture(status: "queued" | "waiting" = "queued") {
   const root = await mkdtemp(join(tmpdir(), "chrona-channel-"));
   const calls: unknown[] = [];
-  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status: "queued" } }; } });
+  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status } }; } });
   const socket = createConnection(join(root, "channel.sock"));
   const next = lines(socket);
   await channel.ready;
@@ -69,6 +69,24 @@ test("channel preserves known typed handler errors and rejects unknown codes", a
     f.socket.write(JSON.stringify({ id: message.id, error: "Conflict", errorCode: "conflict" }) + "\n");
     expect(await result).toEqual({ id: message.id, error: "Conflict", errorCode: "conflict" });
     expect(f.channel.diagnostics()).toContain("Invalid event reply");
+  } finally { await f.close(); }
+});
+test("waiting user decisions survive the routed call reply wire", async () => {
+  const f = await fixture("waiting");
+  try {
+    f.socket.write(JSON.stringify({ id: "decision", method: "callStatus", params: { callId: "c1" } }) + "\n");
+    expect(await f.next()).toEqual({ id: "decision", result: { callId: "c1", status: "waiting" } });
+    expect(f.channel.diagnostics()).toEqual([]);
+  } finally { await f.close(); }
+});
+test.each(["unconfigured", "budget_exceeded", "provider_error", "timeout"])("SDK model failure %s reaches the waiting caller without timing out", async errorCode => {
+  const f = await fixture();
+  try {
+    const result = f.channel.send(event, 1000);
+    const message = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: message.id, error: "Model request failed", errorCode }) + "\n");
+    expect(await result).toEqual({ id: message.id, error: "Model request failed", errorCode });
+    expect(f.channel.diagnostics()).toEqual([]);
   } finally { await f.close(); }
 });
 test("channel drops oversize lines and rejects in-flight event", async () => {

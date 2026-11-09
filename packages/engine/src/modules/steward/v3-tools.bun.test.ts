@@ -3,10 +3,9 @@ import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { testDb } from "./test-db";
-import webManifest from "./builtin/web/module.json";
+import webManifest from "./external/web/module.json";
 import { createRuns } from "./runs";
 import { createApprovals } from "./approvals";
-import { announceApprovals } from "./notify-user";
 import { createTools } from "./tools";
 import type { StewardPorts } from "./ports";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string;
@@ -37,14 +36,11 @@ test("build reports stay in their build, and removed native tools stay unavailab
   for (const name of ["chrona_session_search", "chrona_schedule", "chrona_notify", "chrona_request_approval"]) await expect(tools.call(run.token, name, {})).rejects.toMatchObject({ code: "invalid" });
 });
 
-test("service approvals and legacy backfill persist facts without a notification app", async () => {
+test("service approvals persist facts transactionally without a notification app or backfill", async () => {
   const approvals = createApprovals({ ...ports, workspaceId });
   const requested = await approvals.create({ action: "delete_data", title: "请求", detail: "说明", preview: "摘要", payload: { privateArgument: "not-a-fact" } });
-  const legacy = await db.approval.create({ data: { workspaceId, action: "delete_data", title: "旧请求", detail: "", preview: "", payload: {} } });
-  await announceApprovals(ports, workspaceId);
-  await announceApprovals(ports, workspaceId);
   const facts = await db.audit.findMany({ where: { workspaceId, kind: "kernel_fact_pending" } });
-  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([requested.id, legacy.id].sort());
+  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([requested.id]);
   expect(JSON.stringify(facts)).not.toContain("privateArgument");
   await approvals.resolve(requested.id, { decision: "deny", scope: "once" });
   expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${requested.id}` } } });

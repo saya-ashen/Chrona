@@ -3,55 +3,465 @@
   "description": "Optional local memory provider for Chrona (mnemopi, local SQLite): direct entry and owner recall, retention and preferences. Full-text by default; remote embeddings when the memory_embedding credential is saved.",
   "entry": "index.ts",
   "keepAlive": true,
-  "triggers": [{ "id": "sleep", "schedule": { "kind": "daily", "time": "04:00" } }],
-  "effects": ["network"],
-  "limits": { "virtualMemoryMb": 4096 },
-  "secrets": ["memory_embedding"],
-  "contributes": { "memory": { "interface": 1, "context": "conversation-context", "afterRun": "conversation-retain" } },
-  "tools": [
-    { "name": "conversation-context", "description": "Apply this memory module's conversation recall policy to a calling application snapshot.", "visibility": ["modules"], "idempotent": true,
-      "parameters": { "type": "object", "required": ["snapshot"], "properties": { "snapshot": { "type": "string" } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["text", "recalled", "count"], "properties": { "text": { "type": "string" }, "recalled": { "type": "boolean" }, "count": { "type": "integer" } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "conversation-retain", "description": "Apply this memory module's conversation retention policy to a calling application snapshot.", "visibility": ["modules"], "idempotent": false,
-      "parameters": { "type": "object", "required": ["snapshot"], "properties": { "snapshot": { "type": "string" } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["retained"], "properties": { "retained": { "const": false } }, "additionalProperties": false },
-        { "type": "object", "required": ["retained", "through", "chars"], "properties": { "retained": { "const": true }, "through": { "type": "string" }, "chars": { "type": "integer" } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "retain", "description": "Store one memory.", "visibility": ["modules", "owner", "provider"], "idempotent": false,
-      "parameters": { "type": "object", "required": ["content"], "properties": {
-        "content": { "type": "string" } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "recall", "description": "Memories matching a query, best first.", "visibility": ["modules", "owner", "provider"], "idempotent": true,
-      "parameters": { "type": "object", "required": ["query"], "properties": { "query": { "type": "string" }, "limit": { "type": "number" } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["items"], "properties": { "items": { "type": "array", "items": { "type": "object", "required": ["id", "content", "score"], "properties": { "id": { "type": "string" }, "content": { "type": "string" }, "at": { "type": "string" }, "score": { "type": "number" } }, "additionalProperties": false } } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "forget", "description": "Delete one memory by id.", "visibility": ["modules", "owner", "provider"], "idempotent": true,
-      "parameters": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["forgotten"], "properties": { "forgotten": { "type": "boolean" } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "preferences", "description": "List preferences held by this memory application.", "visibility": ["modules", "owner", "provider"], "idempotent": true, "parameters": { "type": "object", "properties": {} },
-      "output": { "anyOf": [
-        { "type": "array", "items": { "type": "object", "required": ["id", "text", "topic", "origin", "createdAt", "lastUsedAt"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "topic": { "type": "string", "enum": ["general", "ui"] }, "origin": { "const": "said" }, "createdAt": { "type": "string" }, "lastUsedAt": { "type": "null" } }, "additionalProperties": false } },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } },
-    { "name": "remember", "description": "Remember an explicit user preference (never credentials).", "visibility": ["modules", "owner", "provider"], "idempotent": true, "parameters": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" }, "topic": { "type": "string", "enum": ["general", "ui"] } } },
-      "output": { "anyOf": [
-        { "type": "object", "required": ["id", "text", "topic", "origin", "createdAt", "lastUsedAt"], "properties": { "id": { "type": "string" }, "text": { "type": "string" }, "topic": { "type": "string", "enum": ["general", "ui"] }, "origin": { "const": "said" }, "createdAt": { "type": "string" }, "lastUsedAt": { "type": "null" } }, "additionalProperties": false },
-        { "type": "object", "required": ["ignored"], "properties": { "ignored": { "const": "no caller" } }, "additionalProperties": false }
-      ] } }
+  "effects": [
+    "network"
   ],
-  "data": { "schema": 1 },
-  "tests": ["test.ts"]
+  "limits": {
+    "virtualMemoryMb": 4096
+  },
+  "secrets": [
+    "memory_embedding"
+  ],
+  "tools": [
+    {
+      "name": "conversation-context",
+      "description": "Apply this memory module's conversation recall policy to a calling application snapshot.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "snapshot"
+        ],
+        "properties": {
+          "snapshot": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "recalled",
+              "count"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "recalled": {
+                "type": "boolean"
+              },
+              "count": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "conversation-retain",
+      "description": "Apply this memory module's conversation retention policy to a calling application snapshot.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "snapshot"
+        ],
+        "properties": {
+          "snapshot": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "retained"
+            ],
+            "properties": {
+              "retained": {
+                "const": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "retained",
+              "through",
+              "chars"
+            ],
+            "properties": {
+              "retained": {
+                "const": true
+              },
+              "through": {
+                "type": "string"
+              },
+              "chars": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "retain",
+      "description": "Store one memory.",
+      "visibility": [
+        "modules",
+        "owner",
+        "provider"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "recall",
+      "description": "Memories matching a query, best first.",
+      "visibility": [
+        "modules",
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "content",
+                    "score"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "at": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "forget",
+      "description": "Delete one memory by id.",
+      "visibility": [
+        "modules",
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "forgotten"
+            ],
+            "properties": {
+              "forgotten": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "preferences",
+      "description": "List preferences held by this memory application.",
+      "visibility": [
+        "modules",
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "text",
+                "topic",
+                "origin",
+                "createdAt",
+                "lastUsedAt"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string",
+                  "enum": [
+                    "general",
+                    "ui"
+                  ]
+                },
+                "origin": {
+                  "const": "said"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "lastUsedAt": {
+                  "type": "null"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "remember",
+      "description": "Remember an explicit user preference (never credentials).",
+      "visibility": [
+        "modules",
+        "owner",
+        "provider"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "general",
+              "ui"
+            ]
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "text",
+              "topic",
+              "origin",
+              "createdAt",
+              "lastUsedAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "topic": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "ui"
+                ]
+              },
+              "origin": {
+                "const": "said"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "lastUsedAt": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  ],
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test.ts"
+  ]
 }

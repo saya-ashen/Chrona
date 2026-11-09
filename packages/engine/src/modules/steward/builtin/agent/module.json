@@ -3,7 +3,7 @@
   "description": "Agent 执行：管理 Pi 进程、执行状态、补充指令与取消。随 Chrona 发行；应用通过普通调用提交工作并管理自己的操作。",
   "entry": "index.ts",
   "keepAlive": true,
-  "healthCheck": true,
+  "activated": true,
   "limits": {
     "virtualMemoryMb": 8192
   },
@@ -11,9 +11,8 @@
     "runtime-callback.event",
     "runtime-callback.agent-admit",
     "runtime-callback.agent-settle",
-    "modules.report-health"
+    "web.page-set"
   ],
-  "triggers": [],
   "effects": [
     "network"
   ],
@@ -126,406 +125,212 @@
     },
     {
       "name": "start",
-      "description": "Agent start: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent start: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "work-id": {
-            "type": "string"
-          },
-          "project-ref": {
-            "type": "string"
-          },
-          "command-key": {
-            "type": "string"
-          },
-          "goal": {
-            "type": "string"
-          },
-          "resume-from": {
-            "type": "object",
-            "properties": {
-              "work-id": {
-                "type": "string"
-              },
-              "run-id": {
-                "type": "string"
-              },
-              "attempt-id": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "work-id",
-              "run-id",
-              "attempt-id"
-            ]
-          },
-          "budget": {
-            "type": "object",
-            "properties": {
-              "timeout-ms": {
-                "type": "number"
-              },
-              "max-tool-calls": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "timeout-ms",
-              "max-tool-calls"
-            ]
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "operationId"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "operationId"
-            ],
-            "additionalProperties": false
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
           }
-        ]
+        },
+        "required": [
+          "operationId"
+        ],
+        "additionalProperties": false
       }
     },
     {
       "name": "status",
-      "description": "Agent status: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent status: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "operation-id": {
-            "type": "string"
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              },
-              "outcome": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "outcome": {
-                        "type": "string",
-                        "enum": [
-                          "finished",
-                          "failed",
-                          "timed_out",
-                          "unavailable"
-                        ]
-                      },
-                      "sessionId": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "error": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "outcome",
-                      "sessionId",
-                      "error"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "failure": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "operationId",
-              "outcome",
-              "failure"
-            ],
-            "additionalProperties": false
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
           },
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              },
-              "execution": {
+          "outcome": {
+            "anyOf": [
+              {
                 "type": "object",
                 "properties": {
-                  "workId": {
-                    "type": "string"
-                  },
-                  "sessionId": {
-                    "type": "string"
-                  },
-                  "runId": {
-                    "type": "string"
-                  },
-                  "attemptId": {
-                    "type": "string"
-                  },
-                  "projectRef": {
-                    "type": "string"
-                  },
-                  "status": {
+                  "outcome": {
                     "type": "string",
                     "enum": [
-                      "queued",
-                      "running",
-                      "completed",
+                      "finished",
                       "failed",
-                      "cancelled",
-                      "unknown"
+                      "timed_out",
+                      "unavailable"
                     ]
                   },
-                  "cancelRequested": {
-                    "type": "boolean"
+                  "sessionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
-                  "stopConfirmed": {
-                    "type": "boolean"
+                  "error": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
-                  "workId",
+                  "outcome",
                   "sessionId",
-                  "runId",
-                  "attemptId",
-                  "projectRef",
-                  "status",
-                  "cancelRequested",
-                  "stopConfirmed"
+                  "error"
                 ],
                 "additionalProperties": false
+              },
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "operationId",
-              "execution"
-            ],
-            "additionalProperties": false
+            ]
+          },
+          "failure": {
+            "type": "boolean"
           }
-        ]
+        },
+        "required": [
+          "operationId",
+          "outcome",
+          "failure"
+        ],
+        "additionalProperties": false
       }
     },
     {
       "name": "inject",
-      "description": "Agent inject: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent inject: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "operation-id": {
-            "type": "string"
-          },
-          "command-key": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "accepted": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "accepted"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "accepted": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "accepted"
-            ],
-            "additionalProperties": false
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "const": true
           }
-        ]
+        },
+        "required": [
+          "accepted"
+        ],
+        "additionalProperties": false
       }
     },
     {
       "name": "abort",
-      "description": "Agent abort: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent abort: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "operation-id": {
-            "type": "string"
-          },
-          "command-key": {
-            "type": "string"
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "requested": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "requested"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "requested": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "requested"
-            ],
-            "additionalProperties": false
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "boolean",
+            "const": true
           }
-        ]
+        },
+        "required": [
+          "requested"
+        ],
+        "additionalProperties": false
       }
     },
     {
       "name": "release",
-      "description": "Agent release: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent release: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "operation-id": {
-            "type": "string"
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "released": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "released"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "released": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "required": [
-              "released"
-            ],
-            "additionalProperties": false
+        "type": "object",
+        "properties": {
+          "released": {
+            "type": "boolean",
+            "const": true
           }
-        ]
+        },
+        "required": [
+          "released"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -708,6 +513,9 @@
               },
               "failure": {
                 "type": "boolean"
+              },
+              "unknown": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -721,99 +529,25 @@
     },
     {
       "name": "transcript",
-      "description": "Agent transcript: modules use structured arguments and own their operations; input is reserved for kernel calls",
+      "description": "Agent transcript: kernel-only execution control",
       "visibility": [
-        "kernel",
-        "modules"
+        "kernel"
       ],
       "parameters": {
         "type": "object",
         "properties": {
-          "operation-id": {
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "number"
-          },
           "input": {
             "type": "string",
             "description": "Kernel-only encoded request"
           }
         },
-        "required": []
+        "required": [
+          "input"
+        ]
       },
       "output": {
-        "anyOf": [
-          {
-            "type": "array",
-            "items": {}
-          },
-          {
-            "type": "object",
-            "properties": {
-              "events": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "workId": {
-                      "type": "string"
-                    },
-                    "sessionId": {
-                      "type": "string"
-                    },
-                    "runId": {
-                      "type": "string"
-                    },
-                    "attemptId": {
-                      "type": "string"
-                    },
-                    "seq": {
-                      "type": "integer"
-                    },
-                    "at": {
-                      "type": "string"
-                    },
-                    "payload": {}
-                  },
-                  "required": [
-                    "workId",
-                    "sessionId",
-                    "runId",
-                    "attemptId",
-                    "seq",
-                    "at",
-                    "payload"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "cursor": {
-                "type": "string"
-              },
-              "highWatermark": {
-                "type": "integer"
-              },
-              "gap": {
-                "type": "boolean"
-              },
-              "snapshotRequired": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "events",
-              "cursor",
-              "highWatermark",
-              "gap",
-              "snapshotRequired"
-            ],
-            "additionalProperties": false
-          }
-        ]
+        "type": "array",
+        "items": {}
       }
     },
     {
@@ -1840,17 +1574,58 @@
         "required": []
       },
       "output": {
-        "type": "object",
-        "properties": {
-          "accepted": {
-            "type": "boolean",
-            "const": true
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "accepted"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "boolean",
+                "const": false
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "not_found",
+                      "conflict",
+                      "invalid",
+                      "forbidden",
+                      "capacity"
+                    ]
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "accepted",
+              "error"
+            ],
+            "additionalProperties": false
           }
-        },
-        "required": [
-          "accepted"
-        ],
-        "additionalProperties": false
+        ]
       }
     },
     {
@@ -2503,6 +2278,297 @@
           "state",
           "reason",
           "previewDigest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "projects",
+      "description": "List, register or create host projects for the actual current approved owner application",
+      "visibility": [
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "output": {}
+    },
+    {
+      "name": "configure",
+      "description": "Read or replace Agent model tiers, thinking levels and preferred completion timeout",
+      "visibility": [
+        "owner"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {
+              "tiers": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": true
+              },
+              "preferred-timeout-ms": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "tiers",
+              "preferred-timeout-ms"
+            ]
+          },
+          "clear": {
+            "type": "boolean"
+          },
+          "form": {
+            "type": "object",
+            "properties": {
+              "tiers": {
+                "type": "object",
+                "properties": {
+                  "fast": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ]
+                  },
+                  "balanced": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ]
+                  },
+                  "deep": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ]
+                  }
+                },
+                "required": [
+                  "fast",
+                  "balanced",
+                  "deep"
+                ]
+              },
+              "preferred-timeout-ms": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tiers",
+              "preferred-timeout-ms"
+            ]
+          },
+          "view": {
+            "type": "boolean"
+          }
+        },
+        "required": []
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "tiers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string"
+                        },
+                        "thinking": {
+                          "type": "string",
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "model"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "preferredTimeoutMs": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "tiers",
+                  "preferredTimeoutMs"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "form": {
+            "type": "object",
+            "properties": {
+              "tiers": {
+                "type": "object",
+                "properties": {
+                  "fast": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string",
+                        "enum": [
+                          "",
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "balanced": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string",
+                        "enum": [
+                          "",
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "deep": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string",
+                        "enum": [
+                          "",
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "thinking"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "fast",
+                  "balanced",
+                  "deep"
+                ],
+                "additionalProperties": false
+              },
+              "preferredTimeoutMs": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tiers",
+              "preferredTimeoutMs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "config",
+          "ready"
         ],
         "additionalProperties": false
       }

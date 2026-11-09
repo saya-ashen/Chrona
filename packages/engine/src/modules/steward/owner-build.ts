@@ -1,23 +1,24 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { isEntryModule, moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
+import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { buildIntentSchema, reviseBuildSchema } from "./module-build-inputs";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { buildSettings } from "./settings";
 import { controlBuild, queueBuild, requestFiles } from "./module-build-session";
-import type { Caller } from "./module-calls";
+import type { Caller } from "./module-call-types";
 
 import { assertBuildProvider, buildExecutionSchema } from "./build-execution";
 export const ownerBuildSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
   goal: z.string().min(1).max(4000),
-  intent: modulesToolInputSchemas.build.shape.intent,
+  intent: buildIntentSchema,
   requestKey: z.string().min(1).max(200),
   execution: buildExecutionSchema,
 }).strict();
 export async function buildControl(ports: StewardPorts, workspaceId: string, caller: Caller, name: string, args: Record<string, unknown>) {
   if (name === "stop-build") return controlBuild(ports, workspaceId, String(args.session));
-  const input = modulesToolInputSchemas["revise-build"].parse(args);
+  const input = reviseBuildSchema.parse(args);
   if (!input.files?.length) return controlBuild(ports, workspaceId, input.session, input.requirements);
   if (caller.kind !== "provider") throw new StewardError("forbidden", "Only the Provider may supply build reference files");
   const run = await ports.db.run.findFirst({ where: { id: caller.runId, workspaceId } });

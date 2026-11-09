@@ -25,7 +25,7 @@ await (async () => {
   await operations.start(input);
   assert.equal(starts, 1, "Released receipts prevent replay");
   let modelCalls = 0;
-  const moduleOperations = createModuleAgentOperations(data, async () => ({ reservationId: "author-reservation", model: "fake/model", timeoutMs: 1000 }), async () => { modelCalls++; return { text: "answer", inputTokens: 1, outputTokens: 1 }; }, async () => { throw new Error("No run controls in author completion test"); });
+  const moduleOperations = createModuleAgentOperations(data, async () => ({ reservationId: "author-reservation", declaredTier: "fast", effectiveHardLimits: { maxCallsPerEvent: 1, maxOutputTokens: 20, eventTimeoutMs: 1000 } }), async () => { modelCalls++; return { text: "answer", inputTokens: 1, outputTokens: 1 }; }, { async select() { return { model: "fake/model", timeoutMs: 1000, maxOutputTokens: 20 }; } });
   const caller = { kind: "module" as const, module: "author", moduleId: "author-module", hash: "author-version" };
   const params = { "command-key": "author-completion", prompt: "fixture", "max-output-tokens": 20 };
   const result = await moduleOperations.handle("complete", params, caller, "author-call") as { operationId: string };

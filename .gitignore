@@ -73,6 +73,9 @@ prisma/dev.db-wal.*
 .env
 .env.local
 
+# Local seed repositories are regenerated from the versioned module bundles and lock.
+/resources/module-git/repos/
+
 # build output
 /dist/
 dist/

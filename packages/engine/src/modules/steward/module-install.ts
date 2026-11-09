@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Prisma } from "@chrona/db";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,6 +15,7 @@ import type { ExternalModuleInstaller } from "./module-install-types";
 import { resolveExternalRelease, type ModuleRelease } from "./module-release";
 import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "./errors";
+import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 
 export const installationId = (workspaceId: string, requestKey: string) => `module-install:${createHash("sha256").update(workspaceId).update("\0").update(requestKey).digest("hex")}`;
 const detailsOf = (request: ModuleInstallRequest, result: ModuleInstallResult) => ({ request, result });
@@ -124,7 +126,7 @@ async function installationApproval(ports: StewardPorts, workspaceId: string, mo
 }
 /** Recover from persisted proposal/version facts, never repeat a possibly executed proposal. */
 export async function refreshInstallationReceipts(ports: StewardPorts, workspaceId: string): Promise<void> {
-  // Four official packages: refresh their latest receipts in ticks. Older keys reconcile on explicit lookup.
+  // Refresh official packages' latest receipts in ticks. Older keys reconcile on explicit lookup.
   const pointers = await Promise.all(OFFICIAL_EXTERNAL_MODULE_NAMES.map(name => ports.db.audit.findUnique({ where: { id: latestInstallationId(workspaceId, name) } })));
   const ids = pointers.flatMap(pointer => {
     const id = (pointer?.details as { installationId?: unknown } | null)?.installationId;
@@ -137,6 +139,10 @@ async function refreshReceipts(ports: StewardPorts, workspaceId: string, ids: st
   for (const row of rows) {
     const result = moduleInstallResultSchema.parse((row.details as unknown as ReturnType<typeof detailsOf>).result);
     if (!["pending", "building", "pending_approval"].includes(result.status) || activeSubmissions.get(ports.db)?.has(row.id)) continue;
+    if (isModulePaused(result.package)) {
+      await recordInstallationResult(ports, workspaceId, installationFailure(result, new ModuleUnavailableError(result.package)));
+      continue;
+    }
     if (result.status === "pending") {
       const recovered = await recoverSubmission(ports, workspaceId, row, result);
       if (!recovered) continue;
@@ -185,22 +191,29 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
   }
   return { moduleId: module.id, hash: version.hash };
 }
+async function resumeInstallation(tx: Prisma.TransactionClient, request: ModuleInstallRequest, previous: { id: string; details: unknown }) {
+  const details = previous.details as ReturnType<typeof detailsOf>;
+  if (details.request.package !== request.package || details.request.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
+  const previousResult = moduleInstallResultSchema.parse(details.result);
+  const result = isModulePaused(request.package) ? installationFailure(previousResult, new ModuleUnavailableError(request.package)) : previousResult;
+  if (isModulePaused(request.package)) await tx.audit.update({ where: { id: previous.id }, data: { details: detailsOf(request, result) } });
+  return { result, claimed: false };
+}
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
   const request = parseInput(moduleInstallRequestSchema, raw), id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
     const previous = await tx.audit.findUnique({ where: { id } });
-    if (previous) {
-      const details = previous.details as unknown as ReturnType<typeof detailsOf>;
-      if (details.request.package !== request.package || details.request.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
-      return { result: moduleInstallResultSchema.parse(details.result), claimed: false };
-    }
+    if (previous) return resumeInstallation(tx, request, previous);
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
-    if (module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
-    if (!module && request.mode === "update") throw new StewardError("not_found", "Module not installed; explicitly select install");
-    const result: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId: module?.id ?? null, hash: null, approvalId: null, error: null };
-    await tx.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "module_installation", subjectId: module?.id ?? null, details: detailsOf(request, result), createdAt: ports.now() } });
+    const paused = isModulePaused(request.package);
+    if (!paused && module && request.mode === "install") throw new StewardError("conflict", "Module already installed; explicitly select update");
+    if (!paused && !module && request.mode === "update") throw new StewardError("not_found", "Module not installed; explicitly select install");
+    const moduleId = module?.id ?? null;
+    const pending: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId, hash: null, approvalId: null, error: null };
+    const result = paused ? installationFailure(pending, new ModuleUnavailableError(request.package)) : pending;
+    await tx.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "module_installation", subjectId: moduleId, details: detailsOf(request, result), createdAt: ports.now() } });
     await tx.audit.upsert({ where: { id: latestInstallationId(workspaceId, request.package) }, create: { id: latestInstallationId(workspaceId, request.package), workspaceId, actorKey: "kernel", kind: "module_installation_latest", details: { installationId: id }, createdAt: ports.now() }, update: { details: { installationId: id } } });
-    return { result, claimed: true };
+    return { result, claimed: !paused };
   });
   if (!claim.claimed) {
     if (["pending", "building", "pending_approval"].includes(claim.result.status)) {
@@ -265,7 +278,7 @@ function releaseCatalogDetails(release: ModuleRelease) {
 }
 
 function installationFailure(result: ModuleInstallResult, error: unknown): ModuleInstallResult {
-  return { ...result, status: "failed", error: { code: error instanceof StewardError ? error.code : "failed", reason: error instanceof Error && "reason" in error ? String(error.reason) : "installation_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Installation failed" } };
+  return { ...result, status: error instanceof ModuleUnavailableError ? "unavailable" : "failed", error: { code: error instanceof ModuleUnavailableError ? "unavailable" : error instanceof StewardError ? error.code : "failed", reason: error instanceof Error && "reason" in error ? String(error.reason) : "installation_failed", message: error instanceof Error ? redactSensitiveText(error.message).slice(0, 1000) : "Installation failed" } };
 }
 
 function proposalRejection(errors: string[] | undefined) {

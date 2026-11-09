@@ -28,7 +28,9 @@ test("independent unpublished seeds clone offline at their exact commits and unc
   const f = await fixture();
   try {
     const first = await prepareModuleGitRelease(f);
-    expect(first.modules).toHaveLength(buildArtifacts.moduleGit.modules.length);
+    expect(first.modules).toHaveLength(13);
+    expect(first.modules.map(module => module.name)).toEqual(buildArtifacts.moduleGit.modules.map(module => module.name));
+    expect(first.modules.some(module => module.name === "editor")).toBe(false);
     const plan = JSON.parse(await readFile(join(f.seedDir, "publish-plan.json"), "utf8"));
     expect(plan.modules[0].proposedRepository).toBe("chrona-core/chrona-module-web");
     for (const entry of first.modules) {
@@ -40,7 +42,7 @@ test("independent unpublished seeds clone offline at their exact commits and unc
       expect(await readFile(join(clone, "index.ts"), "utf8")).toBe(`// ${entry.name}\n`);
       expect(git(clone, ["log", "-1", "--format=%s"])).toBe(`Extract initial module release from Chrona ${base.hostCommit}`);
       expect(await readFile(join(clone, "LICENSE"), "utf8")).toBe(await readFile(join(f.root, "LICENSE"), "utf8"));
-      if (["web", "coding", "editor"].includes(entry.name)) expect(await readFile(join(clone, "THIRD-PARTY-NOTICES.txt"), "utf8")).toBe("Fixture third-party notices\n");
+      if (["web", "coding", "coding-web"].includes(entry.name)) expect(await readFile(join(clone, "THIRD-PARTY-NOTICES.txt"), "utf8")).toBe("Fixture third-party notices\n");
       expect(git(clone, ["rev-list", "--count", "HEAD"])).toBe("1");
     }
     const same = await prepareModuleGitRelease({ ...f, hostCommit: "b".repeat(40), hostTimestamp: "1735776000" });
@@ -53,7 +55,7 @@ test("independent unpublished seeds clone offline at their exact commits and unc
     expect(await copyModuleGitRelease(join(f.resourcesRoot, "module-git"), f.resourcesRoot)).toEqual(first);
     await rm(join(f.seedDir, "THIRD-PARTY-NOTICES.txt"));
     await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("ENOENT");
-    await writeFile(join(f.resourcesRoot, "builtin/web/index.ts"), "// changed\n");
+    await writeFile(join(f.resourcesRoot, "external/web/index.ts"), "// changed\n");
     const updated = await prepareModuleGitRelease({ ...f, hostTimestamp: "1735776000" });
     expect(updated.modules[0]!.commit).not.toBe(first.modules[0]!.commit);
     expect(git(join(f.seedDir, "repos/web.git"), ["rev-parse", `${updated.modules[0]!.commit}^`])).toBe(first.modules[0]!.commit);
@@ -66,11 +68,13 @@ test("clean seed generation is deterministic and rejects mismatched packaged cod
   try {
     const first = await prepareModuleGitRelease(f), again = await prepareModuleGitRelease(second);
     expect(first).toEqual(again);
-    const source = join(f.resourcesRoot, "external/coding/contract.js");
-    await writeFile(source, "// generated after seed\n");
-    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("differs from packaged source");
-    await rm(source);
-    const license = join(f.resourcesRoot, "builtin/web/LICENSE");
+    for (const name of ["coding", "mind"]) {
+      const source = join(f.resourcesRoot, `external/${name}/contract.js`);
+      await writeFile(source, "// generated after seed\n");
+      await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow(`Module seed differs from packaged source: ${name}`);
+      await rm(source);
+    }
+    const license = join(f.resourcesRoot, "external/web/LICENSE");
     await writeFile(license, "wrong license\n");
     await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("differs from packaged source");
     await writeFile(license, await readFile(join(f.root, "LICENSE")));
@@ -103,7 +107,7 @@ test.skipIf(process.platform === "win32")("public upstream verification never ma
     await expect(verifyPublishedModuleGitRelease(f.seedDir)).rejects.toThrow("Public module upstream is not at the packaged commit");
     expect(await readFile(join(f.seedDir, "lock.json"), "utf8")).toBe(before);
     await writeFile(join(bin, "gh"), publicGh);
-    const cases = lock.modules.map(entry => `*chrona-module-${entry.name}*) printf '${entry.commit}\\trefs/heads/main\\n';;`).join("\n");
+    const cases = lock.modules.map(entry => `*"https://github.com/chrona-core/chrona-module-${entry.name} refs/heads/main") printf '${entry.commit}\\trefs/heads/main\\n';;`).join("\n");
     await writeFile(join(bin, "git"), `#!/bin/sh\ncase "$*" in\n${cases}\n*) exit 1;;\nesac\n`);
     await chmod(join(bin, "git"), 0o755);
     const verified = await verifyPublishedModuleGitRelease(f.seedDir);

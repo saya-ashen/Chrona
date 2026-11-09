@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { isEntryModule } from "@chrona/contracts/steward";
 import * as outputs from "../system-outputs";
 import { CallError, type Caller, type SystemModule } from "../module-calls";
 import type { StewardPorts } from "../ports";
@@ -7,17 +6,14 @@ import { runtimeHealth } from "../runtime-health";
 import { createProviderControl } from "../provider-channel";
 import { activityRecords, activityRecordsOutput } from "../activity";
 import { acknowledgeKernelFacts, factConsumer, kernelFactSchema, readKernelFacts, selectFactConsumer, withdrawnKernelKeys } from "../notification-facts";
-import { tool, text, json, callerManifest } from "./shared";
+import { tool, text, json, requireOwner } from "./shared";
 
 const consumerInput = z.object({ module: z.string().min(1).nullable().optional() }).strict();
 const ackInput = z.object({ revision: z.string().min(1), ids: z.array(z.string().min(1)).min(1).max(100) }).strict();
 const withdrawalsInput = z.object({ revision: z.string().min(1), keys: z.array(z.string().max(4000)).min(1).max(100) }).strict();
 const consumerOutput = z.object({ moduleId: z.string().nullable(), revision: z.string() });
 async function consumer(ports: StewardPorts, workspaceId: string, caller: Caller, args: z.infer<typeof consumerInput>) {
-  if (caller.kind !== "owner") {
-    const manifest = caller.kind === "module" ? await callerManifest(ports.db, caller) : null;
-    if (!manifest?.uses.includes("*") || !isEntryModule(manifest)) throw new CallError("forbidden", "Only an owner entry may select a fact consumer");
-  }
+  await requireOwner(ports.db, workspaceId, caller);
   return args.module === undefined ? factConsumer(ports.db, workspaceId) : selectFactConsumer(ports.db, workspaceId, args.module, ports.now());
 }
 /** Governed audit and finite facts only. Applications own wording, aggregation and delivery. */

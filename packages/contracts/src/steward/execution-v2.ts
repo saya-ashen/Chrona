@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { executionBaselineSchema, executionCommandSchema, executionIdSchema, executionErrorSchema, executionRefSchema, executionResultSchema, executionStartSchema, executionViewSchema } from "./execution";
-import { editorResponseDataSchemas } from "./execution-events";
+import { executionResponseDataSchemas } from "./execution-events";
 
 /** P2 work protocol. v1 execution envelopes and fixtures remain exact. */
 export const WORK_PROTOCOL = "chrona.execution.v2" as const;
@@ -55,16 +55,14 @@ export const workCleanupReceiptSchema = z.object({ workId: id, workspaceRef: id,
 export const workResponseDataSchemas = {
   start: workViewSchema, get: workViewSchema, lookup_start: workViewSchema,
   list: z.union([z.object({ resource: z.literal("works"), works: z.array(workViewSchema).max(100), after: id.nullable() }).strict(), z.object({ resource: z.literal("locations"), locations: z.array(workLocationSchema).max(100), after: id.nullable() }).strict()]),
-  send: editorResponseDataSchemas.send, answer: editorResponseDataSchemas.answer, cancel: workViewSchema, attach: workViewSchema,
-  detach: editorResponseDataSchemas.detach, events: editorResponseDataSchemas.events, snapshot: editorResponseDataSchemas.snapshot,
-  results: workResultsSchema, accept: editorResponseDataSchemas.accept,
+  send: executionResponseDataSchemas.send, answer: executionResponseDataSchemas.answer, cancel: workViewSchema, attach: workViewSchema,
+  detach: executionResponseDataSchemas.detach, events: executionResponseDataSchemas.events, snapshot: executionResponseDataSchemas.snapshot,
+  results: workResultsSchema, accept: executionResponseDataSchemas.accept,
 } as const;
 export const workResponseEnvelopeSchema = z.discriminatedUnion("ok", [
   z.object({ v: z.literal(WORK_PROTOCOL), requestId: id, ok: z.literal(true), data: z.union([workResponseDataSchemas.start, workResponseDataSchemas.list, workResponseDataSchemas.send, workResponseDataSchemas.events, workResponseDataSchemas.snapshot, workResponseDataSchemas.results, workResponseDataSchemas.accept]) }).strict(),
   z.object({ v: z.literal(WORK_PROTOCOL), requestId: id, ok: z.literal(false), error: executionErrorSchema }).strict(),
 ]).refine(value => new TextEncoder().encode(JSON.stringify(value)).byteLength <= WORK_LIMITS.responseBytes, "Work response exceeds byte budget");
-/** All v2 operations, including events, use this path; there is no v2 GET fallback. */
-export const WORK_HTTP = { method: "POST", commands: "/api/editor/v1/commands" } as const;
 export type WorkRequest = z.infer<typeof workRequestSchema>;
 /** Parse each response once against its originating op, then bind correlation and execution identity. */
 export function parseWorkResponse(request: WorkRequest, raw: unknown) {

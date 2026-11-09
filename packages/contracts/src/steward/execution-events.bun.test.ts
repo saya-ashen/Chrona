@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test";
 import cases from "../../fixtures/executions-v1/cases.json";
-import { executionEventSchema, executionEventBatchSchema, executionJsonBytes, executionSnapshotSchema, editorResponseSchema, executionClientMessageSchema } from "./execution-events";
+import { executionErrorSchema } from "./execution";
+import { executionEventSchema, executionEventBatchSchema, executionJsonBytes, executionSnapshotSchema, executionResponseDataSchemas, executionClientMessageSchema } from "./execution-events";
 for (const sample of cases.events) test(`event fixture: ${sample.name}`, () => {
   expect(executionEventSchema.safeParse(sample.value).success).toBe(sample.valid);
 });
 for (const sample of cases.responses) test(`response fixture: ${sample.name}`, () => {
-  expect(editorResponseSchema.safeParse(sample.value).success).toBe(sample.valid);
+  const schema = sample.op === "error" ? executionErrorSchema : executionResponseDataSchemas[sample.op as keyof typeof executionResponseDataSchemas];
+  expect(schema.safeParse(sample.value).success).toBe(sample.valid);
 });
 test("client message uses normalized fields without Pi raw; empty arrays/null stay distinct", () => {
   expect(executionClientMessageSchema.parse(cases.normalizedUi.message).message.content[0]?.text).toBe("你好 🐱");

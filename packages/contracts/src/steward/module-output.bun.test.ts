@@ -27,8 +27,8 @@ test.each([
   expect(moduleOutputSchema.safeParse(schema).success).toBe(false);
 });
 
-test("legacy tool output stays optional in stored manifests", () => {
-  const manifest = { name: "fixture", entry: "index.ts", triggers: [], effects: [], tests: ["test.ts"], tools: [
+test("tool output stays optional in strict manifests", () => {
+  const manifest = { name: "fixture", entry: "index.ts", effects: [], tests: ["test.ts"], tools: [
     { name: "get", description: "Read", parameters: { type: "object" } },
   ] };
   expect(moduleManifestSchema.parse(manifest).tools[0]!.output).toBeUndefined();

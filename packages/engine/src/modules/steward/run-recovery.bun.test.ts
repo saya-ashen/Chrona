@@ -15,7 +15,7 @@ beforeEach(async () => {
   workspaceId = (await db.workspace.create({ data: { name: "recovery" } })).id;
   ports = { db, dataDir: await mkdtemp(join(tmpdir(), "chrona-recovery-")), now: () => time, publicUrl: null };
   const module = await db.module.create({ data: { workspaceId, name: "recovery-app", activeHash: "hash", status: "active" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "recovery-app", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "recovery-app", entry: "index.ts", keepAlive: true, effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
   principal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   sessionId = (await admitContextPrimitive(ports, principal, "context", { requestKey: "context" }) as { contextId: string }).contextId;
 });
@@ -74,7 +74,7 @@ test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as con
   const facts = await db.audit.findMany({ where: { kind: "kernel_fact_pending" } });
   if (["failed", "timed_out", "unavailable"].includes(outcome)) {
     expect(facts).toHaveLength(1);
-    expect(facts[0]!.details).toMatchObject({ type: "lifecycle", data: { key: `build-paused:${run.id}`, session: build.id, fact: { kind: "build-paused", status, outcome: status } } });
+    expect(facts[0]!.details).toMatchObject({ type: "lifecycle", data: { key: `build-paused:${run.id}`, session: build.id, fact: { kind: "build-paused", status } } });
   } else expect(facts).toHaveLength(0);
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
 });

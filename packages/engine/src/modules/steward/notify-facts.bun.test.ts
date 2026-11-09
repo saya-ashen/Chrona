@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { openStore } from "./builtin/notify/store";
-import { createNotify } from "./builtin/notify/notify";
-import { ingestKernelFacts } from "./builtin/notify/facts";
+import { openStore } from "./external/notify/store";
+import { createNotify } from "./external/notify/notify";
+import { ingestKernelFacts } from "./external/notify/facts";
 import { testDb } from "./test-db";
 import { acknowledgeKernelFacts, readKernelFacts, recordApprovalFact, recordWithdrawal, seedFactConsumer, selectFactConsumer, withdrawnKernelKeys } from "./notification-facts";
 
@@ -26,7 +26,26 @@ test("notification preferences persist privately and reject malformed changes wi
   }
   expect(store.rows("SELECT * FROM notifications")).toEqual([]);
 });
-function notice(id: string, key = id): Fact { return { id, at: "2026-11-08T12:00:00Z", type: "notice", data: { key, title: "完成", body: "正文", level: "now", responds: true } }; }
+function notice(id: string, key = id): Fact { return { id, at: "2026-11-08T12:00:00Z", type: "lifecycle", data: { key, fact: { kind: "module-paused", app: key } } }; }
+test("Notify renders structural runtime facts and chooses alert and activation policy locally", async () => {
+  const { store, notify, now } = await fixture();
+  notify.handle("settings", { settings: JSON.stringify({ dailyCap: 0, timezone: "UTC", digestAt: "18:00", quietHours: null }) }, { kind: "owner", via: null }, now);
+  const facts: Fact[] = [
+    { id: "input", at: now.toISOString(), type: "notice", data: { key: "provider:run-a", kind: "provider-input-required", run: "run-a", session: "session-a" } },
+    { id: "activation", at: now.toISOString(), type: "lifecycle", data: { key: "activation", module: "module-a", fact: { kind: "module-activated", app: "app-a", update: true, hash: "hash-a" } } },
+  ];
+  let accepted = false;
+  expect(await ingestKernelFacts(store, notify, async (target, args) => {
+    if (target === "activity.facts") return { revision: "r", facts: accepted ? [] : facts };
+    if (target === "activity.withdrawals") return { withdrawn: [] };
+    accepted = true; return { acknowledged: args.ids };
+  }, now)).toBe(true);
+  expect(store.byKey("provider:run-a")).toMatchObject({ title: "处理需要你的输入", level: "now", status: "queued", session_id: "session-a" });
+  expect(store.byKey("provider:run-a")?.body).toContain("run-a");
+  expect(store.byKey("activation")).toMatchObject({ title: "应用 app-a 已自动更新", level: "digest", status: "folded" });
+  expect(store.byKey("activation")?.body).toContain("hash-a");
+  expect(store.get("kernel-facts:staged")).toBeNull();
+});
 test("lost ACK reply retains private staging and recovery never duplicates delivery", async () => {
   const { store, notify, now, create } = await fixture(), fact = notice("one");
   let consumed = false, loseReply = true;
@@ -115,7 +134,6 @@ for (const recovery of ["2026-11-08T23:00:00Z", "2026-11-09T12:00:00Z"]) test(`b
   notify.handle("configure", { "daily-cap": 1, timezone: "UTC", "digest-at": "18:00", "quiet-start": "22:00", "quiet-end": "08:00", at: now.toISOString() }, { kind: "kernel" }, now);
   const recovered = new Date(recovery);
   notify.handle("send", { key: "already-today", title: "已用限额", body: "正文", level: "now" }, { kind: "kernel" }, recovered);
-  fact.data.responds = false;
   let accepted = false;
   expect(await ingestKernelFacts(store, notify, async (target, args) => {
     if (target === "activity.facts") return { revision: "r", facts: accepted ? [] : [fact] };

@@ -3,6 +3,7 @@ import { checkoutModule, snapshotModule } from "./module-files";
 import { readVersionSource, versionSource } from "./module-source";
 import { moduleModelSettings } from "./settings";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
+import { ModuleUnavailableError } from "./module-availability";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
@@ -10,11 +11,11 @@ import { addsOAuthDefinitions } from "./oauth-definition";
 import { join } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
-import { createRuns, createRunSession } from "./runs";
 import { notifyLifecycle } from "./notify-user";
 import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
-import { isGroupCandidate, recordGroupReview } from "./module-group";
+import { advanceFixedCandidateSet, isGroupCandidate, recordGroupReview } from "./module-group";
+import { findCandidateSet } from "./module-candidate-records";
 import { dataEmpty } from "./module-data";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
@@ -22,7 +23,7 @@ import { audit } from "./audit";
 import { smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
-import { moduleToolExampleError } from "./module-calls";
+import { moduleToolExampleError } from "./module-tool-contract";
 import { codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
@@ -109,6 +110,7 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
   await context.db.$transaction(async tx => {
+    if (await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version)) throw new StewardError("conflict", "Fixed candidates activate only through their receipt");
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
     if (current.status === "migrating" || current.activeHash !== module.activeHash) throw new Error("Module changed during build; submit again");
     await expireModuleApprovals(context, module.id, tx);
@@ -119,6 +121,12 @@ async function activateChecked(context: ModuleContext, { version, module }: Revi
     await activationNotice(context, tx, version, update);
   });
   await supersedeCandidates(context, module.id, hash);
+}
+async function groupReview(context: ModuleContext, { version, module, report }: Review, parts: Parameters<typeof recordGroupReview>[2]): Promise<Proposal | null> {
+  if (!await recordGroupReview(context, version, parts)) return null;
+  const set = await advanceFixedCandidateSet(context, version);
+  const status = set?.state === "approved" ? "approved" : set?.state === "rejected" ? "rejected" : "pending_review";
+  return { moduleId: module.id, hash: version.hash, status, ...(set?.approvalId ? { approvalId: set.approvalId } : {}), report };
 }
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
@@ -134,12 +142,13 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected", report: json(report) } });
     return { moduleId: module.id, hash, status: "rejected", report };
   }
-  await expireModuleApprovals(context, module.id);
-  await supersedeCandidates(context, module.id, hash);
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${module.name}`,
     detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
-  if (await recordGroupReview(context, version, { ...parts, detail: card.detail, needsMigration: review.needsMigration })) return { moduleId: module.id, hash, status: "pending_review", report };
+  const group = await groupReview(context, review, { ...parts, detail: card.detail, needsMigration: review.needsMigration });
+  if (group) return group;
+  await expireModuleApprovals(context, module.id);
+  await supersedeCandidates(context, module.id, hash);
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
@@ -148,7 +157,6 @@ async function modelManifestError(context: ModuleContext, manifest: ReturnType<t
   const workspace = await context.db.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } });
   const limits = moduleModelSettings(workspace.settings);
   return !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
-    : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
     : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
 }
 async function validateBuildManifest(context: ModuleContext, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -165,8 +173,8 @@ async function validateBuildManifest(context: ModuleContext, version: ModuleVers
   return { moduleId: version.moduleId, hash: version.hash, status: "rejected" as const, report };
 }
 export async function activationNotice(context: ModuleContext, tx: Parameters<typeof notifyLifecycle>[0], version: ModuleVersion, update: boolean) {
-  const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await notifyLifecycle(tx, context.ports, context.workspaceId, `module-auto-activated:${version.id}`, { kind: "module-activated", app: manifest.name, update, changes: intent.changes, preserves: intent.preserves, hash: version.hash, module: version.moduleId });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  await notifyLifecycle(tx, context.ports, context.workspaceId, `module-auto-activated:${version.id}`, { kind: "module-activated", app: manifest.name, update, hash: version.hash, module: version.moduleId });
 }
 /** v2-25: tests run only on an entry that type-checks against the SDK and call contracts. */
 async function typecheckAndTest(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -214,7 +222,7 @@ async function checkDependentCallers(context: ModuleContext, manifest: ReturnTyp
       report.dependentChecks.push({ caller: caller.name, status: "skipped", reason: "active caller manifest unavailable" });
       continue;
     }
-    const checked = await typecheckBuild(context, join(context.store, caller.activeHash!), source.data, { moduleName: manifest.name, manifest });
+    const checked = await typecheckBuild(context, join(context.store, caller.activeHash!), source.data, { moduleName: manifest.name, manifest, builtinCaller: caller.builtin && caller.name === "agent" });
     report.dependentChecks.push({ caller: caller.name, status: checked.status, ...(checked.reason ? { reason: checked.reason } : {}), ...(checked.errors ? { errors: checked.errors } : {}) });
     if (checked.status === "failed") return false;
   }
@@ -282,10 +290,7 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
     // Keep continuity diagnostics visible even when successful tests printed a lot.
     const summary = result.report.continuity ? { continuity: result.report.continuity } : result.report;
     const publicReport = JSON.stringify(summary, (key, value: unknown) => ["stdout", "stderr"].includes(key) && typeof value === "string" ? value.slice(0, 1500) : value);
-    await db.$transaction(async tx => {
-      const session = await createRunSession(tx, workspaceId, "module", ports.now(), { moduleId: module.id });
-      await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", label: module.name, prompt: `Module ${module.name} build failed (untrusted test output):\n${publicReport.slice(0, 8000)}` }, tx);
-    });
+    await audit(db, { workspaceId, actor: "chrona", kind: "module_build_failed", subjectId: module.id, details: { versionId: version.id, hash: version.hash, report: publicReport.slice(0, 8000) } });
   }
 }
 function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
@@ -294,20 +299,29 @@ function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
 }
 async function recoverReview(context: ModuleContext, version: ModuleVersion) {
   const { db, workspaceId } = context;
+  const fixed = await findCandidateSet(context, version);
+  if (fixed) {
+    const set = await advanceFixedCandidateSet(context, version);
+    if (!set || set.state !== "submitted") return;
+  }
   const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
   const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
-  if (latest?.id !== version.id || latest.status !== "pending_review" || await isGroupCandidate(context, version)) return;
+  if (version.status !== "pending_review" || (!fixed && (latest?.id !== version.id || await isGroupCandidate(context, version)))) return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
   if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
   if (module.activeHash === version.hash) return;
+  const review = await recoveredReviewMaterial(context, version, module);
+  if (review) await requestReview(context, review);
+}
+async function recoveredReviewMaterial(context: ModuleContext, version: ModuleVersion, module: Review["module"]): Promise<Review | null> {
   const report = version.report as BuildReport | null;
-  if (!report?.continuity) return;
+  if (!report?.continuity) return null;
   const source = await versionSource(context, version);
   const files = source.files;
   report.git = source.revision;
   const manifest = moduleManifestSchema.parse(version.manifest);
   const needsMigration = module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id));
-  await requestReview(context, { version, module, report, files, needsMigration });
+  return { version, module, report, files, needsMigration };
 }
 const recoveringReviews = new WeakMap<ModuleContext["db"], Set<string>>();
 /** Repair only never-created standalone reviews; a resolved/expired card is a deliberate decision, not a retry. */
@@ -318,12 +332,13 @@ async function recoverReviews(context: ModuleContext) {
   if (running.has(workspaceId)) return;
   running.add(workspaceId);
   try {
-    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: "pending_review" } });
+    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: { in: ["pending_review", "rejected"] } } });
     for (const version of candidates) {
       try {
+        if (version.status === "rejected") { await advanceFixedCandidateSet(context, version); continue; }
         await recoverReview(context, version);
       } catch (error) {
-        if (error instanceof ModuleIdentityError) {
+        if (error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError) {
           await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
           await expireModuleApprovals(context, version.moduleId);
           continue;
@@ -350,12 +365,13 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
     let result: Proposal, identityRejected = false;
     try { result = await buildVersion(context, version); }
     catch (error) {
-      if (!(error instanceof ModuleIdentityError)) throw error;
+      if (!(error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError)) throw error;
       identityRejected = true;
       const report: BuildReport = { tests: [], errors: [String(error).slice(0, 4000)] };
       await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
       result = { moduleId: version.moduleId, hash: version.hash, status: "rejected", report };
     }
+    await advanceFixedCandidateSet(context, version);
     if (result.status === "rejected" && version.source === "provider" && !identityRejected) await reportFailure(context, version, result);
   }
 }

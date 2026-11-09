@@ -7353,8 +7353,9 @@ var moduleToolSchema = preprocess(withoutCallers, object({
   idempotent: boolean2().default(false)
 }).strict());
 // packages/contracts/src/steward/module-lifecycle.ts
-var PREINSTALLED_MODULE_NAMES = ["qq", "remind", "mind"];
-var OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor", "mcp", "files", "events"];
+var PREINSTALLED_MODULE_NAMES = ["web", "notify", "qq", "author"];
+var OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind"];
+var INITIALIZATION_MODULE_NAMES = ["web", "notify", "qq", "author", "remind", "mind"];
 var OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES];
 var moduleVersionHashSchema = string2().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 var moduleOriginSchema = _enum(["kernel", "builtin", "external"]);
@@ -7386,20 +7387,10 @@ var moduleInstallResultSchema = object({
   approvalId: string2().nullable(),
   error: object({ code: _enum(["invalid", "forbidden", "conflict", "not_found", "failed", "unavailable"]), reason: string2(), message: string2() }).strict().nullable()
 }).strict();
-var modulePackageCatalogSchema = array(object({
-  name: _enum(OFFICIAL_EXTERNAL_MODULE_NAMES),
-  description: string2().nullable(),
-  available: boolean2(),
-  releaseHash: string2().nullable(),
-  moduleId: string2().nullable(),
-  installation: moduleInstallResultSchema.nullable(),
-  error: string2().nullable(),
-  git: object({ repository: string2().nullable(), branch: string2(), commit: string2().regex(/^[a-f0-9]{40}$/) }).strict().nullable().default(null)
-}).strict());
 var moduleInitializationStateSchema = object({
   version: literal(1),
   status: _enum(["pending", "complete"]),
-  packages: record(_enum(PREINSTALLED_MODULE_NAMES), object({
+  packages: record(_enum(INITIALIZATION_MODULE_NAMES), object({
     requestKey: string2(),
     attempts: number2().int().min(1),
     status: _enum(["pending", "building", "pending_approval", "installed", "failed", "unavailable", "skipped"]),
@@ -7466,7 +7457,6 @@ var providerRunViewSchema = object({
   updatedAt: iso
 }).strict();
 // packages/contracts/src/steward/execution.ts
-var EXECUTION_PROTOCOL = "chrona.execution.v1";
 var executionIdSchema = string2().min(1).max(128).regex(/^[\w:.-]+$/);
 var id2 = executionIdSchema;
 var executionRefSchema = object({ workId: id2, sessionId: id2, runId: id2, attemptId: id2 }).strict();
@@ -7543,7 +7533,6 @@ var executionInputSchemas = {
   results: results.omit({ op: true }),
   accept: accept.omit({ op: true })
 };
-var editorRequestSchema = object({ v: literal(EXECUTION_PROTOCOL), requestId: id2, command: executionCommandSchema }).strict();
 var executionBaselineSchema = object({ kind: _enum(["commit", "snapshot"]), digest: string2().min(1).max(128) }).strict();
 var executionResultSourceInputSchema = object(target).strict();
 var EXECUTION_CHANGES_LIMITS = { bytes: 131072, files: 100, fileBytes: 65536, timeoutMs: 5000 };
@@ -7640,7 +7629,7 @@ var executionClientMessageSchema = object({
 var executionAcceptedSchema = object({ accepted: literal(true) }).strict();
 var executionListSchema = object({ works: array(executionViewSchema).max(100), after: executionIdSchema.nullable() }).strict();
 var executionResultsSchema = object({ results: array(executionResultSchema).max(100) }).strict();
-var editorResponseDataSchemas = {
+var executionResponseDataSchemas = {
   start: executionViewSchema,
   get: executionViewSchema,
   lookup_start: executionViewSchema,
@@ -7655,29 +7644,6 @@ var editorResponseDataSchemas = {
   snapshot: executionSnapshotSchema,
   results: executionResultsSchema
 };
-var eventsFields = executionInputSchemas.events.shape;
-var editorEventsQuerySchema = object({
-  v: literal(EXECUTION_PROTOCOL),
-  requestId: executionIdSchema,
-  workId: eventsFields.workId,
-  runId: eventsFields.runId,
-  attemptId: eventsFields.attemptId,
-  cursor: eventsFields.cursor,
-  limit: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.limit),
-  waitMs: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.waitMs)
-}).strict();
-var editorResponseSchema = discriminatedUnion("ok", [
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(true), data: union([
-    executionViewSchema,
-    executionEventPageSchema,
-    executionSnapshotSchema,
-    executionCapabilitiesSchema,
-    executionAcceptedSchema,
-    executionListSchema,
-    executionResultsSchema
-  ]) }).strict(),
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(false), error: executionErrorSchema }).strict()
-]);
 // packages/contracts/src/steward/execution-v2.ts
 var WORK_PROTOCOL = "chrona.execution.v2";
 var WORK_LIMITS = { children: 20, sourceFiles: 100, sourceBytes: 32768, requestBytes: 262144, responseBytes: 262144, queueMs: 86400000 };
@@ -7744,15 +7710,15 @@ var workResponseDataSchemas = {
   get: workViewSchema,
   lookup_start: workViewSchema,
   list: union([object({ resource: literal("works"), works: array(workViewSchema).max(100), after: id3.nullable() }).strict(), object({ resource: literal("locations"), locations: array(workLocationSchema).max(100), after: id3.nullable() }).strict()]),
-  send: editorResponseDataSchemas.send,
-  answer: editorResponseDataSchemas.answer,
+  send: executionResponseDataSchemas.send,
+  answer: executionResponseDataSchemas.answer,
   cancel: workViewSchema,
   attach: workViewSchema,
-  detach: editorResponseDataSchemas.detach,
-  events: editorResponseDataSchemas.events,
-  snapshot: editorResponseDataSchemas.snapshot,
+  detach: executionResponseDataSchemas.detach,
+  events: executionResponseDataSchemas.events,
+  snapshot: executionResponseDataSchemas.snapshot,
   results: workResultsSchema,
-  accept: editorResponseDataSchemas.accept
+  accept: executionResponseDataSchemas.accept
 };
 var workResponseEnvelopeSchema = discriminatedUnion("ok", [
   object({ v: literal(WORK_PROTOCOL), requestId: id3, ok: literal(true), data: union([workResponseDataSchemas.start, workResponseDataSchemas.list, workResponseDataSchemas.send, workResponseDataSchemas.events, workResponseDataSchemas.snapshot, workResponseDataSchemas.results, workResponseDataSchemas.accept]) }).strict(),
@@ -7767,7 +7733,7 @@ var executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map((
   description: `Execution ${name}`,
   parameters: { type: "object", properties: {}, required: [] },
   input: executionInputSchemas[op],
-  output: editorResponseDataSchemas[op],
+  output: executionResponseDataSchemas[op],
   visibility: ["owner", "modules"],
   idempotent: true
 })), {
@@ -8013,9 +7979,35 @@ var runtimeEventSchema = discriminatedUnion("kind", [
   object({ kind: literal("question"), requestId: string2().uuid(), value: providerQuestionSchema }).strict(),
   object({ kind: literal("interrupt"), requestId: string2().uuid() }).strict()
 ]);
+// packages/contracts/src/steward/module-candidates.ts
+var id5 = string2().min(1).max(128);
+var requestKey = string2().trim().min(1).max(120);
+var name = string2().regex(/^[a-z][a-z0-9-]*$/).max(64);
+var relativeDir = string2().min(1).max(500).refine((value) => !value.startsWith("/") && !value.includes("\\") && !value.includes("\x00") && value.split("/").every((part) => part && part !== "." && part !== ".." && part !== ".git"), "Expected a relative content directory");
+var candidateSubmitterSchema = object({ moduleId: id5, hash: moduleVersionHashSchema }).strict();
+var candidateTargetSchema = object({ name, moduleId: id5.nullable(), expectedActiveHash: moduleVersionHashSchema.nullable() }).strict().refine((target) => target.moduleId !== null || target.expectedActiveHash === null, "New targets cannot have an active hash");
+var candidateAdmissionInputSchema = object({ requestKey, submitter: candidateSubmitterSchema, targets: array(candidateTargetSchema).min(1).max(4) }).strict().refine((input) => new Set(input.targets.map((target) => target.name)).size === input.targets.length && new Set(input.targets.flatMap((target) => target.moduleId ? [target.moduleId] : [])).size === input.targets.filter((target) => target.moduleId).length, "Targets must be unique");
+var candidateIntentSchema = object({ changes: array(string2().trim().min(1).max(500)).min(1).max(20), preserves: array(string2().trim().min(1).max(500)).max(20).default([]) }).strict();
+var candidateSubmitInputSchema = object({ admissionId: id5, requestKey, items: array(object({ name, dir: relativeDir, intent: candidateIntentSchema }).strict()).min(1).max(4) }).strict().refine((input) => new Set(input.items.map((item) => item.name)).size === input.items.length, "Items must be unique");
+var candidateSourceInputSchema = object({ admissionId: id5, moduleId: id5, hash: moduleVersionHashSchema, to: relativeDir }).strict();
+var candidateCheckInputSchema = union([
+  object({ receiptId: id5 }).strict(),
+  object({ admissionId: id5, requestKey }).strict()
+]);
+var candidateAdmissionOutputSchema = object({ admissionId: id5, requestKey, submitter: candidateSubmitterSchema, targets: array(candidateTargetSchema).min(1).max(4) }).strict();
+var candidateSourceOutputSchema = object({ moduleId: id5, hash: moduleVersionHashSchema, materialDigest: string2().regex(/^[a-f0-9]{64}$/) }).strict();
+var candidateReceiptSchema = object({
+  receiptId: id5,
+  admissionId: id5,
+  requestKey,
+  submitter: candidateSubmitterSchema,
+  state: _enum(["submitted", "pending_approval", "approved", "rejected"]),
+  approvalId: id5.nullable(),
+  members: array(object({ name, moduleId: id5, hash: moduleVersionHashSchema, versionId: id5, expectedActiveHash: moduleVersionHashSchema.nullable(), materialDigest: string2().regex(/^[a-f0-9]{64}$/), status: _enum(["building", "testing", "pending_review", "approved", "rejected"]), selected: boolean2() }).strict()).min(1).max(4)
+}).strict();
 
 // packages/contracts/src/steward/index.ts
-var id5 = string2().trim().min(1).max(128);
+var id6 = string2().trim().min(1).max(128);
 var iso3 = string2().datetime({ offset: true }).max(40);
 var short = string2().trim().min(1).max(200);
 var text = string2().trim().min(1);
@@ -8029,25 +8021,9 @@ var RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "can
 var SCHEDULE_MODES = ["wake", "module"];
 var SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"];
 var APPROVAL_STATUSES = ["open", "approved", "denied", "expired"];
-var APPROVAL_SCOPES = ["once", "always"];
-var ACTIONS = [
-  "notify_user",
-  "schedule",
-  "activate_module",
-  "read_source",
-  "connect_source",
-  "send_external_message",
-  "modify_external",
-  "delete_data",
-  "share_third_party",
-  "purchase",
-  "change_credentials",
-  "access_host_path",
-  "change_policy"
-];
+var APPROVAL_SCOPES = ["once"];
+var ACTIONS = ["activate_module", "delete_data", "modify_external"];
 var GRANT_MODES = ["allow", "ask"];
-var NOTIFY_LEVELS = ["now", "digest", "web"];
-var NOTIFICATION_STATUSES = ["queued", "sent", "failed", "uncertain", "folded", "suppressed", "acknowledged"];
 var DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"];
 var RUN_LIMITS = {
   foregroundTimeoutMs: 5 * 60000,
@@ -8071,53 +8047,11 @@ var scheduleRuleSchema = discriminatedUnion("kind", [
   object({ kind: literal("every"), minutes: number2().int().min(5).max(10080) }).strict()
 ]);
 var MODULE_EFFECTS = ["network"];
-var EFFECT_USES = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
-function withoutRemovedFields(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return value;
-  const { channel: _channel, dynamicSchedules: _dynamicSchedules, ...manifest } = value;
-  if (!Array.isArray(manifest.effects))
-    return manifest;
-  const implied = manifest.effects.flatMap((effect) => typeof effect === "string" && EFFECT_USES[effect] ? [EFFECT_USES[effect]] : []);
-  const uses = Array.isArray(manifest.uses) ? manifest.uses : [];
-  return { ...manifest, effects: manifest.effects.filter((effect) => typeof effect !== "string" || !EFFECT_USES[effect]), ...implied.length ? { uses: [...new Set([...uses, ...implied])] } : {} };
-}
 var modelTier = string2().regex(/^[a-z][a-z0-9-]{1,20}$/);
 var RESERVED_LISTEN_PATHS = ["/api/steward", "/api/workspaces", "/api/health"];
-var moduleTriggerSchema = object({ id: slug, schedule: scheduleRuleSchema }).strict();
 var interfaceRefSchema = string2().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/);
 var listenPath = union([literal("/"), string2().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]);
 var listenPaths = (manifest) => manifest.listen === undefined ? [] : typeof manifest.listen === "string" ? [manifest.listen] : [...manifest.listen];
-var moduleSettingSchema = object({
-  type: _enum(["number", "string", "boolean"]),
-  label: string2().trim().min(1).max(60),
-  description: string2().max(300).optional(),
-  default: union([number2(), string2().max(2000), boolean2()]),
-  min: number2().optional(),
-  max: number2().optional(),
-  options: array(string2().max(100)).min(1).max(20).optional(),
-  maxLength: number2().int().min(1).max(2000).optional()
-}).strict().superRefine((setting, ctx) => {
-  for (const message of settingIssues(setting))
-    ctx.addIssue({ code: "custom", message });
-});
-function settingIssues(setting) {
-  return [
-    typeof setting.default !== setting.type && "default must match type",
-    setting.type !== "number" && (setting.min !== undefined || setting.max !== undefined) && "min/max are for numbers",
-    setting.type !== "string" && (setting.options || setting.maxLength) && "options/maxLength are for strings",
-    !settingValueValid(setting, setting.default) && "default is outside the declared bounds"
-  ].filter((message) => !!message);
-}
-function settingValueValid(setting, value) {
-  if (typeof value !== setting.type)
-    return false;
-  if (typeof value === "number")
-    return Number.isFinite(value) && (setting.min === undefined || value >= setting.min) && (setting.max === undefined || value <= setting.max);
-  if (typeof value === "string")
-    return (!setting.options || setting.options.includes(value)) && value.length <= (setting.maxLength ?? 2000);
-  return true;
-}
 var SECRET_NAME_SCHEMA = string2().regex(/^[a-z][a-z0-9_]{1,40}$/);
 var SECRET_FIELD_NAME = string2().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
 var secretLabel = string2().min(1).max(80);
@@ -8150,52 +8084,36 @@ var secretSpecSchema = object({
     authorizationParams: record(string2().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/), string2().max(2000)).refine((value) => !Object.keys(value).some((key) => ["response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method"].includes(key))).optional()
   }).strict().optional()
 }).strict();
-var moduleManifestSchema = preprocess(withoutRemovedFields, object({
+var moduleManifestSchema = object({
   name: slug,
   description: string2().min(1).max(300).optional(),
   entry: string2().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
-  triggers: array(moduleTriggerSchema).max(10),
   tools: array(moduleToolSchema).max(30).default([]),
   keepAlive: boolean2().default(false),
   activated: boolean2().default(false),
-  healthCheck: boolean2().default(false),
   content: boolean2().default(false),
   listen: union([listenPath, array(listenPath).min(1).max(4)]).optional(),
   uses: array(union([interfaceRefSchema, literal("*")])).max(40).default([]),
   packages: array(string2().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,80}$/)).max(20).default([]),
-  contributes: record(slug, json()).optional().refine((value) => value === undefined || JSON.stringify(value).length <= 32 * 1024, "contributes must be at most 32 KiB"),
   secrets: array(union([SECRET_NAME_SCHEMA, secretSpecSchema])).max(50).default([]),
   model: object({ tier: modelTier, maxCalls: number2().int().min(1).max(20), maxOutputTokens: number2().int().min(1).max(32000) }).strict().optional(),
   effects: array(_enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: record(slug, object({ type: _enum(["number", "string", "boolean"]), value: union([number2(), string2().max(2000), boolean2()]) }).strict()).default({}),
-  settings: record(slug, moduleSettingSchema).default({}).refine((value) => Object.keys(value).length <= 20, "At most 20 settings"),
   limits: object({ virtualMemoryMb: number2().int().min(1024).max(8192) }).strict().optional(),
   data: object({ schema: number2().int().min(1), migrate: string2().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
   tests: array(string2().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10)
 }).strict().superRefine((manifest, ctx) => {
-  for (const key of Object.keys(manifest.settings))
-    if (Object.hasOwn(manifest.params, key))
-      ctx.addIssue({ code: "custom", path: ["settings", key], message: "A setting cannot share its name with a param" });
-}).superRefine((manifest, ctx) => {
   for (const [key, param] of Object.entries(manifest.params)) {
     if (typeof param.value !== param.type)
       ctx.addIssue({ code: "custom", path: ["params", key, "value"], message: "Value must match parameter type" });
   }
-  const ids = new Set;
-  manifest.triggers.forEach((trigger, index) => {
-    if (ids.has(trigger.id))
-      ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
-    ids.add(trigger.id);
-  });
-  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive)
-    ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool or keepAlive" });
+  if (!manifest.tools.length && !manifest.keepAlive)
+    ctx.addIssue({ code: "custom", path: ["tools"], message: "A module needs a tool or keepAlive" });
   if (new Set(manifest.effects).size !== manifest.effects.length)
     ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   const names = secretNames(manifest);
   if (new Set(names).size !== names.length)
     ctx.addIssue({ code: "custom", path: ["secrets"], message: "Secret names must be unique" });
-  if (names.includes("qq_bot") && !isEntryModule(manifest))
-    ctx.addIssue({ code: "custom", path: ["secrets"], message: "qq_bot is only for entry modules (chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name))
     ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
 }).superRefine((manifest, ctx) => {
@@ -8207,8 +8125,8 @@ var moduleManifestSchema = preprocess(withoutRemovedFields, object({
     ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length)
     ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
-  if (grantedUses(manifest).some((target) => target === "provider.complete" || target === "agent.complete") !== !!manifest.model)
-    ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses provider.complete or agent.complete" });
+  if (grantedUses(manifest).some((target) => target === "agent.complete") !== !!manifest.model)
+    ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses agent.complete" });
   const names = new Set;
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name))
@@ -8220,12 +8138,10 @@ var moduleManifestSchema = preprocess(withoutRemovedFields, object({
       if (!(key in tool.parameters.properties))
         ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
   });
-}));
-var MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
-var isEntryModule = (manifest) => listenPaths(manifest).includes("/") || (manifest.uses ?? []).some((target) => target === "*" || target.startsWith("chat.") || target.startsWith("approvals.") && !MODULE_APPROVAL_TOOLS.includes(target));
+});
 var channelId = string2().min(1).max(64);
 var moduleResultSchema = json().optional().refine((value) => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 262144, "result must serialize to at most 256 KiB");
-var CALL_STATUSES = ["queued", "running", "succeeded", "failed", "unknown"];
+var CALL_STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "unknown"];
 var callerSchema = discriminatedUnion("kind", [
   object({ kind: literal("module"), module: slug, moduleId: string2().max(128), hash: string2().max(64) }).strict(),
   object({ kind: literal("provider"), runId: string2().max(128) }).strict(),
@@ -8255,8 +8171,7 @@ var moduleEventSchema = object({
       output: json().optional(),
       error: string2().max(2000).optional()
     }).strict(),
-    object({ kind: literal("activated"), id: literal("activated"), firedAt: iso3 }).strict(),
-    object({ kind: literal("health"), id: literal("health"), firedAt: iso3 }).strict()
+    object({ kind: literal("activated"), id: literal("activated"), firedAt: iso3 }).strict()
   ]),
   now: iso3,
   params: record(string2(), union([number2(), string2(), boolean2()]))
@@ -8279,7 +8194,11 @@ var MODULE_CALL_ERRORS = [
   "too_large",
   "capacity",
   "unsupported_version",
-  "unsupported"
+  "unsupported",
+  "unconfigured",
+  "budget_exceeded",
+  "provider_error",
+  "timeout"
 ];
 var moduleEventReplySchema = object({ id: channelId, result: object({ handled: boolean2().optional(), result: moduleResultSchema }).strict().default({}) }).strict().or(object({ id: channelId, error: string2().max(2000), errorCode: _enum(MODULE_CALL_ERRORS).optional() }).strict());
 var secretNames = (manifest) => (manifest.secrets ?? []).map((secret) => typeof secret === "string" ? secret : secret.name);
@@ -8287,7 +8206,7 @@ var SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.token"];
 function grantedUses(manifest) {
   return [...new Set([...manifest.uses ?? [], ...manifest.secrets?.length ? SECRET_TARGETS : []])];
 }
-var SYSTEM_MODULES = ["approvals", "modules", "settings", "schedules", "secrets", "activity", "projects"];
+var SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity"];
 var expectedModuleTargetSchema = object({ moduleId: string2().min(1), contractHash: string2().regex(/^[a-f0-9]{64}$/) }).strict();
 var moduleCallSchema = discriminatedUnion("method", [
   object({ id: channelId, method: literal("call"), params: object({
@@ -8306,12 +8225,12 @@ var moduleCallReplySchema = object({ id: channelId, result: union([
   object({ callId: string2().max(128), status: _enum(CALL_STATUSES), duplicate: boolean2().optional(), output: json().optional(), error: string2().max(2000).optional() }).strict()
 ]) }).strict().or(object({ id: channelId, error: object({ code: _enum(MODULE_CALL_ERRORS), message: string2().max(500) }).strict() }).strict());
 var scheduleSchema = object({
-  id: id5,
+  id: id6,
   mode: _enum(SCHEDULE_MODES),
   rule: scheduleRuleSchema,
   text: string2().max(4000),
-  originSessionId: id5.nullable(),
-  moduleId: id5.nullable(),
+  originSessionId: id6.nullable(),
+  moduleId: id6.nullable(),
   until: iso3.nullable(),
   status: _enum(SCHEDULE_STATUSES),
   nextAt: iso3.nullable(),
@@ -8322,13 +8241,13 @@ var scheduleSchema = object({
   createdAt: iso3
 }).strict();
 var sessionSchema = object({
-  id: id5,
+  id: id6,
   key: string2().max(200),
   source: _enum(SESSION_SOURCES),
   title: string2().max(200).nullable(),
   status: _enum(SESSION_STATUSES),
-  moduleId: id5.nullable(),
-  originSessionId: id5.nullable(),
+  moduleId: id6.nullable(),
+  originSessionId: id6.nullable(),
   focus: array(slug).max(10),
   running: boolean2(),
   lastActivityAt: iso3,
@@ -8336,7 +8255,7 @@ var sessionSchema = object({
   endedAt: iso3.nullable()
 }).strict();
 var appSchema = object({
-  id: id5,
+  id: id6,
   name: slug,
   description: string2().max(300).nullable(),
   status: _enum(["active", "paused"]),
@@ -8346,8 +8265,8 @@ var appSchema = object({
   capabilities: moduleCapabilitiesSchema
 }).strict();
 var runSchema = object({
-  id: id5,
-  sessionId: id5.nullable(),
+  id: id6,
+  sessionId: id6.nullable(),
   lane: _enum(RUN_LANES),
   trigger: _enum(RUN_TRIGGERS),
   status: _enum(RUN_STATUSES),
@@ -8362,19 +8281,19 @@ var runSchema = object({
 var contentRefSchema = string2().trim().min(3).max(542).regex(/^(?!chat\/)[a-z][a-z0-9-]{1,40}\//, "starts with an application name").refine((ref) => relativePathSchema.safeParse(ref.slice(ref.indexOf("/") + 1)).success, "invalid path");
 var attachmentSchema = object({ name: short, ref: contentRefSchema.nullable(), mime: string2().max(100), size: number2().int().min(0) }).strict();
 var messageSchema = object({
-  id: id5,
-  sessionId: id5,
+  id: id6,
+  sessionId: id6,
   direction: _enum(["in", "out"]),
   channel: _enum(DELIVERY_CHANNELS),
   text: string2().max(8000),
   attachments: array(attachmentSchema).max(10),
-  quotedMessageId: id5.nullable(),
+  quotedMessageId: id6.nullable(),
   at: iso3
 }).strict();
 var approvalSchema = object({
-  id: id5,
+  id: id6,
   action: _enum(ACTIONS),
-  moduleId: id5.nullable(),
+  moduleId: id6.nullable(),
   title: short,
   detail: string2().max(4000),
   preview: string2().max(20000),
@@ -8384,10 +8303,10 @@ var approvalSchema = object({
 }).strict();
 var grantScopeSchema = discriminatedUnion("kind", [
   object({ kind: literal("global") }).strict(),
-  object({ kind: literal("module"), moduleId: id5 }).strict()
+  object({ kind: literal("module"), moduleId: id6 }).strict()
 ]);
 var grantSchema = object({
-  id: id5,
+  id: id6,
   action: _enum(ACTIONS),
   mode: _enum(GRANT_MODES),
   scope: grantScopeSchema,
@@ -8397,48 +8316,21 @@ var grantSchema = object({
   createdAt: iso3,
   revokedAt: iso3.nullable()
 }).strict();
-var policyDecisionSchema = object({ action: _enum(ACTIONS), mode: _enum(GRANT_MODES), grantId: id5.nullable(), reason: string2().max(500) }).strict();
+var policyDecisionSchema = object({ action: _enum(ACTIONS), mode: _enum(GRANT_MODES), grantId: id6.nullable(), reason: string2().max(500) }).strict();
 var PREFERENCE_TOPICS = ["general", "ui"];
-var preferenceSchema = object({ id: id5, text: text.max(500), origin: _enum(["said", "learned"]), topic: _enum(PREFERENCE_TOPICS), createdAt: iso3, lastUsedAt: iso3.nullable() }).strict();
-var notificationChannelSchema = string2().min(1).max(120);
-var notificationSchema = object({
-  id: id5,
-  moduleId: id5.nullable(),
-  sessionId: id5.nullable(),
-  level: _enum(NOTIFY_LEVELS),
-  channel: notificationChannelSchema,
-  status: _enum(NOTIFICATION_STATUSES),
-  title: short,
-  body: string2().max(4000),
-  link: string2().max(2048).nullable(),
-  attempts: number2().int().min(0),
-  lastError: string2().max(500).nullable(),
-  createdAt: iso3,
-  sentAt: iso3.nullable(),
-  feedback: _enum(["useful", "not_useful"]).nullable()
-}).strict();
-var notificationSettingsSchema = object({ dailyCap: number2().int().min(0).max(50), quietHours: object({ start: hhmm, end: hhmm }).strict().nullable(), timezone: string2().min(1).max(80), digestAt: hhmm }).strict();
+var preferenceSchema = object({ id: id6, text: text.max(500), origin: _enum(["said", "learned"]), topic: _enum(PREFERENCE_TOPICS), createdAt: iso3, lastUsedAt: iso3.nullable() }).strict();
 var THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-var modelId = string2().trim().min(1).max(200);
-var modelTierTargetSchema = union([modelId, object({ model: modelId, thinking: _enum(THINKING_LEVELS).optional() }).strict()]);
 var moduleModelSettingsSchema = object({
-  models: record(modelTier, modelTierTargetSchema).refine((models) => Object.keys(models).length >= 1 && Object.keys(models).length <= 10, "Configure 1-10 model tiers").describe('Tier name \u2192 { model: exact provider/model id passed to Pi, thinking?: off..max }, e.g. { fast: { model: "openai/gpt-6-luna", thinking: "low" }, strong: { model: "openai/gpt-6.1-sol", thinking: "high" } }'),
   maxCallsPerEvent: number2().int().min(1).max(20),
   maxOutputTokens: number2().int().min(1).max(32000),
   dailyCalls: number2().int().min(1).max(1e4),
-  timeoutMs: number2().int().min(5000).max(600000),
+  eventTimeoutMs: number2().int().min(5000).max(600000),
   moduleDailyCalls: record(slug, number2().int().min(0).max(1e4)).optional()
 }).strict();
 var buildSettingsSchema = object({
   dailyLimit: number2().int().min(0).max(200),
   timeoutMinutes: number2().int().min(5).max(120),
   maxSubmissions: number2().int().min(1).max(20)
-}).strict();
-var memorySettingsSchema = object({ provider: slug.nullable(), autoRecall: boolean2(), autoRetain: boolean2() }).strict();
-var sessionSettingsSchema = object({ idleMinutes: number2().int().min(5).max(1440), minContextTokens: number2().int().min(0).max(1e6), maxContextTokens: number2().int().min(1e4).max(1e6) }).strict();
-var buildGovernanceSchema = object({
-  builds: buildSettingsSchema,
-  buildUsage: object({ date: string2(), timezone: string2(), used: number2().int().min(0), remaining: number2().int().min(0) }).strict()
 }).strict();
 var settingsSchema = object({
   timezone: string2().min(1).max(80),
@@ -8451,80 +8343,17 @@ var healthSchema = object({
   queuedRuns: number2().int().min(0),
   runningRuns: number2().int().min(0),
   failedRunsToday: number2().int().min(0),
-  dueSchedules: number2().int().min(0),
-  queuedNotifications: number2().int().min(0),
-  failedNotifications: number2().int().min(0),
   lastTickAt: iso3.nullable()
 }).strict();
-var todayViewSchema = object({
-  generatedAt: iso3,
-  approvals: array(approvalSchema),
-  upcoming: array(object({ scheduleId: id5, mode: _enum(SCHEDULE_MODES), label: string2().max(300).nullable(), at: iso3 }).strict()).max(50),
-  updates: array(notificationSchema).max(20),
-  apps: array(appSchema).max(200),
-  problems: array(object({
-    module: slug,
-    moduleId: id5,
-    incidentStatus: _enum(["retrying", "unresolved", "verifying"]).nullable(),
-    contractFailures: number2().int().min(0),
-    nextAction: string2().max(500).nullable(),
-    since: iso3.nullable()
-  }).strict()).max(20),
-  sessions: array(sessionSchema).max(20),
-  health: healthSchema
-}).strict();
-var chatReplySchema = object({ runId: id5.nullable(), sessionId: id5, messages: array(messageSchema) }).strict();
-var newSessionSchema = object({ key: string2().min(1).max(200) }).strict();
-var updateSessionSchema = object({ title: short.optional(), status: literal("ended").optional() }).strict();
-var createScheduleSchema = object({ mode: _enum(["wake"]), rule: scheduleRuleSchema, text: string2().max(4000), label: string2().trim().min(1).max(80).optional(), until: iso3.optional() }).strict();
-var moduleScheduleSchema = object({
-  key: string2().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
-  rule: scheduleRuleSchema,
-  label: string2().trim().min(1).max(80),
-  until: iso3.optional(),
-  payload: record(string2(), unknown()).refine((value) => JSON.stringify(value).length <= 4000, "payload must be at most 4000 characters of JSON")
-}).strict();
-var updateScheduleSchema = object({ status: _enum(["active", "paused", "cancelled"]) }).strict();
 var resolveApprovalSchema = object({ decision: _enum(["approve", "deny"]), scope: _enum(APPROVAL_SCOPES).default("once") }).strict();
 var createGrantSchema = object({ action: _enum(ACTIONS), mode: _enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso3.optional() }).strict();
 var updateSettingsSchema = object({ timezone: string2().min(1).max(80).optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 var chronaToolInputSchemas = {
   chrona_reply: object({ text: text.max(8000), files: array(relativePathSchema).max(10).default([]).describe("Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.") }).strict()
 };
-var moduleIntent = object({ changes: array(text.max(500)).min(1).max(20), preserves: array(text.max(500)).max(20).default([]) }).strict().describe("What this version changes and what it keeps (shown on the approval card)");
 var modulesToolInputSchemas = {
-  upstream: moduleUpstreamRequestSchema.describe("Read local and upstream Git status, explicitly fetch the configured upstream, or merge a pinned fetched commit through the checked proposal queue. Never changes active code directly; no caller-supplied repository, branch or host path."),
-  install: moduleInstallRequestSchema.describe("Explicitly install or update a named official external package from the running release. No host path or caller-supplied identity. Local source uses propose. Reuse requestKey after an uncertain receipt; never silently overwrite an installed or customized app."),
   reference: object({ target: string2().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/).optional() }).strict().describe("Read development reference only: without target, list available interfaces (target, source, one-line description); with <module>.<tool>, get its input schema, declared output schema/examples and admission rules. Never executes the target or reads its business data. Undeclared outputs are explicitly unknown, not inferred from empty results."),
-  check: object({
-    module: slug,
-    hash: moduleVersionHashSchema.optional().describe("Defaults to the newest version"),
-    wait: number2().int().min(0).max(600).default(0).describe("Seconds to wait while it is still being checked (set timeoutSeconds at least as long)")
-  }).strict().describe("A module version's status and check report (tests, errors, data continuity, key probe); waits while it is building or testing."),
-  checkout: object({
-    module: slug,
-    hash: moduleVersionHashSchema.optional(),
-    dir: relativePathSchema,
-    source: _enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation")
-  }).strict().refine((input) => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash").describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; it can be customized through the checked module lifecycle. Returns the exact source version; does not submit or activate it."),
-  propose: object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict().describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync\u2192result; async\u2192{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})\u2192{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})\u2192{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 \xA74): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})\u2192{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,authorizationUrl:HTTPS-without-query,tokenUrl:HTTPS-without-query,scopes:[...],accounts?,authorizationParams?:{key:value}}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration, new credentials and changed OAuth definitions require the owner decision. OAuth URLs and authorization extras are declared by the application; Google offline authorization uses authorizationParams:{access_type:"offline",prompt:"consent"}, and Microsoft refresh authorization includes offline_access in scopes.'),
-  rollback: object({ module: slug, hash: moduleVersionHashSchema }).strict().describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
-  "request-group": object({ versions: array(object({ module: slug, hash: moduleVersionHashSchema }).strict()).min(2).max(4) }).strict().describe("v2-15, build conversations that declared several modules: once every declared module has a candidate that passed its checks (pending_review), activate them all together; asks the user once only when one adds credentials. Versions needing a data migration are refused; build that module on its own first."),
-  "stop-build": object({ session: id5 }).strict().describe("Stop a module build conversation's queued/running work; keep its files and history. Already submitted versions and approvals are not withdrawn."),
-  "revise-build": object({
-    session: id5,
-    requirements: text.max(4000),
-    files: array(relativePathSchema).max(10).optional().describe("Additional required references from the calling Provider's cwd or content/chat/. Provider only; owner requests cannot supply filesystem paths.")
-  }).strict().describe("Stop the old module build run and queue a revision at the tail in the same conversation, preserving files and history. Providers may supplement references via files; missing files fail before stopping the old run. Existing approval decisions are unchanged. Returns runId and queuePosition; no automatic retry."),
-  build: object({
-    name: slug.optional().describe("The one module to write or change (or use modules)"),
-    modules: array(slug).min(1).max(4).optional().describe("v2-15: every module this one change touches (1-4), built together and activated together"),
-    goal: text.max(4000),
-    examples: array(text.max(1000)).max(10).default([]),
-    files: array(relativePathSchema).max(10).default([]).describe("Reference files (e.g. screenshots the user sent): attachments under content/chat/ or files in your working directory"),
-    intent: moduleIntent,
-    cause: object({ moduleId: id5, activationId: id5, incidentId: id5.optional(), topic: string2().regex(/^[\w:.-]{1,80}$/).optional() }).strict().refine((cause) => cause.incidentId === undefined !== (cause.topic === undefined), "Give either incidentId or topic").optional().describe("Only for an autonomous fix of a health fact (the ref from modules.health / the mind brief). While a build with the same cause is queued or running, that build is returned instead of a new one. Omit for anything the user asked for.")
-  }).strict().refine((input) => input.name === undefined !== (input.modules === undefined), "Give either name or modules").refine((input) => !input.modules || new Set(input.modules).size === input.modules.length, "modules must not repeat").describe("Queue a build conversation: a separate session writes, tests and submits the module(s), then reports back here. A change that spans several modules is one build with modules: [...], not several builds the user must activate in order. FIFO, one running and up to 10 waiting per workspace; waiting makes no model calls. Returns status (build_queued/build_running), sessionId, runId, queuePosition and aheadCount. Identical outstanding requests from this conversation reuse the build; an outstanding build with the same cause (any conversation) is returned with duplicate: true and charges no budget. Daily new-session allowance is charged at admission; runtime limits start at claim. No dependency ordering beyond FIFO and no automatic retry.")
+  rollback: object({ module: slug, hash: moduleVersionHashSchema }).strict().describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.')
 };
 var CHRONA_TOOLS = Object.keys(chronaToolInputSchemas);
 
@@ -8633,8 +8462,135 @@ function createAgentOperations(provider, data, input) {
   return { start, control, stop };
 }
 
+// packages/engine/src/modules/steward/builtin/agent/model-policy.ts
+import { randomUUID } from "crypto";
+import { mkdir as mkdir2, readFile as readFile2, rename as rename2, writeFile as writeFile2 } from "fs/promises";
+import { join as join2 } from "path";
+
+// packages/engine/src/modules/steward/builtin/agent/module-contracts.ts
+var operation = object({ operationId: string2().regex(/^[a-f0-9]{64}$/) }).strict();
+var moduleAgentInputs = {
+  health: object({}).strict(),
+  complete: object({ commandKey: executionIdSchema, prompt: string2().trim().min(1).max(200000), system: string2().max(20000).optional(), maxOutputTokens: number2().int().min(1).max(32000) }).strict(),
+  completion: operation
+};
+var moduleAgentOutputs = {
+  health: runtimeHealthSchema,
+  complete: operation,
+  completion: object({ result: runtimeCompletionSchema.nullable(), failure: boolean2(), unknown: boolean2().optional() }).strict()
+};
+function isModuleAgentTool(name) {
+  return Object.hasOwn(moduleAgentInputs, name);
+}
+function camelArguments(value) {
+  if (Array.isArray(value))
+    return value.map(camelArguments);
+  if (!value || typeof value !== "object")
+    return value;
+  const result = {};
+  for (const [key, child] of Object.entries(value)) {
+    const normalized = key.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    if (Object.hasOwn(result, normalized))
+      throw new Error("invalid: Duplicate Agent argument");
+    result[normalized] = camelArguments(child);
+  }
+  return result;
+}
+function moduleAgentInput(name, raw) {
+  if (!isModuleAgentTool(name))
+    throw new Error("forbidden: Agent tool is not available to modules");
+  return moduleAgentInputs[name].parse(camelArguments(raw));
+}
+
+// packages/engine/src/modules/steward/builtin/agent/model-policy.ts
+var modelPolicySchema = object({
+  tiers: record(modelTier, object({ model: string2().trim().min(1).max(500), thinking: _enum(THINKING_LEVELS).optional() }).strict()),
+  preferredTimeoutMs: number2().int().min(1).max(600000)
+}).strict();
+var SETTINGS_TIERS = ["fast", "balanced", "deep"];
+var formTier = object({ model: string2().trim().max(500), thinking: _enum(["", ...THINKING_LEVELS]) }).strict();
+var policyFormSchema = object({
+  tiers: object({ fast: formTier, balanced: formTier, deep: formTier }).strict(),
+  preferredTimeoutMs: string2().trim().regex(/^\d+$/)
+}).strict();
+var configureInput = object({ config: modelPolicySchema.optional(), clear: boolean2().optional(), form: policyFormSchema.optional(), view: boolean2().optional() }).strict().refine((value) => [value.config !== undefined, value.clear === true, value.form !== undefined].filter(Boolean).length <= 1, "Choose config, form or clear");
+var configureOutput = object({ config: modelPolicySchema.nullable(), ready: boolean2(), form: policyFormSchema.optional() }).strict();
+function policyForm(config) {
+  return {
+    tiers: Object.fromEntries(SETTINGS_TIERS.map((tier) => [tier, { model: config?.tiers[tier]?.model ?? "", thinking: config?.tiers[tier]?.thinking ?? "" }])),
+    preferredTimeoutMs: String(config?.preferredTimeoutMs ?? 60000)
+  };
+}
+var hardLimitsSchema = object({ maxCallsPerEvent: number2().int().positive(), maxOutputTokens: number2().int().positive().max(32000), eventTimeoutMs: number2().int().positive().max(600000) }).strict();
+function createModelPolicy(data, authorize, backendReady) {
+  const path = join2(data, "model-policy.json");
+  let writes = Promise.resolve();
+  async function read() {
+    await writes;
+    try {
+      return modelPolicySchema.nullable().parse(JSON.parse(await readFile2(path, "utf8")));
+    } catch (error) {
+      if (error.code === "ENOENT")
+        return null;
+      throw error;
+    }
+  }
+  async function ready() {
+    const config = await read();
+    return !!config && Object.keys(config.tiers).length > 0 && await backendReady();
+  }
+  async function configure(raw, callId) {
+    const normalized = camelArguments(raw);
+    const originalConfig = raw?.config;
+    if (originalConfig?.tiers && normalized.config)
+      normalized.config.tiers = originalConfig.tiers;
+    const args = configureInput.parse(normalized);
+    object({ authorized: literal(true) }).parse(await authorize(callId));
+    if (args.config !== undefined || args.clear || args.form) {
+      const write = writes.then(async () => {
+        let config = args.clear ? null : args.config;
+        if (args.form) {
+          let current = null;
+          try {
+            current = modelPolicySchema.nullable().parse(JSON.parse(await readFile2(path, "utf8")));
+          } catch (error) {
+            if (error.code !== "ENOENT")
+              throw error;
+          }
+          const tiers = { ...current?.tiers };
+          for (const tier of SETTINGS_TIERS) {
+            const target = args.form.tiers[tier];
+            if (target.model)
+              tiers[tier] = { model: target.model, ...target.thinking ? { thinking: target.thinking } : {} };
+            else
+              delete tiers[tier];
+          }
+          config = modelPolicySchema.parse({ tiers, preferredTimeoutMs: Number(args.form.preferredTimeoutMs) });
+        }
+        await mkdir2(data, { recursive: true, mode: 448 });
+        const temporary = path + "." + randomUUID() + ".pending";
+        await writeFile2(temporary, JSON.stringify(config), { mode: 384 });
+        await rename2(temporary, path);
+      });
+      writes = write.catch(() => {});
+      await write;
+    }
+    const config = await read();
+    return { config, ready: await ready(), ...args.view || args.form ? { form: policyForm(config) } : {} };
+  }
+  async function select(declaredTier, hardLimits, maxOutputTokens) {
+    const config = await read(), target = config?.tiers[declaredTier];
+    if (!target || !await backendReady())
+      throw new Error("unconfigured: Agent completion tier unavailable");
+    return { ...target, maxOutputTokens: Math.min(maxOutputTokens, hardLimits.maxOutputTokens), timeoutMs: Math.min(config.preferredTimeoutMs, hardLimits.eventTimeoutMs) };
+  }
+  return { configure, ready, select };
+}
+
 // packages/engine/src/modules/steward/builtin/agent/contracts.ts
-var agentCompletionInput = object({ model: string2().min(1).max(500), thinking: _enum(THINKING_LEVELS).optional(), system: string2().max(200000).optional(), prompt: string2().max(2 * 1024 * 1024), maxOutputTokens: number2().int().positive().max(32000), timeoutMs: number2().int().positive().max(300000) }).strict();
+var directCompletionInput = object({ model: string2().min(1).max(500), thinking: _enum(THINKING_LEVELS).optional(), system: string2().max(200000).optional(), prompt: string2().max(2 * 1024 * 1024), maxOutputTokens: number2().int().positive().max(32000), timeoutMs: number2().int().positive().max(300000) }).strict();
+var tierCompletionInput = directCompletionInput.omit({ model: true, thinking: true }).extend({ declaredTier: string2().min(1).max(40), effectiveHardLimits: hardLimitsSchema, timeoutMs: number2().int().positive().max(600000) }).strict();
+var agentCompletionInput = union([directCompletionInput, tierCompletionInput]);
 var agentTools = [
   ["health", object({}).strict(), runtimeHealthSchema],
   ["start", runtimeStartSchema, runtimeOperationSchema],
@@ -8655,68 +8611,22 @@ function agentInput(name, raw) {
 
 // packages/engine/src/modules/steward/builtin/agent/module-operations.ts
 import { createHash as createHash2 } from "crypto";
-import { mkdir as mkdir2, readFile as readFile2, writeFile as writeFile2, rename as rename2 } from "fs/promises";
-import { join as join2 } from "path";
-
-// packages/engine/src/modules/steward/builtin/agent/module-contracts.ts
-var operation = object({ operationId: string2().regex(/^[a-f0-9]{64}$/) }).strict();
-var moduleAgentInputs = {
-  health: object({}).strict(),
-  start: executionStartSchema,
-  status: operation,
-  inject: operation.extend({ commandKey: executionStartSchema.shape.commandKey, message: string2().trim().min(1).max(20000) }),
-  abort: operation.extend({ commandKey: executionStartSchema.shape.commandKey }),
-  release: operation,
-  complete: object({ commandKey: executionStartSchema.shape.commandKey, prompt: string2().trim().min(1).max(200000), system: string2().max(20000).optional(), maxOutputTokens: number2().int().min(1).max(32000) }).strict(),
-  completion: operation,
-  transcript: operation.extend({ cursor: string2().max(1024).optional(), limit: number2().int().min(1).max(100).default(50) })
-};
-var moduleAgentOutputs = {
-  health: runtimeHealthSchema,
-  start: operation,
-  status: operation.extend({ execution: executionViewSchema }),
-  inject: object({ accepted: literal(true) }).strict(),
-  abort: object({ requested: literal(true) }).strict(),
-  release: object({ released: literal(true) }).strict(),
-  complete: operation,
-  completion: object({ result: runtimeCompletionSchema.nullable(), failure: boolean2() }).strict(),
-  transcript: editorResponseDataSchemas.events
-};
-function camelArguments(value) {
-  if (Array.isArray(value))
-    return value.map(camelArguments);
-  if (!value || typeof value !== "object")
-    return value;
-  const result = {};
-  for (const [key, child] of Object.entries(value)) {
-    const normalized = key.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    if (Object.hasOwn(result, normalized))
-      throw new Error("invalid: Duplicate Agent argument");
-    result[normalized] = camelArguments(child);
-  }
-  return result;
-}
-function moduleAgentInput(name, raw) {
-  if (!Object.hasOwn(moduleAgentInputs, name))
-    throw new Error("Unknown Agent tool");
-  return moduleAgentInputs[name].parse(camelArguments(raw));
-}
-
-// packages/engine/src/modules/steward/builtin/agent/module-operations.ts
-var receipt = object({ owner: string2(), hash: string2(), digest: string2(), kind: _enum(["execution", "completion"]), execution: executionViewSchema.optional(), result: runtimeCompletionSchema.optional(), failure: boolean2().optional(), released: boolean2().optional() }).strict();
-function createModuleAgentOperations(data, call, complete, controlRun) {
+import { mkdir as mkdir3, readFile as readFile3, writeFile as writeFile3, rename as rename3 } from "fs/promises";
+import { join as join3 } from "path";
+var receipt = object({ owner: string2(), hash: string2(), digest: string2(), kind: literal("completion"), reservationId: string2().optional(), result: runtimeCompletionSchema.optional(), failure: boolean2().optional() }).strict();
+function createModuleAgentOperations(data, call, complete, policy) {
   const hash = (value) => createHash2("sha256").update(JSON.stringify(value)).digest("hex");
-  const file = (id) => join2(data, "module-operations", id + ".json");
+  const file = (id) => join3(data, "module-operations", id + ".json");
   const active = new Map;
-  const admit = (request, execution) => call("runtime-callback.agent-admit", { callId: request.callId, operation: request.name, ...execution ? { execution } : {} });
+  const admit = (request) => call("runtime-callback.agent-admit", { callId: request.callId, operation: request.name });
   async function save(id, row) {
-    await writeFile2(file(id) + ".pending", JSON.stringify(row), { mode: 384 });
-    await rename2(file(id) + ".pending", file(id));
+    await writeFile3(file(id) + ".pending", JSON.stringify(row), { mode: 384 });
+    await rename3(file(id) + ".pending", file(id));
   }
   async function load(id, caller) {
     let row;
     try {
-      row = receipt.parse(JSON.parse(await readFile2(file(id), "utf8")));
+      row = receipt.parse(JSON.parse(await readFile3(file(id), "utf8")));
     } catch (error) {
       if (error.code === "ENOENT")
         return null;
@@ -8727,15 +8637,20 @@ function createModuleAgentOperations(data, call, complete, controlRun) {
     return row;
   }
   async function launchCompletion(request, id, row) {
-    const reservation = object({ reservationId: string2(), model: string2(), thinking: string2().optional(), timeoutMs: number2() }).parse(await admit(request));
+    const reservation = object({ reservationId: string2(), declaredTier: string2(), effectiveHardLimits: hardLimitsSchema }).strict().parse(await admit(request));
+    row.reservationId = reservation.reservationId;
+    await save(id, row);
     const { args } = request;
-    const work = complete({ prompt: args.prompt, system: args.system, maxOutputTokens: args.maxOutputTokens, model: reservation.model, thinking: reservation.thinking, timeoutMs: reservation.timeoutMs }).then((result) => {
-      row.result = { ...result, text: result.text.slice(0, Number(args.maxOutputTokens) * 4) };
-    }).catch(() => {
-      row.failure = true;
+    const work = (async () => {
+      const target = await policy.select(reservation.declaredTier, reservation.effectiveHardLimits, Number(args.maxOutputTokens));
+      row.result = runtimeCompletionSchema.parse(await complete({ prompt: args.prompt, system: args.system, ...target }));
+    })().catch((error) => {
+      if (error?.code !== "unknown" && !/^unknown:/.test(String(error?.message)))
+        row.failure = true;
     }).then(async () => {
       await save(id, row);
-      await call("runtime-callback.agent-settle", { reservationId: reservation.reservationId, ...row.result ? { result: row.result } : {}, failed: !!row.failure });
+      if (row.result || row.failure)
+        await call("runtime-callback.agent-settle", { reservationId: reservation.reservationId, ...row.result ? { result: row.result } : {}, failed: !!row.failure });
     }).finally(() => active.delete(id));
     active.set(id, work);
     work.catch(() => {});
@@ -8747,68 +8662,28 @@ function createModuleAgentOperations(data, call, complete, controlRun) {
     if (previous) {
       if (previous.digest !== digest)
         throw new Error("conflict: Agent command key reused");
-      if (!previous.execution && !previous.result && !previous.failure && !active.has(id))
+      if (!previous.result && !previous.failure && !active.has(id))
         throw new Error("unknown: Agent operation requires reconciliation");
       return { operationId: id };
     }
-    if (name === "complete" && active.size >= 64)
+    if (active.size >= 64)
       throw new Error("capacity: Agent completions full");
-    const row = { owner: caller.moduleId, hash: caller.hash, digest, kind: name === "start" ? "execution" : "completion" };
-    await mkdir2(join2(data, "module-operations"), { recursive: true, mode: 448 });
-    await writeFile2(file(id), JSON.stringify(row), { mode: 384, flag: "wx" });
-    try {
-      if (name === "start") {
-        row.execution = executionViewSchema.parse(await admit(request));
-        await save(id, row);
-      } else
-        await launchCompletion(request, id, row);
-    } catch (error) {
-      row.failure = true;
-      await save(id, row);
-      throw error;
-    }
+    const row = { owner: caller.moduleId, hash: caller.hash, digest, kind: "completion" };
+    await mkdir3(join3(data, "module-operations"), { recursive: true, mode: 448 });
+    await writeFile3(file(id), JSON.stringify(row), { mode: 384, flag: "wx" });
+    await launchCompletion(request, id, row);
     return { operationId: id };
   }
-  async function release(request, id, row) {
-    if (row.kind === "execution" && !row.execution)
-      throw new Error("unknown: Agent execution requires reconciliation");
-    if (row.kind === "completion" && !row.result && !row.failure)
-      throw new Error("conflict: Agent completion remains unconfirmed");
-    const result = await admit(request, row.execution);
-    row.released = true;
-    await save(id, row);
-    return result;
-  }
-  function completionStatus(id, row) {
-    if (row.kind !== "completion")
-      throw new Error("invalid: Not a completion");
-    return { result: row.result ?? null, failure: !!row.failure || !row.result && !active.has(id) };
-  }
-  async function performControl(request, result) {
-    const command = object({ perform: boolean2(), operationId: string2() }).parse(result);
-    if (command.perform)
-      await controlRun(request.name, { operationId: command.operationId, ...request.name === "inject" ? { message: String(request.args.message) } : {} });
-    return request.name === "inject" ? { accepted: true } : { requested: true };
-  }
-  async function control(request) {
+  async function completionStatus(request) {
     const id = String(request.args.operationId), row = await load(id, request.caller);
-    if (!row || row.released)
+    if (!row)
       throw new Error("not_found: Agent operation not found");
-    if (request.name === "completion")
-      return completionStatus(id, row);
-    if (request.name === "release")
-      return release(request, id, row);
-    if (!row.execution)
-      throw new Error("unknown: Agent execution requires reconciliation");
-    const result = await admit(request, row.execution);
-    if (request.name === "inject" || request.name === "abort")
-      return performControl(request, result);
-    return request.name === "status" ? { operationId: id, execution: result } : result;
+    return { result: row.result ?? null, failure: !!row.failure, ...!row.result && !row.failure && !active.has(id) ? { unknown: true } : {} };
   }
   return { async handle(name, raw, caller, callId) {
     const args = moduleAgentInput(name, raw);
     const request = { name, args, caller, callId };
-    return name === "start" || name === "complete" ? start(request) : control(request);
+    return name === "complete" ? start(request) : completionStatus(request);
   } };
 }
 
@@ -8841,12 +8716,12 @@ await (async () => {
   await operations.start(input);
   assert.equal(starts, 1, "Released receipts prevent replay");
   let modelCalls = 0;
-  const moduleOperations = createModuleAgentOperations(data, async () => ({ reservationId: "author-reservation", model: "fake/model", timeoutMs: 1000 }), async () => {
+  const moduleOperations = createModuleAgentOperations(data, async () => ({ reservationId: "author-reservation", declaredTier: "fast", effectiveHardLimits: { maxCallsPerEvent: 1, maxOutputTokens: 20, eventTimeoutMs: 1000 } }), async () => {
     modelCalls++;
     return { text: "answer", inputTokens: 1, outputTokens: 1 };
-  }, async () => {
-    throw new Error("No run controls in author completion test");
-  });
+  }, { async select() {
+    return { model: "fake/model", timeoutMs: 1000, maxOutputTokens: 20 };
+  } });
   const caller = { kind: "module", module: "author", moduleId: "author-module", hash: "author-version" };
   const params = { "command-key": "author-completion", prompt: "fixture", "max-output-tokens": 20 };
   const result = await moduleOperations.handle("complete", params, caller, "author-call");

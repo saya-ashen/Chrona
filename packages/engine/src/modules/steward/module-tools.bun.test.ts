@@ -1,19 +1,18 @@
-import { modulesUpstreamOutput } from "./system-outputs";
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHRONA_TOOLS, RUN_LIMITS, type ModuleManifest } from "@chrona/contracts/steward";
-import { createStewardService } from "./service";
+import { moduleManifestSchema, RUN_LIMITS, type ModuleManifest } from "@chrona/contracts/steward";
+import { createModules } from "./modules";
+import { registerSystemModules } from "./system-modules";
+import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation } from "./module-evolution";
-// Provider-visible system module tools, including diagnostics and development references.
-const MODULES_TOOLS = 16;
 import { notice, notices } from "./test-notices";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -25,6 +24,7 @@ async function fixture() {
   let error: string | null = null;
   const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null,
     sandbox: testModuleSandbox(async input => {
+      if (input.codeDir.endsWith("notify-fixture")) return { status: "succeeded", exitCode: 0, error: null, output: JSON.stringify({ result: { id: "fixture-notice", status: "pending", duplicate: false } }) };
       calls.push(input);
       return { status: error ? "failed" : "succeeded", exitCode: error ? 1 : 0, error,
         output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }] }) };
@@ -32,31 +32,34 @@ async function fixture() {
   };
   cleanups.push(() => moduleSupervisor(ports).stop());
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
-  const service = createStewardService(ports), api = service.forWorkspace(workspaceId);
-  const session = await db.session.create({ data: { workspaceId, source: "build", key: "build:test", focus: ["mail-sort"] } });
+  registerSystemModules();
+  const notifyManifest = moduleManifestSchema.parse(JSON.parse(await Bun.file(new URL("./external/notify/module.json", import.meta.url)).text()));
+  const notify = await db.module.create({ data: { workspaceId, name: "notify", activeHash: "notify-fixture" } });
+  await db.moduleVersion.create({ data: { moduleId: notify.id, hash: "notify-fixture", manifest: notifyManifest, intent: {}, source: "user", report: {}, status: "approved" } });
+  const api = createModules(ports, workspaceId);
+  const session = await db.session.create({ data: { workspaceId, source: "test", key: "tools:test", focus: ["mail-sort"] } });
   const module = await db.module.create({ data: { workspaceId, name: "mail-sort", activeHash: "hash" } });
   const tool: ModuleManifest["tools"][number] = { name: "find-mail", description: "Find matching mail", visibility: ["provider", "owner"], idempotent: false, parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "number" }, unread: { type: "boolean" }, folder: { type: "string", enum: ["inbox", "sent"] } }, required: ["query"] } };
-  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], tools: [tool] };
+  const manifest = { name: module.name, entry: "index.ts", tests: ["test.ts"], effects: ["network"], uses: ["notify.send"], params: { limit: { type: "number", value: 3 } }, tools: [tool] };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest, intent: {}, source: "user", report: {}, status: "approved" } });
   await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspaceId), tx, { moduleId: module.id, previousHash: null, hash: "hash", generationId: "fixture" }));
-  await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail" });
-  const run = (await api.runs.claimNext("foreground"))!;
-  return { db, ports, service, module, manifest, tool, session, run, calls, workspaceId,
-    call: (args: unknown = { query: "hello" }, name = "m_mail_sort_find_mail") => service.tools.call(run.token, name, args),
+  const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Find mail", provider: "fake", tokenHash: "fixture-provider-token", cwd: dataDir } });
+  return { db, ports, api, module, manifest, tool, session, run, calls, workspaceId,
+    catalog: () => moduleToolCatalog(ports, { workspaceId, sessionId: session.id }),
+    call: (args: unknown = { query: "hello" }, name = "m_mail_sort_find_mail") => callModuleTool(ports, { workspaceId, sessionId: session.id, runId: run.id }, name, args),
     fail: (message = "public stderr") => { error = message; } };
 }
 test("catalog appends focused module tools with schema, meaningful description and their toolset", async () => {
-  const f = await fixture(), catalog = await f.service.tools.catalog(f.run.token);
-  expect(catalog.slice(0, CHRONA_TOOLS.length).map(tool => tool.name)).toEqual([...CHRONA_TOOLS]);
+  const f = await fixture(), catalog = await f.catalog();
   expect(catalog.at(-1)).toEqual({ name: "m_mail_sort_find_mail", exposure: "direct", namespace: { name: "module_mail_sort", description: "Find matching mail" }, description: "Find matching mail",
     inputSchema: { ...f.tool.parameters, additionalProperties: false, description: "[module mail-sort] Find matching mail" }, outputSchema: null, examples: null, sideEffects: null, errors: null,
     idempotent: false, retry: "Unknown async outcomes are not redelivered automatically." });
 });
 test("unfocused sessions find deferred module tools", async () => {
   const f = await fixture();
-  await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, description: "Sort and search work mail" } } });
+  await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { ...f.manifest, description: "Sort and search work mail" } } });
   await f.db.session.update({ where: { id: f.session.id }, data: { focus: [] } });
-  expect((await f.service.tools.catalog(f.run.token)).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail" } });
+  expect((await f.catalog()).at(-1)).toMatchObject({ name: "m_mail_sort_find_mail", exposure: "deferred", namespace: { name: "module_mail_sort", description: "Sort and search work mail" } });
   expect(await f.call()).toMatchObject({ result: { found: 3 } });
   expect(await notice(f.db)).toMatchObject({ moduleId: f.module.id });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "chrona", subjectId: f.module.id, details: { tool: "m_mail_sort_find_mail", callerRunId: f.run.id, callerSessionId: f.session.id } });
@@ -66,14 +69,21 @@ test("module names are unique within the workspace", async () => {
   await expect((async () => { await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort" } }); })()).rejects.toThrow();
 });
 test("owner tools list every toolset and call as the user", async () => {
-  const f = await fixture(), api = f.service.forWorkspace(f.workspaceId);
-  const { tools, toolsets } = await api.modules.tools();
+  const f = await fixture(), api = f.api;
+  const { tools, toolsets } = await api.tools();
   // Chrona's own tools open to the user (v2-13) come first.
-  expect(tools.map(tool => tool.name)).toEqual(["m_modules_catalog", "m_modules_install", "m_modules_upstream", "m_modules_diagnostics", "m_modules_health", "m_modules_interfaces", "m_modules_settings_get", "m_modules_settings_set", "m_modules_permissions", "m_modules_refresh_health", "m_modules_check", "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_modules_build_sessions", "m_modules_build_session", "m_modules_build_transcript", "m_modules_build_settings", "m_modules_build_owner", "m_modules_stop_build", "m_modules_revise_build", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_consumer", "m_projects_list", "m_projects_register", "m_projects_create", "m_mail_sort_find_mail"]);
-  expect(toolsets).toEqual([{ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] }]);
-  expect(await api.modules.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
+  expect(tools.map(tool => tool.name)).toEqual([
+    "m_approvals_list", "m_approvals_resolve",
+    "m_modules_list", "m_modules_tools", "m_modules_reference", "m_modules_diagnostics", "m_modules_health", "m_modules_admit_candidates",
+    "m_modules_rollback", "m_modules_disable", "m_modules_enable", "m_modules_remove", "m_settings_update",
+    "m_secrets_set", "m_secrets_remove", "m_secrets_list", "m_activity_runtime", "m_activity_runs", "m_activity_records", "m_activity_consumer", "m_mail_sort_find_mail",
+    "m_notify_settings", "m_notify_activity", "m_notify_list", "m_notify_status", "m_notify_feedback", "m_notify_retry",
+  ]);
+  expect(toolsets.find(set => set.name === "module_mail_sort")).toEqual({ name: "module_mail_sort", description: "Find matching mail", tools: ["m_mail_sort_find_mail"] });
+  expect(toolsets.find(set => set.name === "module_notify")?.tools).toEqual(["m_notify_settings", "m_notify_activity", "m_notify_list", "m_notify_status", "m_notify_feedback", "m_notify_retry"]);
+  expect(await api.callTool("m_mail_sort_find_mail", { query: "hi" })).toMatchObject({ result: { found: 3 } });
   expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_tool_call" } })).toMatchObject({ actorKey: "user", details: { callerRunId: null, callerSessionId: null } });
-  await expect(api.modules.callTool("m_mail_sort_find_mail", {})).rejects.toMatchObject({ code: "invalid" });
+  await expect(api.callTool("m_mail_sort_find_mail", {})).rejects.toMatchObject({ code: "invalid" });
 });
 test.each([
   [{}, "query"], [{ query: 1 }, "query"], [{ query: "ok", count: "1" }, "count"],
@@ -88,13 +98,13 @@ test("native objects and arrays stay structured through validation, Provider sch
   const f = await fixture();
   const tool = { ...f.tool, parameters: { type: "object" as const, properties: { filters: { type: "array" as const, items: { type: "object" as const,
     properties: { query: { type: "string" as const, enum: ["open", "closed"] }, tags: { type: "array" as const, items: { type: "string" as const } }, count: { type: "number" as const } }, required: ["query"], additionalProperties: false } }, empty: { type: "object" as const, properties: {}, required: [] } }, required: ["filters"] } };
-  await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, tools: [tool] } } });
-  const schema = (await f.service.tools.catalog(f.run.token)).at(-1)?.inputSchema;
+  await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { ...f.manifest, tools: [tool] } } });
+  const schema = (await f.catalog()).at(-1)?.inputSchema;
   expect(schema).toMatchObject({ properties: { filters: { type: "array", items: { type: "object", additionalProperties: false, required: ["query"] } } } });
   const args = { filters: [{ query: "open", tags: ["priority", "today"], count: 2 }, { query: "closed" }], empty: {} };
   expect(await f.call(args)).toMatchObject({ result: { found: 3 } });
   expect(f.calls[0]).toMatchObject({ input: { trigger: { args } } });
-  expect(await f.service.forWorkspace(f.workspaceId).modules.callTool("m_mail_sort_find_mail", args)).toMatchObject({ result: { found: 3 } });
+  expect(await f.api.callTool("m_mail_sort_find_mail", args)).toMatchObject({ result: { found: 3 } });
   expect(f.calls[1]).toMatchObject({ input: { trigger: { args } } });
   for (const invalid of [null, { filters: "[]" }, { filters: [{ query: "other" }] }, { filters: [{ query: "open", unexpected: true }] }, { filters: [{ query: "open", count: Infinity }] }, { filters: [{ query: "open" }, null] }, {}]) {
     f.calls.length = 0;
@@ -106,58 +116,57 @@ test("success returns result, runs sandbox with scoped input and deduplicates sh
   const f = await fixture(), args = { query: "hello", count: 2, unread: true, folder: "inbox" };
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
   expect(await f.call(args)).toEqual({ result: { found: 3 } });
-  expect((await f.db.moduleCall.findMany()).map(call => call.status)).toEqual(["executed", "duplicate"]);
+  expect((await f.db.moduleCall.findMany({ where: { moduleId: f.module.id } })).map(call => call.status).sort()).toEqual(["duplicate", "executed"]);
   expect(f.calls[0]).toEqual({ codeDir: join(f.ports.dataDir, "platform/store/hash"), dataDir: join(f.ports.dataDir, "platform/data", f.module.id), entry: "index.ts", network: true, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes,
     input: { trigger: { id: "find-mail", kind: "tool", firedAt: f.ports.now().toISOString(), args, caller: { kind: "provider", runId: expect.any(String) }, call: { id: expect.any(String), key: null, attempt: 1, chain: [] } }, now: f.ports.now().toISOString(), params: { limit: 3 } } });
   expect((await notices(f.db)).length).toBe(1);
   expect(await f.db.run.count({ where: { lane: "background" } })).toBe(0);
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null });
-  expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ tool: "m_mail_sort_find_mail", ok: true }, { tool: "m_mail_sort_find_mail", ok: true }]);
-  expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(2);
+  expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ triggerId: "tool:find-mail", firedAt: f.ports.now(), exitCode: 0, error: null });
 });
 test("module failure returns truncated public stderr and shares the consecutive failure pause", async () => {
   const f = await fixture();
   f.fail("x".repeat(3000));
-  const now = f.ports.now().toISOString();
-  await expect(moduleSupervisor(f.ports).deliver(f.module.id, "hash", { trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} })).rejects.toThrow();
-  for (let i = 0; i < 2; i++) await expect(f.call()).rejects.toMatchObject({ code: "failed", message: expect.stringContaining("x".repeat(1900)) });
+  for (let i = 0; i < 3; i++) await expect(f.call()).rejects.toMatchObject({ code: "failed", message: expect.stringContaining("x".repeat(1900)) });
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   expect(await f.db.moduleRun.count()).toBe(3);
   expect((await notices(f.db, { title: "模块连续失败，已暂停" })).length).toBe(1);
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
-  expect((await f.service.tools.catalog(f.run.token)).some(tool => tool.name.startsWith("m_mail_sort_"))).toBe(false);
-  expect((await f.db.run.findUniqueOrThrow({ where: { id: f.run.id } })).toolCalls).toMatchObject([{ ok: false }, { ok: false }, { ok: false }]);
-  expect(await f.db.audit.count({ where: { kind: "tool_finished", subjectId: f.run.id } })).toBe(3);
+  expect((await f.catalog()).some(tool => tool.name.startsWith("m_mail_sort_"))).toBe(false);
 });
 test.each(["paused", "migrating", "no-hash"])("catalog and call re-resolve module state: %s", async status => {
-  const f = await fixture(); await f.service.tools.catalog(f.run.token);
+  const f = await fixture(), before = await f.catalog();
   await f.db.module.update({ where: { id: f.module.id }, data: status === "no-hash" ? { activeHash: null } : { status } });
   await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
-  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length + MODULES_TOOLS);
+  expect((await f.catalog()).length).toBe(before.length - 1);
 });
 test("ambiguous concatenated names expose and call only the first tool; overlong names are hidden", async () => {
   const f = await fixture();
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mail-sort-find", activeHash: "later" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "later", manifest: { ...f.manifest, name: module.name, tools: [{ ...f.tool, name: "mail", description: "Hidden collision" }] }, intent: {}, source: "user", report: {}, status: "approved" } });
-  const catalog = await f.service.tools.catalog(f.run.token);
+  const catalog = await f.catalog();
   expect(catalog.filter(tool => tool.name === "m_mail_sort_find_mail")).toHaveLength(1);
   expect(catalog.at(-1)?.inputSchema.description).toBe("[module mail-sort] Find matching mail");
-  await f.call(); expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ moduleId: f.module.id });
+  await f.call(); expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ moduleId: f.module.id });
   await f.db.module.update({ where: { id: module.id }, data: { name: "a".repeat(64) } });
-  expect((await f.service.tools.catalog(f.run.token)).length).toBe(CHRONA_TOOLS.length + MODULES_TOOLS + 1);
+  expect((await f.catalog()).length).toBe(catalog.length);
 });
 test("call uses the current version rather than a previously catalogued schema", async () => {
-  const f = await fixture(); await f.service.tools.catalog(f.run.token);
-  await f.db.moduleVersion.updateMany({ data: { manifest: { ...f.manifest, tools: [{ ...f.tool, parameters: { type: "object", properties: { changed: { type: "boolean" } }, required: ["changed"] } }] } } });
+  const f = await fixture(); await f.catalog();
+  await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: { manifest: { ...f.manifest, tools: [{ ...f.tool, parameters: { type: "object", properties: { changed: { type: "boolean" } }, required: ["changed"] } }] } } });
   await expect(f.call()).rejects.toMatchObject({ code: "invalid", message: expect.stringContaining("changed") });
 });
 
-test("upstream output declares exact commit and checked proposal shapes", () => {
-  const commit = "a".repeat(40), tree = "b".repeat(40);
-  const output = { moduleId: "fixture-module", repository: null, branch: "main", localCommit: commit, fetchedCommit: commit,
-    proposal: { moduleId: "fixture-module", hash: commit, status: "building" as const, report: { tests: [], git: { commit, tree } } } };
-  expect(modulesUpstreamOutput.parse(output)).toEqual(output);
-  expect(modulesUpstreamOutput.safeParse({ ...output, proposal: null, localCommit: null, fetchedCommit: null }).success).toBe(true);
-  expect(modulesUpstreamOutput.safeParse({ ...output, localCommit: "not-a-commit" }).success).toBe(false);
-  expect(modulesUpstreamOutput.safeParse({ ...output, proposal: { ...output.proposal, report: { tests: "invalid" } } }).success).toBe(false);
+test.each(["building", "testing", "pending_review", "rejected", "active", "missing", "malformed"])("catalog and calls refuse an active pointer without an approved valid version: %s", async status => {
+  const f = await fixture();
+  expect((await f.catalog()).some(tool => tool.name === "m_mail_sort_find_mail")).toBe(true);
+  if (status === "missing") await f.db.moduleVersion.deleteMany({ where: { moduleId: f.module.id } });
+  else await f.db.moduleVersion.updateMany({ where: { moduleId: f.module.id }, data: status === "malformed" ? { manifest: { name: "invalid" } } : { status } });
+  for (const tools of [await f.catalog(), (await f.api.tools()).tools]) {
+    expect(tools.some(tool => tool.name === "m_mail_sort_find_mail")).toBe(false);
+  }
+  await expect(f.call()).rejects.toMatchObject({ code: "not_found" });
+  await expect(f.api.callTool("m_mail_sort_find_mail", { query: "hi" })).rejects.toMatchObject({ code: "not_found" });
+  expect(f.calls).toEqual([]);
+  expect(await f.db.moduleRun.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_tool_call" } })).toBe(0);
 });

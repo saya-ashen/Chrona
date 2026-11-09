@@ -20,7 +20,7 @@ async function fixture() {
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-27T03:00:00Z"), publicUrl: null };
   const api = createStewardService(ports).forWorkspace(w);
   async function moduleNamed(name: string, part: Record<string, unknown>) {
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], ...part });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], ...part });
     const module = await db.module.create({ data: { workspaceId: w, name, activeHash: `${name}-1` } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-1`, manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
     let id = 0;
@@ -36,33 +36,31 @@ async function fixture() {
   return { db, dataDir, ports, w, api, moduleNamed, settle };
 }
 
-test("any module may declare a credential the user saves on the page; values never come back", async () => {
+for (const name of ["okx_demo", "qq_bot"]) test(`${name}: any module may declare a user-saved credential; values never enter records`, async () => {
   const f = await fixture();
-  const trader = await f.moduleNamed("trader", { effects: ["network"], secrets: ["okx_demo"], tools: [{ name: "status", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
-  const page = await f.moduleNamed("page", { uses: ["chat.send", "secrets.set", "secrets.remove", "secrets.list"] });
+  const trader = await f.moduleNamed("trader", { effects: ["network"], secrets: [name], tools: [{ name: "status", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
+  const page = await f.moduleNamed("page", { uses: ["*", "secrets.set", "secrets.remove", "secrets.list"] });
   const other = await f.moduleNamed("other", { tools: trader.manifest.tools, uses: ["secrets.set"] });
   expect(isEntryModule(trader.manifest)).toBe(false);
-  expect(moduleManifestSchema.safeParse({ ...trader.manifest, secrets: ["qq_bot"] }).success).toBe(false);
 
-  await expect(trader.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "unavailable" });
-  await expect(page.call("secrets.set", { name: "okx_demo", value: "[1]" })).rejects.toMatchObject({ code: "invalid" });
-  await expect(page.call("secrets.set", { name: "qq_bot", value: '{"a":"b"}' })).rejects.toMatchObject({ code: "invalid" });
-  await expect(other.call("secrets.set", { name: "okx_demo", value: '{"a":"b"}' })).rejects.toMatchObject({ code: "forbidden" });
-  expect((await page.call("secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k-secret", passphrase: "p" }) })).output).toEqual({ name: "okx_demo", configured: true });
-  expect((await stat(join(f.dataDir, "secrets", "okx_demo.json"))).mode & 0o777).toBe(0o600);
+  await expect(trader.call("secrets.get", { name })).rejects.toMatchObject({ code: "unavailable" });
+  await expect(page.call("secrets.set", { name, value: "[1]" })).rejects.toMatchObject({ code: "invalid" });
+  await expect(other.call("secrets.set", { name, value: '{"a":"b"}' })).rejects.toMatchObject({ code: "forbidden" });
+  expect((await page.call("secrets.set", { name, value: JSON.stringify({ apiKey: "k-secret", passphrase: "p" }) })).output).toEqual({ name, configured: true });
+  expect((await stat(join(f.dataDir, "secrets", `${name}.json`))).mode & 0o777).toBe(0o600);
 
   const list = (await page.call("secrets.list", {})).output;
-  expect(list).toEqual([{ name: "okx_demo", configured: true, updatedAt: expect.any(String), modules: ["trader"] }]);
-  expect((await trader.call("secrets.get", { name: "okx_demo" })).output).toEqual({ value: { apiKey: "k-secret", passphrase: "p" } });
-  await expect(page.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "forbidden" });
+  expect(list).toEqual([{ name, configured: true, updatedAt: expect.any(String), modules: ["trader"] }]);
+  expect((await trader.call("secrets.get", { name })).output).toEqual({ value: { apiKey: "k-secret", passphrase: "p" } });
+  await expect(page.call("secrets.get", { name })).rejects.toMatchObject({ code: "forbidden" });
   // Neither the value written nor the value read is kept in call records.
   expect(JSON.stringify(await f.db.moduleInvocation.findMany())).not.toContain("k-secret");
   // v2-18: the change shows in the activity trail by name only.
-  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "secret_set" } })).toMatchObject({ actorKey: "user", details: { name: "okx_demo" } });
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "secret_set" } })).toMatchObject({ actorKey: "user", details: { name } });
   expect(JSON.stringify(await f.db.audit.findMany())).not.toContain("k-secret");
 
-  await page.call("secrets.remove", { name: "okx_demo" });
-  await expect(trader.call("secrets.get", { name: "okx_demo" })).rejects.toMatchObject({ code: "unavailable" });
+  await page.call("secrets.remove", { name });
+  await expect(trader.call("secrets.get", { name })).rejects.toMatchObject({ code: "unavailable" });
 });
 
 test("approvals.request waits for the user's decision and sends it back; approved once, no standing grant", async () => {
@@ -101,21 +99,25 @@ test("approvals.request waits for the user's decision and sends it back; approve
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: String(second.callId) } })).toMatchObject({ status: "succeeded", output: { approval: next.id, decision: "denied" } });
 });
 
-test("v2-17: modules.permissions gathers one app's capabilities, grants, credentials, model use and approvals, visible to modules", async () => {
+test("installed identities and contracts are readable; credentials and approvals require the current owner", async () => {
   const f = await fixture();
-  const trader = await f.moduleNamed("trader", { effects: ["network"], model: { tier: "strong", maxCalls: 1, maxOutputTokens: 100 }, secrets: ["okx_demo"], uses: ["provider.complete", "approvals.request"], tools: [{ name: "start", description: "s", parameters: { type: "object", properties: {}, required: [] } }] });
-  const web = await f.moduleNamed("web", { uses: ["chat.send", "secrets.set"] });
-  const other = await f.moduleNamed("other", { uses: ["chat.send"] });
-  await f.db.workspace.update({ where: { id: f.w }, data: { settings: { moduleModel: { models: { strong: { model: "fake/m", thinking: "high" } }, maxCallsPerEvent: 1, maxOutputTokens: 100, dailyCalls: 10, timeoutMs: 5000, moduleDailyCalls: { trader: 96 } } } } });
+  const trader = await f.moduleNamed("trader", { effects: ["network"], secrets: ["okx_demo"], uses: ["approvals.request"], tools: [{ name: "start", description: "s", visibility: ["modules", "owner"], parameters: { type: "object", properties: {}, required: [] } }] });
+  const web = await f.moduleNamed("web", { uses: ["*"] });
+  const other = await f.moduleNamed("other", {});
   await web.call("secrets.set", { name: "okx_demo", value: JSON.stringify({ apiKey: "k-secret" }) });
-  const grant = await f.db.grant.create({ data: { workspaceId: f.w, action: "modify_external", mode: "allow", scope: { kind: "module", moduleId: trader.module.id } } });
-  await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
-  const view = (await web.call("modules.permissions", { module: "trader" })).output;
-  expect(view).toMatchObject({
-    module: "trader", capabilities: ["联网", "调用 provider.complete", "调用 approvals.request", "读取凭据 okx_demo"],
-    secrets: [{ name: "okx_demo", configured: true }], model: { tier: "strong", target: { model: "fake/m", thinking: "high" }, dailyCap: 96, today: { calls: 0 } },
-    grants: [{ id: grant.id, action: "modify_external", mode: "allow" }], approvals: [{ title: "trader：开始", status: "open" }],
-  });
-  expect(JSON.stringify(view)).not.toContain("k-secret");
-  expect((await other.call("modules.permissions", { module: "trader" })).output).toEqual(view);
+  const approval = await f.api.approvals.create({ action: "modify_external", moduleId: trader.module.id, title: "trader：开始", detail: "", preview: "", payload: {} });
+  const view = (await web.call("modules.list", {})).output;
+  expect(view).toContainEqual(expect.objectContaining({ id: trader.module.id, name: "trader", activeHash: "trader-1", builtin: false, origin: "external", capabilities: expect.objectContaining({ remove: true }), versions: [expect.objectContaining({ hash: "trader-1", status: "approved" })] }));
+  expect((await other.call("modules.list", {})).output).toEqual(view);
+  expect((await other.call("modules.tools", { query: "trader.start" })).output).toMatchObject([{ target: "trader.start", moduleId: trader.module.id, hash: "trader-1", contractHash: expect.any(String) }]);
+  expect((await other.call("modules.reference", { target: "trader.start" })).output).toMatchObject({ target: "trader.start", source: { kind: "module", hash: "trader-1" }, admission: { visibility: ["modules", "owner"], uses: "trader.start" } });
+  const credentials = (await web.call("secrets.list", {})).output;
+  const approvals = (await web.call("approvals.list", {})).output;
+  expect(credentials).toEqual([{ name: "okx_demo", configured: true, updatedAt: expect.any(String), modules: ["trader"] }]);
+  expect(approvals).toContainEqual(expect.objectContaining({ id: approval.id, title: "trader：开始", status: "open" }));
+  for (const target of ["secrets.list", "approvals.list"]) await expect(other.call(target, {})).rejects.toMatchObject({ code: "forbidden" });
+  for (const app of [web, other]) {
+    for (const target of ["approvals.grants", "approvals.revoke-grant", "modules.permissions"]) await expect(app.call(target, {})).rejects.toMatchObject({ code: "not_found" });
+  }
+  expect(JSON.stringify({ view, credentials, approvals, calls: await f.db.moduleInvocation.findMany(), audits: await f.db.audit.findMany() })).not.toContain("k-secret");
 });

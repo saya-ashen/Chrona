@@ -5,30 +5,30 @@ import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import { moduleSupervisor } from "./module-supervisor";
-import { callSync, kernelOrigin, drainCalls } from "./module-calls";
+import { callSync, kernelOrigin, drainCalls, moduleCallbackContractHash } from "./module-calls";
 import { seedFactConsumer } from "./notification-facts";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { resolveBuiltinRelease } from "./module-release";
+import { resolveExternalRelease } from "./module-release";
 import { testDb } from "./test-db";
 import { registerSystemModules } from "./system-modules";
 import type { StewardPorts } from "./ports";
 
-const transportManifest = (name: string) => moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["notify.channel"], tests: ["test.ts"],
+const transportManifest = (name: string) => moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, effects: [], uses: ["notify.channel"], tests: ["test.ts"],
   tools: [{ name: "deliver", description: "Offline delivery", visibility: ["modules"], parameters: { type: "object", required: ["key", "title", "body"], properties: {
     key: { type: "string" }, title: { type: "string" }, body: { type: "string" }, format: { type: "string", enum: ["text", "markdown"] }, link: { type: "string" }, recipient: { type: "string" }, approval: { type: "string" }, scoped: { type: "boolean" } } },
   output: { type: "object", properties: { outcome: { const: "accepted" }, receiptRef: { type: "string" } }, required: ["outcome", "receiptRef"], additionalProperties: false } }] });
 
 test("real notify SDK uses two external callbacks, persists target bindings and isolates a paused owner", async () => {
   registerSystemModules();
-  const dataDir = await mkdtemp("/tmp/chrona-notify-routed-"), resources = join(dataDir, "platform/builtin"), db = testDb();
+  const dataDir = await mkdtemp("/tmp/chrona-notify-routed-"), resources = join(dataDir, "platform/external"), db = testDb();
   const runtime = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
-  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleBuiltinResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
+  const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, moduleExternalResources: resources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
   try {
-    await mkdir(resources, { recursive: true }); await cp(join(import.meta.dirname, "builtin/notify"), join(resources, "notify"), { recursive: true });
+    await mkdir(resources, { recursive: true }); await cp(join(import.meta.dirname, "external/notify"), join(resources, "notify"), { recursive: true });
     await seedTestModuleRelease(resources, "notify");
-    const release = await resolveBuiltinRelease(ports, "notify");
+    const release = await resolveExternalRelease(ports, "notify");
     const workspaceId = (await db.workspace.create({ data: { name: "notify-routed" } })).id;
-    const notify = await db.module.create({ data: { workspaceId, name: "notify", builtin: true, activeHash: release.hash } });
+    const notify = await db.module.create({ data: { workspaceId, name: "notify", builtin: false, activeHash: release.hash } });
     await seedFactConsumer(db, workspaceId, notify.id, ports.now());
     await db.moduleVersion.create({ data: { moduleId: notify.id, hash: release.hash, manifest: release.manifest, source: "user", status: "approved", intent: {}, report: {} } });
     await mkdir(join(dataDir, "platform/store", release.hash), { recursive: true }); await cp(release.codeDir, join(dataDir, "platform/store", release.hash), { recursive: true });
@@ -66,6 +66,6 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
     expect((await sent(beta))[0].caller).toMatchObject({ kind: "module", module: "notify", moduleId: notify.id });
     const calls = await db.moduleInvocation.findMany({ where: { workspaceId, tool: "deliver" } });
     expect(calls).toHaveLength(2);
-    for (const invocation of calls) expect(await db.audit.findUnique({ where: { id: `module-invocation-target:${invocation.id}` } })).toMatchObject({ details: { moduleId: invocation.target === "alpha" ? alpha.id : beta.id, contractHash: expect.any(String) } });
+    for (const invocation of calls) expect(await db.audit.findUnique({ where: { id: `module-invocation-target:${invocation.id}` } })).toMatchObject({ details: { moduleId: invocation.target === "alpha" ? alpha.id : beta.id, contractHash: moduleCallbackContractHash(transportManifest(invocation.target).tools[0]!) } });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);

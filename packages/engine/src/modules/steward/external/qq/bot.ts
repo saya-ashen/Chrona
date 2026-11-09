@@ -84,24 +84,23 @@ const UNBOUND = "【Chrona】这是 Chrona 的私人管家机器人，尚未绑�
 const NOT_OWNER = "【Chrona】这是私人机器人，你没有使用权限。本条未做任何处理。";
 const BIND_FAIL = { no_challenge: "当前没有待使用的绑定码，请重新生成。", expired: "绑定码已过期或尝试次数已用完，请重新生成。", wrong_code: "绑定码不正确（多次错误后会失效）。", already_bound: "这个机器人已经绑定了主人，未做更改。" };
 
-export type ApprovalDecision = { ref: string; decision: "approve" | "deny"; scope: "once" | "always" };
-const BUTTON = /^approval:([0-9a-f-]{36}):(once|always|deny)$/;
-/** Button data and the text fallback (批准/拒绝 <编号前缀> [始终]) both become one decision. */
+export type ApprovalDecision = { ref: string; decision: "approve" | "deny" };
+const BUTTON = /^approval:([0-9a-f-]{36}):(once|deny)$/;
+/** Button data and the text fallback (批准/拒绝 <编号前缀>) both become one decision. */
 export function parseApprovalDecision(input: { button?: string; text?: string }): ApprovalDecision | null {
   const button = input.button ? BUTTON.exec(input.button) : null;
-  if (button) return { ref: button[1]!, decision: button[2] === "deny" ? "deny" : "approve", scope: button[2] === "always" ? "always" : "once" };
-  const text = input.text ? /^\/?(批准|同意|approve|拒绝|deny)\s+([0-9a-f-]{6,36})(?:\s+(始终|always))?$/i.exec(input.text.trim()) : null;
+  if (button) return { ref: button[1]!, decision: button[2] === "deny" ? "deny" : "approve" };
+  const text = input.text ? /^\/?(批准|同意|approve|拒绝|deny)\s+([0-9a-f-]{6,36})$/i.exec(input.text.trim()) : null;
   if (!text) return null;
-  return { ref: text[2]!.toLowerCase(), decision: /^(拒绝|deny)$/i.test(text[1]!) ? "deny" : "approve", scope: text[3] ? "always" : "once" };
+  return { ref: text[2]!.toLowerCase(), decision: /^(拒绝|deny)$/i.test(text[1]!) ? "deny" : "approve" };
 }
-export function approvalButtons(id: string, scoped: boolean) {
+export function approvalButtons(id: string) {
   return qqButtons("approval", [
     { id: "once", label: "✅ 批准一次", visited: "已批准", data: `approval:${id}:once` },
-    ...(scoped ? [{ id: "always", label: "⭐ 始终允许", visited: "已始终允许", data: `approval:${id}:always` }] : []),
     { id: "deny", label: "❌ 拒绝", visited: "已拒绝", data: `approval:${id}:deny`, style: 0 },
   ]);
 }
-const approvalHint = (id: string, scoped: boolean) => `回复「批准 ${id.slice(0, 8)}」${scoped ? `（加「始终」则始终允许）` : ""}或「拒绝 ${id.slice(0, 8)}」。`;
+const approvalHint = (id: string) => `回复「批准 ${id.slice(0, 8)}」或「拒绝 ${id.slice(0, 8)}」。`;
 
 /** Reservations count even failed/uncertain sends; sequence numbers must never be reused. */
 export function createQqPassiveReplies(reply: (openid: string, id: string, text: string, sequence: number, item?: QqReplyItem) => Promise<unknown>, now = Date.now) {
@@ -171,6 +170,10 @@ export function createQqBotHandler({ state, chat, reply, enqueueFinal, resolveAp
     await send(binding ? NOT_OWNER : UNBOUND);
   }
   async function handleApprovalText(text: string, binding: QqBinding, send: (text: string) => Promise<boolean>) {
+    if (/^\/?(?:批准|同意|approve|拒绝|deny)\s+[0-9a-f-]{6,36}\s+(?:始终|always)$/i.test(text)) {
+      await send("【Chrona】不支持始终允许。请回复「批准 <编号>」或「拒绝 <编号>」。");
+      return true;
+    }
     const decision = resolveApproval ? parseApprovalDecision({ text }) : null;
     if (decision) await send(await resolveApproval!(binding, decision).catch(() => "【Chrona】审批未处理，请在网页上操作。"));
     return Boolean(decision);
@@ -216,9 +219,9 @@ export function markdownAppLink(link: string | null, publicUrl?: string | null):
 /** Legacy text approvals retain their button-permission fallback; explicit Markdown never downgrades. */
 async function sendWithButtons(plain: (content: string) => Promise<QqSendOutcome>, text: string, approval: DeliveryMessage["approval"], withButtons: (content: string, keyboard: QqKeyboard) => Promise<QqSendOutcome>) {
   if (!approval) return plain(text);
-  const content = `${text}\n\n${approvalHint(approval.id, approval.scoped)}`;
+  const content = `${text}\n\n${approvalHint(approval.id)}`;
   if (content.length > 2000) return invalidQqMessage("markdown exceeds 2000 UTF-16 code units");
-  const result = await withButtons(content, approvalButtons(approval.id, approval.scoped));
+  const result = await withButtons(content, approvalButtons(approval.id));
   return result.outcome === "rejected" && !result.retryable ? plain(content) : result;
 }
 /** Active sends are only called by the notification outbox. */
@@ -235,7 +238,7 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
     try { link = markdown ? markdownAppLink(message.link, publicUrl) : message.link?.startsWith("/") && publicUrl ? `${publicUrl.replace(/\/$/, "")}${message.link}` : message.link; }
     catch { return invalidQqMessage("unsafe or unresolved application link"); }
     const text = [markdown ? escapeQqTitle(message.title) : message.title, message.body, link].filter(Boolean).join("\n\n");
-    const content = message.approval ? `${text}\n\n${approvalHint(message.approval.id, message.approval.scoped)}` : text;
+    const content = message.approval ? `${text}\n\n${approvalHint(message.approval.id)}` : text;
     if (markdown && content.length > 2000) return invalidQqMessage("markdown exceeds 2000 UTF-16 code units");
     const allowed = allowedRecipients();
     const recipient = message.recipient ?? (allowed.size === 1 ? [...allowed][0]! : "");
@@ -245,7 +248,7 @@ export function createChronaQqDelivery({ tokens, allowedRecipients, publicUrl, f
     if (window.length >= perMinute) return { outcome: "rejected", retryable: true, error: "Local QQ rate limit" };
     sent.set(recipient, [...window, at]);
     const result = message.format === "markdown"
-      ? await send({ tokens, fetch, openid, content, format: message.format, ...(message.approval ? { keyboard: approvalButtons(message.approval.id, message.approval.scoped) } : {}) })
+      ? await send({ tokens, fetch, openid, content, format: message.format, ...(message.approval ? { keyboard: approvalButtons(message.approval.id) } : {}) })
       : await sendWithButtons(content => send({ tokens, fetch, openid, content, format: message.format }), text, message.approval,
         (content, keyboard) => send({ tokens, fetch, openid, content, keyboard, format: message.format }));
     return result.outcome === "accepted" ? { outcome: "accepted", receiptRef: `${DEDICATED_PLATFORM}:${result.messageId}` } : result;

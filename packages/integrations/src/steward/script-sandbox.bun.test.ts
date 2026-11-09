@@ -90,7 +90,8 @@ sandboxTest("long-running SDK module exchanges events and calls, stays isolated,
     await writeFile(join(codeDir, "index.ts"), `import { on, chrona } from "chrona";
 import { readdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
-on("schedule", async ev => {
+on("tool", async ev => {
+  if (ev.id === 'test') throw new Error('handler failed');
   if (readdirSync(${JSON.stringify(homedir())}).length) throw new Error("home visible");
   try { readFileSync(${JSON.stringify(secret)}); throw new Error("secret visible"); } catch (e) { if (e.message === "secret visible") throw e; }
   if (readlinkSync("/proc/self/ns/net") === ${JSON.stringify(network)}) throw new Error("network shared");
@@ -105,18 +106,17 @@ on("schedule", async ev => {
   }
   if (chrona.paths.data !== "/data") throw new Error("paths: " + chrona.paths.data);
   writeFileSync("/data/result", "ok");
-  const reply = await chrona.notify({ key: ev.id, level: "now", title: "test", body: "hello" });
-  try { await chrona.wakeProvider({ key: "wake", prompt: "hello" }); throw new Error("error reply resolved"); }
-  catch (e) { if (e.message !== "Not allowed") throw e; }
+  const key = ev.id + ':' + ev.firedAt;
+  const reply = await chrona.call('notify.send', { key, level: "now", title: "test", body: "hello" }, { mode: 'async', key });
+  try { await chrona.call('agent.context', { 'request-key': key }); throw new Error("error reply resolved"); }
+  catch (e) { if (e.message !== "Not allowed" || e.code !== 'undeclared') throw e; }
   return { handled: true, result: reply.status };
-});
-on("tool", () => { throw new Error("handler failed"); });`);
+});`);
     handle = createScriptSandbox({ bwrapPath, executionMode: "required-isolation", dataDir: root }).startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "channel.sock") });
     await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
     const now = "2026-10-22T09:00:00.000Z";
-    expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "executed" } });
-    // The SDK shorthands are routed calls (v2-10).
-    expect(calls).toMatchObject([{ method: "call", params: { target: "notify.send", mode: "async", key: `daily:${now}:daily`, args: { key: `daily:${now}:daily`, body: "hello" } } }, { method: "call", params: { target: "agent.context" } }]);
+    expect(await channel.send({ trigger: { kind: "tool", id: "daily", args: {}, firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { handled: true, result: "queued" } });
+    expect(calls).toMatchObject([{ method: "call", params: { target: "notify.send", mode: "async", key: `daily:${now}`, args: { key: `daily:${now}`, body: "hello" } } }, { method: "call", params: { target: "agent.context" } }]);
     expect(await channel.send({ trigger: { kind: "tool", id: "test", firedAt: now, args: {} }, now, params: {} }, 2000)).toMatchObject({ error: "handler failed" });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe("ok");
     expect(handle.pid).toBeGreaterThan(0);
@@ -240,18 +240,19 @@ test("without bubblewrap the same SDK module runs as a plain process and kill en
     await writeFile(join(codeDir, "index.ts"), `import { on, chrona } from "chrona";
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
-on("schedule", async () => {
+on("tool", async () => {
   writeFileSync(chrona.paths.data + "/result", process.cwd() + "|" + chrona.paths.module + "|" + (process.env.API_KEY ?? "none"));
   const child = spawn("sleep", ["30"], { stdio: "ignore" });
   writeFileSync(chrona.paths.data + "/child", String(child.pid));
-  return { result: (await chrona.notify({ key: "k", level: "now", title: "t", body: "b" })).status };
+  return { result: (await chrona.call('notify.send', { key: "k", level: "now", title: "t", body: "b" }, { mode: 'async', key: 'k' })).status };
 });`);
     process.env.API_KEY = "must-not-leak";
     handle = plain.startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "channel.sock") });
     delete process.env.API_KEY;
     await Promise.race([channel.ready, handle.exited.then(exit => { throw new Error(JSON.stringify(exit) + ": " + handle!.stderr()); })]);
     const now = "2026-10-23T09:00:00.000Z";
-    expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 5000)).toMatchObject({ result: { result: "executed" } });
+    expect(await channel.send({ trigger: { kind: "schedule", id: "daily", firedAt: now }, now, params: {} }, 5000)).toMatchObject({ error: "No handler for schedule" });
+    expect(await channel.send({ trigger: { kind: "tool", id: "daily", args: {}, firedAt: now }, now, params: {} }, 5000)).toMatchObject({ result: { result: "queued" } });
     expect(await readFile(join(dataDir, "result"), "utf8")).toBe(`${codeDir}|${codeDir}|none`);
     const child = Number(await readFile(join(dataDir, "child"), "utf8"));
     handle.kill();

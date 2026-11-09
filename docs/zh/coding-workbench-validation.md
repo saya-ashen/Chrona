@@ -1,5 +1,7 @@
 # 连续编码工作台开发验证
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 日期：2026-11-08。范围：用户批准的 Chrona 本机连续编码工作台。状态：开发集成与受控验证完成；未部署、未推送、未使用真实模型或真实账户执行项目任务。使用说明见[编码工作台](coding-web-workbench.md)，范围依据见[实现前评估](coding-workbench-implementation-assessment.md)。
 
 ## 实现与提交

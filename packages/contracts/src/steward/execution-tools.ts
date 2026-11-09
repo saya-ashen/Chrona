@@ -1,16 +1,16 @@
 import { z } from "zod";
-/** Official coding/editor builds bundle this entry to package-local contract.js; no runtime repo imports. */
+/** Official Coding builds bundle this entry to package-local contract.js; no runtime repo imports. */
 export * from "./execution";
 export * from "./execution-events";
 export * from "./execution-v2";
 import { executionInputSchemas, executionResultSourceInputSchema, executionResultSourceSchema, executionViewSchema, executionIdSchema, type ExecutionCommand } from "./execution";
-import { editorResponseDataSchemas } from "./execution-events";
+import { executionResponseDataSchemas } from "./execution-events";
 import { executionStartV2Schema, executionPlacementViewSchema, workLocationSchema, workCleanupInputSchema, workCleanupReceiptSchema } from "./execution-v2";
 import type { ModuleTool } from "./module-tool";
 
 /** H implements protocol adaptation with these exact op success results; no second wire protocol. */
-export type EditorCommandConsumer = {
-  [K in ExecutionCommand["op"]]: (input: Omit<Extract<ExecutionCommand, { op: K }>, "op">) => Promise<z.infer<(typeof editorResponseDataSchemas)[K]>>;
+export type ExecutionCommandConsumer = {
+  [K in ExecutionCommand["op"]]: (input: Omit<Extract<ExecutionCommand, { op: K }>, "op">) => Promise<z.infer<(typeof executionResponseDataSchemas)[K]>>;
 };
 /** coding owns work/results; executions owns the single Run-backed execution. */
 export const CODING_TOOL_OPERATIONS = { create: "start", get: "get", "lookup-start": "lookup_start", events: "events", snapshot: "snapshot", list: "list", send: "send", answer: "answer", cancel: "cancel", results: "results", accept: "accept" } as const;
@@ -18,7 +18,7 @@ export const EXECUTION_TOOL_OPERATIONS = { start: "start", get: "get", "lookup-s
 export const EXECUTION_UNRECORDED_TOOLS = ["start", "send", "answer", "start-v2", "workspace-cleanup"] as const;
 export const executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map(([name, op]) => ({
   name, description: `Execution ${name}`, parameters: { type: "object" as const, properties: {}, required: [] },
-  input: executionInputSchemas[op], output: editorResponseDataSchemas[op], visibility: ["owner", "modules"] as ("owner" | "modules")[], idempotent: true,
+  input: executionInputSchemas[op], output: executionResponseDataSchemas[op], visibility: ["owner", "modules"] as ("owner" | "modules")[], idempotent: true,
 })), {
   name: "result-source", description: "Read admitted result provenance", parameters: { type: "object" as const, properties: {}, required: [] },
   input: executionResultSourceInputSchema, output: executionResultSourceSchema, visibility: ["owner", "modules"] as ("owner" | "modules")[], idempotent: true,
@@ -43,7 +43,7 @@ export function codingToolDeclarations(): ModuleTool[] {
   return Object.entries(CODING_TOOL_OPERATIONS).map(([name, op]) => ({
     name, description: `Coding ${name}; input is JSON matching execution ${op}`,
     parameters: { type: "object", properties: { input: { type: "string", description: `JSON execution ${op} payload, without op` } }, required: ["input"] },
-    visibility: name === "accept" ? ["owner"] : ["owner", "provider"], idempotent: true, output: manifestOutput(editorResponseDataSchemas[op]),
+    visibility: name === "accept" ? ["owner"] : ["owner", "provider"], idempotent: true, output: manifestOutput(executionResponseDataSchemas[op]),
   }));
 }
 type CodingToolInput<K extends keyof typeof CODING_TOOL_OPERATIONS> = z.infer<(typeof executionInputSchemas)[(typeof CODING_TOOL_OPERATIONS)[K]]>;

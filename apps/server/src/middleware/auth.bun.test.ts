@@ -23,6 +23,58 @@ describe("apiKeyAuth", () => {
     resetEnvCache();
   });
 
+  const credentials: { name: string; headers: Record<string, string>; authorized: boolean }[] = [
+    { name: "missing", headers: {}, authorized: false },
+    { name: "wrong", headers: { Authorization: "Bearer wrong" }, authorized: false },
+    { name: "correct", headers: { Authorization: "Bearer test-key" }, authorized: true },
+  ];
+
+  for (const path of [
+    "/health", "/api/health",
+    "/healthy", "/health-foo", "/health/", "/health/status",
+    "/api/healthy", "/api/health-foo", "/api/health/", "/api/health/status",
+  ]) {
+    for (const credential of credentials) {
+      it(`${path} with ${credential.name} auth only bypasses auth for an exact health endpoint`, async () => {
+        resetEnvCache();
+        process.env.API_KEY = "test-key";
+        resetEnvCacheForTests();
+
+        const server = new Hono();
+        // Include /health in the middleware so its exemption is exercised too.
+        server.use("*", apiKeyAuth());
+        server.get(path, (c) => c.json({ path: c.req.path }));
+
+        const response = await server.request(`http://local${path}`, { headers: credential.headers });
+        const isHealth = path === "/health" || path === "/api/health";
+        expect(response.status).toBe(isHealth || credential.authorized ? 200 : 401);
+        if (response.status === 200) expect(await response.json()).toEqual({ path });
+      });
+    }
+  }
+
+  for (const credential of credentials) {
+    it(`preserves explicit method-scoped exemptions with ${credential.name} auth`, async () => {
+      resetEnvCache();
+      process.env.API_KEY = "test-key";
+      resetEnvCacheForTests();
+
+      const server = new Hono();
+      server.use("*", apiKeyAuth({
+        isExempt: (path, method) => path === "/oauth/callback" && method === "GET",
+      }));
+      server.all("*", (c) => c.json({ ok: true }));
+
+      const exempt = await server.request("http://local/oauth/callback", { headers: credential.headers });
+      expect(exempt.status).toBe(200);
+
+      for (const [path, method] of [["/oauth/callback/extra", "GET"], ["/oauth/callback", "POST"]]) {
+        const response = await server.request(`http://local${path}`, { method, headers: credential.headers });
+        expect(response.status).toBe(credential.authorized ? 200 : 401);
+      }
+    });
+  }
+
   it("requires a bearer token when API_KEY is set", async () => {
     resetEnvCache();
     process.env.API_KEY = "test-key";

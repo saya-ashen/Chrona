@@ -22,7 +22,7 @@ test("module pause/version/removal refuse held execution and become available af
     resolveExecutionProject: async (_, projectRef) => ({ projectRef, executor: "server", canonicalPath: dataDir, baseline: "snapshot:fixture" }) };
   try {
     const workspace = await db.workspace.create({ data: { name: "guard" } });
-    const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], triggers: [] });
+    const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [] });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1", dataSchema: 1 } });
     for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", intent: {}, report: {}, status: "approved" } });
     ports.executionEvents = createExecutionEventStore(ports); ports.executions = createExecutions(ports);
@@ -44,7 +44,7 @@ test("real SDK handler typed error crosses supervisor and routed call without me
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl: null, sandbox: { ...runtime.health, startModule: runtime.startModule } };
   try {
     const workspace = await db.workspace.create({ data: { name: "typed" } });
-    const manifest = moduleManifestSchema.parse({ name: "typed-error", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], tools: [{ name: "fail", description: "Fail", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
+    const manifest = moduleManifestSchema.parse({ name: "typed-error", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "fail", description: "Fail", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
     const module = await db.module.create({ data: { workspaceId: workspace.id, name: manifest.name, activeHash: "fixture" } });
     await db.moduleVersion.create({ data: { moduleId: module.id, hash: "fixture", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
     const code = join(dataDir, "platform/store/fixture"); await mkdir(code, { recursive: true });

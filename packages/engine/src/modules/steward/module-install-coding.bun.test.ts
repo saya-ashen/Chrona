@@ -1,61 +1,64 @@
-import { expect, test } from "bun:test";
-import { cp, mkdir } from "node:fs/promises";
+import { afterEach, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
+import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import "./module-effects";
-import { agentFixture } from "./agent-application.fixtures";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
-import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
-import { createModules } from "./modules";
-import { moduleSupervisor } from "./module-supervisor";
-import { callSync, CallError } from "./module-calls";
-import { registerSystemModules } from "./system-modules";
-import { setModuleSettings } from "./module-overview";
-import { resolveBuiltinRelease } from "./module-release";
+import { testDb } from "./test-db";
+import { externalPackageCatalog, installExternal, installationId } from "./module-install";
+import { resolveExternalRelease } from "./module-release";
+import { readModuleFiles } from "./module-preview";
+import type { StewardPorts } from "./ports";
+import { PAUSED_MODULE_NAMES } from "./module-availability";
 
-async function activateWebFixture(f: Awaited<ReturnType<typeof agentFixture>>) {
-  const resources = f.ports.moduleBuiltinResources!;
-  await cp(resolve(import.meta.dir, "builtin/web"), join(resources, "web"), { recursive: true });
-  await seedTestModuleRelease(resources, "web");
-  const release = await resolveBuiltinRelease(f.ports, "web");
-  await mkdir(join(f.ports.dataDir, "platform/store"), { recursive: true });
-  await cp(join(resources, "web"), join(f.ports.dataDir, "platform/store", release.hash), { recursive: true });
-  const module = await f.ports.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: f.workspaceId, name: "web" } } });
-  await f.ports.db.moduleVersion.create({ data: { moduleId: module.id, hash: release.hash, source: "builtin", manifest: release.manifest, status: "approved", intent: {}, report: {} } });
-  await f.ports.db.module.update({ where: { id: module.id }, data: { activeHash: release.hash } });
+const cleanups: (() => Promise<unknown>)[] = [];
+afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
+
+async function sourceDigest(source: string) {
+  const digest = createHash("sha256");
+  for (const file of await readModuleFiles(source, "Unsafe retained test source")) digest.update(file.path).update("\0").update(file.bytes).update("\0");
+  return digest.digest("hex");
 }
 
+test.each([...PAUSED_MODULE_NAMES])("retained %s sources cannot become an installable runtime package", async name => {
+  const dataDir = await mkdtemp("/tmp/chrona-paused-install-"), db = testDb();
+  cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
+  const workspace = await db.workspace.create({ data: { name: "paused packages" } });
+  const resources = join(dataDir, "external"), source = resolve(import.meta.dirname, "external", name), retained = join(resources, name);
+  await cp(source, retained, { recursive: true });
+  const before = await sourceDigest(retained);
+  const manifest = JSON.parse(await readFile(join(retained, "module.json"), "utf8")) as { name: string; entry: string; tests: string[] };
+  expect(manifest.name).toBe(name);
+  for (const entry of [manifest.entry, ...manifest.tests]) expect((await readFile(join(retained, entry))).byteLength).toBeGreaterThan(0);
+  let submissions = 0;
+  const ports: StewardPorts = { db, dataDir, moduleExternalResources: resources, now: () => new Date("2026-11-08T12:00:00Z"), publicUrl: null,
+    moduleExternalInstaller: async () => { submissions++; throw new Error("Paused package reached installer"); } };
+  const request = { package: name, mode: "install" as const, requestKey: "paused" };
+  const unavailable = { code: "unavailable", reason: "module_paused" };
+  for (const attempt of [request, request, { ...request, mode: "update" as const, requestKey: "paused-update" }]) {
+    await expect(installExternal(ports, workspace.id, attempt)).rejects.toMatchObject(unavailable);
+  }
+  expect(await db.audit.count({ where: { kind: "module_installation" } })).toBe(0);
+  expect((await externalPackageCatalog(ports, workspace.id)).find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, installation: null, error: expect.stringContaining("unavailable: paused") });
+  await expect(resolveExternalRelease(ports, name)).rejects.toMatchObject(unavailable);
+  expect(submissions).toBe(0);
+  expect(await db.module.count()).toBe(0);
+  expect(await db.moduleVersion.count()).toBe(0);
+  expect(await db.run.count()).toBe(0);
 
-test.each(["coding", "editor"] as const)("actual %s package installs through author tests and startup without configured projects", async name => {
-  const f = await agentFixture(), ports = f.ports, db = ports.db, dir = ports.dataDir;
-  const workspace = { id: f.workspaceId };
-  await db.run.delete({ where: { id: "agent-run" } });
-  ports.moduleExternalResources = join(dir, "external");
-  ports.moduleTypecheck = resolve(import.meta.dirname, "../../../../integrations/src/steward/module-typecheck");
-  registerSystemModules();
-  ports.executionLocations = async () => [];
-  ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
-  try {
-    if (name === "coding") await activateWebFixture(f);
-    await cp(resolve(import.meta.dirname, "external", name), join(dir, "external", name), { recursive: true });
-    await seedTestModuleRelease(ports.moduleExternalResources!, name);
-    const request = { package: name, mode: "install" as const, requestKey: "fresh" };
-    expect(await installExternal(ports, workspace.id, request)).toMatchObject({ status: "building" });
-    await createModules(ports, workspace.id).buildPending();
-    await refreshInstallationReceipts(ports, workspace.id);
-    expect(await installExternal(ports, workspace.id, request)).toMatchObject({ status: "installed", error: null });
-    const module = await db.module.findFirstOrThrow({ where: { name } });
-    const version = await db.moduleVersion.findFirstOrThrow({ where: { moduleId: module.id } });
-    expect(module.activeHash).toBe(version.hash);
-    expect(version.status).toBe("approved");
-    expect(version.report).toMatchObject({ typecheck: { status: "passed" }, tests: [{ exitCode: 0 }, { exitCode: 0 }] });
-    if (name === "coding") {
-      await moduleSupervisor(ports).refreshHealth(module.id);
-      expect(moduleSupervisor(ports).readiness(module.id, version.hash)).toMatchObject({ status: "needs_configuration", stale: false });
-      ports.executionLocations = async () => { throw new CallError("unavailable", "Execution placements unavailable"); };
-      await setModuleSettings(ports, workspace.id, name, {});
-      expect(moduleSupervisor(ports).readiness(module.id, version.hash)).toMatchObject({ status: "needs_configuration", stale: false });
-      await expect(callSync(ports, { workspaceId: workspace.id, caller: { kind: "owner", via: "test" }, chain: [], path: [] }, "coding.work", { input: "{}" })).rejects.toMatchObject({ code: "invalid" });
-    }
-    expect(await db.run.count()).toBe(0);
-  } finally { await f.close(); }
-}, 60_000);
+  // A receipt created before the pause must replay only the unavailable outcome.
+  const existing = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "a".repeat(40) } });
+  const result = { package: name, requestKey: request.requestKey, status: "installed", moduleId: existing.id, hash: existing.activeHash, approvalId: null, error: null };
+  const id = installationId(workspace.id, request.requestKey);
+  await db.audit.create({ data: { id, workspaceId: workspace.id, actorKey: "kernel", kind: "module_installation", subjectId: existing.id, details: { request, result } } });
+  const replay = await installExternal(ports, workspace.id, request);
+  expect(replay).toMatchObject({ ...result, status: "unavailable", error: unavailable });
+  expect(await installExternal(ports, workspace.id, request)).toEqual(replay);
+  expect(await db.audit.findUniqueOrThrow({ where: { id } })).toMatchObject({ details: { request, result: replay } });
+  await expect(installExternal(ports, workspace.id, { ...request, mode: "update" })).rejects.toMatchObject({ code: "conflict" });
+  await expect(installExternal(ports, workspace.id, { ...request, mode: "update", requestKey: "existing-paused-update" })).rejects.toMatchObject(unavailable);
+  expect(await db.module.findUniqueOrThrow({ where: { id: existing.id } })).toEqual(existing);
+  expect(await db.moduleVersion.count()).toBe(0);
+  expect(await db.run.count()).toBe(0);
+  expect(submissions).toBe(0);
+  expect(await sourceDigest(retained)).toBe(before);
+  expect(await sourceDigest(source)).toBe(before);
+});

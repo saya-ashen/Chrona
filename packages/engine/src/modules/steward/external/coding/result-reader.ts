@@ -1,3 +1,4 @@
+import { MAX_ARTIFACT_BYTES } from "./output";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
@@ -6,7 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 import { executionEventPayloadSchema, executionResultSchema, executionResultSourceSchema } from "./contract.js";
 import { codingError, readCodingWork, type CodingContext } from "./storage";
 
-const MAX_RESULT_BYTES = 20 * 1024 * 1024;
+const MAX_RESULT_BYTES = MAX_ARTIFACT_BYTES;
 
 /** Read only a published version owned by this coding application's work journal. */
 export async function readCodingResult(context: CodingContext, ref: unknown): Promise<{ base64: string; mime: "application/json" }> {
@@ -46,7 +47,7 @@ async function readArtifact(context: CodingContext, filename: string): Promise<B
     try {
       const stat = await file.stat();
       if (!stat.isFile()) throw codingError("invalid", "Coding result must be a regular file");
-      if (stat.size > MAX_RESULT_BYTES) throw codingError("too_large", "Coding result exceeds 20 MiB");
+      if (stat.size > MAX_RESULT_BYTES) throw codingError("too_large", "Coding result exceeds 96 KiB");
       const buffer = Buffer.alloc(stat.size);
       let size = 0;
       while (size < buffer.length) {
@@ -55,7 +56,7 @@ async function readArtifact(context: CodingContext, filename: string): Promise<B
         size += bytesRead;
       }
       const after = await file.stat();
-      if (after.size > MAX_RESULT_BYTES) throw codingError("too_large", "Coding result exceeds 20 MiB");
+      if (after.size > MAX_RESULT_BYTES) throw codingError("too_large", "Coding result exceeds 96 KiB");
       if (size !== stat.size || after.size !== stat.size) throw codingError("conflict", "Coding result changed during read");
       return buffer.subarray(0, size);
     } finally { await file.close(); }

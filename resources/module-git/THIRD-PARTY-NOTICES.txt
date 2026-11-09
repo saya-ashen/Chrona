@@ -2,7 +2,7 @@ Third-party notices for bundled code
 
 Chrona module source is licensed under the accompanying MIT LICENSE.
 The following dependencies retain their own licenses and copyright notices.
-This file covers bundled dependencies in web/pages.js and coding/editor generated contracts; it does not relicense those dependencies.
+This file covers bundled dependencies in web/pages.js and Coding generated contracts; it does not relicense those dependencies.
 
 === @json-render/core@0.21.4 (Apache-2.0) ===
 

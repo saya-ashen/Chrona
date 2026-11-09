@@ -1,31 +1,104 @@
 {
   "name": "mcp",
-  "description": "Owner MCP endpoint at /api/mcp for the user's own agents.",
+  "description": "Owner MCP endpoint at /api/mcp using current routed contracts and app-owned conversations.",
   "entry": "index.ts",
   "keepAlive": true,
   "listen": "/api/mcp",
-  "triggers": [],
   "effects": [],
-  "uses": ["agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond", "web.today", "activity.runs", "approvals.list", "approvals.resolve", "modules.list", "modules.tools", "*", "modules.contributions", "modules.settings-get", "modules.build-sessions", "modules.build-session", "modules.build-transcript"],
-  "settings": {
-    "memory-provider": {
-      "type": "string",
-      "label": "记忆应用",
-      "description": "应用名；留空关闭记忆。不自动安装应用。",
-      "default": "",
-      "maxLength": 41
+  "uses": [
+    "*",
+    "web.page-set"
+  ],
+  "tools": [
+    {
+      "name": "settings",
+      "description": "Read or update this MCP application's private memory preferences. settings is a strict partial JSON object with provider, autoRecall and autoRetain.",
+      "visibility": [
+        "owner"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "string"
+          }
+        },
+        "required": []
+      },
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autoRecall": {
+            "type": "boolean"
+          },
+          "autoRetain": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "autoRecall",
+          "autoRetain"
+        ],
+        "additionalProperties": false
+      }
     },
-    "memory-auto-recall": {
-      "type": "boolean",
-      "label": "自动召回记忆",
-      "default": true
-    },
-    "memory-auto-retain": {
-      "type": "boolean",
-      "label": "自动保存记忆",
-      "default": true
+    {
+      "name": "ui-settings",
+      "description": "Read or update MCP memory preferences through scalar settings controls. Empty provider disables memory; omitted fields are preserved.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Memory provider app slug, or empty to disable memory."
+          },
+          "auto-recall": {
+            "type": "boolean"
+          },
+          "auto-retain": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "autoRecall": {
+            "type": "boolean"
+          },
+          "autoRetain": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "autoRecall",
+          "autoRetain"
+        ],
+        "additionalProperties": false
+      }
     }
+  ],
+  "data": {
+    "schema": 1
   },
-  "data": { "schema": 1 },
-  "tests": ["test.ts"]
+  "tests": [
+    "test.ts"
+  ],
+  "activated": true
 }

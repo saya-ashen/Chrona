@@ -1,5 +1,6 @@
 import { mkdtemp, chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { httpSocketReady } from "./module-http-ready";
 import { listenPaths, moduleManifestSchema, moduleRuntimeParams, RUN_LIMITS, type ModuleCall, type moduleCallReplySchema, type ModuleEvent, type ModuleManifest, type moduleEventReplySchema } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
@@ -14,7 +15,7 @@ import { rollbackFailedStart } from "./module-generation";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
 import { isAgentApplication } from "./agent-application";
-import { projectReadiness, type ModuleReadinessReport, type ModuleReadinessRecord } from "./module-readiness";
+import { assertModuleAvailable, isModulePaused, ModuleUnavailableError } from "./module-availability";
 
 type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
 /** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
@@ -36,10 +37,10 @@ function staged(error: unknown, stage: DeliveryStage) {
   const base: Error & { stage?: DeliveryStage } = error instanceof Error ? error : new Error(String(error));
   return Object.assign(base, { stage: base.stage ?? stage });
 }
-function isHandlerRejection(error: unknown, event: ModuleEvent) {
+function isHandlerRejection(error: unknown) {
   const rejection = error as { stage?: DeliveryStage; code?: string };
   if (rejection.stage !== "handler") return false;
-  return event.trigger.kind === "health" || !!rejection.code && !["internal", "failed", "unknown"].includes(rejection.code);
+  return !!rejection.code && !["internal", "failed", "unknown"].includes(rejection.code);
 }
 type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
 type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
@@ -47,13 +48,11 @@ type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
 type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; validateResult?: (result: unknown) => string | null };
 type Instance = {
   moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
-  queue: Promise<unknown>; start?: Promise<void>;
+  queue: Promise<unknown>; start?: Promise<void>; httpReady?: Promise<void>;
   process?: Process; channel?: Awaited<ReturnType<typeof createModuleChannel>>;
   dir?: string; idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
   exit?: { code: number | null; signal: string | null };
-  failureEvidence?: ModuleFailureEvidence;
-  failureRecorded?: boolean;
-  readiness?: ModuleReadinessRecord;
+  failureEvidence?: ModuleFailureEvidence; failureRecorded?: boolean;
 };
 const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
 const isClosing = (instance: Instance) => instance.closing;
@@ -187,6 +186,7 @@ class ModuleSupervisor {
     const { ports } = this;
     const module = await ports.db.module.findUniqueOrThrow({ where: { id: instance.moduleId } });
     if (module.activeHash !== instance.hash || module.status !== "active") throw new Error("Module identity changed before start");
+    assertModuleAvailable(module.name);
     let codeDir = join(ports.dataDir, "platform/store", instance.hash);
     assertModuleOperation(module, "enable");
     const version = await ports.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: instance.hash } } });
@@ -219,6 +219,8 @@ class ModuleSupervisor {
     if (httpDir) await mkdir(httpDir, { mode: 0o700 });
     const agent = await this.agentHost(instance);
     const startModule = agent ? agent.startModule : sandbox.startModule!;
+    await this.getActiveModule(instance.moduleId, instance.hash);
+    if (isClosing(instance)) throw new Error("Module instance closed before start");
     const process = startModule({ codeDir, dataDir, contentDir, httpDir, env: { CHRONA_PUBLIC_URL: ports.publicUrl ?? "", ...agent?.env }, entry: instance.manifest.entry, socketPath: join(instance.dir, "s"), network: instance.manifest.effects.includes("network"), memoryMb: instance.manifest.limits?.virtualMemoryMb });
     instance.process = process;
     // Install exit observers before yielding after startModule returns.
@@ -254,6 +256,7 @@ class ModuleSupervisor {
     if (this.isStopped()) throw new Error("Module supervisor stopped");
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     if (this.isStopped()) throw new Error("Module supervisor stopped");
+    assertModuleAvailable(module.name);
     if (module.status !== "active" || module.activeHash !== hash) throw new Error("Module version is not active");
     return module;
   }
@@ -284,10 +287,12 @@ class ModuleSupervisor {
   }
   private async ensureActive(moduleId: string) {
     const module = await this.ports.db.module.findUnique({ where: { id: moduleId } });
-    if (this.stopped || this.restarts.has(moduleId) || module?.status !== "active" || !module.activeHash) return;
+    if (this.stopped || this.restarts.has(moduleId) || module?.status !== "active" || !module.activeHash || isModulePaused(module.name)) return;
     const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
     if (!moduleManifestSchema.safeParse(version?.manifest).data?.keepAlive) return;
-    const instance = await this.get(moduleId, module.activeHash);
+    await this.startKeepAlive(await this.get(moduleId, module.activeHash));
+  }
+  private async startKeepAlive(instance: Instance) {
     if (instance.start) return;
     instance.busy = true;
     try { await (instance.start = this.startInstance(instance)); }
@@ -297,21 +302,10 @@ class ModuleSupervisor {
       await this.failure(instance, String(error).slice(0, 2000)); await this.restartCurrent(instance);
     }
     finally { await this.finishBusy(instance); }
-    await this.refreshHealth(moduleId).catch(() => {});
-  }
-  async refreshHealth(moduleId: string) {
-    const module = await this.ports.db.module.findUnique({ where: { id: moduleId } });
-    if (!module?.activeHash || module.status !== "active") return;
-    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
-    if (instance) instance.readiness = undefined;
-    const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
-    if (!moduleManifestSchema.safeParse(version?.manifest).data?.healthCheck) return;
-    const now = this.ports.now().toISOString();
-    await this.deliver(moduleId, module.activeHash, { trigger: { kind: "health", id: "health", firedAt: now }, now, params: {} });
   }
   async reconcile() {
     if (this.stopped) return;
-    const modules = await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } });
+    const modules = (await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })).filter(module => !isModulePaused(module.name));
     const active = new Map(modules.map(module => [module.id, module.activeHash]));
     for (const instance of this.instances.values()) if (active.get(instance.moduleId) !== instance.hash) this.retire(instance);
     for (const module of modules) await this.ensureActive(module.id);
@@ -332,20 +326,15 @@ class ModuleSupervisor {
     const file = join(this.ports.dataDir, "platform", "activated.json");
     try {
       this.announced ??= await readFile(file, "utf8").then(text => JSON.parse(text) as Record<string, string>).catch(() => ({}));
-      const hashes = new Map(modules.map(module => [module.name, module.activeHash]));
+      const hashes = new Map(modules.filter(module => !isModulePaused(module.name)).map(module => [module.name, module.activeHash]));
       for (const module of modules) {
+        if (isModulePaused(module.name)) continue;
         const hash = module.activeHash!, manifest = await this.manifestOf(module.id, hash);
         if (!manifest?.activated || (this.stopped as boolean)) continue;
         const uses = [...new Set(manifest.uses.filter(target => target !== "*").map(target => target.split(".")[0]!))].filter(name => name !== module.name && hashes.has(name)).sort();
         const signature = [hash, ...uses.map(name => `${name}@${hashes.get(name)}`)].join(" ");
         if (this.announced[module.id] === signature) continue;
-        const now = this.ports.now().toISOString(), attempt = `${module.id} ${signature}`;
-        try { await this.deliver(module.id, hash, { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} }); }
-        catch {
-          const tries = (this.announceAttempts.get(attempt) ?? 0) + 1;
-          this.announceAttempts.set(attempt, tries);
-          if (tries < 3) continue;
-        }
+        if (!await this.deliverActivation(module.id, hash, signature)) continue;
         this.announced[module.id] = signature;
         await mkdir(join(this.ports.dataDir, "platform"), { recursive: true });
         await writeFile(`${file}.tmp`, JSON.stringify(this.announced));
@@ -353,27 +342,43 @@ class ModuleSupervisor {
       }
     } finally { this.announcing = false; }
   }
+  private async deliverActivation(moduleId: string, hash: string, signature: string) {
+    const now = this.ports.now().toISOString(), attempt = `${moduleId} ${signature}`;
+    try { await this.deliver(moduleId, hash, { trigger: { kind: "activated", id: "activated", firedAt: now }, now, params: {} }); }
+    catch {
+      const tries = (this.announceAttempts.get(attempt) ?? 0) + 1;
+      this.announceAttempts.set(attempt, tries);
+      if (tries < 3) return false;
+    }
+    return true;
+  }
   private async manifestOf(moduleId: string, hash: string) {
     if (!this.manifests.has(hash)) this.manifests.set(hash, moduleManifestSchema.safeParse((await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } }))?.manifest).data ?? null);
     return this.manifests.get(hash);
   }
   private async validateTrigger(instance: Instance, event: ModuleEvent) {
     const { trigger } = event, { manifest, moduleId } = instance;
-    const dynamic = trigger.kind === "schedule" && trigger.scheduleId !== undefined && trigger.payload !== undefined;
-    if (dynamic) {
-      // v2-24: only the module's own timers deliver schedule events.
-      if (!await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires its own timer"), "unavailable");
-    } else if (trigger.kind === "health") {
-      if (!manifest.healthCheck) throw staged(new Error("Module has no health handler"), "unavailable");
-      return;
-    } else if (trigger.kind === "activated" || trigger.kind === "call_result") return;
-    else if (trigger.kind === "tool" ? !manifest.tools.some(tool => tool.name === trigger.id) : !manifest.triggers.some(candidate => candidate.id === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+    switch (trigger.kind) {
+      case "schedule":
+        // Only the module's own runtime timers deliver schedule events.
+        if (trigger.scheduleId === undefined || trigger.payload === undefined || !await this.ports.db.schedule.findFirst({ where: { id: trigger.scheduleId, moduleId, mode: "module" } })) throw staged(new Error("Dynamic schedule requires its own timer"), "unavailable");
+        return;
+      case "tool":
+        if (!manifest.tools.some(tool => tool.name === trigger.id)) throw staged(new Error("Module trigger missing"), "unavailable");
+        return;
+      case "activated":
+        if (!manifest.activated) throw staged(new Error("Module has no activated handler"), "unavailable");
+        return;
+      case "call_result": return;
+      default: throw staged(new Error("Unsupported module event kind"), "unavailable");
+    }
   }
-  /** The owner's settings decide a model module's timeout and every module's params (v2-23 settings). */
+  /** Kernel event ceilings bound requested timeouts; application preferences do not govern them. */
   private async eventLimits(manifest: ModuleManifest, workspaceId: string, requested?: number) {
-    const workspace = manifest.model || Object.keys(manifest.settings).length ? await this.ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } }) : null;
-    const timeoutMs = requested ?? (workspace && manifest.model ? moduleModelSettings(workspace.settings)?.timeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs);
-    return { timeoutMs, params: moduleRuntimeParams(manifest, workspace?.settings) };
+    const workspace = manifest.model ? await this.ports.db.workspace.findUniqueOrThrow({ where: { id: workspaceId } }) : null;
+    const ceiling = workspace && manifest.model ? moduleModelSettings(workspace.settings)?.eventTimeoutMs ?? RUN_LIMITS.jobTimeoutMs : RUN_LIMITS.jobTimeoutMs;
+    const timeoutMs = Math.min(requested ?? ceiling, ceiling);
+    return { timeoutMs, params: moduleRuntimeParams(manifest) };
   }
   private async sendEvent(instance: Instance, event: ModuleEvent, workspaceId: string, requested?: number) {
     const { manifest } = instance;
@@ -405,7 +410,6 @@ class ModuleSupervisor {
       return;
     }
     await this.ports.db.moduleRun.update({ where: { id: runId }, data: { exitCode: 0, output: instance.manifest.name === "agent" ? {} : reply.result } });
-    if (event.trigger.kind === "health") return;
     this.backoffFailures.set(keyOf(instance.moduleId, instance.hash, instance.activationId), 0);
     await recordModuleRecovery(this.ports, { workspaceId, moduleId: instance.moduleId, hash: instance.hash, activationId: instance.activationId, triggerId: triggerKey(event), runId }).catch(error => console.error(JSON.stringify({ component: "module-supervisor", event: "recovery_diagnostic.persist_failed", moduleId: instance.moduleId, hash: instance.hash, error: diagnosticText(String(error), 300) })));
   }
@@ -413,6 +417,10 @@ class ModuleSupervisor {
     const { moduleId, hash } = instance;
     const module = await this.ports.db.module.findUniqueOrThrow({ where: { id: moduleId } });
     const evolution = await currentModuleEvolution(this.ports.db, module.workspaceId, moduleId, hash);
+    if (isModulePaused(module.name)) {
+      await this.close(instance);
+      throw Object.assign(staged(new ModuleUnavailableError(module.name), "unavailable"), { staleActivation: true });
+    }
     if (this.stopped || instance.closing || module.status !== "active" || module.activeHash !== hash || (evolution?.activationId ?? null) !== instance.activationId) {
       await this.close(instance);
       throw Object.assign(staged(new Error("Module activation changed before event delivery"), "unavailable"), { staleActivation: true });
@@ -435,8 +443,7 @@ class ModuleSupervisor {
       return reply;
     } catch (error) {
       if ((error as { staleActivation?: boolean }).staleActivation) throw error;
-      if (event.trigger.kind === "health") instance.readiness = undefined;
-      if (isHandlerRejection(error, event)) {
+      if (isHandlerRejection(error)) {
         // A validated application rejection (invalid input, conflict, permission, capacity)
         // completes this call; the SDK process remains healthy and can serve the next one.
         await this.ports.db.moduleRun.update({ where: { id: run.id }, data: { exitCode: 1, error: diagnosticText(error instanceof Error ? error.message : String(error), 1000) } });
@@ -458,28 +465,19 @@ class ModuleSupervisor {
   /** The HTTP socket of the active module serving path, started if needed; null when none can serve it. */
   async listener(path: string) {
     for (const module of await this.ports.db.module.findMany({ where: { status: "active", activeHash: { not: null } } })) {
+      if (isModulePaused(module.name)) continue;
       const version = await this.ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
       if (!listenPaths(moduleManifestSchema.safeParse(version?.manifest).data ?? {}).includes(path)) continue;
-      await this.ensureActive(module.id);
-      const currentKey = this.current.get(module.id);
-      const instance = currentKey ? this.instances.get(currentKey) : undefined;
-      await instance?.start?.catch(() => {});
-      return instance?.dir && !instance.closing ? join(instance.dir, "http/s") : null;
+      if (this.stopped || this.restarts.has(module.id)) return null;
+      const instance = await this.get(module.id, module.activeHash!);
+      if (instance.idle) this.timers.clearTimeout(instance.idle);
+      try {
+        await (instance.start ??= this.startInstance(instance)); const socket = join(instance.dir!, "http/s");
+        await (instance.httpReady ??= httpSocketReady(socket, instance.channel!, this.timers));
+        await this.assertCurrentActivation(instance); return socket;
+      } catch { return null; }
     }
     return null;
-  }
-  reportHealth(moduleId: string, hash: string, report: ModuleReadinessReport) {
-    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
-    if (!instance || instance.hash !== hash || instance.closing || instance.retiring || !instance.channel?.connected()) throw new Error("Module process is not current");
-    const now = this.ports.now();
-    instance.readiness = { ...report, summary: diagnosticText(report.summary, 300), ...(report.nextAction ? { nextAction: diagnosticText(report.nextAction, 300) } : {}), reportedAt: now.toISOString(), expiresAt: new Date(now.getTime() + report.validForSeconds * 1000).toISOString() };
-    return { reportedAt: instance.readiness.reportedAt, expiresAt: instance.readiness.expiresAt };
-  }
-  readiness(moduleId: string, hash: string | null) {
-    const key = this.current.get(moduleId), instance = key ? this.instances.get(key) : undefined;
-    const report = instance?.hash === hash ? instance.readiness : undefined;
-    const available = !this.stopped && !!instance?.channel?.connected() && !instance.closing && !instance.retiring;
-    return projectReadiness(report, available, this.ports.now());
   }
   status(moduleId: string, hash: string | null, keepAlive: boolean) {
     if (!this.started || this.stopped) return { state: "unobserved" as const, pid: null };
@@ -522,5 +520,5 @@ export function createModuleSupervisor(ports: StewardPorts, { timers = globalThi
   const runtime = new ModuleSupervisor(ports, timers, idleMs, backoffMs);
   // Preserve the closure API: consumers may extract methods without a receiver.
   return { deliver: runtime.deliver.bind(runtime), reconcile: runtime.reconcile.bind(runtime), listener: runtime.listener.bind(runtime),
-    status: runtime.status.bind(runtime), refreshHealth: runtime.refreshHealth.bind(runtime), reportHealth: runtime.reportHealth.bind(runtime), readiness: runtime.readiness.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
+    status: runtime.status.bind(runtime), start: runtime.start.bind(runtime), stop: runtime.stop.bind(runtime), settleModule: runtime.settleModule.bind(runtime) };
 }

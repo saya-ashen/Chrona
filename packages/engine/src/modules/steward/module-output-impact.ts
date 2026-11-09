@@ -1,42 +1,47 @@
-import { grantedUses, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema, type ModuleTool, type ModuleToolParameter } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 
-const canonical = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
-  return JSON.stringify(value);
-};
+// Mirror normalizedToolInputSchema/moduleCallbackContractHash for persisted manifest tools.
+// Importing module-calls here would cycle through supervisor -> builtin -> build -> impact.
+function normalizedParameter(parameter: ModuleToolParameter): Record<string, unknown> {
+  if (parameter.type === "array") return { type: "array", ...(parameter.description ? { description: parameter.description } : {}), items: normalizedParameter(parameter.items) };
+  if (parameter.type === "object") return { type: "object", ...(parameter.description ? { description: parameter.description } : {}), properties: Object.fromEntries(Object.entries(parameter.properties).map(([key, value]) => [key, normalizedParameter(value)])), required: parameter.required ?? [], additionalProperties: parameter.additionalProperties };
+  return { ...parameter };
+}
+function contract(tool: ModuleTool): string {
+  const input = { type: "object", properties: Object.fromEntries(Object.entries(tool.parameters.properties).map(([key, value]) => [key, normalizedParameter(value)])), required: tool.parameters.required, additionalProperties: false };
+  return JSON.stringify({ input, output: tool.output ?? null, visibility: [...tool.visibility].sort(), idempotent: tool.idempotent }, (_key, item: unknown) => item && typeof item === "object" && !Array.isArray(item)
+    ? Object.fromEntries(Object.entries(item).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)) : item);
+}
+function approvedManifest(version: { status: string; manifest: unknown } | null, name: string) {
+  if (version?.status !== "approved") return undefined;
+  const manifest = moduleManifestSchema.safeParse(version.manifest).data;
+  return manifest?.name === name ? manifest : undefined;
+}
 type Db = StewardPorts["db"];
 export type OutputImpact = { caller: string; targets: string[] };
 
-/** Current active consumers whose declared uses point at a changed/removed target contract. */
-// eslint-disable-next-line complexity -- Preserve exact versus wildcard visibility checks and caller-impact ordering for approval safety.
+/** Active approved callers admitted by an existing changed/removed contract's audience. */
 export async function moduleOutputImpacts(db: Db, workspaceId: string, moduleId: string, nextManifest: ReturnType<typeof moduleManifestSchema.parse>): Promise<OutputImpact[]> {
   const module = await db.module.findUnique({ where: { id: moduleId } });
-  if (!module?.activeHash) return [];
+  if (module?.workspaceId !== workspaceId || !module.activeHash) return [];
   const activeVersion = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: module.activeHash } } });
-  const previous = moduleManifestSchema.safeParse(activeVersion?.manifest).data;
+  const previous = approvedManifest(activeVersion, module.name);
   if (!previous) return [];
-  const oldTools = new Map(previous.tools.map(tool => [tool.name, tool]));
   const nextTools = new Map(nextManifest.tools.map(tool => [tool.name, tool]));
-  const changed = new Map<string, { exact: boolean; wildcard: boolean }>();
-  for (const [name, oldTool] of oldTools) {
-    const next = nextTools.get(name);
-    if ((!next || canonical(oldTool.output ?? null) !== canonical(next.output ?? null))
-      && (oldTool.visibility.includes("modules") || oldTool.visibility.includes("owner") || next?.visibility.includes("modules") || next?.visibility.includes("owner")))
-      changed.set(`${module.name}.${name}`, { exact: oldTool.visibility.includes("modules") || !!next?.visibility.includes("modules"), wildcard: oldTool.visibility.includes("owner") || !!next?.visibility.includes("owner") });
-  }
-  for (const [name, next] of nextTools) if (!oldTools.has(name) && (next.visibility.includes("modules") || next.visibility.includes("owner")))
-    changed.set(`${module.name}.${name}`, { exact: next.visibility.includes("modules"), wildcard: next.visibility.includes("owner") });
-  if (!changed.size) return [];
+  const changed = previous.tools.filter(old => {
+    const next = nextTools.get(old.name);
+    return (old.visibility.includes("modules") || old.visibility.includes("owner")) && (!next || contract(old) !== contract(next));
+  });
+  // New tools have no existing consumers to invalidate.
+  if (!changed.length) return [];
   const consumers = await db.module.findMany({ where: { workspaceId, status: "active", activeHash: { not: null }, id: { not: moduleId } }, orderBy: { name: "asc" } });
   const impacts: OutputImpact[] = [];
   for (const caller of consumers) {
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: caller.id, hash: caller.activeHash! } } });
-    const manifest = moduleManifestSchema.safeParse(version?.manifest).data;
+    const manifest = approvedManifest(version, caller.name);
     if (!manifest) continue;
-    const uses = grantedUses(manifest);
-    const targets = [...changed].filter(([target, details]) => details.exact && uses.includes(target) || details.wildcard && uses.includes("*")).map(([target]) => target);
+    const targets = changed.filter(tool => tool.visibility.includes("modules") || manifest.uses.includes("*")).map(tool => `${module.name}.${tool.name}`);
     if (targets.length) impacts.push({ caller: caller.name, targets });
   }
   return impacts;

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { runtimeStartSchema, runtimeOperationSchema, runtimeOutcomeSchema, runtimeHealthSchema, runtimeCompletionSchema, runtimeTranscriptSchema, THINKING_LEVELS } from "@chrona/contracts/steward";
-export const agentCompletionInput = z.object({ model: z.string().min(1).max(500), thinking: z.enum(THINKING_LEVELS).optional(), system: z.string().max(200_000).optional(), prompt: z.string().max(2 * 1024 * 1024), maxOutputTokens: z.number().int().positive().max(32_000), timeoutMs: z.number().int().positive().max(300_000) }).strict();
+import { hardLimitsSchema } from "./model-policy";
+const directCompletionInput = z.object({ model: z.string().min(1).max(500), thinking: z.enum(THINKING_LEVELS).optional(), system: z.string().max(200_000).optional(), prompt: z.string().max(2 * 1024 * 1024), maxOutputTokens: z.number().int().positive().max(32_000), timeoutMs: z.number().int().positive().max(300_000) }).strict();
+const tierCompletionInput = directCompletionInput.omit({ model: true, thinking: true }).extend({ declaredTier: z.string().min(1).max(40), effectiveHardLimits: hardLimitsSchema, timeoutMs: z.number().int().positive().max(600_000) }).strict();
+export const agentCompletionInput = z.union([directCompletionInput, tierCompletionInput]);
 export const agentTools = [
   ["health", z.object({}).strict(), runtimeHealthSchema], ["start", runtimeStartSchema, runtimeOperationSchema],
   ["status", runtimeOperationSchema, runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean() })],

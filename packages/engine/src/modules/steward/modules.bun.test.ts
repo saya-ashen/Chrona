@@ -15,10 +15,10 @@ import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
 import { notice, notices } from "./test-notices";
-import { modulesListOutput, modulesUpstreamOutput } from "./system-outputs";
+import { modulesListOutput } from "./system-outputs";
 import { callSync, listSystemModules } from "./module-calls";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
-import { approvalNoticeBody } from "./builtin/notify/approval";
+import { approvalNoticeBody } from "./external/notify/approval";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -46,7 +46,7 @@ async function fixture(credentials = true) {
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test"), dir = join(root, "price-watch");
   await mkdir(dir, { recursive: true });
-  const manifest = { name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], uses: ["notify.send"], tests: ["test.ts"] };
+  const manifest = { name: "price-watch", entry: "index.ts", tools: [{ name: "inspect", description: "Inspect price state", visibility: ["owner", "provider", "modules"], output: {}, parameters: { type: "object", properties: {} } }], effects: [], uses: ["notify.send"], tests: ["test.ts"] };
   async function write(value = 1) {
     await writeFile(join(dir, "module.json"), JSON.stringify({ ...manifest, ...(credentials ? { secrets: [`credential_${value}`] } : {}), params: { threshold: { type: "number", value } } }));
     await writeFile(join(dir, "index.ts"), `console.log(${value})`);
@@ -77,7 +77,7 @@ test("checks-passing fresh apps and updates activate without a card and send dig
     expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ activeHash: result.hash, status: "active", dataSchema: 1 });
     const message = (await notices(f.db)).find(item => item.body.includes(result.hash));
     expect(message).toMatchObject({ level: "digest", title: `应用 price-watch 已自动${value === 1 ? "启用" : "更新"}` });
-    expect(message?.body).toContain("Track the price");
+    expect((await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: result.moduleId!, hash: result.hash } } })).intent).toEqual(intent);
     expect(message?.body).toContain("回滚");
   }
   expect(await f.db.audit.count({ where: { kind: "module_auto_activated" } })).toBe(2);
@@ -160,14 +160,15 @@ test.each(["open", "expired", "approved", "denied"])("review recovery never recr
   expect(await f.db.approval.findFirst()).toMatchObject({ status, payload: { hash: proposal.hash } });
 });
 
-test("activation schedules the module's schedule triggers", async () => {
-  const f = await fixture(), manifest = JSON.parse(await readFile(join(f.dir, "module.json"), "utf8"));
+test("activation exposes declared tools without producing calendar rows", async () => {
+  const f = await fixture();
   const result = await f.propose();
   expect(f.calls.filter(call => call.entry === "test.ts")).toMatchObject([{ memoryMb: RUN_LIMITS.moduleTestMemoryMb, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs }]);
   expect(f.calls.filter(call => call.entry !== "test.ts").every(call => call.memoryMb === undefined)).toBe(true);
   await f.approve(result.approvalId!);
   const schedules = await f.db.schedule.findMany({ where: { moduleId: result.moduleId! } });
-  expect(schedules.map(row => ({ triggerId: row.triggerId, mode: row.mode, rule: row.rule }))).toEqual([{ triggerId: "daily", mode: "module", rule: manifest.triggers[0].schedule }]);
+  expect(schedules).toEqual([]);
+  expect((await f.service.modules.tools()).tools.map(tool => tool.name)).toContain("m_price_watch_inspect");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: result.moduleId! } })).toMatchObject({ status: "active", activeHash: result.hash });
 });
 
@@ -212,7 +213,7 @@ async function dataFixture(credentials = false) {
     await writeFile(join(input.dataDir, "nested/state"), Buffer.from([0, 255, 1, 2]));
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
-  await f.service.schedules.fireDue(new Date("2026-10-21T01:00:00Z"));
+  await f.service.modules.callTool("m_price_watch_inspect", {});
   expect((await f.db.module.findUniqueOrThrow({ where: { id: first.moduleId! } })).dataSchema).toBe(1);
   f.ports.sandbox!.runModule = original;
   await f.write(2);
@@ -348,7 +349,7 @@ test.each(["empty", "missing", "same schema"])('rollback switches directly with 
   expect(await f.db.generation.findFirstOrThrow({ orderBy: { seq: "desc" } })).toMatchObject({ reason: "rollback" });
 });
 
-test("activation snapshots and migrates current data, then the next firing reads schema 2", async () => {
+test("activation snapshots and migrates current data, then the next routed tool reads schema 2", async () => {
   const f = await dataFixture();
   await f.schema(2, "migrate.ts");
   let migrations = 0, liveReads = 0;
@@ -380,7 +381,7 @@ test("activation snapshots and migrates current data, then the next firing reads
   expect(await readFile(join(f.live, "nested/state"), "utf8")).toBe("schema 2");
   expect(await f.db.module.findFirstOrThrow()).toMatchObject({ dataSchema: 2, activeHash: result.hash, status: "active" });
   expect(await f.db.audit.findFirst({ where: { kind: "module_migration_started" } })).toMatchObject({ details: { hash: result.hash, from: 1, to: 2 } });
-  await f.service.schedules.fireDue(new Date("2026-10-22T01:00:00Z"));
+  await f.service.modules.callTool("m_price_watch_inspect", {});
   expect(liveReads).toBe(1);
   expect((await f.db.moduleRun.findFirstOrThrow({ orderBy: { createdAt: "desc" } })).error).toBeNull();
   await expect(stat(join(f.dataDir, "platform/data-old", f.first.moduleId!))).rejects.toMatchObject({ code: "ENOENT" });
@@ -439,7 +440,7 @@ test.each(["failed", "timeout", "unavailable", "throw", "output", "bytes", "syml
     expect(await readFile(join(input.dataDir, "nested/state"), "utf8")).toBe("changed after build");
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
-  await f.service.schedules.fireDue(new Date("2026-10-22T01:00:00Z"));
+  await f.service.modules.callTool("m_price_watch_inspect", {});
   expect(oldRan).toBe(true);
 });
 
@@ -459,7 +460,7 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
     expect(await readFile(join(input.dataDir, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
     return { status: "succeeded", exitCode: 0, output: '{"effects":[]}', error: null };
   };
-  await f.service.schedules.fireDue(now);
+  await expect(f.service.modules.callTool("m_price_watch_inspect", {})).rejects.toMatchObject({ code: "not_found" });
   expect(ran).toBe(false);
   expect(await f.db.moduleRun.count()).toBe(1);
   const tick = createTick(f.ports);
@@ -471,7 +472,7 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
     expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
     await expect(stat(join(f.live, "migrated"))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(stat(old)).rejects.toMatchObject({ code: "ENOENT" });
-    await f.service.schedules.fireDue(new Date("2026-10-23T01:00:00Z"));
+    await f.service.modules.callTool("m_price_watch_inspect", {});
     expect(ran).toBe(true);
   }
 });
@@ -494,7 +495,7 @@ test("continuity runs author tests on disposable data without invoking business 
   expect(result.report).toMatchObject({ continuity: { status: "passed", migrated: false } });
   expect(JSON.stringify(result.report)).not.toContain('"effects"');
   expect(JSON.stringify(result.report)).not.toContain("author checked copied data");
-  expect(modulesUpstreamOutput.shape.proposal.safeParse(result).success).toBe(true);
+  expect(result).toMatchObject({ moduleId: f.first.moduleId, hash: expect.any(String), status: "pending_review" });
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
   expect(await f.db.run.count()).toBe(0);
@@ -549,7 +550,7 @@ test.each([false, true])("schema upgrade migrates only the copy; migration failu
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
   expect((await f.db.module.findFirstOrThrow()).dataSchema).toBe(1);
   await expect(stat(copy)).rejects.toMatchObject({ code: "ENOENT" });
-  if (failed) expect((await f.db.run.findFirstOrThrow()).prompt).toContain("public migration stderr");
+  if (failed) expect(JSON.stringify((await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).details)).toContain("public migration stderr");
   else expect((await f.db.approval.findUniqueOrThrow({ where: { id: result.approvalId! } })).preview).toContain("1 → 2；需要迁移");
 });
 
@@ -565,7 +566,7 @@ test.each(["nonempty", "empty", "missing", "unknown schema"])("schema upgrade wi
   const result = await f.propose();
   expect(result.status).toBe(kind === "nonempty" ? "rejected" : "approved");
   expect(result.report).toMatchObject({ continuity: { status: kind === "nonempty" ? "failed" : kind === "unknown schema" ? "passed" : "skipped", migrated: false, toSchema: 2, ...(kind === "nonempty" ? { reason: "schema 升级需要 migrate" } : {}) } });
-  if (kind === "nonempty") expect((await f.db.run.findFirstOrThrow()).prompt).toContain("schema 升级需要 migrate");
+  if (kind === "nonempty") expect(JSON.stringify((await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).details)).toContain("schema 升级需要 migrate");
 });
 
 test.each([false, true])("schema downgrade rejects even with empty data=%s", async empty => {
@@ -603,7 +604,7 @@ test.each(["file", "directory", "root"])("continuity refuses live data symlink: 
   expect(await readFile(join(f.live, "nested/state"))).toEqual(Buffer.from([0, 255, 1, 2]));
 });
 
-test("test, continuity and schema failures share the same streak and budgeted digest", async () => {
+test("test, continuity and schema failures retain bounded diagnostics and one lifecycle fact per streak", async () => {
   const f = await dataFixture();
   f.fail();
   expect((await f.propose()).status).toBe("rejected");
@@ -614,14 +615,17 @@ test("test, continuity and schema failures share the same streak and budgeted di
     return { status: "failed", exitCode: 1, output: "public failure after verbose tests", error: null };
   };
   expect((await f.propose()).status).toBe("rejected");
-  const runs = await f.db.run.findMany({ orderBy: { createdAt: "desc" } });
-  expect(runs).toHaveLength(2);
-  expect(runs.some(run => run.prompt?.includes("author tests failed on copied data"))).toBe(true);
+  const failures = await f.db.audit.findMany({ where: { kind: "module_build_failed" } });
+  expect(failures).toHaveLength(2);
+  expect(failures.some(row => JSON.stringify(row.details).includes("author tests failed on copied data"))).toBe(true);
+  expect(failures.every(row => (row.details as { report: string }).report.length <= 8000)).toBe(true);
+  expect(JSON.stringify(failures)).not.toContain("x".repeat(2000));
   for (let i = 4; i <= 5; i++) {
     await f.write(i); await f.schema(2);
     expect((await f.propose()).status).toBe("rejected");
   }
-  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(2);
   expect((await notices(f.db, { level: "digest" })).length).toBe(1);
 });
 
@@ -705,13 +709,14 @@ test("missing transient staging is rebuilt from the pinned Git commit", async ()
   expect(f.calls).toHaveLength(1);
 });
 
-test("three consecutive rejected versions stop waking and enqueue only one budgeted digest per streak", async () => {
+test("rejected versions retain two failure audits and emit only one lifecycle fact per streak", async () => {
   const f = await fixture(); f.fail();
   for (let i = 1; i <= 4; i++) {
     f.ports.now = () => new Date(Date.UTC(2026, 9, 20, 4, i));
     await f.write(i);
     await f.propose();
-    expect(await f.db.run.count()).toBe(Math.min(i, 2));
+    expect(await f.db.run.count()).toBe(0);
+    expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(Math.min(i, 2));
     expect((await notices(f.db, { level: "digest" })).length).toBe(i >= 3 ? 1 : 0);
   }
 });
@@ -721,38 +726,44 @@ test("a successful build resets the failure streak even when the clock has not a
   await f.propose();
   f.fail();
   for (let i = 2; i <= 4; i++) { await f.write(i); await f.propose(); }
-  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(2);
   expect((await notices(f.db, { level: "digest" })).length).toBe(1);
   f.fail(false);
   await f.write(5); await f.propose();
   f.fail();
   for (let i = 6; i <= 8; i++) { await f.write(i); await f.propose(); }
-  expect(await f.db.run.count()).toBe(4);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(4);
   expect((await notices(f.db, { level: "digest" })).length).toBe(2);
 });
 
-test("queued failures sharing a timestamp still stop at two wakes and one digest", async () => {
+test("queued failures sharing a timestamp retain two failure audits and one lifecycle fact", async () => {
   const f = await fixture(); f.fail();
   for (let i = 1; i <= 4; i++) { await f.write(i); await f.submit(); }
   await f.service.modules.buildPending();
-  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(2);
   expect((await notices(f.db, { level: "digest" })).length).toBe(1);
   await f.service.modules.buildPending();
-  expect(await f.db.run.count()).toBe(2);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(2);
   expect((await notices(f.db, { level: "digest" })).length).toBe(1);
 });
 
-test("user proposals do not wake a provider and rejected hashes can be resubmitted", async () => {
+test("user proposals emit no provider failure audit and rejected hashes can be resubmitted by the provider", async () => {
   const f = await fixture(); f.fail();
   const first = await f.service.modules.propose({ root: f.root, dir: "price-watch", intent }, "user");
   await f.service.modules.buildPending();
   expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(0);
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected" });
   expect(await f.submit()).toMatchObject({ hash: first.hash, status: "building" });
   const version = await f.db.moduleVersion.findFirstOrThrow();
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
   await f.service.modules.buildPending();
-  expect(await f.db.run.count()).toBe(1);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(1);
   expect(await f.db.moduleVersion.count()).toBe(1);
 });
 
@@ -790,23 +801,19 @@ test("proposal tests a private snapshot and creates a hash-bound plain-text appr
   expect((await f.service.modules.list())[0]!.activeHash).toBeNull();
 });
 
-test("approval switches schedules atomically, proposals keep old schedules, rollback records full generations", async () => {
+test("approval switches approved hashes atomically and rollback records full generations without calendar work", async () => {
   const f = await fixture(), first = await f.propose();
   await f.approve(first.approvalId!);
-  const old = await f.db.schedule.findFirstOrThrow({ where: { status: "active" } });
-  expect(old).toMatchObject({ mode: "module", moduleId: first.moduleId, triggerId: "daily", text: "price-watch:daily", label: "price-watch", createdBy: "chrona" });
-  expect(old.nextAt?.toISOString()).toBe("2026-10-21T01:00:00.000Z");
   await f.write(2);
   const second = await f.propose();
   expect(second.hash).not.toBe(first.hash);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
-  expect(await f.db.schedule.findMany({ where: { status: "active" } })).toEqual([old]);
   await expect(f.service.modules.rollback(first.moduleId!, second.hash)).rejects.toThrow("not approved");
   await f.approve(second.approvalId!);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(second.hash);
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: old.id } })).status).toBe("cancelled");
   await f.service.modules.rollback(first.moduleId!, first.hash);
-  expect(await f.db.schedule.count({ where: { status: "active" } })).toBe(1);
+  expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
+  expect(await f.db.schedule.count()).toBe(0);
   const generations = await f.db.generation.findMany({ orderBy: { seq: "asc" } });
   expect(generations.map(row => [row.seq, row.reason, row.modules])).toEqual([
     [1, "activate", { [first.moduleId!]: first.hash }], [2, "activate", { [first.moduleId!]: second.hash }], [3, "rollback", { [first.moduleId!]: first.hash }],
@@ -816,12 +823,13 @@ test("approval switches schedules atomically, proposals keep old schedules, roll
   expect(await f.db.audit.count({ where: { kind: "module_rollback" } })).toBe(1);
 });
 
-test.each(["paused", "cancelled", "active"] as const)("module schedule rejects direct status update to %s", async status => {
+test.each(["list", "update", "create"])("removed public schedules.%s cannot change private legacy rows", async tool => {
   const f = await fixture(), first = await f.propose();
   await f.approve(first.approvalId!);
-  const old = await f.db.schedule.findFirstOrThrow({ where: { status: "active" } });
-  await expect(f.service.schedules.update(old.id, { status })).rejects.toMatchObject({ code: "conflict", message: "Module schedules change only through module activation or rollback; the active version keeps running until a new version is approved" });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: old.id } })).toEqual(old);
+  const row = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: first.moduleId!, mode: "module", rule: { kind: "every", minutes: 5 }, text: "inert legacy fixture", createdBy: "chrona", nextAt: f.ports.now() } });
+  expect(f.service).not.toHaveProperty("schedules");
+  await expect(callSync(f.ports, { workspaceId: f.workspace.id, caller: { kind: "owner", via: null }, chain: [], path: [] }, `schedules.${tool}`, { schedule: row.id, status: "active" })).rejects.toMatchObject({ code: "not_found" });
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: row.id } })).toEqual(row);
   expect((await f.service.modules.list())[0]!.activeHash).toBe(first.hash);
 });
 
@@ -902,8 +910,8 @@ test("failing tests reject with public outputs only, no approval, staging cleane
   expect(result.status).toBe("rejected");
   expect(result.report).toEqual({ git: { commit: result.hash, tree: expect.stringMatching(/^[a-f0-9]{40}$/) }, tests: [{ stdout: "public stdout", stderr: "public stderr", exitCode: 1 }] });
   expect(await f.db.approval.count()).toBe(0);
-  expect(await f.db.run.count()).toBe(1);
-  expect(await f.db.run.findFirstOrThrow()).toMatchObject({ lane: "background", status: "queued", prompt: `Module price-watch build failed (untrusted test output):\n${JSON.stringify(result.report)}` });
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.audit.findFirstOrThrow({ where: { kind: "module_build_failed" } })).toMatchObject({ subjectId: result.moduleId, details: { versionId: expect.any(String), hash: result.hash, report: JSON.stringify(result.report) } });
   expect((await f.service.modules.list())[0]!.versions[0]!.status).toBe("rejected");
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
 });
@@ -933,7 +941,7 @@ test.each(["symlink", "bytes", "files"])("reject unsafe module contents: %s", as
   expect(await f.db.module.count()).toBe(0);
 });
 
-test.each(["activate_module", "notify_user"] as const)("ask policy for %s does not gate module activation", async action => {
+test.each(["activate_module", "modify_external"] as const)("ask policy for %s does not gate module activation", async action => {
   const f = await fixture();
   await f.service.grants.create({ action, mode: "ask", scope: { kind: "global" } });
   const proposal = await f.propose();
@@ -962,11 +970,13 @@ test("invalid manifests reject without inventing a module identity or leaking pa
   await writeFile(join(f.dir, "module.json"), "invalid JSON");
   expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { tests: [], errors: ["module.json: missing or not valid JSON"] } });
   // Real Pi run: a human title as name must come back as a fixable field error.
-  await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "喝水提醒", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [], tests: ["test.ts"] }));
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "喝水提醒", entry: "index.ts", tools: [{ name: "inspect", description: "Inspect price state", visibility: ["owner", "provider", "modules"], output: {}, parameters: { type: "object", properties: {} } }], effects: [], tests: ["test.ts"] }));
   expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [expect.stringMatching(/^name: /)] } });
-  // Real build run: a trigger union error must name the closest branch's field, not just "Invalid input".
-  await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "water", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00", timezone: "Asia/Shanghai" } }], effects: [], tests: ["test.ts"] }));
-  expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: ['triggers.0.schedule: Unrecognized key: "timezone"'] } });
+  // Every removed field fails strictly, even when its legacy value is empty.
+  for (const [field, value] of Object.entries({ triggers: [], settings: {}, contributes: {}, healthCheck: "health.ts" })) {
+    await writeFile(join(f.dir, "module.json"), JSON.stringify({ name: "water", entry: "index.ts", effects: [], tests: ["test.ts"], [field]: value }));
+    expect(await f.propose()).toMatchObject({ status: "rejected", moduleId: null, report: { errors: [`module.json: Unrecognized key: "${field}"`] } });
+  }
   expect(await f.db.module.count()).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([]);
@@ -1005,7 +1015,7 @@ test("workspace isolation, full snapshots, last five run summaries and nonmodule
   const listed = (await f.service.modules.list()).find(row => row.id === first.moduleId)!;
   expect(listed.runs).toHaveLength(5);
   expect(listed.runs.map(row => row.createdAt.getTime())).toEqual([6000, 5000, 4000, 3000, 2000]);
-  const approval = await f.service.approvals.create({ action: "send_external_message", title: "Send", detail: "Test", preview: "Draft", payload: { kind: "email", value: 1 } });
+  const approval = await f.service.approvals.create({ action: "modify_external", title: "Send", detail: "Test", preview: "Draft", payload: { kind: "email", value: 1 } });
   await f.approve(approval.id);
   expect(f.forwarded).toHaveLength(1);
   expect(f.forwarded[0]!.payload).toEqual({ kind: "email", value: 1 });
@@ -1035,19 +1045,20 @@ test("tick starts builds without waiting for them and reports build errors on th
   expect((await tick()).failures).toContainEqual({ workspaceId: f.workspace.id, stage: "modules", error: expect.any(Error) });
 });
 
-test("Chrona pauses and resumes an app directly, retaining its schedules and audit trail", async () => {
+test("Chrona pauses and resumes an app directly, cancelling private legacy rows without reviving them", async () => {
   const f = await fixture(), result = await f.propose();
   await f.approve(result.approvalId!);
   const moduleId = result.moduleId!;
+  const legacy = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId, mode: "module", triggerId: "daily", rule: { kind: "every", minutes: 5 }, text: "inert legacy fixture", createdBy: "chrona", nextAt: f.ports.now() } });
   const request = await f.service.modules.lifecycle("disable", moduleId, { reason: "连续三天抓取失败" }, false);
   expect(request).toMatchObject({ status: "paused" });
   expect(await f.db.approval.count({ where: { status: "open" } })).toBe(0);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("paused");
-  expect(await f.db.schedule.findMany({ where: { moduleId, status: { not: "cancelled" } } })).toMatchObject([{ triggerId: "daily", status: "paused", nextAt: null }]);
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled", nextAt: null });
   expect(await f.db.grant.count({ where: { action: "activate_module", once: true, consumedAt: null } })).toBe(0);
   await f.service.modules.lifecycle("enable", moduleId, {}, true);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: moduleId } })).status).toBe("active");
-  expect(await f.db.schedule.findMany({ where: { moduleId, status: { not: "cancelled" } } })).toMatchObject([{ triggerId: "daily", status: "active", nextAt: new Date("2026-10-21T01:00:00Z") }]);
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: legacy.id } })).toMatchObject({ status: "cancelled", nextAt: null });
   expect((await f.db.audit.findMany({ where: { subjectId: moduleId, kind: { in: ["module_disabled", "module_enabled"] } }, orderBy: { createdAt: "asc" } })).map(row => row.kind)).toEqual(["module_disabled", "module_enabled"]);
 });
 
@@ -1118,15 +1129,14 @@ test("proposals omit local Git metadata from the committed source", async () => 
   expect(files.map(file => file.path)).toEqual(["index.ts", "module.json", "test.ts"]);
 });
 
-test("registered upstream tool routes module status and rejects Provider and extra source authority", async () => {
+test("registered module routes retain fixed materials and reject removed upstream authority", async () => {
   const f = await fixture(false), proposal = await f.propose();
-  const upstream = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "upstream")!;
-  expect(upstream.visibility).toEqual(["modules", "owner"]);
-  const request = { action: "status", moduleId: proposal.moduleId! };
-  const scope = { workspaceId: f.workspace.id, caller: { kind: "module" as const, module: "price-watch", moduleId: proposal.moduleId!, hash: proposal.hash }, chain: [], path: [] };
-  expect((await callSync(f.ports, scope, "modules.upstream", request)).output).toMatchObject({ moduleId: proposal.moduleId, localCommit: proposal.hash, repository: null, proposal: null });
+  const system = listSystemModules().find(module => module.name === "modules")!;
+  expect(system.tools.map(tool => tool.name)).toEqual(["list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove"]);
+  const scope = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
   const list = modulesListOutput.parse((await callSync(f.ports, scope, "modules.list", {})).output);
   expect(list.find(item => item.id === proposal.moduleId)?.versions[0]?.git?.commit).toBe(proposal.hash);
-  await expect(callSync(f.ports, { ...scope, caller: { kind: "provider", runId: "untrusted-provider" } }, "modules.upstream", request)).rejects.toMatchObject({ code: "forbidden" });
-  await expect(callSync(f.ports, scope, "modules.upstream", { ...request, repository: "https://github.com/other/repo" })).rejects.toMatchObject({ code: "invalid" });
+  for (const caller of [scope.caller, { kind: "provider" as const, runId: "untrusted-provider" }]) {
+    await expect(callSync(f.ports, { ...scope, caller }, "modules.upstream", { action: "status", moduleId: proposal.moduleId! })).rejects.toMatchObject({ code: "not_found" });
+  }
 });

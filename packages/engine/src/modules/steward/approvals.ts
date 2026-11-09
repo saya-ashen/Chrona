@@ -12,26 +12,9 @@ import { assertExternalModule } from "./module-identity";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { drainCalls, settleWaiting } from "./module-calls";
 const inputSchema = approvalSchema.pick({ action: true, title: true, detail: true, preview: true }).extend({ moduleId: z.string().min(1).optional(), payload: z.json() }).strict();
-async function grantApproval(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
-  const { workspaceId, now } = context;
-  const action = toApproval(row).action;
-  const grant = await tx.grant.create({ data: { workspaceId, action, mode: "allow", scope: row.moduleId ? { kind: "module", moduleId: row.moduleId } : { kind: "global" }, once: scope === "once", createdAt: now() } });
-  return grant.id;
-}
-/** The grant an approval leaves, if any. */
-async function approve(tx: Prisma.TransactionClient, context: RecordContext, row: Parameters<typeof toApproval>[0], scope: z.infer<typeof resolveApprovalSchema>["scope"]) {
-  if ((row.action === "activate_module" || (row.payload as { kind?: unknown } | null)?.kind === "module_remove") && scope !== "once") throw new StewardError("invalid", "Module changes can only be approved once");
-  // A module's request is one decision, never a standing grant that would let it approve itself later.
-  if (isModuleRequest(row.payload)) {
-    if (scope !== "once") throw new StewardError("invalid", "A module's request can only be approved once");
-    return null;
-  }
-  if (row.action === "activate_module") {
-    await assertDynamicModuleActivation(tx, context.workspaceId, row.moduleId, row.payload);
-    return null;
-  }
-  if ((row.payload as { kind?: unknown } | null)?.kind === "module_remove") return null;
-  return grantApproval(tx, context, row, scope);
+/** Module activation must still pass its current identity and payload guards. */
+async function approve(tx: Prisma.TransactionClient, workspaceId: string, row: Parameters<typeof toApproval>[0]) {
+  if (row.action === "activate_module") await assertDynamicModuleActivation(tx, workspaceId, row.moduleId, row.payload);
 }
 /** v2-16: something a module asked the user to decide (`approvals.request`); the decision goes back to its waiting call. */
 export const isModuleRequest = (payload: unknown): payload is { kind: "module_request"; hash: string; call: string } =>
@@ -79,7 +62,8 @@ export function createApprovals(context: RecordContext & { ports?: StewardPorts 
       const row = await tx.approval.findFirst({ where: { workspaceId, id } });
       if (!row) throw new StewardError("not_found", "Approval not found");
       if (row.status !== "open") throw new StewardError("conflict", "Approval already resolved");
-      const grantId = input.decision === "approve" ? await approve(tx, { db, workspaceId, now }, row, input.scope) : null;
+      if (input.decision === "approve") await approve(tx, workspaceId, row);
+      const grantId = null;
       const changed = await tx.approval.updateMany({ where: { workspaceId, id, status: "open" }, data: { status: input.decision === "approve" ? "approved" : "denied", scope: input.scope, grantId, resolvedAt: now() } });
       if (!changed.count) throw new StewardError("conflict", "Approval already resolved");
       await recordWithdrawal(tx, workspaceId, `approval:${id}`, now());

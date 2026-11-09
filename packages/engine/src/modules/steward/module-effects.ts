@@ -1,5 +1,5 @@
 import type { Prisma } from "@chrona/db";
-import { NOTIFY_INTERFACE, type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
+import { type ModuleCall, type moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { registerModuleEffects, type CallScope } from "./module-supervisor";
 import { CallError, callStatus, callSync, drainCalls, enqueueCall, type CallOrigin } from "./module-calls";
@@ -32,8 +32,7 @@ async function routedCall(ports: StewardPorts, scope: CallScope, call: Extract<M
       return { id: call.id, result: { output: result.output } };
     }
     // The caller owns its keys (derive them from what is being done): a repeat after a crash returns the same call.
-    // A notification is stored even while the built-in notify module is not running (e.g. rebuilding); it is delivered later.
-    const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, lenient: target === NOTIFY_INTERFACE, expectedTarget });
+    const queued = await enqueueCall({ tx: ports.db, ports, origin: originOf(scope), target, raw: args }, { key: key!, reply, expectedTarget });
     await ports.db.moduleCall.create({ data: { ...record, key: queued.callId, status: queued.duplicate ? "duplicate" : "executed" } });
     if (!queued.duplicate) void drainCalls(ports, scope.workspaceId).catch(() => {});
     return { id: call.id, result: queued };

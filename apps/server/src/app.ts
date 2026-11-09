@@ -92,10 +92,6 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/editor/*", async (c, next) => {
-    if (!readEnv().API_KEY?.trim()) return c.json({ code: "EDITOR_AUTH_UNCONFIGURED" }, 503);
-    await next();
-  });
   app.use("/api/*", async (c, next) => {
     if (isExecutorOwnerPath(c.req.path, c.req.method)) {
       c.header("Cache-Control", "no-store");

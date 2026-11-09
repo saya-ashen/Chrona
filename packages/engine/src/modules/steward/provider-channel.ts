@@ -70,7 +70,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
         const { method, title, message, options, timeoutMs } = safe;
         const stored = { ...request, question: { method, title, message, options, timeoutMs } };
         await tx.audit.create({ data: { id: `provider-request:${request.id}`, workspaceId: run.workspaceId, actorKey: "chrona", subjectId: run.id, kind: "provider_question", details: stored } });
-        if (!signal.aborted && !closed && !entry.closed) await notifyUser(tx, ports, run.workspaceId, { level: "now", title: safe.title, body: safe.message || safe.title, key: `provider-input:${run.id}` });
+        if (!signal.aborted && !closed && !entry.closed) await notifyUser(tx, ports, run.workspaceId, { kind: "provider-input-required", run: run.id, ...(run.sessionId ? { session: run.sessionId } : {}), key: `provider-input:${run.id}` });
       });
       if (!entry.closed) await observe(request);
       if (signal.aborted || closed) abort();

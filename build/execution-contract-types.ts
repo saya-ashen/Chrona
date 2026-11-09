@@ -33,17 +33,18 @@ export function executionContractDeclarations() {
       lines.push(`export type ${alias} = ${schemaType(value)};`, `export declare const ${name}: ContractSchema<${alias}>;`);
     }
   }
-  for (const name of ["EXECUTION_PROTOCOL", "EXECUTION_CAPABILITIES", "EXECUTION_EVENT_LIMITS", "EXECUTION_CHANGES_LIMITS", "EXECUTION_HTTP_STATUS", "EDITOR_HTTP", "CODING_TOOL_OPERATIONS", "EXECUTION_TOOL_OPERATIONS", "EXECUTION_UNRECORDED_TOOLS", "WORK_PROTOCOL", "WORK_LIMITS", "WORK_HTTP"] as const) {
+  for (const name of ["EXECUTION_PROTOCOL", "EXECUTION_CAPABILITIES", "EXECUTION_EVENT_LIMITS", "EXECUTION_CHANGES_LIMITS", "EXECUTION_HTTP_STATUS", "CODING_TOOL_OPERATIONS", "EXECUTION_TOOL_OPERATIONS", "EXECUTION_UNRECORDED_TOOLS", "WORK_PROTOCOL", "WORK_LIMITS"] as const) {
     lines.push(`export declare const ${name}: ${JSON.stringify(contract[name])};`);
   }
-  const outputs = Object.entries(contract.editorResponseDataSchemas).map(([op, schema]) => `${JSON.stringify(op)}: ${schemaType(schema)}`).join("; ");
+  // These legacy-named shared response types are still imported by Coding's work adapter.
+  const outputs = Object.entries(contract.executionResponseDataSchemas).map(([op, schema]) => `${JSON.stringify(op)}: ${schemaType(schema)}`).join("; ");
   const inputs = Object.entries(contract.executionInputSchemas).map(([op, schema]) => `${JSON.stringify(op)}: ContractSchema<${schemaType(schema)}>`).join("; ");
-  const responseSchemas = Object.keys(contract.editorResponseDataSchemas).map(op => `${JSON.stringify(op)}: ContractSchema<Responses[${JSON.stringify(op)}]>`).join("; ");
+  const responseSchemas = Object.keys(contract.executionResponseDataSchemas).map(op => `${JSON.stringify(op)}: ContractSchema<Responses[${JSON.stringify(op)}]>`).join("; ");
   lines.push(`type Responses = { ${outputs} };`,
     `export declare const executionInputSchemas: { ${inputs} };`,
-    `export declare const editorResponseDataSchemas: { ${responseSchemas} };`,
-    'export type EditorCommandConsumer = { [K in ExecutionCommand["op"]]: (input: Omit<Extract<ExecutionCommand, { op: K }>, "op">) => Promise<Responses[K]> };',
-    'export declare function parseCodingToolInput<K extends keyof typeof CODING_TOOL_OPERATIONS>(name: K, input: string): Parameters<EditorCommandConsumer[(typeof CODING_TOOL_OPERATIONS)[K]]>[0];',
+    `export declare const executionResponseDataSchemas: { ${responseSchemas} };`,
+    'export type ExecutionCommandConsumer = { [K in ExecutionCommand["op"]]: (input: Omit<Extract<ExecutionCommand, { op: K }>, "op">) => Promise<Responses[K]> };',
+    'export declare function parseCodingToolInput<K extends keyof typeof CODING_TOOL_OPERATIONS>(name: K, input: string): Parameters<ExecutionCommandConsumer[(typeof CODING_TOOL_OPERATIONS)[K]]>[0];',
     "export declare function executionJsonBytes(value: unknown): number;");
   const workOutputs = Object.entries(contract.workResponseDataSchemas).map(([op, schema]) => `${JSON.stringify(op)}: ${schemaType(schema)}`).join("; ");
   const workSchemas = Object.keys(contract.workResponseDataSchemas).map(op => `${JSON.stringify(op)}: ContractSchema<WorkResponses[${JSON.stringify(op)}]>`).join("; ");

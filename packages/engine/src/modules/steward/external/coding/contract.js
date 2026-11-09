@@ -4966,7 +4966,6 @@ var executionInputSchemas = {
   results: results.omit({ op: true }),
   accept: accept.omit({ op: true })
 };
-var editorRequestSchema = object({ v: literal(EXECUTION_PROTOCOL), requestId: id2, command: executionCommandSchema }).strict();
 var executionBaselineSchema = object({ kind: _enum(["commit", "snapshot"]), digest: string2().min(1).max(128) }).strict();
 var executionResultSourceInputSchema = object(target).strict();
 var EXECUTION_CHANGES_LIMITS = { bytes: 131072, files: 100, fileBytes: 65536, timeoutMs: 5000 };
@@ -5063,7 +5062,7 @@ var executionClientMessageSchema = object({
 var executionAcceptedSchema = object({ accepted: literal(true) }).strict();
 var executionListSchema = object({ works: array(executionViewSchema).max(100), after: executionIdSchema.nullable() }).strict();
 var executionResultsSchema = object({ results: array(executionResultSchema).max(100) }).strict();
-var editorResponseDataSchemas = {
+var executionResponseDataSchemas = {
   start: executionViewSchema,
   get: executionViewSchema,
   lookup_start: executionViewSchema,
@@ -5078,18 +5077,6 @@ var editorResponseDataSchemas = {
   snapshot: executionSnapshotSchema,
   results: executionResultsSchema
 };
-var EDITOR_HTTP = { commands: "/api/editor/v1/commands", events: "/api/editor/v1/events" };
-var eventsFields = executionInputSchemas.events.shape;
-var editorEventsQuerySchema = object({
-  v: literal(EXECUTION_PROTOCOL),
-  requestId: executionIdSchema,
-  workId: eventsFields.workId,
-  runId: eventsFields.runId,
-  attemptId: eventsFields.attemptId,
-  cursor: eventsFields.cursor,
-  limit: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.limit),
-  waitMs: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.waitMs)
-}).strict();
 var EXECUTION_HTTP_STATUS = {
   invalid: 400,
   unauthorized: 401,
@@ -5103,18 +5090,6 @@ var EXECUTION_HTTP_STATUS = {
   unsupported_version: 409,
   unsupported: 400
 };
-var editorResponseSchema = discriminatedUnion("ok", [
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(true), data: union([
-    executionViewSchema,
-    executionEventPageSchema,
-    executionSnapshotSchema,
-    executionCapabilitiesSchema,
-    executionAcceptedSchema,
-    executionListSchema,
-    executionResultsSchema
-  ]) }).strict(),
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(false), error: executionErrorSchema }).strict()
-]);
 // packages/contracts/src/steward/execution-v2.ts
 var WORK_PROTOCOL = "chrona.execution.v2";
 var WORK_LIMITS = { children: 20, sourceFiles: 100, sourceBytes: 32768, requestBytes: 262144, responseBytes: 262144, queueMs: 86400000 };
@@ -5181,21 +5156,20 @@ var workResponseDataSchemas = {
   get: workViewSchema,
   lookup_start: workViewSchema,
   list: union([object({ resource: literal("works"), works: array(workViewSchema).max(100), after: id3.nullable() }).strict(), object({ resource: literal("locations"), locations: array(workLocationSchema).max(100), after: id3.nullable() }).strict()]),
-  send: editorResponseDataSchemas.send,
-  answer: editorResponseDataSchemas.answer,
+  send: executionResponseDataSchemas.send,
+  answer: executionResponseDataSchemas.answer,
   cancel: workViewSchema,
   attach: workViewSchema,
-  detach: editorResponseDataSchemas.detach,
-  events: editorResponseDataSchemas.events,
-  snapshot: editorResponseDataSchemas.snapshot,
+  detach: executionResponseDataSchemas.detach,
+  events: executionResponseDataSchemas.events,
+  snapshot: executionResponseDataSchemas.snapshot,
   results: workResultsSchema,
-  accept: editorResponseDataSchemas.accept
+  accept: executionResponseDataSchemas.accept
 };
 var workResponseEnvelopeSchema = discriminatedUnion("ok", [
   object({ v: literal(WORK_PROTOCOL), requestId: id3, ok: literal(true), data: union([workResponseDataSchemas.start, workResponseDataSchemas.list, workResponseDataSchemas.send, workResponseDataSchemas.events, workResponseDataSchemas.snapshot, workResponseDataSchemas.results, workResponseDataSchemas.accept]) }).strict(),
   object({ v: literal(WORK_PROTOCOL), requestId: id3, ok: literal(false), error: executionErrorSchema }).strict()
 ]).refine((value) => new TextEncoder().encode(JSON.stringify(value)).byteLength <= WORK_LIMITS.responseBytes, "Work response exceeds byte budget");
-var WORK_HTTP = { method: "POST", commands: "/api/editor/v1/commands" };
 function parseWorkResponse(request, raw) {
   const response = discriminatedUnion("ok", [
     object({ v: literal(WORK_PROTOCOL), requestId: literal(request.requestId), ok: literal(true), data: workResponseDataSchemas[request.command.op] }).strict(),
@@ -5236,7 +5210,7 @@ var executionToolContracts = [...Object.entries(EXECUTION_TOOL_OPERATIONS).map((
   description: `Execution ${name}`,
   parameters: { type: "object", properties: {}, required: [] },
   input: executionInputSchemas[op],
-  output: editorResponseDataSchemas[op],
+  output: executionResponseDataSchemas[op],
   visibility: ["owner", "modules"],
   idempotent: true
 })), {
@@ -5270,7 +5244,7 @@ function codingToolDeclarations() {
     parameters: { type: "object", properties: { input: { type: "string", description: `JSON execution ${op} payload, without op` } }, required: ["input"] },
     visibility: name === "accept" ? ["owner"] : ["owner", "provider"],
     idempotent: true,
-    output: manifestOutput(editorResponseDataSchemas[op])
+    output: manifestOutput(executionResponseDataSchemas[op])
   }));
 }
 function parseCodingToolInput(name, input) {
@@ -5278,7 +5252,6 @@ function parseCodingToolInput(name, input) {
 }
 export {
   CODING_TOOL_OPERATIONS,
-  EDITOR_HTTP,
   EXECUTION_CAPABILITIES,
   EXECUTION_CHANGES_LIMITS,
   EXECUTION_EVENT_LIMITS,
@@ -5286,14 +5259,9 @@ export {
   EXECUTION_PROTOCOL,
   EXECUTION_TOOL_OPERATIONS,
   EXECUTION_UNRECORDED_TOOLS,
-  WORK_HTTP,
   WORK_LIMITS,
   WORK_PROTOCOL,
   codingToolDeclarations,
-  editorEventsQuerySchema,
-  editorRequestSchema,
-  editorResponseDataSchemas,
-  editorResponseSchema,
   executionAcceptedSchema,
   executionBaselineSchema,
   executionCapabilitiesSchema,
@@ -5314,6 +5282,7 @@ export {
   executionPlacementViewSchema,
   executionQuestionSchema,
   executionRefSchema,
+  executionResponseDataSchemas,
   executionResultSchema,
   executionResultSourceInputSchema,
   executionResultSourceSchema,

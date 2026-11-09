@@ -1,7 +1,7 @@
 import { startRescueListener } from "./rescue";
 import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
@@ -85,16 +85,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   ports.executions = createExecutions(ports);
   ports.executionV2Admission = createExecutionV2Admission(ports);
   installDeviceExecution(ports);
-  ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
-    const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
-    if (attempt?.moduleId) {
-      const module = await tx.module.findUnique({ where: { id: attempt.moduleId } });
-      if (module?.name === "coding" && module.status === "active" && module.activeHash === attempt.callerHash) {
-        // Queue with the final state; publication runs after commit and never waits behind cancel.
-        await enqueueCall({ tx, ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: "coding.get", raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
-      }
-    }
-  };
   ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;

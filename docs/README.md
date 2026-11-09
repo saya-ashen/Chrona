@@ -4,6 +4,7 @@
 
 - [English README](../README.md) / [中文 README](../README.zh.md): purpose, pages, setup, configuration and limits.
 - [运维说明](zh/operations.md): data directories, backups, recovery, health and QQ diagnostics (Chinese).
+- [Editor 退役记录](zh/editor-retirement.md): removed legacy application, current Coding protocol, scope and pending cleanup validation; existing 3112 deployment unchanged.
 - [连续编码工作台](zh/coding-web-workbench.md): add local directories, edit directly, continue conversations, answer questions and stop; development status and current limits.
 
 ## Product and development
@@ -18,8 +19,9 @@
 - [Agent 原语与应用编排](zh/agent-module-orchestration.md) / [基础编码工作台](zh/coding-web-workbench.md): current application ownership, interfaces and product limits.
 - [统一模块协议与本地／远端宿主](zh/unified-module-runtime-plan.md): completed local V1 implementation, routed Provider/workspace/content contracts and U0–U4 roadmap; [本机 V1 最终验收](zh/unified-module-v1-acceptance.md) records review fixes, real-model coding/cancellation/crash recovery and final verification; general remote hosts are deferred. [模块安装与就绪报告](zh/module-installation-readiness.md) records removal of fabricated business probes, module-owned diagnostics and the local preview follow-up. [Agent 内置应用](zh/agent-builtin-application.md) records the subsequent extraction into a real SDK process, short execution/control requests, callback identity and restart receipts.
 - [模块 Git 工作流](zh/module-git.md): per-app source history, checked customization, explicit upstream updates and legacy limits; [发行种子与发布](zh/module-git-release.md) covers offline bundles and public-release gates.
+- [内核可移植、可信本地运行与远程执行应用化实施方案](zh/kernel-portability-plan.md): proposed, not started; merges the language-neutrality and cross-platform/remote plans: self-contained Agent with `@chrona/pi`, frozen system contract JSON, TS toolchain as a runtime pack, trusted-local runtime without bwrap/ulimit/sh/Nix, and remote execution as an ordinary app. [Archived original cross-platform plan](zh/history/cross-platform-runtime-and-remote-execution-plan.md).
 - [安全机制简化](zh/security-simplification.md) / [模块依赖方向](zh/module-dependency-direction.md): current rules and registration patterns.
-- [服务器编码工作](zh/server-coding.md): server/device placement, project authorization, results, recovery and explicit cleanup.
+- [当前 Coding 客户端协议](zh/coding-peer-clients-protocol.md) / [实施与原部署记录](zh/coding-peer-clients-implementation.md): shared headless Coding service and peer clients. [旧服务器编码工作](zh/server-coding.md) retains historical server/device placement and recovery evidence; its Editor installation instructions are obsolete.
 - [统一开发方案](zh/chrona-workbench-unified-development-plan.md) / [M3 开发验收](zh/chrona-workbench-m3-acceptance.md): completed M1–M3 development integration, exact evidence and unverified environments; not a public release or deployment.
 - [Provider 运行](zh/provider-runtime.md) / [模块恢复](zh/module-recovery.md) / [Owner 单次受控构建](zh/owner-bounded-builds.md): focused runtime references.
 - [历史设计索引](zh/history/README.md): superseded staged specifications, not current instructions.

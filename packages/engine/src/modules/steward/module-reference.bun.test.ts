@@ -1,143 +1,112 @@
 import { afterEach, expect, test } from "bun:test";
-import { cp, link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleManifestSchema, modulesToolInputSchemas } from "@chrona/contracts/steward";
-import { commitModuleSource } from "./module-git";
-import { snapshotModule } from "./module-files";
-import { seedTestModuleRelease } from "./module-release-test-fixture";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
-import { createStewardService } from "./service";
 import type { StewardPorts } from "./ports";
-import { callSync } from "./module-calls";
-import { moduleDiagnosticsOutputSchema } from "./module-diagnostics";
+import { callSync, listSystemModules, moduleCallbackContractHash, type Caller } from "./module-calls";
+import { registerSystemModules } from "./system-modules";
 import { callsDeclaration } from "./module-contracts";
-import { queueBuild } from "./module-build-session";
+import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT, references } from "./module-reference";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 async function fixture() {
+  registerSystemModules();
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-reference-"));
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(), moduleBuiltinResources: join(dataDir, "release"),
-    moduleSdk: join(import.meta.dirname, "../../../../integrations/src/steward/module-sdk"),
-    provider: { name: "fake", async health() { return { available: true, sandboxed: false, error: null }; }, start() { throw new Error("Reference must not start a Provider"); } },
+  const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date(),
+    provider: { name: "fake", async health() { throw new Error("Reference must not probe a Provider"); }, start() { throw new Error("Reference must not start a Provider"); } },
     sandbox: { available: true, isolated: false, startModule() { throw new Error("Reference must not start a module"); } } };
-  const service = createStewardService(ports);
   const workspace = await db.workspace.create({ data: { name: "reference" } });
-  const api = service.forWorkspace(workspace.id);
-  await queueBuild(ports, workspace.id, { key: "reference-build", actorKey: "user", originSessionId: null,
-    request: modulesToolInputSchemas.build.parse({ name: "reference-app", goal: "Build with references", examples: ["Inspect current release contracts"], intent: { changes: ["Inspect references"], preserves: [] } }) });
-  const run = (await api.runs.claimNext("build"))!;
-  await mkdir(run.cwd, { recursive: true });
-  const call = async (name: string, args: unknown) => (await service.tools.call(run.token, name, args) as { result: unknown }).result;
-  return { db, dataDir, ports, service, api, workspace, run, call };
+  const owner: Caller = { kind: "owner", via: null };
+  const call = async (target: string, args: unknown = {}, caller: Caller = owner) => (await callSync(ports, { workspaceId: workspace.id, caller, chain: [], path: [] }, target, args)).output;
+  return { db, dataDir, ports, workspace, call };
 }
-const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [],
-  tools: [{ name: "inspect", description: "Read-only example interface", parameters: { type: "object", properties: {}, required: [] } }] });
-async function sources(f: Awaited<ReturnType<typeof fixture>>) {
-  const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "web", builtin: true } });
-  const source = join(f.dataDir, "custom-source"), builtin = join(f.ports.moduleBuiltinResources!, "web");
-  for (const [dir, text] of [[source, "custom appearance"], [builtin, "new release feature"]]) {
-    await mkdir(dir!, { recursive: true });
-    await writeFile(join(dir!, "module.json"), JSON.stringify(manifest));
-    await writeFile(join(dir!, "index.ts"), text!);
-    await writeFile(join(dir!, "test.ts"), "// offline test");
-  }
-  const git = await commitModuleSource({ platform: join(f.dataDir, "platform"), moduleId: module.id, versionId: "custom", files: await snapshotModule(f.dataDir, "custom-source"), message: "custom appearance" });
-  const hash = git.commit, stored = join(f.dataDir, "platform", "store", hash);
-  await cp(source, stored, { recursive: true });
-  await f.db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { git } } });
-  const release = await seedTestModuleRelease(f.ports.moduleBuiltinResources!, "web");
-  return { module, hash, stored, builtin, release };
+const manifest = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["modules.reference", "modules.tools"],
+  tools: [{ name: "read", description: "Read", visibility: ["modules", "owner", "provider"], idempotent: true, parameters: { type: "object", properties: {}, required: [] } }] });
+async function active(f: Awaited<ReturnType<typeof fixture>>, name = "target") {
+  const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: "v1" } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: { ...manifest, name }, source: "user", status: "approved", intent: {}, report: {} } });
+  return module;
 }
 
-test("development reference exposes exact contracts, synthetic non-empty examples and permissions without production calls", async () => {
+test("references expose the current public contracts without runtime execution", async () => {
   const f = await fixture();
-  const index = await f.call("m_modules_reference", {});
+  const index = await f.call("modules.reference");
   expect(index).toEqual(expect.arrayContaining([{ target: "modules.diagnostics", source: { kind: "system", hash: null }, description: expect.any(String) }]));
-  // The index stays small enough for the Provider's tool result: names and one line each, contracts on request.
   expect(JSON.stringify(index)).not.toContain("inputSchema");
-  // The Provider's app list keeps the five newest versions and says how many there are.
-  const app = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "prices", activeHash: "v6" } });
-  for (let i = 0; i < 7; i++) await f.db.moduleVersion.create({ data: { moduleId: app.id, hash: `v${i}`, manifest: {}, source: "build", status: "rejected", intent: {}, report: {}, createdAt: new Date(Date.UTC(2026, 9, 1, i)) } });
-  const [prices] = (await f.call("m_modules_list", {}) as { name: string; versions: { hash: string }[]; versionCount: number }[]).filter(item => item.name === "prices");
-  expect([prices!.versions.map(version => version.hash), prices!.versionCount]).toEqual([["v6", "v5", "v4", "v3", "v2"], 7]);
-  const result = await f.call("m_modules_reference", { target: "modules.diagnostics" });
-  expect(result).toMatchObject({ target: "modules.diagnostics", inputSchema: { type: "object", properties: { module: { type: "string" } } },
-    outputSchema: { type: "array" }, admission: { visibility: ["modules", "provider", "owner"], uses: "modules.diagnostics" }, contractHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
-  const reference = result as { examples: unknown[]; documentation: string; contractHash: string };
-  expect(reference.examples.map(example => moduleDiagnosticsOutputSchema.parse(example)[0]!.incidents[0]!.status)).toEqual(["retrying", "unresolved", "verifying", "recovered"]);
-  expect(reference.documentation).toContain("never replay");
-  expect(reference.documentation).toContain("build_request audit");
-  expect(await f.call("m_modules_reference", { target: "modules.diagnostics" })).toMatchObject({ contractHash: reference.contractHash });
-  // v2-25: every module-callable system tool declares its output.
-  expect(await f.call("m_modules_reference", { target: "settings.get" })).toMatchObject({ outputSchema: { type: "object" }, examples: null, sideEffects: null, errors: null, retry: expect.any(String) });
-  for (const target of ["modules.settings-get", "modules.settings-set"]) expect(await f.call("m_modules_reference", { target })).toMatchObject({ outputSchema: expect.any(Object), documentation: expect.stringContaining("not_found"), examples: expect.arrayContaining([expect.anything()]) });
+  expect(listSystemModules().find(module => module.name === "modules")!.tools.map(tool => tool.name)).toEqual([
+    "list", "tools", "reference", "diagnostics", "health", "admit-candidates", "source", "submit", "candidate-check", "rollback", "disable", "enable", "remove",
+  ]);
+  const diagnostics = listSystemModules().find(module => module.name === "modules")!.tools.find(tool => tool.name === "diagnostics")!;
+  expect(await f.call("modules.reference", { target: "modules.diagnostics" })).toMatchObject({ target: "modules.diagnostics",
+    inputSchema: { type: "object", properties: { module: { type: "string" } } }, outputSchema: { type: "array" },
+    admission: { visibility: diagnostics.visibility, uses: "modules.diagnostics" }, contractHash: moduleCallbackContractHash(diagnostics) });
+  for (const target of ["modules.checkout", "modules.propose", "modules.check", "modules.request-group", "modules.settings-get", "modules.settings-set", "modules.catalog", "modules.upstream"]) {
+    await expect(f.call("modules.reference", { target })).rejects.toMatchObject({ code: "not_found" });
+  }
   expect(await f.db.moduleRun.count()).toBe(0);
+  expect(await f.db.run.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_runtime_incident" } })).toBe(0);
 });
 
-test("app output references preserve the original JSON Schema and generated call type", async () => {
-  const f = await fixture();
+test("app output references preserve original JSON Schema and generated call types", async () => {
+  const f = await fixture(), module = await active(f, "typed");
   const schema = { type: "object", properties: { zeta: { type: "string" }, alpha: { type: "integer" } }, required: ["zeta", "alpha"], additionalProperties: false };
-  const active = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "typed", status: "active", activeHash: "typed-v1" } });
-  const appManifest = moduleManifestSchema.parse({ name: "typed", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "read", description: "Read", visibility: ["modules"], parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["ready", "done"] }, limit: { type: "number" } }, required: ["state"] } } }, required: ["filters"] }, output: schema }] });
-  await f.db.moduleVersion.create({ data: { moduleId: active.id, hash: "typed-v1", manifest: appManifest, source: "user", status: "approved", intent: {}, report: {} } });
-  const reference = await f.call("m_modules_reference", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
+  const tool = { ...manifest.tools[0]!, parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["ready", "done"] }, limit: { type: "number" } }, required: ["state"] } } }, required: ["filters"] }, output: schema };
+  await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash: "v1" } }, data: { manifest: moduleManifestSchema.parse({ ...manifest, name: "typed", tools: [tool] }) } });
+  const reference = await f.call("modules.reference", { target: "typed.read" }) as { outputSchema: unknown; inputSchema: { properties: { filters: { items: { additionalProperties: boolean } } } } };
   expect(JSON.stringify(reference.outputSchema)).toBe(JSON.stringify(schema));
   expect(reference.inputSchema.properties.filters.items.additionalProperties).toBe(false);
   expect(await callsDeclaration(f.ports, f.workspace.id)).toContain('"typed.read": { args: { "filters": Array<{ "state": "ready" | "done"; "limit"?: number }> }; output: { "zeta": string; "alpha": number } }');
 });
 
-test("reference discovery is workspace scoped, declares unknown outputs, and cannot be used by an app or owner", async () => {
-  const f = await fixture();
-  const custom = await sources(f);
+test("reference hash binds the live tool and ignores documentation and object-key order", async () => {
+  const f = await fixture(), module = await active(f);
+  const tool = moduleManifestSchema.parse({ ...manifest, tools: [{ ...manifest.tools[0]!, parameters: { type: "object", properties: { value: { type: "string" }, count: { type: "number" } }, required: ["value"] }, output: { type: "object", properties: { answer: { type: "string" } } } }] }).tools[0]!;
+  const reordered = { ...tool, description: "Different documentation", visibility: [...tool.visibility].reverse(), parameters: { required: ["value"], properties: { count: { type: "number" as const }, value: { type: "string" as const } }, type: "object" as const } };
+  expect(moduleCallbackContractHash(reordered)).toBe(moduleCallbackContractHash(tool));
+  expect(moduleCallbackContractHash({ ...tool, idempotent: !tool.idempotent })).not.toBe(moduleCallbackContractHash(tool));
+  expect(moduleCallbackContractHash({ ...tool, visibility: ["owner"] })).not.toBe(moduleCallbackContractHash(tool));
+  expect(moduleCallbackContractHash({ ...tool, output: { type: "string" } })).not.toBe(moduleCallbackContractHash(tool));
+  expect(moduleCallbackContractHash({ ...tool, parameters: { ...tool.parameters, required: ["value", "count"] } })).not.toBe(moduleCallbackContractHash(tool));
+  const reference = await f.call("modules.reference", { target: "target.read" }) as { contractHash: string };
+  const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
+  await expect(callSync(f.ports, origin, "target.read", { unexpected: true }, { expectedTarget: { moduleId: module.id, contractHash: reference.contractHash } })).rejects.toMatchObject({ code: "invalid" });
+  await expect(callSync(f.ports, origin, "target.read", {}, { expectedTarget: { moduleId: module.id, contractHash: "0".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
+});
+
+test.each(["building", "testing", "pending_review", "rejected", "active", "missing", "malformed", "paused", "migrating", "no-hash"])("references and declarations exclude a non-approved or inactive active pointer: %s", async state => {
+  const f = await fixture(), module = await active(f);
+  expect((await references(f.ports, f.workspace.id)).some(entry => entry.target === "target.read")).toBe(true);
+  if (state === "missing") await f.db.moduleVersion.deleteMany({ where: { moduleId: module.id } });
+  else if (state === "malformed") await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { manifest: { name: "invalid" } } });
+  else if (["paused", "migrating", "no-hash"].includes(state)) await f.db.module.update({ where: { id: module.id }, data: state === "no-hash" ? { activeHash: null } : { status: state } });
+  else await f.db.moduleVersion.updateMany({ where: { moduleId: module.id }, data: { status: state } });
+  expect((await references(f.ports, f.workspace.id)).some(entry => entry.target === "target.read")).toBe(false);
+  await expect(f.call("modules.reference", { target: "target.read" })).rejects.toMatchObject({ code: "not_found" });
+  expect(await callsDeclaration(f.ports, f.workspace.id)).not.toContain('"target.read"');
+});
+
+test("discovery stays workspace scoped and honors the current caller admission", async () => {
+  const f = await fixture(), module = await active(f);
   const other = await f.db.workspace.create({ data: { name: "other" } });
-  const privateModule = await f.db.module.create({ data: { workspaceId: other.id, name: "outside", activeHash: "private" } });
-  await f.db.moduleVersion.create({ data: { moduleId: privateModule.id, hash: "private", manifest: { ...manifest, name: "outside" }, status: "approved", source: "user", intent: {}, report: {} } });
-  expect(await f.call("m_modules_reference", { target: "web.inspect" })).toMatchObject({ source: { kind: "module", hash: custom.hash }, outputSchema: null });
-  expect(JSON.stringify(await f.call("m_modules_reference", {}))).not.toContain("outside.inspect");
-  await expect(f.call("m_modules_reference", { target: "outside.inspect" })).rejects.toMatchObject({ code: "not_found" });
-  await expect(f.api.modules.callTool("m_modules_reference", {})).rejects.toMatchObject({ code: "not_found" });
-  for (const target of ["modules.reference", "modules.checkout"]) {
-    await expect(callSync(f.ports, { workspaceId: f.workspace.id, caller: { kind: "module", module: "web", moduleId: custom.module.id, hash: custom.hash }, chain: [], path: [] }, target, {})).rejects.toMatchObject({ code: "forbidden" });
-  }
+  const outside = await f.db.module.create({ data: { workspaceId: other.id, name: "outside", activeHash: "private" } });
+  await f.db.moduleVersion.create({ data: { moduleId: outside.id, hash: "private", manifest: { ...manifest, name: "outside" }, status: "approved", source: "user", intent: {}, report: {} } });
+  expect(await f.call("modules.reference", { target: "target.read" })).toMatchObject({ source: { kind: "module", hash: "v1" }, outputSchema: null });
+  expect(JSON.stringify(await f.call("modules.reference"))).not.toContain("outside.read");
+  await expect(f.call("modules.reference", { target: "outside.read" })).rejects.toMatchObject({ code: "not_found" });
+  const caller: Caller = { kind: "module", module: "target", moduleId: module.id, hash: "v1" };
+  expect(await f.call("modules.reference", { target: "modules.tools" }, caller)).toMatchObject({ target: "modules.tools" });
+  await expect(f.call("modules.reference", { target: "approvals.resolve" }, caller)).rejects.toMatchObject({ code: "not_found" });
 });
 
-test("checkout distinguishes active customization from the current release even when the new built-in was never registered", async () => {
-  const f = await fixture(), seeded = await sources(f);
-  // Nix may deduplicate release resources with hard links; exported copies must not retain them.
-  await link(join(seeded.builtin, "index.ts"), join(f.dataDir, "deduplicated.ts"));
-  expect(await f.call("m_modules_checkout", { module: "web", dir: "active" })).toMatchObject({ source: "stored", hash: seeded.hash });
-  const result = await f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "reference" }) as { hash: string };
-  expect(result).toMatchObject({ source: "builtin", hash: seeded.release.commit });
-  expect(result.hash).not.toBe(seeded.hash);
-  expect(await readFile(join(f.run.cwd, "active", "index.ts"), "utf8")).toBe("custom appearance");
-  expect(await readFile(join(f.run.cwd, "reference", "index.ts"), "utf8")).toBe("new release feature");
-  expect((await stat(join(f.run.cwd, "reference", "index.ts"))).nlink).toBe(1);
-  expect(await f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "another" })).toMatchObject({ hash: result.hash });
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: seeded.module.id } })).activeHash).toBe(seeded.hash);
-  expect(await f.db.moduleVersion.count()).toBe(1);
-  expect(await f.db.approval.count()).toBe(0);
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "reference" })).rejects.toMatchObject({ code: "conflict" });
-});
-
-test("built-in references reject ambiguous provenance, missing resources, path escapes and symlinks without falling back", async () => {
-  const f = await fixture(), seeded = await sources(f);
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", hash: seeded.hash, dir: "ambiguous" })).rejects.toMatchObject({ code: "invalid" });
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "../escape" })).rejects.toMatchObject({ code: "invalid" });
-  await expect(f.call("m_modules_checkout", { module: "missing", source: "builtin", dir: "missing" })).rejects.toMatchObject({ code: "not_found" });
-  const outside = join(f.dataDir, "outside-destination");
-  await mkdir(outside);
-  await symlink(outside, join(f.run.cwd, "linked-output"));
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "linked-output/copy" })).rejects.toMatchObject({ code: "forbidden" });
-  expect(await readdir(outside)).toEqual([]);
-  await symlink(seeded.stored, join(f.ports.moduleBuiltinResources!, "linked"));
-  await expect(f.call("m_modules_checkout", { module: "linked", source: "builtin", dir: "linked" })).rejects.toMatchObject({ code: "not_found" });
-  await symlink(join(seeded.stored, "index.ts"), join(seeded.builtin, "leak.ts"));
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "unsafe" })).rejects.toMatchObject({ code: "forbidden" });
-  f.ports.moduleBuiltinResources = undefined;
-  await expect(f.call("m_modules_checkout", { module: "web", source: "builtin", dir: "no-fallback" })).rejects.toMatchObject({ code: "not_found" });
+test("private build guidance advertises live discovery and fixed material authoring", () => {
+  registerSystemModules();
+  const names = new Set(listSystemModules().flatMap(module => module.tools.map(tool => `m_${module.name}_${tool.name.replaceAll("-", "_")}`)));
+  expect(BUILD_MODULE_TOOLS.every(name => names.has(name))).toBe(true);
+  for (const removed of ["m_modules_checkout", "m_modules_propose", "m_modules_check", "m_modules_request_group", "build_request"]) expect(BUILD_REFERENCE_PROMPT).not.toContain(removed);
+  for (const current of ["modules.reference", "modules.tools", "modules.diagnostics", "modules.submit", "modules.candidate-check", "ordinary", "fixed candidate"]) expect(BUILD_REFERENCE_PROMPT).toContain(current);
 });

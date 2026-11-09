@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EXECUTION_PROTOCOL, executionInputSchemas, executionErrorSchema, executionViewSchema, executionResultSchema, executionCapabilitiesSchema, executionIdSchema as id, executionRefSchema, executionStatusSchema, type ExecutionPrincipal, type ExecutionRef } from "./execution";
+import { executionErrorSchema, executionViewSchema, executionResultSchema, executionIdSchema as id, executionRefSchema, executionStatusSchema, type ExecutionPrincipal, type ExecutionRef } from "./execution";
 
 export const EXECUTION_EVENT_LIMITS = {
   eventBytes: 32 * 1024, pageEvents: 100, pageBytes: 256 * 1024,
@@ -53,31 +53,16 @@ export const executionClientMessageSchema = z.object({
 export const executionAcceptedSchema = z.object({ accepted: z.literal(true) }).strict();
 export const executionListSchema = z.object({ works: z.array(executionViewSchema).max(100), after: id.nullable() }).strict();
 export const executionResultsSchema = z.object({ results: z.array(executionResultSchema).max(100) }).strict();
-/** Each op has exactly one success data shape; the wire envelope is unchanged. */
-export const editorResponseDataSchemas = {
+/** Shared Execution success data schemas used by Agent and Coding. */
+export const executionResponseDataSchemas = {
   start: executionViewSchema, get: executionViewSchema, lookup_start: executionViewSchema, cancel: executionViewSchema, attach: executionViewSchema,
   list: executionListSchema, send: executionAcceptedSchema, answer: executionAcceptedSchema, detach: executionAcceptedSchema, accept: executionAcceptedSchema,
   events: executionEventPageSchema, snapshot: executionSnapshotSchema, results: executionResultsSchema,
 } as const;
-export const EDITOR_HTTP = { commands: "/api/editor/v1/commands", events: "/api/editor/v1/events" } as const;
-// Reuse the events command bounds; decimal query strings are the only HTTP conversion.
-const eventsFields = executionInputSchemas.events.shape;
-export const editorEventsQuerySchema = z.object({
-  v: z.literal(EXECUTION_PROTOCOL), requestId: id, workId: eventsFields.workId, runId: eventsFields.runId, attemptId: eventsFields.attemptId,
-  cursor: eventsFields.cursor, limit: z.string().regex(/^\d+$/).transform(Number).pipe(eventsFields.limit),
-  waitMs: z.string().regex(/^\d+$/).transform(Number).pipe(eventsFields.waitMs),
-}).strict();
 export const EXECUTION_HTTP_STATUS = {
   invalid: 400, unauthorized: 401, forbidden: 403, not_found: 404, conflict: 409, cursor_expired: 410,
   too_large: 413, capacity: 429, unavailable: 503, unsupported_version: 409, unsupported: 400,
 } as const satisfies Record<z.infer<typeof executionErrorSchema>["code"], number>;
-export const editorResponseSchema = z.discriminatedUnion("ok", [
-  z.object({ v: z.literal(EXECUTION_PROTOCOL), requestId: id, ok: z.literal(true), data: z.union([
-    executionViewSchema, executionEventPageSchema, executionSnapshotSchema, executionCapabilitiesSchema,
-    executionAcceptedSchema, executionListSchema, executionResultsSchema,
-  ]) }).strict(),
-  z.object({ v: z.literal(EXECUTION_PROTOCOL), requestId: id, ok: z.literal(false), error: executionErrorSchema }).strict(),
-]);
 export type ExecutionControl = z.infer<typeof executionControlSchema>;
 export type ExecutionEvent = z.infer<typeof executionEventSchema>;
 export type ExecutionPayload = z.infer<typeof executionEventPayloadSchema>;

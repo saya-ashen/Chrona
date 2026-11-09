@@ -44,13 +44,12 @@ export const executionCommandSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("accept"), workId: id, resultId: id, commandKey: id }).strict(),
 ]);
 const [start, get, lookupStart, list, send, answer, cancel, attach, detach, events, snapshot, results, accept] = executionCommandSchema.options;
-/** Routed tools consume the same payload fields, without the editor's op discriminant. */
+/** Routed tools consume the same payload fields without the command op discriminant. */
 export const executionInputSchemas = {
   start: start.omit({ op: true }), get: get.omit({ op: true }), lookup_start: lookupStart.omit({ op: true }), list: list.omit({ op: true }),
   send: send.omit({ op: true }), answer: answer.omit({ op: true }), cancel: cancel.omit({ op: true }), attach: attach.omit({ op: true }),
   detach: detach.omit({ op: true }), events: events.omit({ op: true }), snapshot: snapshot.omit({ op: true }), results: results.omit({ op: true }), accept: accept.omit({ op: true }),
 } as const;
-export const editorRequestSchema = z.object({ v: z.literal(EXECUTION_PROTOCOL), requestId: id, command: executionCommandSchema }).strict();
 /** Internal result provenance is read from the admitted attempt, not inferred from model text. */
 export const executionBaselineSchema = z.object({ kind: z.enum(["commit", "snapshot"]), digest: z.string().min(1).max(128) }).strict();
 export const executionResultSourceInputSchema = z.object(target).strict();
@@ -77,7 +76,7 @@ export type ExecutionView = z.infer<typeof executionViewSchema>;
 export type ExecutionCommand = z.infer<typeof executionCommandSchema>;
 export type ExecutionResult = z.infer<typeof executionResultSchema>;
 export type ExecutionResultSource = z.infer<typeof executionResultSourceSchema>;
-/** Trusted routed context only; never decoded from an editor body or accepted as tool input. */
+/** Trusted routed context only; never decoded from a client body or accepted as tool input. */
 export type ExecutionPrincipal = { workspaceId: string; ownerId: string; caller: { kind: "owner" } | { kind: "module"; moduleId: string; hash: string } };
 export type ExecutionProjectGrant = { projectRef: string; executor: "server"; canonicalPath: string; baseline: string };
 /** Future implementation must atomically deduplicate start and enqueue in the existing Run transaction. */

@@ -1,5 +1,7 @@
 # Module Git Docker / Nix 打包验证
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 2026-11-06，真实目录 `/home/saya/workspace/Chrona`，`platform-v2@55d3481c` 的本次未提交集成树；不是部署或公开发行声明。正式上游为 `https://github.com/chrona-core/chrona-module-<name>`。固定输入 `resources/module-git/` 共 15 文件：11 bundles、lock、MIT LICENSE、第三方声明、公开相对路径发布计划。构建消费固定历史，不依赖宿主 `.git` 或重造模块祖先。发行合同见 [Module Git 发行](module-git-release.md)。
 
 ## 最小改动

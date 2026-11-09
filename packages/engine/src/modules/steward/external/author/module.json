@@ -1,0 +1,480 @@
+{
+  "name": "author",
+  "description": "Ordinary source authoring and local package distribution. Prepares owner admission drafts, edits bounded own source files, stages material and forwards stable kernel receipts. Model execution requires future bounded admission support.",
+  "entry": "index.ts",
+  "content": true,
+  "activated": true,
+  "uses": [
+    "modules.source",
+    "modules.submit",
+    "modules.candidate-check"
+  ],
+  "effects": [],
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test.ts"
+  ],
+  "tools": [
+    {
+      "name": "prepare",
+      "description": "Prepare a material-only owner request and admission arguments. Never signs admission or starts Agent. The owner verifies the selected Author identity.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {requestKey,submitter:{moduleId,hash},targets:[{name,moduleId,expectedActiveHash}],goal,intent:{changes,preserves?}}. New targets use null/null. Owner must verify submitter is the approved Author version."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "material-only"
+          },
+          "request": {
+            "type": "object",
+            "properties": {
+              "goal": {
+                "type": "string"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "moduleId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expectedActiveHash": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "moduleId",
+                    "expectedActiveHash"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "intent": {
+                "type": "object",
+                "properties": {
+                  "changes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "preserves": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "changes",
+                  "preserves"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "goal",
+              "targets",
+              "intent"
+            ],
+            "additionalProperties": false
+          },
+          "admission": {
+            "type": "object",
+            "properties": {
+              "requestKey": {
+                "type": "string"
+              },
+              "submitter": {
+                "type": "object",
+                "properties": {
+                  "moduleId": {
+                    "type": "string"
+                  },
+                  "hash": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "moduleId",
+                  "hash"
+                ],
+                "additionalProperties": false
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "moduleId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expectedActiveHash": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "moduleId",
+                    "expectedActiveHash"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "requestKey",
+              "submitter",
+              "targets"
+            ],
+            "additionalProperties": false
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "execution": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "const": false
+              },
+              "limitation": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "supported",
+              "limitation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kind",
+          "request",
+          "admission",
+          "prompt",
+          "execution"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "write",
+      "description": "Write UTF-8 source text under sources/<workspace>/file. Maximum 64 KiB per file. Rejects symlinks, hard links and special files.",
+      "visibility": [
+        "provider",
+        "modules",
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "size"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "read",
+      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1–2000. Rejects files over 64 KiB.",
+      "visibility": [
+        "provider",
+        "modules",
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "nextOffset": {
+            "type": "integer"
+          },
+          "eof": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "size",
+          "offset",
+          "nextOffset",
+          "eof",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list",
+      "description": "List a source or package directory (maximum 200 entries, 16 KiB output). Use path '' or '.' for the public root; missing paths return not_found. Unsafe entries fail the operation.",
+      "visibility": [
+        "provider",
+        "modules",
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "file",
+                    "directory"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "stage",
+      "description": "Copy a bounded local tree into a new package stage and record declared provenance. Verifies manifest name and entry; kernel checks remain required. No network or overwrite.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {name,from:\"sources/workspace\",to:\"packages/stage\",provenance:{kind:\"local\",label}|{kind:\"kernel-source\",moduleId,hash,ref,materialDigest}}. Provenance is caller-declared."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "dir": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "string"
+          },
+          "files": {
+            "type": "integer"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "materialDigest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "dir",
+          "metadata",
+          "files",
+          "bytes",
+          "materialDigest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "source",
+      "description": "Ask modules.source to export an admitted immutable version into an empty own sources/<workspace>. Returns its unmodified result; no host paths or network.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {admissionId,moduleId,hash,to:\"sources/workspace\"}. Kernel binds caller and authorized source."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "submit",
+      "description": "Submit an entire admitted candidate set from own relative source directories. Returns the kernel receipt unchanged. Never issues admission or runs models.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {admissionId,requestKey,items:[{name,dir,intent:{changes,preserves?}}]}. dir is sources/workspace or packages/stage/source. Use original admission and request key after a lost reply."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "receipt",
+      "description": "Read the exact kernel candidate receipt. Preserves unknown and errors, performs no retry, never selects latest.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {receiptId} OR {admissionId,requestKey}, exactly one selector."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  ]
+}

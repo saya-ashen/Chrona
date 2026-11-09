@@ -6,49 +6,56 @@
       "proposedRepository": "chrona-core/chrona-module-web",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/web.git",
       "branch": "main",
-      "commit": "a641eaa0acc56c12ebc9139ddf355e2ea3b1df84"
+      "commit": "c472a1a9b37ebe566849cdcb41a0209fcc60d17a"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mcp.git",
       "branch": "main",
-      "commit": "6199084d6fad1dd9f47596aa0e1dcc1e824e5e23"
+      "commit": "93117f24f2b31920f5a236af89731f445a5600fe"
     },
     {
       "name": "files",
       "proposedRepository": "chrona-core/chrona-module-files",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/files.git",
       "branch": "main",
-      "commit": "f9baa5df32c092ed839a0d933b5ceaff323ea1e7"
+      "commit": "6a0b949567d2b7c333b2beb919fc4d988bc889ca"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/notify.git",
       "branch": "main",
-      "commit": "e3e53c19f8b244ffd4ab84356c95f7268a957c12"
+      "commit": "81e1f0fa06ecf8c57026b5465e81fd219f5f87bf"
     },
     {
       "name": "events",
       "proposedRepository": "chrona-core/chrona-module-events",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/events.git",
       "branch": "main",
-      "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425"
+      "commit": "8812b430e73b51b583131d1fad8085ab8efedb25"
     },
     {
       "name": "agent",
       "proposedRepository": "chrona-core/chrona-module-agent",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/agent.git",
       "branch": "main",
-      "commit": "faf2fe95ac709c78ad757d353575c3c88a934b6b"
+      "commit": "3665551407932d4512f012115688584fdfe30965"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/qq.git",
       "branch": "main",
-      "commit": "6945c37ce2ea47d5ea63eec73f06c464822f0c00"
+      "commit": "2ecb1c9017838bd978c15efe6ab4c357c1195887"
+    },
+    {
+      "name": "author",
+      "proposedRepository": "chrona-core/chrona-module-author",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/author.git",
+      "branch": "main",
+      "commit": "500181f41722b930acd63e77e7a9942a5c19f46d"
     },
     {
       "name": "remind",
@@ -62,28 +69,28 @@
       "proposedRepository": "chrona-core/chrona-module-mind",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mind.git",
       "branch": "main",
-      "commit": "ea4cf602e25e37568c9df1e7e104d016ce0f8fac"
+      "commit": "b2b81b50698486916f9fb06067e860f1a0ab948b"
     },
     {
       "name": "memory-local",
       "proposedRepository": "chrona-core/chrona-module-memory-local",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/memory-local.git",
       "branch": "main",
-      "commit": "2f9e91afaaf1fdde2842d40a8b082c0f0f86f639"
+      "commit": "f2810daf149807da120177d81723a962604f8969"
     },
     {
       "name": "coding",
       "proposedRepository": "chrona-core/chrona-module-coding",
       "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/coding.git",
       "branch": "main",
-      "commit": "f7da00c2662f942bb24ceda3e597825c1c208f69"
+      "commit": "9516e6df3820c7a7e46d7ba23bff7c5320b1f4ef"
     },
     {
-      "name": "editor",
-      "proposedRepository": "chrona-core/chrona-module-editor",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/editor.git",
+      "name": "coding-web",
+      "proposedRepository": "chrona-core/chrona-module-coding-web",
+      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/coding-web.git",
       "branch": "main",
-      "commit": "608a2812682d45d7f6b5714a2ae90c4041fa6215"
+      "commit": "ec7899059792138b3385c0cc045076f9160853bb"
     }
   ]
 }

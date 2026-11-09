@@ -4491,7 +4491,6 @@ var providerRunViewSchema = object({
 }).strict();
 
 // packages/contracts/src/steward/execution.ts
-var EXECUTION_PROTOCOL = "chrona.execution.v1";
 var executionIdSchema = string2().min(1).max(128).regex(/^[\w:.-]+$/);
 var id2 = executionIdSchema;
 var executionRefSchema = object({ workId: id2, sessionId: id2, runId: id2, attemptId: id2 }).strict();
@@ -4568,7 +4567,6 @@ var executionInputSchemas = {
   results: results.omit({ op: true }),
   accept: accept.omit({ op: true })
 };
-var editorRequestSchema = object({ v: literal(EXECUTION_PROTOCOL), requestId: id2, command: executionCommandSchema }).strict();
 var executionBaselineSchema = object({ kind: _enum(["commit", "snapshot"]), digest: string2().min(1).max(128) }).strict();
 var executionResultSourceInputSchema = object(target).strict();
 var EXECUTION_CHANGES_LIMITS = { bytes: 131072, files: 100, fileBytes: 65536, timeoutMs: 5000 };
@@ -4666,7 +4664,7 @@ var executionClientMessageSchema = object({
 var executionAcceptedSchema = object({ accepted: literal(true) }).strict();
 var executionListSchema = object({ works: array(executionViewSchema).max(100), after: executionIdSchema.nullable() }).strict();
 var executionResultsSchema = object({ results: array(executionResultSchema).max(100) }).strict();
-var editorResponseDataSchemas = {
+var executionResponseDataSchemas = {
   start: executionViewSchema,
   get: executionViewSchema,
   lookup_start: executionViewSchema,
@@ -4681,29 +4679,6 @@ var editorResponseDataSchemas = {
   snapshot: executionSnapshotSchema,
   results: executionResultsSchema
 };
-var eventsFields = executionInputSchemas.events.shape;
-var editorEventsQuerySchema = object({
-  v: literal(EXECUTION_PROTOCOL),
-  requestId: executionIdSchema,
-  workId: eventsFields.workId,
-  runId: eventsFields.runId,
-  attemptId: eventsFields.attemptId,
-  cursor: eventsFields.cursor,
-  limit: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.limit),
-  waitMs: string2().regex(/^\d+$/).transform(Number).pipe(eventsFields.waitMs)
-}).strict();
-var editorResponseSchema = discriminatedUnion("ok", [
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(true), data: union([
-    executionViewSchema,
-    executionEventPageSchema,
-    executionSnapshotSchema,
-    executionCapabilitiesSchema,
-    executionAcceptedSchema,
-    executionListSchema,
-    executionResultsSchema
-  ]) }).strict(),
-  object({ v: literal(EXECUTION_PROTOCOL), requestId: executionIdSchema, ok: literal(false), error: executionErrorSchema }).strict()
-]);
 
 // packages/contracts/src/steward/execution-v2.ts
 var WORK_PROTOCOL = "chrona.execution.v2";
@@ -4771,15 +4746,15 @@ var workResponseDataSchemas = {
   get: workViewSchema,
   lookup_start: workViewSchema,
   list: union([object({ resource: literal("works"), works: array(workViewSchema).max(100), after: id3.nullable() }).strict(), object({ resource: literal("locations"), locations: array(workLocationSchema).max(100), after: id3.nullable() }).strict()]),
-  send: editorResponseDataSchemas.send,
-  answer: editorResponseDataSchemas.answer,
+  send: executionResponseDataSchemas.send,
+  answer: executionResponseDataSchemas.answer,
   cancel: workViewSchema,
   attach: workViewSchema,
-  detach: editorResponseDataSchemas.detach,
-  events: editorResponseDataSchemas.events,
-  snapshot: editorResponseDataSchemas.snapshot,
+  detach: executionResponseDataSchemas.detach,
+  events: executionResponseDataSchemas.events,
+  snapshot: executionResponseDataSchemas.snapshot,
   results: workResultsSchema,
-  accept: editorResponseDataSchemas.accept
+  accept: executionResponseDataSchemas.accept
 };
 var workResponseEnvelopeSchema = discriminatedUnion("ok", [
   object({ v: literal(WORK_PROTOCOL), requestId: id3, ok: literal(true), data: union([workResponseDataSchemas.start, workResponseDataSchemas.list, workResponseDataSchemas.send, workResponseDataSchemas.events, workResponseDataSchemas.snapshot, workResponseDataSchemas.results, workResponseDataSchemas.accept]) }).strict(),

@@ -39,6 +39,9 @@ function finalRunOutcome(outcome: RunOutcome, state: { knownStop: boolean; cance
   return { status: outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome, error: outcome.error };
 }
 
+function mayFinalizeRun(status: string, evidence: unknown, hasAttempt: boolean, agentContext: boolean, error: string | null) {
+  return status === "running" || canReconcileStop(!!evidence, hasAttempt, agentContext, error);
+}
 function runExpired(run: { deadlineAt: Date | null; leaseUntil: Date | null }, now: Date) {
   return !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now));
 }
@@ -187,9 +190,9 @@ class RunService {
     const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
     const agentContext = await isAgentContext(tx, run.sessionId);
     if (attempt?.stopConfirmedAt) return false;
-    if (run.status !== "running" && !canReconcileStop(!!evidence, !!attempt, agentContext, run.error)) return false;
+    if (!mayFinalizeRun(run.status, evidence, !!attempt, agentContext, run.error)) return false;
     const { status, error } = finalRunOutcome(outcome, { knownStop: (!attempt && !agentContext) || !!evidence, cancelled: await runWasCancelled(tx, runId, attempt), expired: runExpired(run, now) });
-    await tx.run.update({ where: { id: runId }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } });
+    await tx.run.update({ where: { id: runId }, data: { status, error: error?.slice(0, 1000) ?? null, endedAt: now, leaseUntil: null } });
     if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
     if (attempt) await finishExecution(ports, tx, runId, evidence, now);
     else await this.finishOrdinaryRun(tx, run, status);
@@ -198,8 +201,8 @@ class RunService {
   }
   /** Application contexts own delivery and continuation; internal builds only publish lifecycle facts. */
   private async finishOrdinaryRun(tx: Prisma.TransactionClient, run: RunRow, status: string) {
-    if (run.lane !== "build" || !["failed", "timed_out", "provider_unavailable"].includes(status)) return;
-    await notifyLifecycle(tx, this.ports, this.workspaceId, `build-paused:${run.id}`, { kind: "build-paused", status, outcome: status, ...(run.sessionId ? { session: run.sessionId } : {}) });
+    if (run.lane !== "build" || (status !== "failed" && status !== "timed_out" && status !== "provider_unavailable")) return;
+    await notifyLifecycle(tx, this.ports, this.workspaceId, `build-paused:${run.id}`, { kind: "build-paused", status, ...(run.sessionId ? { session: run.sessionId } : {}) });
   }
   async expireLeases(now = this.ports.now()) {
     const rows = await this.ports.db.run.findMany({ where: { workspaceId: this.workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });

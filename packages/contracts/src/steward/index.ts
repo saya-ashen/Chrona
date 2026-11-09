@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { slug, moduleToolSchema } from "./module-tool";
 export { slug, TOOL_VISIBILITY, type ModuleTool } from "./module-tool";
-import { moduleOriginSchema, moduleCapabilitiesSchema, moduleInstallRequestSchema, moduleVersionHashSchema, moduleUpstreamRequestSchema } from "./module-lifecycle";
+import { moduleOriginSchema, moduleCapabilitiesSchema, moduleVersionHashSchema } from "./module-lifecycle";
 export * from "./module-lifecycle";
 export { moduleToolParameterSchema, type ModuleToolParameter } from "./module-input";
 export { moduleOutputSchema, compileModuleOutput } from "./module-output";
@@ -35,35 +35,22 @@ export const SESSION_STATUSES = ["active", "ended"] as const;
 export const RUN_LANES = ["foreground", "background", "build"] as const;
 export const RUN_TRIGGERS = ["message", "schedule", "source", "edit", "approval", "retry", "build"] as const;
 export const RUN_STATUSES = ["queued", "running", "finished", "failed", "timed_out", "cancelled", "provider_unavailable"] as const;
-/** `wake` runs the Provider in a fresh session and reports back to the session that created it;
- * `remind` is accepted as input only: it creates a `module` schedule of the built-in remind module with `payload: { text }`;
- * `module` rows are created only by Chrona on module activation/rollback. */
+/** Private persisted schedule vocabulary; no public schedule creation API. */
 export const SCHEDULE_MODES = ["wake", "module"] as const;
 export const SCHEDULE_STATUSES = ["active", "paused", "done", "cancelled"] as const;
 export const APPROVAL_STATUSES = ["open", "approved", "denied", "expired"] as const;
-/** `always` turns the decision into a grant: scoped to the module the approval is about, else global. */
-export const APPROVAL_SCOPES = ["once", "always"] as const;
+/** Private approval resolution is once-only. */
+export const APPROVAL_SCOPES = ["once"] as const;
 
-/** Actions Chrona itself performs for the Provider and therefore gates. Provider-native actions are governed by the Provider runtime/sandbox. */
-export const ACTIONS = [
-  "notify_user", "schedule", "activate_module", "read_source", "connect_source",
-  "send_external_message", "modify_external", "delete_data", "share_third_party", "purchase", "change_credentials", "access_host_path",
-  /** Owner-level policy changes (grants, budgets, moduleModel, notification settings) requested through an entry module. */
-  "change_policy",
-] as const;
-/** An action either runs (`allow`) or asks the user first (`ask`); an approval "always" leaves an `allow` grant (security-simplification §4). */
+/** Approval records for governed module changes and application-requested decisions. */
+export const ACTIONS = ["activate_module", "delete_data", "modify_external"] as const;
+/** Private policy storage vocabulary; approvals do not create grants. */
 export const GRANT_MODES = ["allow", "ask"] as const;
 export const DEFAULT_POLICY = {
-  notify_user: "allow", schedule: "allow", activate_module: "ask", read_source: "allow",
-  connect_source: "ask", send_external_message: "ask", modify_external: "ask", delete_data: "ask",
-  share_third_party: "ask", purchase: "ask", change_credentials: "ask", access_host_path: "ask", change_policy: "ask",
+  activate_module: "ask", delete_data: "ask", modify_external: "ask",
 } as const satisfies Record<(typeof ACTIONS)[number], (typeof GRANT_MODES)[number]>;
 
-export const NOTIFY_LEVELS = ["now", "digest", "web"] as const;
-export const NOTIFICATION_STATUSES = ["queued", "sent", "failed", "uncertain", "folded", "suppressed", "acknowledged"] as const;
 export const DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"] as const;
-export const DEFAULT_NOTIFICATION_SETTINGS = { dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, timezone: "Asia/Shanghai", digestAt: "09:00" } as const;
-
 
 export const RUN_LIMITS = {
   foregroundTimeoutMs: 5 * 60_000, backgroundTimeoutMs: 20 * 60_000, buildTimeoutMs: 60 * 60_000,
@@ -82,11 +69,11 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 export type ScheduleMode = (typeof SCHEDULE_MODES)[number];
 export type Action = (typeof ACTIONS)[number];
 export type GrantMode = (typeof GRANT_MODES)[number];
-export type NotifyLevel = (typeof NOTIFY_LEVELS)[number];
 export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 
-// ------------------------------------------------------------- schedules ---
+// ------------------------------------------ private schedule and manifest ---
 
+/** Retained for domain schedule calculations and stored-record parsing across packages. */
 export const scheduleRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("at"), at: iso }).strict(),
   z.object({ kind: z.literal("daily"), time: hhmm }).strict(),
@@ -95,58 +82,18 @@ export const scheduleRuleSchema = z.discriminatedUnion("kind", [
 ]);
 /** `network`: the sandbox lets the module reach the network. */
 export const MODULE_EFFECTS = ["network"] as const;
-/** Effects before v2-10 stood for interfaces; stored versions get them as `uses` when parsed. */
-const EFFECT_USES: Record<string, string> = { model: "provider.complete", wake_provider: "provider.wake", notify_user: "notify.send" };
-/** Versions stored before fields were removed (`channel`, `dynamicSchedules`, effects other than `network`) still parse. */
-function withoutRemovedFields(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const { channel: _channel, dynamicSchedules: _dynamicSchedules, ...manifest } = value as Record<string, unknown>;
-  if (!Array.isArray(manifest.effects)) return manifest;
-  const implied = manifest.effects.flatMap(effect => typeof effect === "string" && EFFECT_USES[effect] ? [EFFECT_USES[effect]] : []);
-  const uses = Array.isArray(manifest.uses) ? manifest.uses : [];
-  return { ...manifest, effects: manifest.effects.filter(effect => typeof effect !== "string" || !EFFECT_USES[effect]), ...(implied.length ? { uses: [...new Set([...uses, ...implied])] } : {}) };
-}
-/** Module model tier name (e.g. fast, strong); the user maps tiers to exact models in `moduleModel.models`. */
+/** Application-declared model tier; Agent owns its mapping to exact models. */
 export const modelTier = z.string().regex(/^[a-z][a-z0-9-]{1,20}$/);
 export const MODULE_LANGUAGES = ["typescript", "python", "shell"] as const;
 export const RESERVED_LISTEN_PATHS = ["/api/steward", "/api/workspaces", "/api/health"] as const;
-const moduleTriggerSchema = z.object({ id: slug, schedule: scheduleRuleSchema }).strict();
 /** `<module>.<tool>`: a module tool other modules call through Chrona. */
 export const interfaceRefSchema = z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/);
 const listenPath = z.union([z.literal("/"), z.string().regex(/^\/api\/[a-z][a-z0-9-]{1,40}$/)]);
 /** The HTTP paths a module serves (`listen` is one path or several). */
 export const listenPaths = (manifest: { listen?: string | readonly string[] }): string[] => manifest.listen === undefined ? [] : typeof manifest.listen === "string" ? [manifest.listen] : [...manifest.listen];
-/** v2-23: one user-editable setting a module declares: its type, label, default and bounds (shown on the app's Settings tab). */
-export const moduleSettingSchema = z.object({
-  type: z.enum(["number", "string", "boolean"]), label: z.string().trim().min(1).max(60), description: z.string().max(300).optional(),
-  default: z.union([z.number(), z.string().max(2000), z.boolean()]),
-  min: z.number().optional(), max: z.number().optional(), options: z.array(z.string().max(100)).min(1).max(20).optional(), maxLength: z.number().int().min(1).max(2000).optional(),
-}).strict().superRefine((setting, ctx) => { for (const message of settingIssues(setting)) ctx.addIssue({ code: "custom", message }); });
-function settingIssues(setting: { type: string; default: unknown; min?: number; max?: number; options?: string[]; maxLength?: number }) {
-  return [
-    typeof setting.default !== setting.type && "default must match type",
-    setting.type !== "number" && (setting.min !== undefined || setting.max !== undefined) && "min/max are for numbers",
-    setting.type !== "string" && (setting.options || setting.maxLength) && "options/maxLength are for strings",
-    !settingValueValid(setting, setting.default) && "default is outside the declared bounds",
-  ].filter((message): message is string => !!message);
-}
-export type ModuleSetting = z.infer<typeof moduleSettingSchema>;
-/** Whether a value fits a declared setting (type, bounds, options, length). */
-export function settingValueValid(setting: { type: string; min?: number; max?: number; options?: string[]; maxLength?: number }, value: unknown) {
-  if (typeof value !== setting.type) return false;
-  if (typeof value === "number") return Number.isFinite(value) && (setting.min === undefined || value >= setting.min) && (setting.max === undefined || value <= setting.max);
-  if (typeof value === "string") return (!setting.options || setting.options.includes(value)) && value.length <= (setting.maxLength ?? 2000);
-  return true;
-}
-/** The params a module runs with (v2-23): its manifest params, then its settings from the owner's moduleSettings.<name>. */
-export function moduleRuntimeParams(manifest: { name: string; params: Record<string, { value: string | number | boolean }>; settings: Record<string, ModuleSetting> }, settings: unknown) {
-  const stored = ((settings as { moduleSettings?: Record<string, unknown> } | null)?.moduleSettings ?? {})[manifest.name];
-  return { ...Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value])), ...effectiveSettings(manifest.settings, stored) };
-}
-/** The values a module runs with: each stored value that still fits its declaration, else the default. */
-export function effectiveSettings(declared: Record<string, ModuleSetting>, stored: unknown) {
-  const values = stored && typeof stored === "object" && !Array.isArray(stored) ? stored as Record<string, unknown> : {};
-  return Object.fromEntries(Object.entries(declared).map(([key, setting]) => [key, settingValueValid(setting, values[key]) ? values[key] as string | number | boolean : setting.default]));
+/** Versioned literal runtime parameters; mutable application preferences live with their application. */
+export function moduleRuntimeParams(manifest: { params: Record<string, { value: string | number | boolean }> }) {
+  return Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
 }
 const SECRET_NAME_SCHEMA = z.string().regex(/^[a-z][a-z0-9_]{1,40}$/);
 const SECRET_FIELD_NAME = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
@@ -173,19 +120,16 @@ export const secretSpecSchema = z.object({
   }).strict().optional(),
 }).strict();
 export type SecretSpec = z.infer<typeof secretSpecSchema>;
-export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object({
+export const moduleManifestSchema = z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
   description: z.string().min(1).max(300).optional(),
   entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
-  triggers: z.array(moduleTriggerSchema).max(10),
   tools: z.array(moduleToolSchema).max(30).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
   /** Receive on("activated") once per active version and when a module it `uses` changes version (e.g. to call web.page-set). */
   activated: z.boolean().default(false),
-  /** Opt in to diagnostic-only health events, after startup/configuration and on explicit refresh. */
-  healthCheck: z.boolean().default(false),
   /** A private file directory at `chrona.paths.content`, kept with the module's data (v2-8: no longer shown to the user or the Provider; expose files through tools). */
   content: z.boolean().default(false),
   /**
@@ -209,51 +153,33 @@ export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object(
    */
   packages: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,80}$/)).max(20).default([]),
   /**
-   * Declarations for other modules (v2-14), keyed by the module that interprets them (e.g. `events`). Chrona keeps them
-   * with the version and shows them on the approval card, but does not read them; that module reads them through
-   * `modules.contributions`.
-   */
-  contributes: z.record(slug, z.json()).optional()
-    .refine(value => value === undefined || JSON.stringify(value).length <= 32 * 1024, "contributes must be at most 32 KiB"),
-  /**
-   * Kernel-held credentials this module may read with `secret` (v2-16: any module; qq_bot only entry modules). The user sets them on the page or with `chrona admin secret-set`.
+   * Kernel-held credentials an approved module may read through its declared names. The user sets them on the page or with `chrona admin secret-set`.
    * A name alone, or (v2-16 §2.1) the fields the page should ask for: fixed `fields`, `extraFields` for user-named keys (one per account), `oauth` for a kernel-run authorization (v2-30 §4).
    */
   secrets: z.array(z.union([SECRET_NAME_SCHEMA, secretSpecSchema])).max(50).default([]),
-  /** Required with `uses: agent.complete`: a tier the user configured in `moduleModel.models`, bounded by its limits. */
+  /** Required with `uses: agent.complete`: a declared tier plus hard per-event limits. Agent owns model selection. */
   model: z.object({ tier: modelTier, maxCalls: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000) }).strict().optional(),
   effects: z.array(z.enum(MODULE_EFFECTS)).max(MODULE_EFFECTS.length),
   params: z.record(slug, z.object({ type: z.enum(["number", "string", "boolean"]), value: z.union([z.number(), z.string().max(2000), z.boolean()]) }).strict()).default({}),
-  /** v2-23: what the user may change without a new version; values live in Settings and reach the module as params. */
-  settings: z.record(slug, moduleSettingSchema).default({}).refine(value => Object.keys(value).length <= 20, "At most 20 settings"),
   /** v2-21: a higher address-space cap (ulimit -v) than the default, for runtimes that reserve much more than they use; shown on the approval. */
   limits: z.object({ virtualMemoryMb: z.number().int().min(1024).max(8192) }).strict().optional(),
   data: z.object({ schema: z.number().int().min(1), migrate: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/).optional() }).strict().default({ schema: 1 }),
   tests: z.array(z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/)).min(1).max(10),
 }).strict().superRefine((manifest, ctx) => {
-  // v2-23: settings and params arrive together in ev.params.
-  for (const key of Object.keys(manifest.settings)) if (Object.hasOwn(manifest.params, key)) ctx.addIssue({ code: "custom", path: ["settings", key], message: "A setting cannot share its name with a param" });
-}).superRefine((manifest, ctx) => {
   for (const [key, param] of Object.entries(manifest.params)) {
     if (typeof param.value !== param.type) ctx.addIssue({ code: "custom", path: ["params", key, "value"], message: "Value must match parameter type" });
   }
-  const ids = new Set<string>();
-  manifest.triggers.forEach((trigger, index) => {
-    if (ids.has(trigger.id)) ctx.addIssue({ code: "custom", path: ["triggers", index, "id"], message: "Trigger ids must be unique" });
-    ids.add(trigger.id);
-  });
-  if (!manifest.triggers.length && !manifest.tools.length && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["triggers"], message: "A module needs a trigger, a tool or keepAlive" });
+  if (!manifest.tools.length && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["tools"], message: "A module needs a tool or keepAlive" });
   if (new Set(manifest.effects).size !== manifest.effects.length) ctx.addIssue({ code: "custom", path: ["effects"], message: "Effects must be unique" });
   const names = secretNames(manifest);
   if (new Set(names).size !== names.length) ctx.addIssue({ code: "custom", path: ["secrets"], message: "Secret names must be unique" });
-  if (names.includes("qq_bot") && !isEntryModule(manifest)) ctx.addIssue({ code: "custom", path: ["secrets"], message: "qq_bot is only for entry modules (chat.*, approvals.* or *)" });
   if (SYSTEM_MODULES.includes(manifest.name as (typeof SYSTEM_MODULES)[number])) ctx.addIssue({ code: "custom", path: ["name"], message: "Name is reserved for a Chrona system module" });
 }).superRefine((manifest, ctx) => {
   if (new Set(manifest.uses).size !== manifest.uses.length) ctx.addIssue({ code: "custom", path: ["uses"], message: "Uses must be unique" });
   if (manifest.listen && !manifest.keepAlive) ctx.addIssue({ code: "custom", path: ["listen"], message: "listen requires keepAlive" });
   if (listenPaths(manifest).some(own => RESERVED_LISTEN_PATHS.some(path => own === path || own.startsWith(`${path}-`)))) ctx.addIssue({ code: "custom", path: ["listen"], message: "Path is reserved by Chrona" });
   if (new Set(listenPaths(manifest)).size !== listenPaths(manifest).length) ctx.addIssue({ code: "custom", path: ["listen"], message: "Listen paths must be unique" });
-  if (grantedUses(manifest).some(target => target === "provider.complete" || target === "agent.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses provider.complete or agent.complete" });
+  if (grantedUses(manifest).some(target => target === "agent.complete") !== !!manifest.model) ctx.addIssue({ code: "custom", path: ["model"], message: "Declare model limits exactly when the module uses agent.complete" });
   const names = new Set<string>();
   manifest.tools.forEach((tool, index) => {
     if (names.has(tool.name)) ctx.addIssue({ code: "custom", path: ["tools", index, "name"], message: "Tool names must be unique" });
@@ -261,8 +187,7 @@ export const moduleManifestSchema = z.preprocess(withoutRemovedFields, z.object(
     if (new Set(tool.visibility).size !== tool.visibility.length) ctx.addIssue({ code: "custom", path: ["tools", index, "visibility"], message: "Visibility must be unique" });
     for (const key of tool.parameters.required) if (!(key in tool.parameters.properties)) ctx.addIssue({ code: "custom", path: ["tools", index, "parameters", "required"], message: `Required parameter ${key} is not in properties` });
   });
-}));
-export type ModuleTrigger = z.infer<typeof moduleTriggerSchema>;
+});
 /** Acts as the user, or serves the page holding the user's key: never activated automatically. */
 /** v2-16: any module may ask the user to decide something; these do not make it an entry module. */
 const MODULE_APPROVAL_TOOLS = ["approvals.request", "approvals.status"];
@@ -282,19 +207,19 @@ export const isEntryModule = (manifest: { listen?: string | readonly string[]; u
 const channelId = z.string().min(1).max(64);
 const moduleResultSchema = z.json().optional().refine(value => value === undefined || new TextEncoder().encode(JSON.stringify(value)).byteLength <= 262_144, "result must serialize to at most 256 KiB");
 /** Statuses of a routed call: sync calls finish in place; async ones are stored and delivered by Chrona. */
-export const CALL_STATUSES = ["queued", "running", "succeeded", "failed", "unknown"] as const;
+export const CALL_STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "unknown"] as const;
 /** Who made a call, as Chrona recorded it (never supplied by the caller). `via` names the entry module behind an owner call. */
 export const callerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("module"), module: slug, moduleId: z.string().max(128), hash: z.string().max(64) }).strict(),
   z.object({ kind: z.literal("provider"), runId: z.string().max(128) }).strict(),
   z.object({ kind: z.literal("owner"), via: slug.nullable() }).strict(),
   z.object({ kind: z.literal("kernel") }).strict(),
-  /** A system module (in-process, part of Chrona, e.g. `chat` pushing a reply). */
+  /** A kernel service invoked internally. */
   z.object({ kind: z.literal("system"), module: slug }).strict(),
 ]);
 export const moduleEventSchema = z.object({
   trigger: z.discriminatedUnion("kind", [
-    /** `scheduleId` and `payload` are set for dynamic schedules (e.g. reminders created through `chrona_schedule`). */
+    /** Retained private schedule delivery; no public schedule creation API. */
     z.object({ kind: z.literal("schedule"), id: slug, firedAt: iso, scheduleId: z.string().max(128).optional(), payload: z.record(z.string(), z.unknown()).optional() }).strict(),
     /**
      * A tool call. `caller` is who called it; `call` is set for routed calls: `key` is the caller's idempotency key
@@ -308,7 +233,6 @@ export const moduleEventSchema = z.object({
       status: z.enum(["succeeded", "failed", "unknown"]), output: z.json().optional(), error: z.string().max(2000).optional() }).strict(),
     /** For manifests with `activated`: once per active version, and again when a module this one `uses` changes version (e.g. to call web.page-set). */
     z.object({ kind: z.literal("activated"), id: z.literal("activated"), firedAt: iso }).strict(),
-    z.object({ kind: z.literal("health"), id: z.literal("health"), firedAt: iso }).strict(),
   ]),
   now: iso,
   params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
@@ -317,7 +241,9 @@ export const moduleEventMessageSchema = z.object({ id: channelId, event: moduleE
 export const MODULE_CALL_ERRORS = ["undeclared", "invalid", "internal",
   /** Routed calls: visibility, unknown target, cycles, uncertain outcomes and target errors. */
   "forbidden", "not_found", "conflict", "cycle", "unknown", "failed", "unavailable", "reauthorize",
-  "unauthorized", "cursor_expired", "too_large", "capacity", "unsupported_version", "unsupported"] as const;
+  "unauthorized", "cursor_expired", "too_large", "capacity", "unsupported_version", "unsupported",
+  /** Agent model failures propagated by the module SDK, including an unconfirmed completion deadline. */
+  "unconfigured", "budget_exceeded", "provider_error", "timeout"] as const;
 /** `result` answers a tool call. `handled` is ignored (it handed inbound items back before connectors were removed); kept so older modules still answer. */
 export const moduleEventReplySchema = z.object({ id: channelId, result: z.object({ handled: z.boolean().optional(), result: moduleResultSchema }).strict().default({}) }).strict()
   .or(z.object({ id: channelId, error: z.string().max(2000), errorCode: z.enum(MODULE_CALL_ERRORS).optional() }).strict());
@@ -328,10 +254,10 @@ export const SECRET_TARGETS = ["secrets.get", "secrets.authorize", "secrets.toke
 export function grantedUses(manifest: { uses?: readonly string[]; secrets?: readonly unknown[] }): string[] {
   return [...new Set([...(manifest.uses ?? []), ...(manifest.secrets?.length ? SECRET_TARGETS : [])])];
 }
-/** The interface `chrona.notify` and Chrona's own notifications go to. */
+/** Default notification application target; no kernel routing privilege. */
 export const NOTIFY_INTERFACE = "notify.send";
 /** Chrona's in-process system modules: reached by routed calls like modules, but part of Chrona (not proposable, not sandboxed). */
-export const SYSTEM_MODULES = ["approvals", "modules", "settings", "schedules", "secrets", "activity", "projects"] as const;
+export const SYSTEM_MODULES = ["approvals", "modules", "settings", "secrets", "activity"] as const;
 /** Longest call path; synchronous calls are refused when the target is already on their path (it is waiting). */
 export const MAX_CALL_DEPTH = 6;
 /** A saved registration may only call this exact app identity and tool contract; this grants no access. */
@@ -365,7 +291,7 @@ export type ModuleEffect = (typeof MODULE_EFFECTS)[number];
 
 export const scheduleSchema = z.object({
   id, mode: z.enum(SCHEDULE_MODES), rule: scheduleRuleSchema,
-  /** wake: self-contained instruction for a fresh Provider session; remind: the exact text sent to the user. */
+  /** Stored instruction for a private wake or module schedule. */
   text: z.string().max(4000),
   /** wake: the session the result is posted back to. */
   originSessionId: id.nullable(),
@@ -433,50 +359,18 @@ export const policyDecisionSchema = z.object({ action: z.enum(ACTIONS), mode: z.
 export const PREFERENCE_TOPICS = ["general", "ui"] as const;
 export const preferenceSchema = z.object({ id, text: text.max(500), origin: z.enum(["said", "learned"]), topic: z.enum(PREFERENCE_TOPICS), createdAt: iso, lastUsedAt: iso.nullable() }).strict();
 
-/** Registered notification channel name; entry-message delivery channels remain a separate contract. */
-export const notificationChannelSchema = z.string().min(1).max(120);
-export const notificationSchema = z.object({
-  id, moduleId: id.nullable(), sessionId: id.nullable(), level: z.enum(NOTIFY_LEVELS), channel: notificationChannelSchema, status: z.enum(NOTIFICATION_STATUSES),
-  title: short, body: z.string().max(4000), link: z.string().max(2048).nullable(),
-  attempts: z.number().int().min(0), lastError: z.string().max(500).nullable(), createdAt: iso, sentAt: iso.nullable(),
-  feedback: z.enum(["useful", "not_useful"]).nullable(),
-}).strict();
-
-export const notificationSettingsSchema = z.object({ dailyCap: z.number().int().min(0).max(50), quietHours: z.object({ start: hhmm, end: hhmm }).strict().nullable(), timezone: z.string().min(1).max(80), digestAt: hhmm }).strict();
-/** The exact models modules may call, by tier (L1, user-only). No automatic fallback to another model or tier. */
 /** Pi's thinking levels (`pi --thinking`). */
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
-const modelId = z.string().trim().min(1).max(200);
-/** v2-17: a tier is a model and a thinking level; a bare model id (before v2-17) uses Pi's default level. */
-export const modelTierTargetSchema = z.union([modelId, z.object({ model: modelId, thinking: z.enum(THINKING_LEVELS).optional() }).strict()]);
-type ThinkingLevel = (typeof THINKING_LEVELS)[number];
-/** A tier's model and thinking level; Pi's `model:level` shorthand in a bare id is split, as Pi reports the model without it. */
-export function tierTarget(value: z.infer<typeof modelTierTargetSchema>): { model: string; thinking?: ThinkingLevel } {
-  if (typeof value !== "string") return value;
-  const at = value.lastIndexOf(":"), level = value.slice(at + 1);
-  return at > 0 && (THINKING_LEVELS as readonly string[]).includes(level) ? { model: value.slice(0, at), thinking: level as ThinkingLevel } : { model: value };
-}
 export const moduleModelSettingsSchema = z.object({
-  models: z.record(modelTier, modelTierTargetSchema).refine(models => Object.keys(models).length >= 1 && Object.keys(models).length <= 10, "Configure 1-10 model tiers")
-    .describe("Tier name → { model: exact provider/model id passed to Pi, thinking?: off..max }, e.g. { fast: { model: \"openai/gpt-6-luna\", thinking: \"low\" }, strong: { model: \"openai/gpt-6.1-sol\", thinking: \"high\" } }"),
   maxCallsPerEvent: z.number().int().min(1).max(20), maxOutputTokens: z.number().int().min(1).max(32_000),
   /** All modules together per local day; `moduleDailyCalls` caps single modules (v2-17), absent ones only by this. */
-  dailyCalls: z.number().int().min(1).max(10_000), timeoutMs: z.number().int().min(5_000).max(600_000),
+  dailyCalls: z.number().int().min(1).max(10_000), eventTimeoutMs: z.number().int().min(5_000).max(600_000),
   moduleDailyCalls: z.record(slug, z.number().int().min(0).max(10_000)).optional(),
 }).strict();
 export const buildSettingsSchema = z.object({
   dailyLimit: z.number().int().min(0).max(200),
   timeoutMinutes: z.number().int().min(5).max(120),
   maxSubmissions: z.number().int().min(1).max(20),
-}).strict();
-/** v2-21: which module provides memory (null: none), and whether conversations recall at their start and retain as they go. */
-export const memorySettingsSchema = z.object({ provider: slug.nullable(), autoRecall: z.boolean(), autoRetain: z.boolean() }).strict();
-/** Rotation of a QQ or web conversation before the next message: idle past the prompt cache's life with at least minContextTokens, or past maxContextTokens. */
-export const sessionSettingsSchema = z.object({ idleMinutes: z.number().int().min(5).max(1440), minContextTokens: z.number().int().min(0).max(1_000_000), maxContextTokens: z.number().int().min(10_000).max(1_000_000) }).strict();
-export const DEFAULT_SESSION_SETTINGS = { idleMinutes: 60, minContextTokens: 30_000, maxContextTokens: 100_000 } as const;
-export const buildGovernanceSchema = z.object({
-  builds: buildSettingsSchema,
-  buildUsage: z.object({ date: z.string(), timezone: z.string(), used: z.number().int().min(0), remaining: z.number().int().min(0) }).strict(),
 }).strict();
 export const settingsSchema = z.object({
   timezone: z.string().min(1).max(80),
@@ -490,53 +384,15 @@ export const healthSchema = z.object({
   /** Modules and the Provider run inside bubblewrap; false means they run unisolated as the Chrona user. */
   moduleSandbox: z.boolean(),
   queuedRuns: z.number().int().min(0), runningRuns: z.number().int().min(0), failedRunsToday: z.number().int().min(0),
-  dueSchedules: z.number().int().min(0),
-  queuedNotifications: z.number().int().min(0), failedNotifications: z.number().int().min(0), lastTickAt: iso.nullable(),
-}).strict();
-
-export const todayViewSchema = z.object({
-  generatedAt: iso,
-  approvals: z.array(approvalSchema),
-  /** Coming up in the next 7 days, soonest first. Pages show `label` (or a reminder's text), never a wake instruction. */
-  upcoming: z.array(z.object({ scheduleId: id, mode: z.enum(SCHEDULE_MODES), label: z.string().max(300).nullable(), at: iso }).strict()).max(50),
-  /** Recent notifications, newest first. */
-  updates: z.array(notificationSchema).max(20),
-  apps: z.array(appSchema).max(200),
-  /** Apps whose current activation has an open health problem (the modules.health `open` facts), newest first: a summary and the next step, never logs. */
-  problems: z.array(z.object({ module: slug, moduleId: id, incidentStatus: z.enum(["retrying", "unresolved", "verifying"]).nullable(),
-    contractFailures: z.number().int().min(0), nextAction: z.string().max(500).nullable(), since: iso.nullable() }).strict()).max(20),
-  /** Recent user-facing sessions (web, qq, mcp), most recent first. */
-  sessions: z.array(sessionSchema).max(20),
-  health: healthSchema,
+  lastTickAt: iso.nullable(),
 }).strict();
 
 // ------------------------------------------------------------- requests ----
 
-export const chatReplySchema = z.object({ runId: id.nullable(), sessionId: id, messages: z.array(messageSchema) }).strict();
-/** Ends the active session for `key` (QQ `/new`); the next message starts a new one. */
-export const newSessionSchema = z.object({ key: z.string().min(1).max(200) }).strict();
-export const updateSessionSchema = z.object({ title: short.optional(), status: z.literal("ended").optional() }).strict();
-export const createScheduleSchema = z.object({ mode: z.enum(["wake"]), rule: scheduleRuleSchema, text: z.string().max(4000), label: z.string().trim().min(1).max(80).optional(), until: iso.optional() }).strict();
-/** v2-24 `schedules.create`: one timer of the calling module, named by `key`; `payload` comes back in its schedule event. */
-export const moduleScheduleSchema = z.object({
-  key: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/), rule: scheduleRuleSchema, label: z.string().trim().min(1).max(80), until: iso.optional(),
-  payload: z.record(z.string(), z.unknown()).refine(value => JSON.stringify(value).length <= 4000, "payload must be at most 4000 characters of JSON"),
-}).strict();
-export const updateScheduleSchema = z.object({ status: z.enum(["active", "paused", "cancelled"]) }).strict();
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
 export const updateSettingsSchema = z.object({ timezone: z.string().min(1).max(80).optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
-// ------------------------------------------------------------ HTTP map -----
-/**
- * Kernel HTTP (v2-9): `/health`, `/ready` and `/api/steward-agent` (the Provider's tool bridge, run capability tokens).
- * There is no owner API: the user reaches Chrona through entry modules (`listen`, e.g. the web page's /api/web and the
- * owner MCP's /api/mcp), which make routed calls; `/api/*` requests need the API key before Chrona forwards them.
- * Rescue console (v2-4 §5): separate listener (`CHRONA_RESCUE_PORT`, loopback by default), `Authorization: Bearer <RESCUE_KEY>`,
- * never proxied to a module:  GET / (static page) · POST /api/chat {text} -> ChatReply (session key "rescue") ·
- *   GET /api/messages -> {items: Message[]} · GET /api/approvals -> {items: Approval[]} (open) ·
- *   POST /api/approvals/:id/resolve (ResolveApproval) -> Approval.
- */
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
@@ -549,43 +405,12 @@ export const chronaToolInputSchemas = {
   /** Internal build result; application conversations use their own routed tools. */
   chrona_reply: z.object({ text: text.max(8000), files: z.array(relativePathSchema).max(10).default([]).describe("Files written in this build's actual working directory, copied into the receiving application's content; at most 20 MiB each.") }).strict(),
 } as const;
-const moduleIntent = z.object({ changes: z.array(text.max(500)).min(1).max(20), preserves: z.array(text.max(500)).max(20).default([]) }).strict()
-  .describe("What this version changes and what it keeps (shown on the approval card)");
-/** Inputs of the `modules` system module's tools for the Provider (v2-13), reached as m_modules_<tool>. */
+/** Shared inputs used by the public modules router; candidate inputs are exported separately. */
 export const modulesToolInputSchemas = {
-  upstream: moduleUpstreamRequestSchema.describe("Read local and upstream Git status, explicitly fetch the configured upstream, or merge a pinned fetched commit through the checked proposal queue. Never changes active code directly; no caller-supplied repository, branch or host path."),
-  install: moduleInstallRequestSchema.describe("Explicitly install or update a named official external package from the running release. No host path or caller-supplied identity. Local source uses propose. Reuse requestKey after an uncertain receipt; never silently overwrite an installed or customized app."),
   reference: z.object({ target: z.string().regex(/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/).optional() }).strict()
     .describe("Read development reference only: without target, list available interfaces (target, source, one-line description); with <module>.<tool>, get its input schema, declared output schema/examples and admission rules. Never executes the target or reads its business data. Undeclared outputs are explicitly unknown, not inferred from empty results."),
-  check: z.object({ module: slug, hash: moduleVersionHashSchema.optional().describe("Defaults to the newest version"),
-    wait: z.number().int().min(0).max(600).default(0).describe("Seconds to wait while it is still being checked (set timeoutSeconds at least as long)") }).strict()
-    .describe("A module version's status and check report (tests, errors, data continuity, key probe); waits while it is building or testing."),
-  checkout: z.object({ module: slug, hash: moduleVersionHashSchema.optional(), dir: relativePathSchema,
-    source: z.enum(["stored", "builtin"]).optional().describe("stored (default): active or specified stored version; builtin: reference shipped with the running release, never activation") }).strict()
-    .refine(input => input.source !== "builtin" || input.hash === undefined, "A built-in reference cannot select a stored version hash")
-    .describe("Copy source into an empty directory in your working directory. Defaults to the active stored version; source builtin reads the immutable reference shipped with the running release; it can be customized through the checked module lifecycle. Returns the exact source version; does not submit or activate it."),
-  propose: z.object({ dir: relativePathSchema.describe("Module directory in your working directory"), intent: moduleIntent }).strict()
-    .describe('Submit a module. Returns { moduleId, hash, status }; Chrona builds and checks it, then m_modules_check shows the result; a version whose checks pass activates automatically, and only a data migration or new credentials ask the user. module.json {name,description?,entry,triggers,keepAlive?,content?,effects,model?:{tier,maxCalls,maxOutputTokens},params?:{k:{type,value}},settings?:{k:{type,label,description?,default,min?,max?,options?,maxLength?}} (values the user changes on the app page without a new version; delivered in ev.params with the params; never secrets),data?:{schema,migrate?},tools?,tests}. trigger {id,schedule}; tool {name,description,parameters:{type:"object",properties,required},visibility?:["provider","owner","modules","kernel"] (default provider+owner),idempotent?}; uses?:["<module>.<tool>"] tools of other modules this module calls. contributes?:{<module>:json} declarations another module reads (v2-14), e.g. events: {"events":{"emits":[{name,description,payload:<JSON Schema object>}]}}; emit one with chrona.emit(name,payload,{key}) (uses ["events.emit"]); receive one by adding a tool with modules visibility and string parameters event, from, payload, then chrona.call("events.subscribe",{event:"<module>.<name>",tool}) (uses ["events.subscribe"]). name/ids/keys [a-z][a-z0-9-]{1,40} ; files x.ts|py|sh; schedule: schedule rule, every>=5min; effects: only network; capabilities are uses: notify.send, agent.context/agent.run, agent.complete/agent.completion (with model); timers set at run time (e.g. calendar reminders): uses schedules.create/cancel/mine, at the time on("schedule") gets ev.payload; params number|string|boolean. Entry is a long-running process using the SDK: import {on, chrona} from "chrona"; on("schedule"|"tool", async ev => ...) where ev {id,kind,firedAt,args?,now,params}; return {result?} (result <=16KiB answers a tool); tell the user with chrona.call("notify.send",{key,level,title,body},{mode:"async",key}) (uses ["notify.send"]; the notify module applies the budget); other tools with chrona.call(target,args,{mode:"sync"|"async",key,reply}) (sync→result; async→{callId,status}, on("call_result") or chrona.callStatus(id)); wakeProvider({key,prompt,tools?}) (uses ["agent.context","agent.run"]) / model({system?,prompt,maxOutputTokens})→{text} (uses ["agent.complete","agent.completion"]); keys are idempotency keys, derive them from the event. Run a host program (declared in packages) with chrona.exec(command,args,{secretEnv?:{VAR:{secret,field}},secretFiles?:{VAR:{secret,field}},tokenEnv?:{VAR:{secret,provider:"google"|"microsoft",account?}},env?,cwd?,stdin?,timeoutMs?,maxOutputBytes?})→{code,signal,stdout,stderr,timedOut,truncated}: credentials reach only that child, as env vars or temporary 0600 files whose path is in VAR (v2-30); never write credential values into data files or config files. OAuth (v2-30 §4): the kernel keeps refresh tokens; a credential holds clientId/clientSecret saved by the user; chrona.call("secrets.authorize",{name,provider,scopes,account?})→{url,redirectUri,expiresAt} gives a consent link for the user (error unavailable until clientId is saved); tokenEnv or chrona.token({name,provider,account?}) gives a short-lived access token, error reauthorize when the user must consent again. Declare each credential with the fields the user must type, so the page can ask for them: secrets:[{name,label,fields:[{name,label,description?,optional?,plain?}],extraFields?:{label,valueLabel},oauth?:{provider,authorizationUrl:HTTPS-without-query,tokenUrl:HTTPS-without-query,scopes:[...],accounts?,authorizationParams?:{key:value}}}] (extraFields: user-named keys such as one password per account id; oauth: the page asks for clientId/clientSecret and offers authorize); the page saves field by field. Keep state only in chrona.paths.data (process may restart); keepAlive:true for long connections. Tests: import {startModule} from "chrona/testing" (fake kernel, records calls), offline, exit 0. Build checks declared contracts, offline author tests, process startup and SDK ping; business inputs and idempotency are verified by author tests; schema upgrade with data needs migrate (one-shot script, stdin {migrate:{from,to},now}). Passing checks auto-activates updates without existing-data migration or new credentials in either execution mode. Migration, new credentials and changed OAuth definitions require the owner decision. OAuth URLs and authorization extras are declared by the application; Google offline authorization uses authorizationParams:{access_type:"offline",prompt:"consent"}, and Microsoft refresh authorization includes offline_access in scopes.'),
   rollback: z.object({ module: slug, hash: moduleVersionHashSchema }).strict()
     .describe('Roll back to a previously approved version. May return { status: "pending_approval", approvalId } when restoring a data snapshot needs user approval.'),
-  "request-group": z.object({ versions: z.array(z.object({ module: slug, hash: moduleVersionHashSchema }).strict()).min(2).max(4) }).strict()
-    .describe("v2-15, build conversations that declared several modules: once every declared module has a candidate that passed its checks (pending_review), activate them all together; asks the user once only when one adds credentials. Versions needing a data migration are refused; build that module on its own first."),
-  "stop-build": z.object({ session: id }).strict()
-    .describe("Stop a module build conversation's queued/running work; keep its files and history. Already submitted versions and approvals are not withdrawn."),
-  "revise-build": z.object({ session: id, requirements: text.max(4000),
-    files: z.array(relativePathSchema).max(10).optional().describe("Additional required references from the calling Provider's cwd or content/chat/. Provider only; owner requests cannot supply filesystem paths.") }).strict()
-    .describe("Stop the old module build run and queue a revision at the tail in the same conversation, preserving files and history. Providers may supplement references via files; missing files fail before stopping the old run. Existing approval decisions are unchanged. Returns runId and queuePosition; no automatic retry."),
-  build: z.object({ name: slug.optional().describe("The one module to write or change (or use modules)"),
-    modules: z.array(slug).min(1).max(4).optional().describe("v2-15: every module this one change touches (1-4), built together and activated together"),
-    goal: text.max(4000), examples: z.array(text.max(1000)).max(10).default([]),
-    files: z.array(relativePathSchema).max(10).default([]).describe("Reference files (e.g. screenshots the user sent): attachments under content/chat/ or files in your working directory"),
-    intent: moduleIntent,
-    cause: z.object({ moduleId: id, activationId: id, incidentId: id.optional(), topic: z.string().regex(/^[\w:.-]{1,80}$/).optional() }).strict()
-      .refine(cause => (cause.incidentId === undefined) !== (cause.topic === undefined), "Give either incidentId or topic").optional()
-      .describe("Only for an autonomous fix of a health fact (the ref from modules.health / the mind brief). While a build with the same cause is queued or running, that build is returned instead of a new one. Omit for anything the user asked for.") }).strict()
-    .refine(input => (input.name === undefined) !== (input.modules === undefined), "Give either name or modules")
-    .refine(input => !input.modules || new Set(input.modules).size === input.modules.length, "modules must not repeat")
-    .describe("Queue a build conversation: a separate session writes, tests and submits the module(s), then reports back here. A change that spans several modules is one build with modules: [...], not several builds the user must activate in order. FIFO, one running and up to 10 waiting per workspace; waiting makes no model calls. Returns status (build_queued/build_running), sessionId, runId, queuePosition and aheadCount. Identical outstanding requests from this conversation reuse the build; an outstanding build with the same cause (any conversation) is returned with duplicate: true and charges no budget. Daily new-session allowance is charged at admission; runtime limits start at claim. No dependency ordering beyond FIFO and no automatic retry."),
 } as const;
 export const CHRONA_TOOLS = Object.keys(chronaToolInputSchemas) as (keyof typeof chronaToolInputSchemas)[];
 
@@ -649,9 +474,7 @@ export type GrantScope = z.infer<typeof grantScopeSchema>;
 export type Grant = z.infer<typeof grantSchema>;
 export type PolicyDecision = z.infer<typeof policyDecisionSchema>;
 export type Preference = z.infer<typeof preferenceSchema>;
-export type StewardNotification = z.infer<typeof notificationSchema>;
-export type NotificationSettings = z.infer<typeof notificationSettingsSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type Health = z.infer<typeof healthSchema>;
-export type TodayView = z.infer<typeof todayViewSchema>;
-export type ChatReply = z.infer<typeof chatReplySchema>;
+
+export * from "./module-candidates";

@@ -18,7 +18,7 @@ async function fixture() {
   const workspace = await db.workspace.create({ data: { name: "diagnostics" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   const ports = { db, dataDir: "/not-used-for-read-only-diagnostics", publicUrl: null, now: () => new Date("2026-10-25T14:00:00Z") };
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
   const { activationId } = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
   let execution = 0;
   const fail = (extra: Partial<Parameters<typeof recordModuleFailure>[1]> = {}) => db.$transaction(tx => recordModuleFailure(tx, { workspaceId: workspace.id, moduleId: module.id, activationId, hash: "v1", now: ports.now(), retry: true, ...extra, evidence: { ...(extra.evidence ?? evidence), runId: `run-${++execution}` } }));
@@ -186,12 +186,12 @@ test("health pages by name, filters open before pagination and isolates workspac
   expect((await createModules(f.ports, other.id).health()).items.map(item => item.module)).toEqual(["foreign"]);
 });
 
-test("detailed diagnostics admit Provider, owner and every module without a uses entry", async () => {
+test("detailed diagnostics admit Provider, owner and available modules without a uses entry", async () => {
   const f = await fixture(); registerSystemModules();
   await f.fail();
   for (const name of ["web", "mcp", "other"]) {
     const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: name } });
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: [] });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], uses: [] });
     await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: name, manifest, source: "user", status: "approved", report: {}, intent: {} } });
     const origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, moduleId: module.id, module: name, hash: name }, chain: [], path: [] };
     const request = callSync(f.ports, origin, "modules.diagnostics", { module: "example" });

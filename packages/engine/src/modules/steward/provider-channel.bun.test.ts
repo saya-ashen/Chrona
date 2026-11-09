@@ -136,7 +136,8 @@ test("a failed run creates no kernel retry and late cancellation leaves app time
   expect(await db.run.count({ where: { status: "queued" } })).toBe(0);
   const unrelated = await api.runs.enqueue({ sessionId: f.session.id, lane: "background", trigger: "schedule", prompt: "Separate work" });
   const module = await db.module.create({ data: { workspaceId, name: "timer-owner" } });
-  const schedule = await api.schedules.forModule(module.id, module.name).create({ key: "future", label: "Future arrangement", rule: { kind: "every", minutes: 60 }, payload: {} });
+  // Private legacy row: cancellation must not mutate unrelated stored state.
+  const schedule = await db.schedule.create({ data: { workspaceId, moduleId: module.id, triggerId: "future", mode: "module", label: "Future arrangement", text: "legacy inert fixture", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, payload: {}, nextAt: new Date("2030-01-01Z") } });
   await db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: f.run.id, details: {} } });
   await api.provider.cancel(f.run.id);
   expect((await db.run.findUniqueOrThrow({ where: { id: unrelated.id } })).status).toBe("queued");

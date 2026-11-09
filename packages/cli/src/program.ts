@@ -61,6 +61,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await (await import("./admin")).runAdmin("approvals"); });
   admin.command("rollback <module> <hash>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await (await import("./admin")).runAdmin("rollback", [module, hash]); });
   admin.command("disable <module>").description("Pause a module").action(async (module: string) => { await (await import("./admin")).runAdmin("disable", [module]); });
+  admin.command("remove <module>").description("Request app and data removal while the service is stopped; requires separate admin approve")
+    .action(async (module: string) => { await (await import("./admin")).runAdmin("remove", [module]); });
   for (const command of ["approve", "reject"] as const) admin.command(`${command} <approvalId>`).description(`${command} a pending approval`).action(async (id: string) => { await (await import("./admin")).runAdmin(command, [id]); });
   admin.command("secret-set <name>").description("Save a module credential from a JSON object on stdin (never echoed)").action(async (name: string) => { await (await import("./admin")).setSecret(name, await Bun.stdin.text()); });
   admin.command("secret-remove <name>").description("Delete a saved module credential").action(async (name: string) => { await (await import("./admin")).removeSecret(name); });

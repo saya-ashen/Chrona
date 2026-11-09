@@ -13,7 +13,6 @@ import { importModuleGitBundle } from "./module-git-upstream";
 import { exportModuleSource } from "./module-git";
 import { recordModuleUpstream } from "./module-upstream";
 import { installDependencies } from "./module-build";
-import { seedFactConsumer } from "./notification-facts";
 
 async function executable(name: string) {
   if (isAbsolute(name)) return access(name, constants.X_OK).then(() => true, () => false);
@@ -76,7 +75,7 @@ function assertSeedCompatibility(current: SeedIdentity, previous: SeedIdentity |
   if (previous && (current.dataSchema !== previous.dataSchema || current.status !== previous.status)) throw new StewardError("conflict", "Built-in changed while checking release compatibility");
 }
 const registrations = new WeakMap<StewardPorts["db"], Map<string, Promise<void>>>();
-/** Trusted first seed only; subsequent versions use the checked proposal lifecycle. */
+/** Trusted Agent seed only; upgrades bind verified resources of the running Chrona release. */
 export function registerBuiltins(ports: StewardPorts, workspaceId: string): Promise<void> {
   let active = registrations.get(ports.db);
   if (!active) { active = new Map(); registrations.set(ports.db, active); }
@@ -87,13 +86,7 @@ export function registerBuiltins(ports: StewardPorts, workspaceId: string): Prom
   active.set(workspaceId, promise);
   return promise;
 }
-async function seedDefaultFactConsumer(ports: StewardPorts, workspaceId: string) {
-  const application = await ports.db.module.findFirst({ where: { workspaceId, name: "notify", activeHash: { not: null } } });
-  if (application) await seedFactConsumer(ports.db, workspaceId, application.id, ports.now());
-}
 async function register(ports: StewardPorts, workspaceId: string) {
-  // Category-only migration: never replace accepted code, identities or application data.
-  await ports.db.module.updateMany({ where: { workspaceId, builtin: true, name: { in: ["mcp", "files", "events"] } }, data: { builtin: false } });
   if (!ports.moduleBuiltinResources) return;
   const context = moduleContext(ports, workspaceId);
   const failures: string[] = [];
@@ -131,6 +124,5 @@ async function register(ports: StewardPorts, workspaceId: string) {
       failures.push(`${name}: ${redactSensitiveText(error instanceof Error ? error.message : "Release registration failed").slice(0, 1000)}`);
     }
   }
-  await seedDefaultFactConsumer(ports, workspaceId);
   if (failures.length) throw new StewardError("conflict", failures.join("\n"));
 }

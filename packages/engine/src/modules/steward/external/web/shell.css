@@ -1,0 +1,107 @@
+/* Web shell theme: host state is explicit; application specs supply no global CSS. */
+:root {
+  color-scheme: light dark;
+  --fg: #242428; --bg: #f7f7f5; --muted: #77777e; --line: #e7e7e3;
+  --accent: #6257c7; --card: #fff; --rail: #f0f0ed; --selection: #e5e1f5;
+  --workspace-tint: #eeecfa; --workspace-add: #edf6ee; --workspace-remove: #fbefef;
+  --shell-rail-width: 62px;
+}
+body, body.web-shell-app {
+  color-scheme: light dark;
+  color: var(--fg); background: var(--bg);
+  font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Noto Sans CJK SC", "Microsoft Yahei", sans-serif;
+}
+body.web-shell-app {
+  --fg: #242428; --bg: #f7f7f5; --muted: #77777e; --line: #e7e7e3; --accent: #6257c7; --card: #fff;
+}
+body > header [hidden] { display: none !important; }
+body > header { background: var(--rail); }
+body > header > strong { color: var(--accent); }
+body > main { min-width: 0; overflow-wrap: anywhere; }
+body.web-shell-app > main { width: 100%; max-width: 64rem; margin: 0 auto; padding: 36px 32px; }
+body.web-shell-app.web-shell-workspace > main { max-width: none; padding: 0; margin: 0; }
+body.web-shell-login > header { position: static; border: 0; padding: 24px 32px; background: transparent; }
+body.web-shell-login > main { width: 100%; max-width: 30rem; padding: min(12dvh, 96px) 24px 24px; }
+body > main :where(button, input, select) { min-height: 32px; }
+body > main :where(input, textarea, select) { min-width: 0; max-width: 100%; }
+body > main button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+body > main :where(button, input, textarea, select, a, summary, [tabindex]):focus-visible,
+body > header :where(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+body > header nav a { overflow-wrap: anywhere; }
+body > header nav a[aria-current="page"] { background: var(--selection); color: var(--accent); font-weight: 600; }
+body > main :where(.system-page, .registered-page) { min-width: 0; max-width: 100%; }
+body > main :where(img, video, canvas) { max-width: 100%; }
+body > main :where(pre, table) { max-width: 100%; }
+body > main table { display: block; overflow-x: auto; }
+body.web-shell-app .renderer-workspace { --accent: inherit; --workspace-tint: inherit; --workspace-add: inherit; --workspace-remove: inherit; }
+@media (min-width: 701px) {
+  body.web-shell-app { padding-left: var(--shell-rail-width); }
+  body.web-shell-app > header {
+    position: fixed; inset: 0 auto 0 0; width: var(--shell-rail-width); z-index: 3;
+    display: flex; flex-direction: column; gap: 17px; padding: 22px 9px 14px;
+    border: 0; border-right: 1px solid var(--line); background: var(--rail);
+  }
+  body.web-shell-app > header > strong { font-size: 9px; font-weight: 600; margin-bottom: 14px; text-align: center; flex: none; }
+  body.web-shell-app > header > strong::before { content: "c."; display: block; font: 700 24px Georgia, serif; }
+  body.web-shell-app > header nav { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; flex-direction: column; align-items: center; gap: 17px; width: 100%; }
+  body.web-shell-app > header nav a { width: 42px; min-height: 40px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; border-radius: 8px; color: var(--muted); font-size: 9px; line-height: 1.3; text-align: center; text-decoration: none; }
+  body.web-shell-app > header nav a::before { font-size: 20px; line-height: 1.2; }
+  body.web-shell-app > header nav a[href="/today"]::before { content: "◷" / ""; }
+  body.web-shell-app > header nav a[href="/chat"]::before { content: "◌" / ""; }
+  body.web-shell-app > header nav a[href="/apps"]::before { content: "▦" / ""; }
+  body.web-shell-app > header nav a[href="/activity"]::before { content: "≋" / ""; }
+  body.web-shell-app > header nav a[href="/settings"]::before { content: "⚙" / ""; }
+  body.web-shell-app > header nav a[data-page]::before { content: "◇" / ""; }
+  body.web-shell-app > header nav a[href="/settings"] { margin-top: auto; }
+  body.web-shell-app > header nav a:hover, body.web-shell-app > header nav a:focus-visible,
+  body.web-shell-app > header nav a[aria-current="page"] { background: var(--selection); color: var(--accent); }
+  body.web-shell-app > header > button { flex: none; padding: 4px 6px; min-height: 32px; font-size: 10px; background: transparent; }
+}
+@media (min-width: 701px) and (max-width: 1050px) {
+  :root { --shell-rail-width: 52px; }
+  body.web-shell-app > header { padding-left: 6px; padding-right: 6px; }
+}
+@media (max-width: 700px) {
+  body.web-shell-app { padding-left: 0; }
+  body.web-shell-app > header { position: relative; min-height: 46px; display: flex; padding: 7px 12px; gap: 10px; flex-wrap: wrap; font-size: 11px; border-bottom: 1px solid var(--line); }
+  body.web-shell-app > header > strong, body.web-shell-app > header > button { flex: none; }
+  body.web-shell-app > header nav { gap: 10px; flex-wrap: wrap; min-width: 0; }
+  body.web-shell-app > header nav a { flex: none; padding: 5px 7px; border-radius: 5px; color: var(--muted); }
+  body.web-shell-app > header nav a[aria-current="page"] { color: var(--accent); }
+  body.web-shell-app > header > button { padding: 3px 6px; font-size: 10px; }
+  body.web-shell-app > main { padding: 24px 16px; }
+  body.web-shell-login > header { padding: 20px 24px; }
+  body > main :where(button, input, select) { min-height: 36px; }
+}
+@media (prefers-color-scheme: dark) {
+  :root, body.web-shell-app {
+    --fg: #e6e5eb; --bg: #202024; --muted: #a6a3b0; --line: #37363f;
+    --accent: #aca0f2; --card: #26262c; --rail: #1b1b20; --selection: #3b3455;
+    --workspace-tint: #322e47; --workspace-add: #20392b; --workspace-remove: #432a30;
+  }
+  body > main button.primary { color: #201b32; }
+  body.web-shell-app .workspace-breadcrumb,
+  body.web-shell-app .renderer-workspace .message-content,
+  body.web-shell-app .renderer-workspace .message-content strong { color: var(--fg); }
+  body.web-shell-app .renderer-workspace .message-avatar,
+  body.web-shell-app .renderer-workspace .option-compact[aria-pressed="true"] { background: var(--selection); color: var(--accent); }
+  body.web-shell-app .renderer-workspace .message-user .message-avatar,
+  body.web-shell-app .renderer-workspace .markdown code,
+  body.web-shell-app .renderer-workspace .panel-muted,
+  body.web-shell-app .renderer-workspace .option-compact:hover:not(:disabled) { background: var(--bg); color: var(--fg); }
+  body.web-shell-app .renderer-workspace .panel-question { background: #332e25; }
+  body.web-shell-app .renderer-workspace .renderer-composer,
+  body.web-shell-app .renderer-workspace .panel-question .renderer-action-option { border-color: var(--line); }
+  body.web-shell-app .renderer-workspace .renderer-composer:focus-within { border-color: var(--accent); }
+  body.web-shell-app .renderer-workspace .composer-actions button.primary { background: var(--accent); color: #201b32; }
+}
+
+/* Registered workspace framing belongs to the host, independently of child components. */
+body.web-shell-workspace .registered-page { position: relative; min-width: 0; }
+body.web-shell-workspace .registered-page > h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+body.web-shell-workspace .registered-page > .page-loading,
+body.web-shell-workspace .registered-page > .page-feedback { position: absolute; right: 16px; top: 8px; margin: 0; max-width: min(65%, 32rem); z-index: 2; font-size: 11px; padding: 4px 8px; border-radius: 4px; background: var(--card); }
+body.web-shell-workspace .registered-page > .page-feedback { top: auto; bottom: 8px; box-shadow: 0 2px 12px #0001; }
+@media (max-width: 700px) {
+  body.web-shell-workspace .registered-page > .page-loading { right: 8px; font-size: 10px; max-width: 42%; }
+}

@@ -8,17 +8,14 @@ import type { ChronaCalls } from "./calls";
 
 /** Who called a tool, as Chrona recorded it. */
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
-/** `scheduleId` and `payload` are set for timers the module arranged itself (`schedules.create`) and for reminders. */
-export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
+/** Private wire shape used to settle retained timer receipts. */
+type WireTrigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
-  | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
-  | { kind: "activated"; id: "activated"; firedAt: string }
-  /** Diagnostic only: report readiness; do not send messages, modify projects or issue paid requests. */
-  | { kind: "health"; id: "health"; firedAt: string };
+  | { kind: "activated"; id: "activated"; firedAt: string };
+export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };
-type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; contractHash: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
@@ -32,9 +29,8 @@ type Call = {
   /** A target without a declared contract: the result is unknown unless the caller states what it expects. */
   <T = unknown, S extends string = string>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
 };
-type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
-const handlers = new Map<Trigger["kind"], Handler>();
-export type ModelResult = { text: string; inputTokens: number | null; outputTokens: number | null };
+type Handler = (event: WireTrigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
+const handlers = new Map<WireTrigger["kind"], Handler>();
 export class ModelError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "ModelError"; }
 }
@@ -54,18 +50,17 @@ function fail() {
 socket.on("error", fail);
 socket.on("close", fail);
 function send(message: unknown) { socket.write(JSON.stringify(message) + "\n"); }
-// Events run one at a time; the shorthands below scope their keys to the event being handled, so a redelivered event
-// repeats them and another event does not (routed calls keep the caller's key as given).
-let current: string | null = null, modelSequence = 0;
+// Events run one at a time; emit scopes its key to the current event so redelivery repeats it.
+// Routed calls keep the caller's key as given.
+let current: string | null = null;
 const scoped = (key: string) => (current ? `${current}:${key}` : key);
-async function event(message: { id: string; event: { trigger: Trigger; now: string; params: Record<string, string | number | boolean> } }) {
+async function event(message: { id: string; event: { trigger: WireTrigger; now: string; params: Record<string, string | number | boolean> } }) {
   try {
     const handler = handlers.get(message.event.trigger.kind);
     // Results of async calls are optional to handle (callStatus reads them too), and so is `activated`.
     if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
     current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
-    modelSequence = 0;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code } : {}) }); }
@@ -99,7 +94,7 @@ socket.on("data", (chunk: Buffer) => {
 export function on<K extends Trigger["kind"]>(kind: K, handler: (event: Extract<Trigger, { kind: K }> & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>) {
   handlers.set(kind, handler as Handler);
 }
-function call<T = CallResult>(method: string, params: unknown): Promise<T> {
+function call<T = unknown>(method: string, params: unknown): Promise<T> {
   if (stopped) return Promise.reject(new Error("Chrona disconnected"));
   const id = randomUUID();
   return new Promise((resolve, reject) => {
@@ -125,9 +120,6 @@ export const chrona = {
    */
   call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
-  /** Report this process's readiness after a read-only self-check, at startup/config changes and before expiry. Never include credentials or private data. */
-  reportHealth: (report: { status: "ready" | "needs_configuration" | "degraded" | "unknown"; summary: string; nextAction?: string; validForSeconds?: number }) =>
-    chrona.call<{ reportedAt: string; expiresAt: string }>("modules.report-health", report),
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
   /**
@@ -210,38 +202,8 @@ export const chrona = {
   /** Serves the manifest's `listen` path. Long-poll entries use { idleTimeout: 30 }; omitted keeps Bun's default. */
   // @ts-expect-error Installed bun-types rejects Unix idleTimeout; the real SDK 15s proxy probe verifies runtime support.
   serve: (fetch: (request: Request) => Response | Promise<Response>, options: { idleTimeout?: number } = {}) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch, ...options }),
-  /** One completion through Agent, charged to this module's event and declared model limits. */
-  model: async (params: { system?: string; prompt: string; maxOutputTokens: number }): Promise<ModelResult> => {
-    try {
-      const started = await chrona.call<{ operationId: string }>("agent.complete", {
-        "command-key": current ? scoped(`model:${++modelSequence}`) : `model:${randomUUID()}`, prompt: params.prompt,
-        ...(params.system === undefined ? {} : { system: params.system }), "max-output-tokens": params.maxOutputTokens,
-      });
-      const deadline = Date.now() + 360_000;
-      while (Date.now() < deadline) {
-        const status = await chrona.call<{ result: ModelResult | null; failure: boolean }>("agent.completion", { "operation-id": started.operationId });
-        if (status.failure) throw new ModelError("provider_error", "Agent completion failed or remains unconfirmed");
-        if (status.result) return status.result;
-        await new Promise(resolve => setTimeout(resolve, 25));
-      }
-      throw new ModelError("timeout", "Agent completion remains unconfirmed");
-    } catch (error) {
-      const failure = error as ModelError;
-      throw new ModelError(/(?:^|: )(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(failure.message)?.[1] ?? failure.code, failure.message);
-    }
-  },
-  /** Shorthand for an async call to `notify.send` (uses ["notify.send"]); `key` is the idempotency key. */
-  notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => chrona.call<CallState>("notify.send", { ...params, key: scoped(params.key) }, { mode: "async", key: scoped(params.key) })
-    .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
-  /** Create an event-keyed Agent context and enqueue the module's explicit prompt and selected tools. */
-  wakeProvider: async (params: { key: string; prompt: string; tools?: string[] }) => {
-    const key = scoped(params.key);
-    const context = await chrona.call<{ contextId: string }>("agent.context", { "request-key": key });
-    const run = await chrona.call<{ runId: string }>("agent.run", { "context-id": context.contextId, "request-key": key, prompt: params.prompt, lane: "background", tools: params.tools ?? [] });
-    return { status: "executed" as const, contextId: context.contextId, runId: run.runId };
-  },
   /**
-   * Emit an event this module declares in `contributes.events.emits` (v2-14): a sync call to `events.emit` (uses ["events.emit"]).
+   * Emit an event after registering its definition with the ordinary `events.register` tool; this calls `events.emit`.
    * `name` is the event's own name (the module name is added); `key` is the idempotency key, derived from the triggering event.
    */
   emit: (name: string, payload: Record<string, unknown>, options: { key: string }) =>

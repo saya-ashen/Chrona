@@ -109,7 +109,7 @@ export type StewardPorts = {
   /** Existing ExecutionCommand key, consumed before this one-shot live delivery; server inject stays unchanged. */
   deliverRemoteControl?: (input: { target: ExecutorTarget; commandKey: string; text: string }) => Promise<void>;
   executionEvents?: ExecutionEventStore & ExecutionEventTransactions;
-  /** Credentials from the service environment (qq_bot: { appId, clientSecret }); others are saved under `<dataDir>/secrets` (v2-16). */
+  /** Optional host-private credential defaults, used only for approved declared reads when no saved vault value exists. */
   secrets?(name: string): Promise<Record<string, string> | null>;
   /** Presence metadata for host-owned credentials; never reads or returns credential values. */
   secretConfigured?(name: string): Promise<boolean>;

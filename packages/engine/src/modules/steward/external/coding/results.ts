@@ -1,15 +1,17 @@
+import { MAX_ARTIFACT_BYTES } from "./output";
 import { callAgent } from "./agent";
 import { createHash } from "node:crypto";
-import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, open, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { ExecutionView, ExecutionSnapshot, ExecutionResultSource } from "./contract.js";
+import { executionSnapshotSchema, executionResultSourceSchema, type ExecutionView, type ExecutionSnapshot, type ExecutionResultSource } from "./contract.js";
 import { codingError, lookupCodingWork, readCodingWork, writeCodingWork, type CodingContext, type CodingWork } from "./storage";
 
 async function immutableArtifact(dir: string, artifactRef: string, text: string) {
   await mkdir(dir, { recursive: true });
   const path = join(dir, `${artifactRef}.json`);
   const temporary = `${path}.tmp`;
-  await writeFile(temporary, text);
+  const file = await open(temporary, "w", 0o600);
+  try { await file.writeFile(text); await file.sync(); } finally { await file.close(); }
   try {
     // Publish complete bytes atomically without replacing an existing immutable version.
     try { await link(temporary, path); }
@@ -18,8 +20,13 @@ async function immutableArtifact(dir: string, artifactRef: string, text: string)
       if (await readFile(path, "utf8") !== text) throw codingError("conflict", "Result artifact changed");
     }
   } finally { await rm(temporary, { force: true }); }
+  const directory = await open(dir, "r");
+  try { await directory.sync(); } finally { await directory.close(); }
 }
-/** Shared by reads, activation recovery and the completion receipt; never starts another execution. */
+function matchesExecution(actual: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, expected: ExecutionView): boolean {
+  return actual.workId === expected.workId && actual.sessionId === expected.sessionId && actual.runId === expected.runId && actual.attemptId === expected.attemptId;
+}
+/** Read-side result capture never starts another execution. */
 export async function reconcileCodingResult(context: CodingContext, work: CodingWork, view: ExecutionView): Promise<void> {
   if (!view.stopConfirmed || !["completed", "failed", "cancelled"].includes(view.status)) return;
   const existing = work.results.find(result => result.attemptId === view.attemptId);
@@ -30,11 +37,12 @@ export async function reconcileCodingResult(context: CodingContext, work: Coding
   }
   const target = { workId: view.workId, runId: view.runId, attemptId: view.attemptId };
   const snapshot = await callAgent<ExecutionSnapshot>(context, "snapshot", target);
+  if (!executionSnapshotSchema.safeParse(snapshot).success || !matchesExecution(snapshot, view)) throw codingError("conflict", "Result snapshot does not match execution");
   if (!snapshot.stopConfirmed || snapshot.status !== view.status || !snapshot.finalMessage) return;
   const source = await callAgent<ExecutionResultSource>(context, "result-source", {
     workId: view.workId, runId: view.runId, attemptId: view.attemptId,
   });
-  if (source.workId !== view.workId || source.runId !== view.runId || source.attemptId !== view.attemptId || source.sessionId !== view.sessionId) throw codingError("conflict", "Result source does not match execution");
+  if (!executionResultSourceSchema.safeParse(source).success || !matchesExecution(source, view)) throw codingError("conflict", "Result source does not match execution");
   const artifact = { ...work.ref!, baseline: source.baseline, finalMessage: { ...snapshot.finalMessage }, missing: snapshot.missing, checks: [], ...(source.changes ? { changes: structuredClone(source.changes) } : {}) };
   const text = artifactText(artifact), hash = createHash("sha256").update(text).digest("hex");
   const artifactRef = `coding-result-${hash}`;
@@ -43,14 +51,14 @@ export async function reconcileCodingResult(context: CodingContext, work: Coding
   work.results.push({ ...work.ref!, resultId: `result-${hash}`, baseline: source.baseline, artifactRef, accepted: false, checks: [] });
 }
 function artifactText(artifact: ExecutionResultSource & { finalMessage: NonNullable<ExecutionSnapshot["finalMessage"]>; missing: boolean; checks: never[] }): string {
-  if (Buffer.byteLength(JSON.stringify(artifact)) > 192 * 1024 && artifact.changes) {
+  if (Buffer.byteLength(JSON.stringify(artifact)) > MAX_ARTIFACT_BYTES && artifact.changes) {
     artifact.changes.status = "partial"; artifact.changes.reason = "limit"; artifact.changes.patch = "";
     for (const file of artifact.changes.files) if (file.text !== undefined) { delete file.text; file.omitted = "size"; }
   }
-  if (Buffer.byteLength(JSON.stringify(artifact)) > 192 * 1024) {
+  if (Buffer.byteLength(JSON.stringify(artifact)) > MAX_ARTIFACT_BYTES) {
     artifact.finalMessage.text = ""; artifact.finalMessage.truncated = true; artifact.missing = true;
   }
-  if (Buffer.byteLength(JSON.stringify(artifact)) > 192 * 1024) throw codingError("too_large", "Coding result exceeds artifact budget");
+  if (Buffer.byteLength(JSON.stringify(artifact)) > MAX_ARTIFACT_BYTES) throw codingError("too_large", "Coding result exceeds artifact budget");
   return JSON.stringify(artifact);
 }
 async function refreshCodingResults(context: CodingContext, input: { workId: string }) {

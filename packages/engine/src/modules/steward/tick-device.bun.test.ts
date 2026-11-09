@@ -101,7 +101,7 @@ test("application Agent foreground/background keep their priority while device r
   } };
   const local = createRuns(f.ports, f.w.id), queued: { runId: string }[] = [];
   const module = await f.db.module.create({ data: { workspaceId: f.w.id, name: "priority-app", activeHash: "hash", status: "active" } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "priority-app", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
+  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "hash", manifest: { name: "priority-app", entry: "index.ts", keepAlive: true, effects: [], uses: [], tests: ["test.ts"] }, status: "approved", source: "user", intent: {}, report: {} } });
   const principal: ExecutionPrincipal = { ...f.owner, caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   for (const lane of ["foreground", "background"] as const) {
     const context = await admitContextPrimitive(f.ports, principal, "context", { requestKey: lane }) as { contextId: string };

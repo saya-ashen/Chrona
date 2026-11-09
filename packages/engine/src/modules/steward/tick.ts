@@ -1,13 +1,11 @@
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
-import { createSchedules } from "./schedules";
 import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
-import { announceApprovals } from "./notify-user";
 import { callsSettled, drainCalls } from "./module-calls";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
@@ -15,7 +13,6 @@ import { startLocalProvider, runtimeCall } from "./local-runtime";
 import { registerWorkspaceModule } from "./local-workspace";
 import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
 import { EXECUTOR_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
-import { retireReflection } from "./reflection-retirement";
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
@@ -142,14 +139,11 @@ export function createTick(ports: StewardPorts) {
         ["builtins", async () => { await registerBuiltins(ports, workspaceId); }],
         // Keep unrelated startup stages running even if one shipped app fails registration.
         ["initialization", async () => { await refreshInstallationReceipts(ports, workspaceId); await ensureWorkspaceInitialized(ports, workspaceId); }],
-        ["retire-reflection", () => retireReflection(ports, workspaceId)],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
         ["schedules", async () => {
-          await createSchedules(ports, workspaceId).fireDue(now, { waitForDelivery: false });
           void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
         }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); }],
-        ["approvals", () => announceApprovals(ports, workspaceId)],
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
       ] as const) {

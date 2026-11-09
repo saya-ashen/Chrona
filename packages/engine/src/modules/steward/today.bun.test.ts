@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import { todayViewSchema } from "@chrona/contracts/steward";
-import { todayView } from "./builtin/web/today";
+import { todayView } from "./external/web/today";
 import { testDb } from "./test-db";
 import { startOwnerBuildAsCaller } from "./owner-build";
 import type { StewardPorts } from "./ports";
@@ -10,27 +9,31 @@ const runtime = { at, provider: { name: "fixture", available: true, sandboxed: f
   queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null };
 function fixture(overrides: Record<string, unknown> = {}) {
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": [], "schedules.list": [], "notify.list": { items: [] },
+  const answers: Record<string, unknown> = { "activity.runtime": runtime, "approvals.list": [], "notify.list": { items: [] },
     "notify.status": { queued: 2, failed: 1 }, "modules.list": [], "modules.health": { items: [], nextCursor: null }, ...overrides };
   return { calls, call: async (target: string, args?: Record<string, unknown>) => { calls.push([target, args]); const result = answers[target]; if (result instanceof Error) throw result; return result; } };
 }
-test("web owns overview filtering, ordering and horizon, retaining runtime health and hiding wake instructions", async () => {
-  const schedule = { status: "active", mode: "wake", text: "PRIVATE INSTRUCTION", until: null, label: "User label", nextAt: "2026-10-27T05:00:00Z" };
-  const f = fixture({ "schedules.list": [
-    { ...schedule, id: "far", nextAt: "2026-11-10T05:00:00Z" }, { ...schedule, id: "paused", status: "paused" },
-    { ...schedule, id: "past", nextAt: "2026-10-26T05:00:00Z" }, { ...schedule, id: "expired", until: "2026-10-27T04:30:00Z" },
-    { ...schedule, id: "later", nextAt: "2026-10-27T06:00:00Z" }, { ...schedule, id: "first" },
-    { ...schedule, id: "unnamed", label: null, nextAt: "2026-10-27T07:00:00Z" },
-  ] });
-  const result = todayViewSchema.parse(await todayView(f.call, async () => []));
-  expect(result.upcoming.map(item => item.scheduleId)).toEqual(["first", "later", "unnamed"]);
-  expect(result.upcoming[0]!.label).toBe("User label");
-  expect(result.upcoming[2]!.label).toBeNull();
+test("web retains runtime health with empty upcoming and no calendar source", async () => {
+  const f = fixture({ "schedules.list": new Error("PRIVATE INSTRUCTION: no calendar source") });
+  const result = await todayView(f.call, async () => []);
+  expect(result).toMatchObject({ generatedAt: at, approvals: [], updates: [], apps: [], problems: [], sessions: [] });
+  expect(result.upcoming).toEqual([]);
   expect(JSON.stringify(result)).not.toContain("PRIVATE INSTRUCTION");
   expect(result.health).toMatchObject({ queuedNotifications: 2, failedNotifications: 1 });
-  expect(f.calls).toContainEqual(["schedules.list", { timers: true }]);
-  expect(f.calls.some(([target]) => target.startsWith("history."))).toBe(false);
-  expect(f.calls.some(([target]) => target === "web.today")).toBe(false);
+  expect(f.calls.map(([target]) => target).sort()).toEqual([
+    "activity.runtime", "approvals.list", "modules.health", "modules.list", "notify.list", "notify.status",
+  ]);
+  expect(f.calls).toContainEqual(["notify.list", { limit: 20 }]);
+});
+test("web projects Notify-owned updates while preserving delivery and source details", async () => {
+  const update = { id: "private-notice", moduleId: "source-module", sessionId: "private-session", level: "now", channel: "third-party-room",
+    status: "failed", title: "Update", body: "**Details**", format: "markdown", link: "/sessions/private-session", attempts: 3,
+    lastError: "Delivery rejected", createdAt: at, sentAt: null, feedback: null };
+  const f = fixture({ "notify.list": { items: [update] } });
+  const result = await todayView(f.call, async () => []);
+  const { format: _format, ...expected } = update;
+  expect(result.updates).toEqual([expected]);
+  expect(result.updates[0]).not.toHaveProperty("format");
 });
 test("web follows health cursors, excludes recovered facts and bounds problems", async () => {
   const f = fixture();
@@ -41,11 +44,31 @@ test("web follows health cursors, excludes recovered facts and bounds problems",
   } : f.call(target, args);
   expect((await todayView(call, async () => [])).problems.map(item => item.module)).toEqual(["second", "first"]);
 });
-test("optional module health failures keep the page available; required reads fail visibly", async () => {
-  const optionalFailure = await todayView(fixture({ "modules.health": new Error("unavailable"), "notify.status": new Error("unavailable"), "notify.list": new Error("unavailable") }).call, async () => []);
-  expect(optionalFailure.problems).toEqual([]);
-  expect(optionalFailure.updates).toEqual([]);
-  await expect(todayView(fixture({ "approvals.list": new Error("unavailable") }).call, async () => [])).rejects.toThrow("unavailable");
+test.each(["not_found", "unavailable"])("optional Notify %s errors keep Today available", async code => {
+  const failure = Object.assign(new Error(`Notify ${code}`), { code });
+  for (const target of ["notify.list", "notify.status"]) {
+    const result = await todayView(fixture({ [target]: failure }).call, async () => []);
+    expect(result.upcoming).toEqual([]);
+    expect(result.problems).toEqual([]);
+    expect(result.updates).toEqual([]);
+    expect(result.health).toMatchObject(target === "notify.status"
+      ? { queuedNotifications: 0, failedNotifications: 0 }
+      : { queuedNotifications: 2, failedNotifications: 1 });
+  }
+});
+test("Today preserves unexpected Notify errors and all required read errors", async () => {
+  for (const target of ["notify.list", "notify.status"]) {
+    for (const code of [undefined, "invalid", "forbidden", "conflict"]) {
+      const failure = Object.assign(new Error(`${target} failed`), code ? { code } : {});
+      await expect(todayView(fixture({ [target]: failure }).call, async () => [])).rejects.toBe(failure);
+    }
+  }
+  for (const target of ["activity.runtime", "approvals.list", "modules.list", "modules.health"]) {
+    for (const code of [undefined, "not_found", "unavailable"]) {
+      const failure = Object.assign(new Error(`${target} failed`), code ? { code } : {});
+      await expect(todayView(fixture({ [target]: failure }).call, async () => [])).rejects.toBe(failure);
+    }
+  }
 });
 test("web bounds private conversations and propagates private journal failures", async () => {
   const f = fixture(), sessions = Array.from({ length: 25 }, (_, id) => ({ id: `private-${id}`, title: `Conversation ${id}` }));
@@ -60,7 +83,7 @@ test("owner builds recognize entry manifests without application-name lists", as
     for (const [name, uses, entry] of [["new-entry", ["approvals.grants"], true], ["agent-entry", ["*"], true],
       ["approval-entry", ["approvals.revoke-grant"], true], ["web", ["approvals.request"], false]] as const) {
       const module = await db.module.create({ data: { workspaceId, name, activeHash: "h" } });
-      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
+      await db.moduleVersion.create({ data: { moduleId: module.id, hash: "h", manifest: { name, entry: "index.ts", keepAlive: true, effects: [], uses: [...uses], tests: ["test.ts"] }, status: "approved", source: "builtin", intent: {}, report: {} } });
       const caller = { kind: "module" as const, module: name, moduleId: module.id, hash: "h" };
       await expect(startOwnerBuildAsCaller(ports, workspaceId, caller, {})).rejects.toMatchObject(entry ? { name: "ZodError" } : { code: "forbidden" });
     }

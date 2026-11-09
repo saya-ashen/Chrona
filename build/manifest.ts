@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { resolve } from "node:path";
+
 export type BuildTargetName = keyof typeof buildTargets;
 
 export type ReleaseResource = {
@@ -13,20 +16,23 @@ export const buildArtifacts = {
     resourcesDir: "module-git",
     seedDir: "resources/module-git",
     modules: [
-      { name: "web", source: "builtin/web" },
+      { name: "web", source: "external/web" },
       { name: "mcp", source: "external/mcp" },
       { name: "files", source: "external/files" },
-      { name: "notify", source: "builtin/notify" },
+      { name: "notify", source: "external/notify" },
       { name: "events", source: "external/events" },
       { name: "agent", source: "builtin/agent" },
       { name: "qq", source: "external/qq" },
+      { name: "author", source: "external/author" },
       { name: "remind", source: "external/remind" },
       { name: "mind", source: "external/mind" },
       { name: "memory-local", source: "external/memory-local" },
       { name: "coding", source: "external/coding" },
-      { name: "editor", source: "external/editor" },
+      { name: "coding-web", source: "external/coding-web" },
     ],
   },
+  // Seeds keep provenance for retained sources; these trees must never ship as runtime packages.
+  pausedModuleResources: ["external/remind"],
   executor: { platform: "linux", manager: "systemd 262", processEntry: "__executor-process", extension: "external-plugins/pi-steward-agent/chrona-tools.ts", foregroundOnly: true },
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
@@ -52,6 +58,11 @@ export const buildArtifacts = {
     { from: "node_modules/@types/node", to: "resources/module-typecheck/node_modules/@types/node", required: true },
   ] satisfies ReleaseResource[],
 } as const;
+
+/** Apply only to staged distribution resources, after verifying all fixed source seeds. */
+export async function omitPausedRuntimeModules(resourcesRoot: string): Promise<void> {
+  for (const source of buildArtifacts.pausedModuleResources) await rm(resolve(resourcesRoot, source), { recursive: true, force: true });
+}
 
 export const buildTargets = {
   "linux-x64": {

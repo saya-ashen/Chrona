@@ -22,10 +22,6 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
     const listed = target === "secrets.authorize" || (manifest.secrets ?? []).some(secret => (typeof secret === "string" ? secret : secret.name) === String(args.name)), stub = findStub(stubs, target) ?? (target === "secrets.get" ? findStub(stubs, "secret") : undefined);
     return listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
   }
-  if (target === "provider.complete") {
-    const stub = findStub(stubs, "provider.complete") ?? findStub(stubs, "model");
-    return { result: { output: stub ? await stub(args) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
-  }
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args) ?? null : null } };
 }
@@ -33,7 +29,7 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
   const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
   if (target.startsWith("agent.") && !findStub(stubs, target)) {
-    const result = await agentReply(target, args, stubs, completions);
+    const result = await agentReply(target, args, completions);
     if (result) return result;
   }
   if (call.params.mode === "async") {
@@ -45,9 +41,9 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
   return effectReply(target, args, stubs, manifest);
 }
 /**
- * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`, and the SDK
- * shorthands notify, wakeProvider, model, secret) answer from `stubs["<module>.<tool>"]` (sync: its
- * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
+ * Fake kernel for author tests. No call ever executes a real external effect. Routed calls answer from
+ * `stubs["<module>.<tool>"]` (sync: its value is the output), built-in Agent fixtures, or a queued call.
+ * `stubs.secret` also supplies secrets.get.
  */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
@@ -130,18 +126,14 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   };
 }
 
-async function agentReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, completions: Map<string, unknown>) {
+async function agentReply(target: string, args: Record<string, unknown>, completions: Map<string, unknown>) {
   if ((target === "agent.context" || target === "agent.run")) {
     const key = `${target}:${String(args["request-key"])}`;
     return { result: { output: target === "agent.context" ? { contextId: key } : { contextId: args["context-id"], runId: key, status: "queued", active: true } } };
   }
   if (target === "agent.complete") {
-    const operationId = String(args["command-key"]), previous = completions.get(operationId);
-    if (!previous) {
-      const stub = findStub(stubs, "model");
-      const input = { prompt: args.prompt, ...(args.system === undefined ? {} : { system: args.system }), maxOutputTokens: args["max-output-tokens"] };
-      completions.set(operationId, stub ? await stub(input) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
-    }
+    const operationId = String(args["command-key"]);
+    if (!completions.has(operationId)) completions.set(operationId, { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
     return { result: { output: { operationId } } };
   }
   if (target === "agent.completion") return { result: { output: { result: completions.get(String(args["operation-id"])) ?? null, failure: !completions.has(String(args["operation-id"])) } } };

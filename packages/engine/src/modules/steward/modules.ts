@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { assertExternalModule, moduleIdentity } from "./module-identity";
 import { moduleUpstream } from "./module-upstream";
 import { moduleUpstreamRequestSchema } from "@chrona/contracts/steward";
@@ -47,8 +47,7 @@ async function currentContractFailures(db: StewardPorts["db"], workspaceId: stri
 
 function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | null; status: string }, version: { manifest: unknown } | null) {
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data, supervisor = moduleSupervisor(ports);
-  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false),
-    readiness: supervisor.readiness(row.id, row.activeHash), healthCheck: manifest?.healthCheck ?? false };
+  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false) };
 }
 
 function incidentSummary(current: ModuleIncident | undefined) {
@@ -72,7 +71,7 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
     contractFailureCount = failures.count;
     truncated = incident.truncated || failures.truncated;
   }
-  const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } } }) : null;
+  const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true } }) : null;
   return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
     ...runtimeOf(ports, moduleRow, version),
     activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status, activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
@@ -84,15 +83,21 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
 async function list(context: ModuleContext) {
   const { db, workspaceId } = context;
-  const rows = await db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true, manifest: true, report: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
-  return Promise.all(rows.map(async ({ versions, ...row }) => {
-    const manifest = moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data;
-    return { ...row, ...moduleIdentity(row, { configurable: !!manifest && Object.keys(manifest.settings).length > 0, removable: !manifest || !isEntryModule(manifest) }), description: manifest?.description ?? null,
+  const rows = await db.module.findMany({ where: { workspaceId }, select: {
+    id: true, name: true, builtin: true, status: true, activeHash: true,
+    versions: { take: 5, select: { hash: true, status: true, createdAt: true, report: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+    runs: { take: 5, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } },
+  } });
+  return Promise.all(rows.map(async ({ versions, runs, ...row }) => {
+    const active = row.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash } }, select: { manifest: true } }) : null;
+    const manifest = moduleManifestSchema.safeParse(active?.manifest).data;
+    return { id: row.id, name: row.name, builtin: row.builtin, status: row.status, activeHash: row.activeHash, ...moduleIdentity(row), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row),
-      versions: versions.map(({ manifest: _manifest, report, ...version }) => {
+      versions: versions.map(({ report, ...version }) => {
         const metadata = z.object({ errors: z.array(z.string()).optional(), git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).optional() }).safeParse(report).data;
-        return { ...version, errors: metadata?.errors ?? null, git: metadata?.git ?? null };
+        return { ...version, errors: metadata?.errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null, git: metadata?.git ?? null };
       }),
+      runs: runs.map(run => ({ ...run, error: run.error === null ? null : diagnosticText(run.error, 1000).slice(0, 1000) })),
     };
   }));
 }

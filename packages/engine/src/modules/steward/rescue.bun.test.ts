@@ -10,13 +10,13 @@ async function fixture() {
   const approvals = createApprovals({ db, workspaceId: workspace.id, now: () => new Date() });
   return { db, workspace, approvals };
 }
-test.each(["entry", "web", "mcp", "qq", "rescue", "cli", "custom-entry"] as const)("entry-module and policy approvals resolve from any source: %s", async source => {
+test.each(["entry", "web", "mcp", "qq", "rescue", "cli", "custom-entry"] as const)("entry-module and application-requested approvals resolve from any source: %s", async source => {
   const { db, workspace, approvals } = await fixture();
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "entry" } });
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a".repeat(64), manifest: { name: "entry", entry: "index.ts", keepAlive: true, triggers: [], effects: [], uses: ["chat.send"], tests: ["test.ts"] }, intent: {}, source: "user", report: {}, status: "pending_review" } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "a".repeat(64), manifest: { name: "entry", entry: "index.ts", keepAlive: true, effects: [], uses: ["chat.send"], tests: ["test.ts"] }, intent: {}, source: "user", report: {}, status: "pending_review" } });
   const entry = await approvals.create({ action: "activate_module", moduleId: module.id, title: "Enable", detail: "Review", preview: "diff", payload: { kind: "activate_module", moduleId: module.id, hash: "a".repeat(64) } });
-  const policy = await approvals.create({ action: "change_policy", title: "Settings", detail: "Review", preview: "settings diff", payload: { kind: "change_policy" } });
+  const requested = await approvals.create({ action: "modify_external", title: "Update", detail: "Review", preview: "external diff", payload: { kind: "external_update" } });
   expect((await approvals.resolve(entry.id, { decision: "deny" }, source)).approval.status).toBe("denied");
-  expect((await approvals.resolve(policy.id, { decision: "deny" }, source)).approval.status).toBe("denied");
-  expect(await db.audit.findFirst({ where: { kind: "approval_resolved", subjectId: policy.id } })).toMatchObject({ actorKey: "user", details: { source } });
+  expect((await approvals.resolve(requested.id, { decision: "deny" }, source)).approval.status).toBe("denied");
+  expect(await db.audit.findFirst({ where: { kind: "approval_resolved", subjectId: requested.id } })).toMatchObject({ actorKey: "user", details: { source } });
 });

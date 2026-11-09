@@ -26,7 +26,7 @@ afterEach(async () => { liveRuns.clear(); for (const db of databases.splice(0)) 
 async function fixture() {
   const db = testDb(); databases.push(db);
   const workspace = await db.workspace.create({ data: { name: "M3-Q-test" } });
-  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "coding", activeHash: "hash", status: "active" } });
+  const module = await db.module.create({ data: { workspaceId: workspace.id, name: "execution-test", activeHash: "hash", status: "active" } });
   const principal: ExecutionPrincipal = { workspaceId: workspace.id, ownerId: "owner", caller: { kind: "module", moduleId: module.id, hash: "hash" } };
   let now = new Date("2026-11-06T12:00:00Z"), online = true;
   await db.executionExecutor.create({ data: { id: "device", workspaceId: workspace.id, ownerId: "owner", label: "fixture", credentialHash: "not-a-credential", incarnation: "daemon", reconciledAt: now, authorizedUntil: new Date(now.getTime() + 60_000) } });
@@ -246,11 +246,11 @@ test("authorized preparation intent fixes IDs and rejects changed payload before
 
 async function installCompletionOutbox(f: Fixture) {
   if (f.principal.caller.kind !== "module") throw new Error("fixture module required");
-  const manifest = moduleManifestSchema.parse({ name: "coding", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "get", description: "Read work", idempotent: true, visibility: ["owner"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
+  const manifest = moduleManifestSchema.parse({ name: "execution-test", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "get", description: "Read work", idempotent: true, visibility: ["owner"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
   await f.db.moduleVersion.create({ data: { moduleId: f.principal.caller.moduleId, hash: "hash", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   f.ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
     const attempt = await tx.executionAttempt.findUniqueOrThrow({ where: { runId } });
-    await enqueueCall({ tx, ports: f.ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: "coding.get", raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
+    await enqueueCall({ tx, ports: f.ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: "execution-test.get", raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
   };
 }
 test("completion outbox shares final transaction; failed enqueue rolls back final/stop/snapshot and replay has one stopped invocation", async () => {
@@ -283,7 +283,13 @@ test("queued cancel and unknown-to-stop completion each preserve stable outbox k
   await f.db.$transaction(tx => completion.commit(tx, { principal: f.principal, target: a.target, final, digest, stop: null }));
   const stop: VerifiedDeviceStop = { executorId: "device", generation: 1, target: a.target, digest, proof: { kind: "never_started", tombstoneDigest: "f".repeat(64) } };
   await f.db.$transaction(tx => completion.commit(tx, { principal: f.principal, target: a.target, final, digest, stop }));
-  expect(await f.db.moduleInvocation.count()).toBe(3);
+  const callbacks = await f.db.moduleInvocation.findMany({ orderBy: { key: "asc" } });
+  expect(callbacks.map(row => row.key).sort()).toEqual([
+    `execution-result:${queued.execution.attemptId}:stopped`,
+    `execution-result:${a.execution.attemptId}:unknown`,
+    `execution-result:${a.execution.attemptId}:stopped`,
+  ].sort());
+  for (const row of callbacks) expect(row).toMatchObject({ target: "execution-test", tool: "get", mode: "async", status: "queued", caller: "owner" });
   const session = await f.db.session.create({ data: { workspaceId: f.principal.workspaceId, source: "web", key: "web:ordinary" } });
   await f.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "hello" });
   const run = await f.runs.claimNext("foreground"); await f.runs.finish(run!.id, { outcome: "finished", sessionId: null, error: null });

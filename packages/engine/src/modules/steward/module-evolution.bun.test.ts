@@ -11,13 +11,13 @@ import { moduleManifestSchema } from "@chrona/contracts/steward";
 const closes: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of closes.splice(0).reverse()) await close(); });
 
-async function rollbackFixture(options: { paused?: boolean; migrating?: boolean; group?: boolean; migration?: boolean; migrated?: boolean; verified?: boolean; firstInstall?: boolean; dataSchema?: number; manifestSchema?: number; previousSchema?: number; entry?: boolean; secret?: boolean; effect?: "network"; scheduled?: boolean; previousScheduled?: boolean; dynamic?: boolean; targetStatus?: "approved" | "pending_review" | "rejected" } = {}) {
+async function rollbackFixture(options: { paused?: boolean; migrating?: boolean; group?: boolean; migration?: boolean; migrated?: boolean; verified?: boolean; firstInstall?: boolean; dataSchema?: number; manifestSchema?: number; previousSchema?: number; entry?: boolean; secret?: boolean; effect?: "network"; recordedDelivery?: boolean; dynamic?: boolean; targetStatus?: "approved" | "pending_review" | "rejected" } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-evolution-"); closes.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "app", activeHash: "candidate", status: options.paused ? "paused" : options.migrating ? "migrating" : "active", dataSchema: options.dataSchema ?? 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "app", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: options.scheduled ? [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] : [],
+  const manifest = moduleManifestSchema.parse({ name: "app", entry: "index.ts", keepAlive: true, tests: ["test.ts"],
     listen: options.entry ? "/api/app" : undefined, effects: options.effect ? [options.effect] : [], uses: options.dynamic ? ["schedules.create"] : [], secrets: options.secret ? ["demo_credential"] : [], data: { schema: options.manifestSchema ?? 1 } });
-  if (!options.firstInstall) await db.moduleVersion.create({ data: { moduleId: module.id, hash: "previous", manifest: { ...manifest, triggers: options.previousScheduled ? [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] : [], data: { schema: options.previousSchema ?? options.manifestSchema ?? 1 } }, source: "user", status: options.targetStatus ?? "approved", intent: {}, report: {} } });
+  if (!options.firstInstall) await db.moduleVersion.create({ data: { moduleId: module.id, hash: "previous", manifest: { ...manifest, data: { schema: options.previousSchema ?? options.manifestSchema ?? 1 } }, source: "user", status: options.targetStatus ?? "approved", intent: {}, report: {} } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "candidate", manifest, source: "user", status: "approved", intent: { changes: ["safe fix"] }, report: { tests: [], continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: options.migrated ?? false } } } });
   const ports = { db, dataDir, publicUrl: null, now: () => new Date("2026-10-30T12:00:00Z") };
   const context = moduleContext(ports, workspace.id);
@@ -29,7 +29,10 @@ async function rollbackFixture(options: { paused?: boolean; migrating?: boolean;
     await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_activate", details: { hash: "candidate", generationId: "gen-candidate", approvalId: approval.id } } });
   }
   if (options.migration) await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_migration_started", details: { hash: "candidate", from: 1, to: 1 } } });
-  if (options.scheduled) await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "daily", mode: "module", rule: { kind: "daily", time: "09:00" }, text: "daily", createdBy: "chrona", nextAt: new Date("2030-01-01T00:00:00Z") } });
+  if (options.recordedDelivery) {
+    const schedule = await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "previous-occurrence", mode: "module", rule: {}, text: "Recorded delivery", createdBy: "chrona", status: "done" } });
+    await db.moduleInvocation.create({ data: { workspaceId: workspace.id, caller: "system:schedules", target: module.name, tool: "schedule", mode: "schedule", key: `${schedule.id}:recorded`, args: { scheduleId: schedule.id }, status: "unknown", error: "Delivery interrupted; outcome unknown" } });
+  }
   const attempt = () => rollbackFailedStart(context, module.id, "candidate", activation.activationId);
   return { db, workspace, module, context, manifest, activation, attempt, dataDir };
 }
@@ -38,7 +41,7 @@ test("activation outcome is tied to the active candidate and successful capabili
   const db = testDb(); closes.push(() => db.$disconnect());
   const workspace = await db.workspace.create({ data: { name: "evolution" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "candidate", dataSchema: 2 } });
-  const manifest = { name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], uses: [], data: { schema: 2 } };
+  const manifest = { name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], uses: [], data: { schema: 2 } };
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "old", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "candidate", manifest, source: "user", status: "approved", intent: { changes: ["repair search"], preserves: [] }, report: { tests: [{ exitCode: 0 }], typecheck: { status: "passed" }, continuity: { status: "passed" }, outputImpacts: [{ caller: "caller", targets: ["example.read"] }] } } });
   const context = moduleContext({ db, dataDir: "/tmp/not-used", publicUrl: null, now: () => new Date("2026-10-25T14:00:00Z") }, workspace.id);
@@ -117,7 +120,7 @@ test("a same-hash activation cannot interleave between mismatch epoch check and 
 test.each([
   ["first install", { firstInstall: true }], ["paused", { paused: true }], ["migrating", { migrating: true }],
   ["group activation", { group: true }], ["migration or restore", { migration: true }], ["schema mismatch", { manifestSchema: 2, previousSchema: 1, dataSchema: 2 }],
-  ["dynamic schedule", { dynamic: true }], ["changed static schedule", { scheduled: true, previousScheduled: false }], ["migration marker", { migrated: true }],
+  ["removed scheduler dependency", { dynamic: true }], ["migration marker", { migrated: true }],
   ["unapproved target", { targetStatus: "pending_review" as const }], ["successful verification", { verified: true }],
 ] as const)("automatic rollback stays blocked for %s", async (_label, options) => {
   const f = await rollbackFixture(options), result = await f.attempt();
@@ -152,13 +155,15 @@ test("removed module cannot be switched by a stale rollback callback", async () 
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
 });
 
-test("eligible rollback preserves current data and existing static schedule rows without replay", async () => {
-  const f = await rollbackFixture({ scheduled: true, previousScheduled: true });
+test("eligible rollback preserves current data and unknown delivery evidence without replay", async () => {
+  const f = await rollbackFixture({ recordedDelivery: true });
   const data = join(f.dataDir, "platform/data", f.module.id); await mkdir(data, { recursive: true }); await writeFile(join(data, "current.txt"), "current data");
   const schedule = await f.db.schedule.findFirstOrThrow({ where: { moduleId: f.module.id } });
+  const delivery = await f.db.moduleInvocation.findFirstOrThrow({ where: { target: f.module.name } });
   expect(await f.attempt()).toMatchObject({ rolledBack: true });
   expect(await readFile(join(data, "current.txt"), "utf8")).toBe("current data");
   expect(await f.db.schedule.findMany({ where: { moduleId: f.module.id } })).toEqual([schedule]);
+  expect(await f.db.moduleInvocation.findMany({ where: { target: f.module.name } })).toEqual([delivery]);
   const outcomes = await moduleEvolutionOutcomes(f.db, f.workspace.id, f.module.id);
   expect(outcomes[0]).toMatchObject({ candidateHash: "previous", rollback: { attempted: false, result: "blocked" } });
   expect(outcomes[1]).toMatchObject({ candidateHash: "candidate", status: "rolled-back", rollback: { attempted: true, result: "succeeded" } });

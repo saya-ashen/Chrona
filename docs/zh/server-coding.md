@@ -1,5 +1,7 @@
 # 服务器编码工作：开发集成说明
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 2026-11-08 阅读提示：M2/M3 的历史模型限制不否定后续[本机 V1 真实模型验收](unified-module-v1-acceptance.md)。当前应用调用使用 Agent 原语，下文 executions 是内部执行机制或旧阶段接口；见[应用编排](agent-module-orchestration.md)、[基础 Web 工作台](coding-web-workbench.md)和[统一开发路线](development-roadmap.md)。
 
 当前 M2/M3 开发集成已通过，尚未公开发布或部署。真实 Hono/SDK/SQLite、fakePi、Neovim、固定本机 executor、有界并行、不可变成果比较/接受与独立 worktree 清理的实际证据见 [M3 验收记录](chrona-workbench-m3-acceptance.md)和[统一方案](chrona-workbench-unified-development-plan.md)。本页保留旧 server 项目配置示例；v2 固定位置授权、预算和设备协议见 [P2 契约](chrona-workbench-p2-contract.md)。真实模型效果、个人设备安装和其他平台原生执行仍未验证。

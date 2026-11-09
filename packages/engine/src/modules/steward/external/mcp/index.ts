@@ -1,29 +1,49 @@
-import { chrona, on } from "chrona";
-import { createAgentConversations, isAgentConversation } from "./agent-conversations";
-import { memoryView } from "./memory";
-import { appOverview, systemApps } from "./app-overview";
+import { chrona, on, onDisconnect } from "chrona";
+import { createAgentConversations } from "./agent-conversations";
+import { memoryView, redactSensitiveText } from "./memory";
+import { createPreferences } from "./preferences";
+import { uiSettings } from "./ui-settings";
+import { SETTINGS_PAGE } from "./page";
+import { appOverview, kernelNamespaces, systemApps } from "./app-overview";
+import { object, validate } from "./validation";
 
-// Stateless Streamable HTTP with JSON responses: plain JSON-RPC, no MCP SDK needed. Tools are routed calls (v2-8).
 type Args = Record<string, unknown>;
-const str = (description?: string) => ({ type: "string", ...(description ? { description } : {}) });
+const str = (description?: string) => ({ type: "string", minLength: 1, ...(description ? { description } : {}) });
 const schema = (properties: Args = {}, required: string[] = []) => ({ type: "object", properties, required, additionalProperties: false });
 type McpTool = { name: string; description: string; inputSchema: Args; run(args: Args): Promise<unknown>; destructive?: boolean };
-const call = (target: string, args: Args = {}) => chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+type Contract = { target: string; inputSchema: Args; moduleId?: string; hash?: string; contractHash?: string };
+const preferences = createPreferences(chrona.paths.data);
+const call = (target: string, args: Args = {}) => target === "mcp.settings" ? preferences.tool(args) : chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
+on("tool", async event => {
+  if (event.id !== "settings" && event.id !== "ui-settings") throw new Error(`Unknown tool ${event.id}`);
+  if (!event.caller) throw new Error("forbidden: missing actual caller");
+  return { result: await (event.id === "ui-settings" ? uiSettings(preferences, event.args) : preferences.tool(event.args)) };
+});
+// Explicit uses: web.page-set causes activation again when Web becomes available or changes version.
+on("activated", async () => {
+  try {
+    const registered = await chrona.call("web.page-set", SETTINGS_PAGE);
+    if (registered && typeof registered === "object" && "error" in registered) throw new Error("Settings page registration rejected");
+  }
+  catch { console.error(JSON.stringify({ component: "mcp", event: "settings_page_registration_failed" })); }
+  return {};
+});
 const conversations = createAgentConversations({ source: "mcp", dataDir: chrona.paths.data, call, reply: () => {} });
-on("schedule", async event => ({ result: await conversations.legacyWake(event) }));
 let polling = false;
-setInterval(() => {
+const timer = setInterval(() => {
   if (polling) return;
   polling = true;
-  void conversations.poll().catch(error => console.error(JSON.stringify({ component: "mcp", event: "conversation_poll_failed", error: String(error).slice(0, 300) }))).finally(() => { polling = false; });
+  void conversations.poll().catch(error => console.error(JSON.stringify({ component: "mcp", event: "conversation_poll_failed", error: redactSensitiveText(String(error), 300) }))).finally(() => { polling = false; });
 }, 1000);
-async function ask(args: Args) {
-  const session = typeof args.sessionId === "string" ? args.sessionId : undefined;
-  if (session && !await conversations.owns(session)) throw new Error("conflict: 历史或其他入口的会话只供查看，请新建 MCP 会话继续。");
-  const sent = await conversations.send({ session, key: typeof args.key === "string" ? args.key : undefined, text: args.text, requestKey: typeof args.requestKey === "string" ? args.requestKey : undefined });
-  return waitForReply(sent);
+onDisconnect(() => clearInterval(timer));
+async function ownedSession(id: unknown) {
+  const session = id as string;
+  if (!await conversations.owns(session)) throw Object.assign(new Error("MCP conversation not found"), { code: "not_found" });
+  return session;
 }
-async function waitForReply(sent: Awaited<ReturnType<typeof conversations.send>>) {
+async function ask(args: Args) {
+  const session = args.sessionId === undefined ? undefined : await ownedSession(args.sessionId);
+  const sent = await conversations.send({ session, key: args.key as string | undefined, text: args.text, requestKey: args.requestKey as string | undefined });
   const until = Date.now() + 120000;
   while (Date.now() < until) {
     await conversations.poll();
@@ -34,119 +54,88 @@ async function waitForReply(sent: Awaited<ReturnType<typeof conversations.send>>
   }
   return { ...sent, status: "pending" };
 }
+async function discoveredCall(args: Args) {
+  const name = args.name as string;
+  // Decisions use dedicated destructive tools; there is no alternate generic route.
+  if (["approvals.resolve", "agent.respond"].includes(name)) throw Object.assign(new Error("Use the dedicated decision tool after the user decides"), { code: "forbidden" });
+  const contracts = await call("modules.tools", { query: name, audience: "user" }) as Contract[];
+  const exact = contracts.filter(tool => tool.target === name);
+  if (exact.length !== 1) throw Object.assign(new Error(`Current user tool ${name} not found`), { code: "not_found" });
+  const tool = exact[0]!, input = args.arguments ?? {};
+  validate(tool.inputSchema, input);
+  if (tool.moduleId !== undefined || !kernelNamespaces.includes(name.split(".")[0]!)) {
+    if (!tool.moduleId || !tool.contractHash || !tool.hash) throw Object.assign(new Error("Application contract binding is unavailable"), { code: "unavailable" });
+    return chrona.call(name, input, { expectedTarget: { moduleId: tool.moduleId, contractHash: tool.contractHash } });
+  }
+  return chrona.call(name, input);
+}
 const tools: McpTool[] = [
-  { name: "chrona_today", description: "What needs the user now: waiting approvals, conversations, today's agenda and open app health problems with next actions (up to 20, newest first).", inputSchema: schema(), run: () => call("web.today") },
-  { name: "chrona_sessions", description: "List this MCP app's conversations and bounded build facts, optionally filtered by source and status.", inputSchema: schema({ source: { type: "string", enum: ["mcp", "build"] }, status: { type: "string", enum: ["active", "ended"] } }),
-    run: async ({ source, status }) => {
-      if ((source !== undefined && (typeof source !== "string" || !["mcp", "build"].includes(source))) || (status !== undefined && (typeof status !== "string" || !["active", "ended"].includes(status)))) throw new Error("invalid: expected mcp/build source and active/ended status");
-      const builds = source === "mcp" ? [] : await call("modules.build-sessions", { limit: 50 }) as { status: string; [key: string]: unknown }[];
-      return [...(source === "build" ? [] : await conversations.list()), ...builds.map(build => ({ ...build, source: "build" }))].filter(session => !status || session.status === status);
-    } },
-  { name: "chrona_session", description: "Get a conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: ({ sessionId }) => isAgentConversation(String(sessionId)) ? conversations.session(String(sessionId)) : call("modules.build-session", { session: sessionId }) },
-  { name: "chrona_session_update", description: "Rename or end a conversation.", inputSchema: schema({ sessionId: str(), title: str(), status: { type: "string", enum: ["ended"] } }, ["sessionId"]),
-    run: ({ sessionId, title, status }) => conversations.update(String(sessionId), { title: typeof title === "string" ? title : undefined, status: status === "ended" ? status : undefined }) },
-  { name: "chrona_session_new", description: "End the active conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), run: async ({ key }) => { const session = (await conversations.list()).find(session => session.key === key && session.status === "active"); return session ? conversations.update(session.id, { status: "ended" }) : { status: "no_active_session" }; } },
-  { name: "chrona_session_messages", description: "Read a conversation's recent messages.", inputSchema: schema({ sessionId: str(), limit: { type: "integer", minimum: 1, maximum: 200 } }, ["sessionId"]),
-    run: async ({ sessionId, limit }) => {
-      if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 200)) throw new Error("invalid: limit must be an integer from 1 to 200");
-      if (isAgentConversation(String(sessionId))) return (await conversations.messages(String(sessionId))).slice(-((limit as number | undefined) ?? 100));
-      await call("modules.build-session", { session: sessionId });
-      return [];
-    } },
-  { name: "chrona_session_transcript", description: "What Chrona did in a conversation or module build: its text, tool calls and clipped results.", inputSchema: schema({ sessionId: str() }, ["sessionId"]),
-    run: ({ sessionId }) => isAgentConversation(String(sessionId)) ? conversations.transcript(String(sessionId)) : call("modules.build-transcript", { session: sessionId }) },
-  { name: "chrona_chat", description: "Send the user's message to Chrona by session id or key and return its reply. Without either, start a new MCP session.", inputSchema: schema({ text: str(), sessionId: str(), key: str(), requestKey: str("Reuse for the same authorized message; changed content conflicts") }, ["text"]), run: ask },
-  { name: "chrona_approvals", description: "List approvals; defaults to open ones waiting for the user.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }),
-    run: ({ status }) => call("approvals.list", { status }) },
-  { name: "chrona_approval_resolve", description: "Approve or deny an approval as the user. Only call after the user explicitly decided.", destructive: true,
-    inputSchema: schema({ approvalId: str(), decision: { type: "string", enum: ["approve", "deny"] }, scope: { type: "string", enum: ["once", "always"] } }, ["approvalId", "decision"]),
-    run: ({ approvalId, decision, scope = "once" }) => call("approvals.resolve", { approval: approvalId, decision, scope }) },
-  { name: "chrona_runs", description: "Chrona's recent work (runs) with progress and any question waiting for the user.", inputSchema: schema({ sessionId: str() }), run: async ({ sessionId }) => [...(await conversations.runs()).filter(run => !sessionId || run.sessionId === sessionId), ...await call("activity.runs", { session: sessionId }) as unknown[]] },
-  { name: "chrona_run_answer", description: "Answer a question a running Chrona run asked the user. Only send what the user decided.", destructive: true,
-    inputSchema: schema({ interactionId: str(), decision: { type: "string", enum: ["submit", "cancel"] }, value: { type: ["boolean", "integer", "string"], description: "confirm: true/false; select: option index; input/editor: text" } }, ["interactionId", "decision"]),
-    run: async ({ interactionId, decision, value }) => { await conversations.poll(); return conversations.answer(String(interactionId), decision === "cancel" ? { decision } : { decision, value }); } },
-  { name: "chrona_run_cancel", description: "Stop a running Chrona run (work already done is kept).", inputSchema: schema({ runId: str() }, ["runId"]), run: ({ runId }) => conversations.interrupt(String(runId)) },
-  { name: "chrona_modules", description: "List installed apps, their origin, current lifecycle capabilities, versions and recent runs.", inputSchema: schema(), run: () => call("modules.list") },
-  { name: "chrona_module_catalog", description: "Read official external packages, release availability and the latest installation receipt. Does not install anything.", inputSchema: schema(), run: () => call("modules.catalog") },
-  { name: "chrona_module_install", description: "Install or explicitly update one official external package after the user authorized it. Reuse requestKey to query the same request; pending or unavailable is not success. Never retry an unknown result with a new key.", destructive: true,
-    inputSchema: schema({ package: { type: "string", enum: ["qq", "remind", "mind", "memory-local", "mcp", "files", "events"] }, mode: { type: "string", enum: ["install", "update"] }, requestKey: { type: "string", minLength: 1, maxLength: 120 } }, ["package", "mode", "requestKey"]),
-    run: args => {
-      if (Object.keys(args).some(key => !["package", "mode", "requestKey"].includes(key)) || typeof args.package !== "string" || !["qq", "remind", "mind", "memory-local", "mcp", "files", "events"].includes(args.package) || typeof args.mode !== "string" || !["install", "update"].includes(args.mode) || typeof args.requestKey !== "string" || !args.requestKey.trim() || args.requestKey.trim().length > 120)
-        throw new Error("invalid: expected official package, install/update mode and requestKey of 1–120 characters; host paths are not accepted");
-      return call("modules.install", { ...args, requestKey: args.requestKey.trim() });
-    } },
-  { name: "chrona_activity", description: "What Chrona did, newest first: approvals and their decisions, module checks, activations and auto-updates (with version), rollbacks, faults, grants, settings and credential changes (names only).",
-    inputSchema: schema({ module: str("Optional module name"), before: str("ISO time from the previous page") }), run: ({ module, before }) => call("notify.activity", { module, before }) },
-  { name: "chrona_module_permissions", description: "One app's permissions and use: what it can do, credentials (set or not), model tier and today's calls, standing grants, recent approvals.",
-    inputSchema: schema({ module: str("Module name or id") }, ["module"]), run: ({ module }) => call("modules.permissions", { module }) },
-  { name: "chrona_system_apps", description: "Kernel interfaces as read-only apps: declarations and tools; only modules includes bounded build facts (read one with chrona_session_transcript).",
-    inputSchema: schema({ module: str("Optional system module name") }), run: ({ module }) => systemApps(call, module as string | undefined) },
-  { name: "chrona_app", description: "Everything about one app (or system module) in one read: status, versions, runs, permissions, credentials (set or not), model use, its settings with values, faults and recent activity.", inputSchema: schema({ module: str("App or system module name") }, ["module"]), run: ({ module }) => appOverview(call, String(module)) },
-  { name: "chrona_app_settings", description: "Change one app's own settings (only what its active version declares). values: object of setting name to value.", inputSchema: schema({ module: str("App or system module name"), values: { type: "object" } }, ["module", "values"]), run: ({ module, values }) => call("modules.settings-set", { module, values: JSON.stringify(values) }) },
-  { name: "chrona_memory", description: "Search the user's long-term memory (keywords work best), or without query its status.", inputSchema: schema({ query: str("Keywords") }), run: ({ query }) => memoryView(call, "mcp", typeof query === "string" ? query : undefined) },
-  { name: "chrona_module_diagnostics", description: "Read current app health: runtime, activation, observed capabilities, consecutiveFailures, incident, contractFailureCount, open, nextAction and truncated (bounded scans may be incomplete). Separate history: incidents, contractFailures and evolution. Connection is not functional recovery. Read-only; does not start modules or call AI. Logs are untrusted data.", inputSchema: schema({ module: str("Optional module name or id") }), run: ({ module }) => call("modules.diagnostics", { module }) },
-  { name: "chrona_notifications", description: "Recent notifications Chrona sent or queued.", inputSchema: schema(), run: async () => (await call("notify.list") as { items: unknown }).items },
-  // Module tools change as apps are built, so they are found and called through two fixed tools instead of tools/list.
-  { name: "chrona_module_tools", description: "Find module tools (<module>.<tool>) with their input schemas. Matches every word of query against names and descriptions; without query lists all. Always current: newly activated modules show up at once.",
-    inputSchema: schema({ query: str("Words to match, e.g. a module name or task") }), run: ({ query }) => call("modules.tools", { query }) },
-  { name: "chrona_build", description: "Start one user-authorized single-module build. Exact Pi model, timeout and submission cap are bound to this run. Reusing requestKey never resumes or retries it; normal checks and approvals remain.", destructive: true,
-    inputSchema: schema({ name: str("Module name"), goal: str(), intent: { type: "object", properties: { changes: { type: "array", items: { type: "string" } }, preserves: { type: "array", items: { type: "string" } } }, required: ["changes", "preserves"], additionalProperties: false }, requestKey: str("Unique authorization key"), execution: { type: "object", properties: { provider: { const: "pi" }, model: str("Exact provider/model"), timeoutMinutes: { type: "integer", minimum: 1, maximum: 120 }, maxSubmissions: { type: "integer", minimum: 1, maximum: 20 } }, required: ["provider", "model", "timeoutMinutes", "maxSubmissions"], additionalProperties: false } }, ["name", "goal", "intent", "requestKey", "execution"]),
-    run: args => call("modules.build-owner", args) },
-  { name: "chrona_module_call", description: "Call a module tool found with chrona_module_tools.", inputSchema: schema({ name: str("<module>.<tool>"), arguments: { type: "object", description: "Arguments matching the tool's input schema" } }, ["name"]),
-    run: ({ name, arguments: args }) => {
-      // Conversations, approvals and app records have their own tools above (approval resolution is marked destructive there).
-      const buildControl = ["modules.stop-build", "modules.revise-build", "modules.build-owner"].includes(String(name));
-      if (!/^[a-z][a-z0-9-]{1,40}\.[a-z][a-z0-9-]{1,40}$/.test(String(name)) || (!buildControl && /^(chat|approvals|modules)\./.test(String(name)))) throw new Error(`not_found: unknown module tool ${String(name)}`);
-      return chrona.call(String(name), (args ?? {}) as Args);
-    } },
+  { name: "chrona_today", description: "The Web application's current owner overview, when its exact user tool is available.", inputSchema: schema(), run: () => discoveredCall({ name: "web.today" }) },
+  { name: "chrona_sessions", description: "List only this MCP application's conversations, optionally filtered by status.", inputSchema: schema({ status: { type: "string", enum: ["active", "ended"] } }), run: async ({ status }) => (await conversations.list()).filter(session => !status || session.status === status) },
+  { name: "chrona_session", description: "Read an MCP-owned conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: async ({ sessionId }) => conversations.session(await ownedSession(sessionId)) },
+  { name: "chrona_session_update", description: "Rename or end an MCP-owned conversation.", inputSchema: schema({ sessionId: str(), title: { type: "string", minLength: 1, maxLength: 200 }, status: { type: "string", enum: ["ended"] } }, ["sessionId"]), run: async ({ sessionId, title, status }) => conversations.update(await ownedSession(sessionId), { title: title as string | undefined, status: status as "ended" | undefined }) },
+  { name: "chrona_session_new", description: "End the active MCP conversation for a key; the next message starts a new one.", inputSchema: schema({ key: str() }, ["key"]), run: async ({ key }) => { const session = (await conversations.list()).find(session => session.key === key && session.status === "active"); return session ? conversations.update(session.id, { status: "ended" }) : { status: "no_active_session" }; } },
+  { name: "chrona_session_messages", description: "Read up to 100 recent messages from an MCP-owned conversation.", inputSchema: schema({ sessionId: str(), limit: { type: "integer", minimum: 1, maximum: 100 } }, ["sessionId"]), run: async ({ sessionId, limit }) => (await conversations.messages(await ownedSession(sessionId))).slice(-((limit as number | undefined) ?? 100)) },
+  { name: "chrona_session_transcript", description: "Read the latest turn's bounded transcript from an MCP-owned conversation.", inputSchema: schema({ sessionId: str() }, ["sessionId"]), run: async ({ sessionId }) => conversations.transcript(await ownedSession(sessionId)) },
+  { name: "chrona_chat", description: "Send a user message to an MCP conversation or start one; wait for its foreground Agent reply. Reuse requestKey for the same message.", inputSchema: schema({ text: { type: "string", minLength: 1, maxLength: 20000 }, sessionId: str(), key: { type: "string", minLength: 1, maxLength: 200 }, requestKey: { type: "string", minLength: 1, maxLength: 200 } }, ["text"]), run: ask },
+  { name: "chrona_approvals", description: "List approvals, defaulting to open requests.", inputSchema: schema({ status: { type: "string", enum: ["open", "approved", "denied", "expired"] } }), run: args => call("approvals.list", args) },
+  { name: "chrona_approval_resolve", description: "Approve or deny one request only after the user's explicit decision.", destructive: true, inputSchema: schema({ approvalId: str(), decision: { type: "string", enum: ["approve", "deny"] } }, ["approvalId", "decision"]), run: ({ approvalId, decision }) => call("approvals.resolve", { approval: approvalId, decision }) },
+  { name: "chrona_runs", description: "Read only the runs owned by MCP conversations.", inputSchema: schema({ sessionId: str() }), run: async ({ sessionId }) => { if (sessionId !== undefined) await ownedSession(sessionId); return (await conversations.runs()).filter(run => !sessionId || run.sessionId === sessionId); } },
+  { name: "chrona_run_answer", description: "Answer an MCP run's question only with the user's decision.", destructive: true, inputSchema: schema({ interactionId: str(), decision: { type: "string", enum: ["submit", "cancel"] }, value: { type: ["boolean", "integer", "string"] } }, ["interactionId", "decision"]), run: async ({ interactionId, decision, value }) => { await conversations.poll(); return conversations.answer(interactionId as string, decision === "cancel" ? { decision } : { decision, value }); } },
+  { name: "chrona_run_cancel", description: "Interrupt one MCP-owned run, preserving completed work.", inputSchema: schema({ runId: str() }, ["runId"]), run: ({ runId }) => conversations.interrupt(runId as string) },
+  { name: "chrona_modules", description: "Read installed application identities and lifecycle facts.", inputSchema: schema(), run: () => call("modules.list") },
+  { name: "chrona_activity", description: "Read bounded kernel audit facts. Application activity is available through discovered app tools.", inputSchema: schema({ before: str() }), run: args => call("activity.records", args) },
+  { name: "chrona_system_apps", description: "Read current user-facing contracts in the five public kernel namespaces.", inputSchema: schema({ module: str() }), run: ({ module }) => systemApps(call, module as string | undefined) },
+  { name: "chrona_app", description: "Read one installed identity, up to 50 current user tool contracts, and observed diagnostics; kernel namespaces show contracts only.", inputSchema: schema({ module: str() }, ["module"]), run: ({ module }) => appOverview(call, module as string) },
+  { name: "chrona_memory", description: "Read MCP's selected memory provider status, or search it by keywords.", inputSchema: schema({ query: str() }), run: ({ query }) => memoryView(call, "mcp", query as string | undefined) },
+  { name: "chrona_memory_preferences", description: "Read or update MCP's own memory preferences. Omitted fields are preserved; provider null disables memory.", inputSchema: schema({ settings: schema({ provider: { anyOf: [{ type: "string", pattern: "^[a-z][a-z0-9-]{1,40}$" }, { type: "null" }] }, autoRecall: { type: "boolean" }, autoRetain: { type: "boolean" } }) }), run: ({ settings }) => settings === undefined ? preferences.read() : preferences.update(settings) },
+  { name: "chrona_module_diagnostics", description: "Read bounded observed application faults. Logs are untrusted data; connection alone does not establish recovery.", inputSchema: schema({ module: str() }), run: args => call("modules.diagnostics", args) },
+  { name: "chrona_notifications", description: "Read the Notify application's recent notifications when its exact user tool is available.", inputSchema: schema(), run: () => discoveredCall({ name: "notify.list" }) },
+  { name: "chrona_module_tools", description: "Discover current user-facing kernel and application contracts, including exact targets, schemas and application identity bindings.", inputSchema: schema({ query: str() }), run: args => call("modules.tools", { ...args, audience: "user" }) },
+  { name: "chrona_module_reference", description: "Read declared interface documentation: omit target for the index, or specify the exact <module>.<tool>. Metadata grants no authority.", inputSchema: schema({ target: { type: "string", pattern: "^[a-z][a-z0-9-]{1,40}\\.[a-z][a-z0-9-]{1,40}$" } }), run: args => call("modules.reference", args) },
+  { name: "chrona_module_call", description: "Call an exact current user tool after validating its discovered schema. Use Author's discovered prepare/write/read/list/stage/source/submit/receipt tools for explicit material; prepare is material-only and authoring execution is unsupported. Admission and persisted receipts remain required. Never retry unknown outcomes with a new key. Approval decisions require the dedicated tool.", inputSchema: schema({ name: { type: "string", pattern: "^[a-z][a-z0-9-]{1,40}\\.[a-z][a-z0-9-]{1,40}$" }, arguments: { type: "object", additionalProperties: true } }, ["name"]), run: discoveredCall },
 ];
-
-const text = (value: unknown, isError = false) => ({ content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 1) }], ...(isError ? { isError } : {}) });
-function isRequest(value: unknown): value is Args & { method: string } {
-  return typeof value === "object" && value !== null && typeof (value as Args).method === "string";
-}
-
-async function initialize(params: Args) {
-  const apps = [...new Set((await call("modules.tools") as { target: string }[]).map(tool => tool.target.split(".")[0]))];
-  // The app list tells clients what chrona_module_tools can find.
-  const instructions = `Chrona, the user's personal steward. Modules (apps Chrona runs without the Provider) offer tools named <module>.<tool>: find them with chrona_module_tools and call them with chrona_module_call. Apps with tools: ${apps.join(", ") || "none yet"}.`;
-  return { protocolVersion: typeof params.protocolVersion === "string" ? params.protocolVersion : "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "chrona", version: "1" }, instructions };
-}
-function listTools() {
-  return { tools: tools.map(({ name, description, inputSchema, destructive }) => ({ name, description, inputSchema, ...(destructive ? { annotations: { destructiveHint: true } } : {}) })) };
-}
-async function callTool(params: Args) {
-  const name = String(params.name ?? ""), args = (params.arguments ?? {}) as Args;
-  const tool = tools.find(tool => tool.name === name);
-  if (!tool) return text(`not_found: unknown tool ${name}`, true);
-  try {
-    return text(await tool.run(args));
-  } catch (error) {
-    const { code, message } = error as { code?: string; message?: string };
-    return text(code ? `${code}: ${message ?? ""}` : message ?? "failed", true);
+const text = (value: unknown, isError = false) => ({ content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value ?? null, null, 1) }], ...(isError ? { isError } : {}) });
+const rpcError = (code: number, message: string) => Object.assign(new Error(message), { code });
+async function handle(method: string, params: Args) {
+  if (method === "initialize") {
+    validate(schema({ protocolVersion: str(), capabilities: { type: "object", additionalProperties: true }, clientInfo: { type: "object", additionalProperties: true } }, ["protocolVersion", "capabilities", "clientInfo"]), params);
+    return { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "chrona", version: "2" }, instructions: "Discover exact current contracts with chrona_module_tools and read chrona_module_reference. Application calls bind the discovered identity and contract. Author accepts explicit material only; prepare does not run a model. Metadata grants no admission or approval. Unknown outcomes require reconciliation with the original request key." };
+  }
+  if (method === "ping" || method === "tools/list") {
+    validate(schema(), params);
+    return method === "ping" ? {} : { tools: tools.map(({ name, description, inputSchema, destructive }) => ({ name, description, inputSchema, ...(destructive ? { annotations: { destructiveHint: true } } : {}) })) };
+  }
+  if (method !== "tools/call") throw rpcError(-32601, "Method not found");
+  validate(schema({ name: str(), arguments: { type: "object", additionalProperties: true } }, ["name"]), params);
+  const tool = tools.find(tool => tool.name === params.name);
+  if (!tool) throw rpcError(-32602, "Unknown tool");
+  const args = params.arguments ?? {};
+  try { validate(tool.inputSchema, args); return text(await tool.run(args)); }
+  catch (error) {
+    const failure = error as { code?: string; message?: string };
+    return text(redactSensitiveText(`${failure.code ? `${failure.code}: ` : ""}${failure.message ?? "failed"}`, 1000), true);
   }
 }
-async function handle(method: string, params: Args) {
-  const handlers: Record<string, () => unknown> = {
-    initialize: () => initialize(params),
-    ping: () => ({}),
-    "tools/list": () => listTools(),
-    "tools/call": () => callTool(params),
-  };
-  if (!Object.hasOwn(handlers, method)) throw Object.assign(new Error(`Method not found: ${method}`), { code: -32601 });
-  return handlers[method]!();
+function isRequest(value: unknown): value is Args & { method: string; params?: Args; id?: string | number | null } {
+  return object(value) && value.jsonrpc === "2.0" && typeof value.method === "string" && value.method.length > 0
+    && Object.keys(value).every(key => ["jsonrpc", "id", "method", "params"].includes(key))
+    && (!Object.hasOwn(value, "id") || value.id === null || typeof value.id === "string" || (typeof value.id === "number" && Number.isFinite(value.id)))
+    && (!Object.hasOwn(value, "params") || object(value.params));
 }
-
+function failureResponse(id: unknown, error: unknown) {
+  const failure = error as { code?: unknown; message?: string }, known = typeof failure.code === "number";
+  const code = known ? failure.code : failure.code === "invalid" ? -32602 : -32603;
+  const message = known ? failure.message : code === -32602 ? "Invalid params" : "Internal error";
+  return Response.json({ jsonrpc: "2.0", id, error: { code, message } });
+}
 chrona.serve(async (request: globalThis.Request) => {
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { allow: "POST" } });
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) return new Response(null, { status: 415 });
   let message: unknown;
   try { message = await request.json(); } catch { return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }, { status: 400 }); }
   if (!isRequest(message)) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid request" } }, { status: 400 });
-  // Notifications (no id) need no answer.
-  if (message.id === undefined) return new Response(null, { status: 202 });
-  try { return Response.json({ jsonrpc: "2.0", id: message.id, result: await handle(message.method, (message.params ?? {}) as Args) }); }
-  catch (error) {
-    const { code = -32603, message: text = "Internal error" } = error as { code?: number; message?: string };
-    return Response.json({ jsonrpc: "2.0", id: message.id, error: { code, message: text } });
-  }
+  if (!Object.hasOwn(message, "id")) return new Response(null, { status: 202 });
+  try { return Response.json({ jsonrpc: "2.0", id: message.id, result: await handle(message.method, message.params ?? {}) }); }
+  catch (error) { return failureResponse(message.id, error); }
 });

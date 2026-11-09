@@ -12,15 +12,16 @@ const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
 async function fixture() {
   const db = testDb(); cleanups.push(() => db.$disconnect());
-  const workspace = await db.workspace.create({ data: { name: "pause", settings: { notifications: { timezone: "UTC", dailyCap: 5, quietHours: { start: "23:00", end: "08:00" }, digestAt: "09:00" } } } });
+  const workspace = await db.workspace.create({ data: { name: "pause" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
   let now = new Date("2026-11-04T12:00:00Z");
   const ports = { db, dataDir: "/not-used-for-pause", publicUrl: null, now: () => now };
   const context = moduleContext(ports, workspace.id);
-  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), source: "user", status: "approved", intent: {}, report: {} } });
   const { activationId } = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
-  const schedule = (status = "active", rule = { kind: "every", minutes: 60 } as Record<string, string | number>) => db.schedule.create({ data: {
-    workspaceId: workspace.id, moduleId: module.id, mode: "module", triggerId: "daily", text: "timer", createdBy: "chrona", rule, status,
+  // Deliberately opaque rule: lifecycle governance must never interpret calendar schemas.
+  const schedule = (status = "active") => db.schedule.create({ data: {
+    workspaceId: workspace.id, moduleId: module.id, mode: "module", triggerId: "daily", text: "timer", createdBy: "chrona", rule: {}, status,
     nextAt: status === "active" ? now : null,
   } });
   const status = (value: "active" | "paused", source = "owner", reason = source) => db.$transaction(tx => setStatusIn(context, tx, module.id, value, { source, reason }));
@@ -37,42 +38,42 @@ async function fixture() {
   return { db, workspace, module, ports, context, schedule, status, failure, audit, advance: () => { now = new Date(now.getTime() + 86400_000); } };
 }
 
-test("three failures share the manual pause record, including incident and exact schedule IDs; resume restores only those", async () => {
-  const f = await fixture(), timer = await f.schedule(), userPaused = await f.schedule("paused");
+test("three failures pause the module and retire calendar work, preserving incident evidence", async () => {
+  const f = await fixture(), timer = await f.schedule(), paused = await f.schedule("paused");
   await f.failure(); await f.failure();
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
   expect(await f.db.audit.count({ where: { kind: "module_disabled" } })).toBe(0);
   await f.failure();
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("paused");
   const incident = await f.audit("module_runtime_incident");
-  expect((await f.audit("module_disabled")).details).toEqual({ source: "automatic", reason: "连续三次失败", schedules: [timer.id], incidentId: (incident.details as { id: string }).id });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "paused", nextAt: null });
+  const details = (await f.audit("module_disabled")).details as { source: string; reason: string; schedules: string[]; incidentId: string };
+  expect(details).toMatchObject({ source: "automatic", reason: "连续三次失败", incidentId: (incident.details as { id: string }).id });
+  expect(details.schedules.sort()).toEqual([timer.id, paused.id].sort());
+  expect(await f.db.schedule.findMany()).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: timer.id, status: "cancelled", nextAt: null }),
+    expect.objectContaining({ id: paused.id, status: "cancelled", nextAt: null }),
+  ]));
   expect(await notices(f.db, { title: "模块连续失败，已暂停" })).toHaveLength(1);
   await f.status("active");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "active", nextAt: new Date("2026-11-04T13:00:00Z") });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: userPaused.id } })).toMatchObject({ status: "paused", nextAt: null });
-  expect((await f.audit("module_enabled")).details).toEqual({ source: "owner", schedules: [timer.id] });
+  expect(await f.db.schedule.count({ where: { status: "cancelled" } })).toBe(2);
+  expect((await f.audit("module_enabled")).details).toEqual({ source: "owner" });
 });
 
-test.each(["owner", "cli", "chrona"])("%s pause/resume remains idempotent and uses only the latest pause's schedules", async source => {
-  const f = await fixture(), timer = await f.schedule(), userPaused = await f.schedule("paused");
+test.each(["owner", "cli", "chrona"])("%s pause/resume is idempotent and never revives calendar work", async source => {
+  const f = await fixture(), timer = await f.schedule();
   const pause = () => source === "chrona" ? requestStatus(f.context, f.module.id, "paused", "maintenance") : f.status("paused", source, "maintenance");
   await pause(); await pause();
   expect(await f.db.audit.count({ where: { kind: "module_disabled" } })).toBe(1);
   expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance", schedules: [timer.id] });
-  await f.status("active", source);
-  await f.db.schedule.update({ where: { id: timer.id }, data: { status: "paused", nextAt: null } });
-  await f.db.schedule.update({ where: { id: userPaused.id }, data: { status: "active", nextAt: f.ports.now() } });
-  await pause();
-  // A fixed clock exercises same-millisecond transition ordering as well.
-  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance", schedules: [userPaused.id] });
   await f.status("active", source); await f.status("active", source);
+  await pause(); await f.status("active", source);
+  // A fixed clock exercises same-millisecond transition ordering.
   expect(await f.db.audit.count({ where: { kind: "module_enabled" } })).toBe(2);
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "paused", nextAt: null });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: userPaused.id } })).toMatchObject({ status: "active", nextAt: new Date("2026-11-04T13:00:00Z") });
+  expect((await f.audit("module_disabled")).details).toEqual({ source, reason: "maintenance", schedules: [] });
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toMatchObject({ status: "cancelled", nextAt: null });
 });
 
-test("three failures from a stale version cannot pause the current module or schedules", async () => {
+test("three failures from a stale version cannot pause the current module or cancel its work", async () => {
   const f = await fixture(), timer = await f.schedule();
   await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v2" } });
   await f.failure("v1"); await f.failure("v1"); await f.failure("v1");
@@ -82,32 +83,24 @@ test("three failures from a stale version cannot pause the current module or sch
   expect(await f.db.moduleInvocation.count()).toBe(0);
 });
 
-test.each(["no audit", "audit without IDs", "after manual resume"])("legacy auto-pause (%s) keeps schedules paused and explicitly records missing provenance", async history => {
-  const f = await fixture(), timer = await f.schedule();
-  if (history === "after manual resume") { await f.status("paused"); await f.status("active"); }
-  if (history === "audit without IDs") await f.db.audit.create({ data: { workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_disabled", details: { source: "automatic", reason: "legacy failures" } } });
+test("resume does not interpret old pause audit or calculate missed calendar occurrences", async () => {
+  const f = await fixture(), timer = await f.schedule("paused");
+  await f.db.audit.create({ data: { workspaceId: f.workspace.id, subjectId: f.module.id, actorKey: "chrona", kind: "module_disabled", details: { source: "automatic", schedules: [timer.id] } } });
   await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
-  await f.db.schedule.update({ where: { id: timer.id }, data: { status: "paused" } });
-  await f.status("active");
+  f.advance(); await f.status("active");
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).status).toBe("paused");
-  expect((await f.audit("module_enabled")).details).toEqual({ source: "owner", schedules: [], unrestoredLegacyPause: true });
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  expect((await f.audit("module_enabled")).details).toEqual({ source: "owner" });
+  expect(await f.db.moduleInvocation.count()).toBe(0);
 });
 
-test("resume fires a missed one-off late, ends expired timers, continues recurring work without catching up", async () => {
-  const f = await fixture(), recurring = await f.schedule(), oneOff = await f.schedule("active", { kind: "at", at: "2026-11-04T13:00:00Z" });
-  const expired = await f.schedule();
-  await f.db.schedule.update({ where: { id: expired.id }, data: { until: new Date("2026-11-04T13:00:00Z") } });
-  await f.db.schedule.update({ where: { id: recurring.id }, data: { lastAt: f.ports.now(), lastResult: "delivery unknown", failures: 1 } });
-  await f.failure(); await f.failure(); await f.failure();
-  const runs = await f.db.moduleRun.findMany(), calls = await f.db.moduleInvocation.findMany();
-  f.advance();
-  await f.status("active");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: recurring.id } })).toMatchObject({ status: "active", nextAt: new Date("2026-11-05T13:00:00Z"), lastAt: recurring.nextAt, lastResult: "delivery unknown", failures: 1 });
-  // The one-off never ran while paused: it fires late, once. The expired timer ends; nothing else is replayed.
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: oneOff.id } })).toMatchObject({ status: "active", nextAt: f.ports.now() });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: expired.id } })).toMatchObject({ status: "done", nextAt: null });
-  expect(await f.db.moduleRun.findMany()).toEqual(runs);
-  expect(await f.db.moduleInvocation.findMany()).toEqual(calls);
-  expect(await f.db.run.count()).toBe(0);
+test.each(["queued", "running", "unknown"])("pause handles %s delivery without weakening stop evidence", async deliveryStatus => {
+  const f = await fixture(), timer = await f.schedule("done");
+  const invocation = await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "system:schedules", target: f.module.name, tool: "schedule", mode: "schedule", key: `${timer.id}:occurrence`, args: {}, status: deliveryStatus, leaseToken: deliveryStatus === "running" ? "inflight" : null, leaseUntil: deliveryStatus === "running" ? f.ports.now() : null } });
+  const other = await f.db.moduleInvocation.create({ data: { workspaceId: f.workspace.id, caller: "system:schedules", target: "another-module", tool: "schedule", mode: "schedule", key: "another-timer:occurrence", args: {} } });
+  await f.status("paused"); await f.status("active");
+  const result = await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: invocation.id } });
+  if (deliveryStatus === "queued") expect(result).toMatchObject({ status: "cancelled", finishedAt: f.ports.now(), error: "Module paused before delivery" });
+  else expect(result).toEqual(invocation);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: other.id } })).toEqual(other);
 });

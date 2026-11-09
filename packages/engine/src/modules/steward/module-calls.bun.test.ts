@@ -6,27 +6,28 @@ import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import { admitted, callSync, callsSettled, enqueueCall, kernelOrigin, moduleCallbackContractHash, moduleToolExampleError, runDueCalls, validateToolArgs } from "./module-calls";
-import { callModuleTool } from "./module-tools";
+import { callModuleTool, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, recordModuleFailure } from "./module-diagnostics";
 import { registerSystemModules } from "./system-modules";
+import { PAUSED_MODULE_NAMES } from "./module-availability";
 import type { StewardPorts } from "./ports";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 type Handler = Parameters<typeof testModuleProcess>[0];
 const tool = (name: string, extra: Record<string, unknown> = {}) => ({ name, description: name, parameters: { type: "object", properties: { text: { type: "string" } } }, visibility: ["modules"], ...extra });
-const schedule: ModuleEvent = { trigger: { id: "daily", kind: "schedule", firedAt: "2026-10-24T00:00:00Z" }, now: "2026-10-24T00:00:00Z", params: {} };
+const startEvent = { trigger: { id: "pong", kind: "tool", args: {}, caller: { kind: "kernel" }, firedAt: "2026-10-24T00:00:00Z" }, now: "2026-10-24T00:00:00Z", params: {} } satisfies ModuleEvent;
 
 /** Two modules, alpha (the caller) and beta (the callee), on the real supervisor, socket and database. */
 async function fixture(handlers: { alpha: Handler; beta: Handler }) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cmc-test-");
   const workspace = await db.workspace.create({ data: { name: "calls" } });
   const manifests = {
-    alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }],
-      uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong")] },
-    beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], uses: ["alpha.pong"],
+    alpha: { name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [],
+      uses: ["beta.echo", "beta.private", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "modules.contributions"], tools: [tool("pong"), tool("start")] },
+    beta: { name: "beta", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["alpha.pong"],
       tools: [tool("echo", { visibility: ["modules", "kernel"] }), tool("private", { visibility: ["kernel"] }), tool("hidden", { visibility: ["owner"] }), tool("bounce", { visibility: ["modules", "kernel"] }), tool("crash", { visibility: ["modules", "kernel"] }), tool("again", { idempotent: true, visibility: ["modules", "kernel"] }), tool("unlisted")],
-      contributes: { alpha: { hello: "from beta" }, gamma: { secret: true } } },
+    },
   };
   const modules: Record<string, { id: string }> = {};
   for (const [name, manifest] of Object.entries(manifests)) {
@@ -39,7 +40,7 @@ async function fixture(handlers: { alpha: Handler; beta: Handler }) {
   const ports: StewardPorts = { db, dataDir, now: () => new Date(time), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   return { db, ports, workspace, alpha: modules.alpha!, beta: modules.beta!, ...peer, advance: (ms: number) => { time += ms; },
-    fire: () => moduleSupervisor(ports).deliver(modules.alpha!.id, "alpha-v1", schedule) };
+    fire: (id = "pong") => moduleSupervisor(ports).deliver(modules.alpha!.id, "alpha-v1", { ...startEvent, trigger: { ...startEvent.trigger, id } }) };
 }
 const output = (reply: unknown) => (reply as { result: { result: unknown } }).result.result;
 
@@ -60,7 +61,7 @@ test("routed argument validation rejects non-JSON numbers and preserves open nes
 });
 
 test("declared examples are checked against input and output contracts without invoking a module", () => {
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "search", description: "Search", visibility: ["owner"],
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "search", description: "Search", visibility: ["owner"],
     parameters: { type: "object", properties: { filters: { type: "array", items: { type: "object", properties: { state: { type: "string", enum: ["open", "closed"] } }, required: ["state"] } } }, required: ["filters"] },
     output: { type: "object", properties: { count: { type: "integer" } }, required: ["count"], additionalProperties: false },
     examples: [{ args: { filters: [{ state: "open" }] }, result: { count: 1 } }] }] });
@@ -263,8 +264,8 @@ test("visibility admission is independent of target contracts; only uses star re
       [{ kind: "provider", runId: "test" }, ["provider"], true],
       [{ kind: "kernel" }, ["kernel"], true],
     ] as const) {
-      const targetTool = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], tools: [tool("echo", { visibility })] }).tools[0]!;
-      expect(await admitted(f.db, caller, targetTool)).toBe(expected);
+      const targetTool = moduleManifestSchema.parse({ name: "target", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [tool("echo", { visibility })] }).tools[0]!;
+      expect(await admitted(f.db, caller, targetTool, f.workspace.id)).toBe(expected);
     }
   }
 });
@@ -372,11 +373,11 @@ test("unknown targets and hidden tools are refused; owner requests cannot reach 
 
 test("a sync call back into a module that is waiting is refused as a cycle, not left to time out", async () => {
   const f = await fixture({
-    alpha: async (event, call) => event.trigger.kind === "tool" ? { result: "pong" } : { result: await call("call", { target: "beta.bounce", args: {} } as never) },
+    alpha: async (event, call) => event.trigger.id === "pong" ? { result: "pong" } : { result: await call("call", { target: "beta.bounce", args: {} } as never) },
     beta: async (_event, call) => ({ result: await call("call", { target: "alpha.pong", args: {}, mode: "sync" } as never) }),
   });
   const started = Date.now();
-  expect(output(await f.fire())).toMatchObject({ result: { output: { error: { code: "cycle" } } } });
+  expect(output(await f.fire("start"))).toMatchObject({ result: { output: { error: { code: "cycle" } } } });
   expect(Date.now() - started).toBeLessThan(5000);
 });
 
@@ -385,8 +386,8 @@ test("a sync call into a module that waits on the caller in another event is ref
   const gate = new Promise<void>(resolve => { release = resolve; });
   let betaReply: unknown;
   const f = await fixture({
-    // alpha's scheduled event waits on beta.echo; beta answers only after its own other event called alpha.
-    alpha: async (event, call) => event.trigger.kind === "tool" ? { result: "pong" } : { result: await call("call", { target: "beta.echo", args: {} } as never) },
+    // alpha's tool event waits on beta.echo; beta answers only after its own other event called alpha.
+    alpha: async (event, call) => event.trigger.id === "pong" ? { result: "pong" } : { result: await call("call", { target: "beta.echo", args: {} } as never) },
     beta: async (event, call) => {
       if (event.trigger.id === "bounce") { await gate; betaReply = await call("call", { target: "alpha.pong", args: {} } as never); return { result: betaReply }; }
       return { result: "echo" };
@@ -397,7 +398,7 @@ test("a sync call into a module that waits on the caller in another event is ref
   await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.bounce", raw: {} }, { key: "bounce" });
   const delivering = runDueCalls(f.ports, f.workspace.id);
   await Bun.sleep(50);
-  const alpha = f.fire();
+  const alpha = f.fire("start");
   await Bun.sleep(50);
   release(); await delivering;
   expect(output(await alpha)).toMatchObject({ result: { output: "echo" } });
@@ -411,14 +412,14 @@ test("async calls are stored under the caller's key, delivered once and answered
   const f = await fixture({
     alpha: async (event, call) => {
       if (event.trigger.kind === "call_result") { results.push(event.trigger); return {}; }
-      if (event.trigger.kind === "tool") return { result: await call("callStatus", { callId } as never) };
+      if (event.trigger.id === "pong") return { result: await call("callStatus", { callId } as never) };
       const first = await call("call", { target: "beta.echo", args: { text: "once" }, mode: "async", key: "k1", reply: true } as never) as { result: { callId: string } };
       callId = first.result.callId;
       return { result: [first, await call("call", { target: "beta.echo", args: { text: "once" }, mode: "async", key: "k1", reply: true } as never)] };
     },
     beta: async event => { deliveries.push(event.trigger); return { result: { echo: (event.trigger as unknown as { args: { text: string } }).args.text } }; },
   });
-  expect(output(await f.fire())).toMatchObject([{ result: { status: "queued", duplicate: false } }, { result: { callId: expect.any(String), duplicate: true } }]);
+  expect(output(await f.fire("start"))).toMatchObject([{ result: { status: "queued", duplicate: false } }, { result: { callId: expect.any(String), duplicate: true } }]);
   // The call itself started a delivery loop; let it finish, then run once more (nothing is delivered twice).
   await callsSettled(f.ports); await runDueCalls(f.ports, f.workspace.id); await callsSettled(f.ports);
   expect(deliveries).toHaveLength(1);
@@ -486,7 +487,7 @@ test("uses \"*\" reaches owner and modules tools but not kernel-only tools", asy
     },
     beta: async event => ({ result: { tool: (event.trigger as { id: string }).id } }),
   });
-  const alpha = moduleManifestSchema.parse({ name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], uses: ["*", "modules.tools"], tools: [tool("pong")] });
+  const alpha = moduleManifestSchema.parse({ name: "alpha", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["*", "modules.tools"], tools: [tool("pong")] });
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.alpha.id, hash: "alpha-v1" } }, data: { manifest: alpha } });
   const results = output(await f.fire()) as Record<string, { result?: { output: unknown }; error?: { code: string } }>;
   expect(results["beta.hidden"]).toMatchObject({ result: { output: { tool: "hidden" } } });
@@ -496,10 +497,11 @@ test("uses \"*\" reaches owner and modules tools but not kernel-only tools", asy
   expect((results["modules.tools"]!.result!.output as { target: string }[]).map(entry => entry.target).filter(target => target.startsWith("beta."))).toEqual(["beta.echo", "beta.hidden", "beta.bounce", "beta.crash", "beta.again", "beta.unlisted"]);
 });
 
-test("a module can call a modules-visible tool absent from uses; contributions remain scoped to their recipient", async () => {
+test("a module can call a modules-visible tool absent from uses; retired contributions stay unavailable", async () => {
+  expect(moduleManifestSchema.safeParse({ name: "beta", entry: "index.ts", tests: ["test.ts"], tools: [tool("echo")], contributes: { alpha: { hello: "from beta" } } }).success).toBe(false);
   const f = await fixture({
     alpha: async (event, call) => {
-      const target = (event.trigger as { id: string }).id === "daily" ? "beta.unlisted" : "";
+      const target = (event.trigger as { id: string }).id === "pong" ? "beta.unlisted" : "";
       return { result: { granted: await call("call", { target, args: { text: "hi" } } as never),
         mine: await call("call", { target: "modules.contributions", args: { section: "alpha" } } as never),
         theirs: await call("call", { target: "modules.contributions", args: { section: "gamma" } } as never) } };
@@ -508,6 +510,91 @@ test("a module can call a modules-visible tool absent from uses; contributions r
   });
   const reply = output(await f.fire()) as { granted: unknown; mine: unknown; theirs: unknown };
   expect(reply.granted).toMatchObject({ result: { output: { caller: "alpha" } } });
-  expect(reply.mine).toMatchObject({ result: { output: [{ module: "beta", hash: "beta-v1", value: { hello: "from beta" } }] } });
-  expect(reply.theirs).toMatchObject({ error: { code: "forbidden" } });
+  expect(reply.mine).toMatchObject({ error: { code: "not_found" } });
+  expect(reply.theirs).toMatchObject({ error: { code: "not_found" } });
+});
+
+test("paused targets return unavailable before any installed or release target read", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const guarded = new Proxy(f.db, { get() { throw new Error("Paused resolution must not read the database"); } });
+  for (const name of PAUSED_MODULE_NAMES) {
+    await expect(callSync({ ...f.ports, db: guarded }, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
+  }
+  expect(f.processes).toHaveLength(0);
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+});
+
+test("installed paused apps stay undiscoverable and never dispatch sync or queued calls", async () => {
+  let executed = 0;
+  const f = await fixture({ alpha: async () => { executed++; return {}; }, beta: async () => { executed++; return {}; } });
+  registerSystemModules();
+  const calls = [];
+  for (const name of PAUSED_MODULE_NAMES) {
+    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: `${name}-v1` } });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [tool("echo", { visibility: ["modules", "owner", "kernel"] })] });
+    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-v1`, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+    await expect(callSync(f.ports, kernelOrigin(f.workspace.id), `${name}.echo`, {})).rejects.toMatchObject({ code: "unavailable", reason: "module_paused" });
+    calls.push(await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: `${name}.echo`, raw: {} }, { key: `paused-${name}` }));
+  }
+  const found = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "owner", via: null } }, "modules.tools", { query: "echo" })).output as { target: string }[];
+  expect(found.some(item => item.target === "beta.echo")).toBe(false); // beta.echo is not owner visible.
+  expect(found.filter(item => PAUSED_MODULE_NAMES.some(name => item.target.startsWith(`${name}.`)))).toEqual([]);
+  // A module audience still sees ordinary application tools.
+  const visible = (await callSync(f.ports, { ...kernelOrigin(f.workspace.id), caller: { kind: "module", module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } }, "modules.tools", { query: "echo" })).output as { target: string }[];
+  expect(visible.map(item => item.target)).toContain("beta.echo");
+  expect(visible.filter(item => PAUSED_MODULE_NAMES.some(name => item.target.startsWith(`${name}.`)))).toEqual([]);
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    await runDueCalls(f.ports, f.workspace.id);
+    for (const call of calls) expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.callId } })).toMatchObject({ attempts: attempt, status: attempt < 6 ? "queued" : "failed", error: expect.stringContaining("unavailable: paused") });
+    f.advance(600_000);
+  }
+  expect(executed).toBe(0);
+  expect(f.processes).toHaveLength(0);
+  expect(await f.db.moduleRun.count()).toBe(0);
+});
+
+test("paused installed apps stay absent from owner and provider tool catalogs", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  for (const name of [...PAUSED_MODULE_NAMES, "ordinary"]) {
+    const module = await f.db.module.create({ data: { workspaceId: f.workspace.id, name, activeHash: `${name}-v1` } });
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [tool("echo", { visibility: ["owner", "provider"] })] });
+    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: `${name}-v1`, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  }
+  for (const audience of ["owner", "provider"] as const) {
+    const catalog = await moduleToolCatalog(f.ports, { workspaceId: f.workspace.id, audience });
+    expect(catalog.map(item => item.name)).toContain("m_ordinary_echo");
+    expect(catalog.filter(item => PAUSED_MODULE_NAMES.some(name => item.namespace.name === `module_${name}`))).toEqual([]);
+  }
+  expect(f.processes).toHaveLength(0);
+});
+
+test("paused installed callers cannot invoke active tools or receive deferred results", async () => {
+  const f = await fixture({ alpha: async () => ({}), beta: async () => ({}) });
+  const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
+  const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "old-callback", reply: true });
+  await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "succeeded", output: {}, finishedAt: f.ports.now() } });
+  await f.db.module.update({ where: { id: f.alpha.id }, data: { name: "remind" } });
+  const caller = { ...origin, caller: { ...origin.caller, module: "remind" } };
+  await expect(callSync(f.ports, caller, "beta.echo", {})).rejects.toMatchObject({ code: "forbidden" });
+  await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "beta.echo", raw: {} }, { key: "paused-caller" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "missing.echo", raw: {} }, { key: "paused-missing" })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "beta.echo", raw: {} }, { key: "old-callback", reply: true })).rejects.toMatchObject({ code: "forbidden" });
+  await runDueCalls(f.ports, f.workspace.id);
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ repliedAt: null, replyAttempts: 1 });
+  expect(await f.db.moduleInvocation.count()).toBe(1);
+  expect(f.processes).toHaveLength(0);
+  expect(await f.db.moduleRun.count()).toBe(0);
+});
+
+test("ordinary async calls reject absent Notify and other absent apps before queuing", async () => {
+  const f = await fixture({ alpha: async (_event, call) => {
+    const errors = [];
+    for (const target of ["notify.send", "missing.echo"]) {
+      const reply = await call("call", { target, args: {}, mode: "async", key: target, reply: false }) as { error?: { code: string } };
+      errors.push(reply.error?.code);
+    }
+    return { result: { errors } };
+  }, beta: async () => ({}) });
+  expect(output(await f.fire())).toEqual({ errors: ["not_found", "not_found"] });
+  expect(await f.db.moduleInvocation.count()).toBe(0);
 });

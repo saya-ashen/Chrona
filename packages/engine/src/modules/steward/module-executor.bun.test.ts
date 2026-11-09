@@ -8,7 +8,9 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
-import { notice, notices } from "./test-notices";
+import { callsSettled, callSync } from "./module-calls";
+import { notices } from "./test-notices";
+import { installNotifyTarget } from "./test-notify-target";
 
 type ModuleInput = Parameters<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>[0];
 type ModuleResult = Awaited<ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>>>;
@@ -30,12 +32,12 @@ async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: str
       return result;
     }),
   };
-  cleanups.push(() => moduleSupervisor(ports).stop());
+  cleanups.push(async () => { await callsSettled(ports); await moduleSupervisor(ports).stop(); });
   const service = createStewardService(ports).forWorkspace(workspace.id);
   const root = join(dataDir, "sessions", "test");
   const dir = join(root, "price-watch");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "price-watch", entry: "index.ts", triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }], effects, uses, params: { threshold: { type: "number", value: 42 } }, tests: ["test.ts"] }));
+  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "price-watch", entry: "index.ts", tools: [{ name: "inspect", description: "Inspect price state", visibility: ["owner", "provider", "modules"], output: {}, parameters: { type: "object", properties: {} } }], effects, uses, params: { threshold: { type: "number", value: 42 } }, tests: ["test.ts"] }));
   await writeFile(join(dir, "index.ts"), source);
   await writeFile(join(dir, "test.ts"), "process.exit(0)");
   const proposal = await service.modules.propose({ root, dir: "price-watch", intent: { changes: ["Watch prices"], preserves: [] } }, "provider");
@@ -45,129 +47,130 @@ async function fixture({ effects = [], uses = ["notify.send"] }: { effects?: str
   // Start from the module's own notices: its auto-activation digest is covered in modules.bun.test.ts.
   await db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
   await db.audit.deleteMany({ where: { kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } } });
-  const schedule = await db.schedule.findFirstOrThrow({ where: { moduleId: proposal.moduleId, status: "active" } });
+  await installNotifyTarget(ports, workspace.id, true);
   const moduleId = proposal.moduleId!;
   async function fire(delay = 0) {
-    const current = await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } });
-    now = new Date(current.nextAt!.getTime() + delay);
-    return service.schedules.fireDue(now);
+    now = new Date(now.getTime() + Math.max(1, delay));
+    return service.modules.callTool("m_price_watch_inspect", {});
   }
-  return { db, dataDir, service, ports, workspace, moduleId, schedule, hash: proposal.hash, calls, fire, setResult: (value: ModuleResult) => { result = value; } };
+  return { db, dataDir, service, ports, workspace, moduleId, hash: proposal.hash, calls, fire, setResult: (value: ModuleResult) => { result = value; } };
 }
 
-test("approved module fires through notification budget without a Provider Run; protocol and notify dedupe", async () => {
+test("approved module executes a routed tool without a Provider Run and scopes notification dedupe to each event", async () => {
   const f = await fixture({ effects: ["network"] });
-  expect(await f.fire(123)).toBe(1);
+  expect(await f.fire(123)).toEqual({ result: null });
   expect(f.calls).toHaveLength(1);
-  expect(f.calls[0]).toEqual({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "daily", kind: "schedule", firedAt: f.schedule.nextAt!.toISOString() }, now: new Date(f.schedule.nextAt!.getTime() + 123).toISOString(), params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
+  expect(f.calls[0]).toMatchObject({ codeDir: join(f.dataDir, "platform/store", f.hash), dataDir: join(f.dataDir, "platform/data", f.moduleId), entry: "index.ts", input: { trigger: { id: "inspect", kind: "tool", args: {}, caller: { kind: "owner" } }, params: { threshold: 42 } }, network: true, timeoutMs: 60_000, maxOutputBytes: 64 * 1024 });
   expect(await f.db.run.count()).toBe(0);
-  expect(await notice(f.db)).toMatchObject({ idempotencyKey: `module:${f.moduleId}:daily:${f.schedule.nextAt!.toISOString()}:price`, level: "now", title: notify.title, body: notify.body, moduleId: f.moduleId });
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ lastResult: "Module exit 0; effects 1; delay 123ms", failures: 0 });
-  expect(await f.db.moduleRun.findFirstOrThrow()).toMatchObject({ hash: f.hash, triggerId: "daily", firedAt: f.schedule.nextAt, exitCode: 0, output: {}, error: null });
-  expect(await f.service.schedules.fireDue()).toBe(0);
+  expect(await f.db.schedule.count()).toBe(0);
+  const records = await f.db.moduleRun.findMany({ where: { moduleId: f.moduleId } });
+  expect(records).toHaveLength(1);
+  expect(records[0]).toMatchObject({ hash: f.hash, triggerId: "tool:inspect", exitCode: 0, output: {}, error: null });
   await f.fire();
-  expect((await notices(f.db)).length).toBe(2);
+  await callsSettled(f.ports);
+  expect((await notices(f.db)).map(row => row.body)).toEqual([notify.body, notify.body]);
+  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send", status: "succeeded" } })).toBe(2);
   expect((await f.db.moduleCall.findMany()).map(row => row.status)).toEqual(["executed", "executed"]);
 });
 
-test.each(["json", "schema", "exit", "timeout", "throw"])("module failure %s is bounded, counted, and pauses all active module schedules on third failure", async kind => {
+test.each(["json", "schema", "exit", "timeout", "throw"])("routed module failure %s is bounded, counted, and pauses after three failures", async kind => {
   const f = await fixture();
-  const other = await f.db.schedule.create({ data: { workspaceId: f.workspace.id, moduleId: f.moduleId, triggerId: "daily", mode: "module", rule: { kind: "every", minutes: 5 }, text: "other trigger", createdBy: "chrona", nextAt: new Date("2030-01-01Z") } });
   f.setResult({ status: kind === "timeout" ? "timed_out" : kind === "exit" ? "failed" : "succeeded", exitCode: kind === "exit" ? 1 : 0, output: kind === "schema" ? '{"effects":[{}]}' : "not JSON", error: "x".repeat(3000) });
   if (kind === "throw") f.ports.sandbox = testModuleSandbox(async () => { throw new Error("x".repeat(3000)); });
-  for (let i = 1; i <= 3; i++) {
-    await f.fire();
-    expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).failures).toBe(i);
-  }
+  for (let i = 1; i <= 3; i++) await expect(f.fire()).rejects.toThrow();
   const records = await f.db.moduleRun.findMany();
   expect(records).toHaveLength(3);
   for (const row of records) {
     expect(row.output).toBeNull(); expect(row.error).toBeTruthy(); expect(row.error!.length).toBeLessThanOrEqual(2000);
   }
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("paused");
-  for (const id of [f.schedule.id, other.id]) expect((await f.db.schedule.findUniqueOrThrow({ where: { id } })).status).toBe("paused");
-  const [notification] = await notices(f.db, { title: "模块连续失败，已暂停" });
-  expect(notification).toMatchObject({ title: "模块连续失败，已暂停", level: "now", idempotencyKey: `module:${f.moduleId}:paused:${records[2]!.firedAt.toISOString()}` });
+  await expect(f.fire()).rejects.toMatchObject({ code: "not_found" });
+  expect(await f.db.moduleRun.count()).toBe(3);
   expect(await f.db.run.count()).toBe(0);
 });
 
-test("rolling back a paused module reactivates it and its schedules", async () => {
+test("rolling back a paused module restores routed execution without recreating calendar work", async () => {
   const f = await fixture();
   f.setResult({ status: "failed", exitCode: 1, output: "", error: "boom" });
-  for (let i = 0; i < 3; i++) await f.fire();
+  for (let i = 0; i < 3; i++) await expect(f.fire()).rejects.toThrow();
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("paused");
   await f.service.modules.rollback(f.moduleId, f.hash);
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("active");
-  expect(await f.db.schedule.count({ where: { moduleId: f.moduleId, status: "active" } })).toBe(1);
+  f.setResult({ status: "succeeded", exitCode: 0, output: '{"result":{"restored":true}}', error: null });
+  expect(await f.fire()).toEqual({ result: { restored: true } });
+  expect(await f.db.schedule.count()).toBe(0);
 });
 
-test("successful module occurrence resets consecutive failures", async () => {
+test("successful routed execution resets consecutive failures", async () => {
   const f = await fixture();
-  await f.db.schedule.update({ where: { id: f.schedule.id }, data: { failures: 2 } });
+  f.setResult({ status: "failed", exitCode: 1, output: "", error: "boom" });
+  for (let i = 0; i < 2; i++) await expect(f.fire()).rejects.toThrow();
+  f.setResult({ status: "succeeded", exitCode: 0, output: "{}", error: null });
   await f.fire();
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).failures).toBe(0);
+  f.setResult({ status: "failed", exitCode: 1, output: "", error: "boom again" });
+  for (let i = 0; i < 2; i++) await expect(f.fire()).rejects.toThrow();
+  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("active");
+  expect(await f.db.moduleRun.count()).toBe(5);
 });
 
-test.each(["paused", "hash", "missing", "foreign"])("ineligible module %s is skipped with an explanation", async kind => {
+test.each(["paused", "hash", "missing", "foreign"])("ineligible module %s cannot be routed to a sandbox", async kind => {
   const f = await fixture();
   if (kind === "paused") await f.db.module.update({ where: { id: f.moduleId }, data: { status: "paused" } });
   if (kind === "hash") await f.db.module.update({ where: { id: f.moduleId }, data: { activeHash: null } });
-  if (kind === "missing") await f.db.schedule.update({ where: { id: f.schedule.id }, data: { moduleId: null } });
+  if (kind === "missing") await f.db.module.delete({ where: { id: f.moduleId } });
   if (kind === "foreign") {
     const foreign = await f.db.workspace.create({ data: { name: "foreign" } });
     await f.db.module.update({ where: { id: f.moduleId }, data: { workspaceId: foreign.id } });
   }
-  await f.fire();
+  await expect(f.fire()).rejects.toMatchObject({ code: "not_found" });
   expect(f.calls).toHaveLength(0);
   expect(await f.db.moduleRun.count()).toBe(0);
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).lastResult).toMatch(/Module (missing|is paused|has no active hash)/);
 });
 
-test.each(["version", "manifest", "trigger"])("invalid module metadata %s fails without sandbox execution", async kind => {
+test.each(["version", "manifest", "tool"])("invalid module metadata %s fails before sandbox execution", async kind => {
   const f = await fixture();
   if (kind === "version") await f.db.moduleVersion.deleteMany({ where: { moduleId: f.moduleId } });
   if (kind === "manifest") await f.db.moduleVersion.updateMany({ where: { moduleId: f.moduleId }, data: { manifest: {} } });
-  if (kind === "trigger") await f.db.schedule.update({ where: { id: f.schedule.id }, data: { triggerId: "missing" } });
-  await f.fire();
+  if (kind === "tool") await f.db.moduleVersion.updateMany({ where: { moduleId: f.moduleId }, data: { manifest: { name: "price-watch", entry: "index.ts", tests: ["test.ts"], effects: [], tools: [] } } });
+  await expect(f.fire()).rejects.toMatchObject({ code: "not_found" });
   expect(f.calls).toHaveLength(0);
   expect(await f.db.moduleRun.count()).toBe(0);
-  expect(await f.db.audit.count({ where: { kind: "module_execution_result" } })).toBe(0);
   expect((await f.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).status).toBe("active");
-  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).toMatchObject({ failures: 1, lastResult: expect.stringContaining("Module exit") });
 });
 
-test("rollback-replaced schedule cannot execute, including stale rows selected before rollback", async () => {
+test("a module caller with a replaced hash loses its declared secret access after rollback", async () => {
   const f = await fixture();
-  // Interleave rollback between selection and the guarded claim.
-  const findMany = f.db.schedule.findMany.bind(f.db.schedule);
-  f.db.schedule.findMany = (async (...args: Parameters<typeof findMany>) => {
-    const rows = await findMany(...args);
-    await f.service.modules.rollback(f.moduleId, f.hash);
-    return rows;
-  }) as typeof findMany;
-  expect(await f.fire()).toBe(0);
+  const current = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: f.moduleId } });
+  const manifest = { ...current.manifest as object, secrets: ["demo_key"] };
+  await f.db.moduleVersion.update({ where: { id: current.id }, data: { manifest } });
+  f.ports.secrets = async () => ({ token: "private-token" });
+  const origin = { workspaceId: f.workspace.id, caller: { kind: "module" as const, moduleId: f.moduleId, module: "price-watch", hash: f.hash }, chain: [], path: [] };
+  expect(await callSync(f.ports, origin, "secrets.get", { name: "demo_key" })).toMatchObject({ output: { value: { token: "private-token" } } });
+  await f.db.moduleVersion.create({ data: { moduleId: f.moduleId, hash: "replacement", status: "approved", source: "user", manifest, intent: {}, report: {} } });
+  await f.service.modules.rollback(f.moduleId, "replacement");
+  await expect(callSync(f.ports, origin, "secrets.get", { name: "demo_key" })).rejects.toMatchObject({ code: "forbidden" });
   expect(f.calls).toHaveLength(0);
   expect(await f.db.moduleRun.count()).toBe(0);
-  expect((await f.db.schedule.findUniqueOrThrow({ where: { id: f.schedule.id } })).status).toBe("cancelled");
 });
 
 const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-(realSandbox.health.available ? test : test.skip)("real SDK module persists its data counter across two scheduled fires", async () => {
+(realSandbox.health.available ? test : test.skip)("real SDK module persists its data counter across two routed tool calls", async () => {
   const f = await fixture({}, undefined, `
 import { on, chrona } from 'chrona';
-on('schedule', async () => {
+on('tool', async () => {
   const file = Bun.file(chrona.paths.data + '/counter');
   const count = await file.exists() ? Number(await file.text()) + 1 : 1;
   await Bun.write(file, String(count));
-  await chrona.notify({ key: 'counter-' + count, level: 'now', title: 'Counter', body: String(count) });
+  const key = 'counter-' + count;
+  await chrona.call('notify.send', { key, level: 'now', title: 'Counter', body: String(count) }, { mode: 'async', key });
 });
 `);
   const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: f.dataDir });
   f.ports.sandbox = { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule };
-  await f.fire();
-  await f.fire();
+  await f.fire(); await f.fire();
+  await callsSettled(f.ports);
   expect(await readFile(join(f.dataDir, "platform/data", f.moduleId, "counter"), "utf8")).toBe("2");
-  expect(await f.db.moduleRun.count({ where: { error: null } })).toBe(2);
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.moduleId, error: null } })).toBe(2);
+  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send", status: "succeeded" } })).toBe(2);
   expect((await notices(f.db)).map(row => row.body).sort()).toEqual(["1", "2"]);
   expect(await f.db.run.count()).toBe(0);
 });

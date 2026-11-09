@@ -5,41 +5,306 @@
   "content": true,
   "keepAlive": true,
   "activated": true,
-  "secrets": ["qq_bot"],
-  "triggers": [],
-  "uses": ["*", "agent.context", "agent.run", "agent.get", "agent.stream", "agent.write", "agent.interrupt", "agent.respond", "modules.tools", "approvals.list", "approvals.resolve", "notify.channel", "notify.send", "modules.contributions", "modules.settings-get"],
-  "tools": [
-    { "name": "deliver", "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.", "visibility": ["modules"],
-      "output": { "anyOf": [{ "type": "object", "properties": { "outcome": { "const": "accepted" }, "receiptRef": { "type": ["string", "null"] } }, "required": ["outcome", "receiptRef"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "rejected" }, "retryable": { "type": "boolean" }, "error": { "type": "string" } }, "required": ["outcome", "retryable", "error"], "additionalProperties": false }, { "type": "object", "properties": { "outcome": { "const": "uncertain" }, "error": { "type": "string" } }, "required": ["outcome", "error"], "additionalProperties": false }] },
-      "parameters": { "type": "object", "required": ["key", "title", "body"], "properties": {
-        "key": { "type": "string" }, "title": { "type": "string" }, "body": { "type": "string" }, "format": { "type": "string", "enum": ["text", "markdown"], "description": "Explicit message format; omitted means text." }, "link": { "type": "string" },
-        "recipient": { "type": "string" }, "approval": { "type": "string" }, "scoped": { "type": "boolean" } } } },
-    { "name": "reply", "description": "A reply in the qq:dm conversation: a passive reply to the message it answers while that window lasts, otherwise through notify.send.", "visibility": ["modules"],
-      "output": { "type": "object", "properties": { "delivered": { "type": "string" } }, "required": ["delivered"], "additionalProperties": false },
-      "parameters": { "type": "object", "required": ["session", "message", "text", "workspace"], "properties": {
-        "session": { "type": "string" }, "message": { "type": "string" }, "text": { "type": "string" }, "workspace": { "type": "string" },
-        "attachments": { "type": "string", "description": "JSON array of the reply's files, with appId" }, "in-reply-to": { "type": "string" } } } }
+  "secrets": [
+    "qq_bot"
   ],
-  "effects": ["network"],
-  "settings": {
-    "memory-provider": {
-      "type": "string",
-      "label": "记忆应用",
-      "description": "应用名；留空关闭记忆。不自动安装应用。",
-      "default": "",
-      "maxLength": 41
+  "uses": [
+    "*",
+    "agent.context",
+    "agent.run",
+    "agent.get",
+    "agent.stream",
+    "agent.write",
+    "agent.interrupt",
+    "agent.respond",
+    "modules.tools",
+    "approvals.list",
+    "approvals.resolve",
+    "notify.channel",
+    "notify.send",
+    "web.page-set"
+  ],
+  "tools": [
+    {
+      "name": "deliver",
+      "description": "Send one notification to the bound owner. Returns the delivery outcome; never retried by Chrona.",
+      "visibility": [
+        "modules"
+      ],
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "const": "accepted"
+              },
+              "receiptRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "outcome",
+              "receiptRef"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "const": "rejected"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "retryable",
+              "error"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "const": "uncertain"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "parameters": {
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "text",
+              "markdown"
+            ],
+            "description": "Explicit message format; omitted means text."
+          },
+          "link": {
+            "type": "string"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "approval": {
+            "type": "string"
+          },
+          "scoped": {
+            "type": "boolean"
+          }
+        }
+      }
     },
-    "memory-auto-recall": {
-      "type": "boolean",
-      "label": "自动召回记忆",
-      "default": true
+    {
+      "name": "reply",
+      "description": "A reply in the qq:dm conversation: a passive reply to the message it answers while that window lasts, otherwise through notify.send.",
+      "visibility": [
+        "modules"
+      ],
+      "output": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "delivered"
+        ],
+        "additionalProperties": false
+      },
+      "parameters": {
+        "type": "object",
+        "required": [
+          "session",
+          "message",
+          "text",
+          "workspace"
+        ],
+        "properties": {
+          "session": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "string",
+            "description": "JSON array of the reply's files, with appId"
+          },
+          "in-reply-to": {
+            "type": "string"
+          }
+        }
+      }
     },
-    "memory-auto-retain": {
-      "type": "boolean",
-      "label": "自动保存记忆",
-      "default": true
+    {
+      "name": "settings",
+      "description": "Read or update qq owned memory preferences. Omitted fields keep their values; provider null disables memory.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "string",
+            "description": "JSON partial preferences: provider (app slug or null), autoRecall and autoRetain (booleans)."
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "provider",
+              "autoRecall",
+              "autoRetain"
+            ],
+            "properties": {
+              "provider": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "autoRecall": {
+                "type": "boolean"
+              },
+              "autoRetain": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ignored"
+            ],
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ui-settings",
+      "description": "Read or update QQ memory preferences through scalar settings controls. Empty provider disables memory; omitted fields are preserved.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Memory provider app slug, or empty to disable memory."
+          },
+          "auto-recall": {
+            "type": "boolean"
+          },
+          "auto-retain": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "autoRecall": {
+                "type": "boolean"
+              },
+              "autoRetain": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "provider",
+              "autoRecall",
+              "autoRetain"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ignored": {
+                "const": "no caller"
+              }
+            },
+            "required": [
+              "ignored"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
     }
+  ],
+  "effects": [
+    "network"
+  ],
+  "data": {
+    "schema": 1
   },
-  "data": { "schema": 1 },
-  "tests": ["test.ts", "format-test.ts", "regression-test.ts", "approval-test.ts"]
+  "tests": [
+    "test.ts",
+    "format-test.ts",
+    "regression-test.ts",
+    "approval-test.ts"
+  ]
 }

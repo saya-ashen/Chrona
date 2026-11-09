@@ -16,7 +16,7 @@ export const TEST_COMMANDS: Record<string, Command> = {
 TEST_COMMANDS.all = command("Steward test suites", ...Object.values(TEST_COMMANDS).flatMap(c => c.steps));
 export const COMMANDS: Record<string, Partial<Record<string, Command>>> = {
   dev: {
-    all: command("Server (the web page is the built-in web module)", ["--watch", "apps/server/src/index.bun.ts"]),
+    all: command("Server (the web page is the ordinary preinstalled Web application)", ["--watch", "apps/server/src/index.bun.ts"]),
   },
   build: {
     all: binary(),

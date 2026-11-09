@@ -3,7 +3,6 @@ import { chmod, link, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/pr
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, moduleManifestSchema } from "@chrona/contracts/steward";
 import { testDb } from "./test-db";
-import { json } from "./module-context";
 import { registerBuiltins } from "./module-builtin";
 import { resolveBuiltinRelease } from "./module-release";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
@@ -25,19 +24,21 @@ async function fixture() {
   } };
   async function write(name: string, revision: number, extra: Record<string, unknown> = {}) {
     const dir = join(ports.moduleBuiltinResources!, name); await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], ...extra })));
+    await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...extra })));
     await writeFile(join(dir, "index.ts"), `// release ${revision}\n`);
     await writeFile(join(dir, "test.ts"), "// author checked before release\n");
     await seedTestModuleRelease(ports.moduleBuiltinResources!, name);
   }
   for (const name of BUILTIN_MODULE_NAMES) await write(name, 1);
-  const current = (name = "web") => db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: workspace.id, name } } });
+  const current = (name = "agent") => db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: workspace.id, name } } });
   return { db, ports, workspaceId: workspace.id, write, current, executions: () => executions, start: () => registerBuiltins(ports, workspace.id) };
 }
 
-test("fixed builtins bind approved trusted release metadata without builds or extra directory registration", async () => {
+test("only Agent binds trusted release metadata without builds or extra directory registration", async () => {
   const f = await fixture();
   await f.write("surprise", 1);
+  await f.write("web", 1); await f.write("notify", 1);
+  expect([...BUILTIN_MODULE_NAMES]).toEqual(["agent"]);
   await f.start();
   expect((await f.db.module.findMany()).map(m => m.name).sort()).toEqual([...BUILTIN_MODULE_NAMES].sort());
   expect(await f.current()).toMatchObject({ builtin: true, status: "active", dataSchema: 1 });
@@ -52,26 +53,26 @@ test("fixed builtins bind approved trusted release metadata without builds or ex
   expect(f.executions()).toBe(0);
 });
 
-test.each(["mcp", "files", "events"])("extracted %s preserves its identity, custom active version and private data across restart", async name => {
+test.each(["web", "notify", "mcp", "files", "events"])("registrar never migrates the old %s identity or custom data", async name => {
   const f = await fixture();
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: true, activeHash: "owner-custom", status: "paused", dataSchema: 7 } });
-  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], data: { schema: 7 } });
+  const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], data: { schema: 7 } });
   await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: "owner-custom", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const dir = join(f.ports.dataDir, "platform/data", row.id); await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
   const versions = await f.db.moduleVersion.findMany({ where: { moduleId: row.id } });
   await f.start(); await f.start();
-  expect(await f.current(name)).toMatchObject({ id: row.id, builtin: false, activeHash: "owner-custom", status: "paused", dataSchema: 7 });
+  expect(await f.current(name)).toMatchObject({ id: row.id, builtin: true, activeHash: "owner-custom", status: "paused", dataSchema: 7 });
   expect(await f.db.moduleVersion.findMany({ where: { moduleId: row.id } })).toEqual(versions);
   expect(await readFile(join(dir, "owner.json"), "utf8")).toBe('{"keep":true}');
   expect(f.executions()).toBe(0);
 });
 
-test("category migration also runs when builtin release resources are absent", async () => {
+test("registrar does not migrate old identities when release resources are absent", async () => {
   const f = await fixture();
   const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "mcp", builtin: true } });
   f.ports.moduleBuiltinResources = undefined;
   await f.start();
-  expect(await f.current("mcp")).toMatchObject({ id: row.id, builtin: false });
+  expect(await f.current("mcp")).toMatchObject({ id: row.id, builtin: true });
 });
 
 test("parallel first registrations share the Git seed and activate each builtin once", async () => {
@@ -101,7 +102,7 @@ test.each(["release", "missing", "schema"])("existing active builtin ignores %s 
   const versions = await f.db.moduleVersion.findMany({ where: { moduleId: first.id } });
   const dir = join(f.ports.dataDir, "platform/data", first.id); await mkdir(dir, { recursive: true }); await writeFile(join(dir, "owner.json"), '{"keep":true}');
   if (change === "missing") await rm(f.ports.moduleBuiltinResources!, { recursive: true });
-  else await f.write("web", 2, change === "schema" ? { data: { schema: 2 }, packages: ["chrona-fixture-program-does-not-exist"] } : {});
+  else await f.write("agent", 2, change === "schema" ? { data: { schema: 2 }, packages: ["chrona-fixture-program-does-not-exist"] } : {});
   await f.start();
   expect(await f.current()).toMatchObject({ activeHash: first.activeHash, builtin: true, status: "active", dataSchema: 1 });
   expect(await f.db.moduleVersion.findMany({ where: { moduleId: first.id } })).toEqual(versions);
@@ -110,42 +111,28 @@ test.each(["release", "missing", "schema"])("existing active builtin ignores %s 
   expect(f.executions()).toBe(0);
 });
 
-test("checked builtin customization survives restart, missing release and unavailable runtime", async () => {
-  const f = await fixture(); await f.start();
-  const module = await f.current(), hash = "a".repeat(40);
-  const previous = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-  await f.db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: json(previous.manifest), source: "user", status: "approved", intent: {}, report: { tests: [] } } });
-  await f.db.module.update({ where: { id: module.id }, data: { activeHash: hash, status: "paused" } });
-  f.ports.sandbox = undefined;
-  await rm(f.ports.moduleBuiltinResources!, { recursive: true });
-  await f.start();
-  expect(await f.current()).toMatchObject({ activeHash: hash, builtin: true, status: "paused" });
-  expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length + 1);
-});
-
 test("missing runtime or host dependency reports a paused builtin without running installer", async () => {
   const f = await fixture();
-  await f.write("web", 2, { packages: ["chrona-fixture-program-does-not-exist"] });
+  await f.write("agent", 2, { packages: ["chrona-fixture-program-does-not-exist"] });
   await expect(f.start()).rejects.toThrow("Required host program unavailable");
   expect(await f.current()).toMatchObject({ status: "paused", activeHash: null });
-  expect(await f.current("notify")).toMatchObject({ status: "active" });
   expect(f.executions()).toBe(0);
 });
 
 test("read-only hardlinked release resources retain their bytes and seed a separate runtime store", async () => {
-  const f = await fixture(), path = join(f.ports.moduleBuiltinResources!, "web/index.ts");
+  const f = await fixture(), path = join(f.ports.moduleBuiltinResources!, "agent/index.ts");
   const bytes = await readFile(path);
   await link(path, join(f.ports.dataDir, "same-file")); await chmod(path, 0o444);
   await f.start(); await f.start();
   expect(await readFile(path)).toEqual(bytes);
-  expect((await f.current()).activeHash).toBe((await resolveBuiltinRelease(f.ports, "web")).hash);
+  expect((await f.current()).activeHash).toBe((await resolveBuiltinRelease(f.ports, "agent")).hash);
   expect(await readFile(join(f.ports.dataDir, "platform/store", (await f.current()).activeHash!, "index.ts"))).toEqual(bytes);
   expect(f.executions()).toBe(0);
 });
 
 test("external row with reserved builtin name fails closed and is never promoted", async () => {
   const f = await fixture();
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: false } });
+  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "agent", builtin: false } });
   await expect(f.start()).rejects.toThrow("identity conflicts");
   expect(await f.db.module.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ builtin: false, activeHash: null });
   expect(await f.db.moduleVersion.count({ where: { moduleId: row.id } })).toBe(0);
@@ -154,9 +141,9 @@ test("external row with reserved builtin name fails closed and is never promoted
 
 test.each([false, true])("trusted seed prepares runtime dependencies before approval (failure=%s)", async failure => {
   const f = await fixture(), root = f.ports.moduleBuiltinResources!;
-  await writeFile(join(root, "web/package.json"), JSON.stringify({ name: "seed-dependency-fixture", private: true }));
-  await writeFile(join(root, "web/bun.lock"), "synthetic lock handled by the fixture adapter");
-  await seedTestModuleRelease(root, "web", "https://github.com/chrona-fixture/web.git");
+  await writeFile(join(root, "agent/package.json"), JSON.stringify({ name: "seed-dependency-fixture", private: true }));
+  await writeFile(join(root, "agent/bun.lock"), "synthetic lock handled by the fixture adapter");
+  await seedTestModuleRelease(root, "agent", "https://github.com/chrona-fixture/agent.git");
   let installs = 0;
   f.ports.packages = { backend: "system", async install({ dir, gcroot }) {
     installs++;
@@ -164,7 +151,7 @@ test.each([false, true])("trusted seed prepares runtime dependencies before appr
     expect(gcroot).toStartWith(join(f.ports.dataDir, "platform/gcroots"));
     // A separate write transaction must remain possible while dependency work runs.
     await f.db.$transaction(async tx => {
-      expect(await tx.moduleVersion.count({ where: { module: { name: "web" } } })).toBe(0);
+      expect(await tx.moduleVersion.count({ where: { module: { name: "agent" } } })).toBe(0);
     });
     if (!failure) {
       await mkdir(join(dir, "node_modules/seed-runtime"), { recursive: true });
@@ -188,7 +175,7 @@ test.each([false, true])("trusted seed prepares runtime dependencies before appr
     await Promise.all([f.start(), f.start()]);
     expect(await f.current()).toMatchObject({ activeHash: local, status: "paused" });
     expect(await getModuleLocalHead(location)).toBe(local);
-    expect(await getModuleUpstreamHead({ ...location, branch: (await resolveBuiltinRelease(f.ports, "web")).git!.branch })).toBe(local);
+    expect(await getModuleUpstreamHead({ ...location, branch: (await resolveBuiltinRelease(f.ports, "agent")).git!.branch })).toBe(local);
     expect(await f.db.moduleVersion.count()).toBe(BUILTIN_MODULE_NAMES.length);
     expect(await f.db.generation.count()).toBe(BUILTIN_MODULE_NAMES.length);
     expect(installs).toBe(2);
@@ -200,4 +187,11 @@ test.each([false, true])("trusted seed prepares runtime dependencies before appr
     expect(installs).toBe(1);
   }
   expect(f.executions()).toBe(0);
+});
+
+test("registrar never selects an existing ordinary Notify as default fact consumer", async () => {
+  const f = await fixture();
+  await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "notify", activeHash: "owner-notify", builtin: false } });
+  await f.start(); await f.start();
+  expect(await f.db.audit.count({ where: { kind: "kernel_fact_consumer" } })).toBe(0);
 });

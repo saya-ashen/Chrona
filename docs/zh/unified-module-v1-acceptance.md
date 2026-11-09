@@ -1,5 +1,7 @@
 # 本机统一模块 V1：最终审查与真实模型验收
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 日期：2026-11-07。核查起点：`31a726c9c1dc58a7a989a6beca57d573c59d7629`；分支：`platform-v2`。
 
 范围：本机 V1 的集中审查、问题修复、隔离真实模型验收及提交推送。远端 V2、生产部署、私人数据迁移均不在此次范围内。设计与实现边界见[统一模块运行时方案](./unified-module-runtime-plan.md)。

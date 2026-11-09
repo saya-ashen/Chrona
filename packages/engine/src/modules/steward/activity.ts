@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import type { StewardPorts } from "./ports";
-import type { Json } from "./module-calls";
+import type { Json } from "./module-call-types";
 
 /** Only these audit facts may cross the module boundary. Never return raw audit details. */
 const KINDS = ["approval_created", "approval_resolved", "module_build_started", "module_submission", "module_build_settled", "module_build_rejection",

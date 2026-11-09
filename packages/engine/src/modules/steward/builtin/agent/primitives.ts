@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { runtimeTranscriptSchema, type ProviderTranscriptItem, executionIdSchema, executionStartSchema, executionStartV2Schema, executionViewSchema, executionInputSchemas, executionResultSourceSchema, executionPlacementViewSchema, workLocationSchema, workCleanupInputSchema, workCleanupReceiptSchema, editorResponseDataSchemas } from "@chrona/contracts/steward";
+import { runtimeTranscriptSchema, type ProviderTranscriptItem, executionIdSchema, executionStartSchema, executionStartV2Schema, executionViewSchema, executionInputSchemas, executionResultSourceSchema, executionPlacementViewSchema, workLocationSchema, workCleanupInputSchema, workCleanupReceiptSchema, executionResponseDataSchemas } from "@chrona/contracts/steward";
 import { contextInput, contextRunInput, contextRunTarget, contextWriteInput, contextInterruptInput, contextRespondInput, contextStreamInput, contextOutput, contextRunOutput, contextStreamOutput } from "./context-contracts";
 import { transcriptRedactor } from "../../../../../../integrations/src/steward/transcript-redaction";
 import { camelArguments } from "./module-contracts";
@@ -26,11 +26,14 @@ export const primitiveOutputs = {
   run: z.union([contextRunOutput, z.object({ execution: executionViewSchema, placement: executionPlacementViewSchema.optional() }).strict()]),
   get: z.union([contextRunOutput, executionViewSchema]),
   lookup: executionViewSchema,
-  stream: z.union([contextStreamOutput, editorResponseDataSchemas.events]),
+  stream: z.union([contextStreamOutput, executionResponseDataSchemas.events]),
   write: z.object({ accepted: z.literal(true) }).strict(),
   interrupt: z.union([contextRunOutput, executionViewSchema]),
-  respond: z.object({ accepted: z.literal(true) }).strict(),
-  inspect: z.object({ snapshot: editorResponseDataSchemas.snapshot, source: executionResultSourceSchema }).strict(),
+  respond: z.union([
+    z.object({ accepted: z.literal(true) }).strict(),
+    z.object({ accepted: z.literal(false), error: z.object({ code: z.enum(["not_found", "conflict", "invalid", "forbidden", "capacity"]), message: z.string() }).strict() }).strict(),
+  ]),
+  inspect: z.object({ snapshot: executionResponseDataSchemas.snapshot, source: executionResultSourceSchema }).strict(),
   placement: executionPlacementViewSchema,
   locations: z.object({ locations: z.array(workLocationSchema).max(100), after: id.nullable() }).strict(),
   cleanup: workCleanupReceiptSchema,

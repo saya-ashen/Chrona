@@ -44,8 +44,8 @@ export function createRelay({ call, notify, publicUrl, download, conversations }
       const matches = open.filter(approval => approval.id.startsWith(decision.ref));
       if (matches.length !== 1) return matches.length ? "【Chrona】编号对应多条审批，请多写几位。" : "【Chrona】没有找到这条待批准事项，可能已经处理过了。";
       const approval = matches[0]!;
-      await call("approvals.resolve", { approval: approval.id, decision: decision.decision, scope: decision.scope });
-      return `【Chrona】已${decision.decision === "deny" ? "拒绝" : decision.scope === "always" ? "批准（始终允许）" : "批准"}：${approval.title}`;
+      await call("approvals.resolve", { approval: approval.id, decision: decision.decision });
+      return `【Chrona】已${decision.decision === "deny" ? "拒绝" : "批准"}：${approval.title}`;
     },
     /** The first image of a reply, as bytes for a QQ rich-media upload. */
     async replyImage(item: Pick<QqReplyItem, "messageId" | "attachments">) {

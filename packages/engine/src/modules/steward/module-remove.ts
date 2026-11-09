@@ -1,7 +1,7 @@
 import { cp, mkdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "./audit";
 import { createApprovals } from "./approvals";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
@@ -10,7 +10,7 @@ import { requireModule, type ModuleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
-import { assertModuleOperation, isRemovableMcp } from "./module-identity";
+import { assertModuleOperation } from "./module-identity";
 import { moduleGitPath } from "./module-git";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
@@ -25,9 +25,6 @@ async function assertRemovable(db: Db, module: Row) {
   assertModuleOperation(module, "remove");
   await assertExecutionModuleIdle(db, module.id);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
-  const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, hash: module.activeHash ?? "" } });
-  const manifest = moduleManifestSchema.safeParse(versions[0]?.manifest).data;
-  if (manifest && isEntryModule(manifest) && !isRemovableMcp(module)) throw new StewardError("conflict", `${module.name} 是入口应用，不能删除；可以停用`);
   await assertNoDependents(db, module);
   await assertNoPendingWork(db, module);
 }
@@ -41,7 +38,7 @@ async function assertNoDependents(db: Db, module: Row) {
 }
 async function removalSessions(db: Db, module: Row) {
   const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true, source: true, moduleId: true } });
-  const contexts = isRemovableMcp(module) ? await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } }) : [];
+  const contexts = await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } });
   const retainedContexts = new Set(contexts.map(row => row.subjectId));
   // Agent contexts retain continuation, not an application's private conversation state.
   // Their Runs and unknown-stop evidence still participate in every execution guard.

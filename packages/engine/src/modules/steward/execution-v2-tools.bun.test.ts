@@ -20,10 +20,10 @@ async function fixture() {
   const workspaceId = (await db.workspace.create({ data: { name: "router-test" } })).id;
   async function module(name: string, uses: string[] = ["agent.run", "agent.placement", "agent.locations", "agent.cleanup", "agent.get"]) {
     const row = await db.module.create({ data: { workspaceId, name, activeHash: "hash", status: "active" } });
-    await db.moduleVersion.create({ data: { moduleId: row.id, hash: "hash", manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses }), source: "user", intent: {}, report: {}, status: "approved" } });
+    await db.moduleVersion.create({ data: { moduleId: row.id, hash: "hash", manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses }), source: "user", intent: {}, report: {}, status: "approved" } });
     return { kind: "module" as const, moduleId: row.id, module: name, hash: "hash" };
   }
-  const caller = await module("coding"), other = await module("other");
+  const caller = await module("execution-test"), other = await module("other");
   const baseline = { kind: "commit" as const, digest: "a".repeat(40) }, placement = { executorId: "device", projectRef: "repo", mappingRevision: 1 };
   const now = new Date("2026-11-06T12:00:00Z"); let online = false;
   await db.executionExecutor.create({ data: { id: "device", workspaceId, ownerId: "owner", label: "fixture", credentialHash: "fixture-not-secret", incarnation: "daemon" } });

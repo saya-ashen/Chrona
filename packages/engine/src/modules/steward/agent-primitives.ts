@@ -3,6 +3,7 @@ import { providerAnswerSchema } from "@chrona/contracts/steward";
 import type { ExecutionPrincipal, ExecutionStart, ExecutionStartV2 } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { CallError } from "./module-call-error";
+import { isExecutionControlRejected } from "./execution-control-error";
 import { handleExecutionV2Tool } from "./execution-v2-tools";
 import { primitiveInput, type AgentPrimitive } from "./builtin/agent/primitives";
 
@@ -45,12 +46,19 @@ async function admitExistingExecution(ports: StewardPorts, service: ExecutionSer
     if (name === "stream") return ports.executionEvents.read(principal, { ...ref, cursor: args.cursor, limit: args.limit!, waitMs: 0 });
     return { snapshot: await ports.executionEvents.snapshot(principal, ref), source: await service.resultSource(principal, ref) };
   }
-  if (name === "respond") {
-    await service.answer(principal, { ...ref, op: "answer", commandKey: args.requestKey!, requestId: args.questionId!, answer: parseAnswer(args.answer) });
-    return { accepted: true };
-  }
+  if (name === "respond") return respondToExecution(service, principal, ref, args);
   const command = name === "write" ? { ...ref, op: "send" as const, commandKey: args.requestKey!, text: args.text! } : { ...ref, op: "cancel" as const, commandKey: args.requestKey! };
   return admitExecutionControl(ports, service, principal, command, view);
+}
+
+async function respondToExecution(service: ExecutionService, principal: ExecutionPrincipal, ref: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, args: ExecutionArgs) {
+  try {
+    await service.answer(principal, { ...ref, op: "answer", commandKey: args.requestKey!, requestId: args.questionId!, answer: parseAnswer(args.answer) });
+    return { accepted: true };
+  } catch (error) {
+    if (isExecutionControlRejected(error)) return { accepted: false, error: { code: error.code, message: error.message } };
+    throw error;
+  }
 }
 
 async function admitExecutionControl(ports: StewardPorts, service: ExecutionService, principal: ExecutionPrincipal, command: Parameters<ExecutionService["admitControl"]>[1], view: ExecutionView) {

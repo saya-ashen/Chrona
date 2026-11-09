@@ -2,6 +2,8 @@
 
 本目录保存 Chrona 按阶段形成的平台设计、讨论与当时的实现记录，不是当前功能或部署状态说明。文中的计划、验收结果和“当前”均属于记录形成时的上下文；与[当前架构](../architecture.md)冲突时，以当前架构为准。保留原文以便追溯，仅修正归档后的链接；当前执行、依赖和操作规则分别见[安全机制简化](../security-simplification.md)、[模块依赖方向](../module-dependency-direction.md)和[运维说明](../operations.md)。
 
+旧 Editor 应用已退役并移除，当前仅 Mind、Remind 整应用暂停。删除范围和待补验证见[退役记录](../editor-retirement.md)，当前接入见[Coding 客户端协议](../coding-peer-clients-protocol.md)。本页链接到的旧 Editor 安装、接口和源码保留说法属于历史，不表示仍支持安装或要求保留该应用。
+
 ## 根目录保留的阶段记录
 
 以下文件保留原路径以维持源码、契约和证据链接；属于阶段记录，不再是独立开发入口。全项目待办见[统一开发路线](../development-roadmap.md)。
@@ -49,3 +51,4 @@
 - [platform-v2-28-mind-agenda.md](platform-v2-28-mind-agenda.md)
 - [platform-v2-29-content-refs.md](platform-v2-29-content-refs.md)
 - [platform-v2-30-secrets-for-tools.md](platform-v2-30-secrets-for-tools.md)
+- [cross-platform-runtime-and-remote-execution-plan.md](cross-platform-runtime-and-remote-execution-plan.md)（已合并入[内核可移植方案](../kernel-portability-plan.md)）

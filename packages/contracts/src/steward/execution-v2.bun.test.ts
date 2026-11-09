@@ -1,11 +1,10 @@
 import { expect, test } from "bun:test";
-import { editorRequestSchema } from "./execution";
-import { WORK_PROTOCOL, WORK_HTTP, workCleanupInputSchema, workRequestSchema, workStartSchema, executionSourceSchema, parseWorkResponse, workViewSchema } from "./execution-v2";
+import { executionCommandSchema } from "./execution";
+import { WORK_PROTOCOL, workCleanupInputSchema, workRequestSchema, workStartSchema, executionSourceSchema, parseWorkResponse, workViewSchema } from "./execution-v2";
 import fixture from "../../fixtures/executions-v2/cases.json";
 
-test("shared v2 fixtures correlate all thirteen operations on the commands route", () => {
+test("shared v2 fixtures correlate all thirteen operations", () => {
   expect(fixture.requests).toHaveLength(13);
-  expect(WORK_HTTP).toEqual({ method: "POST", commands: "/api/editor/v1/commands" });
   for (const [index, body] of fixture.requests.entries()) {
     const request = workRequestSchema.parse(body), response = fixture.responses[index]!;
     expect(parseWorkResponse(request, response).ok).toBe(true);
@@ -37,7 +36,7 @@ const leaf = { kind: "execution", workId: "work", commandKey: "key", goal: "Insp
 test("v2 fixed placement and groups require the explicit version and bounded body", () => {
   const body = { v: WORK_PROTOCOL, requestId: "request", command: { op: "start", input: leaf } };
   expect(workRequestSchema.parse(body).command.op).toBe("start");
-  expect(editorRequestSchema.safeParse(body).success).toBe(false);
+  expect(executionCommandSchema.safeParse(body.command).success).toBe(false);
   expect(workStartSchema.parse({ kind: "group", workId: "parent", commandKey: "parent-key", goal: "Compare independent results", children: [leaf] }).kind).toBe("group");
   expect(workStartSchema.safeParse({ ...leaf, workspace: { mode: "independent_worktree", baseline: { kind: "snapshot", digest: "opaque" } } }).success).toBe(false);
   const children = Array.from({ length: 20 }, (_, i) => ({ ...leaf, workId: `child-${i}`, commandKey: `key-${i}`, goal: "x".repeat(20_000) }));

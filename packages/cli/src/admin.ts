@@ -7,17 +7,20 @@ import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { createQqBotState, createSecrets, createStewardService, moduleSupervisor, refreshInstallationReceipts, type StewardPorts } from "@chrona/engine";
 import { getChronaDataDir } from "./start-server";
 import { createModuleRuntimePorts } from "../../integrations/src/steward/module-runtime";
-import { moduleInstallRequestSchema } from "@chrona/contracts/steward";
+import { moduleInstallRequestSchema, moduleVersionHashSchema } from "@chrona/contracts/steward";
 
-export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "approvals" | "approve" | "reject";
+export type AdminCommand = "diagnostics" | "modules" | "catalog" | "install" | "rollback" | "disable" | "remove" | "approvals" | "approve" | "reject";
 type AdminApi = ReturnType<ReturnType<typeof createStewardService>["forWorkspace"]>;
 async function changeModule(db: PrismaClient, api: AdminApi, command: AdminCommand, args: string[]) {
   const workspaceId = "ws_default";
+  if (!args[0]) throw new Error("Module name or id is required");
   const module = await db.module.findFirst({ where: { workspaceId, OR: [{ id: args[0] }, { name: args[0] }] } });
   if (!module) throw new Error("Module not found");
   if (command === "disable") return api.modules.disable(module.id, "cli");
-  const hash = args[1];
-  if (!hash || !/^[a-f0-9]{64}$/.test(hash)) throw new Error("An approved external module version hash is required");
+  if (command === "remove") return api.modules.lifecycle("remove", module.id, { reason: "Removal requested through stopped-service CLI administration" }, true);
+  const parsedHash = moduleVersionHashSchema.safeParse(args[1]);
+  if (!parsedHash.success) throw new Error("An approved external module version hash is required");
+  const hash = parsedHash.data;
   const rollback = await api.modules.rollback(module.id, hash);
   // Local administration is a trusted approval source, including data-restore confirmations.
   const result = rollback.status === "pending_approval" ? (await api.approvals.resolve(rollback.approvalId, { decision: "approve", scope: "once" }, "cli")).approval : rollback;

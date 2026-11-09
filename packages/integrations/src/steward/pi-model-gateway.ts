@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { inspectPiLaunch, piEnvironment, piLaunchConfig, type PiProviderOptions } from "./pi-launch";
@@ -7,66 +7,127 @@ import { inspectPiLaunch, piEnvironment, piLaunchConfig, type PiProviderOptions 
 type Input = { model: string; thinking?: string; system?: string; prompt: string; maxOutputTokens: number; timeoutMs: number };
 type Result = { text: string; inputTokens: number | null; outputTokens: number | null };
 type PiMessage = { provider?: string; model: string; stopReason?: string; content?: { type: string; text?: string }[]; usage?: { input?: unknown; output?: unknown } };
-type CompletionState = { child?: ChildProcess; dir?: string; expired: boolean };
+type CompletionState = { child?: ChildProcess; closed?: Promise<void>; dir?: string; expired: boolean };
+type OutputState = { result?: Result };
 const failure = (code: "provider_error" | "timeout") => Object.assign(new Error(`Module model call: ${code}`), { code });
 const tokens = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 const timedOut = (state: CompletionState) => state.expired;
 const childOf = (state: CompletionState) => state.child;
 
+// Verified against the locally installed @earendil-works/pi-coding-agent 1.5.0
+// CLI and bundled provider source. There is no CLI max-token flag. Explicit -e
+// still loads with --no-extensions; extension load errors abort print mode.
+const TOKEN_LIMIT_PI_VERSION = "1.5.0";
+function tokenLimitExtension(input: Input, dir: string): string {
+  return `import { writeFileSync } from "node:fs";
+export default function (pi) {
+  const limit = ${input.maxOutputTokens};
+  const expectedModel = ${JSON.stringify(input.model)};
+  let requested = false;
+  // Pi catches hook exceptions and sends the original payload, so a thrown
+  // error would fail open. Exit synchronously before handing a request back.
+  const refuse = () => process.exit(1);
+  pi.on("session_before_compact", refuse);
+  pi.on("before_provider_request", (event, ctx) => {
+    try {
+      const model = ctx.model;
+      if (!model || (model.provider + "/" + model.id !== expectedModel && model.id !== expectedModel) || requested) return refuse();
+      const payload = event.payload;
+      let target = payload, field;
+      switch (model.api) {
+        case "anthropic-messages": field = "max_tokens"; break;
+        case "openai-completions":
+          if (Object.hasOwn(payload, "max_tokens") === Object.hasOwn(payload, "max_completion_tokens")) return refuse();
+          field = Object.hasOwn(payload, "max_tokens") ? "max_tokens" : "max_completion_tokens";
+          break;
+        case "openai-responses": field = "max_output_tokens"; break;
+        case "google-generative-ai": target = payload.config; field = "maxOutputTokens"; break;
+        // In particular, Pi's Codex request builder has no output-token cap.
+        default: return refuse();
+      }
+      // Require Pi's provider to have emitted its supported native cap. Some
+      // Responses compatibility modes deliberately omit it: do not invent one.
+      if (!target || !Object.hasOwn(target, field) || !Number.isSafeInteger(target[field]) || target[field] <= 0) return refuse();
+      target[field] = Math.min(target[field], limit);
+      if (model.api === "openai-responses" && target[field] < 16) return refuse();
+      if (model.api === "anthropic-messages" && payload.thinking?.type === "enabled") {
+        // Match Pi's 1024-token answer reserve without increasing the cap.
+        // Anthropic also needs at least 1024 thinking tokens when enabled.
+        const budget = payload.thinking.budget_tokens;
+        if (!Number.isSafeInteger(budget) || budget < 1024 || target[field] < 2048) return refuse();
+        payload.thinking.budget_tokens = Math.min(budget, target[field] - 1024);
+      }
+      requested = true;
+      // Pi redirects extension stdout to stderr in JSON mode. Record only the
+      // applied limit in our private directory, before the provider can send.
+      writeFileSync(${JSON.stringify(join(dir, "token-limit.applied"))}, String(limit), { mode: 0o600, flag: "wx" });
+      return payload;
+    } catch { return refuse(); }
+  });
+}
+`;
+}
 function validMessage(message: PiMessage, input: Input) {
   const exact = message.provider ? `${message.provider}/${message.model}` : message.model;
-  return (exact === input.model || message.model === input.model) && (message.stopReason === "stop" || message.stopReason === "length") && Array.isArray(message.content) && !message.content.some((part: { type: string }) => part.type === "toolCall");
+  const output = tokens(message.usage?.output);
+  return (exact === input.model || message.model === input.model) && (message.stopReason === "stop" || message.stopReason === "length") && Array.isArray(message.content) && !message.content.some(part => part.type === "toolCall" || part.type === "text" && typeof part.text !== "string") && (output === null || output <= input.maxOutputTokens);
 }
-function messageResult(message: PiMessage, input: Input): Result {
+function messageResult(message: PiMessage): Result {
   const content = message.content ?? [];
-  return { text: content.filter(part => part.type === "text").map(part => part.text ?? "").join("").slice(0, input.maxOutputTokens * 4), inputTokens: tokens(message.usage?.input), outputTokens: tokens(message.usage?.output) };
+  return { text: content.filter(part => part.type === "text").map(part => part.text ?? "").join(""), inputTokens: tokens(message.usage?.input), outputTokens: tokens(message.usage?.output) };
 }
-function parseLine(text: string, input: Input, fail: () => void, setResult: (result: Result) => void) {
+function parseLine(text: string, input: Input, output: OutputState, fail: () => void) {
   if (!text.trim()) return;
   try {
     const event = JSON.parse(text);
-    if (event.type === "tool_execution_start" || event.type === "auto_retry_start") { fail(); return; }
+    if (event.type === "tool_execution_start" || event.type === "auto_retry_start" || event.type === "auto_compaction_start") { fail(); return; }
     if (event.type !== "message_end" || event.message?.role !== "assistant") return;
-    if (!validMessage(event.message, input)) { fail(); return; }
-    setResult(messageResult(event.message, input));
+    if (output.result || !validMessage(event.message, input)) { fail(); return; }
+    output.result = messageResult(event.message);
   } catch { fail(); }
 }
 function runPiProcess(config: ReturnType<typeof piLaunchConfig>, input: Input, dir: string, state: CompletionState, isExpired: () => boolean): Promise<Result> {
-  const args = ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-approve", "--mode", "json", "--model", input.model, ...(input.thinking ? ["--thinking", input.thinking] : [])];
+  const args = ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-mcp", "--offline", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes", "--no-approve", "-e", join(dir, "token-limit.mjs"), "--mode", "json", "--model", input.model, ...(input.thinking ? ["--thinking", input.thinking] : [])];
   // Pi also accepts file paths here: our own file preserves literal system text,
   // even if that text happens to name a host file. Prompt stdin is documented by Pi CLI.
   if (input.system !== undefined) args.push("--system-prompt", join(dir, "system.txt"));
   return new Promise<Result>((resolve, reject) => {
     const process = spawn(config.command, args, { cwd: dir, env: piEnvironment(config), stdio: ["pipe", "pipe", "ignore"], shell: false });
     state.child = process;
-    let buffer = "", bytes = 0, result: Result | undefined, invalid = false;
-    const fail = () => { invalid = true; process.kill("SIGKILL"); reject(failure("provider_error")); };
+    state.closed = new Promise<void>(closed => process.once("close", () => closed()));
+    let buffer = "", bytes = 0, invalid = false;
+    const output: OutputState = {};
+    const fail = () => { invalid = true; process.kill("SIGKILL"); };
     process.stdout.setEncoding("utf8");
     process.stdout.on("data", (chunk: string) => {
+      if (invalid) return;
       bytes += Buffer.byteLength(chunk);
       if (bytes > 8 * 1024 * 1024) { fail(); return; }
       buffer += chunk;
       let end: number;
-      while ((end = buffer.indexOf("\n")) !== -1) { parseLine(buffer.slice(0, end), input, fail, value => { result = value; }); buffer = buffer.slice(end + 1); }
+      while ((end = buffer.indexOf("\n")) !== -1) { parseLine(buffer.slice(0, end), input, output, fail); buffer = buffer.slice(end + 1); }
     });
     process.stdin.on("error", fail);
     process.once("error", fail);
     process.once("close", code => {
-      if (buffer) parseLine(buffer, input, fail, value => { result = value; });
+      if (!invalid && buffer) parseLine(buffer, input, output, fail);
       if (isExpired()) reject(failure("timeout"));
-      else if (invalid || code !== 0 || !result) reject(failure("provider_error"));
-      else resolve(result);
+      else if (invalid || code !== 0 || !output.result) reject(failure("provider_error"));
+      else resolve(output.result);
     });
     process.stdin.end(input.prompt);
   });
 }
 async function work(config: ReturnType<typeof piLaunchConfig>, input: Input, state: CompletionState, isExpired: () => boolean): Promise<Result> {
-  if (await inspectPiLaunch(config)) throw failure("provider_error");
+  if (config.version !== TOKEN_LIMIT_PI_VERSION || await inspectPiLaunch(config)) throw failure("provider_error");
   if (isExpired()) throw failure("timeout");
   state.dir = await mkdtemp(join(tmpdir(), "chrona-model-"));
+  await writeFile(join(state.dir, "token-limit.mjs"), tokenLimitExtension(input, state.dir), { mode: 0o600 });
   if (input.system !== undefined) await writeFile(join(state.dir, "system.txt"), input.system, { mode: 0o600 });
   if (isExpired()) throw failure("timeout");
-  return runPiProcess(config, input, state.dir, state, isExpired);
+  const result = await runPiProcess(config, input, state.dir, state, isExpired);
+  if (await readFile(join(state.dir, "token-limit.applied"), "utf8") !== String(input.maxOutputTokens)) throw failure("provider_error");
+  return result;
 }
 function timeoutError(error: unknown, isExpired: () => boolean) {
   return isExpired() || error && typeof error === "object" && "code" in error && error.code === "timeout";
@@ -74,15 +135,15 @@ function timeoutError(error: unknown, isExpired: () => boolean) {
 async function cleanup(state: CompletionState, timer: ReturnType<typeof setTimeout> | undefined, workPromise: Promise<Result> | undefined) {
   if (timer) clearTimeout(timer);
   await workPromise?.catch(() => {});
-  const process = childOf(state);
-  if (process?.pid && process.exitCode === null && process.signalCode === null) await new Promise<void>(resolve => process.once("close", () => resolve()));
+  await state.closed;
   if (state.dir) await rm(state.dir, { recursive: true, force: true });
 }
 
-/** Credential/model adapter only. No Provider tools, extensions, sessions, or model fallback. */
+/** Credential/model adapter only. One trusted token-cap extension; no tools, user extensions, sessions, or fallback. */
 export function createPiModelGateway(options: PiProviderOptions) {
   const config = piLaunchConfig(options);
   return { async complete(input: Input): Promise<Result> {
+    if (!Number.isSafeInteger(input.maxOutputTokens) || input.maxOutputTokens <= 0 || !Number.isSafeInteger(input.timeoutMs) || input.timeoutMs <= 0 || input.timeoutMs > 2_147_483_647) throw failure("provider_error");
     const state: CompletionState = { expired: false };
     let timer: ReturnType<typeof setTimeout> | undefined, workPromise: Promise<Result> | undefined;
     const isExpired = () => timedOut(state);

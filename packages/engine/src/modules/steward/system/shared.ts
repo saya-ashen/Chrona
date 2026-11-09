@@ -1,14 +1,19 @@
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { CallError, type Caller, type Json, type SystemTool, type Tool } from "../module-calls";
 import type { StewardPorts } from "../ports";
+import { isOwnerCaller } from "../module-owner";
 
 type Properties = Tool["parameters"]["properties"];
 export const tool = (name: string, description: string, properties: Properties, required: string[], extra: Partial<SystemTool> = {}): SystemTool =>
   ({ name, description, parameters: { type: "object", properties, required }, visibility: ["modules"], idempotent: false, ...extra });
 export const text = (description?: string) => ({ type: "string" as const, ...(description ? { description } : {}) });
-/** Conversations and approvals act for the user: only a module (its manifest `uses`, approved with it) may call them. */
+/** Module identity for operations scoped to the caller's own resources. */
 export function entry(caller: Caller) {
   if (caller.kind !== "module") throw new CallError("forbidden", "Only an entry module may call this");
+  return caller;
+}
+export async function requireOwner(db: Parameters<typeof isOwnerCaller>[0], workspaceId: string, caller: Caller) {
+  if ((caller.kind !== "owner" && caller.kind !== "module") || !await isOwnerCaller(db, workspaceId, caller)) throw new CallError("forbidden", "Only an owner may manage this resource");
   return caller;
 }
 export const json = (value: unknown) => (value === undefined ? null : JSON.parse(JSON.stringify(value))) as Json;

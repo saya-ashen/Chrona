@@ -111,16 +111,23 @@ test("active delivery allowlist, local rate limit and no passive message id", as
 
 test("approval decisions: buttons and owner text commands, never routed to chat", async () => {
   const id = "5266f07c-2e68-4c6e-8f91-45e39f8d1aec";
-  expect(parseApprovalDecision({ button: `approval:${id}:always` })).toEqual({ ref: id, decision: "approve", scope: "always" });
-  expect(parseApprovalDecision({ button: `approval:${id}:deny` })).toEqual({ ref: id, decision: "deny", scope: "once" });
-  expect(parseApprovalDecision({ text: "批准 5266F07C 始终" })).toEqual({ ref: "5266f07c", decision: "approve", scope: "always" });
+  expect(parseApprovalDecision({ button: `approval:${id}:always` })).toBeNull();
+  expect(parseApprovalDecision({ button: `approval:${id}:once` })).toEqual({ ref: id, decision: "approve" });
+  expect(parseApprovalDecision({ button: `approval:${id}:deny` })).toEqual({ ref: id, decision: "deny" });
+  for (const text of ["批准 5266F07C 始终", "approve 5266f07c always", "拒绝 5266f07c always"]) expect(parseApprovalDecision({ text })).toBeNull();
+  expect(parseApprovalDecision({ text: "批准 5266F07C" })).toEqual({ ref: "5266f07c", decision: "approve" });
   expect(parseApprovalDecision({ text: "批准一下这个" })).toBeNull();
   const h = harness(); await h.bind();
   await h.say("U2", "批准 5266f07c");
   expect(h.decisions).toEqual([]);
+  for (const text of ["批准 5266f07c 始终", "/approve 5266f07c always", "拒绝 5266f07c always"]) {
+    await h.say("U1", text);
+    expect(h.replies.at(-1)!.text).toContain("不支持始终允许");
+  }
+  expect(h.decisions).toEqual([]); expect(h.calls).toEqual([]);
   h.replies.length = 0;
   await h.say("U1", "拒绝 5266f07c");
-  expect(h.decisions).toEqual([{ ref: "5266f07c", decision: "deny", scope: "once" }]);
+  expect(h.decisions).toEqual([{ ref: "5266f07c", decision: "deny" }]);
   expect(h.replies).toEqual([{ text: "已批准", sequence: 1 }]); expect(h.calls).toEqual([]);
 });
 test("approval delivery carries buttons, and falls back to text when buttons are refused", async () => {
@@ -137,7 +144,8 @@ test("approval delivery carries buttons, and falls back to text when buttons are
   const message = { idempotencyKey: "k", title: "需要你批准", body: "读 career-ops", link: null, recipient: "chrona_qq:U1", approval: { id, scoped: true } };
   expect(await delivery.send(message)).toMatchObject({ outcome: "accepted" });
   expect(sent[0]).toMatchObject({ msg_type: 2, markdown: { content: expect.stringContaining("批准 5266f07c") } });
-  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:always`, `approval:${id}:deny`]);
+  expect(sent[0]!.keyboard.content.rows[0].buttons.map((b: any) => b.action.data)).toEqual([`approval:${id}:once`, `approval:${id}:deny`]);
+  expect(JSON.stringify(sent[0])).not.toContain("始终");
   refuse = true; sent.length = 0;
   expect(await delivery.send({ ...message, approval: { id, scoped: false } })).toMatchObject({ outcome: "accepted" });
   expect(sent).toHaveLength(2); expect(sent[0]!.keyboard.content.rows[0].buttons).toHaveLength(2);
