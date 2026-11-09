@@ -12,4 +12,3 @@ export type ModuleRuntime = {
   check?: { programs: RuntimePrograms; argv: string[] };
 };
 export type ModuleRuntimes = { version: 1; runtimes: ModuleRuntime[] };
-

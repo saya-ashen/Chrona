@@ -135,15 +135,15 @@ test("fixed module seeds preserve paused source materials and regenerate active 
     expect(lock.modules.some(module => module.name === "editor")).toBe(false);
     expect(await Bun.file(join(resourcesRoot, "module-git/editor.bundle")).exists()).toBe(false);
     expect(await Bun.file(join(resourcesRoot, "external/editor/module.json")).exists()).toBe(false);
-    expect(buildArtifacts.pausedModuleResources.slice().sort()).toEqual(["external/mind", "external/remind"]);
+    expect([...buildArtifacts.pausedModuleResources]).toEqual(["external/remind"]);
     for (const source of buildArtifacts.pausedModuleResources) {
       expect(await Bun.file(join(resourcesRoot, source, "module.json")).exists()).toBe(false);
       // Retained bundles record source provenance, but have no runtime installation tree.
       expect(await Bun.file(join(resourcesRoot, "module-git", `${source.split("/").pop()}.bundle`)).exists()).toBe(true);
     }
-    for (const name of ["web", "notify", "qq", "author", "files", "events", "memory-local", "mcp", "coding", "coding-web", "remote-execution"]) expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
+    for (const name of ["web", "notify", "qq", "author", "files", "events", "memory-local", "mcp", "mind", "coding", "coding-web", "remote-execution"]) expect(await Bun.file(join(resourcesRoot, "external", name, "module.json")).exists()).toBe(true);
     const { BUILTIN_MODULE_NAMES, OPTIONAL_EXTERNAL_MODULE_NAMES, PREINSTALLED_MODULE_NAMES } = await import("@chrona/contracts/steward");
-    for (const module of [{ name: "coding", source: "external/coding" }, { name: "coding-web", source: "external/coding-web" }, { name: "remote-execution", source: "external/remote-execution" }] as const) {
+    for (const module of [{ name: "mind", source: "external/mind" }, { name: "coding", source: "external/coding" }, { name: "coding-web", source: "external/coding-web" }, { name: "remote-execution", source: "external/remote-execution" }] as const) {
       const { name } = module;
       expect(buildArtifacts.moduleGit.modules).toContainEqual(module);
       expect(lock.modules.find(module => module.name === name)?.bundle).toBe(`${name}.bundle`);

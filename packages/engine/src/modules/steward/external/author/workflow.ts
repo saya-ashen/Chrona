@@ -47,7 +47,7 @@ export async function authorTool(context: AuthorContext, id: string, args: Recor
     }
     case "list": {
       object(args, ["path"]);
-      return context.files.list(text(args.path, 1000));
+      return context.files.list(args.path === "" ? "" : text(args.path, 1000));
     }
     case "stage": return stagePackage(context.files, parseStage(jsonInput(args)));
     case "source": {

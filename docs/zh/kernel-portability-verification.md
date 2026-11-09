@@ -1,12 +1,30 @@
 # 内核可移植性实施验证记录
 
-日期：2026-11-09。状态：**S0–S3 已实施；S4/S5 部分完成，S6 未验收**。对应[实施方案](kernel-portability-plan.md)，本记录核对至当日 **18:36（+08:00）**。物理存储改动后 root tsc final9、root lint final6、边界 final3、schema `--check` 与原始 hash 基线通过；新增 7 文件确定性回归 **50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核预算预留、签名停止及 cleanup。普通应用和设备新增有限 SQLite 页数、实际分配的证据预留与有界回滚日志；满额后拒绝新工作，已接纳任务继续提交终止和控制回执。独立复核 7 项测试 / 106 断言通过，没有确认的实质缺陷。安全归档、超过 100 项设备 journal 的持续运行与完整故障矩阵仍未完成。
+日期：2026-11-09。状态：**S0–S3 已实施；S4/S5 部分完成，S6 未验收**。对应[实施方案](kernel-portability-plan.md)，本记录的实施快照核对至当日 **18:36（+08:00）**，主分支合并后的检查见下方“合并复核”。物理存储改动后 root tsc final9、root lint final6、边界 final3、schema `--check` 与原始 hash 基线通过；新增 7 文件确定性回归 **50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核预算预留、签名停止及 cleanup。普通应用和设备新增有限 SQLite 页数、实际分配的证据预留与有界回滚日志；满额后拒绝新工作，已接纳任务继续提交终止和控制回执。独立复核 7 项测试 / 106 断言通过，没有确认的实质缺陷。安全归档、超过 100 项设备 journal 的持续运行与完整故障矩阵仍未完成。
 
 第三轮 full Bun 在物理存储改动前已跑完 229 文件，notify 首次失败后隔离重试通过，不能称为无重试全绿；修复持久化等待后定向回归 17 pass / 0 fail。完整 API 为 105 pass / 19 文件。编译产物 helper 路径与 ELF RPATH/RUNPATH 泄漏已修复；17:55 默认 Linux CLI 使用仅允许离线缓存、保留 frozen lockfile、禁用安装脚本的 Bun 包装器完成迁移、health 与 Web runtime smoke。18:36 包含物理存储改动的最终 14 seeds、核心及设备发行包均已刷新；完整 Linux runtime smoke、实际可选应用 seed 安装与复制设备二进制 smoke 再次通过，结果见 §2.3。所有结果限本地；completion 使用假实现，无真实外部模型、部署或生产验收。
 
-基准 HEAD 为 `a35dd2b8d75a62fede578015759c27513efc55a9`，工作区有大量未提交修改；该提交本身不包含全部被测实现。已记录的原生进程测试环境为 Linux 7.3.0-cachyos x86_64、Bun 1.4.2、Node v22.22.3、GCC 15.2.0。临时日志和交接文件是本机证据，未作为仓库持久测试报告提交。复现时必须另存实际 revision、工作区差异、环境、命令、退出码与完整输出。
+以下 18:36 及此前的实施记录以 `a35dd2b8d75a62fede578015759c27513efc55a9` 加当时工作区修改为基准；实现随后保存为 `442223ee`。该早期基准提交本身不包含全部被测实现。已记录的原生进程测试环境为 Linux 7.3.0-cachyos x86_64、Bun 1.4.2、Node v22.22.3、GCC 15.2.0。临时日志和交接文件是本机证据，未作为仓库持久测试报告提交。复现时必须另存实际 revision、工作区差异、环境、命令、退出码与完整输出。
 
 通过数来自实际检查日志及所有者交接；文内给出持久源码或测试入口，`/tmp` 文件用于定位本机当次输出，不充当唯一测试源码。以下时间均为 2026-11-09 +08:00；秒级时间为日志最后写入时间，只有分钟的时间为交接标记，均不推定为命令开始时间。分次检查不构成同一冻结修订的全部验收，后续源码变化须另记证据。
+
+## 合并复核（2026-11-09 19:18 +08:00）
+
+按所有者要求，将主目录 `platform-v2` 的 `f964e4dd`（包含 `079daa24`）合入可移植性实现 `442223ee`，再更新主目录。保留主分支的对话续接、进度、pending reply、冻结请求、Mind 可选应用恢复及 Pi 有限重试，同时保留共享 Agent 合同、Pi 独立包、认证 loopback、原生停止证据和远程交付治理。原始 125 项 hash golden 未修改；主分支 Mind 的六项新增、四项变化另记于 [main merge fixture](../../packages/contracts/fixtures/contract-hash-main-merge.json)。重复的旧 Agent 集成测试移除，保留 `scripts/agent-integration` 中的等价测试；完成回调的固定键、事务回滚和重放断言迁入现行交付测试。
+
+本次检查与此前实施验收分开，不宣称重新跑完所有 Bun 文件：
+
+| 合并后检查 | 实际结果与本机证据 |
+| --- | --- |
+| 根 TypeScript | PASS；`/tmp/chrona-portability-merge-typecheck3.log`，最后新增回调断言后再次检查见 `/tmp/chrona-portability-merge-typecheck-final.log` |
+| Lint | 两父提交逐文件比较 389 文件，0 errors / 62 warnings，无高于两父提交既有债务的文件；`/tmp/chrona-portability-merge-lint-parents.log`。普通单父 ratchet 曾因另一父提交已有 Web 警告失败，保留该结果，不称默认 ratchet 全绿；仓库 ratchet 策略未放宽 |
+| 依赖边界 | PASS，0 errors / 40 warnings，826 modules / 4329 dependencies；`/tmp/chrona-portability-merge-boundaries.log`。先前恢复的重复 browser test 触发三项 Agent 边界错误，确认与已迁移测试等价后删除旧副本，没有添加豁免 |
+| 定向消费面 | 23 文件、278 pass / 0 fail / 0 skip，1939 断言；`/tmp/chrona-portability-merge-tests.log`。包括完成 outbox、hash、Pi retry、Agent 设置/响应、Mind、对话、Web 三尺寸浏览器、MCP/QQ、SDK/进程/Pi 消费面 |
+| 全部 server/API | 19 文件、104 pass / 0 fail，844 断言；`/tmp/chrona-portability-merge-api.log`，每文件独立临时数据库 |
+| 独立复核 | 未确认实质合并回归；253 项定向检查通过，14 个 seeds 的 checksum、commit 与源码树一致。与上面套件有重叠，不相加 |
+| 最终生成与发行 | 14 seeds 再生；初次 compiled resources 检查发现删除重复 Agent browser test 后 seed 滞后，刷新后通过。全新 Linux CLI 编译、shipped SDK checker、默认迁移/health/Web/auth API runtime smoke PASS；`/tmp/chrona-portability-merge-release/`。依赖只使用离线缓存、frozen lockfile、禁用安装脚本 |
+
+上述发行复核仅刷新本地 CLI 和资源；18:36 的独立设备压缩包属于合并前产物，不把旧 checksum 作为本次合并产物。许可证及第三方声明按原文件逐字复制，新增三个声明副本保留原有 EOF 空行。无 push、部署、真实模型或外部账户操作。Windows/macOS、安全归档和完整故障矩阵的未完成项保持原判定。
 
 ## 1. 阶段判定与现行源码
 

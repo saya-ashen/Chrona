@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { stripVTControlCharacters } from "node:util";
 import { providerText } from "@chrona/domain/steward/provider";
 import { PiEvents } from "./pi-events";
@@ -15,9 +15,18 @@ export type { PiProviderOptions } from "./pi-launch";
 type Result = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 function buildProfile(config: PiLaunchConfig, input: ProviderRunInput) {
   if (!input.model && input.resources !== "minimal") return null;
+  const settingsPath = join(config.agentDir, "settings.json");
+  const raw = existsSync(settingsPath) ? readFileSync(settingsPath, "utf8").replace(/^\uFEFF/, "") : "";
+  const settings = raw ? object(JSON.parse(raw)) : {};
+  const retry = object(settings.retry);
   const profile = mkdtempSync(join(config.agentDir, "build-"));
   for (const name of ["auth.json", "models.json"]) if (existsSync(join(config.agentDir, name))) symlinkSync(join(config.agentDir, name), join(profile, name));
-  if (existsSync(join(config.agentDir, "settings.json"))) copyFileSync(join(config.agentDir, "settings.json"), join(profile, "settings.json"));
+  // Pi's RPC setter only changes enabled. Install finite session recovery before spawn;
+  // it continues the failed model stream, retaining prior tool results. Never replay a Run.
+  writeFileSync(join(profile, "settings.json"), JSON.stringify({ ...settings, retry: {
+    ...retry, enabled: true, maxRetries: 2, baseDelayMs: 2000, maxAgentDelayMs: 8000,
+    provider: { ...object(retry.provider), maxRetries: 0 },
+  } }), { mode: 0o600 });
   return profile;
 }
 
@@ -326,6 +335,10 @@ class PiRun {
     const message = object(value);
     if (message.role === "assistant") this.modelError = messageError(message);
   }
+  private retryEnd(event: RecordValue) {
+    this.retrying = false;
+    if (event.success === false) this.modelError = typeof event.finalError === "string" && event.finalError ? event.finalError : this.modelError || "Pi model retry failed";
+  }
   private agentSettled(event: RecordValue) {
     this.sessionSettled = true; this.streaming = false; this.epoch++;
     if (event.aborted === true) this.modelError = "Pi run aborted";
@@ -349,7 +362,7 @@ class PiRun {
       case "response": this.response(event); break;
       case "agent_start": this.streaming = true; this.sessionSettled = false; this.modelError = null; this.epoch++; break;
       case "auto_retry_start": this.retrying = true; this.sessionSettled = false; this.epoch++; break;
-      case "auto_retry_end": this.retrying = false; break;
+      case "auto_retry_end": this.retryEnd(event); break;
       case "compaction_start": case "summarization_retry_scheduled": this.sessionSettled = false; this.epoch++; break;
       case "message_end": this.messageEnd(event.message); break;
       case "agent_end": this.agentEnd(event); break;
@@ -371,7 +384,7 @@ class PiRun {
       if (`${model.provider}/${model.id}` !== this.input.model) throw new Error("Pi selected a different model than the authorized build");
       }
     if (this.input.model || this.input.resources === "minimal") {
-      await this.send("set_auto_retry", { enabled: false });
+      await this.send("set_auto_retry", { enabled: true });
       await this.send("set_auto_compaction", { enabled: false });
     }
     if (typeof state.sessionId === "string") this.sessionId = state.sessionId;
@@ -406,7 +419,7 @@ class PiRun {
       if (invalid) { this.stop("unavailable", invalid); return; }
       if (profileOverlaps(config.agentDir, resolve(this.input.cwd))) { this.stop("unavailable", "Pi profile must be separate from the working directory"); return; }
       if (this.input.resources === "configured" || this.input.content?.length) prepareContent(this.input);
-      // RPC retry/compaction setters persist settings. Give bounded builds a disposable profile,
+      // RPC retry/compaction setters persist settings. Give bounded runs a disposable profile,
       // sharing Pi-managed auth/models by reference, never changing the service's own settings.
       this.runProfile = buildProfile(config, this.input);
       this.child = this.spawn(config);

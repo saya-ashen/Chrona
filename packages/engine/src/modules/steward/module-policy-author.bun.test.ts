@@ -8,14 +8,19 @@ import { runTests } from "./module-continuity";
 import { testDb } from "./test-db";
 import { parsePrepare } from "./external/author/contracts";
 import { prepareMaterial } from "./external/author/workflow";
-import { assertModuleAvailable } from "./module-availability";
 
-test.each(["web", "notify", "qq", "author", "mcp"])("%s author tests preserve application-owned policies", async name => {
+test.each(["web", "notify", "qq", "author", "mcp", "mind"])("%s author tests preserve application-owned policies", async name => {
   const dataDir = await mkdtemp("/tmp/chrona-policy-author-"), db = testDb();
   try {
     const code = join(dataDir, "platform", "store", name);
     await mkdir(code, { recursive: true });
-    await cp(join(import.meta.dirname, "external", name), code, { recursive: true });
+    const source = join(import.meta.dirname, "external", name);
+    await cp(source, code, { recursive: true, filter: path => name !== "mind" || path !== join(source, "node_modules") });
+    if (name === "mind") {
+      const install = Bun.spawn([process.execPath, "install", "--offline", "--frozen-lockfile"], { cwd: code, stdout: "pipe", stderr: "pipe" });
+      const output = await Promise.all([new Response(install.stdout).text(), new Response(install.stderr).text(), install.exited]);
+      expect(output[2], output.slice(0, 2).join("\n")).toBe(0);
+    }
     const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(code, "module.json"), "utf8")));
     const sandbox = createScriptSandbox({ dataDir, executionMode: "trusted-local" });
     const reports: TestReport = [];
@@ -26,17 +31,6 @@ test.each(["web", "notify", "qq", "author", "mcp"])("%s author tests preserve ap
     expect(reports.every(report => report.exitCode === 0)).toBe(true);
   } finally { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 120_000);
-
-test.each([
-  { name: "mind", policies: ["agenda.ts", "execution.ts", "activation-harness.ts"] },
-])("paused $name keeps its author tests and policy sources without executing them", async ({ name, policies }) => {
-  const code = join(import.meta.dirname, "external", name);
-  const manifest = JSON.parse(await readFile(join(code, "module.json"), "utf8")) as { name: string; entry: string; tests: string[] };
-  expect(manifest.name).toBe(name);
-  expect(manifest.tests.length).toBeGreaterThan(0);
-  for (const path of [manifest.entry, ...manifest.tests, ...policies]) expect((await readFile(join(code, path))).byteLength).toBeGreaterThan(0);
-  expect(() => assertModuleAvailable(name)).toThrow(expect.objectContaining({ code: "unavailable", reason: "module_paused" }));
-});
 
 test("Author prepares material-only drafts with evidence standards and no execution authority", async () => {
   const input = parsePrepare({ requestKey: "material-policy", submitter: { moduleId: "author-id", hash: "a".repeat(40) }, targets: [{ name: "sample", moduleId: null, expectedActiveHash: null }],

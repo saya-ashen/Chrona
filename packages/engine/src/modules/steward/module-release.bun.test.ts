@@ -19,7 +19,7 @@ async function fixture(name = "files") {
   const git = await seedTestModuleRelease(resources, name);
   return { root, resources, codeDir, git, ports: { moduleExternalResources: resources } };
 }
-test.each(["files", "author", "coding", "coding-web"])("offline %s release identity is its real commit with no invented upstream", async name => {
+test.each(["files", "author", "coding", "coding-web", "mind"])("offline %s release identity is its real commit with no invented upstream", async name => {
   const f = await fixture(name), release = await resolveExternalRelease(f.ports, name);
   expect(release.hash).toBe(f.git.commit);
   expect(release.git).toEqual({ repository: null, branch: "main", commit: f.git.commit, bundlePath: f.git.bundlePath });
@@ -32,7 +32,7 @@ test.each(["files", "events", "web", "notify"])("extracted official %s still ver
   await writeFile(join(f.codeDir, "index.ts"), "// changed after approval\n");
   await expect(resolveExternalRelease(f.ports, name, hash)).rejects.toMatchObject({ reason: "release_drift" });
 });
-test.each(["files", "author", "coding", "coding-web"])("%s bundle integrity and source commit drift both fail closed", async name => {
+test.each(["files", "author", "coding", "coding-web", "mind"])("%s bundle integrity and source commit drift both fail closed", async name => {
   const f = await fixture(name);
   await writeFile(join(f.codeDir, "index.ts"), "// drift\n");
   await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
@@ -40,7 +40,7 @@ test.each(["files", "author", "coding", "coding-web"])("%s bundle integrity and 
   await appendFile(f.git.bundlePath, "tampered");
   await expect(resolveExternalRelease(f.ports, name)).rejects.toMatchObject({ reason: "release_drift" });
 });
-test.each(["files", "author", "coding", "coding-web"])("new %s release has no snapshot fallback when lock is missing or ambiguous", async name => {
+test.each(["files", "author", "coding", "coding-web", "mind"])("new %s release has no snapshot fallback when lock is missing or ambiguous", async name => {
   const f = await fixture(name), lockPath = join(f.root, "module-git", "lock.json");
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   lock.modules.push(lock.modules[0]); await writeFile(lockPath, JSON.stringify(lock));

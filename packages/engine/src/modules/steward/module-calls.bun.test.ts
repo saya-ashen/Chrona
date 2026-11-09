@@ -573,8 +573,8 @@ test("paused installed callers cannot invoke active tools or receive deferred re
   const origin = { ...kernelOrigin(f.workspace.id), caller: { kind: "module" as const, module: "alpha", moduleId: f.alpha.id, hash: "alpha-v1" } };
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin, target: "beta.echo", raw: {} }, { key: "old-callback", reply: true });
   await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { status: "succeeded", output: {}, finishedAt: f.ports.now() } });
-  await f.db.module.update({ where: { id: f.alpha.id }, data: { name: "mind" } });
-  const caller = { ...origin, caller: { ...origin.caller, module: "mind" } };
+  await f.db.module.update({ where: { id: f.alpha.id }, data: { name: "remind" } });
+  const caller = { ...origin, caller: { ...origin.caller, module: "remind" } };
   await expect(callSync(f.ports, caller, "beta.echo", {})).rejects.toMatchObject({ code: "forbidden" });
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "beta.echo", raw: {} }, { key: "paused-caller" })).rejects.toMatchObject({ code: "forbidden" });
   await expect(enqueueCall({ tx: f.db, ports: f.ports, origin: caller, target: "missing.echo", raw: {} }, { key: "paused-missing" })).rejects.toMatchObject({ code: "forbidden" });

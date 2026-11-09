@@ -19,12 +19,9 @@ const concurrency = Math.max(
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
 );
 
-// These application sources are retained pending the owner's decision; boundary/pause tests still run.
-const pausedApplicationSuites = new Set([
-  "packages/engine/src/modules/steward/mind-agent.bun.test.ts",
-]);
+// Remind's source remains retained; its boundary/pause tests still run.
 function shouldInclude(path: string) {
-  if (pausedApplicationSuites.has(path) || /^packages\/engine\/src\/modules\/steward\/external\/(mind|remind)\//.test(path)) return false;
+  if (path.startsWith("packages/engine/src/modules/steward/external/remind/")) return false;
 	const retained = [
 		"scripts/agent-integration/",
 		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",

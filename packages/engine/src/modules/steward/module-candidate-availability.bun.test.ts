@@ -99,7 +99,7 @@ test.each([...PAUSED_MODULE_NAMES])("stored %s admission, source export, receipt
 });
 
 test("a paused grant issuer cannot authorize replay by an otherwise active submitter", async () => {
-  const f = await fixture(), issuer = await f.app("mind");
+  const f = await fixture(), issuer = await f.app("remind");
   const stored = await storedAdmission(f, f.input.targets[0]!, { kind: "module", module: issuer.name, moduleId: issuer.id, hash });
   await expect(submitCandidates(f.ports, f.workspace.id, f.caller, stored.submission)).rejects.toMatchObject(unavailable);
   const set = await storedReceipt(f, stored);

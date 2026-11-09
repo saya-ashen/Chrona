@@ -11,6 +11,7 @@ import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { testModuleSandbox } from "./module-test-process";
 import { moduleSupervisor } from "./module-supervisor";
+import { callsSettled } from "./module-calls";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation } from "./module-evolution";
 import { notice, notices } from "./test-notices";
@@ -30,7 +31,7 @@ async function fixture() {
         output: JSON.stringify({ result: { found: 3 }, effects: [{ type: "notify_user", key: "found", level: "now", title: "Found", body: "Three" }] }) };
     }),
   };
-  cleanups.push(() => moduleSupervisor(ports).stop());
+  cleanups.push(async () => { await callsSettled(ports); await moduleSupervisor(ports).stop(); });
   const workspaceId = (await db.workspace.create({ data: { name: "tools" } })).id;
   registerSystemModules();
   const notifyManifest = moduleManifestSchema.parse(JSON.parse(await Bun.file(new URL("./external/notify/module.json", import.meta.url)).text()));

@@ -35,7 +35,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   routed("modules.reference", args => args.target ? { target: args.target, outputSchema: null, admission: { visibility: ["owner"] } } : contracts.map(({ target }) => ({ target }))),
   routed("modules.list", () => [{ id: "files-id", name: "files", status: "active" }]), routed("modules.diagnostics", () => [diagnostic]),
   routed("agent.context", () => ({ contextId: "context-mcp" })), routed("agent.run", () => ({ runId: "run-mcp", status: "queued", active: true })),
-  routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
+  routed("agent.get", () => ({ status: "finished", active: false })), routed("agent.stream", () => ({ items: [], after: 0, ended: true, transcript: [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "done" }], interactions: [{ id: "i1", status: "pending" }] })),
   routed("agent.respond"), routed("agent.interrupt"), routed("approvals.resolve"), routed("approvals.list", () => []), routed("activity.records", () => ({ items: [], before: null })),
   routed("planning.search", args => args), routed("files.list", () => ["file"]), routed("web.today", () => ({ approvals: [] })), routed("notify.list", () => ({ items: [] })),
   routed("author.prepare", args => ({ kind: "material-only", execution: { supported: false }, admission: { requestKey: JSON.parse(String(args.input)).requestKey, submitter: { moduleId: "author-id", hash: "a".repeat(64) }, targets: [{ name: "example", moduleId: null, expectedActiveHash: null }] } })),

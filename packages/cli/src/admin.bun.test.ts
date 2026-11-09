@@ -203,7 +203,7 @@ test("admin install queues trusted official code offline, preserves the lock and
   }
 });
 
-test.each(["author", "files", "events", "mcp"])("stopped-service official %s recovery needs no other entry, Provider or tick", async name => {
+test.each(["author", "files", "events", "mcp", "mind"])("stopped-service official %s recovery needs no other entry, Provider or tick", async name => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   const previous = process.env.CHRONA_RESOURCE_DIR;
   process.env.CHRONA_RESOURCE_DIR = await offlineResources(f.options.dataDir, name);
@@ -230,7 +230,7 @@ test.each(["author", "files", "events", "mcp"])("stopped-service official %s rec
   }
 });
 
-test.each(["mind", "remind"])("offline admin cannot reinstall paused %s", async name => {
+test.each(["remind"])("offline admin cannot reinstall paused %s", async name => {
   const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
   try {
     expect(await runAdmin("catalog", [], f.options)).toContainEqual(expect.objectContaining({ name, available: false, error: expect.stringContaining("paused") }));

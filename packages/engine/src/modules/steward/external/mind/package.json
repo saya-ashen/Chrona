@@ -1,0 +1,7 @@
+{
+  "name": "chrona-mind",
+  "private": true,
+  "dependencies": {
+    "zod": "4.3.6"
+  }
+}

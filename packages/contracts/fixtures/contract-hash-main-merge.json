@@ -1,0 +1,56 @@
+{
+  "sourceCommit": "079daa24",
+  "reason": "Preserve platform-v2 Mind restoration contracts exactly as committed before merging portability; the original 125-tool baseline remains immutable.",
+  "changes": [
+    {
+      "target": "mind.agenda",
+      "before": "8d03833bb9cdd74bb67514cfd188d02bbe43512110bb15f1e296cddb0de1d6b3",
+      "after": "dbb6c20edc1fac9c13446c223a33c31ad3ed15b27f090eee7d6313992236d150"
+    },
+    {
+      "target": "mind.check",
+      "before": null,
+      "after": "69098e00c48a56247f7b59d0dfcc2fc3677255cdfcab74b156f3f20fd016ca67"
+    },
+    {
+      "target": "mind.decisions",
+      "before": "18cfd9ac4d83e121254bceeece291760b227519ef2a09094651419cb0ab0b290",
+      "after": "6d6b1d12cff2205c4a3af5f42ddcaf501783850c06ae38d13fa6fc28c797365a"
+    },
+    {
+      "target": "mind.note",
+      "before": "1998dfc952353719f1f215a113d7c201aceb26603cadd75a192f3904a4ffa3ec",
+      "after": "e28ec14c270e56ff87a4e97778500f08d770cee351a0b2818bb16d7a5a6dcc41"
+    },
+    {
+      "target": "mind.propose",
+      "before": null,
+      "after": "3455c64e92811d5f0552ea7404a93489d505a21663619fae7b1cad3dd45b655a"
+    },
+    {
+      "target": "mind.report",
+      "before": "fda17c905349cc6528b6d361b45cd929e170b5aadc8181caa4d7ab1c5dd65ff7",
+      "after": "efb6997ff01716dc035968fba53a387a4ba591820a1315e50c834168aa71f077"
+    },
+    {
+      "target": "mind.signal",
+      "before": null,
+      "after": "0452f409283644b1095fef8c378adca1163f11af59e8c64752e8cfaefbb193f4"
+    },
+    {
+      "target": "mind.ui-agenda",
+      "before": null,
+      "after": "dc44542bb8287391ba6cedf0bfac6fff094de44a3f9d719e738f9ea4db45b9b6"
+    },
+    {
+      "target": "mind.ui-dismiss",
+      "before": null,
+      "after": "17291974df0a02bc7efa75be6b2c6ab2df4a5273c67403f0f3668ade01d99d4a"
+    },
+    {
+      "target": "mind.ui-settings",
+      "before": null,
+      "after": "d6031d01e8394c48e5910a10e644cc31ce6f140eeb25cd29bec1a8f97cce2d00"
+    }
+  ]
+}

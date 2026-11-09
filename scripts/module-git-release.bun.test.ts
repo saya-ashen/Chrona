@@ -68,10 +68,12 @@ test("clean seed generation is deterministic and rejects mismatched packaged cod
   try {
     const first = await prepareModuleGitRelease(f), again = await prepareModuleGitRelease(second);
     expect(first).toEqual(again);
-    const source = join(f.resourcesRoot, "external/coding/contract.js");
-    await writeFile(source, "// generated after seed\n");
-    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("differs from packaged source");
-    await rm(source);
+    for (const name of ["coding", "mind"]) {
+      const source = join(f.resourcesRoot, `external/${name}/contract.js`);
+      await writeFile(source, "// generated after seed\n");
+      await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow(`Module seed differs from packaged source: ${name}`);
+      await rm(source);
+    }
     const license = join(f.resourcesRoot, "external/web/LICENSE");
     await writeFile(license, "wrong license\n");
     await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("differs from packaged source");

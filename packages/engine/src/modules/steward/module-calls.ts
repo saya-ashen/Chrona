@@ -11,6 +11,7 @@ import type { SystemTool, SystemModule } from "./module-system-types";
 export type { SystemTool, SystemModule } from "./module-system-types";
 import { authorizeAgentRequest } from "./agent-application";
 import { retainAgentCaller } from "./agent-caller-context";
+import { isAgentContextEntry } from "./agent-context-entry";
 import { admitted } from "./module-call-admission";
 export { admitted } from "./module-call-admission";
 import { moduleCallbackContractHash, validateToolArgs } from "./module-tool-contract";
@@ -240,7 +241,8 @@ async function addWaitEdge(edges: Map<string, string[]>, name: string | null, ta
 async function invokeModuleSync({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }: SyncInvocation & { timeoutMs?: number; rowId: string; finish: (data: Prisma.ModuleInvocationUpdateInput) => Promise<unknown> }) {
   let graph = waiting.get(ports.db);
   if (!graph) { graph = new Map(); waiting.set(ports.db, graph); }
-  const name = callerName(origin.caller), edges = graph;
+  // A detached Agent entry has an identity, but no originating module event waiting on it.
+  const name = isAgentContextEntry(ports, origin) ? null : callerName(origin.caller), edges = graph;
   await addWaitEdge(edges, name, resolved.module.name, target, finish);
   let reply;
   try { reply = await deliverSyncModule({ ports, origin, resolved, target, args, chain, path, now, timeoutMs, activationId, rowId, finish }); }
@@ -261,7 +263,7 @@ async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target
   if (resolved instanceof CallError) throw resolved;
   if (!await admitted(ports.db, origin.caller, resolved.tool, origin.workspaceId)) throw new CallError("forbidden", `${target} does not accept calls from this caller`);
   assertExpectedTarget(resolved, expectedTarget);
-  const route = nextPath(origin);
+  const route = isAgentContextEntry(ports, origin) ? { chain: [], path: [] } : nextPath(origin);
   if (route.chain.includes(resolved.module.name)) throw new CallError("cycle", `${target}: ${resolved.module.name} is waiting on this call path (${route.chain.join(" → ")})`);
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
   return { resolved, route };

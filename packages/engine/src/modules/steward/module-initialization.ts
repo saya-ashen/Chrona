@@ -6,8 +6,9 @@ import { redactSensitiveText } from "@chrona/logging/redaction";
 import { seedFactConsumer } from "./notification-facts";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 
-// Keep handled pause decisions in the initialization ledger after removing them from default delivery.
+// These optional apps retain explicit skipped ledger entries, never default installation.
 const initializationNames = [...new Set([...PREINSTALLED_MODULE_NAMES, "mind", "remind"] as const)];
+const isPreinstalled = (name: string) => PREINSTALLED_MODULE_NAMES.some(preinstalled => preinstalled === name);
 const KEY = "moduleInitialization";
 const settingsObject = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 async function read(tx: Prisma.TransactionClient, workspaceId: string) {
@@ -54,20 +55,20 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
     // Existing external apps count as handled. Do not replace their custom code.
     for (const name of initializationNames) {
       const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
-      if (isModulePaused(name)) initial.packages[name] = pausedPackage(name, { ...initial.packages[name], moduleId: module?.id ?? null });
+      if (!isPreinstalled(name)) initial.packages[name] = skippedOptionalPackage(name, { ...initial.packages[name], moduleId: module?.id ?? null });
       else if (module) initial.packages[name] = { ...initial.packages[name], status: "skipped", moduleId: module.id };
     }
     await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...stored.settings, [KEY]: initial } as Prisma.InputJsonValue } });
     return initial;
   });
-  await recordPausedPackages(ports, workspaceId, state);
+  await recordOptionalPackages(ports, workspaceId, state);
   if (state.status === "complete") {
     await seedInitialFactConsumer(ports, workspaceId);
     return state;
   }
   for (const name of initializationNames) {
     const previous = state.packages[name];
-    if (isModulePaused(name)) continue;
+    if (!isPreinstalled(name)) continue;
     if (["installed", "skipped"].includes(previous.status)) continue;
     // The recorded app was deliberately removed while initialization was pending.
     if (previous.moduleId && !await ports.db.module.findFirst({ where: { id: previous.moduleId, workspaceId } })) {
@@ -93,15 +94,16 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
   return state;
 }
 
-async function recordPausedPackages(ports: StewardPorts, workspaceId: string, state: ModuleInitializationState) {
+async function recordOptionalPackages(ports: StewardPorts, workspaceId: string, state: ModuleInitializationState) {
   for (const name of initializationNames) {
-    if (isModulePaused(name) && state.packages[name].status !== "skipped") {
-      state.packages[name] = pausedPackage(name, state.packages[name]);
+    if (!isPreinstalled(name) && state.packages[name].status !== "skipped") {
+      state.packages[name] = skippedOptionalPackage(name, state.packages[name]);
       await save(ports, workspaceId, state);
     }
   }
 }
-function pausedPackage(name: string, previous: ModuleInitializationState["packages"]["notify"]): ModuleInitializationState["packages"]["notify"] {
+function skippedOptionalPackage(name: string, previous: ModuleInitializationState["packages"]["notify"]): ModuleInitializationState["packages"]["notify"] {
+  if (!isModulePaused(name)) return { ...previous, status: "skipped", error: null };
   const { reason, message } = new ModuleUnavailableError(name);
   return { ...previous, status: "skipped", error: { code: "unavailable", reason, message } };
 }

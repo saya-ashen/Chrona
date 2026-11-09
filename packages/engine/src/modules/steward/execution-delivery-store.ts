@@ -26,7 +26,6 @@ export function kernelPlacementView(a: DeliveryRow["attempt"]): KernelPlacementV
 }
 export async function admitApplicationExecution(ports: StewardPorts, principal: ExecutionPrincipal, raw: KernelExecutionStart) {
   const input = applicationExecutionStartSchema.parse(raw);
-  if (input.placement.kind !== "application") throw new CallError("unsupported", "Local execution uses the host workspace admission port");
   const placement = input.placement;
   const admitted = await ports.db.$transaction(async tx => {
     await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;

@@ -8,6 +8,11 @@ const eslintConfig = defineConfig([
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: [".dependency-cruiser-resolve.cjs"],
+    languageOptions: { sourceType: "commonjs", globals: globals.node },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     // The built-in web module executes in a browser.
     files: ["packages/engine/src/modules/steward/external/web/*.js"],
     languageOptions: { globals: globals.browser },
@@ -177,12 +182,9 @@ const eslintConfig = defineConfig([
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",
-    // Retained paused applications still use removed kernel contracts. Match
-    // tsconfig.json's exclusions until these callers migrate to the permanent
-    // boundary; keeping their sources does not make them active build inputs.
-    "packages/engine/src/modules/steward/external/mind/**",
+    // Remind retains removed kernel contracts until its separate restoration.
+    // Match tsconfig.json: retained source is not an active build input.
     "packages/engine/src/modules/steward/external/remind/**",
-    "packages/engine/src/modules/steward/mind-agent.bun.test.ts",
     // Generated browser bundle; lint its src/pages.tsx source instead.
     "packages/engine/src/modules/steward/external/web/pages.js",
     // Generated Agent bundles; lint their TypeScript sources instead.

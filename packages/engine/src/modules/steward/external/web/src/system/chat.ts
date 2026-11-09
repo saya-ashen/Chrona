@@ -3,7 +3,10 @@ import type { ReplyEvent, Subscribe } from "./adapter";
 import { builder } from "./spec";
 
 export type ChatSession = { id: string; title?: string | null; createdAt: string; source: string };
-export type Message = { id: string; direction: string; text: string; attachments?: { name: string; ref?: string | null }[] };
+import type { Execution } from "./chat-execution";
+export type { Execution } from "./chat-execution";
+export const continueRequest = (runId: string) => ({ runId, requestKey: `web-continue:${runId}` });
+export type Message = { id: string; direction: string; text: string; execution?: Execution; progress?: string; attachments?: { name: string; ref?: string | null }[] };
 export const chatData = { sessions: { tool: "sessions" } };
 export function selectedSession(path: string, sessions: ChatSession[]) {
   const parts = path.split("/").filter(Boolean);
@@ -27,12 +30,16 @@ export function chatSpec(state: Record<string, unknown>, path: string): Spec {
 export function openMessages(session: string, subscribe: Subscribe, load: () => Promise<Message[]>, handlers: { show: (items: Message[]) => void; reply: () => void; fail: (error: Error) => void }) {
   const { show, reply, fail } = handlers;
   let stopped = false, loaded = false;
-  const messages: Message[] = [], early: Message[] = [], shown = new Set<string>();
-  const append = (message: Message) => { if (!shown.has(message.id)) { shown.add(message.id); messages.push(message); } };
+  const messages: Message[] = [], early: Message[] = [];
+  const append = (message: Message) => {
+    const index = messages.findIndex(item => item.id === message.id);
+    if (index >= 0) messages[index] = { ...messages[index], ...message };
+    else messages.push(message);
+  };
   const unsubscribe = subscribe((event: ReplyEvent) => {
     if (stopped || event.type !== "reply" || event.session !== session || !event.message) return;
     try {
-      const message: Message = { id: event.message, direction: "out", text: event.text ?? "", attachments: JSON.parse(event.attachments ?? "[]") };
+      const message: Message = { id: event.message, direction: "out", text: event.text ?? "", attachments: JSON.parse(event.attachments ?? "[]"), ...(event.execution ? { execution: event.execution, progress: event.progress } : {}) };
       reply();
       if (loaded) { append(message); show([...messages]); } else early.push(message);
     } catch (error) { fail(error as Error); }

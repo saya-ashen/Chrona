@@ -5,17 +5,17 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "2569b346f1378441343f8f57aeb2f63d3ec4b973",
+      "commit": "021c1933b58ab6b99ee4a5b6ac017035805d4fe9",
       "bundle": "web.bundle",
-      "bundleSha256": "5d787d47c6b4290d539a6885a09b643705da3590b1242b6d9f745455db25b2e6"
+      "bundleSha256": "a765b590cf9d3dae888ae1cbd2a6ee5de6ea567939e8daaada400f497d4e03b1"
     },
     {
       "name": "mcp",
       "repository": null,
       "branch": "main",
-      "commit": "3d0413663011f3013994702b174828ab3254f529",
+      "commit": "29ac2a7865a2d598334111476fd1a7b0c30719ea",
       "bundle": "mcp.bundle",
-      "bundleSha256": "7008c599ffa45772a705489c65741688ebd5036c37a2e403cb891e36ecc03512"
+      "bundleSha256": "892d897552f22b440f1830bc2632ceac1dad2e946a60c42133c36fe5067f42bb"
     },
     {
       "name": "files",
@@ -45,25 +45,25 @@
       "name": "agent",
       "repository": null,
       "branch": "main",
-      "commit": "32ecbe00144cae2b5895fc4857ad43c3728fa4c8",
+      "commit": "2486d8c8c8e3ef4ebe2af168c42b11729b56b990",
       "bundle": "agent.bundle",
-      "bundleSha256": "7e3c4696d9ae3db5be402170c6a3005396a2ba5749456305e5df890c16dc6761"
+      "bundleSha256": "cd1e834b02a598874bf2119f5555fa45f1edf6a867230a019fcb69af658f6da3"
     },
     {
       "name": "qq",
       "repository": null,
       "branch": "main",
-      "commit": "dde28b8286d8715a23a36464f26d16fbac04b3d6",
+      "commit": "6c3312c5f1a9d083465e465cd953f86af54b2ab1",
       "bundle": "qq.bundle",
-      "bundleSha256": "0c39c6ee65c0890c2bc3427b4b5b852ab240dc30504fce109d9534e201799f73"
+      "bundleSha256": "bd274375fc0c309097b6e90e9d549ae4fc16bc231028b35b1609ac58f46ad0ac"
     },
     {
       "name": "author",
       "repository": null,
       "branch": "main",
-      "commit": "24071ee993c0423c73d75322573083a55e2b03ed",
+      "commit": "c0e74db32c94a2ce1f20286d0aa390c11e5e55dd",
       "bundle": "author.bundle",
-      "bundleSha256": "6353e1cc5ac61a8ef21fdf5776d66af6c592e1d0baf34985de0012de94fb886f"
+      "bundleSha256": "ed3cd23f52f362e24b3f678d44928913fb8e3f1b3e07929957579958fe00cf64"
     },
     {
       "name": "remind",
@@ -77,9 +77,9 @@
       "name": "mind",
       "repository": null,
       "branch": "main",
-      "commit": "ea4cf602e25e37568c9df1e7e104d016ce0f8fac",
+      "commit": "1049976aec72ce099e67803c004586f477832857",
       "bundle": "mind.bundle",
-      "bundleSha256": "36d75e6653a7e46b866aaff4184ff0ddfd9f2ded3b4397dd2a392d346106eab9"
+      "bundleSha256": "986d1b2e6d330a4db3240bc9511282e943b954aab95ee528f406aa0515d2c299"
     },
     {
       "name": "memory-local",
@@ -109,9 +109,9 @@
       "name": "remote-execution",
       "repository": null,
       "branch": "main",
-      "commit": "e7f05e2ef5e476eaabf35c95d11ac8cac6e3b3a8",
+      "commit": "da462b853373262cb24479394979fb8348a3f039",
       "bundle": "remote-execution.bundle",
-      "bundleSha256": "e9f783050a834fdc3a8b9ad1708de0b048f3205857e06d6fda8be220888db671"
+      "bundleSha256": "f54fb9015aa44bdcffbd91fa43f478fb87193842062cdfde02046fe1ae2d16ec"
     }
   ]
 }

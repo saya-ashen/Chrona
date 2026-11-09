@@ -73,7 +73,7 @@ for (const persistent of [false, true]) {
   }, 20_000);
 }
 
-for (const name of ["remind", "mind"] as const) for (const status of ["active", "paused"] as const) {
+for (const name of ["remind"] as const) for (const status of ["active", "paused"] as const) {
   test(`retained ${name} source never registers or executes while admission is paused (status=${status})`, async () => {
     const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-registration-paused-"));
     const externalRoot = join(dataDir, "platform", "external"), source = join(externalRoot, name);

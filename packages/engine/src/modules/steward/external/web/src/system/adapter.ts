@@ -1,5 +1,6 @@
+import type { Execution } from "./chat-execution";
 type Args = Record<string, unknown>;
-export type ReplyEvent = { type: string; session?: string; message?: string; text?: string; attachments?: string };
+export type ReplyEvent = { type: string; session?: string; message?: string; text?: string; attachments?: string; execution?: Execution; progress?: string };
 export type Subscribe = (listener: (event: ReplyEvent) => void) => () => void;
 export type SystemHost = {
   web: (path: string, options?: { method?: string; body?: unknown; raw?: boolean }) => Promise<unknown>;
@@ -32,6 +33,9 @@ export function systemCall(host: SystemHost) {
     call: args => post("/call", { target: args.target, args: args.args }),
     sessions: () => host.web("/sessions"),
     messages: args => host.web(`/sessions/${id(args)}/messages`),
+    execution: args => host.web(`/sessions/${id(args)}/execution`),
+    continue: args => post(`/sessions/${id(args)}/continue`, { runId: args.runId, requestKey: args.requestKey }),
+    reconcile: args => post(`/sessions/${id(args)}/reconcile`, { requestKey: args.requestKey }),
     chat: args => post("/chat", { text: args.text, ...(args.session ? { session: args.session } : {}), ...(args.requestKey ? { requestKey: args.requestKey } : {}) }),
     file: args => host.web(`/file?message=${encodeURIComponent(String(args.message))}&ref=${encodeURIComponent(String(args.ref))}`, { raw: true }),
     transcript: args => host.web(`/sessions/${id(args)}/transcript`),

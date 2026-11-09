@@ -1,0 +1,1 @@
+export type Execution = { runId: string; status: string; active: boolean; phase?: string; reason?: string; canContinue: boolean; replyPending?: boolean; pendingAdmission?: { requestKey: string }; pendingContinuation?: { runId: string; requestKey: string } };

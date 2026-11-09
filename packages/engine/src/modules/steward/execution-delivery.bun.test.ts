@@ -14,6 +14,7 @@ import { recordModuleActivation } from "./module-evolution";
 import { recordModuleExecution } from "./module-failure-policy";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { verifyExecutionStop } from "./execution-delivery-stop";
+import { enqueueCall } from "./module-calls";
 
 const databases: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of databases.splice(0)) await db.$disconnect(); });
@@ -35,6 +36,16 @@ async function fixture() {
   const final: ExecutionDeliveryFinal = { outcome: "finished", error: null, throughSourceSeq: 0, baseline, finalMessage: null, missing: false };
   return { db, ports, caller, app, principal, owner, receiver, key, approval, input, final, service, setNow: (next: Date) => { now = next; } };
 }
+async function installCompletionOutbox(f: Awaited<ReturnType<typeof fixture>>) {
+  const manifest = moduleManifestSchema.parse({ name: f.caller.name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "get", description: "Read work", idempotent: true, visibility: ["owner"], parameters: { type: "object", properties: { input: { type: "string" } }, required: ["input"] } }] });
+  await f.db.moduleVersion.create({ data: { moduleId: f.caller.id, hash: f.caller.activeHash!, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  f.ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
+    const attempt = await tx.executionAttempt.findUniqueOrThrow({ where: { runId } });
+    await enqueueCall({ tx, ports: f.ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: `${f.caller.name}.get`, raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
+  };
+  return f.ports.onExecutionFinishedIn;
+}
+
 test("claim and complete launch survive fake-app crash, response loss and restart; signed stop releases once", async () => {
   const f = await fixture(), admitted = await f.service.admit(f.principal, f.input);
   expect(await f.db.run.count()).toBe(1);
@@ -122,8 +133,9 @@ test("source replay is fixed, gaps roll back, and signatures bind source, proces
   expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: d.target.attemptId } })).toMatchObject({ stopConfirmedAt: null, heldDirectory: expect.any(String) });
 });
 
-test("claim and stop settlement roll back together with delivery, Run and occupancy", async () => {
-  const f = await fixture(); await f.service.admit(f.principal, f.input);
+test("claim, final and stop settlement roll back together with the real completion outbox, snapshot, Run and occupancy", async () => {
+  const f = await fixture(), enqueueCompletion = await installCompletionOutbox(f);
+  await f.service.admit(f.principal, f.input);
   const events = f.ports.executionEvents!;
   f.ports.executionEvents = { ...events, async saveSnapshot() { throw new Error("fake crash after delivery insert"); } };
   await expect(createRuns(f.ports, f.principal.workspaceId).claimNext("background", undefined, { kind: "application" })).rejects.toThrow("fake crash");
@@ -131,17 +143,80 @@ test("claim and stop settlement roll back together with delivery, Run and occupa
   expect(await f.db.run.findFirstOrThrow()).toMatchObject({ status: "queued", startedAt: null });
   f.ports.executionEvents = events;
   const d = (await f.service.poll(f.receiver)).deliveries[0]!;
+  const crashAfterEnqueue: typeof enqueueCompletion = async (tx, workspaceId, runId) => {
+    await enqueueCompletion(tx, workspaceId, runId);
+    throw new Error("fake crash after completion enqueue");
+  };
+  const beforeFinal = await f.db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: d.target.attemptId } });
+  f.ports.onExecutionFinishedIn = crashAfterEnqueue;
+  await expect(f.service.final(f.receiver, d.target, "final", f.final)).rejects.toThrow("fake crash after completion enqueue");
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+  expect(await f.db.executionDelivery.findUniqueOrThrow({ where: { id: d.target.deliveryId } })).toMatchObject({ finalDigest: null, final: null, finalCommittedAt: null, settledAt: null });
+  expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: d.target.attemptId } })).toMatchObject({ capabilityRevokedAt: null, stopConfirmedAt: null, heldDirectory: expect.any(String) });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: d.target.runId } })).toMatchObject({ status: "running", endedAt: null });
+  expect(await f.db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: d.target.attemptId } })).toEqual(beforeFinal);
+  expect(await f.db.executionReceipt.count({ where: { operation: "final" } })).toBe(0);
+  f.ports.onExecutionFinishedIn = enqueueCompletion;
   const final = await f.service.final(f.receiver, d.target, "final", f.final);
+  const unknownCallbacks = await f.db.moduleInvocation.findMany();
+  expect(unknownCallbacks.map(row => row.key)).toEqual([`execution-result:${d.target.attemptId}:unknown`]);
+  const beforeStop = await f.db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: d.target.attemptId } });
   const statement: ExecutionSignedStop["statement"] = { target: d.target, kind: "never_started", processIdentity: null, finalDigest: final.finalDigest, sourceThrough: 0, observedAt: f.ports.now().toISOString() };
   const proof = { statement, signature: sign(null, Buffer.from(executionDigest(statement), "hex"), f.key.privateKey).toString("base64") };
-  f.ports.onExecutionFinishedIn = async () => { throw new Error("fake crash during settlement"); };
-  await expect(f.service.stop(f.receiver, d.target, "stop", proof)).rejects.toThrow("fake crash");
-  expect(await f.db.executionDelivery.findUniqueOrThrow({ where: { id: d.target.deliveryId } })).toMatchObject({ settledAt: null });
+  f.ports.onExecutionFinishedIn = crashAfterEnqueue;
+  await expect(f.service.stop(f.receiver, d.target, "stop", proof)).rejects.toThrow("fake crash after completion enqueue");
+  expect(await f.db.moduleInvocation.findMany()).toEqual(unknownCallbacks);
+  expect(await f.db.executionDelivery.findUniqueOrThrow({ where: { id: d.target.deliveryId } })).toMatchObject({ finalDigest: final.finalDigest, settledAt: null });
   expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: d.target.attemptId } })).toMatchObject({ stopConfirmedAt: null, heldDirectory: expect.any(String) });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: d.target.runId } })).toMatchObject({ status: "failed", error: "Execution stop is unconfirmed" });
+  expect(await f.db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: d.target.attemptId } })).toEqual(beforeStop);
   expect(await f.db.executionReceipt.count({ where: { operation: "stop" } })).toBe(0);
-  delete f.ports.onExecutionFinishedIn;
-  await f.service.stop(f.receiver, d.target, "stop", proof);
+  f.ports.onExecutionFinishedIn = enqueueCompletion;
+  const restarted = createExecutionDelivery(f.ports), stopped = await restarted.stop(f.receiver, d.target, "stop", proof);
+  expect(await createExecutionDelivery(f.ports).stop(f.receiver, d.target, "stop", proof)).toEqual(stopped);
+  expect((await f.db.moduleInvocation.findMany()).map(row => row.key).sort()).toEqual([`execution-result:${d.target.attemptId}:unknown`, `execution-result:${d.target.attemptId}:stopped`].sort());
+  expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: d.target.attemptId } })).toMatchObject({ stopConfirmedAt: expect.any(Date), heldDirectory: null });
   expect(await f.db.run.findUniqueOrThrow({ where: { id: d.target.runId } })).toMatchObject({ status: "finished" });
+});
+
+test("queued cancel and offered unknown-to-signed-stop completion keep exact outbox keys and identity across replay and restart", async () => {
+  const f = await fixture(); await installCompletionOutbox(f);
+  const queued = await f.service.admit(f.principal, f.input);
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: queued.execution.runId } })).toMatchObject({ status: "queued", startedAt: null });
+  expect(await f.db.executionDelivery.count()).toBe(0);
+  const cancelled = await f.service.control(f.principal, f.input.workId, "cancel", { operation: "cancel" });
+  expect(await createExecutionDelivery(f.ports).control(f.principal, f.input.workId, "cancel", { operation: "cancel" })).toEqual(cancelled);
+  expect(await f.db.executionDelivery.count()).toBe(0);
+  expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: queued.execution.attemptId } })).toMatchObject({ stopConfirmedAt: expect.any(Date), heldDirectory: null });
+  expect((await f.db.moduleInvocation.findMany()).map(row => row.key)).toEqual([`execution-result:${queued.execution.attemptId}:stopped`]);
+
+  const offered = await f.service.admit(f.principal, { ...f.input, workId: "offered", commandKey: "offered" });
+  const d = (await f.service.poll(f.receiver)).deliveries[0]!;
+  expect(d.target.attemptId).toBe(offered.execution.attemptId);
+  const final = await f.service.final(f.receiver, d.target, "final", f.final);
+  const unknownCallbacks = await f.db.moduleInvocation.findMany({ orderBy: { key: "asc" } });
+  expect(unknownCallbacks.map(row => row.key).sort()).toEqual([`execution-result:${queued.execution.attemptId}:stopped`, `execution-result:${offered.execution.attemptId}:unknown`].sort());
+  expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: offered.execution.attemptId } })).toMatchObject({ stopConfirmedAt: null, heldDirectory: expect.any(String) });
+  expect(await createExecutionDelivery(f.ports).final(f.receiver, d.target, "final", f.final)).toEqual(final);
+  expect(await createExecutionDelivery(f.ports).final(f.receiver, d.target, "final-again", f.final)).toEqual(final);
+  expect(await f.db.moduleInvocation.findMany({ orderBy: { key: "asc" } })).toEqual(unknownCallbacks);
+
+  const statement: ExecutionSignedStop["statement"] = { target: d.target, kind: "never_started", processIdentity: null, finalDigest: final.finalDigest, sourceThrough: 0, observedAt: f.ports.now().toISOString() };
+  const proof = { statement, signature: sign(null, Buffer.from(executionDigest(statement), "hex"), f.key.privateKey).toString("base64") };
+  const stopped = await createExecutionDelivery(f.ports).stop(f.receiver, d.target, "stop", proof);
+  const callbacks = await f.db.moduleInvocation.findMany({ orderBy: { key: "asc" } });
+  expect(callbacks.map(row => row.key).sort()).toEqual([
+    `execution-result:${queued.execution.attemptId}:stopped`,
+    `execution-result:${offered.execution.attemptId}:unknown`,
+    `execution-result:${offered.execution.attemptId}:stopped`,
+  ].sort());
+  for (const row of callbacks) expect(row).toMatchObject({ workspaceId: f.principal.workspaceId, target: f.caller.name, tool: "get", mode: "async", status: "queued", caller: "owner", callerModuleId: null, callerHash: null, args: { input: JSON.stringify({ workId: row.key === `execution-result:${queued.execution.attemptId}:stopped` ? f.input.workId : "offered" }) } });
+  const restarted = createExecutionDelivery(f.ports);
+  expect(await restarted.stop(f.receiver, d.target, "stop", proof)).toEqual(stopped);
+  expect(await restarted.stop(f.receiver, d.target, "stop-again", proof)).toEqual(stopped);
+  expect(await restarted.final(f.receiver, d.target, "final", f.final)).toEqual(final);
+  expect(await restarted.control(f.principal, f.input.workId, "cancel", { operation: "cancel" })).toEqual(cancelled);
+  expect(await f.db.moduleInvocation.findMany({ orderBy: { key: "asc" } })).toEqual(callbacks);
 });
 
 test("unknown stop occupies the same capacity across authority epochs and independent workspaces", async () => {

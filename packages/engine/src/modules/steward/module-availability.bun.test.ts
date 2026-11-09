@@ -3,8 +3,8 @@ import { assertModuleAvailable, isModulePaused, ModuleUnavailableError, PAUSED_M
 import { CallError } from "./module-call-error";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 
-test("only the two retained unmigrated applications remain paused", () => {
-  expect([...PAUSED_MODULE_NAMES].sort()).toEqual(["mind", "remind"]);
+test("only retained Remind remains paused", () => {
+  expect([...PAUSED_MODULE_NAMES]).toEqual(["remind"]);
 });
 
 test.each([...PAUSED_MODULE_NAMES])("%s is explicitly unavailable even without configured release resources", async name => {
@@ -17,7 +17,7 @@ test.each([...PAUSED_MODULE_NAMES])("%s is explicitly unavailable even without c
   }
 });
 
-test.each(["coding", "coding-web", "web", "qq", "notify", "agent", "author", "events", "files", "memory-local", "mcp"])("%s remains admitted by the temporary policy", name => {
+test.each(["mind", "coding", "coding-web", "web", "qq", "notify", "agent", "author", "events", "files", "memory-local", "mcp"])("%s remains admitted by the temporary policy", name => {
   expect(isModulePaused(name)).toBe(false);
   expect(() => assertModuleAvailable(name)).not.toThrow();
 });

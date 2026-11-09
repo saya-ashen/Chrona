@@ -213,6 +213,9 @@ async function checkChat() {
   await call("$web.chat", { text: "new" }); await call("$web.chat", { text: "existing", session: "s", requestKey: "stable-message" });
   await call("$web.file", { message: "m /", ref: "chat/a 中.txt" });
   assert.deepEqual(mapped, [["/sessions"], ["/sessions/a%2Fb%20%E4%B8%AD/messages"], ["/chat", { method: "POST", body: { text: "new" } }], ["/chat", { method: "POST", body: { text: "existing", session: "s", requestKey: "stable-message" } }], ["/file?message=m%20%2F&ref=chat%2Fa%20%E4%B8%AD.txt", { raw: true }]]);
+  await call("$web.execution", { id: "a/b 中" });
+  await call("$web.continue", { id: "a/b 中", runId: "failed-run", requestKey: "web-continue:failed-run" });
+  assert.deepEqual(mapped.slice(-2), [["/sessions/a%2Fb%20%E4%B8%AD/execution"], ["/sessions/a%2Fb%20%E4%B8%AD/continue", { method: "POST", body: { runId: "failed-run", requestKey: "web-continue:failed-run" } }]]);
   const sessions = [{ id: "newest", title: "最新", source: "web", createdAt: "2026-11-04" }, { id: "a/b", source: "build", createdAt: "2026-11-03" }];
   for (const [path, expected] of [["/chat", "newest"], ["/chat/new", null], ["/sessions/a%2Fb", "a/b"], ["/sessions/missing", "missing"]] as const) {
     assert.equal(selectedSession(path, sessions), expected);

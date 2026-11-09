@@ -31,8 +31,6 @@ node_modules/
 !/build/entry-conversations.ts
 !/build/manifest.ts
 !/build/manifest.bun.test.ts
-!/build/agent-dependencies.ts
-!/build/agent-declaration-bundle.ts
 !/build/execution-contracts.ts
 !/build/execution-contract-types.ts
 !/build/execution-contracts.bun.test.ts

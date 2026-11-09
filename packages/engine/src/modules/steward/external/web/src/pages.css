@@ -168,3 +168,10 @@
 @media (prefers-color-scheme: dark) {
   .renderer-diff:not(.renderer-workspace .renderer-diff) { --workspace-add: #173024; --workspace-remove: #3b2228; }
 }
+
+/* Execution outcomes stay distinct from provider progress, including after reload. */
+.chat-outcome { border-inline-start: 3px solid #b45309; padding-inline-start: .75rem; }
+.chat-outcome p, .chat-progress p { margin-block: .5rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-progress { margin-block-start: .75rem; opacity: .85; }
+.chat-progress small { display: block; font-weight: 600; }
+.chat-execution { margin-block: 1rem; overflow-wrap: anywhere; }

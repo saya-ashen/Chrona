@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import hashes from "../../../../contracts/fixtures/contract-hashes.json";
 import transitions from "../../../../contracts/fixtures/contract-hash-transitions.json";
 import additions from "../../../../contracts/fixtures/contract-hash-additions.json";
+import mainMerge from "../../../../contracts/fixtures/contract-hash-main-merge.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -21,7 +22,16 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(expected[transition.target]).toBe(transition.before);
     expected[transition.target] = transition.after;
   }
-  const newTargets = Object.keys(current).filter(target => !Object.hasOwn(hashes, target)).sort();
+  expect(mainMerge.sourceCommit).toBe("079daa24");
+  expect(mainMerge.changes.map(change => change.target)).toEqual([
+    "mind.agenda", "mind.check", "mind.decisions", "mind.note", "mind.propose", "mind.report", "mind.signal", "mind.ui-agenda", "mind.ui-dismiss", "mind.ui-settings",
+  ]);
+  for (const change of mainMerge.changes) {
+    expect((expected as Record<string, string | null>)[change.target] ?? null).toBe(change.before);
+    expect(change.after).toMatch(/^[a-f0-9]{64}$/);
+    expected[change.target] = change.after;
+  }
+  const newTargets = Object.keys(current).filter(target => !Object.hasOwn(expected, target)).sort();
   expect(newTargets).toEqual(additions.map(addition => addition.target).sort());
   for (const addition of additions) {
     expect(addition.hash).toMatch(/^[a-f0-9]{64}$/);

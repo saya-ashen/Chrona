@@ -15,13 +15,20 @@ const stub = (target: string, answer: (args: Args) => unknown) => [target, (args
 let inventoryFailure = false;
 const inventory = [{ id: "m-files", name: "files", status: "active", activeHash: "h" }, { id: "m-p", name: "planning", status: "active", activeHash: "h" }];
 let filesContract = "a".repeat(64);
+let execution = { status: "queued", active: true }, phase = "", earlyText = false;
+const admissions = new Map<string, { digest: string; runId: string; status: string; active: boolean }>();
 const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("activity.runtime", () => ({ at: "2026-10-27T04:00:00Z", provider: { name: "fixture", available: false, sandboxed: false, lastError: null }, moduleSandbox: false, queuedRuns: 0, runningRuns: 0, failedRunsToday: 0, dueSchedules: 0, lastTickAt: null })),
   stub("approvals.list", () => []), stub("modules.health", () => ({ items: [], nextCursor: null })), stub("notify.list", () => ({ items: [] })), stub("notify.status", () => ({ queued: 0, failed: 0 })),
   stub("agent.context", () => ({ contextId: "context-author" })),
-  stub("agent.run", () => ({ runId: "run-author", status: "queued", active: true })),
-  stub("agent.get", () => ({ status: "queued", active: true })),
-  stub("agent.stream", () => ({ transcript: [], interactions: [], items: [], after: 0, ended: false })),
+  stub("agent.run", args => {
+    const key = String(args["request-key"]), digest = JSON.stringify(args);
+    if (admissions.has(key)) assert.equal(admissions.get(key)!.digest, digest);
+    else admissions.set(key, { digest, runId: `run-author-${admissions.size + 1}`, status: "queued", active: true });
+    const { digest: _digest, ...run } = admissions.get(key)!; return run;
+  }),
+  stub("agent.get", () => execution),
+  stub("agent.stream", () => ({ transcript: earlyText ? [{ at: "2026-11-09T00:00:00Z", kind: "text", text: "已开始检查，尚未完成。" }] : [], interactions: [], items: phase ? [{ sequence: 1, payload: { type: "progress", value: { phase } } }] : [], after: phase ? 1 : 0, ended: !execution.active })),
   stub("approvals.resolve", args => ({ id: args.approval })),
   stub("modules.disable", () => ({ status: "paused" })),
   stub("modules.enable", () => ({ status: "active" })),
@@ -118,6 +125,36 @@ try {
   assert.equal(agentRun[1].lane, "foreground");
   assert.equal(calls.filter(([target]) => target === "chat.send").length, 0);
   assert.deepEqual(await (await post("/api/web/chat", { text: "new", requestKey: "author-new" })).json(), created);
+  const sessionPath = `/api/web/sessions/${encodeURIComponent(created.sessionId)}`;
+  const request = { runId: created.runId, requestKey: `web-continue:${created.runId}` };
+  assert.equal((await post(`${sessionPath}/continue`, request)).status, 409);
+  execution = { status: "running", active: true }; phase = "recovering";
+  assert.equal((await (await get(`${sessionPath}/execution`)).json()).phase, "recovering");
+  assert.equal((await post(`${sessionPath}/continue`, request)).status, 409);
+  execution = { status: "unknown", active: true };
+  assert.equal((await post(`${sessionPath}/continue`, request)).status, 409);
+  execution = { status: "failed", active: false }; phase = ""; earlyText = true;
+  const failedMessages = await (await get(`${sessionPath}/messages`)).json();
+  const failed = failedMessages.at(-1);
+  assert.equal(failed.execution.status, "failed"); assert.equal(failed.execution.canContinue, true);
+  assert.match(failed.text, /本次执行失败[\s\S]*已产生的过程文字（不代表完成）/);
+  assert.equal(failed.progress, "已开始检查，尚未完成。");
+  assert.deepEqual(await (await get(`${sessionPath}/messages`)).json(), failedMessages);
+  assert.equal((await post(`${sessionPath}/continue`, { ...request, prompt: "untrusted replacement" })).status, 400);
+  assert.equal((await post(`${sessionPath}/continue`, { ...request, runId: "foreign" })).status, 409);
+  assert.equal((await post("/api/web/sessions/web-agent%3Aforeign/continue", request)).status, 404);
+  const continued = await post(`${sessionPath}/continue`, request);
+  assert.equal(continued.status, 200);
+  const continuation = await continued.json(); assert.equal(continuation.runId, "run-author-2");
+  assert.deepEqual(await (await post(`${sessionPath}/continue`, request)).json(), continuation);
+  assert.equal(admissions.size, 2);
+  const runRequests = calls.filter(([target]) => target === "agent.run");
+  assert.equal(runRequests.length, 2);
+  assert.notEqual(runRequests[0]![1]["request-key"], runRequests[1]![1]["request-key"]);
+  assert.equal(runRequests[0]![1]["context-id"], runRequests.at(-1)![1]["context-id"]);
+  assert.match(String(runRequests.at(-1)![1].prompt), /Inspect the current state and prior tool outcomes/);
+  execution = { status: "queued", active: true };
+  assert.equal((await (await get(`${sessionPath}/execution`)).json()).canContinue, false);
   await post("/api/web/approvals/a1/resolve", { decision: "approve" });
   assert.deepEqual(calls.at(-1), ["approvals.resolve", { approval: "a1", decision: "approve" }]);
   const beforeScope = calls.length;

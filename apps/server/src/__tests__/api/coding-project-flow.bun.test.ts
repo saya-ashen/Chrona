@@ -16,13 +16,14 @@ const { handleCodingCommand } = await import("../../../../../packages/engine/src
 
 // These retained applications are pause-boundary acceptance, not execution acceptance.
 // Keep the expected set literal so adding/removing a pause requires an explicit test decision.
-test("only mind and remind are paused; Coding and its Web peer remain optional applications", () => {
-  expect([...PAUSED_MODULE_NAMES].sort()).toEqual(["mind", "remind"]);
+test("only Remind is paused; Mind, Coding and its Web peer remain optional applications", () => {
+  expect([...PAUSED_MODULE_NAMES].sort()).toEqual(["remind"]);
+  expect(isModulePaused("mind")).toBe(false);
   expect(isModulePaused("coding")).toBe(false);
   expect(isModulePaused("coding-web")).toBe(false);
 });
 
-test.each(["mind", "remind"] as const)("%s retains source but cannot be released, executed, discovered or admitted through the API", async name => {
+test.each(["remind"] as const)("%s retains source but cannot be released, executed, discovered or admitted through the API", async name => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-paused-api-");
   try {
     const workspaceId = (await db.workspace.create({ data: { name: "Pause acceptance" } })).id;
@@ -54,10 +55,10 @@ test.each(["mind", "remind"] as const)("%s retains source but cannot be released
     await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "a".repeat(64), status: "approved", source: "user", intent: {}, report: {},
       manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }) } });
     const session = await db.session.create({ data: { workspaceId, source: "module", key: "pause-test", moduleId: entry.id } });
-    await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", details: { hash: "a".repeat(64) } } });
+    await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "a".repeat(64) } } });
     await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "No model" });
     const run = (await api.runs.claimNext("foreground"))!;
-    await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", details: { targets: ["modules.tools", "modules.admit-candidates"] } } });
+    await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets: ["modules.tools", "modules.admit-candidates"] } } });
     const post = (tool: string, body: unknown) => app.request(`/tools/${tool}`, { method: "POST", headers: { authorization: `Bearer ${run.token}`, "content-type": "application/json" }, body: JSON.stringify(body) }, peer);
     const search = await post("m_modules_tools", { query: name });
     expect(search.status).toBe(200);

@@ -22,7 +22,7 @@ export type Target = {
 };
 export type NativeControl = { requestKey: string; operation: "control"; payload: { operation: "cancel" } | { operation: "write"; text: string } | { operation: "answer"; requestId: string; answer: { decision: "cancel" } | { decision: "submit"; value: boolean | number | string } } } | { requestKey: string; operation: "cleanup"; payload: { op: "preview" | "confirm"; workId: string; commandKey: string; previewDigest?: string } };
 export type ModelInput = { prompt: string; system?: string; maxOutputTokens: number };
-export type ModelResult = { status: "pending" | "rejected" | "completed"; reservationId: string; error?: string | null; result?: { text: string; inputTokens: number | null; outputTokens: number | null } }; 
+export type ModelResult = { status: "pending" | "rejected" | "completed"; reservationId: string; error?: string | null; result?: { text: string; inputTokens: number | null; outputTokens: number | null } };
 export type Launch = {
   fence: Omit<Target, "launchDigest">;
   placement: { kind: "application"; applicationId: string; targetRef: string; targetRevision: number; projectRef: string };

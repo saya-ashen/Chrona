@@ -98,8 +98,6 @@
     "dist",
     "artifacts",
     "packages/pi/resources",
-    "packages/engine/src/modules/steward/external/mind",
-    "packages/engine/src/modules/steward/external/remind",
-    "packages/engine/src/modules/steward/mind-agent.bun.test.ts"
+    "packages/engine/src/modules/steward/external/remind"
   ]
 }

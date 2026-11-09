@@ -17,7 +17,7 @@ async function fixture() {
     if (target === "agent.context") return { contextId: `context:${args["request-key"]}` };
     if (target === "agent.run") { const runId = `run:${prompts.length}`; prompts.push(args); runs.set(runId, { status: "queued", active: true }); return { runId, ...runs.get(runId) }; }
     if (target === "agent.get") return runs.get(String(args["run-id"]));
-    if (target === "agent.stream") return { transcript: [{ at: now().toISOString(), kind: "text", text: "Stored reply" }], interactions: [] };
+    if (target === "agent.stream") return { items: [], after: 0, ended: true, transcript: [{ at: now().toISOString(), kind: "text", text: "Stored reply" }], interactions: [] };
     throw new Error(`Unexpected call: ${target}`);
   };
   const sends: string[] = [];

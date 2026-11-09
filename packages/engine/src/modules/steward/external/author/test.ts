@@ -23,6 +23,9 @@ try {
   const content = join(root, "content"), outside = join(root, "outside");
   await mkdir(content); await mkdir(outside);
   const files = createSourceFiles(content);
+  assert.deepEqual(await files.list(""), { path: "", entries: [] });
+  assert.deepEqual(await files.list("."), { path: "", entries: [] });
+  await assert.rejects(files.list("sources"), { code: "not_found" });
   assert.deepEqual(prepareMaterial(parsePrepare(prepare)).admission, { requestKey: prepare.requestKey, submitter: prepare.submitter, targets: prepare.targets });
   assert.equal(Object.hasOwn(prepareMaterial(parsePrepare(prepare)).admission, "execution"), false);
   assert.match(prepareMaterial(parsePrepare(prepare)).prompt, /checks actually run/);
@@ -157,6 +160,9 @@ async function result(id: string, args: Record<string, unknown>, caller: typeof 
   return reply.result!.result;
 }
 try {
+  assert.deepEqual(await result("list", { path: "" }, provider), { path: "", entries: [] });
+  assert.deepEqual(await result("list", { path: "." }, provider), { path: "", entries: [] });
+  assert.equal((await tool("list", { path: "sources" }, provider)).errorCode, "not_found");
   const draft = await result("prepare", input(prepare));
   assert.deepEqual(draft, prepareMaterial(parsePrepare(prepare)));
   assert.deepEqual(runtime.calls, [], "prepare never calls owner admission or Agent");

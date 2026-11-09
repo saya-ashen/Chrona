@@ -33,7 +33,7 @@ export const buildArtifacts = {
     ],
   },
   // Seeds keep provenance for retained sources; these trees must never ship as runtime packages.
-  pausedModuleResources: ["external/mind", "external/remind"],
+  pausedModuleResources: ["external/remind"],
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },

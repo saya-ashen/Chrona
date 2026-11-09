@@ -175,7 +175,7 @@ test("a real automatically activated group cannot partially roll back after star
 });
 
 test.each(["building", "pending_review"])("stored %s candidates for a paused app reject without interrupting build recovery", async status => {
-  const f = await fixture(), app = await f.app("mind");
+  const f = await fixture(), app = await f.app("remind");
   await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: "next" } }, data: { status } });
   let executed = 0;
   f.ports.packages = { install: async () => { executed++; throw new Error("Paused apps must not install dependencies"); } } as NonNullable<StewardPorts["packages"]>;

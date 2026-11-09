@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
@@ -13,9 +13,10 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
   const path = join(dataDir, "conversations/state.json");
   const journal = async () => JSON.parse(await readFile(path, "utf8"));
   const calls: { target: string; args: Args }[] = [], runs = new Map<string, Run>(), replies: Args[] = [];
-  let failRun = false, failWrite = false;
+  const admitted = new Map<string, string>();
+  let failRun = false, failWrite = false, failStream = false;
   const current = { status: "finished", active: false };
-  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }], interactions: [{ id: "question-1", status: "waiting" }] };
+  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: { type: string; value: { phase: string } } }[], after: 0 };
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (target === `${source}.settings`) return { provider: memory ? "memory-local" : null, autoRecall: true, autoRetain: true };
@@ -31,18 +32,20 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
     if (target === "agent.run") {
       expect((await journal()).sessions.at(-1).contextId).toBe(args["context-id"]);
       const key = String(args["request-key"]);
+      if (admitted.has(key)) expect(JSON.stringify(args)).toBe(admitted.get(key)!);
+      else admitted.set(key, JSON.stringify(args));
       if (!runs.has(key)) runs.set(key, { runId: `run-${runs.size + 1}`, status: "running", active: true });
       if (failRun) { failRun = false; throw new Error("response lost"); }
       return runs.get(key);
     }
     if (target === "agent.get") return current;
-    if (target === "agent.stream") return stream;
+    if (target === "agent.stream") { if (failStream) { failStream = false; throw new Error("stream unavailable"); } return stream; }
     if (target === "agent.write") { if (failWrite) throw new Error("write response lost"); return { ok: true }; }
     if (target === "agent.respond" || target === "agent.interrupt") return { ok: true };
     throw new Error(`Unexpected call: ${target}`);
   };
   const restart = () => createAgentConversations({ source, dataDir, call, ...(discovered === undefined ? { tools: [] } : {}), reply: event => { replies.push(event); }, now: () => new Date("2026-11-09T00:00:02.000Z") });
-  return { path, journal, calls, runs, replies, restart, current, stream, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; } };
+  return { path, journal, calls, runs, replies, restart, current, stream, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; }, loseStreamResponse: () => { failStream = true; } };
 }
 
 for (const source of ["web", "qq", "mcp"] as const) test(`${source}: foreground sends preserve private context, replay identity and persisted replies`, async () => {
@@ -169,4 +172,144 @@ test("invalid message input and unknown sessions cause no routed calls or persis
   await expect(app.send({ text: "消息", session: "web-agent:foreign" })).rejects.toMatchObject({ code: "not_found" });
   expect(f.calls).toHaveLength(0);
   await expect(readFile(f.path)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+for (const source of ["web", "mcp", "qq"] as const) for (const status of ["failed", "timed_out", "provider_unavailable", "cancelled"]) test(`${source}: ${status} keeps early text separate from a durable incomplete outcome`, async () => {
+  const f = await fixture(source), app = f.restart();
+  const sent = await app.send({ text: "完成核对", requestKey: "original" });
+  f.current.status = status;
+  await app.poll();
+  const reply = (await f.restart().messages(sent.sessionId)).at(-1)!;
+  expect(reply.execution).toMatchObject({ runId: sent.runId, status, active: false, canContinue: true });
+  expect(reply.text).toContain(status === "cancelled" ? "停止" : "未完成");
+  expect(reply.text).toContain("过程文字（不代表完成）");
+  expect(reply.progress).toBe("已核对");
+  expect((await f.journal()).sessions[0].turns[0]).toMatchObject({ status, active: false, reason: reply.execution!.reason });
+  expect(await f.restart().execution(sent.sessionId)).toEqual(reply.execution!);
+  expect(f.runs.size).toBe(1);
+  expect(f.replies).toHaveLength(1);
+});
+
+for (const status of ["queued", "running", "unknown"]) test(`${status}: explicit continuation cannot replay active or stop-unknown work`, async () => {
+  const f = await fixture(), app = f.restart(), sent = await app.send({ text: "开始", requestKey: "original" });
+  f.current.status = status; f.current.active = status !== "unknown";
+  await expect(app.continue(sent.sessionId, { runId: sent.runId!, requestKey: "continue-click" })).rejects.toMatchObject({ code: "conflict" });
+  expect((await app.execution(sent.sessionId))?.canContinue).toBe(false);
+  expect(await app.messages(sent.sessionId)).toHaveLength(1);
+  expect(f.runs.size).toBe(1);
+});
+
+test("normalized recovering progress is persisted and cannot offer continuation", async () => {
+  const f = await fixture(), app = f.restart(), sent = await app.send({ text: "开始", requestKey: "original" });
+  f.current.status = "running"; f.current.active = true;
+  f.stream.items.push({ sequence: 1, payload: { type: "progress", value: { phase: "recovering" } } }); f.stream.after = 1;
+  expect(await app.execution(sent.sessionId)).toMatchObject({ status: "running", active: true, phase: "recovering", canContinue: false });
+  expect((await f.journal()).sessions[0].turns[0].phase).toBe("recovering");
+  await expect(f.restart().continue(sent.sessionId, { runId: sent.runId!, requestKey: "explicit" })).rejects.toMatchObject({ code: "conflict" });
+  expect(f.runs.size).toBe(1);
+});
+
+test("explicit continue retains context/history and exact click identity through duplicate calls, lost response and reload", async () => {
+  const f = await fixture(), app = f.restart(), sent = await app.send({ text: "检查后处理", requestKey: "original" });
+  f.current.status = "failed"; await app.poll();
+  const request = { runId: sent.runId!, requestKey: "continue-click" };
+  f.loseRunResponse();
+  await expect(app.continue(sent.sessionId, request)).rejects.toThrow("response lost");
+  expect(await f.restart().execution(sent.sessionId)).toMatchObject({ status: "pending", active: true, canContinue: false, pendingContinuation: request });
+  const pending = (await f.journal()).sessions[0];
+  expect(pending.turns).toHaveLength(2);
+  expect(pending.turns[1]).toMatchObject({ continuationOf: sent.runId, key: request.requestKey });
+  // Polling never repeats the pending admission automatically.
+  const callsBefore = f.calls.filter(call => call.target === "agent.run").length;
+  await f.restart().poll();
+  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(callsBefore);
+  const continued = await f.restart().continue(sent.sessionId, request);
+  expect(await app.continue(sent.sessionId, request)).toEqual(continued);
+  expect(f.runs.size).toBe(2);
+  expect((await f.journal()).sessions[0].messages.map((message: { direction: string }) => message.direction)).toEqual(["in", "out", "in"]);
+  const runs = f.calls.filter(call => call.target === "agent.run");
+  expect(runs[1]!.args).toEqual(runs[2]!.args);
+  expect(runs[1]!.args["request-key"]).not.toBe(runs[0]!.args["request-key"]);
+  expect(runs[1]!.args["context-id"]).toBe(runs[0]!.args["context-id"]);
+  expect(runs[1]!.args.prompt).toContain("Inspect the current state and prior tool outcomes");
+  expect(runs[1]!.args.prompt).toContain("Never repeat actions with unknown effects");
+  expect(f.calls.filter(call => call.target === "agent.context")).toHaveLength(1);
+  await expect(app.continue(sent.sessionId, { ...request, runId: continued.runId! })).rejects.toMatchObject({ code: "conflict" });
+  await expect(app.send({ session: sent.sessionId, text: pending.turns[1].text, requestKey: request.requestKey })).rejects.toMatchObject({ code: "conflict" });
+});
+
+test("refresh corrects old failed plain replies without duplicating delivery or hiding early text", async () => {
+  const f = await fixture(), app = f.restart(), sent = await app.send({ text: "开始", requestKey: "original" });
+  await app.poll();
+  const state = await f.journal(); state.sessions[0].turns[0].status = "failed";
+  delete state.sessions[0].messages[1].execution;
+  await writeFile(f.path, JSON.stringify(state)); f.current.status = "failed";
+  const messages = await f.restart().messages(sent.sessionId);
+  expect(messages).toHaveLength(2);
+  expect(messages[1]!.text).toContain("本次执行失败");
+  expect(messages[1]!.progress).toBe("已核对");
+  expect(messages[1]!.id).toBe(`reply:${sent.messageId}`);
+});
+
+test("lost continuation admission freezes the tool catalog and prompt across reload", async () => {
+  const tools = ["files.list"], f = await fixture("web", tools), app = f.restart();
+  const sent = await app.send({ text: "核对文件", requestKey: "original" }); f.current.status = "failed"; await app.poll();
+  const request = { runId: sent.runId!, requestKey: "continue-click" }; f.loseRunResponse();
+  await expect(app.continue(sent.sessionId, request)).rejects.toThrow("response lost");
+  tools.push("files.read");
+  await f.restart().continue(sent.sessionId, request);
+  const requests = f.calls.filter(call => call.target === "agent.run");
+  expect(requests[1]!.args).toEqual(requests[2]!.args);
+  expect(requests[2]!.args.tools).toEqual(["files.list"]);
+});
+
+test("a transcript read failure cannot hide terminal failure and a later refresh reconciles early text", async () => {
+  const f = await fixture(), app = f.restart(), sent = await app.send({ text: "检查", requestKey: "original" });
+  f.current.status = "failed"; f.loseStreamResponse();
+  const failed = (await app.messages(sent.sessionId)).at(-1)!;
+  expect(failed.execution).toMatchObject({ status: "failed", active: false, canContinue: true });
+  expect(failed.text).toContain("本次执行失败");
+  expect((await f.journal()).sessions[0].turns[0]).toMatchObject({ status: "failed", streamPending: true });
+  const refreshed = (await f.restart().messages(sent.sessionId)).at(-1)!;
+  expect(refreshed.id).toBe(failed.id);
+  expect(refreshed.progress).toBe("已核对");
+  expect((await f.journal()).sessions[0].turns[0].streamPending).toBe(false);
+  expect(f.runs.size).toBe(1);
+});
+
+test("finished status cannot publish cached process text before the final reply can be read", async () => {
+  const f = await fixture("web", undefined, true), app = f.restart();
+  const sent = await app.send({ text: "检查", requestKey: "original" });
+  f.current.status = "running"; f.current.active = true; await app.poll();
+  f.current.status = "finished"; f.current.active = false; f.loseStreamResponse();
+  expect(await app.execution(sent.sessionId)).toMatchObject({ status: "finished", active: false, replyPending: true, canContinue: false });
+  expect((await f.journal()).sessions[0].messages).toHaveLength(1);
+  expect(f.replies).toHaveLength(0);
+  expect(f.calls.filter(item => item.target === "memory-local.conversation-retain")).toHaveLength(0);
+  f.loseStreamResponse();
+  expect(await f.restart().messages(sent.sessionId)).toHaveLength(1);
+  f.stream.transcript.push({ at: "2026-11-09T00:00:03.000Z", kind: "text", text: "最终核对结果" });
+  const reply = (await f.restart().messages(sent.sessionId)).at(-1)!;
+  expect(reply.text).toContain("最终核对结果");
+  expect(reply.execution).toMatchObject({ status: "finished", replyPending: false });
+  expect(f.calls.filter(item => item.target === "memory-local.conversation-retain")).toHaveLength(1);
+  expect(f.runs.size).toBe(1);
+});
+
+test("ordinary lost admission exposes only explicit reconciliation of the frozen original request", async () => {
+  const f = await fixture("web", ["source.original"]); f.loseRunResponse();
+  await expect(f.restart().send({ text: "检查原请求", requestKey: "original" })).rejects.toThrow("response lost");
+  const session = (await f.journal()).sessions[0];
+  expect(await f.restart().execution(session.id)).toMatchObject({ status: "pending", active: true, canContinue: false, pendingAdmission: { requestKey: "original" } });
+  await f.restart().poll();
+  expect(f.calls.filter(item => item.target === "agent.run")).toHaveLength(1);
+  await expect(f.restart().reconcile(session.id, { requestKey: "foreign" })).rejects.toMatchObject({ code: "not_found" });
+  const app = createAgentConversations({ source: "web", dataDir: f.path.replace("/conversations/state.json", ""), tools: ["source.changed"], call: async (target, args) => {
+    if (target !== "agent.run") throw new Error(`Unexpected reconcile call ${target}`);
+    expect(args).toEqual(f.calls.find(item => item.target === "agent.run")!.args);
+    return { runId: "run-1", status: "running", active: true };
+  }, reply: () => {} });
+  expect(await app.reconcile(session.id, { requestKey: "original" })).toMatchObject({ runId: "run-1", sessionId: session.id });
+  expect(await f.restart().reconcile(session.id, { requestKey: "original" })).toMatchObject({ runId: "run-1" });
+  expect(f.runs.size).toBe(1);
 });

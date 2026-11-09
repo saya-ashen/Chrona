@@ -1,7 +1,7 @@
 import { CallError } from "./module-call-error";
 
 /** Temporary runtime and release admission policy. Source and Git provenance remain retained for review. */
-export const PAUSED_MODULE_NAMES = ["mind", "remind"] as const;
+export const PAUSED_MODULE_NAMES = ["remind"] as const;
 const paused: ReadonlySet<string> = new Set(PAUSED_MODULE_NAMES);
 
 export function isModulePaused(name: string): boolean { return paused.has(name); }

@@ -298,7 +298,7 @@
     },
     {
       "name": "list",
-      "description": "List one source or package directory (maximum 200 entries, 16 KiB output). Unsafe entries fail the operation.",
+      "description": "List a source or package directory (maximum 200 entries, 16 KiB output). Use path '' or '.' for the public root; missing paths return not_found. Unsafe entries fail the operation.",
       "visibility": [
         "provider",
         "modules",

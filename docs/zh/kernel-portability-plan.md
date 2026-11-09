@@ -2,7 +2,7 @@
 
 日期：2026-11-09。状态：**S0–S3 已实施；S4 部分实现，原生平台矩阵未验收；S5 本机实际设备全链路与可靠性修复定向通过，仍为部分完成；S6 未验收**。
 
-当前验证快照核对至当日 **18:36（+08:00）**。物理存储改动后 root tsc final9、root lint final6 PASS（440 files、0 errors、1 个既有 doctor warning）、边界 final3 PASS（0 errors / 35 warnings、798 modules / 4175 dependencies）；schema `--check`、原始 hash 基线 9 pass / 147 断言、schema 生成测试 7 pass / 43 断言通过。新增有限物理存储、私有 journal 和设备回归 **7 文件 / 50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核模型预留、签名停止及 cleanup。普通应用和设备均使用有限 SQLite 页数、实际证据预留与有界 DELETE 回滚日志；达到高水位后拒绝普通准入，保留终止/控制回执写入空间。安全归档与超过 100 项设备 journal 的持续恢复尚未完成。
+主分支 `f964e4dd` 已与实现提交 `442223ee` 完成语义合并；合并后 23 文件 / 278 项定向检查、全部 server/API 19 文件 / 104 项、边界检查及新编译 Linux CLI runtime smoke 通过。详细范围、lint 双父比较与历史失败见[验证记录的合并复核](kernel-portability-verification.md#合并复核2026-11-09-1918-0800)。以下实施快照核对至当日 **18:36（+08:00）**。物理存储改动后 root tsc final9、root lint final6 PASS（440 files、0 errors、1 个既有 doctor warning）、边界 final3 PASS（0 errors / 35 warnings、798 modules / 4175 dependencies）；schema `--check`、原始 hash 基线 9 pass / 147 断言、schema 生成测试 7 pass / 43 断言通过。新增有限物理存储、私有 journal 和设备回归 **7 文件 / 50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核模型预留、签名停止及 cleanup。普通应用和设备均使用有限 SQLite 页数、实际证据预留与有界 DELETE 回滚日志；达到高水位后拒绝普通准入，保留终止/控制回执写入空间。安全归档与超过 100 项设备 journal 的持续恢复尚未完成。
 
 完整 API 曾通过 105 项 / 19 文件；第三轮 full Bun 在物理存储改动前结束 229 文件，最终文件结果为 2450 pass / 38 skip，包含 notify 首次失败后隔离重试通过，**不能称为无重试全绿**；持久化等待修复后定向回归 17 pass / 0 fail。helper 路径与 ELF RPATH/RUNPATH 泄漏已修复，18 项发行回归通过；17:55 默认 Linux CLI 经离线缓存、frozen lockfile、禁用安装脚本完成迁移/health/Web runtime smoke。包含最终物理存储改动的 14 seeds、核心和独立设备包已刷新，默认 Linux runtime、可选应用实际安装及复制设备 smoke 再次通过；883 个源码文件 sourceguard 与 archive 比对通过。分次结果及失败历史见[验证记录](kernel-portability-verification.md)。所有结果限本地，completion 为假实现，无真实外部模型、部署或生产验收。
 

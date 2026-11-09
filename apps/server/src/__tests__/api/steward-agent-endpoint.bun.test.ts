@@ -25,10 +25,10 @@ async function fixture() {
   await mkdir(join(dataDir, "platform/store"), { recursive: true });
   await cp(authorRoot, join(dataDir, "platform/store", "c".repeat(64)), { recursive: true });
   const session = await db.session.create({ data: { workspaceId, source: "module", key: "module:http-test", moduleId: entry.id } });
-  await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", details: { hash: "v1" } } });
+  await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture; never launch a model" });
   const run = (await api.runs.claimNext("foreground"))!;
-  await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", details: { targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"] } } });
+  await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"] } } });
   const headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
   const request = (path: string, init?: RequestInit) => app.request(path, init, peer);
   const post = (name: string, body: unknown) => request(`/tools/${name}`, { method: "POST", headers, body: JSON.stringify(body) });

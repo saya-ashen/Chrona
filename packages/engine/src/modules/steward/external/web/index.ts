@@ -25,7 +25,7 @@ const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
   ["web.ui-settings", args => webSettings(call, preferences, args)],
   ["web.ui-preferences", args => webPreferences(call, args)],
 ]);
-const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409, conflict: 409, unavailable: 503 };
+const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, invalid: 400, undeclared: 403, cycle: 409, conflict: 409, unknown: 409, unavailable: 503 };
 const NO_ROUTE = Symbol("no-route");
 type ApiContext = { request: Request; url: URL; path: string[]; body: Args; route: string };
 type ApiResult = unknown | typeof NO_ROUTE;
@@ -87,15 +87,26 @@ const getSessions = () => conversations.list();
 async function getSettings() {
   return settingsView(call);
 }
-async function sessionRoute({ request, path }: ApiContext): Promise<ApiResult> {
-  if (path[0] !== "sessions") return NO_ROUTE;
-  if (request.method === "GET" && path.length === 3) return readConversation(path[1]!, path[2]!);
+async function sessionRoute({ request, path, body }: ApiContext): Promise<ApiResult> {
+  if (path[0] !== "sessions" || path.length !== 3) return NO_ROUTE;
+  if (request.method === "GET") return readConversation(path[1]!, path[2]!);
+  if (request.method !== "POST") return NO_ROUTE;
+  if (path[2] === "reconcile") {
+    const parsed = z.object({ requestKey: z.string().min(1) }).strict().safeParse(body);
+    if (!parsed.success) throw Object.assign(new Error("消息核对请求参数无效"), { code: "invalid" });
+    return conversations.reconcile(path[1]!, parsed.data);
+  }
+  if (path[2] === "continue") {
+    if (Object.keys(body).some(key => key !== "runId" && key !== "requestKey") || typeof body.runId !== "string" || typeof body.requestKey !== "string") throw Object.assign(new Error("继续请求参数无效"), { code: "invalid" });
+    return conversations.continue(path[1]!, { runId: body.runId, requestKey: body.requestKey });
+  }
   return NO_ROUTE;
 }
 function readConversation(session: string, part: string): Promise<ApiResult> | typeof NO_ROUTE {
   if (!isAgentConversation(session)) return NO_ROUTE;
   if (part === "transcript") return conversations.transcript(session);
   if (part === "messages") return conversations.messages(session);
+  if (part === "execution") return conversations.execution(session);
   return NO_ROUTE;
 }
 async function approvalRoute({ request, path, body }: ApiContext): Promise<ApiResult> {

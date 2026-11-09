@@ -22,6 +22,7 @@ async function withContent<T>(root: string, action: (handles: FileHandle[], root
     return await action(handles, handle);
   } catch (error) {
     if (error instanceof AuthorError) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new AuthorError("not_found", "Source path not found.");
     // Do not expose OS errors containing host paths or source contents.
     throw new AuthorError("source_io", "Source operation failed: missing, occupied, or unsafe path.");
   } finally { for (const handle of handles.reverse()) await handle.close().catch(() => {}); }
@@ -148,8 +149,20 @@ export function createSourceFiles(content: string) {
       });
     },
     async list(path: string) {
-      const parts = visible(path);
+      const parts = path === "" || path === "." ? [] : visible(path);
       return scope(async (handles, root) => {
+        if (!parts.length) {
+          // Inspect only public namespaces, never enumerate private content.
+          const entries: { name: string; kind: "directory" }[] = [];
+          for (const name of ["packages", "sources"]) {
+            let stat;
+            try { stat = await lstat(child(root, name)); }
+            catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
+            if (!stat.isDirectory()) throw new AuthorError("unsafe_source", "Source namespace must be a real directory.");
+            entries.push({ name, kind: "directory" });
+          }
+          return boundedOutput({ path: "", entries });
+        }
         const dir = await directory(handles, root, parts);
         const { opendir } = await import("node:fs/promises");
         const stream = await opendir(`/proc/self/fd/${dir.fd}`);

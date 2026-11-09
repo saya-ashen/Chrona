@@ -11,4 +11,3 @@ export async function declaredModules(db: Pick<StewardPorts["db"], "audit">, wor
   const targets = details.data.modules ?? [details.data.name];
   return new Set(targets).size === targets.length && targets[0] === details.data.name ? targets : null;
 }
-
