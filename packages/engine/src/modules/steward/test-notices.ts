@@ -1,5 +1,5 @@
 import type { StewardPorts } from "./ports";
-import { lifecycleNotice } from "./builtin/notify/lifecycle";
+import { lifecycleNotice } from "./external/notify/lifecycle";
 import { kernelFactSchema } from "./notification-facts";
 
 export type Notice = { title: string; body: string; level: string; idempotencyKey: string; moduleId: string | null; sessionId: string | null; approvalId: string | null; recipient: string | null; caller: string; status: string };
@@ -10,7 +10,7 @@ export async function notices(db: StewardPorts["db"], filter: Partial<Notice> = 
   const rows = [...calls.map(row => ({ ...row, raw: row.args as Record<string, unknown> })), ...facts.flatMap(row => {
     const fact = kernelFactSchema.parse(row.details);
     if (fact.type !== "notice" && fact.type !== "lifecycle") return [];
-    const raw = fact.type === "notice" ? fact.data : { ...fact.data, ...lifecycleNotice(fact.data.fact.kind, fact.data.fact) };
+    const raw = fact.type === "notice" ? { ...fact.data, title: "处理需要你的输入", body: `运行 ${fact.data.run} 正在等待输入，请打开会话查看并回答。`, level: "now" } : { ...fact.data, ...lifecycleNotice(fact.data.fact.kind, fact.data.fact) };
     return [{ id: row.id, createdAt: row.createdAt, raw, caller: "kernel", callerModuleId: null, status: row.kind === "kernel_fact_pending" ? "pending" : "consumed" }];
   })].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
   return rows.map(row => {

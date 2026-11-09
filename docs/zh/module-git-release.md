@@ -1,18 +1,20 @@
 # 模块 Git 种子与官方发布
 
-当前固定种子共十二项：web、mcp、files、notify、events、agent、qq、remind、mind、memory-local、coding、editor。系统模块不拆。准确来源与发行 commit 以 `resources/module-git/lock.json` 为准；2026-11-08 盘点中仅 files/events/remind 的 repository 非空，其余为 null，不能承诺全部当前提交已有公开 upstream。官方仓库命名约定为 `chrona-core/chrona-module-<name>`；离线种子、历史公开仓库与当前提交发布核验分别记录。后续收口见[统一开发路线](development-roadmap.md)。
+Editor 应用已退役并移除，不再进入官方安装目录、生成契约或发行种子，见[退役记录](editor-retirement.md)。当前应用目录区分唯一内置 Agent、普通默认预装 Web/Notify/QQ/Author，以及 Coding/coding-web 等普通可选应用；仅 Mind、Remind 整应用暂停并保留源码和依赖材料。准确种子集合、来源与发行 commit 以本轮更新后的 `resources/module-git/lock.json` 和 `publish-plan.json` 为准；退役清理后的种子计数和构建验证由协调者补齐，不沿用早期十二、十三或十四份的快照。
 
-初次提取从当前构建输入源码创建 `Extract initial module release from Chrona <base commit>` 初始提交，说明中明确源码来自工作树，不声称继承主仓库子目录历史。作者固定为 Chrona Release，时间来自宿主 commit；不读取个人 Git identity。每模块随包 MIT License 原样复制自主仓库，保留 `Copyright (c) 2025 AgentDashboard Contributors`；不将引用的第三方依赖重新许可。SDK 仍由 Chrona 发行资源提供，独立源码仓库不是自带完整 SDK 的 npm 包。初始提取 commit 后追加 License 提交，保留原始 ancestry；web/coding/editor 再追加第三方通知提交；完整 bundle 包含全部提交。相同源码树复用现有种子的 commit；之后修改在该独立仓库历史上追加提交，不自动提交主仓库。
+2026-11-08 的历史盘点仅 files/events/remind 的 repository 非空，其余为 null；这是当时的锁定元数据，不能承诺当前提交均有公开 upstream。官方仓库命名约定为 `chrona-core/chrona-module-<name>`；离线种子、历史公开仓库与当前提交发布核验分别记录。后续收口见[统一开发路线](development-roadmap.md)。
+
+初次提取从当前构建输入源码创建 `Extract initial module release from Chrona <base commit>` 初始提交，说明中明确源码来自工作树，不声称继承主仓库子目录历史。作者固定为 Chrona Release，时间来自宿主 commit；不读取个人 Git identity。每模块随包 MIT License 原样复制自主仓库，保留 `Copyright (c) 2025 AgentDashboard Contributors`；不将引用的第三方依赖重新许可。SDK 仍由 Chrona 发行资源提供，独立源码仓库不是自带完整 SDK 的 npm 包。历史初始提取 commit 后追加 License 提交，保留原始 ancestry；当时 web/coding/editor 再追加第三方通知提交。该历史不要求继续分发已退役 Editor 的 bundle；仍分发的完整 bundle 包含其全部提交。相同源码树复用现有种子的 commit；之后修改在该独立仓库历史上追加提交，不自动提交主仓库。
 
 ## 准备和审阅
 
-默认构建复制资源后，生成 coding/editor 契约，统一给十二份 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的 web/coding/editor 复制 `THIRD-PARTY-NOTICES.txt`，再消费固定种子。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
+默认构建复制资源后，生成当前 Coding 所需契约，给当前种子集合的 staging 模块复制 `resources/module-git/LICENSE`，并给含第三方 bundle 的模块复制 `THIRD-PARTY-NOTICES.txt`，再消费固定种子。Editor 不再是生成或暂存目标。构建不会生成初始提交，也不依赖主仓库 `.git` 或宿主 commit 环境变量。
 
-受版本控制的发行输入是 `resources/module-git/`：`lock.json`、十二份完整 `.bundle`、MIT `LICENSE`、`THIRD-PARTY-NOTICES.txt` 和不含本机路径的 `publish-plan.json`。默认构建、Docker、Nix 消费同一历史；`CHRONA_MODULE_GIT_SEEDS` 可显式覆盖种子目录，仍严格验证 checksum、commit 和源码 tree。
+受版本控制的发行输入是 `resources/module-git/`：`lock.json`、当前集合的完整 `.bundle`、MIT `LICENSE`、`THIRD-PARTY-NOTICES.txt` 和不含本机路径的 `publish-plan.json`。默认构建、Docker、Nix 消费同一历史；`CHRONA_MODULE_GIT_SEEDS` 可显式覆盖种子目录，仍严格验证 checksum、commit 和源码 tree。
 
 `dist/module-git/` 仅为显式维护种子的缓存，不作为默认构建输入：
 
-- `repos/<name>.git`：十二份独立 bare repo，可供最终发布审阅。
+- `repos/<name>.git`：当前集合的独立 bare repo，可供最终发布审阅。
 - `<name>.bundle`：含完整 main 历史、无外部 prerequisite 的离线种子。
 - `lock.json`：`{ version: 1, modules: [{ name, repository, branch, commit, bundle, bundleSha256 }] }`。
 - `publish-plan.json`：拟议公开仓库名、本地 repo、branch、commit；与可信 lock 分开。
@@ -26,7 +28,7 @@ bun scripts/build-binaries.ts --resources-only dist/module-resources
 CHRONA_RESOURCE_DIR="$PWD/dist/module-resources/resources" bun run dev
 ```
 
-维护已有发布历史时，先把固定 `lock.json` 和十二份 bundle 复制到维护目录；prepare 会在 bare 缓存缺失时从已校验 bundle 恢复 main，再追加提交。不得从空目录为已有公开模块重新提取 root。
+维护已有发布历史时，先把固定 `lock.json` 和对应 bundle 复制到维护目录；prepare 会在 bare 缓存缺失时从已校验 bundle 恢复 main，再追加提交。不得从空目录为已有公开模块重新提取 root。
 
 维护者准备了 staging 资源根（含 builtin/ 与 external/，且先完成生成契约）后，可单独准备；prepare 自动使用主仓库 `LICENSE` 和固定发行目录的第三方通知，与正常构建共用同一 staging 规则：
 
@@ -46,15 +48,15 @@ bun scripts/module-git-release.ts prepare /absolute/path/to/seeds /absolute/path
 bun scripts/module-git-release.ts verify-published /absolute/path/to/seeds
 ```
 
-核验需要发布者的 `gh` 和系统 Git；不读取或打印 token。任一未公开、未建立或 commit 不匹配则不更新 lock。该命令只接受上述计划中的十二项名称，不允许任意来源替换官方身份。
+核验需要发布者的 `gh` 和系统 Git；不读取或打印 token。任一未公开、未建立或 commit 不匹配则不更新 lock。该命令只接受当前官方计划中的模块名称，不允许任意来源替换官方身份。
 
-4. 将已核验的 `lock.json` 与十二份 bundle 同步进 `resources/module-git/`，保留主仓库 MIT License；不要版本控制 bare repos 或含本机路径的缓存 plan。正式构建默认消费它们，保留远端和离线 bundle 的同一提交历史；独立维护种子可显式覆盖：
+4. 将已核验的 `lock.json` 与对应 bundle 同步进 `resources/module-git/`，保留主仓库 MIT License；不要版本控制 bare repos 或含本机路径的缓存 plan。正式构建默认消费它们，保留远端和离线 bundle 的同一提交历史；独立维护种子可显式覆盖：
 
 ```sh
 CHRONA_MODULE_GIT_SEEDS=/absolute/path/to/seeds bun run build
 ```
 
-构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。当前通知覆盖 web 的 React/React DOM/scheduler、json-render、zod，以及 coding/editor 生成契约的 zod；它们各自保留 MIT 或 Apache-2.0。
+构建逐项核对 bundle SHA256、完整性、main commit 和源码 tree；源码或生成契约不符时失败，不能静默创建另一条初始历史。以后官方更新先在真实独立仓库提交、更新固定种子，再交付主发行。修改生成 bundle 时，用相同 Bun 版本与参数的 metafile 核对实际依赖，更新第三方通知；第三方原始许可证和版权通知应完整保留。仍分发模块的第三方通知需覆盖其实际依赖，包括 Web 的 React/React DOM/scheduler、json-render、zod 和 Coding 生成契约所含依赖；各依赖保留原许可证。退役 Editor 的历史通知不构成继续打包该应用的理由。
 
 归档包含 `resources/module-git/{name}.bundle` 与 `lock.json`，bundle 在源码根之外，不混入 `.git`、依赖或数据。运行构建产物、安装依赖与数据备份仍按现有机制保留；Git 只替代重复源码副本。
 

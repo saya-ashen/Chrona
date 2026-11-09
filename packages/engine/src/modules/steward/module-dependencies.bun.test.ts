@@ -17,7 +17,7 @@ test("lockfile libraries install at build time, never come from the submission, 
   const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-deps-");
   const sandbox = createScriptSandbox({ dataDir });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-23T04:00:00Z"), publicUrl: null,
-    sandbox: { ...sandbox.health, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule }, packages: createModulePackages({ backend: "system" }) };
+    sandbox: { ...sandbox.health, isolated: true, runModule: sandbox.runModule, startModule: sandbox.startModule }, packages: createModulePackages() };
   cleanups.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspace = await db.workspace.create({ data: { name: "deps" } });
   const service = createStewardService(ports).forWorkspace(workspace.id);
@@ -25,7 +25,7 @@ test("lockfile libraries install at build time, never come from the submission, 
   await mkdir(dir, { recursive: true }); await mkdir(dep);
   await writeFile(join(dep, "package.json"), JSON.stringify({ name: "dep", version: "1.0.0", main: "index.js" }));
   await writeFile(join(dep, "index.js"), "module.exports = { shout: s => s.toUpperCase() };");
-  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "fmt", entry: "index.ts", triggers: [], effects: [], tests: ["test.ts"],
+  await writeFile(join(dir, "module.json"), JSON.stringify({ name: "fmt", entry: "index.ts", effects: [], tests: ["test.ts"],
     tools: [{ name: "shout", description: "Shout", output: { type: "string" }, parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] } }] }));
   await writeFile(join(dir, "package.json"), JSON.stringify({ name: "fmt", dependencies: { dep: `file:${dep}` } }));
   await writeFile(join(dir, "index.ts"), `import { on } from "chrona"; import dep from "dep"; on("tool", ev => ({ result: dep.shout(String(ev.args.text)) }));`);

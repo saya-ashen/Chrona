@@ -2,7 +2,13 @@
 
 适用于重构后的单一 owner 版本。先读[快速开始与配置表](../../README.zh.md)。所有命令均在仓库根目录执行，或使用对应版本的打包 CLI；不要用旧版本可执行文件操作新库。
 
-## 当前最小内核与本地升级（2026-11-08）
+## 当前应用状态（2026-11-09）
+
+Agent 是唯一不可变内置应用；Web、Notify、QQ、Author 是普通默认预装应用。Coding 是无界面的普通可选服务，coding-web 是独立可选客户端；使用[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)。旧 Editor 应用及安装入口已退役移除，见[退役记录](editor-retirement.md)。仅 Mind、Remind 整应用暂停并保留源码；memory-local 仅暂停定时整理。Editor 清理没有更新现有 3112 部署，下方历史升级和验收不证明清理版本已经部署。
+
+## 历史最小内核与本地升级（2026-11-08）
+
+本节保留当时升级边界；应用类别、编码协议和安装支持以本页上方当前状态及永久内核合同为准。
 
 固定内置为 `agent/web/notify`。`mcp/files/events` 已转为可选官方外置应用；保留已有身份、批准版本及私有数据，删除后启动不补装。Agent 不允许动态替换。当前开发仅面向本地，不以 chino 数据副本作为门禁；真实旧数据删除仍须单独确认。
 
@@ -27,9 +33,9 @@
 
 当前开发契约见 [P0 契约](chrona-workbench-p0-contract.md)。官方外置资源已移至 external；发行包需同时含 resources/builtin 与 resources/external，缺发行资源不得回退源码。`chrona admin catalog` 只读目录，`admin install <package> --request-key <key> [--update]` 在停服锁下仅持久受理/入队；运行时与停服 admin 共用真实官方安装适配器，不启动额外 Provider；受理后由原受检构建流水线处理。未配置适配器时返回 unavailable，收到 building/pending 不代表安装完成。失败重试要明确新 key；未知回执复用原 key 查询；初始化完成后不补装已删预装。只用全新开发数据目录，旧生产转换、迁移与部署另行授权。开发完整套件、三尺寸浏览器与 Linux x64 发行验证已完成，协调者已签署 M1 开发验收；精确树、归档散列与未覆盖环境见 [M1 验收记录](chrona-workbench-m1-acceptance.md)。当时的内置划分已被上方最小内核划分取代；该节仅保留历史验收边界。
 
-## M2 编码开发集成边界
+## M2 历史编码开发集成边界
 
-可选官方外置 `coding`、`editor` 的项目映射、owner 身份、成果与停止未知恢复见[服务器编码工作](server-coding.md)。当前单服务器编码、真实 fake Pi/Neovim 目标联调已通过；完整集成检查状态见[M2 验收记录](chrona-workbench-m2-acceptance.md)。M3 本机执行器与并行尚未实现，不配置私人设备或将旧 loopback Provider bridge 暴露到外网。
+当时可选官方外置 `coding`、`editor` 的项目映射、owner 身份、成果与停止未知恢复见[服务器编码工作](server-coding.md)。当时单服务器编码、真实 fake Pi/Neovim 目标联调已通过；完整集成检查状态见[M2 验收记录](chrona-workbench-m2-acceptance.md)。M3 在该阶段尚未实现；此记录不作为当前安装或部署说明。不得将旧 loopback Provider bridge 暴露到外网。
 
 ## 启动与数据位置
 
@@ -62,14 +68,14 @@ export CHRONA_STEWARD_AGENT=pi
 
 ## 备份与恢复
 
-先停止服务（完整备份会获取数据库运行锁，服务运行时拒绝操作），确认 `CHRONA_DATA_DIR` 与 `DATABASE_URL` 指向同一实例。系统需提供 GNU 兼容的 `tar`。
+先停止服务（完整备份会获取数据库运行锁，服务运行时拒绝操作），确认 `CHRONA_DATA_DIR` 与 `DATABASE_URL` 指向同一实例。归档和恢复在进程内处理，不依赖系统 `tar` 或 Shell。
 
 ```bash
 chrona backup /absolute/private/path/chrona-backup.db
 chrona doctor
 ```
 
-备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/platform`、`sessions`、`secrets` 和 `qq-bot`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的数据目录按空目录恢复。`secrets`、`qq-bot` 中的符号链接和特殊文件会使备份失败；`platform`、`sessions` 中的则不进入归档，并在命令输出中列出（它们指向数据目录外，或可重新生成，如 gcroot、会话的 `content/chat`、依赖安装的 `.bin`）。模块和会话中安装的依赖目录（`node_modules`、`.venv`）与会话里的浏览器临时配置（`.chrome-*`）不备份；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
+备份生成一对文件：`chrona-backup.db`（一致性 SQLite 副本）和 `chrona-backup.db.tar`（`<dataDir>/platform`、`sessions`、`secrets` 和 `qq-bot`）。即使数据库放在数据目录外，也以显式 `CHRONA_DATA_DIR` 选择文件根目录。两者缺一不可，均未加密；tar 和数据库文件权限为 0600，备份目录也应仅 owner 可访问。缺失的数据目录按空目录恢复。`secrets`、`qq-bot` 中的符号链接和特殊文件会使备份失败；`platform`、`sessions` 中的则不进入归档，并在命令输出中列出（它们指向数据目录外，或可重新生成，如依赖安装的 `.bin`）。模块和会话中安装的依赖目录（`node_modules`、`.venv`）与会话里的浏览器临时配置（`.chrome-*`）不备份；使用 portable ustar，超出该格式路径/文件大小限制会失败。命令失败时可能留下不完整副本，不要将其当成成功备份；重试使用新输出路径。
 
 不要用运行中的裸数据库复制代替一致性备份。Provider profile（默认 `<dataDir>/providers/pi`，包含其自身认证）及其他自定义目录不在此 tar 中，需单独安全归档。不要公开或将认证写入版本库。
 
@@ -91,17 +97,19 @@ chrona restore /absolute/private/path/chrona-backup.db
 bun run packages/cli/src/index.ts doctor
 ```
 
-`doctor` 检查数据库存在性、SQLite 完整性、存储权限、运行锁和网络安全配置；它不会验证模型或 QQ 能否真正响应。确认进程已退出后，才考虑 `chrona doctor --repair-stale-lock`；它隔离确认陈旧的锁，不删除数据库。畸形锁需人工检查。
+`doctor` 检查 Git、执行模式配置、数据库存在性、SQLite 完整性、存储权限、运行锁和网络安全配置。旧隔离配置会产生 `executionMode` 错误并使命令非零退出，附移除说明；它不探测 bubblewrap，也不全局要求 Shell、Nix、Python、浏览器或外部 `tar`。模块按自身声明检查所需程序；doctor 不替代模块安装检查，也不验证模型或 QQ 能否真正响应。确认进程已退出后，才考虑 `chrona doctor --repair-stale-lock`；它隔离确认陈旧的锁，不删除数据库。畸形锁需人工检查。
 
 ## 环境变量
 
-完整操作配置见 [README 配置表](../../README.zh.md)。重点：
+源码环境样例见 [`.env.example`](../../.env.example)；当前运行配置以下列说明为准：
 
 - 存储：`DATABASE_URL`、`CHRONA_DATA_DIR`；迁移路径覆盖为 `CHRONA_MIGRATIONS_DIR`。
 - API：`HOST`、`PORT`、`API_KEY`、`ALLOWED_ORIGINS`。保持回环监听；不得靠危险覆盖项替代认证。
 - Provider：`CHRONA_STEWARD_AGENT=pi`、`CHRONA_STEWARD_PI_COMMAND`（必填绝对路径）、`CHRONA_STEWARD_PI_VERSION`（默认精确 `0.85.0`，可显式选 `1.3.0` 及以后的 `1.x`）、`CHRONA_STEWARD_PI_AGENT_DIR`（默认 `<dataDir>/providers/pi`）、`CHRONA_STEWARD_PI_RESOURCES_FILE`（可选受控资源清单）、`CHRONA_STEWARD_PI_MODEL`、`CHRONA_STEWARD_PI_WEB_EXTENSION`；Chrona 工具扩展由运行时选择。
 - 后台：`CHRONA_STEWARD_TICK_SECONDS` 默认 30 秒；没有接待 / assessor 双角色。
-- 模块依赖：有 `nix` 时用 `CHRONA_NIXPKGS`（flake 引用，建议固定为系统 nixpkgs）构建系统程序；没有时只检查主机已安装的程序。语言库只按模块的 `bun.lock` / `uv.lock` 安装，构建时需要能访问 npm / PyPI。
+- 本地执行：`CHRONA_STEWARD_EXECUTION_MODE` 未设置、空值或 `trusted-local` 均为可信本地执行。`required-isolation` 和其他非空值报错；非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 也报错，须从启动环境和配置文件移除，不能沿用旧隔离配置。
+- 模块依赖：manifest 的 `packages` 是宿主已安装、Chrona 进程 `PATH` 可找到的程序名，缺失时报告并请用户安装后重新提交；不再通过 Nix 自动供应，`CHRONA_NIXPKGS` 不再是模块运行配置。语言库按 `bun.lock` / `uv.lock` 安装；npm 依赖使用宿主 Bun 的冻结安装并禁用安装脚本，Python 依赖需要宿主 `uv` 和 `python3` / `python`，执行 `uv sync --frozen --python <宿主解释器> --no-python-downloads`。语言库安装仍需 npm / PyPI 或本机缓存。
+- 浏览器：`CHRONA_STEWARD_BROWSER` 可指定已安装的 Chromium 兼容可执行文件；也会在 `PATH` 查找已安装浏览器。不自动下载或通过 Nix 获取浏览器；缺失只影响网页工具，不使其他本地能力失效。
 - QQ：由官方预装外置 `qq` 模块提供。`CHRONA_QQ_APP_ID` 与 `CHRONA_QQ_SECRET_FILE`（私有文件）由内核保存，模块经声明的 `secrets.get` 按需读取；链接用 `CHRONA_PUBLIC_URL`。`CHRONA_QQ_STATE_DIR` 只在首次升级时用于迁移旧绑定。
 - Owner MCP：`/api/mcp`（Streamable HTTP，无状态，`Authorization: Bearer <API_KEY>`）由内置 `mcp` 模块提供，供用户自己的 Pi / Claude Code 使用。工具与网页 owner 操作相同：`chrona_today`、`chrona_apps`、`chrona_sessions` 等会话工具、`chrona_chat`、`chrona_approvals`、`chrona_approval_resolve`、`chrona_modules`、`chrona_notifications`；通过 `chrona_module_tools` 发现 owner 可用的模块工具，再用 `chrona_module_call` 调用，不直接暴露 Provider 的 `m_*` 工具。客户端应对 `chrona_approval_resolve` 要求逐次确认。
 
@@ -164,8 +172,10 @@ install -d -m 700 "$CHRONA_STEWARD_PI_AGENT_DIR"
 
 ## 脚本限制
 
-Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。`CHRONA_STEWARD_EXECUTION_MODE` 由 owner 设置，可选 `trusted-local`（明确本地运行，忽略 bwrap 包装）或 `required-isolation`（模块、构建检查和 Provider 都要求可用且探测成功的 bubblewrap；不可用时失败关闭）。未设置/空值默认 `trusted-local`，即使已安装 bwrap 也不包装隔离；未知非空值拒绝启动。`CHRONA_STEWARD_SANDBOX_BWRAP` 指定 bubblewrap。`trusted-local` 保留 Pi 的 bash 与文件工具，使用服务用户的 OS 权限；宿主文件不会默认隐藏，`content/chat` 是符号链接，附件只读是 Agent 行为规则而非挂载限制。`required-isolation` 下 Provider 隐藏 home 和 Chrona 数据，只读挂入附件，会话目录、服务专用 Pi profile 和已批准宿主路径为可写例外，其他宿主挂载只读且可联网。它不隔离所有宿主读取，不能当成凭据保密边界。两种模式均保留 Chrona 的路由授权、路径访问审批和对外动作审批，OS 可访问性不等于用户授权。
+Provider 自带文件、命令与网页工具，Chrona 不再维护脚本草稿/工具版本系统。本地执行只支持 `trusted-local`，模块、构建检查和 Provider 使用服务用户的 OS 权限；已移除 `required-isolation` 和 bubblewrap 包装。旧模式或非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 明确报错，须移除配置后再使用可信本地执行。宿主文件不会默认隐藏，附件只读是 Agent 行为规则而非挂载限制。Manifest 和路由声明不构成对恶意代码的 OS 隔离。Chrona 的路由授权、路径访问审批和对外动作审批仍保留，OS 可访问性不等于用户授权。
 
-`CHRONA_STEWARD_SANDBOX_BWRAP` 也配置模块沙箱。默认 `trusted-local` 以本地进程运行，不使用 bubblewrap；`required-isolation` 下探测不通过或未配置则拒绝模块启动/检查，不回退。依赖安装器目前仍在宿主执行；该模式下含 `package.json`、`pyproject.toml` 或系统 `packages` 的候选在安装前拒绝，直到提供隔离安装实现；无依赖候选不受此安装限制影响。可信本地进程仍受超时、内存与输出限制，但网络与文件范围不再受隔离约束。构建检查全部通过的版本自动启用并事后通知，不再使用审批分级、AI 复核或长期模块启用授权。仅迁移已有数据、恢复旧数据快照、新增凭据与删除应用需要用户决定；运行时对外动作审批保留，所有入口均可批准或拒绝。以实际执行结果为准，不以模型文字为准。
+模块入口与检查命令由 `packages/integrations/src/steward/runtimes.json` 声明，发行包对应 `resources/runtimes.json`。运行器按扩展名选择宿主解释器和参数，直接启动进程，不再经过 `sh` 包装、`ulimit -v` 或设置 `MALLOC_ARENA_MAX`。当前 `.ts` 使用 Bun 和 TS 运行包的 SDK loader / `check` 命令；`.py` 优先模块内 venv（POSIX 为 `.venv/bin/python`，Windows 声明为 `.venv/Scripts/python.exe`），否则按声明找宿主 Python；只有 `.sh` 入口需要宿主 Shell。未声明 `check` 的运行时跳过类型检查，不跳过其他安装检查。不要在 manifest 中保留 `limits.virtualMemoryMb` 或 `limits`，严格 schema 会拒绝旧字段。
+
+超时、输出上限、并发与模型预算、取消和实际停止证据继续由相应执行路径治理；不再承诺硬虚拟内存限制。模型额度不是 OS 内存上限。运行时声明和路径修复属于 S1，不能据此宣布 Windows/macOS 完整支持：本地 socket/IPC 与进程监管的跨平台工作及三端验收仍待 S4；S2–S6 未由本文宣告完成。阶段范围见[可移植实施方案](kernel-portability-plan.md)。
 
 新激活的外置模块版本若在任何事件投递前启动失败，Chrona 自动切回前一已批准版本一次，无需开关或长期授权，入口/网络模块也适用。候选与目标均须已批准且 manifest 有效，模块仍为当前 active 激活与 hash、尚无已验证能力；数据 schema 必须与前版及当前数据一致，且无迁移/恢复记录、非分组激活、无动态或变化的日程。内置故障只重启/暂停/诊断，不回到旧 store 代码。不满足条件时按[模块故障诊断与恢复](module-recovery.md)人工处理。自动回滚保留当前数据和兼容静态日程，不重建日程、不重放工作；恢复目标不会继续自动回滚。

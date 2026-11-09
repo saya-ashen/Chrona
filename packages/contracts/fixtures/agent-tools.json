@@ -1,0 +1,2552 @@
+[
+  {
+    "name": "health",
+    "description": "Agent health: modules use structured arguments and own their operations; input is reserved for kernel calls",
+    "visibility": [
+      "kernel",
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "supportsRunModel": {
+              "type": "boolean"
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "sandboxed": {
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "supportsRunModel",
+            "complete",
+            "available",
+            "sandboxed",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "supportsRunModel": {
+              "type": "boolean"
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "sandboxed": {
+              "type": "boolean"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "supportsRunModel",
+            "complete",
+            "available",
+            "sandboxed",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "start",
+    "description": "Agent start: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "operationId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "status",
+    "description": "Agent status: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "finished",
+                    "failed",
+                    "timed_out",
+                    "unavailable"
+                  ]
+                },
+                "sessionId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "outcome",
+                "sessionId",
+                "error"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operationId",
+        "outcome",
+        "failure"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "inject",
+    "description": "Agent inject: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "abort",
+    "description": "Agent abort: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "requested": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "requested"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "release",
+    "description": "Agent release: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "released": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "released"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "complete",
+    "description": "Agent complete: modules use structured arguments and own their operations; input is reserved for kernel calls",
+    "visibility": [
+      "kernel",
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command-key": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "max-output-tokens": {
+          "type": "number"
+        },
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operationId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "completion",
+    "description": "Agent completion: modules use structured arguments and own their operations; input is reserved for kernel calls",
+    "visibility": [
+      "kernel",
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "operation-id": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "result": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "inputTokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "outputTokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "failure": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "result",
+            "failure"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "result": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "inputTokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "outputTokens": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "failure": {
+              "type": "boolean"
+            },
+            "unknown": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "result",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "transcript",
+    "description": "Agent transcript: kernel-only execution control",
+    "visibility": [
+      "kernel"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Kernel-only encoded request"
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "output": {
+      "type": "array",
+      "items": {}
+    }
+  },
+  {
+    "name": "context",
+    "description": "Low-level Agent context; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "request-key": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contextId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contextId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "run",
+    "description": "Low-level Agent run; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "context-id": {
+          "type": "string"
+        },
+        "request-key": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lane": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project-ref": {
+          "type": "string"
+        },
+        "resume-from": {
+          "type": "object",
+          "properties": {
+            "work-id": {
+              "type": "string"
+            },
+            "run-id": {
+              "type": "string"
+            },
+            "attempt-id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "work-id",
+            "run-id",
+            "attempt-id"
+          ]
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "timeout-ms": {
+              "type": "number"
+            },
+            "max-tool-calls": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "timeout-ms",
+            "max-tool-calls"
+          ]
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "placement": {
+          "type": "object",
+          "properties": {
+            "executor-id": {
+              "type": "string"
+            },
+            "project-ref": {
+              "type": "string"
+            },
+            "mapping-revision": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "executor-id",
+            "project-ref",
+            "mapping-revision"
+          ]
+        },
+        "workspace": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string"
+            },
+            "baseline": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "digest": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "digest"
+              ]
+            },
+            "source": {
+              "type": "object",
+              "properties": {
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "sha256": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "sha256"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "files"
+              ]
+            }
+          },
+          "required": [
+            "mode",
+            "baseline"
+          ]
+        },
+        "queue-expires-at": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "runId",
+            "contextId",
+            "status",
+            "active"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "execution": {
+              "type": "object",
+              "properties": {
+                "workId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "attemptId": {
+                  "type": "string"
+                },
+                "projectRef": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "unknown"
+                  ]
+                },
+                "cancelRequested": {
+                  "type": "boolean"
+                },
+                "stopConfirmed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "workId",
+                "sessionId",
+                "runId",
+                "attemptId",
+                "projectRef",
+                "status",
+                "cancelRequested",
+                "stopConfirmed"
+              ],
+              "additionalProperties": false
+            },
+            "placement": {
+              "type": "object",
+              "properties": {
+                "workId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "attemptId": {
+                  "type": "string"
+                },
+                "placement": {
+                  "type": "object",
+                  "properties": {
+                    "executorId": {
+                      "type": "string"
+                    },
+                    "projectRef": {
+                      "type": "string"
+                    },
+                    "mappingRevision": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "executorId",
+                    "projectRef",
+                    "mappingRevision"
+                  ],
+                  "additionalProperties": false
+                },
+                "workspace": {
+                  "type": "object",
+                  "properties": {
+                    "workspaceRef": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "existing",
+                        "independent_worktree"
+                      ]
+                    },
+                    "baseline": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "commit",
+                            "snapshot"
+                          ]
+                        },
+                        "digest": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "digest"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "requested",
+                        "ready",
+                        "failed",
+                        "retained",
+                        "removed",
+                        "unknown"
+                      ]
+                    },
+                    "sourceReceipt": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "object",
+                              "properties": {
+                                "executorId": {
+                                  "type": "string"
+                                },
+                                "projectRef": {
+                                  "type": "string"
+                                },
+                                "mappingRevision": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "executorId",
+                                "projectRef",
+                                "mappingRevision"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "baseline": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "commit",
+                                    "snapshot"
+                                  ]
+                                },
+                                "digest": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "digest"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "manifestDigest": {
+                              "type": "string"
+                            },
+                            "fileCount": {
+                              "type": "integer"
+                            },
+                            "verifiedAt": {
+                              "type": "string"
+                            },
+                            "stage": {
+                              "type": "string",
+                              "const": "claim"
+                            }
+                          },
+                          "required": [
+                            "placement",
+                            "baseline",
+                            "manifestDigest",
+                            "fileCount",
+                            "verifiedAt",
+                            "stage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "retained": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "workspaceRef",
+                    "mode",
+                    "baseline",
+                    "state",
+                    "sourceReceipt",
+                    "retained"
+                  ],
+                  "additionalProperties": false
+                },
+                "queueExpiresAt": {
+                  "type": "string"
+                },
+                "online": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "workId",
+                "sessionId",
+                "runId",
+                "attemptId",
+                "placement",
+                "workspace",
+                "queueExpiresAt",
+                "online"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "execution"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "get",
+    "description": "Low-level Agent get; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "run-id": {
+          "type": "string"
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "runId",
+            "contextId",
+            "status",
+            "active"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "workId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "attemptId": {
+              "type": "string"
+            },
+            "projectRef": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "completed",
+                "failed",
+                "cancelled",
+                "unknown"
+              ]
+            },
+            "cancelRequested": {
+              "type": "boolean"
+            },
+            "stopConfirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "workId",
+            "sessionId",
+            "runId",
+            "attemptId",
+            "projectRef",
+            "status",
+            "cancelRequested",
+            "stopConfirmed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "lookup",
+    "description": "Low-level Agent lookup; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "request-key": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "workId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "attemptId": {
+          "type": "string"
+        },
+        "projectRef": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "cancelRequested": {
+          "type": "boolean"
+        },
+        "stopConfirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workId",
+        "sessionId",
+        "runId",
+        "attemptId",
+        "projectRef",
+        "status",
+        "cancelRequested",
+        "stopConfirmed"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "stream",
+    "description": "Low-level Agent stream; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "run-id": {
+          "type": "string"
+        },
+        "after": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "sequence": {
+                    "type": "integer"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "payload": {}
+                },
+                "required": [
+                  "sequence",
+                  "at",
+                  "kind",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "after": {
+              "type": "integer"
+            },
+            "ended": {
+              "type": "boolean"
+            },
+            "transcript": {
+              "type": "array",
+              "items": {}
+            },
+            "interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "runId": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "question": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string",
+                        "enum": [
+                          "select",
+                          "confirm",
+                          "input",
+                          "editor"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "prefill": {
+                        "type": "string"
+                      },
+                      "timeoutMs": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "title",
+                      "message",
+                      "options",
+                      "timeoutMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "answered",
+                      "cancelled",
+                      "expired",
+                      "interrupted"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "runId",
+                  "sessionId",
+                  "question",
+                  "createdAt",
+                  "expiresAt",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "items",
+            "after",
+            "ended",
+            "transcript",
+            "interactions"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "workId": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "runId": {
+                    "type": "string"
+                  },
+                  "attemptId": {
+                    "type": "string"
+                  },
+                  "seq": {
+                    "type": "integer"
+                  },
+                  "at": {
+                    "type": "string"
+                  },
+                  "payload": {}
+                },
+                "required": [
+                  "workId",
+                  "sessionId",
+                  "runId",
+                  "attemptId",
+                  "seq",
+                  "at",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "highWatermark": {
+              "type": "integer"
+            },
+            "gap": {
+              "type": "boolean"
+            },
+            "snapshotRequired": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "events",
+            "cursor",
+            "highWatermark",
+            "gap",
+            "snapshotRequired"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "write",
+    "description": "Low-level Agent write; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "run-id": {
+          "type": "string"
+        },
+        "request-key": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "interrupt",
+    "description": "Low-level Agent interrupt; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "run-id": {
+          "type": "string"
+        },
+        "request-key": {
+          "type": "string"
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "runId",
+            "contextId",
+            "status",
+            "active"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "workId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "attemptId": {
+              "type": "string"
+            },
+            "projectRef": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "completed",
+                "failed",
+                "cancelled",
+                "unknown"
+              ]
+            },
+            "cancelRequested": {
+              "type": "boolean"
+            },
+            "stopConfirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "workId",
+            "sessionId",
+            "runId",
+            "attemptId",
+            "projectRef",
+            "status",
+            "cancelRequested",
+            "stopConfirmed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "respond",
+    "description": "Low-level Agent respond; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "run-id": {
+          "type": "string"
+        },
+        "request-key": {
+          "type": "string"
+        },
+        "question-id": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "execution-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "accepted"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "const": false
+            },
+            "error": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "not_found",
+                    "conflict",
+                    "invalid",
+                    "forbidden",
+                    "capacity"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "accepted",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "inspect",
+    "description": "Low-level Agent inspect; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "execution-id": {
+          "type": "string"
+        },
+        "run-id": {
+          "type": "string"
+        },
+        "attempt-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "workId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "attemptId": {
+              "type": "string"
+            },
+            "highWatermark": {
+              "type": "integer"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "completed",
+                "failed",
+                "cancelled",
+                "unknown"
+              ]
+            },
+            "cancelRequested": {
+              "type": "boolean"
+            },
+            "stopConfirmed": {
+              "type": "boolean"
+            },
+            "finalMessage": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "messageId": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "artifactRef": {
+                      "type": "string"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "messageId",
+                    "text",
+                    "truncated"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "select",
+                      "confirm",
+                      "input",
+                      "editor"
+                    ]
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "answered",
+                      "cancelled",
+                      "expired",
+                      "interrupted"
+                    ]
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "title",
+                  "method",
+                  "options",
+                  "expiresAt",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "missing": {
+              "type": "boolean"
+            },
+            "expiresAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workId",
+            "sessionId",
+            "runId",
+            "attemptId",
+            "highWatermark",
+            "status",
+            "cancelRequested",
+            "stopConfirmed",
+            "finalMessage",
+            "questions",
+            "missing",
+            "expiresAt"
+          ],
+          "additionalProperties": false
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "workId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "attemptId": {
+              "type": "string"
+            },
+            "baseline": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "commit",
+                    "snapshot"
+                  ]
+                },
+                "digest": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "digest"
+              ],
+              "additionalProperties": false
+            },
+            "changes": {
+              "type": "object",
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "const": "baseline_to_worktree"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "complete",
+                    "partial",
+                    "unavailable"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "snapshot_unresolvable",
+                    "baseline_unverified",
+                    "not_git",
+                    "capture_failed",
+                    "limit"
+                  ]
+                },
+                "patch": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "tracked",
+                          "untracked"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "omitted": {
+                        "type": "string",
+                        "enum": [
+                          "binary",
+                          "symlink",
+                          "size",
+                          "encoding",
+                          "unsupported"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "scope",
+                "status",
+                "patch",
+                "files"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "workId",
+            "sessionId",
+            "runId",
+            "attemptId",
+            "baseline"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "snapshot",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "placement",
+    "description": "Low-level Agent placement; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "execution-id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "workId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "attemptId": {
+          "type": "string"
+        },
+        "placement": {
+          "type": "object",
+          "properties": {
+            "executorId": {
+              "type": "string"
+            },
+            "projectRef": {
+              "type": "string"
+            },
+            "mappingRevision": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "executorId",
+            "projectRef",
+            "mappingRevision"
+          ],
+          "additionalProperties": false
+        },
+        "workspace": {
+          "type": "object",
+          "properties": {
+            "workspaceRef": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "existing",
+                "independent_worktree"
+              ]
+            },
+            "baseline": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "commit",
+                    "snapshot"
+                  ]
+                },
+                "digest": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "digest"
+              ],
+              "additionalProperties": false
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "requested",
+                "ready",
+                "failed",
+                "retained",
+                "removed",
+                "unknown"
+              ]
+            },
+            "sourceReceipt": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "placement": {
+                      "type": "object",
+                      "properties": {
+                        "executorId": {
+                          "type": "string"
+                        },
+                        "projectRef": {
+                          "type": "string"
+                        },
+                        "mappingRevision": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "executorId",
+                        "projectRef",
+                        "mappingRevision"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "baseline": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "commit",
+                            "snapshot"
+                          ]
+                        },
+                        "digest": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "digest"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "manifestDigest": {
+                      "type": "string"
+                    },
+                    "fileCount": {
+                      "type": "integer"
+                    },
+                    "verifiedAt": {
+                      "type": "string"
+                    },
+                    "stage": {
+                      "type": "string",
+                      "const": "claim"
+                    }
+                  },
+                  "required": [
+                    "placement",
+                    "baseline",
+                    "manifestDigest",
+                    "fileCount",
+                    "verifiedAt",
+                    "stage"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "retained": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "workspaceRef",
+            "mode",
+            "baseline",
+            "state",
+            "sourceReceipt",
+            "retained"
+          ],
+          "additionalProperties": false
+        },
+        "queueExpiresAt": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workId",
+        "sessionId",
+        "runId",
+        "attemptId",
+        "placement",
+        "workspace",
+        "queueExpiresAt",
+        "online"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "locations",
+    "description": "Low-level Agent locations; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "executorId": {
+                "type": "string"
+              },
+              "projectRef": {
+                "type": "string"
+              },
+              "mappingRevision": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "server",
+                  "device"
+                ]
+              },
+              "online": {
+                "type": "boolean"
+              },
+              "baseline": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "commit",
+                      "snapshot"
+                    ]
+                  },
+                  "digest": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "digest"
+                ],
+                "additionalProperties": false
+              },
+              "workspaceModes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "existing",
+                    "independent_worktree"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "executorId",
+              "projectRef",
+              "mappingRevision",
+              "label",
+              "kind",
+              "online",
+              "baseline",
+              "workspaceModes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "locations",
+        "after"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "cleanup",
+    "description": "Low-level Agent cleanup; caller owns business sessions and orchestration",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "workId": {
+          "type": "string"
+        },
+        "workspaceRef": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "retained",
+            "blocked",
+            "removed",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "previewDigest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "workId",
+        "workspaceRef",
+        "state",
+        "reason",
+        "previewDigest"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "projects",
+    "description": "List, register or create host projects for the actual current approved owner application",
+    "visibility": [
+      "modules"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "output": {}
+  },
+  {
+    "name": "configure",
+    "description": "Read or replace Agent model tiers, thinking levels and preferred completion timeout",
+    "visibility": [
+      "owner"
+    ],
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "properties": {
+            "tiers": {
+              "type": "object",
+              "properties": {},
+              "required": [],
+              "additionalProperties": true
+            },
+            "preferred-timeout-ms": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tiers",
+            "preferred-timeout-ms"
+          ]
+        },
+        "clear": {
+          "type": "boolean"
+        },
+        "form": {
+          "type": "object",
+          "properties": {
+            "tiers": {
+              "type": "object",
+              "properties": {
+                "fast": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ]
+                },
+                "balanced": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ]
+                },
+                "deep": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ]
+                }
+              },
+              "required": [
+                "fast",
+                "balanced",
+                "deep"
+              ]
+            },
+            "preferred-timeout-ms": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tiers",
+            "preferred-timeout-ms"
+          ]
+        },
+        "view": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "tiers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "type": "string"
+                      },
+                      "thinking": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "preferredTimeoutMs": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "tiers",
+                "preferredTimeoutMs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "form": {
+          "type": "object",
+          "properties": {
+            "tiers": {
+              "type": "object",
+              "properties": {
+                "fast": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string",
+                      "enum": [
+                        "",
+                        "off",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ],
+                  "additionalProperties": false
+                },
+                "balanced": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string",
+                      "enum": [
+                        "",
+                        "off",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ],
+                  "additionalProperties": false
+                },
+                "deep": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string"
+                    },
+                    "thinking": {
+                      "type": "string",
+                      "enum": [
+                        "",
+                        "off",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "model",
+                    "thinking"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "fast",
+                "balanced",
+                "deep"
+              ],
+              "additionalProperties": false
+            },
+            "preferredTimeoutMs": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tiers",
+            "preferredTimeoutMs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "config",
+        "ready"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

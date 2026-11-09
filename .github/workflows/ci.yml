@@ -34,6 +34,9 @@ jobs:
 
       - run: bun run db:generate
 
+      - name: Build source process guardian before runtime checks
+        run: bun scripts/chrona.ts build helper
+
       - name: Smoke documented development entrypoints
         run: bun run smoke:entrypoints
       - name: Types, lint, boundaries and tests on a fresh migrated database

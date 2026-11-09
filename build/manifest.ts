@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { resolve } from "node:path";
+
 export type BuildTargetName = keyof typeof buildTargets;
 
 export type ReleaseResource = {
@@ -13,37 +16,47 @@ export const buildArtifacts = {
     resourcesDir: "module-git",
     seedDir: "resources/module-git",
     modules: [
-      { name: "web", source: "builtin/web" },
+      { name: "web", source: "external/web" },
       { name: "mcp", source: "external/mcp" },
       { name: "files", source: "external/files" },
-      { name: "notify", source: "builtin/notify" },
+      { name: "notify", source: "external/notify" },
       { name: "events", source: "external/events" },
       { name: "agent", source: "builtin/agent" },
       { name: "qq", source: "external/qq" },
+      { name: "author", source: "external/author" },
       { name: "remind", source: "external/remind" },
       { name: "mind", source: "external/mind" },
       { name: "memory-local", source: "external/memory-local" },
       { name: "coding", source: "external/coding" },
-      { name: "editor", source: "external/editor" },
+      { name: "coding-web", source: "external/coding-web" },
+      { name: "remote-execution", source: "external/remote-execution" },
     ],
   },
-  executor: { platform: "linux", manager: "systemd 262", processEntry: "__executor-process", extension: "external-plugins/pi-steward-agent/chrona-tools.ts", foregroundOnly: true },
+  // Seeds keep provenance for retained sources; these trees must never ship as runtime packages.
+  pausedModuleResources: ["external/mind", "external/remind"],
   resources: [
     { from: "apps/server/src/static/rescue.html", to: "resources/rescue.html", required: true },
     { from: "prisma/schema.prisma", to: "resources/prisma/schema.prisma", required: true },
     { from: "prisma/migrations", to: "resources/prisma/migrations", required: true },
     { from: ".env.example", to: "resources/.env.example", required: false },
-    { from: "external-plugins/pi-steward-agent", to: "resources/external-plugins/pi-steward-agent", required: true },
+    { from: "packages/pi/resources", to: "resources/pi", required: true },
     { from: "packages/engine/src/modules/steward/builtin", to: "resources/builtin", required: true },
     { from: "packages/engine/src/modules/steward/external", to: "resources/external", required: true },
     { from: "packages/integrations/src/steward/module-sdk/package.json", to: "resources/module-sdk/package.json", required: true },
+    { from: "packages/integrations/src/steward/module-typecheck/chrona-sdk-loader.ts", to: "resources/module-sdk/chrona-sdk-loader.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/sdk.ts", to: "resources/module-sdk/sdk.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/transport.ts", to: "resources/module-sdk/transport.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/process.ts", to: "resources/module-sdk/process.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/windows-transport.ts", to: "resources/module-sdk/windows-transport.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/build-contract.md", to: "resources/module-sdk/build-contract.md", required: true },
     { from: "packages/integrations/src/steward/module-sdk/group-build-contract.md", to: "resources/module-sdk/group-build-contract.md", required: true },
     { from: "packages/integrations/src/steward/module-sdk/calls.d.ts", to: "resources/module-sdk/calls.d.ts", required: true },
     // v2-25: the module type check runs with Bun, so it ships TypeScript and Bun's types beside it.
+    { from: "packages/integrations/src/steward/runtimes.json", to: "resources/runtimes.json", required: true },
+    { from: "packages/integrations/src/steward/module-typecheck/chrona-sdk-loader.ts", to: "resources/module-typecheck/chrona-sdk-loader.ts", required: true },
+    { from: "packages/integrations/src/steward/module-typecheck/calls.ts", to: "resources/module-typecheck/calls.ts", required: true },
     { from: "packages/integrations/src/steward/module-typecheck/check.ts", to: "resources/module-typecheck/check.ts", required: true },
     { from: "node_modules/typescript/package.json", to: "resources/module-typecheck/node_modules/typescript/package.json", required: true },
     { from: "node_modules/typescript/lib", to: "resources/module-typecheck/node_modules/typescript/lib", required: true },
@@ -52,6 +65,11 @@ export const buildArtifacts = {
     { from: "node_modules/@types/node", to: "resources/module-typecheck/node_modules/@types/node", required: true },
   ] satisfies ReleaseResource[],
 } as const;
+
+/** Apply only to staged distribution resources, after verifying all fixed source seeds. */
+export async function omitPausedRuntimeModules(resourcesRoot: string): Promise<void> {
+  for (const source of buildArtifacts.pausedModuleResources) await rm(resolve(resourcesRoot, source), { recursive: true, force: true });
+}
 
 export const buildTargets = {
   "linux-x64": {

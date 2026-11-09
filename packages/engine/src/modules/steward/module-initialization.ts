@@ -1,9 +1,13 @@
-import { moduleInitializationStateSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
+import { moduleInitializationStateSchema, moduleInstallRequestSchema, PREINSTALLED_MODULE_NAMES, type ModuleInitializationState } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
-import { installExternal, refreshInstallationReceipts } from "./module-install";
+import { installExternal, installationId, refreshInstallationReceipts } from "./module-install";
 import { redactSensitiveText } from "@chrona/logging/redaction";
+import { seedFactConsumer } from "./notification-facts";
+import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 
+// Keep handled pause decisions in the initialization ledger after removing them from default delivery.
+const initializationNames = [...new Set([...PREINSTALLED_MODULE_NAMES, "mind", "remind"] as const)];
 const KEY = "moduleInitialization";
 const settingsObject = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 async function read(tx: Prisma.TransactionClient, workspaceId: string) {
@@ -16,6 +20,16 @@ async function save(ports: StewardPorts, workspaceId: string, state: ModuleIniti
   await ports.db.$transaction(async tx => {
     const { settings } = await read(tx, workspaceId);
     await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...settings, [KEY]: state } as Prisma.InputJsonValue } });
+  });
+}
+/** Recover selection from the persisted successful install, never from a same-name replacement. */
+async function seedInitialFactConsumer(ports: StewardPorts, workspaceId: string) {
+  await ports.db.$transaction(async tx => {
+    const { state } = await read(tx, workspaceId);
+    const installed = state?.packages.notify;
+    if (installed?.status !== "installed" || !installed.moduleId || !installed.hash) return;
+    const application = await tx.module.findFirst({ where: { id: installed.moduleId, workspaceId, name: "notify", builtin: false, status: "active", activeHash: installed.hash } });
+    if (application) await seedFactConsumer(tx, workspaceId, application.id, ports.now());
   });
 }
 const inflight = new WeakMap<StewardPorts["db"], Map<string, Promise<ModuleInitializationState>>>();
@@ -34,20 +48,26 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
   const state = await ports.db.$transaction(async tx => {
     const stored = await read(tx, workspaceId);
     if (stored.state) return stored.state;
-    const initial: ModuleInitializationState = { version: 1, status: "pending", packages: Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name => [name, {
+    const initial: ModuleInitializationState = { version: 1, status: "pending", packages: Object.fromEntries(initializationNames.map(name => [name, {
       requestKey: `initialize:v1:${name}:1`, attempts: 1, status: "pending", moduleId: null, hash: null, approvalId: null, error: null,
     }])) as ModuleInitializationState["packages"] };
     // Existing external apps count as handled. Do not replace their custom code.
-    for (const name of PREINSTALLED_MODULE_NAMES) {
+    for (const name of initializationNames) {
       const module = await tx.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
-      if (module) initial.packages[name] = { ...initial.packages[name], status: "skipped", moduleId: module.id };
+      if (isModulePaused(name)) initial.packages[name] = pausedPackage(name, { ...initial.packages[name], moduleId: module?.id ?? null });
+      else if (module) initial.packages[name] = { ...initial.packages[name], status: "skipped", moduleId: module.id };
     }
     await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...stored.settings, [KEY]: initial } as Prisma.InputJsonValue } });
     return initial;
   });
-  if (state.status === "complete") return state;
-  for (const name of PREINSTALLED_MODULE_NAMES) {
+  await recordPausedPackages(ports, workspaceId, state);
+  if (state.status === "complete") {
+    await seedInitialFactConsumer(ports, workspaceId);
+    return state;
+  }
+  for (const name of initializationNames) {
     const previous = state.packages[name];
+    if (isModulePaused(name)) continue;
     if (["installed", "skipped"].includes(previous.status)) continue;
     // The recorded app was deliberately removed while initialization was pending.
     if (previous.moduleId && !await ports.db.module.findFirst({ where: { id: previous.moduleId, workspaceId } })) {
@@ -65,16 +85,33 @@ async function initialize(ports: StewardPorts, workspaceId: string, options: { r
     state.packages[name] = await initializePackage(ports, workspaceId, name, previous);
     await save(ports, workspaceId, state);
   }
-  if (PREINSTALLED_MODULE_NAMES.every(name => ["installed", "skipped"].includes(state.packages[name].status))) {
+  if (initializationNames.every(name => ["installed", "skipped"].includes(state.packages[name].status))) {
     state.status = "complete";
     await save(ports, workspaceId, state);
   }
+  await seedInitialFactConsumer(ports, workspaceId);
   return state;
 }
 
-async function initializePackage(ports: StewardPorts, workspaceId: string, name: typeof PREINSTALLED_MODULE_NAMES[number], previous: ModuleInitializationState["packages"][typeof name]): Promise<ModuleInitializationState["packages"][typeof name]> {
+async function recordPausedPackages(ports: StewardPorts, workspaceId: string, state: ModuleInitializationState) {
+  for (const name of initializationNames) {
+    if (isModulePaused(name) && state.packages[name].status !== "skipped") {
+      state.packages[name] = pausedPackage(name, state.packages[name]);
+      await save(ports, workspaceId, state);
+    }
+  }
+}
+function pausedPackage(name: string, previous: ModuleInitializationState["packages"]["notify"]): ModuleInitializationState["packages"]["notify"] {
+  const { reason, message } = new ModuleUnavailableError(name);
+  return { ...previous, status: "skipped", error: { code: "unavailable", reason, message } };
+}
+async function initializePackage(ports: StewardPorts, workspaceId: string, name: typeof initializationNames[number], previous: ModuleInitializationState["packages"][typeof name]): Promise<ModuleInitializationState["packages"][typeof name]> {
   try {
-    const result = await installExternal(ports, workspaceId, { package: name, mode: previous.attempts > 1 && previous.moduleId ? "update" : "install", requestKey: previous.requestKey });
+    // A retry can start as an install and acquire its moduleId while building. Resume
+    // that receipt's original mode rather than turning the same requestKey into an update.
+    const receipt = await ports.db.audit.findUnique({ where: { id: installationId(workspaceId, previous.requestKey) } });
+    const mode = receipt ? moduleInstallRequestSchema.parse((receipt.details as { request?: unknown } | null)?.request).mode : previous.attempts > 1 && previous.moduleId ? "update" : "install";
+    const result = await installExternal(ports, workspaceId, { package: name, mode, requestKey: previous.requestKey });
     return {
       requestKey: result.requestKey, attempts: previous.attempts, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId, error: result.error,
     };

@@ -4,7 +4,7 @@ import type { StewardPorts } from "./ports";
 import { runtimeCall } from "./local-runtime";
 
 export type TranscriptItem = ProviderTranscriptItem;
-import { transcriptRedactor } from "../../../../integrations/src/steward/transcript-redaction";
+import { transcriptRedactor } from "@chrona/logging/redaction";
 /** Backend file formats stay in the adapter; chat owns scoped access and sanitized, bounded output. */
 export async function sessionTranscript(ports: StewardPorts, sessionId: string, limit = 300): Promise<TranscriptItem[]> {
   if (!ports.provider?.transcript) return [];

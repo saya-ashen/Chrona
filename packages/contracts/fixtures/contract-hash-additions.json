@@ -1,0 +1,98 @@
+[
+  {
+    "target": "remote-execution.bind",
+    "hash": "b9eae3f3fbad55aa575c188ee50b643b5a24c3630a4d5418cd78e6c82f2ad65d",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.control",
+    "hash": "940cd2b7b948c5c8fa0b5efc019237620bca074f0acc022d8b0c382642bfc732",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.delivery",
+    "hash": "c4250998085ae98c79bdd15011e477c80986de6a608f22268409a95daf73e66c",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-model",
+    "hash": "01ff6d49d4cba2d2082ff9d7dc6242b61a88d02ab3c9fc97290daeee54cf3bb3",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-pair",
+    "hash": "12c1abe0a5523fd7a6daff019a64181ab38d1611ab5c60903d9fb7319775607b",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-poll",
+    "hash": "32468b161c553b4f152fa20d2ddc02a10ec976a3527fb2b6ad1e2211d75ea438",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-reconcile",
+    "hash": "9204fc06ee917b5c0e018368424f00b048f5ec097dadfc55fb414f9ac6deeb25",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-report",
+    "hash": "824427ce4a76e7aaff1ff7444a5f7e933a032020642ca5266e8b639e86fdd814",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.device-revoke",
+    "hash": "4eca60ae3818f4a3bf66445dd4f8a0cbe2744edf4aed0ff466da4af2de55339d",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.forward",
+    "hash": "52bedf08da2b561637c37e7555b429e5285dbae2ca2f59b19b5ce4bf4061319c",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.lifecycle",
+    "hash": "637166a502808ab45d5e9b7c1ebd79d609a6cfbc9fea4ed9f7ad4d6135d14364",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.mapping-set",
+    "hash": "09b99df7938adf946d2b1fbb64f8d39c260fc761ff45888f9da2c711116706e0",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.pairing-create",
+    "hash": "adb33002ab9b1a41cb96716e3ab2685e152965a76fa2ad35a51e04a92ce27c32",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.placement",
+    "hash": "95b830969f4073b418bb65d89d2ce99d5acf6c4b2c6bb5fbba25268dd37af442",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.status",
+    "hash": "ef523506a91930a073b06c16ce587d0c85d1c2d677e7ab3a4d791ed8a4838230",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  },
+  {
+    "target": "remote-execution.sync",
+    "hash": "1c46ce461e0bb358bd224026a24eb79e00a36673ac99cc0ebc11f24d4d52c79f",
+    "stage": "S5",
+    "reason": "S5 ordinary remote-execution application introduces device protocol, governed model requests and bounded durable receipt-carrier tools."
+  }
+]

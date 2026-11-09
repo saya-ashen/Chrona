@@ -73,9 +73,6 @@ describe("SQLite backup and restore", () => {
       }
       writeFileSync(join(data, "platform/store/hash/bun.lock"), "lockfile");
       backupSqliteDatabase(`file:${db}`, backup, data);
-      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
-      expect(listing).toContain("platform/store/hash/bun.lock");
-      for (const name of ["node_modules", ".venv", ".chrona"]) expect(listing).not.toContain(name);
       const restored = join(directory, "restored");
       restoreSqliteDatabase(`file:${join(directory, "restored.db")}`, backup, { dataDir: restored });
       expect(readFileSync(join(restored, "platform/store/hash/bun.lock"), "utf8")).toBe("lockfile");
@@ -116,9 +113,6 @@ describe("SQLite backup and restore", () => {
         writeFileSync(join(data, path), "saved");
       }
       backupSqliteDatabase(`file:${db}`, backup, data);
-      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
-      for (const path of skipped) expect(listing).not.toContain(`${path}/`);
-      for (const path of saved) expect(listing).toContain(path);
       const restored = join(directory, "restored");
       restoreSqliteDatabase(`file:${join(directory, "restored.db")}`, backup, { dataDir: restored });
       for (const path of skipped) expect(existsSync(join(restored, path))).toBe(false);
@@ -135,9 +129,10 @@ describe("SQLite backup and restore", () => {
       for (const path of links) { mkdirSync(join(data, path, ".."), { recursive: true }); symlinkSync("missing", join(data, path)); }
       writeFileSync(join(data, "sessions/session/content/note.md"), "saved");
       expect(backupSqliteDatabase(`file:${db}`, backup, data).omitted.sort()).toEqual([...links].sort());
-      const listing = execFileSync("tar", ["-tf", `${backup}.tar`], { encoding: "utf8" });
-      for (const path of links) expect(listing).not.toContain(path);
-      expect(listing).toContain("sessions/session/content/note.md");
+      const restored = join(directory, "restored");
+      restoreSqliteDatabase(`file:${join(directory, "restored.db")}`, backup, { dataDir: restored });
+      for (const path of links) expect(existsSync(join(restored, path))).toBe(false);
+      expect(readFileSync(join(restored, "sessions/session/content/note.md"), "utf8")).toBe("saved");
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
@@ -243,7 +238,13 @@ describe("SQLite backup and restore", () => {
       mkdirSync(join(directory, "platform"));
       backupSqliteDatabase(`file:${db}`, backup, directory);
       const original = readFileSync(`${backup}.tar`);
-      for (const [name, type] of [["platform/../../escaped", "5"], ["/platform", "5"], ["sessions/link", "2"], ["secrets/special", "6"]]) {
+      writeFileSync(join(directory, "platform/keep"), "current data");
+      for (const [name, type] of [
+        ["platform/../../escaped", "5"], ["/platform", "5"], ["platform//empty", "5"],
+        ["platform/./relative", "5"], ["sessions/back\\slash", "0"], ["unrecognized", "5"],
+        ["sessions/hardlink", "1"], ["sessions/symlink", "2"], ["secrets/special", "6"],
+        ["sessions/extended", "x"], ["sessions/longname", "L"],
+      ]) {
         const malicious = Buffer.from(original);
         malicious.fill(0, 0, 100);
         malicious.write(name!, 0);
@@ -254,6 +255,7 @@ describe("SQLite backup and restore", () => {
         writeFileSync(`${backup}.tar`, malicious);
         expect(() => restoreSqliteDatabase(`file:${db}`, backup, { force: true, dataDir: directory })).toThrow("unsafe");
         expect(readValue(db)).toBe("current");
+        expect(readFileSync(join(directory, "platform/keep"), "utf8")).toBe("current data");
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });

@@ -20,13 +20,24 @@ const manifest = JSON.parse(await readFile("module.json", "utf8")) as { entry: s
 const { startModule } = await import("./testing");
 const module = await startModule(manifest.entry, { stubs: Object.fromEntries(Object.entries(fixtures).map(([target, output]) => [target, () => output])) });
 
+// Wait for the protocol's readiness report; a module without HTTP still gets a bounded preview error.
+let readinessTimer: ReturnType<typeof setTimeout>;
+const httpReady = Promise.race([
+  module.httpReady,
+  new Promise<never>((_, reject) => { readinessTimer = setTimeout(() => reject(new Error("Module HTTP readiness timed out")), 5000); }),
+]).finally(() => clearTimeout(readinessTimer));
+void httpReady.catch(() => {});
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 0, async fetch(request) {
-  const url = new URL(request.url), body = ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer();
-  // The module may still be starting.
-  for (let attempt = 0; ; attempt++) {
-    try { return await fetch(`http://module${url.pathname}${url.search}`, { unix: module.httpSocket, method: request.method, headers: request.headers, body, redirect: "manual" }); }
-    catch { if (attempt >= 50) return new Response("The module is not serving HTTP (does it call chrona.serve?)", { status: 502 }); await Bun.sleep(100); }
-  }
+  const url = new URL(request.url), headers = new Headers(request.headers);
+  headers.delete("authorization"); headers.delete("cookie"); headers.delete("x-chrona-module-token");
+  try {
+    await httpReady;
+    const response = await module.fetch(`${url.pathname}${url.search}`, { method: request.method, headers, body: request.body, signal: request.signal });
+    const out = new Headers(response.headers);
+    // Modules cannot overwrite browser credentials on the preview's origin.
+    out.delete("set-cookie"); out.delete("x-chrona-module-token");
+    return new Response(response.body, { status: response.status, headers: out });
+  } catch { return new Response("The module is not serving HTTP (does it call chrona.serve?)", { status: 502 }); }
 } });
 console.log(`Preview: http://127.0.0.1:${server.port}/`);
 async function stop() { await server.stop(true); await module.stop(); process.exit(0); }

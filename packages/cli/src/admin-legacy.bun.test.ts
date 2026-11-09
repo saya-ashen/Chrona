@@ -8,7 +8,6 @@ import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { adminLegacy } from "./admin-legacy";
 import { createProgram } from "./program";
-import webManifest from "../../engine/src/modules/steward/builtin/web/module.json";
 
 const fixtures: { db: PrismaClient; root: string }[] = [];
 afterEach(async () => {
@@ -60,11 +59,9 @@ test("CLI export → pinned verify → explicit delete uses only selected tempor
   } finally { log.mockRestore(); }
 });
 
-test.each(["export", "verify", "delete", "migrate-wake"])("CLI %s refuses a live runtime lock before touching archive/source", async operation => {
+test.each(["export", "verify", "delete"])("CLI %s refuses a live runtime lock before touching archive/source", async operation => {
   const f = await fixture();
-  const request = operation === "migrate-wake"
-    ? { operation, workspaceId: f.scope.workspaceId, offline: true, limit: 1, owners: [{ moduleId: "checked-owner", hash: "checked-version" }] }
-    : { operation, ...f.scope, ...(operation === "export" ? {} : { manifestSha256: "a".repeat(64) }), ...(operation === "delete" ? { authorizeDelete: true } : {}) };
+  const request = { operation, ...f.scope, ...(operation === "export" ? {} : { manifestSha256: "a".repeat(64) }), ...(operation === "delete" ? { authorizeDelete: true } : {}) };
   const lock = acquireSqliteRuntimeLock(f.options.databaseUrl);
   try {
     await expect(adminLegacy(f.write(request), f.options)).rejects.toThrow("already in use");
@@ -90,47 +87,22 @@ test("CLI rejects malformed, unbounded, implicit or extra request fields before 
   await expect(adminLegacy(f.write(base), options)).rejects.toThrow("Chrona database not found");
 });
 
-test.each(["active", "paused"])("CLI migrate-wake preserves %s timer identity and state with checked owner pins", async status => {
-  const f = await fixture(), log = spyOn(console, "log").mockImplementation(() => {});
-  try {
-    const hash = "a".repeat(64);
-    const module = await f.db.module.create({ data: { workspaceId: f.scope.workspaceId, name: "web", activeHash: hash, status: "active" } });
-    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash, status: "approved", source: "user", manifest: webManifest, intent: {}, report: {} } });
-    await f.db.session.update({ where: { id: f.session.id }, data: { entryModuleId: module.id } });
-    const timer = await f.db.schedule.create({ data: { workspaceId: f.scope.workspaceId, originSessionId: f.session.id, mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Continue temporary work", label: "Temporary timer", status, nextAt: new Date("2026-11-01T00:00:00Z"), until: new Date("2026-12-01T00:00:00Z"), failures: 2, createdBy: "user" } });
-    const request = { operation: "migrate-wake", workspaceId: f.scope.workspaceId, offline: true, limit: 1, owners: [{ moduleId: module.id, hash }] };
-    await expect(adminLegacy(f.write({ ...request, owners: [] }), f.options)).rejects.toThrow("checked handler");
-    await expect(adminLegacy(f.write({ ...request, owners: [{ moduleId: module.id, hash: "wrong" }] }), f.options)).rejects.toThrow("checked handler");
-    expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
-    expect(await adminLegacy(f.write(request), f.options)).toEqual({ migrated: [{ scheduleId: timer.id, moduleId: module.id, hash }] });
-    expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual({ ...timer, mode: "module", moduleId: module.id, text: `legacy-wake:${timer.id}`, payload: { kind: "legacy-wake", originSessionId: f.session.id, text: timer.text } });
-    expect(await adminLegacy(f.write(request), f.options)).toEqual({ migrated: [] });
-    expect(await f.db.run.count()).toBe(0);
-    expect(await f.db.moduleRun.count()).toBe(0);
-    expect(await f.db.moduleInvocation.count()).toBe(0);
-    expect(await f.db.stewardState.count()).toBe(0);
-    expect(await f.db.message.count()).toBe(1);
-    expect(existsSync(f.attachment)).toBe(true);
-    expect(existsSync(f.scope.outputDir)).toBe(false);
-    const lock = acquireSqliteRuntimeLock(f.options.databaseUrl); lock.release();
-  } finally { log.mockRestore(); }
-});
-
-test("CLI migrate-wake rejects missing, unbounded or extra fields before database access", async () => {
+test("CLI rejects removed migrate-wake before database access and preserves legacy rows", async () => {
   const f = await fixture();
-  const options = { ...f.options, databaseUrl: `file:${join(f.options.dataDir, "absent.db")}` };
-  const base = { operation: "migrate-wake", workspaceId: f.scope.workspaceId, offline: true, limit: 1, owners: [{ moduleId: "owner", hash: "checked" }] };
-  for (const request of [
-    { operation: base.operation, workspaceId: base.workspaceId },
-    { ...base, offline: false }, { ...base, offline: undefined },
-    { ...base, limit: 0 }, { ...base, limit: 501 }, { ...base, limit: 1.5 },
-    { ...base, owners: undefined }, { ...base, owners: Array(101).fill(base.owners[0]) },
-    { ...base, owners: [{ moduleId: "owner" }] }, { ...base, owners: [{ moduleId: "", hash: "checked" }] },
-    { ...base, owners: [{ moduleId: "owner", hash: "" }] }, { ...base, owners: [{ ...base.owners[0], checked: true }] },
-    { ...base, outputDir: f.scope.outputDir }, { ...base, sessionIds: f.scope.sessionIds }, { ...base, stopped: true },
-  ]) await expect(adminLegacy(f.write(request), options)).rejects.toThrow();
-  expect(existsSync(join(f.options.dataDir, "absent.db"))).toBe(false);
-  await expect(adminLegacy(f.write(base), options)).rejects.toThrow("Chrona database not found");
+  const timer = await f.db.schedule.create({ data: { workspaceId: f.scope.workspaceId, originSessionId: f.session.id, mode: "wake", rule: { kind: "every", minutes: 60 }, text: "Legacy timer", status: "paused", nextAt: null, failures: 2, createdBy: "user" } });
+  const request = { operation: "migrate-wake", workspaceId: f.scope.workspaceId, offline: true, limit: 1, owners: [{ moduleId: "owner", hash: "checked" }] };
+  const absent = join(f.options.dataDir, "absent.db");
+  for (const options of [f.options, { ...f.options, databaseUrl: `file:${absent}` }]) {
+    await expect(adminLegacy(f.write(request), options)).rejects.toMatchObject({ name: "ZodError", issues: [expect.objectContaining({ path: ["operation"], code: "invalid_union" })] });
+  }
+  expect(existsSync(absent)).toBe(false);
+  expect(await f.db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  expect(await f.db.message.count()).toBe(1);
+  expect(existsSync(f.attachment)).toBe(true);
+  expect(existsSync(f.scope.outputDir)).toBe(false);
+  expect(await f.db.run.count()).toBe(0);
+  expect(await f.db.moduleInvocation.count()).toBe(0);
+  const lock = acquireSqliteRuntimeLock(f.options.databaseUrl); lock.release();
 });
 
 test("CLI stop guard rejects active Run evidence and releases maintenance ownership", async () => {

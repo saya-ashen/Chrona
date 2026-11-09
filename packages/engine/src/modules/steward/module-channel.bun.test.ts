@@ -1,8 +1,5 @@
 import { expect, test } from "bun:test";
 import { createConnection, type Socket } from "node:net";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { createModuleChannel } from "./module-channel";
 
 const now = "2026-10-22T09:00:00.000Z";
@@ -20,19 +17,20 @@ function lines(socket: Socket) {
   });
   return () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve));
 }
-async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "chrona-channel-"));
+async function fixture(status: "queued" | "waiting" = "queued") {
   const calls: unknown[] = [];
-  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status: "queued" } }; } });
-  const socket = createConnection(join(root, "channel.sock"));
+  const channel = await createModuleChannel({ onCall: async call => { calls.push(call); return { id: call.id, result: { callId: "c1", status } }; } });
+  const socket = createConnection({ host: "127.0.0.1", port: Number(new URL(channel.endpoint).port) });
   const next = lines(socket);
+  socket.write(JSON.stringify({ type: "auth", version: 1, token: channel.token }) + "\n");
+  await next();
   await channel.ready;
-  return { channel, socket, next, calls, path: join(root, "channel.sock"), close: async () => { socket.destroy(); await channel.close(); await rm(root, { recursive: true, force: true }); } };
+  return { channel, socket, next, calls, endpoint: channel.endpoint, close: async () => { socket.destroy(); await channel.close(); } };
 }
-test("channel drops malformed lines, validates calls and event replies, then recovers", async () => {
+test("channel validates calls and event replies, then recovers", async () => {
   const f = await fixture();
   try {
-    f.socket.write('not-json\n{"id":"bad","method":"unknown","params":{}}\n');
+    f.socket.write('{"id":"bad","method":"unknown","params":{}}\n');
     expect(await f.next()).toMatchObject({ id: "bad", error: { code: "invalid" } });
     f.socket.write(JSON.stringify({ id: "bad-params", method: "call", params: { target: "notify.send", mode: "async" } }) + "\n");
     expect(await f.next()).toMatchObject({ id: "bad-params", error: { code: "invalid" } });
@@ -44,7 +42,7 @@ test("channel drops malformed lines, validates calls and event replies, then rec
     f.socket.write(JSON.stringify({ id: message.id, result: { handled: true, result: 42 } }) + "\n");
     expect(await result).toEqual({ id: message.id, result: { handled: true, result: 42 } });
     expect(f.calls).toHaveLength(1);
-    expect(f.channel.diagnostics()).toEqual(["Malformed JSON", "Invalid module call", "Invalid module call", "Invalid event reply"]);
+    expect(f.channel.diagnostics()).toEqual(["Invalid module call", "Invalid module call", "Invalid event reply"]);
   } finally { await f.close(); }
 });
 test.each([true, false])("SDK ping validates protocol without a business event; valid=%s", async valid => {
@@ -71,6 +69,24 @@ test("channel preserves known typed handler errors and rejects unknown codes", a
     expect(f.channel.diagnostics()).toContain("Invalid event reply");
   } finally { await f.close(); }
 });
+test("waiting user decisions survive the routed call reply wire", async () => {
+  const f = await fixture("waiting");
+  try {
+    f.socket.write(JSON.stringify({ id: "decision", method: "callStatus", params: { callId: "c1" } }) + "\n");
+    expect(await f.next()).toEqual({ id: "decision", result: { callId: "c1", status: "waiting" } });
+    expect(f.channel.diagnostics()).toEqual([]);
+  } finally { await f.close(); }
+});
+test.each(["unconfigured", "budget_exceeded", "provider_error", "timeout"])("SDK model failure %s reaches the waiting caller without timing out", async errorCode => {
+  const f = await fixture();
+  try {
+    const result = f.channel.send(event, 1000);
+    const message = await f.next() as { id: string };
+    f.socket.write(JSON.stringify({ id: message.id, error: "Model request failed", errorCode }) + "\n");
+    expect(await result).toEqual({ id: message.id, error: "Model request failed", errorCode });
+    expect(f.channel.diagnostics()).toEqual([]);
+  } finally { await f.close(); }
+});
 test("channel drops oversize lines and rejects in-flight event", async () => {
   const f = await fixture();
   try {
@@ -79,7 +95,7 @@ test("channel drops oversize lines and rejects in-flight event", async () => {
     await f.next();
     f.socket.write("x".repeat(32 * 1024 * 1024 + 1));
     expect((await rejected as Error).message).toBe("Module disconnected");
-    expect(f.channel.diagnostics()).toContain("Module line overflow");
+    expect(f.channel.diagnostics()).toContain("Invalid channel message");
   } finally { await f.close(); }
 });
 test("event sends serialize; timeout does not close channel; late reply is ignored", async () => {
@@ -101,7 +117,7 @@ test("event sends serialize; timeout does not close channel; late reply is ignor
 test("channel accepts exactly one connection and rejects invalid outbound events", async () => {
   const f = await fixture();
   try {
-    const extra = createConnection(f.path);
+    const extra = createConnection({ host: "127.0.0.1", port: Number(new URL(f.endpoint).port) });
     await new Promise<void>(resolve => { extra.on("error", () => {}); extra.on("close", () => resolve()); });
     const result = f.channel.send(event, 1000);
     const message = await f.next() as { id: string };
@@ -111,12 +127,13 @@ test("channel accepts exactly one connection and rejects invalid outbound events
   } finally { await f.close(); }
 });
 test("drained waits for calls the module is still waiting on, and says whether it waited", async () => {
-  const root = await mkdtemp(join(tmpdir(), "chrona-channel-"));
   let answer!: () => void;
   const held = new Promise<void>(resolve => { answer = resolve; });
-  const channel = await createModuleChannel(join(root, "channel.sock"), { onCall: async call => { await held; return { id: call.id, result: { output: { ok: true } } }; } });
-  const socket = createConnection(join(root, "channel.sock")), next = lines(socket);
+  const channel = await createModuleChannel({ onCall: async call => { await held; return { id: call.id, result: { output: { ok: true } } }; } });
+  const socket = createConnection({ host: "127.0.0.1", port: Number(new URL(channel.endpoint).port) }), next = lines(socket);
   try {
+    socket.write(JSON.stringify({ type: "auth", version: 1, token: channel.token }) + "\n");
+    await next();
     await channel.ready;
     expect(await channel.drained()).toBe(false);
     socket.write(JSON.stringify({ id: "resolve", method: "call", params: { target: "approvals.resolve", args: {} } }) + "\n");
@@ -127,5 +144,5 @@ test("drained waits for calls the module is still waiting on, and says whether i
     answer();
     expect(await drained).toBe(true);
     expect(await next()).toEqual({ id: "resolve", result: { output: { ok: true } } });
-  } finally { socket.destroy(); await channel.close(); await rm(root, { recursive: true, force: true }); }
+  } finally { socket.destroy(); await channel.close(); }
 });

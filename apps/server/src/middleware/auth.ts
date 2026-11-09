@@ -39,7 +39,7 @@ export function apiKeyAuth(
 
   return async (c, next) => {
     if (
-      SKIP_PATHS.some((p) => c.req.path === p || c.req.path.startsWith(p))
+      SKIP_PATHS.includes(c.req.path)
       || options.isExempt?.(c.req.path, c.req.method)
     ) {
       return next();

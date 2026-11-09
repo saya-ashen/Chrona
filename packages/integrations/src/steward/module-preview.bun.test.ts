@@ -14,7 +14,7 @@ async function buildDir() {
   await mkdir(join(root, "node_modules"), { recursive: true });
   await cp(join(import.meta.dirname, "module-sdk"), join(root, "node_modules", "chrona"), { recursive: true });
   await mkdir(join(root, "page"));
-  await writeFile(join(root, "page", "module.json"), JSON.stringify({ name: "page", entry: "index.ts", tests: [], triggers: [], effects: [], keepAlive: true, listen: ["/"], uses: ["chat.today", "chat.send"] }));
+  await writeFile(join(root, "page", "module.json"), JSON.stringify({ name: "page", entry: "index.ts", tests: [], effects: [], keepAlive: true, listen: ["/"], uses: ["chat.today", "chat.send"] }));
   await writeFile(join(root, "page", "index.ts"), `import { chrona } from "chrona";
 chrona.serve(async request => {
   const url = new URL(request.url);

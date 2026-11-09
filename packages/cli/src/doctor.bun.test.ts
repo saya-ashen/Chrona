@@ -19,7 +19,50 @@ describe("chrona doctor", () => {
       process.env.DATABASE_URL = `file:${join(directory, "missing.db")}`;
       process.env.CHRONA_CONFIG_DIR = join(directory, "config");
       process.env.PATH = directory;
-      expect(inspectLocalChrona()).toContainEqual(expect.objectContaining({ key: "git", status: "error", message: expect.stringContaining("Install Git") }));
+      process.env.HOST = "127.0.0.1";
+      delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
+      delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
+      const checks = inspectLocalChrona();
+      expect(checks).toContainEqual(expect.objectContaining({ key: "git", status: "error", message: expect.stringContaining("Install Git") }));
+      // Optional interpreters, shell, Nix, browser and external tar are not global prerequisites.
+      expect(checks.filter(check => check.status === "error").map(check => check.key)).toEqual(["git"]);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    { mode: undefined, bwrap: undefined, status: "ok", message: "host user permissions" },
+    { mode: "", bwrap: "", status: "ok", message: "host user permissions" },
+    { mode: " \t", bwrap: " \t", status: "ok", message: "host user permissions" },
+    { mode: "trusted-local", bwrap: undefined, status: "ok", message: "host user permissions" },
+    { mode: " trusted-local ", bwrap: undefined, status: "ok", message: "host user permissions" },
+    { mode: "required-isolation", bwrap: undefined, status: "error", message: "Remove the setting" },
+    { mode: "unknown", bwrap: undefined, status: "error", message: "supports only trusted-local" },
+    { mode: "Trusted-local", bwrap: undefined, status: "error", message: "supports only trusted-local" },
+    { mode: undefined, bwrap: "/missing/bwrap", status: "error", message: "CHRONA_STEWARD_SANDBOX_BWRAP has been removed" },
+    { mode: "trusted-local", bwrap: "0", status: "error", message: "Remove this setting" },
+    { mode: "required-isolation", bwrap: " /missing/bwrap ", status: "error", message: "CHRONA_STEWARD_SANDBOX_BWRAP has been removed" },
+  ])("diagnoses execution mode $mode and legacy bwrap $bwrap", ({ mode, bwrap, status, message }) => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-mode-"));
+    try {
+      process.env.DATABASE_URL = `file:${join(directory, "missing.db")}`;
+      process.env.CHRONA_CONFIG_DIR = join(directory, "config");
+      if (mode === undefined) delete process.env.CHRONA_STEWARD_EXECUTION_MODE;
+      else process.env.CHRONA_STEWARD_EXECUTION_MODE = mode;
+      if (bwrap === undefined) delete process.env.CHRONA_STEWARD_SANDBOX_BWRAP;
+      else process.env.CHRONA_STEWARD_SANDBOX_BWRAP = bwrap;
+      expect(inspectLocalChrona()).toContainEqual(expect.objectContaining({ key: "executionMode", status, message: expect.stringContaining(message) }));
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it("exits nonzero with removal guidance for legacy isolation configuration", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-doctor-cli-"));
+    try {
+      const result = Bun.spawnSync([process.execPath, "run", join(import.meta.dir, "index.ts"), "doctor"], {
+        env: { ...process.env, DATABASE_URL: `file:${join(directory, "missing.db")}`, CHRONA_CONFIG_DIR: join(directory, "config"), HOST: "127.0.0.1", CHRONA_STEWARD_EXECUTION_MODE: "required-isolation", CHRONA_STEWARD_SANDBOX_BWRAP: "" },
+      });
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout.toString()).toContain("[error] executionMode:");
+      expect(result.stdout.toString()).toContain("Remove the setting or explicitly set trusted-local");
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 

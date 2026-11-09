@@ -1,10 +1,11 @@
+import { startKernelExecution, kernelExecutionPlacement, kernelExecutionLocations, kernelExecutionCleanup } from "./kernel-execution-tools";
+import { createExecutionDelivery } from "./execution-delivery";
 import { admitContextPrimitive } from "./agent-context";
-import { providerAnswerSchema } from "@chrona/contracts/steward";
-import type { ExecutionPrincipal, ExecutionStart, ExecutionStartV2 } from "@chrona/contracts/steward";
+import { providerAnswerSchema, primitiveInput, type AgentPrimitive } from "@chrona/contracts/steward";
+import type { ExecutionPrincipal, ExecutionStart, KernelExecutionStart } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { CallError } from "./module-call-error";
-import { handleExecutionV2Tool } from "./execution-v2-tools";
-import { primitiveInput, type AgentPrimitive } from "./builtin/agent/primitives";
+import { isExecutionControlRejected } from "./execution-control-error";
 
 type ExecutionService = NonNullable<StewardPorts["executions"]>;
 type ExecutionView = Awaited<ReturnType<ExecutionService["get"]>>;
@@ -23,11 +24,12 @@ export async function admitAgentPrimitive(ports: StewardPorts, principal: Execut
   if (name === "run") {
     const { executionId, requestKey, prompt, ...scope } = input as ReturnType<typeof primitiveInput> & { executionId: string; requestKey: string; prompt: string };
     const request = { ...scope, workId: executionId, commandKey: requestKey, goal: prompt };
-    if ("placement" in scope) return handleExecutionV2Tool(ports, principal, "start-v2", request as ExecutionStartV2);
+    if ("placement" in scope) return startKernelExecution(ports, principal, request as KernelExecutionStart);
     return { execution: await service.start(principal, request as ExecutionStart) };
   }
   if (name === "lookup") return service.lookupStart(principal, (input as { requestKey: string }).requestKey);
-  if (name === "locations" || name === "cleanup") return handleExecutionV2Tool(ports, principal, name === "cleanup" ? "workspace-cleanup" : name, input);
+  if (name === "locations") return kernelExecutionLocations(ports, principal, input as { after?: string; limit: number });
+  if (name === "cleanup") return kernelExecutionCleanup(ports, principal, input as import("@chrona/contracts/steward").KernelCleanupInput);
   return admitExistingExecution(ports, service, principal, name, input as ExecutionArgs);
 }
 
@@ -37,7 +39,7 @@ async function admitExistingExecution(ports: StewardPorts, service: ExecutionSer
     assertOptionalReference(args, view);
     return view;
   }
-  if (name === "placement") return handleExecutionV2Tool(ports, principal, name, { workId: view.workId });
+  if (name === "placement") return kernelExecutionPlacement(ports, principal, view.workId);
   if (args.runId !== view.runId || args.attemptId !== view.attemptId) throw new CallError("conflict", "Agent execution reference changed");
   const ref = { workId: view.workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId };
   if (name === "stream" || name === "inspect") {
@@ -46,18 +48,29 @@ async function admitExistingExecution(ports: StewardPorts, service: ExecutionSer
     return { snapshot: await ports.executionEvents.snapshot(principal, ref), source: await service.resultSource(principal, ref) };
   }
   if (name === "respond") {
-    await service.answer(principal, { ...ref, op: "answer", commandKey: args.requestKey!, requestId: args.questionId!, answer: parseAnswer(args.answer) });
-    return { accepted: true };
+    const attempt = await ports.db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } });
+    if (attempt.targetBinding) { await createExecutionDelivery(ports).control(principal, view.workId, args.requestKey!, { operation: "answer", requestId: args.questionId!, answer: parseAnswer(args.answer) }); return { accepted: true }; }
+    return respondToExecution(service, principal, ref, args);
   }
   const command = name === "write" ? { ...ref, op: "send" as const, commandKey: args.requestKey!, text: args.text! } : { ...ref, op: "cancel" as const, commandKey: args.requestKey! };
   return admitExecutionControl(ports, service, principal, command, view);
 }
 
+async function respondToExecution(service: ExecutionService, principal: ExecutionPrincipal, ref: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, args: ExecutionArgs) {
+  try {
+    await service.answer(principal, { ...ref, op: "answer", commandKey: args.requestKey!, requestId: args.questionId!, answer: parseAnswer(args.answer) });
+    return { accepted: true };
+  } catch (error) {
+    if (isExecutionControlRejected(error)) return { accepted: false, error: { code: error.code, message: error.message } };
+    throw error;
+  }
+}
+
 async function admitExecutionControl(ports: StewardPorts, service: ExecutionService, principal: ExecutionPrincipal, command: Parameters<ExecutionService["admitControl"]>[1], view: ExecutionView) {
-  // Server handles live in Agent. Remote controls use the existing authenticated executor transport.
-  const attempt = await ports.db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId }, select: { executorId: true } });
-  if (attempt.executorId !== "server") {
-    if (command.op === "send") await service.send(principal, command); else await service.cancel(principal, command);
+  // Local handles live in Agent; application controls use the durable delivery journal.
+  const attempt = await ports.db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId }, select: { executorId: true, targetBinding: true } });
+  if (attempt.targetBinding) {
+    await createExecutionDelivery(ports).control(principal, view.workId, command.commandKey, command.op === "send" ? { operation: "write", text: command.text } : { operation: "cancel" });
     return { perform: false, operationId: view.runId, execution: await service.get(principal, view.workId) };
   }
   const admitted = await service.admitControl(principal, command);

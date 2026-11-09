@@ -1,0 +1,8 @@
+{
+  "name": "@chrona/process",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build:helper": "bun scripts/build-helper.ts", "test": "bun test src" }
+}

@@ -59,8 +59,7 @@ Set these in the server environment, then restart:
 | `CHRONA_STEWARD_PI_RESOURCES_FILE` | Optional private, canonical JSON manifest of reviewed explicit skill/extension entry files and extra tool names; no installation or ambient discovery |
 | `CHRONA_STEWARD_PI_MODEL` | Optional Pi model selection |
 | `CHRONA_STEWARD_PI_WEB_EXTENSION` | Optional explicit web extension path |
-| `CHRONA_STEWARD_EXECUTION_MODE` | Owner-selected `trusted-local` (default for unset/empty values) or `required-isolation`; other values reject startup |
-| `CHRONA_STEWARD_SANDBOX_BWRAP` | bubblewrap executable for Provider and module isolation in `required-isolation` mode |
+| `CHRONA_STEWARD_EXECUTION_MODE` | Trusted local execution; unset, empty or `trusted-local` are accepted; retired isolation settings fail explicitly |
 | `CHRONA_STEWARD_TICK_SECONDS` | Background tick interval; default `30` seconds |
 | `CHRONA_PUBLIC_URL` | Public HTTP(S) origin for notification links |
 | `CHRONA_QQ_APP_ID` | Dedicated QQ bot application ID |
@@ -69,7 +68,7 @@ Set these in the server environment, then restart:
 
 The default `trusted-local` mode runs Pi's bash, file tools and modules as local processes with the service user's OS permissions, even when bubblewrap is installed. Host files are not hidden by an OS sandbox; `content/chat` uses symlinks, so treating attachments as read-only is an agent rule rather than an enforced mount. Chrona's routed authorization, approvals and budgets still apply; local access does not grant permission to bypass them.
 
-Explicit `required-isolation` requires a successful bubblewrap probe for the Provider, modules and build checks, with no local fallback. The Provider masks home and Chrona data, mounts attachments read-only, and allows writes to its session workspace, dedicated Pi profile and approved host paths; other host mounts remain readable, and network access remains available. It is not a boundary against every host read. This mode currently rejects module candidates needing host dependency installation. Chrona does not duplicate Provider web or shell tools; recurring executable work runs in modules.
+Applications and Providers use host-installed interpreters and programs directly. Python, Shell and browsers are checked when needed; browsers are never downloaded automatically. Manifest declarations do not restrict host OS permissions. The retired `required-isolation` mode and nonempty `CHRONA_STEWARD_SANDBOX_BWRAP` settings fail explicitly and must be removed. Portable IPC, process-tree supervision and three-platform acceptance remain in progress.
 
 Pi resource auto-discovery and project trust are disabled. An optional reviewed [resource manifest](docs/zh/provider-runtime.md) adds explicit skills/extensions using Pi's own loading mechanism; native MCP requires an explicit `1.x` pin of `1.3.0` or later. Startup checks command resources before prompting. This is not a full tool manifest or proof that wrappers/extensions are safe: review the executable, extension code and service profile independently. Health checks validate launch configuration/version, not authentication or model success.
 

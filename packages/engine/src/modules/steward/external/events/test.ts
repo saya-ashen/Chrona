@@ -4,11 +4,15 @@ import { createHash } from "node:crypto";
 import { startModule } from "chrona/testing";
 
 type Call = { id: string; method: string; params: { target?: string; mode?: string; key?: string; args?: Record<string, unknown> } };
-const declared = [{ module: "planning", hash: "p1", value: { emits: [{ name: "updated", description: "A plan changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" }, rev: { type: "integer" } } } }] } }];
+const emits = JSON.stringify([{ name: "updated", description: "A plan changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" }, rev: { type: "integer" } } } }]);
 // beta.on-plan is visible to modules (modules.tools lists it); beta.private is not.
+// Installation smoke checks provide no routed calls; a later real tool call must retry startup reconciliation.
+let startupUnavailable = true;
 const module = await startModule("index.ts", { stubs: {
-  "modules.contributions": () => declared,
-  "modules.list": () => ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" })),
+  "modules.list": () => {
+    if (startupUnavailable) { startupUnavailable = false; return null; }
+    return ["planning", "beta"].map(name => ({ id: `${name}-id`, name, status: "active", activeHash: "h" }));
+  },
   "modules.tools": () => [{ target: "beta.on-plan", moduleId: "beta-id", hash: "h", contractHash: "callback-v1", inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }],
 } });
 const caller = (name: string) => ({ kind: "module", module: name, moduleId: `${name}-id`, hash: "h" });
@@ -26,6 +30,11 @@ const refused = async (id: string, args: Record<string, unknown>, from: unknown,
 };
 const deliveries = () => (module.calls as Call[]).filter(call => call.method === "call" && call.params.target === "beta.on-plan");
 try {
+  // Publishers register with their real SDK identity; no manifest contribution lookup.
+  await refused("register", { emits }, { kind: "owner", via: null }, /forbidden/);
+  await refused("subscribe", { event: "planning.updated", tool: "on-plan" }, caller("beta"), /not_found/);
+  assert.deepEqual(await ok("register", { emits }, caller("planning")), { registered: true });
+  assert.deepEqual(await ok("register", { emits }, caller("planning")), { registered: true });
   // Only modules, only declared events, only the subscriber's own tools that let events call them.
   await refused("subscribe", { event: "planning.updated", tool: "on-plan" }, { kind: "kernel" }, /forbidden/);
   await refused("subscribe", { event: "planning.deleted", tool: "on-plan" }, caller("beta"), /not_found/);
@@ -46,6 +55,7 @@ try {
   const [delivery] = deliveries();
   assert.deepEqual(delivery!.params.args, { event: "planning.updated", from: "planning", payload: '{"id":"p1","rev":2}' });
   assert.equal(delivery!.params.mode, "async");
+  assert.deepEqual((delivery!.params as Record<string, unknown>).expectedTarget, { moduleId: "beta-id", contractHash: "callback-v1" });
   assert.equal(delivery!.params.key, createHash("sha256").update(JSON.stringify(["planning-id", "updated", "k1", "beta-id", "on-plan"])).digest("hex"));
 
   // A delivery whose contract failed stays visible but receives nothing until the owner registers again.
@@ -57,6 +67,14 @@ try {
   await ok("subscribe", { event: "planning.updated", tool: "on-plan" }, caller("beta"));
   assert.deepEqual(await ok("unsubscribe", { event: "planning.updated", tool: "on-plan" }, caller("beta")), { unsubscribed: true });
   assert.deepEqual(await ok("subscriptions", {}, caller("beta")), { subscriptions: [] });
+
+  // An activation reconciles the application-owned store; [] withdraws the publisher's declarations.
+  const activation = await module.send({ trigger: { kind: "activated", id: "activated", firedAt: now() }, now: now(), params: {} });
+  assert.ok(!("error" in activation), JSON.stringify(activation));
+  assert.deepEqual(await ok("register", { emits: "[]" }, caller("planning")), { registered: true });
+  await refused("subscribe", { event: "planning.updated", tool: "on-plan" }, caller("beta"), /not_found/);
+  await refused("emit", { event: "updated", payload: '{}', key: "withdrawn" }, caller("planning"), /not_found/);
+  assert.ok(!(module.calls as Call[]).some(call => call.params.target === "modules.contributions"));
 } finally {
   await module.stop();
 }

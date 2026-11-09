@@ -1,19 +1,15 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  BUILTIN_MODULE_NAMES, EDITOR_HTTP, EXECUTION_PROTOCOL, PREINSTALLED_MODULE_NAMES, editorResponseDataSchemas,
-  moduleManifestSchema, type ExecutionCommand, type ExecutionEventPage, type ExecutionPayload,
-  type ExecutionResult, type ExecutionSnapshot, type ExecutionView, type ProviderAdapter, type ProviderRunInput,
-} from "@chrona/contracts/steward";
-import { callSync, moduleSupervisor } from "@chrona/engine";
+import { BUILTIN_MODULE_NAMES, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, type ExecutionPayload, type ExecutionView, type ProviderAdapter, type ProviderRunInput } from "@chrona/contracts/steward";
+import { callSync } from "@chrona/engine";
+import { PrismaClient } from "@chrona/db";
+import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { testDb } from "@chrona/engine/test-support";
-import { buildExecutionContracts } from "../../../../../build/execution-contracts";
+import { registerTestProvider } from "../../../../../packages/engine/src/modules/steward/test-provider";
 import { moduleContext } from "../../../../../packages/engine/src/modules/steward/module-context";
 import { switchActiveIn } from "../../../../../packages/engine/src/modules/steward/module-generation";
 import { seedTestModuleRelease, testReleasePackages } from "../../../../../packages/engine/src/modules/steward/module-release-test-fixture";
-import { resolveExternalRelease } from "../../../../../packages/engine/src/modules/steward/module-release";
 import { requestRemove } from "../../../../../packages/engine/src/modules/steward/module-remove";
 import { requestStatus } from "../../../../../packages/engine/src/modules/steward/module-status";
 import { createServerApp } from "../../app";
@@ -62,221 +58,165 @@ async function until<T>(read: () => Promise<T>, ready: (value: T) => boolean, la
   return value;
 }
 
-const sourceRoot = resolve(import.meta.dirname, "../../../../..");
-const environmentKeys = ["API_KEY", "CHRONA_STEWARD_EXECUTION_MODE"] as const;
-let savedEnvironment: (string | undefined)[], root: string, project: string;
+// A test-owned application exercises general HTTP/execution trust.
+const methods = ["run", "get", "stream", "inspect", "write", "interrupt", "respond"];
+const savedKeys = ["API_KEY", "CHRONA_STEWARD_EXECUTION_MODE"] as const;
+let saved: (string | undefined)[], root: string, project: string, workspaceId: string;
 let db: ReturnType<typeof testDb>, runtime: ReturnType<typeof createStewardRuntime>;
 let app: Awaited<ReturnType<typeof createServerApp>>, fake: ReturnType<typeof controlledProvider>;
-let coding: { id: string; hash: string }, workspaceId: string, request = 0;
-let errors: unknown[];
-
+let entry: { id: string; hash: string }, errors: unknown[];
 async function boot() {
   runtime = createStewardRuntime(db, { dataDir: join(root, "data"), provider: fake.provider, onError: error => { errors.push(error); } });
-  runtime.ports.moduleExternalResources = join(root, "external");
   runtime.ports.moduleBuiltinResources = join(root, "builtin");
   runtime.ports.packages = testReleasePackages(runtime.ports.moduleBuiltinResources);
-  await moduleSupervisor(runtime.ports).start();
   app = await createServerApp({ steward: runtime });
 }
 beforeEach(async () => {
-  savedEnvironment = environmentKeys.map(key => process.env[key]);
+  saved = savedKeys.map(key => process.env[key]);
   process.env.API_KEY = "execution-integration-test";
-  process.env.CHRONA_STEWARD_EXECUTION_MODE = "trusted-local";
-  resetEnvCacheForTests();
-  root = await mkdtemp(join(tmpdir(), "chrona-execution-loop-"));
-  project = join(root, "project");
-  await mkdir(project);
-  project = await realpath(project);
-  await writeFile(join(project, "AGENTS.md"), "Integration project rule: preserve the existing file.\n");
+  process.env.CHRONA_STEWARD_EXECUTION_MODE = "trusted-local"; resetEnvCacheForTests();
+  root = await mkdtemp("/tmp/chrona-generic-execution-");
+  project = join(root, "project"); await mkdir(project); project = await realpath(project);
+  await writeFile(join(project, "AGENTS.md"), "Preserve existing.txt.\n");
   await writeFile(join(project, "existing.txt"), "existing\n");
   db = testDb(); fake = controlledProvider(); errors = [];
-  // Existing official preinstalls are recorded as handled; this fixture never queues their installation.
-  const initialization = { version: 1, status: "complete", packages: Object.fromEntries(PREINSTALLED_MODULE_NAMES.map(name => [name, {
-    requestKey: `integration:${name}`, attempts: 1, status: "skipped", moduleId: null, hash: null, approvalId: null, error: null,
+  const initialization = { version: 1, status: "complete", packages: Object.fromEntries([...PREINSTALLED_MODULE_NAMES, "mind", "remind"].map(name => [name, {
+    requestKey: `fixture:${name}`, attempts: 1, status: "skipped", moduleId: null, hash: null, approvalId: null, error: null,
   }])) };
-  workspaceId = (await db.workspace.create({ data: { name: "Execution integration", settings: { moduleInitialization: initialization } } })).id;
-  const builtinRoot = join(root, "builtin");
-  await cp(join(sourceRoot, "packages/engine/src/modules/steward/builtin"), builtinRoot, { recursive: true });
-  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtinRoot, name);
-  const externalRoot = join(root, "external");
-  await mkdir(externalRoot);
-  for (const name of ["coding", "editor"]) await cp(join(sourceRoot, "packages/engine/src/modules/steward/external", name), join(externalRoot, name), { recursive: true });
-  // Official generator, actual package source, private build output. No replacement handlers or contract fixtures.
-  expect(await buildExecutionContracts(externalRoot)).toEqual(["coding", "editor"]);
-  for (const name of ["coding", "editor"]) {
-    await seedTestModuleRelease(externalRoot, name);
-    const release = await resolveExternalRelease({ moduleExternalResources: externalRoot }, name);
-    const module = await db.module.create({ data: { workspaceId, name, activeHash: release.hash, status: "active", dataSchema: release.manifest.data.schema } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash: release.hash, manifest: release.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-    await mkdir(join(root, "data/platform/store"), { recursive: true });
-    await cp(release.codeDir, join(root, "data/platform/store", release.hash), { recursive: true });
-    if (name === "coding") coding = { id: module.id, hash: release.hash };
-  }
-  await writeFile(join(root, "data/execution-projects.json"), JSON.stringify({ projects: [{
-    workspaceId, ownerId: "owner", moduleId: coding.id, projectRef: "project", canonicalPath: project, baseline: "snapshot:integration-baseline",
-  }] }));
+  workspaceId = (await db.workspace.create({ data: { name: "Generic execution acceptance", settings: { moduleInitialization: initialization } } })).id;
+  const builtin = join(root, "builtin");
+  await cp(resolve(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"), builtin, { recursive: true });
+  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtin, name);
+  const manifest = moduleManifestSchema.parse({ name: "execution-test", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, listen: "/api/execution-test",
+    uses: methods.map(method => `agent.${method}`), tools: [{ name: "dispatch", description: "Owner execution fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" } }, required: ["tool", "input"] } }] });
+  const module = await db.module.create({ data: { workspaceId, name: manifest.name, activeHash: "execution-fixture", status: "active" } });
+  entry = { id: module.id, hash: "execution-fixture" };
+  await db.moduleVersion.create({ data: { moduleId: entry.id, hash: entry.hash, manifest, source: "user", status: "approved", intent: {}, report: {} } });
+  const code = join(root, "data/platform/store", entry.hash); await mkdir(code, { recursive: true });
+  await writeFile(join(code, "index.ts"), `import { chrona, on, ModelError } from "chrona";
+const methods = new Set(${JSON.stringify(methods)});
+async function dispatch(tool, input) { if (!methods.has(tool)) throw new ModelError("forbidden", "Fixture method denied"); return chrona.call("agent." + tool, input); }
+on("tool", async event => ({ result: await dispatch(event.args.tool, JSON.parse(event.args.input)) }));
+chrona.serve(async request => { try { const { tool, input } = await request.json(); return Response.json({ result: await dispatch(tool, input) }); }
+catch (error) { return Response.json({ error: { code: error.code, message: error.message } }, { status: 409 }); } });`);
+  await writeFile(join(root, "data/execution-projects.json"), JSON.stringify({ projects: [{ workspaceId, ownerId: "owner", moduleId: entry.id, projectRef: "project", canonicalPath: project, baseline: "snapshot:fixture" }] }));
   await boot();
 }, 30_000);
-
 afterEach(async () => {
-  // Resolve every fake process before runtime.stop, whose production shutdown correctly waits for actual done.
   for (const run of fake?.started ?? []) run.finish({ outcome: "failed", sessionId: null, error: "Test cleanup" });
-  try { await runtime?.stop(); }
-  finally {
-    await db?.$disconnect();
-    if (root) await rm(root, { recursive: true, force: true });
-    environmentKeys.forEach((key, i) => { if (savedEnvironment[i] === undefined) delete process.env[key]; else process.env[key] = savedEnvironment[i]; });
-    resetEnvCacheForTests();
+  try { await runtime?.stop(); } finally {
+    await db?.$disconnect(); if (root) await rm(root, { recursive: true, force: true });
+    savedKeys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i]; }); resetEnvCacheForTests();
   }
 }, 30_000);
-
-async function command<K extends ExecutionCommand["op"]>(input: Extract<ExecutionCommand, { op: K }>) {
-  const response = await app.request(EDITOR_HTTP.commands, {
-    method: "POST", headers: { authorization: "Bearer execution-integration-test", "content-type": "application/json" },
-    body: JSON.stringify({ v: EXECUTION_PROTOCOL, requestId: `http-${++request}`, command: input }),
-  });
-  const body = await response.json() as { ok: boolean; data?: unknown; error?: unknown };
+async function raw(tool: string, input: unknown) { return app.request("/api/execution-test/commands", { method: "POST", headers: { authorization: "Bearer execution-integration-test", "content-type": "application/json" }, body: JSON.stringify({ tool, input }) }); }
+async function command(tool: string, input: unknown) {
+  const response = await raw(tool, input), body = await response.json();
   expect({ status: response.status, error: body.error }).toEqual({ status: 200, error: undefined });
-  expect(body.ok).toBe(true);
-  return editorResponseDataSchemas[input.op].parse(body.data);
+  return body.result;
 }
-const startInput = (workId: string) => ({ op: "start" as const, workId, projectRef: "project", commandKey: `start-${workId}`, goal: "Write a temporary project file and report the checks actually run.", budget: { timeoutMs: 60_000, maxToolCalls: 6 } });
-const target = (view: ExecutionView) => ({ workId: view.workId, runId: view.runId, attemptId: view.attemptId });
-async function start(workId: string) {
-  const view = await command(startInput(workId)) as ExecutionView;
-  await until(async () => fake.started.find(run => run.input.runId === view.runId), Boolean, "Provider launch");
-  return { view, run: fake.started.find(run => run.input.runId === view.runId)! };
+const startInput = (executionId: string) => ({ executionId, requestKey: `start-${executionId}`, prompt: "Use native file tools; report only checks actually run.", projectRef: "project", budget: { timeoutMs: 60_000, maxToolCalls: 6 } });
+const target = (view: ExecutionView) => ({ executionId: view.workId, runId: view.runId, attemptId: view.attemptId });
+async function start(id: string) {
+  const { execution: view } = await command("run", startInput(id)) as { execution: ExecutionView };
+  const run = await until(async () => fake.started.find(run => run.input.runId === view.runId), Boolean, "Provider launch");
+  return { view, run: run! };
 }
-async function storedWork(workId: string) {
-  return JSON.parse(await readFile(join(root, "data/platform/data", coding.id, `${workId}.json`), "utf8")) as { results: ExecutionResult[]; acceptances: unknown[] };
-}
-function ownerCall(tool: string, args: Record<string, unknown>) {
-  return callSync(runtime.ports, { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, tool, args);
-}
+function caller() { return { kind: "module" as const, module: "execution-test", moduleId: entry.id, hash: entry.hash }; }
+function direct(who: Parameters<typeof callSync>[1]["caller"], tool: string, args: Record<string, unknown>) { return callSync(runtime.ports, { workspaceId, caller: who, chain: [], path: [] }, tool, args); }
 
-test("real editor/SDK/runtime persists questions, detach, completion and human acceptance behind host auth", async () => {
-  expect(runtime.ports.sandbox?.executionMode).toBe("trusted-local");
-  expect(runtime.ports.sandbox?.isolated).toBe(false);
-  expect((await app.request(EDITOR_HTTP.commands, { method: "POST" })).status).toBe(401);
-  delete process.env.API_KEY; resetEnvCacheForTests();
-  expect((await app.request(EDITOR_HTTP.commands, { method: "POST" })).status).toBe(503);
-  process.env.API_KEY = "execution-integration-test"; resetEnvCacheForTests();
+test("generic HTTP execution retains auth, owner visibility, private fences, questions, replay and completion", async () => {
+  expect((await app.request("/api/execution-test/commands", { method: "POST" })).status).toBe(401);
+  expect((await app.request("/api/execution-test/commands", { method: "POST", headers: { authorization: "Bearer invalid" } })).status).toBe(401);
   const { view, run } = await start("complete");
   expect(run.input.cwd).toBe(project);
-  expect(run.input.execution).toEqual({ ...target(view), sessionId: view.sessionId });
-  expect(run.input.cwd).toBe(await realpath(project));
-  expect(run.input.prompt).toContain("use native file tools to read AGENTS.md relative to the actual execution cwd");
-  expect(run.input.prompt).toContain("Read it again each round");
-  expect(run.input.prompt).not.toContain("Integration project rule");
-  expect(await readFile(join(run.input.cwd, "AGENTS.md"), "utf8")).toBe("Integration project rule: preserve the existing file.\n");
+  expect(run.input.execution).toEqual({ workId: view.workId, sessionId: view.sessionId, runId: view.runId, attemptId: view.attemptId });
   expect(run.input.executionBudget).toEqual({ maxToolCalls: 6 });
-  expect(run.input.content).toEqual([]);
-  expect(run.input.hostPaths).toEqual([]);
-  expect(await command(startInput("complete"))).toMatchObject(target(view));
+  expect(run.input.content).toEqual([]); expect(run.input.hostPaths).toEqual([]);
+  expect((await command("run", startInput("complete"))).execution).toMatchObject({ runId: view.runId, attemptId: view.attemptId });
   expect(fake.started).toHaveLength(1);
-  await command({ op: "send", ...target(view), commandKey: "send-once", text: "Keep existing.txt" });
-  await command({ op: "send", ...target(view), commandKey: "send-once", text: "Keep existing.txt" });
-  expect(run.messages).toEqual(["Keep existing.txt"]);
-  for (const [method, value] of [["confirm", false], ["select", 0]] as const) {
-    const question = run.input.events!.question({ method, title: `Question ${method}`, message: "Choose", options: method === "select" ? ["first", "second"] : [], timeoutMs: 30_000 }, new AbortController().signal);
-    const snapshot = await until(async () => await command({ op: "snapshot", ...target(view) }) as ExecutionSnapshot,
-      snapshot => snapshot.questions.some(item => item.method === method && item.status === "pending"), `persisted ${method} question`);
-    const pending = snapshot.questions.find(item => item.method === method && item.status === "pending")!;
-    const journal = await db.audit.findUniqueOrThrow({ where: { id: `provider-request:${pending.requestId}` } });
-    expect((journal.details as { id: string }).id).toBe(pending.requestId);
-    await command({ op: "answer", ...target(view), commandKey: `answer-${method}`, requestId: pending.requestId, answer: { decision: "submit", value } });
-    expect(await question).toEqual({ decision: "submit", value });
-    expect((await command({ op: "snapshot", ...target(view) }) as ExecutionSnapshot).questions.find(item => item.requestId === pending.requestId)?.status).toBe("answered");
+  for (const who of [{ kind: "owner" as const, via: null }, { kind: "provider" as const, runId: view.runId }, { kind: "kernel" as const }]) {
+    await expect(direct(who, "agent.get", target(view))).rejects.toMatchObject({ code: "forbidden" });
   }
-  await command({ op: "detach", workId: view.workId });
-  expect(run.aborted).toBe(0);
-  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).cancelRequestedAt).toBeNull();
-  await writeFile(join(run.input.cwd, "generated.txt"), "temporary project output\n");
-  await run.append({ type: "message", messageId: "final", role: "assistant", text: "Created generated.txt; no check command was run.", complete: true });
-  const before = await command({ op: "events", ...target(view), limit: 100, waitMs: 0 }) as ExecutionEventPage;
-  run.finish({ outcome: "finished", sessionId: "fake-provider-session", error: null });
-  // No coding.get/results HTTP call here: only production onRunFinished may publish this version.
-  const work = await until(() => storedWork(view.workId), work => work.results.length === 1, "automatic result publication");
-  expect(work.results[0]).toMatchObject({ ...target(view), accepted: false, checks: [], baseline: { kind: "snapshot", digest: "integration-baseline" } });
-  expect(work.acceptances).toEqual([]);
-  const result = work.results[0]!;
-  const artifactPath = join(root, "data/platform/content", coding.id, `${result.artifactRef}.json`);
-  const artifactBytes = await readFile(artifactPath, "utf8");
-  expect(JSON.parse(artifactBytes)).toMatchObject({ finalMessage: { text: "Created generated.txt; no check command was run." }, checks: [] });
+  await expect(direct({ kind: "provider", runId: view.runId }, "execution-test.dispatch", { tool: "get", input: JSON.stringify(target(view)) })).rejects.toMatchObject({ code: "forbidden" });
+  expect((await direct({ kind: "owner", via: null }, "execution-test.dispatch", { tool: "get", input: JSON.stringify(target(view)) })).output).toMatchObject({ runId: view.runId });
+  const other = await db.module.create({ data: { workspaceId, name: "other-execution-test", activeHash: "other-fixture" } });
+  await db.moduleVersion.create({ data: { moduleId: other.id, hash: "other-fixture", source: "user", status: "approved", intent: {}, report: {},
+    manifest: moduleManifestSchema.parse({ name: other.name, entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["agent.get"], tools: [{ name: "noop", description: "Unused identity fixture", visibility: ["owner"], parameters: { type: "object", properties: {} } }] }) } });
+  await expect(direct({ kind: "module", module: other.name, moduleId: other.id, hash: "other-fixture" }, "agent.get", target(view))).rejects.toMatchObject({ code: "not_found" });
+  const invocations = await db.moduleInvocation.findMany();
+  expect(invocations.length).toBeGreaterThan(0);
+  expect(JSON.stringify(invocations)).not.toContain(startInput("complete").prompt);
+  for (const _ of [1, 2]) await command("write", { ...target(view), requestKey: "write-once", text: "Preserve existing.txt" });
+  expect(run.messages).toEqual(["Preserve existing.txt"]);
+  for (const [method, value] of [["confirm", false], ["select", 0]] as const) {
+    const answer = run.input.events!.question({ method, title: method, message: "Choose", options: method === "select" ? ["first", "second"] : [], timeoutMs: 30_000 }, new AbortController().signal);
+    const inspected = await until(() => command("inspect", target(view)), result => result.snapshot.questions.some((q: { method: string; status: string }) => q.method === method && q.status === "pending"), `persisted ${method}`);
+    const question = inspected.snapshot.questions.find((q: { method: string; status: string }) => q.method === method && q.status === "pending");
+    await command("respond", { ...target(view), requestKey: `answer-${method}`, questionId: question.requestId, answer: JSON.stringify({ decision: "submit", value }) });
+    expect(await answer).toEqual({ decision: "submit", value });
+    expect((await command("inspect", target(view))).snapshot.questions.find((q: { requestId: string }) => q.requestId === question.requestId).status).toBe("answered");
+  }
+  await run.append({ type: "message", messageId: "final", role: "assistant", text: "No check command was run.", complete: true });
+  const before = await command("stream", { ...target(view), limit: 100 });
+  run.finish({ outcome: "finished", sessionId: "fixture-session", error: null });
+  await until(() => command("get", target(view)), result => result.stopConfirmed, "confirmed completion");
+  expect((await command("inspect", target(view))).snapshot).toMatchObject({ status: "completed", stopConfirmed: true });
+  expect((await command("stream", { ...target(view), cursor: before.cursor, limit: 100 })).snapshotRequired).toBe(true);
   expect(await readFile(join(project, "existing.txt"), "utf8")).toBe("existing\n");
-  expect(await readFile(join(project, "generated.txt"), "utf8")).toBe("temporary project output\n");
-  const after = await command({ op: "events", ...target(view), cursor: before.cursor, limit: 100, waitMs: 0 }) as ExecutionEventPage;
-  expect(after.snapshotRequired).toBe(true);
-  expect((await command({ op: "snapshot", ...target(view) }) as ExecutionSnapshot)).toMatchObject({ status: "completed", stopConfirmed: true });
-  await expect(callSync(runtime.ports, { workspaceId, caller: { kind: "provider", runId: view.runId }, chain: [], path: [] }, "coding.accept", {
-    input: JSON.stringify({ workId: view.workId, resultId: result.resultId, commandKey: "provider-must-not-accept" }),
-  })).rejects.toMatchObject({ code: "forbidden" });
-  expect((await storedWork(view.workId)).results[0]?.accepted).toBe(false);
-  expect((await storedWork(view.workId)).acceptances).toEqual([]);
-  await command({ op: "accept", workId: view.workId, resultId: result.resultId, commandKey: "human-accept" });
-  expect((await storedWork(view.workId)).results[0]?.accepted).toBe(true);
-  expect(await readFile(artifactPath, "utf8")).toBe(artifactBytes);
-  expect(await command({ op: "attach", workId: view.workId })).toMatchObject({ status: "completed", stopConfirmed: true });
-  expect(fake.started).toHaveLength(1);
+  expect(await db.module.count({ where: { name: { in: ["coding", "mcp", "mind", "remind"] } } })).toBe(0);
   expect(errors).toEqual([]);
-}, 60_000);
+}, 30_000);
 
-test("owner cancellation retains the live attempt until actual exit; pause/hash/removal cannot hide it", async () => {
-  const { view, run } = await start("cancel");
-  const context = moduleContext(runtime.ports, workspaceId);
-  await expect(requestStatus(context, coding.id, "paused", "integration pause")).rejects.toMatchObject({ code: "conflict" });
-  await expect(db.$transaction(tx => switchActiveIn(context, tx, coding.id, "replacement"))).rejects.toMatchObject({ code: "conflict" });
-  await expect(requestRemove(context, coding.id, "integration removal")).rejects.toMatchObject({ code: "conflict" });
-  expect(run.aborted).toBe(0);
-  expect((await db.module.findUniqueOrThrow({ where: { id: coding.id } })).status).toBe("active");
-  await runtime.service.forWorkspace(workspaceId).provider.cancel(view.runId);
+test("HTTP cancellation keeps the live attempt held until exit; lifecycle operations cannot hide it", async () => {
+  const { view, run } = await start("cancel"), context = moduleContext(runtime.ports, workspaceId);
+  await command("interrupt", { ...target(view), requestKey: "cancel-once" });
   expect(run.aborted).toBe(1);
-  expect(await command({ op: "get", workId: view.workId })).toMatchObject({ status: "unknown", cancelRequested: true, stopConfirmed: false });
+  expect(await command("get", target(view))).toMatchObject({ status: "unknown", cancelRequested: true, stopConfirmed: false });
   expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(`execution:${view.runId}`);
-  const { op: _op, ...occupiedInput } = { ...startInput(view.workId), commandKey: "before-stop" };
-  await expect(ownerCall("coding.create", { input: JSON.stringify(occupiedInput) })).rejects.toMatchObject({ code: "conflict" });
+  const conflict = await raw("run", { ...startInput(view.workId), requestKey: "before-stop" });
+  expect(conflict.status).toBe(409); expect(await conflict.json()).toMatchObject({ error: { code: "conflict" } });
+  await expect(requestStatus(context, entry.id, "paused", "fixture pause")).rejects.toMatchObject({ code: "conflict" });
+  await expect(db.$transaction(tx => switchActiveIn(context, tx, entry.id, "replacement"))).rejects.toMatchObject({ code: "conflict" });
+  await expect(requestRemove(context, entry.id, "fixture removal")).rejects.toMatchObject({ code: "conflict" });
+  // Even a refused lifecycle transition fences module access; host evidence must still retain the live attempt.
+  await expect(direct(caller(), "agent.get", target(view))).rejects.toMatchObject({ code: "forbidden" });
+  expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(`execution:${view.runId}`);
   run.finish({ outcome: "failed", sessionId: null, error: "Process exited after cancellation" });
-  await until(async () => db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } }), row => row.stopConfirmedAt !== null, "actual process stop");
-  expect(await command({ op: "get", workId: view.workId })).toMatchObject({ status: "cancelled", stopConfirmed: true });
+  const stopped = await until(() => db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: view.attemptId } }), row => (row.snapshot as { stopConfirmed?: boolean }).stopConfirmed === true, "actual exit");
+  expect(stopped.snapshot).toMatchObject({ status: "cancelled", cancelRequested: true, stopConfirmed: true });
   expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBeNull();
-  await requestStatus(context, coding.id, "paused", "stopped and checked");
-  await expect(callSync(runtime.ports, { workspaceId, caller: { kind: "module", module: "coding", moduleId: coding.id, hash: coding.hash }, chain: [], path: [] }, "agent.get", { "execution-id": view.workId, "run-id": view.runId, "attempt-id": view.attemptId })).rejects.toMatchObject({ code: "forbidden" });
+  await requestStatus(context, entry.id, "paused", "Stop checked");
+  await expect(direct(caller(), "agent.get", target(view))).rejects.toMatchObject({ code: "forbidden" });
   expect(errors).toEqual([]);
-}, 60_000);
+}, 30_000);
 
-test("editor coding.cancel completes while process completion publishes through the routed outbox", async () => {
-  const { view, run } = await start("editor-cancel");
-  await run.append({ type: "message", messageId: "cancel-final", role: "assistant", text: "Stopped with partial work.", complete: true });
-  run.stopOnAbort = true;
-  await command({ op: "cancel", ...target(view), commandKey: "editor-cancel-once" });
+test("HTTP interrupt completes without a handler deadlock when the controlled process exits during abort", async () => {
+  const { view, run } = await start("exit-on-abort"); run.stopOnAbort = true;
+  await command("interrupt", { ...target(view), requestKey: "interrupt-once" });
   expect(run.aborted).toBe(1);
-  await until(() => storedWork(view.workId), work => work.results.length === 1, "cancel result publication without serial-handler deadlock");
-  expect(await command({ op: "get", workId: view.workId })).toMatchObject({ status: "cancelled", stopConfirmed: true });
-  expect((await storedWork(view.workId)).results[0]?.accepted).toBe(false);
+  expect(await until(() => command("get", target(view)), result => result.stopConfirmed, "abort completion")).toMatchObject({ status: "cancelled", stopConfirmed: true });
   expect(errors).toEqual([]);
-}, 60_000);
+}, 30_000);
 
-test("disconnected execution stays unknown across a fresh runtime and does not release or restart its attempt", async () => {
+test("unknown execution survives a fresh HTTP runtime without releasing or restarting; stale hashes fail closed", async () => {
   const { view, run } = await start("restart");
-  const before = await command({ op: "events", ...target(view), limit: 100, waitMs: 0 }) as ExecutionEventPage;
-  run.disconnect();
+  const before = await command("stream", { ...target(view), limit: 100 }); run.disconnect();
   await runtime.service.tick.settled({ includeRuns: true });
-  await until(async () => db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } }), row => row.capabilityRevokedAt !== null, "unknown finalization");
-  await runtime.stop();
+  await until(() => db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } }), row => row.capabilityRevokedAt !== null, "unknown finalization");
+  const [database] = await db.$queryRawUnsafe<{ file: string }[]>("PRAGMA database_list");
+  await runtime.stop(); await db.$disconnect();
+  db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: `file:${database!.file}` }) });
+  registerTestProvider(db);
   await boot();
-  expect(await command({ op: "attach", workId: view.workId })).toMatchObject({ ...target(view), status: "unknown", stopConfirmed: false });
+  expect(await command("get", target(view))).toMatchObject({ status: "unknown", stopConfirmed: false });
   expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: view.attemptId } })).heldDirectory).toBe(`execution:${view.runId}`);
-  expect((await command({ op: "events", ...target(view), cursor: before.cursor, limit: 100, waitMs: 0 }) as ExecutionEventPage).snapshotRequired).toBe(true);
-  expect((await storedWork(view.workId)).results).toEqual([]);
+  expect((await command("stream", { ...target(view), cursor: before.cursor, limit: 100 })).snapshotRequired).toBe(true);
   expect(fake.started).toHaveLength(1);
-  const oldCaller = { kind: "module" as const, module: "coding", moduleId: coding.id, hash: coding.hash };
-  // Simulate an externally stale activation to exercise ingress identity checks as well as the lifecycle guard above.
-  const version = await db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: coding.id, hash: coding.hash } } });
-  const replacement = "b".repeat(64);
-  await db.moduleVersion.create({ data: { moduleId: coding.id, hash: replacement, manifest: moduleManifestSchema.parse(version.manifest), source: "user", intent: {}, report: {}, status: "approved" } });
-  await db.module.update({ where: { id: coding.id }, data: { activeHash: replacement } });
-  await expect(callSync(runtime.ports, { workspaceId, caller: oldCaller, chain: [], path: [] }, "agent.get", { "execution-id": view.workId, "run-id": view.runId, "attempt-id": view.attemptId })).rejects.toMatchObject({ code: "forbidden" });
-  await db.module.update({ where: { id: coding.id }, data: { activeHash: coding.hash } });
-  expect(fake.started).toHaveLength(1);
-  expect(errors).toEqual([]);
-}, 60_000);
+  await expect(direct(caller(), "agent.get", { ...target(view), attemptId: "foreign-attempt" })).rejects.toMatchObject({ code: "conflict" });
+  const oldCaller = caller();
+  await db.module.update({ where: { id: entry.id }, data: { activeHash: "externally-stale" } });
+  await expect(direct(oldCaller, "agent.get", target(view))).rejects.toMatchObject({ code: "forbidden" });
+  await db.module.update({ where: { id: entry.id }, data: { activeHash: entry.hash } });
+  expect(fake.started).toHaveLength(1); expect(errors).toEqual([]);
+}, 30_000);

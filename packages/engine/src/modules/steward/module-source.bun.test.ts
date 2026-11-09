@@ -61,9 +61,9 @@ test("a commit hash cannot use another commit's provenance", async () => {
 });
 
 test("legacy built-in source imports only the exact trusted release when no store exists", async () => {
-  const f = await fixture(), resources = join(f.context.ports.dataDir, "release"), code = join(resources, "web");
+  const f = await fixture(), resources = join(f.context.ports.dataDir, "release"), code = join(resources, "agent");
   f.context.ports.moduleBuiltinResources = resources;
-  const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], keepAlive: true });
+  const manifest = moduleManifestSchema.parse({ name: "agent", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true });
   const files = [
     { path: "index.ts", bytes: Buffer.from("legacy release") },
     { path: "module.json", bytes: Buffer.from(JSON.stringify(manifest)) },
@@ -73,11 +73,11 @@ test("legacy built-in source imports only the exact trusted release when no stor
   const digest = createHash("sha256");
   for (const file of files) { await writeFile(join(code, file.path), file.bytes); digest.update(file.path).update("\0").update(file.bytes).update("\0"); }
   const hash = digest.digest("hex");
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "web", builtin: true, activeHash: hash } });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: hash } });
   const version = await f.version(hash);
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { source: "builtin", manifest } });
   expect(await readVersionSource(f.context, f.module.id, hash)).toEqual(files);
-  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ name: "web", builtin: true, activeHash: hash });
+  expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ name: "agent", builtin: true, activeHash: hash });
   expect(await f.db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).toMatchObject({ hash, status: "pending_review", source: "builtin" });
   await expect(stat(join(f.context.store, hash))).rejects.toMatchObject({ code: "ENOENT" });
   await f.db.moduleVersion.update({ where: { id: version.id }, data: { report: { tests: [] } } });

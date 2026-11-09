@@ -4,86 +4,100 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/web.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/web.git",
       "branch": "main",
-      "commit": "a641eaa0acc56c12ebc9139ddf355e2ea3b1df84"
+      "commit": "2569b346f1378441343f8f57aeb2f63d3ec4b973"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mcp.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/mcp.git",
       "branch": "main",
-      "commit": "6199084d6fad1dd9f47596aa0e1dcc1e824e5e23"
+      "commit": "3d0413663011f3013994702b174828ab3254f529"
     },
     {
       "name": "files",
       "proposedRepository": "chrona-core/chrona-module-files",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/files.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/files.git",
       "branch": "main",
-      "commit": "f9baa5df32c092ed839a0d933b5ceaff323ea1e7"
+      "commit": "6a0b949567d2b7c333b2beb919fc4d988bc889ca"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/notify.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/notify.git",
       "branch": "main",
-      "commit": "e3e53c19f8b244ffd4ab84356c95f7268a957c12"
+      "commit": "c91818ad49c6a9ac3b7983e172067d3575896dde"
     },
     {
       "name": "events",
       "proposedRepository": "chrona-core/chrona-module-events",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/events.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/events.git",
       "branch": "main",
-      "commit": "d4f28c78fdd70193b56076856cec8ebc4c040425"
+      "commit": "a2d1acd90efc68b439882afad86c7783e790c028"
     },
     {
       "name": "agent",
       "proposedRepository": "chrona-core/chrona-module-agent",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/agent.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/agent.git",
       "branch": "main",
-      "commit": "faf2fe95ac709c78ad757d353575c3c88a934b6b"
+      "commit": "32ecbe00144cae2b5895fc4857ad43c3728fa4c8"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/qq.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/qq.git",
       "branch": "main",
-      "commit": "6945c37ce2ea47d5ea63eec73f06c464822f0c00"
+      "commit": "dde28b8286d8715a23a36464f26d16fbac04b3d6"
+    },
+    {
+      "name": "author",
+      "proposedRepository": "chrona-core/chrona-module-author",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/author.git",
+      "branch": "main",
+      "commit": "24071ee993c0423c73d75322573083a55e2b03ed"
     },
     {
       "name": "remind",
       "proposedRepository": "chrona-core/chrona-module-remind",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/remind.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/remind.git",
       "branch": "main",
       "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/mind.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/mind.git",
       "branch": "main",
       "commit": "ea4cf602e25e37568c9df1e7e104d016ce0f8fac"
     },
     {
       "name": "memory-local",
       "proposedRepository": "chrona-core/chrona-module-memory-local",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/memory-local.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/memory-local.git",
       "branch": "main",
-      "commit": "2f9e91afaaf1fdde2842d40a8b082c0f0f86f639"
+      "commit": "381f348078d4b520eae561f4d1f9b60cab2b7803"
     },
     {
       "name": "coding",
       "proposedRepository": "chrona-core/chrona-module-coding",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/coding.git",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/coding.git",
       "branch": "main",
-      "commit": "f7da00c2662f942bb24ceda3e597825c1c208f69"
+      "commit": "b3a65705a025932dfe66f8a3099d99d331a8c278"
     },
     {
-      "name": "editor",
-      "proposedRepository": "chrona-core/chrona-module-editor",
-      "localRepository": "/home/saya/workspace/Chrona/resources/module-git/repos/editor.git",
+      "name": "coding-web",
+      "proposedRepository": "chrona-core/chrona-module-coding-web",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/coding-web.git",
       "branch": "main",
-      "commit": "608a2812682d45d7f6b5714a2ae90c4041fa6215"
+      "commit": "049ef7481c90bbd511bc892ef7b64e79f664c748"
+    },
+    {
+      "name": "remote-execution",
+      "proposedRepository": "chrona-core/chrona-module-remote-execution",
+      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/remote-execution.git",
+      "branch": "main",
+      "commit": "e7f05e2ef5e476eaabf35c95d11ac8cac6e3b3a8"
     }
   ]
 }

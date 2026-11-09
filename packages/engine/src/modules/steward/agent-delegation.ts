@@ -1,25 +1,26 @@
 import type { StewardPorts } from "./ports";
-import type { CallOrigin } from "./module-calls";
+import type { CallOrigin } from "./module-call-types";
 import { CallError } from "./module-call-error";
 import { isAgentApplication } from "./agent-application";
 import { callerManifest, json } from "./system/shared";
 import { reserveCompletion, finishCompletion } from "./module-model-budget";
 import { assertExecutionPrincipal } from "./execution-principal";
 import type { ExecutionPrincipal, ExecutionStart, ExecutionView } from "@chrona/contracts/steward";
-import { moduleAgentInput } from "./builtin/agent/module-contracts";
+import { moduleAgentInput, primitiveInput, isAgentPrimitive, moduleManifestSchema } from "@chrona/contracts/steward";
 import { agentCaller } from "./agent-caller-context";
 import { admitContextPrimitive } from "./agent-context";
-import { primitiveInput } from "./builtin/agent/primitives";
-import { isAgentPrimitive } from "./builtin/agent/primitives";
 import { admitAgentPrimitive } from "./agent-primitives";
+import { admitted } from "./module-call-admission";
+import { admitAgentProjects } from "./agent-projects";
 
 async function reserveModel(ports: StewardPorts, context: NonNullable<ReturnType<typeof agentCaller>>, input: Record<string, unknown>) {
   const { origin } = context, { caller } = origin;
+  if (caller.kind !== "module") throw new CallError("forbidden", "Model admission requires a module caller");
   const manifest = await callerManifest(ports.db, caller);
   if (!manifest) throw new CallError("forbidden", "Agent caller manifest unavailable");
   const reservation = await reserveCompletion(ports, { workspaceId: origin.workspaceId, moduleId: caller.moduleId, hash: caller.hash, manifest, ...origin.run }, input as { prompt: string; system?: string; maxOutputTokens: number }, ports.now());
   if (reservation.error) throw new CallError(reservation.error === "unconfigured" ? "unavailable" : "forbidden", `${reservation.error}: module model call`);
-  return json({ reservationId: reservation.id, model: reservation.model, thinking: reservation.thinking, timeoutMs: reservation.settings!.timeoutMs });
+  return json({ reservationId: reservation.id, declaredTier: reservation.declaredTier, effectiveHardLimits: reservation.effectiveHardLimits });
 }
 async function executionControl(ports: StewardPorts, principal: ExecutionPrincipal, name: string, input: Record<string, unknown>, ref?: ExecutionView) {
   const service = ports.executions;
@@ -49,22 +50,40 @@ async function executionHistory(ports: StewardPorts, principal: ExecutionPrincip
 }
 export async function delegateAgent(ports: StewardPorts, workspaceId: string, caller: CallOrigin["caller"], name: string, args: Record<string, unknown>) {
   if (caller.kind !== "module" || !await isAgentApplication(ports, caller, workspaceId)) throw new CallError("forbidden", "Only the builtin Agent can delegate admission");
-  if (name === "agent-settle") {
-    await finishCompletion(ports, workspaceId, { id: String(args.reservationId), result: args.result as { text: string; inputTokens: number | null; outputTokens: number | null } | undefined, error: args.failed ? "provider_error" : null });
-    return null;
-  }
+  if (name === "agent-settle") return settleModel(ports, workspaceId, args);
   const context = agentCaller(ports, String(args.callId));
   if (!context) throw new CallError("forbidden", "Agent caller context expired or mismatched");
   validateContext(context, workspaceId, args.operation);
   const { caller: original } = context.origin;
+  if (context.name === "configure") {
+    return authorizeConfiguration(ports, workspaceId, caller, original);
+  }
+  if (context.name === "projects") {
+    return delegateProjects(ports, workspaceId, original, context.args, args);
+  }
+  if (original.kind !== "module") throw new CallError("forbidden", "Agent execution requires a module caller");
   const principal: ExecutionPrincipal = { workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: original.moduleId, hash: original.hash } };
   await assertExecutionPrincipal(ports.db, principal);
   if (args.settle === true) return settleControl(ports, principal, context);
   if (isAgentPrimitive(context.name)) return json(await admitAgentPrimitive(ports, principal, context.name, context.args));
+  return delegateLegacyControl(ports, principal, context, args);
+}
+
+async function delegateLegacyControl(ports: StewardPorts, principal: ExecutionPrincipal, context: NonNullable<ReturnType<typeof agentCaller>>, args: Record<string, unknown>) {
   const input = moduleAgentInput(context.name, context.args) as Record<string, unknown>;
   if (context.name === "complete") return reserveModel(ports, context, input);
   if (context.name === "release" && !args.execution) return { released: true };
   return executionControl(ports, principal, context.name, input, args.execution as ExecutionView | undefined);
+}
+
+async function delegateProjects(ports: StewardPorts, workspaceId: string, original: CallOrigin["caller"], input: Record<string, unknown>, admission: Record<string, unknown>) {
+  if ("settle" in admission || "execution" in admission) throw new CallError("invalid", "Unexpected Agent projects admission arguments");
+  return json(await admitAgentProjects(ports, workspaceId, original, input));
+}
+
+async function settleModel(ports: StewardPorts, workspaceId: string, args: Record<string, unknown>) {
+  await finishCompletion(ports, workspaceId, { id: String(args.reservationId), result: args.result as { text: string; inputTokens: number | null; outputTokens: number | null } | undefined, error: args.failed ? "provider_error" : null });
+  return null;
 }
 
 async function settleControl(ports: StewardPorts, principal: ExecutionPrincipal, context: NonNullable<ReturnType<typeof agentCaller>>) {
@@ -77,4 +96,13 @@ async function settleControl(ports: StewardPorts, principal: ExecutionPrincipal,
 
 function validateContext(context: NonNullable<ReturnType<typeof agentCaller>>, workspaceId: string, operation: unknown) {
   if (context.origin.workspaceId !== workspaceId || context.name !== operation) throw new CallError("forbidden", "Agent caller context expired or mismatched");
+}
+
+async function authorizeConfiguration(ports: StewardPorts, workspaceId: string, caller: Extract<CallOrigin["caller"], { kind: "module" }>, original: CallOrigin["caller"]) {
+    const module = await ports.db.module.findFirst({ where: { workspaceId, id: caller.moduleId, name: "agent", builtin: true, status: "active", activeHash: caller.hash } });
+    const version = module ? await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: caller.hash } } }) : null;
+    const manifest = version?.status === "approved" ? moduleManifestSchema.safeParse(version.manifest).data : undefined;
+    const tool = manifest?.tools.find(tool => tool.name === "configure");
+    if (!tool?.visibility.includes("owner") || !await admitted(ports.db, original, tool, workspaceId)) throw new CallError("forbidden", "Agent configuration requires current owner authority");
+    return { authorized: true };
 }

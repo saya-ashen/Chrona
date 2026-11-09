@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type ExecutionPrincipal, type ExecutionEvent, type ExecutionRef, type ExecutionStart, executionInputSchemas, executionRefSchema, editorResponseDataSchemas, codingToolDeclarations, parseCodingToolInput, executionToolContracts, moduleManifestSchema, type ProviderRunInput, MODULE_CALL_ERRORS, moduleCallReplySchema } from "@chrona/contracts/steward";
+import { type ExecutionPrincipal, type ExecutionEvent, type ExecutionRef, type ExecutionStart, executionInputSchemas, executionRefSchema, executionResponseDataSchemas, codingToolDeclarations, parseCodingToolInput, executionToolContracts, moduleManifestSchema, type ProviderRunInput, MODULE_CALL_ERRORS, moduleCallReplySchema } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { testDb } from "./test-db";
 import { handleModuleCall } from "./module-effects";
@@ -120,29 +120,29 @@ test("P1 consumer smoke: routed identity, manifest JSON input, bound Provider si
   try {
     const workspace = await db.workspace.create({ data: { name: "p1-consumer" } });
     const callers: Caller[] = [];
-    for (const [name, uses] of [["coding", ["executions.start"]], ["editor", []], ["owner-entry", ["*"]]] as const) {
-      const manifest = moduleManifestSchema.parse({ name, uses, entry: "index.ts", tests: ["test.ts"], keepAlive: true, triggers: [], effects: [], tools: name === "coding" ? codingToolDeclarations() : [] });
-      if (name === "coding") expect(validateToolArgs(manifest.tools[0]!, { input: JSON.stringify(input) })).toEqual({ input: JSON.stringify(input) });
+    for (const [name, uses] of [["p1-consumer", ["p1-error-probe.probe"]], ["p1-other-consumer", []], ["owner-entry", ["*"]]] as const) {
+      const manifest = moduleManifestSchema.parse({ name, uses, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools: name === "p1-consumer" ? codingToolDeclarations() : [] });
+      if (name === "p1-consumer") expect(validateToolArgs(manifest.tools[0]!, { input: JSON.stringify(input) })).toEqual({ input: JSON.stringify(input) });
       const row = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "v1", status: "active" } });
       await db.moduleVersion.create({ data: { moduleId: row.id, hash: "v1", manifest, status: "approved", source: "user", intent: {}, report: {} } });
       callers.push({ kind: "module", module: name, moduleId: row.id, hash: "v1" });
     }
-    const [coding, namedEditor, entry] = callers;
-    registerSystemModule({ name: "p1-error-probe", description: "Test-only error consumer", tools: [{ ...executionToolContracts[0]!, name: "probe" }],
+    const [consumer, otherConsumer, entry] = callers;
+    registerSystemModule({ name: "p1-error-probe", description: "Test-only error consumer", tools: [{ ...executionToolContracts[0]!, name: "probe", visibility: ["modules"] }],
       async handle(_context, _tool, args) { throw new CallError(args.goal as (typeof MODULE_CALL_ERRORS)[number], "bounded fixture error"); },
     });
-    const manifest = moduleManifestSchema.parse({ name: "coding", uses: ["executions.start"], entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: codingToolDeclarations() });
+    const manifest = moduleManifestSchema.parse({ name: "p1-consumer", uses: ["p1-error-probe.probe"], entry: "index.ts", tests: ["test.ts"], effects: [], tools: codingToolDeclarations() });
     for (const code of ["invalid", "forbidden", "conflict", "unavailable", "capacity", "cursor_expired", "too_large", "unsupported_version"] as const) {
-      const reply = await handleModuleCall(ports, { workspaceId: workspace.id, moduleId: (coding as Extract<Caller, { kind: "module" }>).moduleId, hash: "v1", manifest }, { id: "error-smoke", method: "call", params: { target: "p1-error-probe.probe", mode: "sync", reply: false, args: { ...input, goal: code } } });
+      const reply = await handleModuleCall(ports, { workspaceId: workspace.id, moduleId: (consumer as Extract<Caller, { kind: "module" }>).moduleId, hash: "v1", manifest }, { id: "error-smoke", method: "call", params: { target: "p1-error-probe.probe", mode: "sync", reply: false, args: { ...input, goal: code } } });
       expect(moduleCallReplySchema.parse(reply)).toMatchObject({ error: { code } });
     }
-    const codingPrincipal = await resolveExecutionPrincipal(ports, workspace.id, coding!);
-    expect(codingPrincipal.caller).toMatchObject({ kind: "module", moduleId: (coding as Extract<Caller, { kind: "module" }>).moduleId });
-    expect((await resolveExecutionPrincipal(ports, workspace.id, namedEditor!)).caller.kind).toBe("module");
-    expect(await admitted(db, entry!, { ...executionToolContracts[0]!, visibility: ["owner"] })).toBe(true);
+    const consumerPrincipal = await resolveExecutionPrincipal(ports, workspace.id, consumer!);
+    expect(consumerPrincipal.caller).toMatchObject({ kind: "module", moduleId: (consumer as Extract<Caller, { kind: "module" }>).moduleId });
+    expect((await resolveExecutionPrincipal(ports, workspace.id, otherConsumer!)).caller.kind).toBe("module");
+    expect(await admitted(db, entry!, { ...executionToolContracts[0]!, visibility: ["owner"] }, workspace.id)).toBe(true);
     const principal = await resolveExecutionPrincipal(ports, workspace.id, entry!);
     expect(principal.caller.kind).toBe("owner");
-    expect(await admitted(db, namedEditor!, { ...executionToolContracts[0]!, visibility: ["owner"] })).toBe(false);
+    expect(await admitted(db, otherConsumer!, { ...executionToolContracts[0]!, visibility: ["owner"] }, workspace.id)).toBe(false);
     const decoded: ExecutionStart = parseCodingToolInput("create", JSON.stringify(input));
     expect(decoded).toEqual(executionInputSchemas.start.parse(input));
     await db.$transaction(async tx => {
@@ -152,17 +152,17 @@ test("P1 consumer smoke: routed identity, manifest JSON input, bound Provider si
       await ports.executionEvents!.saveSnapshot(tx, principal, { ...snapshot, status: "completed" });
       expect(txCalls.every(value => value === tx)).toBe(true);
     });
-    const project = await ports.resolveExecutionProject!(codingPrincipal, "p");
+    const project = await ports.resolveExecutionProject!(consumerPrincipal, "p");
     const run: ProviderRunInput = { runId: ref.runId, token: "fixture-only", lane: "background", cwd: project.canonicalPath, sessionDir: "/tmp/independent-log", sessionId: null, systemPrompt: "Fixture instructions", resources: "minimal", prompt: "goal", deadline: new Date(), execution: ref, detail: { append: value => ports.executionEvents!.append(principal, value) } };
     const handle = ports.provider!.start(run);
     await run.detail!.append(event(1)); provider.settle(ref.runId); await handle.done;
     const view = { ...ref, projectRef: "p", status: "completed", cancelRequested: false, stopConfirmed: true };
-    const attached = editorResponseDataSchemas.attach.parse(view), target = executionRefSchema.parse({ workId: attached.workId, sessionId: attached.sessionId, runId: attached.runId, attemptId: attached.attemptId });
+    const attached = executionResponseDataSchemas.attach.parse(view), target = executionRefSchema.parse({ workId: attached.workId, sessionId: attached.sessionId, runId: attached.runId, attemptId: attached.attemptId });
     const page = await ports.executionEvents!.read(principal, { ...target, limit: 1, waitMs: 0 });
-    expect(editorResponseDataSchemas.events.parse(page).events).toHaveLength(1);
+    expect(executionResponseDataSchemas.events.parse(page).events).toHaveLength(1);
     expect((await ports.executionEvents!.read(principal, { ...target, cursor: page.cursor, limit: 1, waitMs: 0 })).events).toEqual([]);
-    expect(editorResponseDataSchemas.snapshot.parse(await ports.executionEvents!.snapshot(principal, target)).status).toBe("completed");
-    expect(editorResponseDataSchemas.results.parse({ results: [] })).toEqual({ results: [] });
-    expect(editorResponseDataSchemas.accept.parse({ accepted: true })).toEqual({ accepted: true });
+    expect(executionResponseDataSchemas.snapshot.parse(await ports.executionEvents!.snapshot(principal, target)).status).toBe("completed");
+    expect(executionResponseDataSchemas.results.parse({ results: [] })).toEqual({ results: [] });
+    expect(executionResponseDataSchemas.accept.parse({ accepted: true })).toEqual({ accepted: true });
   } finally { await db.$disconnect(); }
 });

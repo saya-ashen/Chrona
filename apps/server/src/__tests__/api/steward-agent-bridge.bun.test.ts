@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import bridge from "../../../../../external-plugins/pi-steward-agent/chrona-tools";
+import bridge from "../../../../../packages/pi/resources/chrona-tools";
 
 test("Pi bridge surfaces structured HTTP errors and redacts capability", async () => {
   const oldFetch = globalThis.fetch;

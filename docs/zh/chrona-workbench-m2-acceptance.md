@@ -1,5 +1,7 @@
 # M2 服务器编码与 Neovim 验收记录
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 状态：**协调者于 2026-11-05 通过 M2 开发集成验收**，保留下列明确环境限制和 Workbench 已有失败。本记录不是公开发行、部署或真实模型/设备验收。本记录保留 M2 当时的边界；后续 `P2-20261106` 与 M3 已于 2026-11-06 另行通过[开发集成验收](chrona-workbench-m3-acceptance.md)，不追改本记录的历史测试结果。方案见[统一开发计划](chrona-workbench-unified-development-plan.md)，使用与限制见[服务器编码工作](server-coding.md)。
 
 ## 已审阅集成范围

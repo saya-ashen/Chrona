@@ -1,8 +1,10 @@
 # Chrona 当前架构
 
-2026-11-08 内核瘦身集成：Agent 保持不可动态替换；web/notify 保留为可受检定制的内置应用；mcp/files/events 变为可选官方外置应用。旧 history/chat/content/memory 门面已删除。当前开发证据见[实施方案](kernel-minimization-plan.md)及其阶段记录；旧冻结文档不建立现行接口或部署结论。
+2026-11-09 当前边界以[永久内核合同](kernel-permanent-boundary-contract.md)为准：内核公开 5 个命名空间、32 个工具；Agent 是唯一不可替换的内置应用，Pi 是唯一内置 Provider。Web、Notify、QQ、Author 是普通预装应用，MCP、Coding、coding-web 等是普通可选应用。仅 Mind、Remind 整应用保留源码但暂停接入；Editor 已退役并移除，见[退役记录](editor-retirement.md)。下文较早的内置应用、公开调度和构建接口说明属于历史实现，不建立现行 API；发生冲突时，以永久内核合同与当前源码为准。旧冻结文档不建立现行接口或部署结论。
 
-本文是当前仓库实现的阅读入口，不是新规格，也不表示这些代码已部署。产品意图见[设计目标](steward-goals.md)；执行与审批规则见[安全机制简化](security-simplification.md)，依赖与登记模式见[模块依赖方向](module-dependency-direction.md)，启动、配置和备份见[运维说明](operations.md)。[历史设计](history/README.md)仅供追溯，冲突时以本文和当前实现为准。
+Coding 的当前接入见[统一业务服务与平级客户端实施记录](coding-peer-clients-implementation.md)及[客户端协议](coding-peer-clients-protocol.md)：无界面 Coding 持有项目、持续对话、回执和成果；coding-web 持有页面选择与草稿。认证 HTTP 和模块调用共用同一业务处理函数，项目通过 Agent 保留真实原始 Coding 主体；不增加内核 API。外部编辑器与未来 Electron 可消费该应用协议，本次未修改它们。
+
+本文保留较早架构的阅读线索，不是新规格，也不表示这些代码已部署。产品意图见[设计目标](steward-goals.md)；执行与审批规则见[安全机制简化](security-simplification.md)，依赖与登记模式见[模块依赖方向](module-dependency-direction.md)，启动、配置和备份见[运维说明](operations.md)。[历史设计](history/README.md)仅供追溯，冲突时以本文和当前实现为准。
 
 下文路径均相对仓库根目录；`steward/` 简指 `packages/engine/src/modules/steward/`。
 
@@ -14,17 +16,17 @@
 
 ## Agent 原语与应用编排
 
-当前开发树将 Web、MCP、QQ、mind 和 coding/editor 的执行调用接到 Agent 原语。应用拥有会话、提示词、工作流和交付；内核保留 caller、预算、队列与停止证据。生产注册表已移除 chat/provider/executions；旧记录没有在线 history 兼容入口；停止服务后可显式导出、校验及清理旧会话。现行 Agent 上下文、Provider continuation 和执行证据不在清理范围。运行事实经 activity 读取。详细接口、旧数据边界和当前限制见[Agent 原语与应用编排](agent-module-orchestration.md)。下文既有内部服务路径不表示它们仍是应用可调用的公开系统目标。
+当前 Web、MCP、QQ 和 Coding 的执行调用接到 Agent 原语；Mind 整应用暂停，旧 Editor 应用已移除。应用拥有会话、提示词、工作流和交付；内核保留 caller、预算、队列与停止证据。生产注册表已移除 chat/provider/executions；旧记录没有在线 history 兼容入口；停止服务后可显式导出、校验及清理旧会话。现行 Agent 上下文、Provider continuation 和执行证据不在清理范围。运行事实经 activity 读取。详细接口、旧数据边界和当前限制见[Agent 原语与应用编排](agent-module-orchestration.md)。下文既有内部服务路径不表示它们仍是应用可调用的公开系统目标。
 
-## 当前开发集成边界
+## 历史开发集成边界（M1–M3）
 
-[M1 P0 契约](chrona-workbench-p0-contract.md) 保存当时冻结的开发接口；其中全部内置不可变规则已由 2026-11-08 的五应用受检定制决策修订。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。当前内置为 agent/web/notify；mcp/files/events 为可选官方外置包，旧实例只变更类别，保留 moduleId、active 版本和私有数据。服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行已进入开发集成树。
+[M1 P0 契约](chrona-workbench-p0-contract.md) 保存当时冻结的开发接口；其中全部内置不可变规则已由 2026-11-08 的五应用受检定制决策修订。共享 origin/capabilities、身份断言、可信发行解析、持久安装回执/初始化 helper、catalog/install 接线与 fixtures 已落地；qq/remind/mind/memory-local 已整体搬至 `steward/external/`。当时内置为 agent/web/notify；mcp/files/events 为可选官方外置包，旧实例只变更类别，保留 moduleId、active 版本和私有数据。当时服务器 `executions`、可选 `coding/editor`、固定设备执行器和有界并行进入开发集成树；当前公开合同和 Editor 退役状态以上方说明为准。
 
-M1 当时的 A–E 集成证据如下，内置生命周期以第 2 节当前规则为准：当时 registrar 从可信发行资源恢复并逐项诊断；动态构建、审批和领取事务复核应用身份。官方安装适配器复用受检提案/构建，固定 request key 的持久回执在构建、审批、迁移恢复后刷新；首次初始化仅入队三个预装外置包，不等待作者测试，删除后不自动复活。未配置适配器仍明确 unavailable。M1 运行时集成、完整 Bun/API、typecheck/lint、三尺寸浏览器及 Linux x64 真实发行 smoke 已完成开发验证；协调者已签署 M1 开发验收，未部署。[P1 契约](chrona-workbench-p1-contract.md)与 [P2 固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现；[M2](chrona-workbench-m2-acceptance.md)、[M3](chrona-workbench-m3-acceptance.md)均已完成开发集成签收，包含真实 Hono/SDK/SQLite、受控 fake Pi、Neovim、独立工作树与设备协议恢复证据。真实模型、个人设备安装、生产部署和公开发行不在该验收范围。历史冻结树与逐项证据保留于各阶段记录，接线细节见[共享接线记录](chrona-workbench-m1-shared-integration.md)。
+M1 当时的 A–E 集成证据如下，当前生命周期以上方永久内核合同为准：当时 registrar 从可信发行资源恢复并逐项诊断；动态构建、审批和领取事务复核应用身份。官方安装适配器复用受检提案/构建，固定 request key 的持久回执在构建、审批、迁移恢复后刷新；首次初始化仅入队三个预装外置包，不等待作者测试，删除后不自动复活。未配置适配器仍明确 unavailable。M1 运行时集成、完整 Bun/API、typecheck/lint、三尺寸浏览器及 Linux x64 真实发行 smoke 已完成开发验证；协调者已签署 M1 开发验收，未部署。[P1 契约](chrona-workbench-p1-contract.md)与 [P2 固定设备契约](chrona-workbench-p2-contract.md)已冻结并实现；[M2](chrona-workbench-m2-acceptance.md)、[M3](chrona-workbench-m3-acceptance.md)均已完成开发集成签收，包含真实 Hono/SDK/SQLite、受控 fake Pi、Neovim、独立工作树与设备协议恢复证据。真实模型、个人设备安装、生产部署和公开发行不在该验收范围。历史冻结树与逐项证据保留于各阶段记录，接线细节见[共享接线记录](chrona-workbench-m1-shared-integration.md)。
 
 ## 1. 用途与信任模型
 
-Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事，Provider 处理需求，需要持久能力时构建或修改应用。默认执行模式为 `trusted-local`：Provider 与应用在本机受信环境运行，manifest、路由和审批用于接口约束、防误操作与留痕，不是抵御同一 OS 用户下恶意代码的隔离边界。显式选择 `required-isolation` 时，bubblewrap 不可用即失败；目前需要宿主依赖安装的候选也被拒绝，不静默降级。
+Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事，Provider 处理需求，需要持久能力时构建或修改应用。本地只支持 `trusted-local`：Provider 与应用使用服务用户的 OS 权限，manifest、路由和审批用于接口约束、防误操作与留痕，不是抵御同一 OS 用户下恶意代码的隔离边界。`required-isolation`、未知模式及非空旧 bwrap 配置明确报错，须移除；不再提供 bubblewrap、`ulimit -v` 或硬虚拟内存限制。模块依赖使用宿主已安装程序，语言库按锁文件安装，浏览器不自动下载。入口与检查由 `runtimes.json` 声明并直接启动解释器，详见[运维说明](operations.md#脚本限制)。这属于 S1 范围，S4 本地进程通信、监管与三端验收仍待完成，不表示 Windows/macOS 完整支持或 S2–S6 已完成。
 
 代码：`apps/server/src/steward-runtime.ts`、`packages/integrations/src/steward/script-sandbox.ts`、`packages/integrations/src/steward/pi-launch.ts`。细节：[安全机制简化](security-simplification.md)、[运维说明](operations.md#脚本限制)。
 
@@ -35,7 +37,7 @@ Chrona 是单一 owner 的个人工具：用户通过聊天或应用工具办事
 - **内核是信任根**：管理真实调用方、会话与运行、版本切换、构建检查、数据迁移、凭据、审批、预算与事件投递，不把具体应用业务塞进内核。
 - **系统模块**是随服务运行的进程内接口，不经过应用提案、沙箱构建或暂停。`steward/system/*` 提供 `modules`、`approvals`、`settings`、`schedules`、`secrets`、`activity`、`projects`；不再注册 history/chat/content/memory。系统模块不是可由 AI 替换的应用进程。
 - **受信任本机能力模块**位于 `steward/local-*`，通过独立 local registry 注册到同一路由，发行身份为 `local:<name>`。工具输入与输出均有 schema，失败输出校验会拒绝调用；敏感输入／输出及适配器错误正文不落通用日志。它们不由应用提案替换，保留名称发生安装冲突时拒绝解析。
-- **内置模块**位于 `steward/builtin/*`：`agent`、`web`、`notify`。预装官方外置 `qq/remind/mind`，以及可选 `mcp/files/events/memory-local/coding/editor` 位于 `steward/external/*`；共用 SDK/路由/独立进程协议。可选包不在首次启动种子中，删除后不会自动复活。
+- **内置应用**位于 `steward/builtin/*`，只有 `agent`。普通默认预装 `web/notify/qq/author` 和可选 `mcp/files/events/memory-local/coding/coding-web` 位于 `steward/external/*`；共用 SDK/路由/独立进程协议。Mind、Remind 整应用暂停并保留源码；Editor 已退役移除，不再是可安装应用。普通应用删除后不会自动补装。
 - **外置应用**由 `module.json`、入口和测试组成，在独立 SDK 进程中处理工具、定时等事件，数据与内容目录按模块分开。外置应用及 web/notify 支持受检更新和显式回滚到已批准版本。web/notify 禁止动态删除及 install 重装；首次可信 seed 后不因新发行覆盖已有 active 定制，上游更新需显式提出并检查。Agent 禁止普通 build/propose/group/activate/update/rollback/remove/install，只走可信发行更新；内核、运行能力及救援入口同样不由应用替换。参见 [Git 工作流](module-git.md)。
 
 代码：`steward/system-modules.ts`、`module-calls.ts`、`module-builtin.ts`、`module-supervisor.ts`、`module-build.ts`。细节：[模块依赖方向](module-dependency-direction.md)、[模块恢复](module-recovery.md)。

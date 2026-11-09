@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { WorkspaceCleanupHost } from "@chrona/engine";
-import { cleanupLocalWorkspace } from "../../../packages/integrations/src/executor/workspace-cleanup";
+import { cleanupLocalWorkspace } from "@chrona/workspaces";
 
 export function createExecutionWorkspaceCleanupHost(dataDir: string): WorkspaceCleanupHost {
   return (request, command, verify) => {

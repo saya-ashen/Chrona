@@ -1,0 +1,76 @@
+import type { ModuleCall, moduleCallReplySchema, ModuleEvent, ModuleManifest, moduleEventReplySchema } from "@chrona/contracts/steward";
+import type { StewardPorts } from "./ports";
+import type { createModuleChannel } from "./module-channel";
+import type { moduleHttpReady } from "./module-http-ready";
+import { diagnosticText, type ModuleFailureEvidence } from "./module-diagnostics";
+
+export type Reply = ReturnType<typeof moduleEventReplySchema.parse>;
+/** `chain`/`path`: the routed call path of the event being handled (see module-calls). */
+export type CallScope = { workspaceId: string; moduleId: string; hash: string; receiverActivationId?: string; manifest: ModuleManifest; moduleRunId?: string; eventKey?: string; chain?: string[]; path?: string[] };
+/** Where a failed delivery stopped: never reached the module, the module answered with an error, or lost after sending. */
+export type DeliveryStage = "unavailable" | "handler" | "lost";
+export function staged(error: unknown, stage: DeliveryStage) {
+  const base: Error & { stage?: DeliveryStage } = error instanceof Error ? error : new Error(String(error));
+  return Object.assign(base, { stage: base.stage ?? stage });
+}
+export function isHandlerRejection(error: unknown) {
+  const rejection = error as { stage?: DeliveryStage; code?: string };
+  if (rejection.stage !== "handler") return false;
+  return !!rejection.code && !["internal", "failed", "unknown"].includes(rejection.code);
+}
+export type Process = ReturnType<NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>>;
+export type Timers = Pick<typeof globalThis, "setTimeout" | "clearTimeout">;
+export type Options = { timers?: Timers; idleMs?: number; backoffMs?: number };
+export type DeliveryOptions = { chain?: string[]; path?: string[]; timeoutMs?: number; activationId?: string | null; beforeDelivery?: () => Promise<void>; validateResult?: (result: unknown) => string | null };
+export type Instance = {
+  moduleId: string; hash: string; activationId: string | null; manifest: ModuleManifest; scope: CallScope;
+  queue: Promise<unknown>; start?: Promise<void>; httpReady?: ReturnType<typeof moduleHttpReady>;
+  process?: Process; channel?: Awaited<ReturnType<typeof createModuleChannel>>;
+  idle?: ReturnType<typeof setTimeout>; retiring: boolean; closing: boolean; busy: boolean; connected?: boolean;
+  exit?: { code: number | null; signal: string | null };
+  failureEvidence?: ModuleFailureEvidence; failureRecorded?: boolean;
+  stopUnknown?: Error; closePromise?: Promise<void>; retirement?: Promise<void>;
+};
+export const triggerKey = (event: ModuleEvent) => event.trigger.kind === "tool" ? `tool:${event.trigger.id}` : event.trigger.kind === "call_result" ? `call_result:${event.trigger.callId}` : event.trigger.id;
+export const keyOf = (moduleId: string, hash: string, activationId: string | null) => `${moduleId}:${hash}:${activationId ?? "untracked"}`;
+function failurePhase(event: ModuleEvent | undefined, connected: boolean | undefined) { return event ? "event" : connected ? "process" : "start"; }
+function processEvidence(instance: Partial<Pick<Instance, "process" | "exit">>) {
+  const process = instance.process, exit = instance.exit;
+  return { pid: process?.pid ?? null, exitCode: exit?.code ?? null, signal: exit?.signal ?? null,
+    stderr: diagnosticText(process?.stderr() ?? "", 4000, true) };
+}
+export function evidence(instance: Partial<Pick<Instance, "connected" | "process" | "exit">>, error: string, runId?: string, event?: ModuleEvent): ModuleFailureEvidence {
+  return { phase: failurePhase(event, instance.connected), reason: diagnosticText(error, 1000),
+    runId: runId ?? null, triggerId: event ? triggerKey(event) : "process", delivery: null, ...processEvidence(instance) };
+}
+
+/** A retired or closing owner cannot serve a new delivery. */
+export function availableInstance(instance: Instance | undefined) {
+  return instance?.retiring || instance?.closing ? undefined : instance;
+}
+
+export function activationChanged(instance: Instance, hash: string, activationId: string | null) {
+  return hash !== instance.hash || activationId !== instance.activationId;
+}
+
+export function restartDelay(backoffMs: number, persistedFailures: number, localFailures: number) {
+  return Math.min(60_000, backoffMs * 2 ** Math.max(0, Math.max(persistedFailures, localFailures) - 1));
+}
+
+/** Observed process state after the supervisor's ownership/backoff checks. */
+export function instanceStatus(instance: Instance | undefined, hash: string | null, keepAlive: boolean) {
+  if (instance && instance.hash === hash && !instance.closing) return { state: instance.connected ? "running" as const : "starting" as const, pid: instance.process?.pid ?? null };
+  return { state: keepAlive ? "unavailable" as const : "idle" as const, pid: null };
+}
+
+type ModuleEffects = {
+  handleModuleCall(ports: StewardPorts, scope: CallScope, call: ModuleCall): Promise<ReturnType<typeof moduleCallReplySchema.parse>>;
+  pauseFailedModule(ports: StewardPorts, execution: { workspaceId: string; moduleId: string; hash: string; activationId: string | null; triggerId: string; firedAt: Date }, runId: string): Promise<void>;
+};
+// module-effects routes a module's calls through module-calls, which delivers through this supervisor: it registers here instead of being imported.
+let effects: ModuleEffects | undefined;
+export function registerModuleEffects(value: ModuleEffects) { effects = value; }
+export function moduleEffects() {
+  if (!effects) throw new Error("Module effects are not registered: import ./module-effects");
+  return effects;
+}

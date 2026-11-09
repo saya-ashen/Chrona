@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import "./module-effects";
-import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema, type ModuleEvent } from "@chrona/contracts/steward";
-import { createModuleSupervisor } from "./module-supervisor";
+import { createModuleSupervisor, moduleSupervisor } from "./module-supervisor";
+import { callsSettled } from "./module-calls";
+import { installNotifyTarget } from "./test-notify-target";
 import { testModuleProcess } from "./module-test-process";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
@@ -16,67 +18,100 @@ import { resolveBuiltinRelease } from "./module-release";
 
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-const event: ModuleEvent = { trigger: { id: "daily", kind: "schedule", firedAt: "2026-10-21T00:00:00Z" }, now: "2026-10-21T00:00:00Z", params: {} };
+const event: ModuleEvent = { trigger: { id: "daily", kind: "tool", args: {}, caller: { kind: "owner", via: null }, firedAt: "2026-10-21T00:00:00Z" }, now: "2026-10-21T00:00:00Z", params: {} };
 async function until(condition: () => boolean | Promise<boolean>) { for (let i = 0; i < 200; i++) { if (await condition()) return; await Bun.sleep(5); } throw new Error("Condition not reached"); }
 function clock() {
   let time = 0;
   const tasks = new Map<number, { at: number; fn: () => void }>(); let id = 0;
   return { timers: { setTimeout: ((fn: () => void, ms: number) => { tasks.set(++id, { at: time + ms, fn }); return id; }) as unknown as typeof setTimeout, clearTimeout: ((id: number) => { tasks.delete(id); }) as unknown as typeof clearTimeout },
+    pending: () => [...tasks.values()].map(task => task.at - time),
     advance(ms: number) { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
-async function fixture({ keepAlive = false, healthCheck = false, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; healthCheck?: boolean; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
+async function fixture({ keepAlive = false, listen, uses = ["notify.send", "provider.wake"], handler = async () => ({}) }: { keepAlive?: boolean; listen?: string; uses?: string[]; handler?: Parameters<typeof testModuleProcess>[0] } = {}) {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-test-");
   const workspace = await db.workspace.create({ data: { name: "supervisor" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v1" } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, healthCheck, effects: [], uses, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", tests: ["test.ts"], keepAlive, listen, effects: [], uses, tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} } }] });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "user", intent: {}, report: {}, status: "approved" } });
   const peer = testModuleProcess(handler), fakeClock = clock();
   let now = 0;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(Date.UTC(2026, 9, 21) + now++), publicUrl: null, sandbox: { available: true, isolated: true, startModule: peer.startModule } };
   const activation = await db.$transaction(tx => recordModuleActivation(moduleContext(ports, workspace.id), tx, { moduleId: module.id, previousHash: null, hash: "v1", generationId: "fixture" }));
   const supervisor = createModuleSupervisor(ports, { timers: fakeClock.timers });
-  cleanups.push(async () => { await supervisor.stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
-  return { db, module, manifest, ports, supervisor, activation, ...peer, ...fakeClock, deliver: () => supervisor.deliver(module.id, "v1", event) };
+  let stopErrors: Error[] | undefined;
+  cleanups.push(async () => {
+    try {
+      await callsSettled(ports);
+      await moduleSupervisor(ports).stop();
+      if (stopErrors) await expect(supervisor.stop()).rejects.toMatchObject({ name: "AggregateError", errors: stopErrors });
+      else await supervisor.stop();
+    } finally {
+      await db.$disconnect();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+  return { db, module, manifest, ports, supervisor, activation, ...peer, ...fakeClock,
+    expectStopErrors: (...errors: Error[]) => { stopErrors = errors; }, deliver: () => supervisor.deliver(module.id, "v1", event) };
 }
-test("module readiness is scoped to the current process, expires and never proves recovery", async () => {
-  const f = await fixture();
-  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown", reportedAt: null });
-  await f.deliver();
-  const report = { status: "needs_configuration" as const, summary: "Select a project", nextAction: "Configure project access", validForSeconds: 60 };
-  f.supervisor.reportHealth(f.module.id, "v1", report);
-  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ source: "module", status: "needs_configuration", stale: false });
-  expect(() => f.supervisor.reportHealth(f.module.id, "old-hash", report)).toThrow("not current");
-  expect(f.supervisor.readiness(f.module.id, "old-hash")).toMatchObject({ status: "unknown", reportedAt: null });
-  f.supervisor.reportHealth(f.module.id, "v1", { status: "ready", summary: "Ready", validForSeconds: 1 });
-  const previous = f.ports.now;
-  f.ports.now = () => new Date(previous().getTime() + 2000);
-  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown", stale: true });
-  f.ports.now = previous;
-  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
-  await f.supervisor.stop();
-  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown" });
-  expect(() => f.supervisor.reportHealth(f.module.id, "v1", report)).toThrow("not current");
-});
-
-test("diagnostic health errors leave readiness unknown without pausing or verifying business capability", async () => {
-  const f = await fixture({ keepAlive: true, healthCheck: true, handler: async event => {
-    if (event.trigger.kind === "health") throw new Error("Diagnostic unavailable");
-    return {};
-  } });
+test("supervisor starts keep-alive processes without producing health events", async () => {
+  const seen: ModuleEvent[] = [];
+  const f = await fixture({ keepAlive: true, handler: async event => { seen.push(event); return {}; } });
+  await f.supervisor.reconcile();
+  f.advance(120000);
   await f.supervisor.reconcile();
   expect(f.processes).toHaveLength(1);
-  expect(f.supervisor.readiness(f.module.id, "v1")).toMatchObject({ status: "unknown" });
-  await expect(f.supervisor.refreshHealth(f.module.id)).rejects.toThrow("Diagnostic unavailable");
-  expect((await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).status).toBe("active");
-  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
+  expect(seen).toEqual([]);
+  for (const retired of ["readiness", "reportHealth", "refreshHealth"]) expect(f.supervisor).not.toHaveProperty(retired);
+  expect(await f.db.moduleRun.count()).toBe(0);
   expect((await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
+});
+
+test.each([false, true])("cold HTTP waits for authenticated readiness (reconciled=%s)", async reconciled => {
+  const f = await fixture({ keepAlive: true, listen: "/api/example" });
+  if (reconciled) await f.supervisor.reconcile();
+  let resolved = false;
+  const listener = f.supervisor.listener("/api/example").then(endpoint => { resolved = true; return endpoint; });
+  await until(() => f.pending().includes(60_000));
+  expect(resolved).toBe(false);
+  expect(f.processes).toHaveLength(1);
+  f.processes[0]!.httpReady("http://127.0.0.1:43210");
+  const endpoint = { endpoint: "http://127.0.0.1:43210", token: f.processes[0]!.input.ipcToken };
+  expect(await listener).toEqual(endpoint);
+  expect(await f.supervisor.listener("/api/example")).toEqual(endpoint);
+  expect(await f.db.moduleRun.count()).toBe(0);
+  expect((await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
+});
+
+test.each(["stop", "exit", "timeout", "disable"])("HTTP readiness wait settles safely on %s", async action => {
+  const f = await fixture({ keepAlive: true, listen: "/api/example" });
+  await f.supervisor.reconcile();
+  const listener = f.supervisor.listener("/api/example");
+  await until(() => f.pending().includes(60_000));
+  if (action === "stop") await f.supervisor.stop();
+  if (action === "exit") f.processes[0]!.kill();
+  if (action === "timeout") f.advance(60_000);
+  if (action === "disable") {
+    await f.db.module.update({ where: { id: f.module.id }, data: { status: "disabled" } });
+    f.processes[0]!.httpReady("http://127.0.0.1:43210");
+  }
+  expect(await listener).toBeNull();
+});
+
+test("ordinary tool delivery records observed behavior without readiness claims", async () => {
+  const seen: ModuleEvent[] = [];
+  const f = await fixture({ handler: async event => { seen.push(event); return { result: { applied: true } }; } });
+  await f.deliver();
+  expect(seen.map(event => event.trigger.kind)).toEqual(["tool"]);
+  expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ triggerId: "tool:daily", exitCode: 0 });
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toEqual([]);
+  expect((await moduleEvolutionOutcomes(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ observedCapabilities: ["tool:daily"] });
 });
 
 test.each([false, true] as const)("start failure rolls back once before delivery; rollback target failure does not bounce (oldFails=%s)", async oldFails => {
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-auto-rollback-");
   const workspace = await db.workspace.create({ data: { name: "auto rollback" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], listen: "/api/example", effects: ["network"] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], listen: "/api/example", effects: ["network"] });
   for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: { changes: [hash] }, report: { tests: [], continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, startModule: (() => {
@@ -98,7 +133,7 @@ test.each(["handler", "lost"] as const)("post-delivery %s failures never trigger
   const db = testDb(), dataDir = await mkdtemp("/tmp/cms-post-delivery-");
   const workspace = await db.workspace.create({ data: { name: "post-delivery" } });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "v2", dataSchema: 1 } });
-  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }], effects: [] });
+  const manifest = moduleManifestSchema.parse({ name: "example", entry: "index.ts", keepAlive: true, tests: ["test.ts"], tools: [{ name: "daily", description: "Ordinary application operation", visibility: ["owner"], parameters: { type: "object", properties: {} } }], effects: [] });
   for (const hash of ["v1", "v2"]) await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: "user", status: "approved", intent: {}, report: { continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: false } } } });
   const ports: StewardPorts = { db, dataDir, now: () => new Date("2026-10-30T12:00:00Z"), publicUrl: null,
     sandbox: { available: true, isolated: true, startModule: (() => {
@@ -146,16 +181,15 @@ test("a successful stale callback after same-hash reactivation cannot verify the
   expect(outcomes.find(item => item.activationId === second.activationId)).toMatchObject({ status: "awaiting-verification", observedCapabilities: [] });
 });
 
-test("lazy start, private short socket directory, idle stop and restart", async () => {
+test("lazy start uses per-instance loopback credentials, idle stop and restart", async () => {
   const f = await fixture();
   await f.supervisor.start(); expect(f.processes).toHaveLength(0);
   await f.deliver(); expect(f.processes).toHaveLength(1);
-  const path = f.processes[0]!.input.socketPath;
-  expect(path.length).toBeLessThan(108);
-  expect((await stat(join(path, ".."))).mode & 0o777).toBe(0o700);
+  const { ipcEndpoint, ipcToken } = f.processes[0]!.input;
+  expect(ipcEndpoint).toMatch(/^tcp:\/\/127\.0\.0\.1:\d+$/);
+  expect(ipcToken).toMatch(/^[a-f0-9]{64}$/);
   f.advance(600_000);
   await until(() => f.processes[0]!.socket.destroyed);
-  await until(async () => !(await stat(path).catch(() => null)));
   await f.deliver(); expect(f.processes).toHaveLength(2);
 });
 test("reconciliation polls every thirty seconds", async () => {
@@ -181,7 +215,6 @@ test("shutdown immediately after spawning settles startup without leaking or res
   await stopping;
   expect(f.processes).toHaveLength(1);
   expect(f.processes[0]!.socket.destroyed).toBe(true);
-  expect(await stat(f.processes[0]!.input.socketPath).catch(() => null)).toBeNull();
   expect(await f.db.moduleRun.count()).toBeLessThanOrEqual(1);
   expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toHaveLength(1);
   f.advance(60_000);
@@ -271,20 +304,120 @@ test("one real exit seen by both the socket and process observers counts once", 
   expect(await moduleFailurePolicy(f.db, { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: f.activation.activationId })).toMatchObject({ consecutiveFailures: 1 });
 });
 
-test("version switch drains old event while new events use the new process; stop kills all", async () => {
-  let finish!: () => void;
+test("version switch blocks new events until the old event drains and its process stops", async () => {
+  let finish!: () => void, entered = false, settled = false;
   const gate = new Promise<void>(resolve => { finish = resolve; });
-  const f = await fixture({ handler: async (_event, _call, input) => { if (input.codeDir.endsWith("v1")) await gate; return { result: input.codeDir }; } });
-  const old = f.deliver(); await until(() => f.processes.length === 1);
-  await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v2", manifest: f.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
-  await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v2" } });
+  const f = await fixture({ handler: async (_event, _call, input) => { if (input.codeDir.endsWith("v1")) { entered = true; await gate; } return { result: input.codeDir }; } });
+  // Observe rejection immediately, then assert the outcome after releasing the gate.
+  const old = f.deliver().then(reply => { settled = true; return { reply }; }, error => { settled = true; return { error }; });
+  try {
+    await until(() => entered);
+    await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: "v2", manifest: f.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
+    await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: "v2" } });
+    await expect(f.supervisor.deliver(f.module.id, "v2", event)).rejects.toMatchObject({ stage: "unavailable", message: expect.stringContaining("not confirmed descendant stop") });
+    expect(settled).toBe(false);
+    expect(f.processes).toHaveLength(1);
+    expect(f.processes[0]!.socket.destroyed).toBe(false);
+  } finally {
+    finish();
+    expect(await old).toMatchObject({ reply: { result: { result: expect.stringContaining("v1") } } });
+  }
+  await until(() => f.processes[0]!.socket.destroyed);
   const reply = await f.supervisor.deliver(f.module.id, "v2", event);
   expect(reply).toMatchObject({ result: { result: expect.stringContaining("v2") } });
-  expect(f.processes[0]!.socket.destroyed).toBe(false);
-  finish(); await old;
-  await until(() => f.processes[0]!.socket.destroyed);
+  expect(f.processes).toHaveLength(2);
+  expect(f.processes[1]!.input.dataDir).toBe(f.processes[0]!.input.dataDir);
   await f.supervisor.stop(); expect(f.processes.every(process => process.socket.destroyed)).toBe(true);
 });
+test.each(["same activation", "new hash", "new activation"])("rejected exit retains ownership and blocks %s without automatic restart", async replacement => {
+  const f = await fixture({ keepAlive: true });
+  const unknown = new Error("synthetic descendant stop unknown");
+  f.expectStopErrors(unknown);
+  await f.supervisor.start();
+  f.processes[0]!.rejectExit(unknown);
+  await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).length === 1);
+  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unavailable", pid: 1, error: expect.stringContaining(unknown.message) });
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", failures: 1, evidence: { phase: "process", exitCode: null } }]);
+  // No restart timer survives an unknown exit; the polling loop is still present.
+  expect(f.pending()).toEqual([30_000]);
+  f.advance(1000);
+  await expect(f.supervisor.reconcile()).rejects.toMatchObject({ message: unknown.message, cause: unknown });
+  expect(f.processes).toHaveLength(1);
+  const hash = replacement === "new hash" ? "v2" : "v1";
+  if (replacement === "new hash") {
+    await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest: f.manifest, source: "user", intent: {}, report: {}, status: "approved" } });
+    await f.db.module.update({ where: { id: f.module.id }, data: { activeHash: hash } });
+  }
+  if (replacement !== "same activation") await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, previousHash: "v1", hash, generationId: replacement }));
+  await expect(f.supervisor.deliver(f.module.id, hash, event)).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
+  await expect(f.supervisor.settleModule(f.module.id)).rejects.toBe(unknown);
+  await expect(f.supervisor.stop()).rejects.toMatchObject({ name: "AggregateError", errors: [unknown] });
+  expect(f.supervisor.status(f.module.id, hash, true)).toMatchObject({ state: "unavailable", pid: 1 });
+  expect(f.processes).toHaveLength(1);
+  expect(await f.db.moduleRun.count()).toBe(1);
+  expect(f.pending()).toEqual([]);
+});
+
+test("exit rejection before authentication retains startup ownership and blocks retry", async () => {
+  const f = await fixture();
+  const unknown = new Error("synthetic startup stop unknown");
+  f.expectStopErrors(unknown);
+  const start = f.ports.sandbox!.startModule!;
+  f.ports.sandbox!.startModule = input => {
+    const process = start(input);
+    f.processes[0]!.rejectExit(unknown);
+    return process;
+  };
+  await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
+  expect(f.supervisor.status(f.module.id, "v1", false)).toMatchObject({ state: "unavailable", pid: 1 });
+  await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message });
+  expect(f.processes).toHaveLength(1);
+  expect(await f.db.moduleRun.count()).toBe(1);
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", evidence: { phase: "start", exitCode: null } }]);
+  expect(f.pending()).toEqual([]);
+});
+
+test("in-flight exit rejection reports lost delivery and retains ownership without replay", async () => {
+  const unknown = new Error("synthetic in-flight stop unknown");
+  let deliveries = 0;
+  const f = await fixture({ keepAlive: true, handler: async () => { deliveries++; f.processes[0]!.rejectExit(unknown); return {}; } });
+  f.expectStopErrors(unknown);
+  await expect(f.deliver()).rejects.toMatchObject({ stage: "lost", message: unknown.message });
+  await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable", message: unknown.message, cause: unknown });
+  expect(f.supervisor.status(f.module.id, "v1", true)).toMatchObject({ state: "unavailable", pid: 1 });
+  expect(await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).toMatchObject([{ status: "unresolved", failures: 1, deliveryUnknown: true, evidence: { phase: "event", delivery: "lost", exitCode: null } }]);
+  f.advance(60_000);
+  expect(f.pending()).toEqual([]);
+  expect(f.processes).toHaveLength(1);
+  expect(deliveries).toBe(1);
+  expect(await f.db.moduleRun.count()).toBe(1);
+});
+
+test("stop aggregates every unknown owner while still stopping healthy modules", async () => {
+  const f = await fixture({ keepAlive: true });
+  const others: { id: string }[] = [];
+  for (const name of ["second", "healthy"]) {
+    const module = await f.db.module.create({ data: { workspaceId: f.module.workspaceId, name, activeHash: "v1" } });
+    await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: { ...f.manifest, name }, source: "user", intent: {}, report: {}, status: "approved" } });
+    others.push(module);
+  }
+  const unknowns = [new Error("synthetic first stop unknown"), new Error("synthetic second stop unknown")];
+  f.expectStopErrors(...unknowns);
+  await f.supervisor.reconcile();
+  expect(f.processes).toHaveLength(3);
+  const first = f.processes.find(process => process.input.dataDir.endsWith(f.module.id))!;
+  const second = f.processes.find(process => process.input.dataDir.endsWith(others[0]!.id))!;
+  const healthy = f.processes.find(process => process.input.dataDir.endsWith(others[1]!.id))!;
+  first.rejectExit(unknowns[0]!);
+  second.rejectExit(unknowns[1]!);
+  await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).length === 1 && (await moduleIncidents(f.db, f.module.workspaceId, others[0]!.id)).length === 1);
+  expect(healthy.socket.destroyed).toBe(false);
+  await expect(f.supervisor.stop()).rejects.toBeInstanceOf(AggregateError);
+  expect(healthy.socket.destroyed).toBe(true);
+  for (const moduleId of [f.module.id, others[0]!.id]) expect(f.supervisor.status(moduleId, "v1", true)).toMatchObject({ state: "unavailable" });
+  expect(f.pending()).toEqual([]);
+});
+
 test("events are serial and calls without uses are executed and recorded", async () => {
   let active = 0, maximum = 0;
   const f = await fixture({ uses: [], handler: async (_event, call) => {
@@ -292,6 +425,7 @@ test("events are serial and calls without uses are executed and recorded", async
     const reply = await call("call", { target: "notify.send", args: { key: "key", level: "now", title: "Title", body: "Body" }, mode: "async", key: "key" } as never);
     await Bun.sleep(5); active--; return { result: reply };
   } });
+  await installNotifyTarget(f.ports, f.module.workspaceId, true);
   const replies = await Promise.all([f.deliver(), f.deliver()]);
   expect(maximum).toBe(1); expect(f.processes).toHaveLength(1);
   expect(replies[0]).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
@@ -301,17 +435,24 @@ test("events are serial and calls without uses are executed and recorded", async
 test("duplicate keys return duplicate and a different event does not swallow the next notification", async () => {
   // Keys scoped to the event, as the SDK shorthands send them.
   const f = await fixture({ handler: async (event, call) => ({ result: await call("call", { target: "notify.send", args: { key: `${event.trigger.firedAt}:key`, level: "now", title: "Title", body: "Body" }, mode: "async", key: `${event.trigger.firedAt}:key` } as never) }) });
+  await installNotifyTarget(f.ports, f.module.workspaceId, true);
   expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: false } } } });
-  expect(await f.deliver()).toMatchObject({ result: { result: { result: { status: "queued", duplicate: true } } } });
+  await callsSettled(f.ports);
+  const first = await f.db.moduleInvocation.findFirstOrThrow({ where: { target: "notify", tool: "send" } });
+  expect(first).toMatchObject({ status: "succeeded", attempts: 1 });
+  expect(await f.deliver()).toMatchObject({ result: { result: { result: { callId: first.id, status: "succeeded", duplicate: true } } } });
+  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send" } })).toBe(1);
   await f.supervisor.deliver(f.module.id, "v1", { ...event, trigger: { ...event.trigger, firedAt: "2026-10-22T00:00:00Z" } });
+  await callsSettled(f.ports);
   expect((await notices(f.db)).length).toBe(2);
+  expect(await f.db.moduleInvocation.count({ where: { target: "notify", tool: "send", status: "succeeded", attempts: 1 } })).toBe(2);
   expect(await f.db.moduleCall.count()).toBe(3);
 });
 
 test("crash evidence is attributed, backoff cannot be bypassed, and reconnect remains unverified until a real call succeeds", async () => {
   const f = await fixture({ keepAlive: true });
   const start = f.ports.sandbox!.startModule!;
-  f.ports.sandbox!.startModule = input => ({ ...start(input), stderr: () => "panic: Failed to start HTTP Client thread; password=example-private", limits: { virtualMemoryMb: 512 } });
+  f.ports.sandbox!.startModule = input => ({ ...start(input), stderr: () => "panic: Failed to start HTTP Client thread; password=example-private" });
   await f.supervisor.start();
   f.processes[0]!.kill();
   await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id)).length === 1);
@@ -319,7 +460,7 @@ test("crash evidence is attributed, backoff cannot be bypassed, and reconnect re
   await expect(f.deliver()).rejects.toMatchObject({ stage: "unavailable" });
   expect(await f.db.moduleRun.count()).toBe(1);
   const [failure] = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
-  expect(failure).toMatchObject({ status: "retrying", evidence: { pid: 1, exitCode: 1, virtualMemoryMb: 512 } });
+  expect(failure).toMatchObject({ status: "retrying", evidence: { pid: 1, exitCode: 1 } });
   expect(failure!.evidence.stderr).toContain("HTTP Client thread");
   expect(failure!.evidence.stderr).not.toContain("example-private");
   f.advance(1000);
@@ -337,7 +478,7 @@ test("lost in-flight delivery is never replayed and remains marked uncertain aft
   await expect(f.deliver()).rejects.toMatchObject({ stage: "lost" });
   expect(calls).toBe(1);
   const [failure] = await moduleIncidents(f.db, f.module.workspaceId, f.module.id);
-  expect(failure).toMatchObject({ status: "retrying", deliveryUnknown: true, evidence: { phase: "event", delivery: "lost", exitCode: 1, triggerId: "daily" } });
+  expect(failure).toMatchObject({ status: "retrying", deliveryUnknown: true, evidence: { phase: "event", delivery: "lost", exitCode: 1, triggerId: "tool:daily" } });
   expect(failure!.evidence.runId).toBe((await f.db.moduleRun.findFirstOrThrow()).id);
   f.advance(1000);
   await until(async () => (await moduleIncidents(f.db, f.module.workspaceId, f.module.id))[0]?.status === "verifying");
@@ -395,9 +536,9 @@ test("a module terminated with Chrona (SIGTERM) is restarted without an incident
 });
 test("exit before handshake retains the real signal and stderr rather than the cleanup kill", async () => {
   const f = await fixture({ keepAlive: true });
-  f.ports.sandbox!.startModule = () => ({ pid: 999, exited: Promise.resolve({ code: null, signal: "SIGABRT" }), stderr: () => "panic: runtime initialization", limits: { virtualMemoryMb: 512 }, kill() {} });
+  f.ports.sandbox!.startModule = () => ({ pid: 999, exited: Promise.resolve({ code: null, signal: "SIGABRT" }), stderr: () => "panic: runtime initialization", kill() {} });
   await f.supervisor.start();
-  expect((await moduleIncidents(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ evidence: { phase: "start", pid: 999, signal: "SIGABRT", stderr: "panic: runtime initialization", virtualMemoryMb: 512 } });
+  expect((await moduleIncidents(f.db, f.module.workspaceId, f.module.id))[0]).toMatchObject({ evidence: { phase: "start", pid: 999, signal: "SIGABRT", stderr: "panic: runtime initialization" } });
 });
 
 test("old-version failures cannot pause the newly activated version", async () => {
@@ -429,7 +570,7 @@ test("activated reaches opted-in modules once per version and again when a modul
   const workspace = await db.workspace.create({ data: { name: "activated" } });
   const create = async (name: string, hash: string, extra: Record<string, unknown>) => {
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: hash } });
-    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], triggers: [], effects: [], tools: [{ name: "go", description: "go", parameters: { type: "object", properties: {}, required: [] } }], ...extra }), source: "user", intent: {}, report: {}, status: "approved" } });
+    await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], effects: [], tools: [{ name: "go", description: "go", parameters: { type: "object", properties: {}, required: [] } }], ...extra }), source: "user", intent: {}, report: {}, status: "approved" } });
     return module;
   };
   const web = await create("web", "w1", {}), app = await create("app", "a1", { activated: true, uses: ["web.page-set"] }), quiet = await create("quiet", "q1", { uses: ["web.page-set"] });
@@ -455,17 +596,17 @@ test("activated reaches opted-in modules once per version and again when a modul
 
 test.each([false, true])("builtin startup uses trusted release code and never stored fallback (drift=%s)", async drift => {
   const f = await fixture({ keepAlive: true });
-  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "notify");
+  const root = join(f.ports.dataDir, "release"), codeDir = join(root, "agent");
   await mkdir(codeDir, { recursive: true });
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "notify" });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "agent" });
   await writeFile(join(codeDir, "module.json"), JSON.stringify(manifest));
   await writeFile(join(codeDir, "index.ts"), "export {};");
   f.ports.moduleBuiltinResources = root;
   const files = await import("./module-preview").then(({ readModuleFiles }) => readModuleFiles(codeDir, "unsafe fixture"));
   const digest = new Bun.CryptoHasher("sha256");
   for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  const release = await resolveBuiltinRelease(f.ports, "notify", digest.digest("hex"));
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "notify", builtin: true, activeHash: release.hash } });
+  const release = await resolveBuiltinRelease(f.ports, "agent", digest.digest("hex"));
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: release.hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash: release.hash, manifest, source: "builtin", status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash: release.hash, previousHash: null, generationId: "release" }));
   if (drift) await writeFile(join(codeDir, "index.ts"), "changed after registration");
@@ -493,8 +634,8 @@ test("internal delivery fence rejects before execution and never sends an event"
 
 test.each(["user", "build", "builtin"])("approved Git builtin from %s runs from store without release resources", async source => {
   const f = await fixture({ keepAlive: true }), hash = "a".repeat(40);
-  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "notify" });
-  await f.db.module.update({ where: { id: f.module.id }, data: { name: "notify", builtin: true, activeHash: hash } });
+  const manifest = moduleManifestSchema.parse({ ...f.manifest, name: "agent" });
+  await f.db.module.update({ where: { id: f.module.id }, data: { name: "agent", builtin: true, activeHash: hash } });
   await f.db.moduleVersion.create({ data: { moduleId: f.module.id, hash, manifest, source, status: "approved", intent: {}, report: {} } });
   await f.db.$transaction(tx => recordModuleActivation(moduleContext(f.ports, f.module.workspaceId), tx, { moduleId: f.module.id, hash, previousHash: "v1", generationId: "custom" }));
   f.ports.moduleBuiltinResources = join(f.ports.dataDir, "missing-release");

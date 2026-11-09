@@ -1,45 +1,20 @@
-import { createServer, type Socket } from "node:net";
+import { createLoopbackChannel } from "@chrona/integrations/steward/module-sdk/transport";
 import { randomUUID } from "node:crypto";
 import { moduleEventMessageSchema, moduleEventReplySchema, moduleCallSchema, moduleCallReplySchema, type ModuleCall, type ModuleEvent } from "@chrona/contracts/steward";
 
 type EventReply = ReturnType<typeof moduleEventReplySchema.parse>;
 type CallReply = ReturnType<typeof moduleCallReplySchema.parse>;
-// Owner calls carry attachments as base64 (20 MiB files); chunks are collected, not re-copied.
-const maxLine = 32 * 1024 * 1024;
-
-/** Newline-delimited lines of at most `maxLine` bytes; past it, `overflow` and stop. */
-function lineSplitter(onLine: (text: string) => void, overflow: () => void) {
-  let parts: Buffer[] = [], size = 0;
-  return (chunk: Buffer) => {
-    let start = 0, end: number;
-    while ((end = chunk.indexOf(10, start)) !== -1) {
-      if (size + end - start > maxLine) { overflow(); return; }
-      const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
-      parts = []; size = 0; start = end + 1;
-      onLine(text);
-    }
-    if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
-    if (size > maxLine) overflow();
-  };
-}
-
-export async function createModuleChannel(socketPath: string, { onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
-  let socket: Socket | undefined, accepted = false, closed = false;
+export async function createModuleChannel({ onCall, timers = globalThis }: { onCall(call: ModuleCall): Promise<CallReply>; timers?: Pick<typeof globalThis, "setTimeout" | "clearTimeout"> }) {
+  let closed = false;
   let pending: { id: string; resolve(reply: EventReply): void; reject(error: Error): void } | undefined;
-  let connected!: () => void, disconnected!: (error: Error) => void;
-  const ready = new Promise<void>((resolve, reject) => { connected = resolve; disconnected = reject; });
-  let ended!: (error: Error) => void;
-  const closedWithError = new Promise<Error>(resolve => { ended = resolve; });
-  // A process can fail before the caller starts awaiting its connection.
-  void ready.catch(() => {});
   const records: string[] = [];
   // Calls the module is still waiting on; a replaced version is closed only after they are answered.
   const inflight = new Set<Promise<unknown>>();
   function record(message: string) { records.push(message); if (records.length > 32) records.shift(); }
-  function fail(error: Error) { ended(error); disconnected(error); pending?.reject(error); }
+  function fail(error: Error) { pending?.reject(error); }
   function reply(message: CallReply) {
     const validated = moduleCallReplySchema.parse(message);
-    if (socket && !socket.destroyed) socket.write(JSON.stringify(validated) + "\n");
+    if (transport.connected()) transport.send(validated);
   }
   async function handleCall(value: unknown) {
     if (!value || typeof value !== "object" || !("method" in value || "params" in value)) return false;
@@ -60,29 +35,18 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
     finally { inflight.delete(work); }
     return true;
   }
-  async function line(text: string) {
-    let value: unknown;
-    try { value = JSON.parse(text); } catch { record("Malformed JSON"); return; }
+  async function message(value: unknown) {
     if (await handleCall(value)) return;
     const result = moduleEventReplySchema.safeParse(value);
     if (!result.success) { record("Invalid event reply"); return; }
     if (pending?.id === result.data.id) pending.resolve(result.data);
     else record("Unmatched event reply");
   }
-  const server = createServer(client => {
-    if (accepted || closed) { client.destroy(); return; }
-    accepted = true; socket = client;
-    const overflow = () => { record("Module line overflow"); fail(new Error("Module disconnected")); client.destroy(); };
-    client.on("data", lineSplitter(text => { void line(text).catch(() => { record("Module line failed"); }); }, overflow));
-    client.on("error", () => fail(new Error("Module connection failed")));
-    client.on("close", () => fail(new Error("Module disconnected")));
-    connected();
+  const transport = await createLoopbackChannel({
+    onMessage(value) { void message(value).catch(() => { record("Module line failed"); }); },
+    onDisconnect(error) { record(error.message); fail(new Error("Module disconnected")); },
   });
-  server.on("error", () => fail(new Error("Module channel failed")));
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(socketPath, () => { server.removeListener("error", reject); resolve(); });
-  });
+  const { ready, closedWithError } = transport;
   let queue: Promise<unknown> = Promise.resolve();
   function exchange(message: { id: string; event?: ModuleEvent; ping?: true }, timeoutMs: number): Promise<EventReply> {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error("Invalid event timeout"));
@@ -92,24 +56,24 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
       const timer = timers.setTimeout(() => { expired = true; pending = undefined; fail(new Error("Module event timeout")); }, timeoutMs);
       void ready.then(() => {
         if (expired) return;
-        if (closed || !socket || socket.destroyed) throw new Error("Module channel closed");
+        if (closed || !transport.connected()) throw new Error("Module channel closed");
         pending = { id: message.id,
           resolve: reply => { timers.clearTimeout(timer); pending = undefined; resolve(reply); },
           reject: error => { timers.clearTimeout(timer); pending = undefined; fail(error); } };
         written = true;
-        socket.write(JSON.stringify(message) + "\n");
+        transport.send(message);
       }).catch(error => { timers.clearTimeout(timer); pending = undefined; fail(error); });
     }));
     queue = run.catch(() => {});
     return run;
   }
   return {
-    ready, closedWithError,
+    endpoint: transport.endpoint, token: transport.token, httpReady: transport.httpReady, ready, closedWithError,
     async ping(timeoutMs = 10_000) {
       const reply = await exchange({ id: randomUUID(), ping: true }, timeoutMs);
       if ("error" in reply || Object.keys(reply.result).length) throw new Error("Invalid SDK ping reply");
     },
-    connected: () => accepted && !closed && !!socket && !socket.destroyed,
+    connected: () => !closed && transport.connected(),
     diagnostics: () => [...records],
     /** Resolves true when it had to wait for calls the module was still waiting on. */
     drained: async () => { const waiting = [...inflight]; await Promise.allSettled(waiting); return waiting.length > 0; },
@@ -117,8 +81,8 @@ export async function createModuleChannel(socketPath: string, { onCall, timers =
       return exchange(moduleEventMessageSchema.parse({ id: randomUUID(), event }), timeoutMs);
     },
     async close() {
-      closed = true; fail(new Error("Module channel closed")); socket?.destroy();
-      await new Promise<void>(resolve => server.close(() => resolve()));
+      closed = true; fail(new Error("Module channel closed"));
+      await transport.close();
     },
   };
 }

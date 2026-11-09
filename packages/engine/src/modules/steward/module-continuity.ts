@@ -1,3 +1,4 @@
+import { assertBuildOwnership, buildOwnershipError, holdBuildOwnership } from "./module-build-ownership";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,23 +9,29 @@ import type { ModuleContext, ContinuityReport, TestReport, requireModule } from 
 
 type Manifest = z.output<typeof moduleManifestSchema>;
 type Module = Awaited<ReturnType<typeof requireModule>>;
-/** Author tests get the test allowance, or the module's own higher cap (v2-21). */
-const testMemoryMb = (manifest: Manifest) => Math.max(RUN_LIMITS.moduleTestMemoryMb, manifest.limits?.virtualMemoryMb ?? 0);
 async function copyTestData(source: string | undefined, target: string) { return source ? copyData(source, target) : true; }
 export const moduleParams = (manifest: Manifest) => Object.fromEntries(Object.entries(manifest.params).map(([key, param]) => [key, param.value]));
+async function prepareTestContent(data: string, manifest: Manifest) {
+  if (!manifest.content) return undefined;
+  const contentDir = join(data, ".build-content");
+  await mkdir(contentDir, { recursive: true });
+  return contentDir;
+}
 async function runOneTest(context: ModuleContext, staging: string, manifest: Manifest, entry: string, options: { tests: TestReport; sourceData?: string }) {
+  assertBuildOwnership(context, staging);
   const { tests, sourceData } = options, { ports } = context, sandbox = ports.sandbox;
   if (!sandbox?.available || !sandbox.runModule) return false;
   const data = await mkdtemp(join(tmpdir(), "chrona-module-test-"));
   try {
     if (!await copyTestData(sourceData, data)) return false;
-    const contentDir = manifest.content ? join(data, ".build-content") : undefined;
-    if (contentDir) await mkdir(contentDir, { recursive: true });
-    const result = await sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes, memoryMb: testMemoryMb(manifest) });
+    const contentDir = await prepareTestContent(data, manifest);
+    const result = await sandbox.runModule({ codeDir: staging, dataDir: data, ...(contentDir ? { contentDir } : {}), entry, input: { now: ports.now().toISOString(), params: moduleParams(manifest) }, network: false, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes });
     tests.push({ stdout: result.output.slice(0, RUN_LIMITS.jobOutputBytes), stderr: (result.error ?? "").slice(0, RUN_LIMITS.jobOutputBytes), exitCode: result.exitCode ?? 1 });
     return result.status === "succeeded" && result.exitCode === 0;
-  } catch { return false; }
-  finally { await rm(data, { recursive: true, force: true }); }
+  } catch (error) {
+    if (holdBuildOwnership(context, staging, error)) throw error;
+    return false;
+  } finally { if (!buildOwnershipError(context, staging)) await rm(data, { recursive: true, force: true }); }
 }
 export async function runTests(context: ModuleContext, staging: string, manifest: Manifest, tests: TestReport, sourceData?: string) {
   let passed = true;
@@ -60,6 +67,7 @@ function schemaFailure(from: number | null, to: number, empty: boolean, manifest
   return null;
 }
 export async function checkContinuity(context: ModuleContext, staging: string, module: Module, manifest: Manifest, continuity: ContinuityReport) {
+  assertBuildOwnership(context, staging);
   const from = module.dataSchema, to = manifest.data.schema, live = join(context.platform, "data", module.id);
   let data: string | undefined, needsMigration = false;
   try {
@@ -71,7 +79,9 @@ export async function checkContinuity(context: ModuleContext, staging: string, m
       data = await mkdtemp(join(tmpdir(), "chrona-module-continuity-"));
       await checkCopy(context, live, { staging, data, manifest, continuity });
     }
-  } catch { fail(continuity, "continuity check failed"); }
-  finally { if (data) await rm(data, { recursive: true, force: true }); }
+  } catch (error) {
+    if (holdBuildOwnership(context, staging, error)) throw error;
+    fail(continuity, "continuity check failed");
+  } finally { if (data && !buildOwnershipError(context, staging)) await rm(data, { recursive: true, force: true }); }
   return { passed: continuity.status !== "failed", needsMigration };
 }

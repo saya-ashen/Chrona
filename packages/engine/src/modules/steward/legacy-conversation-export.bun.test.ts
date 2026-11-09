@@ -2,17 +2,17 @@ import { afterAll, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { deleteExportedLegacyConversations, exportLegacyConversations, verifyLegacyConversationExport, type LegacyConversationExportOptions, LEGACY_CONVERSATION_SOURCES } from "./legacy-conversation-export";
 
-const root = resolve(import.meta.dirname, "../../../../../.tmp/kernel-minimization");
-await mkdir(root, { recursive: true });
+const root = await mkdtemp(join(tmpdir(), "chrona-legacy-export-test-"));
 const databaseUrl = `file:${join(root, "stage5-export-fix.db")}`;
 ensureSqliteDatabase({ databaseUrl, migrationsDir: resolve(import.meta.dirname, "../../../../../prisma/migrations") });
 const db = new PrismaClient({ adapter: new PrismaBunSqlite({ url: databaseUrl }) });
-afterAll(() => db.$disconnect());
+afterAll(async () => { await db.$disconnect(); await rm(root, { recursive: true, force: true }); });
 async function fixture() {
   const directory = await mkdtemp(join(root, "stage5-export-"));
   const dataDir = join(directory, "data");

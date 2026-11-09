@@ -4,9 +4,19 @@ import { join } from "node:path";
 import { createScriptSandbox } from "./script-sandbox";
 import { createModuleChannel } from "@chrona/engine";
 
+async function releaseResources(root: string) {
+  const sdk = join(root, "release/resources/module-sdk"), typecheck = join(root, "release/resources/module-typecheck");
+  await cp(join(import.meta.dirname, "module-sdk"), sdk, { recursive: true });
+  await mkdir(typecheck, { recursive: true });
+  const loader = join(import.meta.dirname, "module-typecheck/chrona-sdk-loader.ts");
+  await cp(loader, join(typecheck, "chrona-sdk-loader.ts"));
+  await cp(loader, join(sdk, "chrona-sdk-loader.ts"));
+  return { sdk, typecheck };
+}
+
 for (const inherited of [undefined, "/synthetic/untrusted-node-path"]) test(`trusted release SDK resolves with inherited NODE_PATH=${inherited}`, async () => {
   const root = await mkdtemp("/tmp/chrona-sdk-release-"), original = process.env.NODE_PATH;
-  const channel = await createModuleChannel(join(root, "socket"), { onCall: async call => ({ id: call.id, error: { code: call.method === "call" && call.params.target === "executions.snapshot" ? "cursor_expired" : "capacity", message: "bounded fixture error" } }) });
+  const channel = await createModuleChannel({ onCall: async call => ({ id: call.id, error: { code: call.method === "call" && call.params.target === "executions.snapshot" ? "cursor_expired" : "capacity", message: "bounded fixture error" } }) });
   let child: ReturnType<ReturnType<typeof createScriptSandbox>["startModule"]> | undefined;
   try {
     if (inherited === undefined) delete process.env.NODE_PATH; else process.env.NODE_PATH = inherited;
@@ -27,11 +37,10 @@ try {
 `);
     await writeFile(join(codeDir, "index.ts"), 'import { on, chrona } from "chrona"; on("tool", async () => { const codes = []; for (const target of ["executions.start", "executions.snapshot"]) { try { await chrona.call(target, {}); } catch (error) { codes.push((error as {code:string}).code); } } return { result: { sdk: true, inherited: process.env.NODE_PATH ?? null, codes } }; });');
     const before = await readFile(join(codeDir, "index.ts"), "utf8");
-    const sdk = join(root, "release/resources/module-sdk");
-    await cp(join(import.meta.dirname, "module-sdk"), sdk, { recursive: true });
-    const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk });
+    const { sdk, typecheck } = await releaseResources(root);
+    const sandbox = createScriptSandbox({ executionMode: "trusted-local", dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
     expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", exitCode: 0, output: "function\n" });
-    child = sandbox.startModule({ codeDir, dataDir, entry: "index.ts", socketPath: join(root, "socket") });
+    child = sandbox.startModule({ codeDir, dataDir, entry: "index.ts", ipcEndpoint: channel.endpoint, ipcToken: channel.token });
     await channel.ready;
     const now = new Date().toISOString();
     expect(await channel.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} }, 2000)).toMatchObject({ result: { result: { sdk: true, inherited: null, codes: ["capacity", "cursor_expired"] } } });
@@ -41,4 +50,57 @@ try {
     if (original === undefined) delete process.env.NODE_PATH; else process.env.NODE_PATH = original;
     await rm(root, { recursive: true, force: true });
   }
+}, 10_000);
+
+for (const mode of ["stop", "exit", "unknown"] as const) test.skipIf(process.platform !== "linux")(`copied SDK testing ${mode} preserves descendant stop evidence`, async () => {
+  const root = await mkdtemp("/tmp/chrona-sdk-process-release-");
+  try {
+    const { sdk, typecheck } = await releaseResources(root);
+    // Exercise the trusted override independently of the SDK-local static loader.
+    if (mode === "exit") await rm(join(sdk, "chrona-sdk-loader.ts"));
+    const codeDir = join(root, "app"), dataDir = join(root, "data"), contentDir = join(root, "content");
+    await mkdir(codeDir); await mkdir(dataDir); await mkdir(contentDir);
+    await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: [] }));
+    await writeFile(join(codeDir, "index.ts"), `import { on } from "chrona";
+import { spawn } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" });
+child.unref();
+writeFileSync(process.env.CHRONA_DATA + "/descendant", String(child.pid));
+const guardian = Number(readFileSync("/proc/" + process.pid + "/status", "utf8").match(/^PPid:\\s+(\\d+)$/m)[1]);
+on("tool", () => {
+  ${mode === "exit" ? "setTimeout(() => process.exit(0), 50);" : ""}
+  return { result: { child: child.pid, guardian } };
+});
+`);
+    await writeFile(join(codeDir, "test.ts"), `import assert from "node:assert/strict";
+import { existsSync, writeFileSync } from "node:fs";
+import { startModule } from "chrona/testing";
+import { ProcessStopUnknownError } from "chrona/process";
+${mode === "exit" ? `process.env.CHRONA_SDK_LOADER = ${JSON.stringify(join(typecheck, "chrona-sdk-loader.ts"))};` : ""}
+const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const module = await startModule("index.ts");
+const now = new Date().toISOString();
+const reply = await module.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} });
+const { child, guardian } = reply.result.result;
+assert.equal(alive(child), true);
+${mode === "unknown" ? `
+writeFileSync(process.env.CHRONA_DATA + "/owned", "retain");
+writeFileSync(process.env.CHRONA_CONTENT + "/owned", "retain");
+process.kill(guardian, "SIGKILL");
+await assert.rejects(module.exited, ProcessStopUnknownError);
+await assert.rejects(module.stop(), ProcessStopUnknownError);
+assert.equal(existsSync(process.env.CHRONA_DATA + "/owned"), true);
+assert.equal(existsSync(process.env.CHRONA_CONTENT + "/owned"), true);
+assert.equal(alive(child), true);
+` : mode === "exit" ? "await module.exited; await module.stop(); assert.equal(alive(child), false);" : "await module.stop(); await module.stop(); assert.equal(alive(child), false);"}
+console.log("verified");
+// On unknown, the outer test guardian still owns and reaps the retained tree.
+${mode === "unknown" ? "process.exit(0);" : ""}
+`);
+    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
+    expect(await sandbox.runModule({ codeDir, dataDir, contentDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", exitCode: 0, output: "verified\n", stopEvidence: { treeClean: true } });
+    const descendant = Number(await readFile(join(dataDir, "descendant"), "utf8"));
+    expect(() => process.kill(descendant, 0)).toThrow();
+  } finally { await rm(root, { recursive: true, force: true }); }
 }, 10_000);

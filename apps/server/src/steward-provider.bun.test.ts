@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStewardService, type StewardPorts } from "@chrona/engine";
 import { testDb } from "@chrona/engine/test-support";
+import { testReleaseRuntimeChecks } from "../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import type { ProviderAnswer, ProviderRunView } from "@chrona/contracts";
 import { queueBuild } from "../../../packages/engine/src/modules/steward/module-build-session";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, service: ReturnType<typeof createStewardService>;
@@ -11,7 +12,7 @@ let workspaceId: string;
 let answers: ProviderAnswer[];
 beforeEach(async () => {
   db = testDb(); workspaceId = (await db.workspace.create({ data: { name: "owner" } })).id; answers = [];
-  ports = { db, moduleSdk: join(import.meta.dirname, "../../../packages/integrations/src/steward/module-sdk"), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
+  ports = { db, ...testReleaseRuntimeChecks(), now: () => new Date(), dataDir: await mkdtemp(join(tmpdir(), "chrona-provider-api-")), publicUrl: null,
     provider: { name: "fake", health: async () => ({ available: true, sandboxed: true, error: null }), start(input) {
       const controller = new AbortController();
       const done = (async () => {

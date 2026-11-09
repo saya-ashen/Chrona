@@ -1,3 +1,4 @@
+import { fenceExecutionVersionChange } from "./execution-delivery-controls";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -8,7 +9,7 @@ import { assertDynamicModuleActivation, expireModuleApprovals, isGroupPayload, r
 import { dataEmpty, snapshotAt, type Restore } from "./module-data";
 import { activateIn, startMigration } from "./module-generation";
 import { migrateData } from "./module-migration";
-import { activateGroupIn } from "./module-group";
+import { activateFixedCandidateApprovedIn, activateGroupIn } from "./module-group";
 import { removeApproved } from "./module-remove";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
 import { assertExternalModule } from "./module-identity";
@@ -50,10 +51,20 @@ export async function activateApprovedIn(context: ModuleContext, tx: Prisma.Tran
   const payload = action.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.kind !== "activate_module") return;
   if (action.workspaceId !== context.workspaceId || typeof payload.moduleId !== "string" || typeof payload.hash !== "string") throw new StewardError("invalid", "Invalid module approval");
+  if (await activateFixedCandidateApprovedIn(context, tx, action)) return;
   const { moduleId, hash } = payload, restore = parseRestore(payload.restore);
   return prepareApproved(context, tx, action, { moduleId, hash, restore });
 }
+function approvalVersions(payload: ApprovedAction["payload"]) {
+  const group = isGroupPayload(payload) ? payload as { versions: { moduleId: string; hash: string }[] } : null;
+  const single = payload as { kind?: string; moduleId?: string; hash?: string } | null;
+  return group?.versions ?? (single?.kind === "activate_module" && single.moduleId && single.hash ? [{ moduleId: single.moduleId, hash: single.hash }] : []);
+}
 export async function onApproved(context: ModuleContext, action: ApprovedAction) {
+  const approval = await context.db.approval.findFirst({ where: { id: action.approvalId, workspaceId: context.workspaceId, status: "approved" } });
+  if (!approval || action.workspaceId !== context.workspaceId || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Module approval does not match");
+  const versions = approvalVersions(action.payload);
+  for (const target of versions) await fenceExecutionVersionChange(context.ports, context.workspaceId, target.moduleId, target.hash);
   if (isGroupPayload(action.payload)) { await context.db.$transaction(tx => activateGroupIn(context, tx, action)); return; }
   if (moduleRemovePayloadSchema.safeParse(action.payload).success) { await removeApproved(context, action); return; }
   const prepared = await context.db.$transaction(tx => activateApprovedIn(context, tx, action));
@@ -80,6 +91,10 @@ async function prepareRollback(context: ModuleContext, tx: Prisma.TransactionCli
   return { migration: { module, version, manifest, from, to } };
 }
 export async function rollback(context: ModuleContext, moduleId: string, hash: string) {
+  await assertExternalModule(context.db, context.workspaceId, moduleId, "rollback");
+  const version = await context.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash } } });
+  if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
+  await fenceExecutionVersionChange(context.ports, context.workspaceId, moduleId, hash);
   const prepared = await context.db.$transaction(tx => prepareRollback(context, tx, moduleId, hash));
   if (prepared.restore) {
     await expireModuleApprovals(context, moduleId);

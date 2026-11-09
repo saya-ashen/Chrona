@@ -7,7 +7,7 @@ import { testDb } from "@chrona/engine/test-support";
 import { createRescueApp, startRescueListener } from "./rescue";
 import { builtinEntry, createRelay, qqEntry } from "@chrona/engine/test-support";
 import { buildArtifacts } from "../../../build/manifest";
-import webManifest from "../../../packages/engine/src/modules/steward/builtin/web/module.json";
+import webManifest from "../../../packages/engine/src/modules/steward/external/web/module.json";
 
 const dbs: ReturnType<typeof testDb>[] = [];
 afterEach(async () => { for (const db of dbs.splice(0)) await db.$disconnect(); });
@@ -46,14 +46,17 @@ test("rescue approvals and kernel tick work with both web and notify disabled", 
   const f = await fixture();
   await f.db.module.createMany({ data: ["web", "notify"].map(name => ({ workspaceId: "ws_default", name, builtin: true, activeHash: `${name}-hash`, status: "paused" })) });
   await f.service.tick();
-  for (const scope of ["once", "always"]) {
-    const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "schedule", title: "Schedule", detail: "Changes", preview: "diff", payload: {} });
+  for (const scope of [undefined, "once"]) {
+    const approval = await f.service.forWorkspace("ws_default").approvals.create({ action: "modify_external", title: "Decide", detail: "Changes", preview: "diff", payload: {} });
     const list = await (await f.request("/api/approvals")).json();
     expect(list.items).toContainEqual(expect.objectContaining({ id: approval.id, preview: "diff" }));
+    expect((await f.request(`/api/approvals/${approval.id}/resolve`, { decision: "approve", scope: "always" })).status).toBe(400);
+    expect((await f.db.approval.findUniqueOrThrow({ where: { id: approval.id } })).status).toBe("open");
     const result = await f.request(`/api/approvals/${approval.id}/resolve`, { decision: "approve", scope });
     expect(result.status).toBe(200);
     expect((await result.json()).status).toBe("approved");
   }
+  expect(await f.db.grant.count()).toBe(0);
   expect(await f.db.audit.count({ where: { workspaceId: "ws_default", kind: "kernel_fact_pending" } })).toBeGreaterThanOrEqual(4);
   expect(await f.db.moduleInvocation.count({ where: { workspaceId: "ws_default", target: { in: ["web", "notify"] } } })).toBe(0);
 });
@@ -71,18 +74,18 @@ test("rescue exposes governed recovery controls, never conversations", async () 
   expect((await f.request(`/api/modules/${module.id}/rollback`, { hash: "approved", disableAuth: true })).status).toBe(400);
 });
 // The mcp module resolves through this same owner HTTP route.
-test("the web page and QQ resolve policy approvals like any other entry", async () => {
+test("the web page and QQ resolve application-requested approvals like any other entry", async () => {
   const f = await fixture();
-  const create = (action: "change_policy" | "schedule") => f.service.forWorkspace("ws_default").approvals.create({ action, title: "Settings", detail: "Review", preview: "diff", payload: {} });
-  const viaWeb = await create("change_policy"), viaQq = await create("change_policy"), deniedViaQq = await create("schedule");
+  const create = () => f.service.forWorkspace("ws_default").approvals.create({ action: "modify_external", title: "Decision", detail: "Review", preview: "diff", payload: {} });
+  const viaWeb = await create(), viaQq = await create(), deniedViaQq = await create();
   const web = await builtinEntry(f.ports, "ws_default", "web");
   expect(await web.call("approvals.resolve", { approval: viaWeb.id, decision: "approve" })).toMatchObject({ status: "approved" });
   const binding = { version: 1 as const, workspaceId: "ws_default", openid: "owner", appId: "test", boundAt: new Date().toISOString() };
   // The qq module resolves through the approvals system module, as an entry (no owner API).
   const qq = await qqEntry(f.ports, "ws_default");
   const relay = createRelay({ call: qq.call, notify: async () => ({}), publicUrl: null, download: async () => { throw new Error("unused"); } });
-  expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve", scope: "once" })).toContain("已批准");
-  expect(await relay.resolveApproval(binding, { ref: deniedViaQq.id, decision: "deny", scope: "once" })).toContain("已拒绝");
+  expect(await relay.resolveApproval(binding, { ref: viaQq.id, decision: "approve" })).toContain("已批准");
+  expect(await relay.resolveApproval(binding, { ref: deniedViaQq.id, decision: "deny" })).toContain("已拒绝");
   expect((await f.service.forWorkspace("ws_default").approvals.list("open"))).toHaveLength(0);
 });
 test("rescue HTML is a required release resource", () => {

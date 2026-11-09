@@ -17,11 +17,11 @@ test("project mappings bind owner/workspace/immutable module id without reading 
   await expect(resolve(principal, "unknown")).rejects.toThrow("not configured");
   for (const raw of [{ projects: [project, project] }, { projects: [{ ...project, canonicalPath: "relative/path" }] }, { projects: [{ ...project, executor: "device" }] }, { projects: [{ ...project, baseline: "untyped-digest" }] }, { projects: [{ ...project, baseline: "commit:" }] }]) expect(() => parseExecutionProjects(raw)).toThrow();
 });
-test("P2 placements bind fixed device/revision and never expose or inspect a remote host path", async () => {
-  const grant = { executor: "device" as const, executorId: "device", executorGeneration: 2, projectRef: "repo", mappingRevision: 3, directoryIdentity: "a".repeat(64), baseline: { kind: "commit" as const, digest: "b".repeat(40) }, label: "Selected project" };
+test("local placements bind owner, module and revision while rejecting device grants", async () => {
+  const grant = { executor: "server" as const, executorId: "server" as const, executorGeneration: 2, canonicalPath: "/explicit/local/project", projectRef: "repo", mappingRevision: 3, directoryIdentity: "a".repeat(64), baseline: { kind: "commit" as const, digest: "b".repeat(40) }, label: "Selected project" };
   const config = { projects: [], placements: [{ workspaceId: "w", ownerId: "owner", moduleId: "coding-id", grant }] };
   const resolve = parseExecutionPlacements(config);
-  const selection = { executorId: "device", projectRef: "repo", mappingRevision: 3 };
+  const selection = { executorId: "server", projectRef: "repo", mappingRevision: 3 };
   expect(await resolve(principal, selection)).toEqual(grant);
   expect(await resolve.list(principal)).toEqual([selection]);
   expect(await resolve.list({ ...principal, ownerId: "other" })).toEqual([]);
@@ -32,7 +32,7 @@ test("P2 placements bind fixed device/revision and never expose or inspect a rem
   await expect(resolve(principal, { ...selection, mappingRevision: 4 })).rejects.toThrow("revision");
   await expect(resolve({ ...principal, ownerId: "other" }, selection)).rejects.toThrow("not configured");
   for (const bad of [
-    { ...grant, canonicalPath: "/remote/path" }, { ...grant, executorId: "server" },
+    { ...grant, executor: "device", executorId: "device" }, { ...grant, executorId: "other" },
     { ...grant, executor: "server", executorId: "server", canonicalPath: "relative/path" },
   ]) expect(() => parseExecutionPlacements({ ...config, placements: [{ ...config.placements[0], grant: bad }] })).toThrow();
   expect(() => parseExecutionPlacements({ ...config, placements: [config.placements[0], config.placements[0]] })).toThrow("Duplicate");
@@ -48,13 +48,13 @@ test("fixed owner file: missing disables, malformed fails, explicit config loads
     await expect(loadExecutionPlacements(dir)).rejects.toThrow();
     await writeFile(join(dir, "execution-projects.json"), JSON.stringify({ projects: [project] }));
     expect(await (await loadExecutionProjects(dir))!(principal, "repo")).toMatchObject({ canonicalPath: project.canonicalPath });
-    const grant = { executor: "device" as const, executorId: "device", executorGeneration: 2, projectRef: "repo", mappingRevision: 3,
+    const grant = { executor: "server" as const, executorId: "server" as const, executorGeneration: 2, canonicalPath: "/explicit/local/project", projectRef: "repo", mappingRevision: 3,
       directoryIdentity: "a".repeat(64), baseline: { kind: "commit" as const, digest: "b".repeat(40) }, label: "Selected project" };
     await writeFile(join(dir, "execution-projects.json"), JSON.stringify({ projects: [], placements: [{ workspaceId: "w", ownerId: "owner", moduleId: "coding-id", grant }] }));
     const placements = (await loadExecutionPlacements(dir))!;
     // Admission resolution uses the loaded host snapshot, without reopening the owner file in a writer transaction.
     await rm(join(dir, "execution-projects.json"));
-    expect(await placements(principal, { executorId: "device", projectRef: "repo", mappingRevision: 3 })).toEqual(grant);
-    await expect(placements({ ...principal, ownerId: "other" }, { executorId: "device", projectRef: "repo", mappingRevision: 3 })).rejects.toThrow("not configured");
+    expect(await placements(principal, { executorId: "server", projectRef: "repo", mappingRevision: 3 })).toEqual(grant);
+    await expect(placements({ ...principal, ownerId: "other" }, { executorId: "server", projectRef: "repo", mappingRevision: 3 })).rejects.toThrow("not configured");
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

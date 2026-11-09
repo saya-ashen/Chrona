@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
 
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { chmod, cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } from "./manifest";
 import { assertElfInterpreterFile } from "./portable-elf";
@@ -56,7 +58,7 @@ export function releaseSmokeEnvironment(
   configDir: string,
   inheritedEnvironment: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  return {
+  const env: NodeJS.ProcessEnv = {
     ...inheritedEnvironment,
     CHRONA_DATA_DIR: dataDir,
     CHRONA_CONFIG_DIR: configDir,
@@ -67,6 +69,8 @@ export function releaseSmokeEnvironment(
     CHRONA_QQ_APP_ID: "",
     CHRONA_QQ_SECRET_FILE: "",
   };
+  for (const name of ["CHRONA_RESOURCE_DIR", "CHRONA_PACKAGE_DIR", "CHRONA_MIGRATIONS_DIR", "CHRONA_PROCESS_HELPER", "CHRONA_SDK"]) delete env[name];
+  return env;
 }
 
 async function waitForJson(url: string, label: string, apiKey?: string) {
@@ -109,8 +113,9 @@ async function assertRuntimeStarts(binaryPath: string) {
   const configDir = join(tempRoot, "config");
 
   const env = releaseSmokeEnvironment(dataDir, configDir);
+  env.CHRONA_RESOURCE_DIR = join(dirname(binaryPath), buildArtifacts.resourcesRoot);
   const proc = Bun.spawn([binaryPath, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], {
-    cwd: ROOT,
+    cwd: tempRoot,
     env,
     stdout: "pipe",
     stderr: "pipe",
@@ -139,6 +144,24 @@ async function assertRuntimeStarts(binaryPath: string) {
   }
 }
 
+/** Help must work before server configuration or database initialization. */
+export async function assertReleaseCli(binaryPath: string) {
+  const root = await mkdtemp(join(tmpdir(), "chrona-release-cli-"));
+  const data = join(root, "data"), config = join(root, "config");
+  const env = { ...process.env, CHRONA_DATA_DIR: data, CHRONA_CONFIG_DIR: config, DATABASE_URL: "invalid:release-cli-must-not-load" };
+  try {
+    const help = spawnSync(binaryPath, ["--help"], { cwd: root, env, encoding: "utf8", timeout: 10_000 });
+    if (help.error || help.status !== 0 || !help.stdout.includes("start") || !help.stdout.includes("admin") || /executor|owner.?key|device/i.test(help.stdout)) {
+      throw new Error("Packaged CLI help failed or advertises obsolete device administration");
+    }
+    for (const command of ["executor", "__executor-process"]) {
+      const result = spawnSync(binaryPath, [command], { cwd: root, env, encoding: "utf8", timeout: 10_000 });
+      if (result.error || result.status === 0 || !result.stderr.includes("unknown command")) throw new Error(`Packaged CLI still accepts ${command}`);
+    }
+    if (await pathExists(data) || await pathExists(config)) throw new Error("CLI help or an obsolete command initialized private server state");
+  } finally { await rm(root, { recursive: true, force: true }); }
+}
+
 export type SmokeReleaseOptions = {
   releaseRoot?: string;
   runtime?: boolean;
@@ -155,15 +178,30 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
     await assertElfInterpreterFile(binaryPath, manifestTarget.linuxInterpreter);
   }
 
+  await assertReleaseCli(binaryPath);
+
+  const helperPlatform = target.startsWith("windows-") ? "win32" : target.split("-")[0];
+  const helperArch = target.split("-")[1];
+  const helperPath = resolve(releaseDir, buildArtifacts.resourcesRoot, `process/${helperPlatform}-${helperArch}/chrona-process-guardian${helperPlatform === "win32" ? ".exe" : ""}`);
+  await assertExists(helperPath, "Native process guardian");
+  if (manifestTarget.executable) await assertExecutable(helperPath);
+  if ("linuxInterpreter" in manifestTarget) await assertElfInterpreterFile(helperPath, manifestTarget.linuxInterpreter);
+
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/schema.prisma"), "Prisma schema");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/migrations"), "Prisma migrations");
 
-  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/pi-steward-agent"), "Pi steward extension");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "pi/chrona-tools.ts"), "Pi steward extension");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "pi/browser-tools.ts"), "Pi browser extension");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "builtin"), "Built-in module resources");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/sdk.ts"), "Module SDK");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/package.json"), "Module SDK package");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "rescue.html"), "Immutable rescue console");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/testing.ts"), "Module test helper");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/transport.ts"), "Module SDK transport");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/process.ts"), "Module SDK process supervision");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/windows-transport.ts"), "Module SDK Windows transport");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/chrona-sdk-loader.ts"), "Module SDK static loader");
+  await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-typecheck/chrona-sdk-loader.ts"), "Module type check static loader");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/build-contract.md"), "Module build contract");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "module-sdk/group-build-contract.md"), "Module group-build contract");
   await assertModuleTypecheck(resolve(releaseDir, buildArtifacts.resourcesRoot));
@@ -175,11 +213,22 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   console.log(`✓ Release smoke passed for ${target}`);
 }
 
-/** v2-25: the shipped type check resolves TypeScript and Bun's types on its own and passes a built-in module. */
-async function assertModuleTypecheck(resources: string) {
-  const child = Bun.spawn(["bun", "--no-install", join(resources, "module-typecheck/check.ts"), join(resources, "external/remind"), join(resources, "module-sdk")], { stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-  if (code !== 0) throw new Error(`Module type check failed (exit ${code}): ${stdout.slice(-500)} ${stderr.slice(-500)}`);
+/** Check Files against packaged Web contracts in a writable SDK, as ordinary builds do. */
+export async function assertModuleTypecheck(resources: string) {
+  const temporary = await mkdtemp(join(tmpdir(), "chrona-release-typecheck-")), sdk = join(temporary, "sdk");
+  try {
+    await cp(join(resources, "module-sdk"), sdk, { recursive: true });
+    await chmod(join(sdk, "calls.d.ts"), 0o644);
+    const web = moduleManifestSchema.parse(JSON.parse(await readFile(join(resources, "external/web/module.json"), "utf8")));
+    const contracts = Object.fromEntries(web.tools.filter(tool => tool.visibility.some(who => who === "modules" || who === "owner"))
+      .map(tool => [`web.${tool.name}`, { input: tool.parameters, output: tool.output ?? null }]));
+    await writeFile(join(sdk, "calls.json"), JSON.stringify(contracts));
+    const child = Bun.spawn(["bun", "--no-install", join(resources, "module-typecheck/check.ts"), join(resources, "external/files"), sdk], { stdout: "pipe", stderr: "pipe" });
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    if (code !== 0) throw new Error(`Module type check failed (exit ${code}): ${stdout.slice(-500)} ${stderr.slice(-500)}`);
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
 }
 
 if (import.meta.main) {

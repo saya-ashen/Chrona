@@ -16,7 +16,7 @@ function isExactLoopbackHost(host: string): boolean {
 }
 
 export type ChronaDoctorCheck = {
-  key: "git" | "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
+  key: "git" | "executionMode" | "database" | "databaseIntegrity" | "dataDirectoryPermissions" | "databasePermissions" | "databaseArtifactsPermissions" | "configDirectoryPermissions" | "configPermissions" | "runtimeLock" | "backupRestore" | "networkBind" | "apiProtection";
   status: "ok" | "warning" | "error";
   message: string;
 };
@@ -77,10 +77,21 @@ function artifactPermissionsCheck(databasePath: string): ChronaDoctorCheck {
     : { key: "databaseArtifactsPermissions", status: "warning", message: `Sensitive SQLite artifacts have permissions broader than owner-only: ${insecure.join(", ")}` };
 }
 
+function executionModeCheck(): ChronaDoctorCheck {
+  const mode = process.env.CHRONA_STEWARD_EXECUTION_MODE?.trim();
+  if (process.env.CHRONA_STEWARD_SANDBOX_BWRAP?.trim()) {
+    return { key: "executionMode", status: "error", message: "CHRONA_STEWARD_SANDBOX_BWRAP has been removed. Remove this setting and use trusted-local execution with host user permissions." };
+  }
+  if (mode && mode !== "trusted-local") {
+    return { key: "executionMode", status: "error", message: "CHRONA_STEWARD_EXECUTION_MODE supports only trusted-local; required-isolation has been removed. Remove the setting or explicitly set trusted-local to run with host user permissions." };
+  }
+  return { key: "executionMode", status: "ok", message: "Execution mode is trusted-local. Modules and Provider run with host user permissions, without OS isolation or a hard virtual-memory limit." };
+}
+
 export function inspectLocalChrona(): ChronaDoctorCheck[] {
   const git = spawnSync("git", ["--version"], { encoding: "utf8", timeout: 5_000, maxBuffer: 4096, windowsHide: true });
   const gitAvailable = git.status === 0 && /^git version /m.test(git.stdout);
-  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }];
+  const checks: ChronaDoctorCheck[] = [{ key: "git", status: gitAvailable ? "ok" : "error", message: gitAvailable ? "Git is available for module source repositories." : "Git is required for module source repositories. Install Git and make it available on the Chrona process PATH, then rerun chrona doctor." }, executionModeCheck()];
   const databaseUrl = configuredDatabaseUrl();
   const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
   if (!sqlitePath || sqlitePath === ":memory:") {

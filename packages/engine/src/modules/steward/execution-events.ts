@@ -1,4 +1,4 @@
-import { EXECUTION_EVENT_LIMITS as limits, type ExecutorFinal, type ExecutionEvent, type ExecutionRef, type ExecutionSnapshot } from "@chrona/contracts/steward";
+import { EXECUTION_EVENT_LIMITS as limits, type ExecutionFinal, type ExecutionEvent, type ExecutionRef, type ExecutionSnapshot } from "@chrona/contracts/steward";
 import { CallError } from "./module-calls";
 import { canonicalExecutionFinalDisplay } from "./execution-final-display";
 export { canonicalExecutionFinalDisplay } from "./execution-final-display";
@@ -67,7 +67,7 @@ export function executionWait(signal: AbortSignal | undefined, ms: number): Prom
   });
 }
 
-export function assertCanonicalExecutionFinalDisplay(final: Pick<ExecutorFinal, "finalMessage" | "outcome">) {
+export function assertCanonicalExecutionFinalDisplay(final: ExecutionFinal) {
   const canonical = canonicalExecutionFinalDisplay(final);
-  if (canonical.finalMessage?.text !== final.finalMessage?.text || canonical.outcome.error !== final.outcome.error) throw new CallError("invalid", "Final display fields must be normalized before digesting");
+  if (canonical.finalMessage?.text !== final.finalMessage?.text || canonical.error !== final.error) throw new CallError("invalid", "Final display fields must be normalized before digesting");
 }

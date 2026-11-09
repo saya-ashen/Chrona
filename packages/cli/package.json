@@ -7,6 +7,7 @@
     "chrona": "./src/index.ts"
   },
   "dependencies": {
+    "@chrona/workspaces": "workspace:*",
     "@chrona/db": "workspace:*",
     "@chrona/integrations": "workspace:*",
     "commander": "^15.0.0",

@@ -141,7 +141,7 @@ export async function captureWorkspaceChanges(cwd: string, baseline: ExecutionRe
 export async function captureExecutionChanges(ports: Pick<StewardPorts, "db">, runId: string): Promise<void> {
   const row = await ports.db.executionAttempt.findUnique({ where: { runId }, include: { run: true } });
   if (!row) return;
-  if (row.executorId !== "server" || row.resolvedCwd === null) throw new Error("Device changes must come from the verified remote final");
+  if (row.targetBinding || row.executorId !== "server" || row.resolvedCwd === null) throw new Error("Device changes must come from the verified remote final");
   const source = executionResultSourceSchema.parse(provenance(row));
   const ownsDirectory = row.queueExpiresAt ? row.heldDirectory !== null : row.heldDirectory === `execution:${row.runId}` || row.heldDirectory === row.resolvedCwd;
   const changes = ownsDirectory ? await captureWorkspaceChanges(row.resolvedCwd, source.baseline) : unavailable("capture_failed");

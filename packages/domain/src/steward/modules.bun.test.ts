@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { moduleScheduleSchema, grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
+import { grantedUses, DEFAULT_POLICY, moduleManifestSchema, moduleCallSchema, moduleEventReplySchema, scheduleSchema, chronaToolInputSchemas } from "@chrona/contracts/steward";
 import { decidePolicy } from "./policy";
 
 const manifest = {
   name: "price-watch", entry: "index.ts",
-  triggers: [{ id: "daily", schedule: { kind: "daily", time: "08:00" } }],
-  effects: ["network"], uses: ["notify.send", "provider.wake"], tests: ["test.ts"],
+  keepAlive: true,
+  effects: ["network"], uses: ["notify.send", "agent.run"], tests: ["test.ts"],
 };
 
 describe("module manifest contract", () => {
@@ -34,13 +34,13 @@ describe("module manifest contract", () => {
     expect(moduleManifestSchema.safeParse({ ...manifest, params: { threshold: { type, value } } }).success).toBe(false);
   });
   test.each([
-    { triggers: [manifest.triggers[0], manifest.triggers[0]] },
+    { triggers: [{ id: "daily", schedule: { kind: "daily", time: "08:00" } }, { id: "daily", schedule: { kind: "daily", time: "08:00" } }] },
     { effects: ["network", "network"] },
     { effects: ["shell"] }, { effects: Array(4).fill("network") },
     { name: "X" }, { entry: "../index.ts" }, { entry: "folder/index.ts" }, { entry: "index.js" },
     { tests: [] }, { tests: ["../test.ts"] }, { tests: Array(11).fill("test.ts") },
-    { triggers: [] }, { triggers: Array(11).fill(manifest.triggers[0]) },
-    { triggers: [{ ...manifest.triggers[0], extra: true }] },
+    { triggers: [] }, { triggers: Array(11).fill({ id: "daily", schedule: { kind: "daily", time: "08:00" } }) },
+    { triggers: [{ id: "daily", schedule: { kind: "daily", time: "08:00" }, extra: true }] },
     { triggers: [{ id: "daily", schedule: { kind: "every", minutes: 1 } }] },
     { params: { "bad key": { type: "number", value: 1 } } },
     { params: { threshold: { type: "number", value: 1, extra: true } } },
@@ -54,9 +54,9 @@ describe("module manifest contract", () => {
 
 const notify = { key: "price", level: "now", title: "Price changed", body: "New price" };
 describe("module channel contract", () => {
-  test("only routed calls cross the channel (v2-10): notify, wake and model are system interfaces", () => {
+  test("only routed application calls cross the channel", () => {
     expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "notify.send", args: notify, mode: "async", key: "price" } }).success).toBe(true);
-    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "provider.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
+    expect(moduleCallSchema.safeParse({ id: "1", method: "call", params: { target: "agent.complete", args: { prompt: "p", maxOutputTokens: 10 } } }).success).toBe(true);
     for (const method of ["notify", "wakeProvider", "model", "secret"]) expect(moduleCallSchema.safeParse({ id: "1", method, params: {} }).success).toBe(false);
   });
   test("event replies default result and cap it at 256 KiB serialized", () => {
@@ -73,29 +73,35 @@ describe("module channel contract", () => {
   ])("rejects invalid call %j", call => {
     expect(moduleCallSchema.safeParse({ id: "1", ...call }).success).toBe(false);
   });
-  test("secrets stand for the secrets interfaces; stored deprecated effects and removed fields parse into uses", () => {
+  test("secrets stand for the secrets interfaces without inferring other uses", () => {
     expect(grantedUses({ uses: ["files.read"], secrets: ["qq_bot"] }).sort()).toEqual(["files.read", "secrets.authorize", "secrets.get", "secrets.token"]);
-    const stored = moduleManifestSchema.parse({ name: "old", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: ["model", "wake_provider", "notify_user", "network"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 100 }, uses: ["files.read"], channel: "chrona_qqbot", dynamicSchedules: true });
-    expect(stored.effects).toEqual(["network"]);
-    expect(stored).not.toHaveProperty("channel");
-    expect(stored).not.toHaveProperty("dynamicSchedules");
-    expect([...stored.uses].sort()).toEqual(["files.read", "notify.send", "provider.complete", "provider.wake"]);
-    // v2-14: contributes is opaque JSON for the module it names, at most 32 KiB.
-    const base = { name: "mod", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [] };
-    expect(moduleManifestSchema.parse({ ...base, contributes: { events: { emits: [{ name: "updated" }] } } }).contributes).toEqual({ events: { emits: [{ name: "updated" }] } });
-    expect(moduleManifestSchema.safeParse({ ...base, contributes: { events: "x".repeat(33 * 1024) } }).success).toBe(false);
-    expect(moduleManifestSchema.safeParse({ ...base, contributes: { "Bad Name": 1 } }).success).toBe(false);
+    expect(moduleManifestSchema.parse(manifest).uses).toEqual(manifest.uses);
+  });
+  test.each([
+    { channel: "chrona_qqbot" }, { dynamicSchedules: true },
+    { settings: {} }, { healthCheck: false }, { healthCheck: true },
+    { contributes: { events: { emits: [{ name: "updated" }] } } },
+    { contributes: { events: "x".repeat(33 * 1024) } },
+    { contributes: { "Bad Name": 1 } },
+  ])("rejects retired manifest fields instead of normalizing %j", patch => {
+    const parsed = moduleManifestSchema.safeParse({ ...manifest, ...patch });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues).toContainEqual(expect.objectContaining({ code: "unrecognized_keys", keys: Object.keys(patch) }));
+  });
+  test.each(["model", "wake_provider", "notify_user"])("rejects retired effect %s instead of inferring uses", effect => {
+    expect(moduleManifestSchema.safeParse({ ...manifest, effects: [effect, "network"] }).success).toBe(false);
   });
 });
 
-test("module-owned timers validate bounded payloads without native scheduling tools; stored schedules remain readable", () => {
-  const input = { key: "check:daily", rule: { kind: "every" as const, minutes: 5 }, label: "Check", payload: { task: "Check" } };
-  expect(moduleScheduleSchema.parse(input)).toEqual(input);
-  for (const patch of [{ key: "bad key" }, { payload: "Check" }, { payload: { text: "x".repeat(4000) } }, { label: "" }, { command: "echo test" }, { mode: "wake" }, { text: "Check" }]) {
-    expect(moduleScheduleSchema.safeParse({ ...input, ...patch }).success).toBe(false);
-  }
+test("private stored schedules retain their record contract without native scheduling tools", () => {
   expect(Object.keys(chronaToolInputSchemas)).toEqual(["chrona_reply"]);
-  for (const mode of ["module", "wake"]) expect(scheduleSchema.safeParse({ rule: input.rule, text: "Check", label: input.label, id: "stored-schedule", originSessionId: null, moduleId: null, mode, until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" }).success).toBe(true);
+  for (const mode of ["module", "wake"] as const) {
+    const stored = { rule: { kind: "every", minutes: 5 }, text: "Check", label: "Check", id: "stored-schedule", originSessionId: null, moduleId: null, mode, until: null, status: "paused", nextAt: null, lastAt: null, lastResult: null, createdBy: "chrona", createdAt: "2026-10-20T00:00:00Z" } as const;
+    expect(scheduleSchema.parse(stored)).toEqual(stored);
+    for (const patch of [{ rule: { kind: "every", minutes: 0 } }, { mode: "job" }, { status: "unknown" }]) {
+      expect(scheduleSchema.safeParse({ ...stored, ...patch }).success).toBe(false);
+    }
+  }
 });
 
 test("module activation defaults to ask with its policy label", () => {

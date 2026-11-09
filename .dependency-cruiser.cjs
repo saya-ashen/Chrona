@@ -3,8 +3,8 @@
 // These enforce the package boundaries documented in AGENTS.md.
 //
 // Severity policy:
-//   error — boundaries that production (non-test) code already satisfies. A new
-//           violation is a regression and fails `bun run check`.
+//   error — enforced architectural boundaries. Tests, fixtures and types must
+//           comply wherever a rule applies; violations fail the boundary check.
 //   warn  — historical debt we tolerate but want visible: intra-package type
 //           cycles and test files reaching into another package's internals.
 //
@@ -19,6 +19,9 @@ const TEST = "(__tests__/|(?:^|/)test\\.ts$|\\.test\\.|\\.bun\\.test\\.|\\.spec\
 const ENGINE_PUBLIC = "^packages/engine/src/(index|engine|executor)\\.ts$";
 const ENGINE_TEST_PUBLIC = "^packages/engine/src/(index|engine|executor|test-support)\\.ts$";
 const DB_INTERNAL = "^packages/db/src/(generated/|db\\.ts$)";
+const AGENT = "^packages/engine/src/modules/steward/builtin/agent/";
+const AGENT_DEPENDENCIES =
+  `${AGENT}|^packages/(contracts|pi|logging)/|^packages/integrations/src/steward/module-sdk/|^node_modules/`;
 
 module.exports = {
   forbidden: [
@@ -28,6 +31,29 @@ module.exports = {
       severity: "error",
       from: {},
       to: { circular: true },
+    },
+
+    // --- S2: kernel and Agent are independent, including tests and fixtures ---
+    {
+      name: "kernel-never-imports-agent",
+      comment:
+        "Kernel steward files, system modules and server code use shared contracts; they cannot import any Agent implementation, type, manifest or test fixture.",
+      severity: "error",
+      from: {
+        path: "^(packages/engine/src/modules/steward/([^/]+\\.ts$|system/)|apps/server/)",
+      },
+      to: { path: AGENT },
+    },
+    {
+      name: "agent-stays-self-contained",
+      comment:
+        "The entire Agent directory may depend only on itself, contracts, Pi, logging, the chrona SDK, third-party packages and runtime builtins.",
+      severity: "error",
+      from: { path: AGENT },
+      to: {
+        pathNot: AGENT_DEPENDENCIES,
+        dependencyTypesNot: ["core"],
+      },
     },
 
     // --- packages/domain must stay pure (no IO, no framework, no app) --------
@@ -190,10 +216,13 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     exclude: {
-      path: "(node_modules|/generated/prisma/|dist|build|coverage|e2e|\\.worktrees)",
+      // Exclude output directories, while still checking sources such as build.ts.
+      path: "(^|/)(node_modules|generated/prisma|dist|build|coverage|e2e|\\.worktrees)/",
     },
     tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.json" },
+    // Honor installed-package semantics for the Agent's local file: closure.
+    webpackConfig: { fileName: ".dependency-cruiser-resolve.cjs" },
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "types"],

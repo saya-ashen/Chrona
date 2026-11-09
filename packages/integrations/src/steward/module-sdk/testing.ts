@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
+import { requireDescendantStop, spawnSupervised } from "./process";
 import { existsSync } from "node:fs";
-import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
-import { createServer, type Socket } from "node:net";
+import { readFile } from "node:fs/promises";
+import { createLoopbackChannel } from "./transport";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Trigger } from "./sdk";
@@ -22,10 +22,6 @@ async function effectReply(target: string, args: Record<string, unknown>, stubs:
     const listed = target === "secrets.authorize" || (manifest.secrets ?? []).some(secret => (typeof secret === "string" ? secret : secret.name) === String(args.name)), stub = findStub(stubs, target) ?? (target === "secrets.get" ? findStub(stubs, "secret") : undefined);
     return listed && stub ? { result: { output: await stub(args) } } : { error: { code: listed ? "unavailable" : "forbidden", message: "No secret in tests" } };
   }
-  if (target === "provider.complete") {
-    const stub = findStub(stubs, "provider.complete") ?? findStub(stubs, "model");
-    return { result: { output: stub ? await stub(args) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 } } };
-  }
   const stub = findStub(stubs, target);
   return { result: { output: stub ? await stub(args) ?? null : null } };
 }
@@ -33,7 +29,7 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
   if (call.method === "callStatus") return { result: { callId: String(call.params.callId), status: "queued" } };
   const target = String(call.params.target), args = (call.params.args ?? {}) as Record<string, unknown>;
   if (target.startsWith("agent.") && !findStub(stubs, target)) {
-    const result = await agentReply(target, args, stubs, completions);
+    const result = await agentReply(target, args, completions);
     if (result) return result;
   }
   if (call.params.mode === "async") {
@@ -45,76 +41,79 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
   return effectReply(target, args, stubs, manifest);
 }
 /**
- * Fake kernel for author tests. No call ever executes a real external effect. Routed calls (`chrona.call`, and the SDK
- * shorthands notify, wakeProvider, model, secret) answer from `stubs["<module>.<tool>"]` (sync: its
- * value is the output; `stubs.model` / `stubs.secret` also work) or with a queued call.
+ * Fake kernel for author tests. No call ever executes a real external effect. Routed calls answer from
+ * `stubs["<module>.<tool>"]` (sync: its value is the output), built-in Agent fixtures, or a queued call.
+ * `stubs.secret` also supplies secrets.get.
  */
 export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
-  const dir = await mkdtemp("/tmp/ct-");
-  await chmod(dir, 0o700);
-  const path = join(dir, "s"), calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
-  let socket: Socket | undefined, closed = false;
+  const calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
+  let closed = false;
   const pending = new Map<string, { resolve(reply: Reply): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
-  let connect!: () => void, disconnect!: (error: Error) => void;
-  const ready = new Promise<void>((resolve, reject) => { connect = resolve; disconnect = reject; });
-  void ready.catch(() => {});
-  function fail() {
+  function fail(error = new Error("Module disconnected")) {
     closed = true;
-    const error = new Error("Module disconnected");
-    disconnect(error);
     for (const request of pending.values()) { clearTimeout(request.timer); request.reject(error); }
     pending.clear();
   }
-  async function line(text: string) {
-    const message = JSON.parse(text);
-    if (typeof message.method === "string") {
-      const call = message as Call;
+  async function message(value: unknown) {
+    if (typeof value !== "object" || value === null || !("id" in value) || typeof value.id !== "string") throw new Error("Invalid module message");
+    if ("method" in value && typeof value.method === "string") {
+      const call = value as Call;
       calls.push(call);
       const reply = await callReply(call, stubs, manifest, seen, completions);
-      socket?.write(JSON.stringify({ id: call.id, ...reply as object }) + "\n");
+      channel.send({ id: call.id, ...reply as object });
       return;
     }
-    const request = pending.get(message.id);
-    if (request) { pending.delete(message.id); clearTimeout(request.timer); request.resolve(message); }
+    const request = pending.get(value.id);
+    if (request) { pending.delete(value.id); clearTimeout(request.timer); request.resolve(value as Reply); }
   }
-  const server = createServer(client => {
-    if (socket || closed) { client.destroy(); return; }
-    socket = client;
-    let buffer = "";
-    client.on("data", chunk => {
-      buffer += chunk.toString();
-      let end: number;
-      while ((end = buffer.indexOf("\n")) >= 0) {
-        if (end > 32 * 1024 * 1024) { client.destroy(); return; }
-        const text = buffer.slice(0, end); buffer = buffer.slice(end + 1);
-        void line(text).catch(() => client.destroy());
-      }
-      if (buffer.length > 32 * 1024 * 1024) client.destroy();
-    });
-    client.on("error", fail); client.on("close", fail); connect();
+  const channel = await createLoopbackChannel({
+    onMessage(value) { void message(value).catch(() => { void channel.close(); }); },
+    onDisconnect: fail,
   });
-  try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(path, resolve); }); }
-  catch (error) { await rm(dir, { recursive: true, force: true }); throw error; }
-  const httpSocket = join(dir, "http");
-  // Child processes do not inherit the parent's SDK preload for external release directories.
-  const loader = join(import.meta.dirname, "..", "chrona-sdk-loader.ts");
-  const child = spawn(process.execPath, ["--no-install", ...(existsSync(loader) ? ["--preload", loader] : []), entry], { env: { ...process.env, CHRONA_SOCKET: path, CHRONA_HTTP_SOCKET: httpSocket }, stdio: "ignore" });
-  const exited = new Promise<void>(resolve => { child.once("error", () => { fail(); resolve(); }); child.once("close", () => { fail(); resolve(); }); });
+  // The release ships this static loader with the SDK. A trusted launcher may
+  // supply its own preload path; a child never inherits Bun's preload flags.
+  const loader = process.env.CHRONA_SDK_LOADER ?? join(import.meta.dirname, "chrona-sdk-loader.ts");
+  let task: ReturnType<typeof spawnSupervised>;
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CHRONA_SDK: process.env.CHRONA_SDK ?? import.meta.dirname, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token };
+    delete env.CHRONA_SOCKET; delete env.CHRONA_HTTP_SOCKET;
+    task = spawnSupervised(process.execPath, ["--no-install", ...(process.env.CHRONA_SDK_LOADER || existsSync(loader) ? ["--preload", loader] : []), entry], { env });
+    task.process.stdin.end();
+    task.process.stdout.resume(); task.process.stderr.resume();
+  } catch (error) { await channel.close(); throw error; }
+  const exited = task.exited.then(requireDescendantStop).then(async () => {
+    fail(); await channel.close();
+  }).catch(error => { fail(error); throw error; });
+  // Tests may only use send()/stop(). Keep a natural unknown exit observable by
+  // those methods without an unhandled rejection or releasing its resources.
+  void exited.catch(() => {});
   let queue: Promise<unknown> = Promise.resolve();
   return {
     calls,
-    /** Where `chrona.serve` listens: `fetch("http://module/...", { unix: httpSocket })`. */
-    httpSocket,
+    /** Rejects if descendant shutdown cannot be confirmed. */
+    exited,
+    /** Resolves only after the authenticated module reports its private HTTP listener. */
+    httpReady: channel.httpReady,
+    /** Fetch a path at the module's listener, with its private transport credential. Redirects stay manual. */
+    async fetch(path: string, options: RequestInit = {}): Promise<Response> {
+      const { endpoint, token } = await channel.httpReady;
+      const url = new URL(path, endpoint);
+      if (!path.startsWith("/") || url.origin !== endpoint) throw new Error("Module fetch requires a local path");
+      const headers = new Headers(options.headers);
+      headers.delete("authorization"); headers.delete("cookie");
+      headers.set("x-chrona-module-token", token);
+      return globalThis.fetch(url, { ...options, headers, redirect: "manual" });
+    },
     send(event: Event): Promise<Reply> {
       const run = queue.then(() => new Promise<Reply>((resolve, reject) => {
         const id = randomUUID();
         const timer = setTimeout(() => { pending.delete(id); reject(new Error("Module event timeout")); }, 5000);
         pending.set(id, { resolve, reject, timer });
-        void ready.then(() => {
+        void channel.ready.then(() => {
           if (closed) throw new Error("Module disconnected");
           if (pending.has(id)) {
-            socket!.write(JSON.stringify({ id, event }) + "\n");
+            channel.send({ id, event });
           }
         }).catch(error => { pending.delete(id); clearTimeout(timer); reject(error); });
       }));
@@ -122,26 +121,20 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
       return run;
     },
     async stop() {
-      fail(); child.kill("SIGKILL"); socket?.destroy();
+      fail(); task.stop();
       await exited;
-      await new Promise<void>(resolve => server.close(() => resolve()));
-      await rm(dir, { recursive: true, force: true });
     },
   };
 }
 
-async function agentReply(target: string, args: Record<string, unknown>, stubs: Record<string, Stub>, completions: Map<string, unknown>) {
+async function agentReply(target: string, args: Record<string, unknown>, completions: Map<string, unknown>) {
   if ((target === "agent.context" || target === "agent.run")) {
     const key = `${target}:${String(args["request-key"])}`;
     return { result: { output: target === "agent.context" ? { contextId: key } : { contextId: args["context-id"], runId: key, status: "queued", active: true } } };
   }
   if (target === "agent.complete") {
-    const operationId = String(args["command-key"]), previous = completions.get(operationId);
-    if (!previous) {
-      const stub = findStub(stubs, "model");
-      const input = { prompt: args.prompt, ...(args.system === undefined ? {} : { system: args.system }), maxOutputTokens: args["max-output-tokens"] };
-      completions.set(operationId, stub ? await stub(input) : { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
-    }
+    const operationId = String(args["command-key"]);
+    if (!completions.has(operationId)) completions.set(operationId, { text: "Chrona test model response", inputTokens: 0, outputTokens: 0 });
     return { result: { output: { operationId } } };
   }
   if (target === "agent.completion") return { result: { output: { result: completions.get(String(args["operation-id"])) ?? null, failure: !completions.has(String(args["operation-id"])) } } };

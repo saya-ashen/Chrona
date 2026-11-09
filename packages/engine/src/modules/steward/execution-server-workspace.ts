@@ -1,13 +1,13 @@
 import { isAbsolute, normalize } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { executionStartV2Schema, type ExecutionProjectGrantP2 } from "@chrona/contracts/steward";
+import { executionStartV2Schema, type LocalExecutionProjectGrant } from "@chrona/contracts/steward";
 import type { PreparedServerWorkspace, ServerWorkspaceRequest } from "./ports";
 import { executionBaseline, executionDigest, executionPrincipal } from "./execution-state";
 import { CallError } from "./module-calls";
 
 type Attempt = Prisma.ExecutionAttemptGetPayload<{ include: { run: true } }>;
 export type ServerClaimPreparation = { request: ServerWorkspaceRequest; prepared: PreparedServerWorkspace; admissionDigest: string };
-export function serverClaimRequest(row: Attempt, grant: Extract<ExecutionProjectGrantP2, { executor: "server" }>): ServerWorkspaceRequest {
+export function serverClaimRequest(row: Attempt, grant: LocalExecutionProjectGrant): ServerWorkspaceRequest {
   if (!row.queueExpiresAt || !row.workspaceRef) throw new CallError("unavailable", "Stored server workspace binding is missing");
   const parsed = executionStartV2Schema.safeParse({ kind: "execution", workId: row.workId, commandKey: row.commandKey, goal: row.run.prompt,
     placement: { executorId: row.executorId, projectRef: row.projectRef, mappingRevision: row.mappingRevision },

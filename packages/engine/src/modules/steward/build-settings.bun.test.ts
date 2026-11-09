@@ -1,9 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { settingsOutput } from "./system-outputs";
-import { buildGovernanceSchema } from "@chrona/contracts/steward";
 import { createBuildGovernance } from "./build-governance";
-import { createSettings } from "./settings";
+import { createSettings, kernelSettingsSchema } from "./settings";
 import { createRuns } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
@@ -20,11 +18,14 @@ async function fixture(at = "2026-10-25T16:00:00Z") {
   return { db, ports, workspaceId, settings, builds };
 }
 
-test("existing workspaces get 20/60/5; partial owner edits persist without losing unrelated settings", async () => {
+test("internal build governance defaults to 20/60/5; partial edits preserve unrelated settings", async () => {
   const f = await fixture(), before = await f.builds().get();
   expect(before.builds).toEqual({ dailyLimit: 20, timeoutMinutes: 60, maxSubmissions: 5 });
-  expect(buildGovernanceSchema.safeParse(before).success).toBe(true);
-  expect(settingsOutput.safeParse(await f.settings().get()).success).toBe(true);
+  expect(before.buildUsage).toEqual({ date: "2026-10-26", timezone: "Asia/Shanghai", used: 0, remaining: 20 });
+  const kernelSettings = await f.settings().get();
+  expect(kernelSettingsSchema.safeParse(kernelSettings).success).toBe(true);
+  expect(kernelSettings).not.toHaveProperty("builds");
+  expect(kernelSettings).not.toHaveProperty("buildUsage");
   const saved = await f.builds().update({ dailyLimit: 30 });
   expect(saved.builds).toEqual({ dailyLimit: 30, timeoutMinutes: 60, maxSubmissions: 5 });
   expect((await f.builds().get()).builds).toEqual(saved.builds);
@@ -37,6 +38,16 @@ test("existing workspaces get 20/60/5; partial owner edits persist without losin
   expect(await f.db.audit.findFirst({ where: { kind: "settings_updated" } })).not.toBeNull();
 });
 
+test("kernel settings reject application authoring policy atomically", async () => {
+  const f = await fixture();
+  const before = await f.settings().get();
+  const stored = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings;
+  await expect(f.settings().update({ builds: { dailyLimit: 30 } })).rejects.toMatchObject({ code: "invalid" });
+  expect(await f.settings().get()).toEqual(before);
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toEqual(stored);
+  expect(await f.db.audit.count({ where: { kind: "settings_updated" } })).toBe(0);
+});
+
 for (const builds of [
   { dailyLimit: -1 }, { dailyLimit: 201 }, { dailyLimit: 1.5 },
   { timeoutMinutes: 4 }, { timeoutMinutes: 121 }, { timeoutMinutes: "60" },
@@ -46,7 +57,7 @@ for (const builds of [
   const f = await fixture();
   await expect(f.builds().update(builds)).rejects.toMatchObject({ code: "invalid" });
   expect((await f.settings().get()).timezone).toBe("Asia/Shanghai");
-  expect(await f.db.audit.count({ where: { kind: "settings_updated" } })).toBe(0);
+  expect(await f.db.audit.count({ where: { kind: { in: ["settings_updated", "build_settings_updated"] } } })).toBe(0);
 });
 
 for (const c of [

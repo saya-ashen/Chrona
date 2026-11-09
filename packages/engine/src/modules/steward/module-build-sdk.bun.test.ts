@@ -9,30 +9,33 @@ import { moduleContext, type ContinuityReport, type TestReport } from "./module-
 import { testDb } from "./test-db";
 import { notices } from "./test-notices";
 
-const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
-(sandbox.health.available ? test : test.skip)("SDK author helpers, startup and copied-data continuity run without business probes", async () => {
+const sandbox = createScriptSandbox({  });
+(sandbox.health.available ? test : test.skip)("SDK routed calls, startup and copied-data continuity run without business probes", async () => {
   const dir = await mkdtemp("/tmp/cb-sdk-"), db = testDb();
   try {
-    const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir: dir });
+    const runtime = createScriptSandbox({ dataDir: dir });
     const code = join(dir, "platform/store/sdk"); await mkdir(code, { recursive: true });
     const manifest = moduleManifestSchema.parse({ name: "sdk-check", entry: "index.ts", tests: ["test.ts"], effects: [], uses: ["notify.send", "agent.complete", "agent.completion"], model: { tier: "fast", maxCalls: 1, maxOutputTokens: 20 }, data: { schema: 2, migrate: "migrate.ts" },
-      triggers: [{ id: "daily", schedule: { kind: "every", minutes: 5 } }],
-      tools: [{ name: "lookup", description: "Lookup", parameters: { type: "object", properties: {} } }] });
+      keepAlive: true,
+      tools: [{ name: "lookup", description: "Lookup", idempotent: true, parameters: { type: "object", properties: {} } }] });
     await writeFile(join(code, "module.json"), JSON.stringify(manifest));
     await writeFile(join(code, "index.ts"), `
 import { on, chrona } from 'chrona';
 import { existsSync, readFileSync } from 'node:fs';
-on('schedule', async ev => {
+on('tool', async ev => {
+  if (ev.id !== 'lookup') throw new Error('unexpected tool');
   const state = chrona.paths.data + '/state';
   if (existsSync(state) && readFileSync(state, 'utf8') !== 'migrated') throw new Error('migration missing');
-  const completion = await chrona.model({ prompt: 'Never send this to a real model', maxOutputTokens: 20 });
-  if (!['Chrona test model response', 'Stub summary'].includes(completion.text)) throw new Error('unexpected model response');
-  const params = { key: 'daily:' + ev.firedAt, level: 'now', title: 'Build', body: completion.text };
-  await chrona.notify(params);
-  if ((await chrona.notify(params)).status !== 'duplicate') throw new Error('dedup missing');
-  if ((await chrona.wakeProvider({ key: 'no', prompt: 'No execution' })).status !== 'executed') throw new Error('missing stub reply');
+  const key = ev.id + ':' + ev.firedAt;
+  const started = await chrona.call('agent.complete', { 'command-key': key, prompt: 'Never send this to a real model', 'max-output-tokens': 20 });
+  if ((await chrona.call('agent.complete', { 'command-key': key, prompt: 'Never send this to a real model', 'max-output-tokens': 20 })).operationId !== started.operationId) throw new Error('completion receipt changed');
+  const completion = await chrona.call('agent.completion', { 'operation-id': started.operationId });
+  if (completion.failure || !completion.result) throw new Error('completion failed or unconfirmed');
+  if (!['Chrona test model response', 'Stub summary'].includes(completion.result.text)) throw new Error('unexpected model response');
+  const params = { key, level: 'now', title: 'Build', body: completion.result.text };
+  await chrona.call('notify.send', params, { mode: 'async', key });
+  if (!(await chrona.call('notify.send', params, { mode: 'async', key })).duplicate) throw new Error('dedup missing');
 });
-on('tool', () => ({ result: 'tool answered' }));
 `);
     await writeFile(join(code, "migrate.ts"), `import { writeFileSync } from 'node:fs'; writeFileSync(process.env.CHRONA_DATA + '/state', 'migrated');`);
     await writeFile(join(code, "test.ts"), `
@@ -40,22 +43,25 @@ import { startModule } from 'chrona/testing';
 import { strict as assert } from 'node:assert';
 import { writeFileSync } from 'node:fs';
 if (${runtime.health.isolated}) for (const path of ['/node_modules/chrona/sdk.ts', '/node_modules/chrona/testing.ts']) assert.throws(() => writeFileSync(path, 'changed'));
-const module = await startModule('index.ts', { stubs: { model: () => ({ text: 'Stub summary', inputTokens: 1, outputTokens: 2 }) } });
+const module = await startModule('index.ts', { stubs: {
+  'agent.complete': args => ({ operationId: args['command-key'] }),
+  'agent.completion': () => ({ result: { text: 'Stub summary', inputTokens: 1, outputTokens: 2 }, failure: false }),
+} });
 try {
   const now = '2026-10-21T04:00:00.000Z';
-  const reply = await module.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
+  const reply = await module.send({ trigger: { kind: 'tool', id: 'lookup', args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(module.calls.length, 6);
-  assert.equal(module.calls[2].params.args.body, 'Stub summary');
-  assert.equal(module.calls[4].params.target, 'agent.context');
-  assert.equal(module.calls[5].params.target, 'agent.run');
+  assert.deepEqual(module.calls.map(call => call.params.target), ['agent.complete', 'agent.complete', 'agent.completion', 'notify.send', 'notify.send']);
+  assert.deepEqual(module.calls[0].params.args, module.calls[1].params.args);
+  assert.equal(module.calls[3].params.args.body, 'Stub summary');
+  assert.equal(module.calls[3].params.key, 'lookup:' + now);
 } finally { await module.stop(); }
 const defaultModule = await startModule('index.ts');
 try {
   const now = '2026-10-21T04:00:00.000Z';
-  const reply = await defaultModule.send({ trigger: { kind: 'schedule', id: 'daily', firedAt: now }, now, params: {} });
+  const reply = await defaultModule.send({ trigger: { kind: 'tool', id: 'lookup', args: {}, firedAt: now }, now, params: {} });
   assert.equal(reply.error, undefined);
-  assert.equal(defaultModule.calls[2].params.args.body, 'Chrona test model response');
+  assert.equal(defaultModule.calls[3].params.args.body, 'Chrona test model response');
 } finally { await defaultModule.stop(); }
 `);
     const workspace = await db.workspace.create({ data: { name: "build checks" } });

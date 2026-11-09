@@ -1,0 +1,17 @@
+{
+  "name": "@chrona/remote-device",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "chrona-remote-device": "dist/chrona-remote-device" },
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build": "bun scripts/build.ts", "smoke:build": "bun scripts/smoke-build.ts", "test": "bun test src", "typecheck": "tsc --noEmit -p tsconfig.json" },
+  "dependencies": {
+    "@chrona/pi": "workspace:*",
+    "@chrona/remote-model": "workspace:*",
+    "@chrona/process": "workspace:*",
+    "@chrona/workspaces": "workspace:*",
+    "@chrona/contracts": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

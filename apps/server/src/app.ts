@@ -5,7 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 
 import { createApiRouter } from "./routes/api";
-import { createExecutorRouter, isExecutorPath, isExecutorOwnerPath } from "./executor-router";
+import { createRemoteExecutionRouter, isRemoteExecutionDevicePath, isRemoteExecutionOwnerPath } from "./remote-execution-router";
 import { completeOAuth, OAUTH_CALLBACK_PATH } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
@@ -32,15 +32,17 @@ function resolveOrigin(origin: string | undefined, allowed: string[]) {
   return allowed.includes(origin) ? origin : null;
 }
 
-/** Forwards a request to a module's HTTP socket without the user's credentials (v2-4 `listen`). */
-async function proxy(socket: string, request: Request) {
+/** Forwards a request to a module's authenticated HTTP endpoint without the user's credentials (v2-4 `listen`). */
+async function proxy(endpoint: { endpoint: string; token: string }, request: Request) {
   const url = new URL(request.url), headers = new Headers(request.headers);
   headers.delete("authorization");
   headers.delete("cookie");
+  headers.set("x-chrona-module-token", endpoint.token);
   try {
-    const response = await fetch(`http://module${url.pathname}${url.search}`, { unix: socket, method: request.method, headers, body: request.body, redirect: "manual", signal: request.signal });
+    const response = await fetch(`${endpoint.endpoint}${url.pathname}${url.search}`, { method: request.method, headers, body: request.body, redirect: "manual", signal: request.signal });
     const out = new Headers(response.headers);
     out.delete("set-cookie");
+    out.delete("x-chrona-module-token");
     return new Response(response.body, { status: response.status, headers: out });
   } catch {
     return Response.json({ code: "MODULE_UNAVAILABLE" }, { status: 503 });
@@ -92,19 +94,12 @@ export async function createServerApp(options: { steward?: StewardRuntime } = {}
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/editor/*", async (c, next) => {
-    if (!readEnv().API_KEY?.trim()) return c.json({ code: "EDITOR_AUTH_UNCONFIGURED" }, 503);
-    await next();
-  });
   app.use("/api/*", async (c, next) => {
-    if (isExecutorOwnerPath(c.req.path, c.req.method)) {
-      c.header("Cache-Control", "no-store");
-      if (!readEnv().API_KEY?.trim()) return c.json({ code: "EXECUTOR_OWNER_AUTH_UNCONFIGURED" }, 503);
-    }
+    if (isRemoteExecutionOwnerPath(c.req.path, c.req.method) && !readEnv().API_KEY?.trim()) return c.json({ code: "REMOTE_EXECUTION_OWNER_AUTH_UNCONFIGURED" }, 503);
     await next();
   });
-  app.use("/api/*", apiKeyAuth({ isExempt: (path, method) => isStewardAgentPath(path, method) || isExecutorPath(path, method) }));
-  app.route("/", createExecutorRouter(steward.ports));
+  app.use("/api/*", apiKeyAuth({ isExempt: (path, method) => isStewardAgentPath(path, method) || isRemoteExecutionDevicePath(path, method) }));
+  app.route("/", createRemoteExecutionRouter(steward.ports));
   app.use(
     "/api/*",
     bodyLimit({

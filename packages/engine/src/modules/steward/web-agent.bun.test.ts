@@ -2,9 +2,9 @@ import { expect, test } from "bun:test";
 import { cp, readFile, mkdir, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { agentFixture } from "./agent-application.fixtures";
+import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { callSync, kernelOrigin } from "./module-calls";
-import { createAgentConversations } from "./builtin/web/agent-conversations";
+import { createAgentConversations } from "./external/web/agent-conversations";
 import { createRuns } from "./runs";
 
 test("attachment ownership uses the complete private journal, not the recent message window", async () => {
@@ -28,7 +28,7 @@ test("Web owns persisted conversations while actual Agent SDK admits scoped and 
   try {
     await f.ports.db.run.delete({ where: { id: "agent-run" } });
     for (const name of ["web", "notify"]) {
-      const source = join(import.meta.dir, "builtin", name), hash = `web-agent-${name}`;
+      const source = join(import.meta.dir, "external", name), hash = `web-agent-${name}`;
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await cp(source, join(f.ports.dataDir, "platform/store", hash), { recursive: true });
       const module = await f.ports.db.module.update({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } }, data: { activeHash: hash } });

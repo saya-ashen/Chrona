@@ -2,15 +2,15 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, join, normalize } from "node:path";
 import { z } from "zod";
 import { CallError } from "@chrona/engine";
-import { executionIdSchema, executionHostBaselineSchema, executionProjectGrantP2Schema, type ExecutionPrincipal, type ExecutionProjectGrant, type ExecutionProjectGrantP2, type WorkPlacement } from "@chrona/contracts/steward";
+import { executionIdSchema, executionHostBaselineSchema, localExecutionProjectGrantSchema, type ExecutionPrincipal, type ExecutionProjectGrant, type LocalExecutionProjectGrant, type WorkPlacement } from "@chrona/contracts/steward";
 
 const projectSchema = z.object({
   workspaceId: executionIdSchema, ownerId: executionIdSchema, moduleId: executionIdSchema,
   projectRef: executionIdSchema, canonicalPath: z.string().min(1).refine(path => isAbsolute(path) && normalize(path) === path, "Expected normalized absolute host path"),
   baseline: executionHostBaselineSchema,
 }).strict();
-const placementSchema = z.object({ workspaceId: executionIdSchema, ownerId: executionIdSchema, moduleId: executionIdSchema, grant: executionProjectGrantP2Schema }).strict()
-  .refine(value => value.grant.executor === "server" ? isAbsolute(value.grant.canonicalPath) && normalize(value.grant.canonicalPath) === value.grant.canonicalPath : value.grant.executorId !== "server", "Invalid executor mapping");
+const placementSchema = z.object({ workspaceId: executionIdSchema, ownerId: executionIdSchema, moduleId: executionIdSchema, grant: localExecutionProjectGrantSchema }).strict()
+  .refine(value => isAbsolute(value.grant.canonicalPath) && normalize(value.grant.canonicalPath) === value.grant.canonicalPath, "Invalid local execution mapping");
 const configSchema = z.object({ projects: z.array(projectSchema).max(100), placements: z.array(placementSchema).max(100).optional() }).strict();
 
 /** Owner-only <dataDir>/execution-projects.json. Parsing never scans, opens or authorizes a project directory. */
@@ -30,7 +30,7 @@ export function parseExecutionProjects(raw: unknown) {
   };
 }
 
-/** P2 resolver is separate from v1; loading a device grant never authorizes local stat/read/write. */
+/** Local placements are owner configured; remote application placements use kernel authority approvals. */
 export function parseExecutionPlacements(raw: unknown) {
   const { placements = [] } = configSchema.parse(raw);
   const keys = new Set<string>();
@@ -39,7 +39,7 @@ export function parseExecutionPlacements(raw: unknown) {
     if (keys.has(key)) throw new Error("Duplicate P2 project mapping");
     keys.add(key);
   }
-  const resolve = async (principal: ExecutionPrincipal, placement: WorkPlacement): Promise<ExecutionProjectGrantP2> => {
+  const resolve = async (principal: ExecutionPrincipal, placement: WorkPlacement): Promise<LocalExecutionProjectGrant> => {
     const item = placements.find(item => item.workspaceId === principal.workspaceId && item.ownerId === principal.ownerId
       && principal.caller.kind === "module" && item.moduleId === principal.caller.moduleId
       && item.grant.executorId === placement.executorId && item.grant.projectRef === placement.projectRef && item.grant.mappingRevision === placement.mappingRevision);

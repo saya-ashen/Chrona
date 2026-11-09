@@ -18,7 +18,7 @@ async function scopedAttempt(tx: Prisma.TransactionClient, principal: ExecutionP
   return rows[0]!;
 }
 async function online(ports: StewardPorts, tx: Prisma.TransactionClient, executorId: string) {
-  return executorId === "server" || !!await ports.executorAdmission?.online(tx, { executorId, now: ports.now() });
+  return executorId === "server";
 }
 async function placement(ports: StewardPorts, principal: ExecutionPrincipal, workId: string) {
   return ports.db.$transaction(async tx => {

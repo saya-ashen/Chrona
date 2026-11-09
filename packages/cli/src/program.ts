@@ -1,4 +1,3 @@
-import { registerExecutorCommands } from "./executor-commands";
 import { Command } from "commander";
 import { join, resolve } from "node:path";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
@@ -7,7 +6,7 @@ import { getChronaDataDir } from "./start-server.js";
 import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
 
 export type StartCommandOptions = { host?: string; port?: string; open?: boolean };
-type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void> };
+type CreateProgramOptions = { startServer?: (options: StartCommandOptions) => Promise<void>; adminBuild?: (file: string) => Promise<unknown> };
 
 export function createProgram(options: CreateProgramOptions = {}): Command {
   const program = new Command().name("chrona").description("Chrona personal steward").version(cliPackage.version);
@@ -48,7 +47,10 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     });
   const admin = program.command("admin").description("Local recovery administration (only build invokes the Provider)");
   admin.command("build <request-file>").description("Run one explicitly authorized bounded module build while the service is stopped; never activates it")
-    .action(async (file: string) => { const { adminBuild } = await import("./admin-build"); await adminBuild(file); });
+    .action(async (file: string) => {
+      if (!options.adminBuild) throw new Error("chrona admin build is only available in packaged Chrona binaries.");
+      await options.adminBuild(file);
+    });
   admin.command("legacy <request-file>").description("Export, verify or explicitly delete selected legacy conversations while the service is stopped")
     .action(async (file: string) => { const { adminLegacy } = await import("./admin-legacy"); await adminLegacy(file); });
   admin.command("modules").description("List modules and versions").action(async () => { await (await import("./admin")).runAdmin("modules"); });
@@ -61,6 +63,8 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   admin.command("approvals").description("List pending approvals, including rescue-only items").action(async () => { await (await import("./admin")).runAdmin("approvals"); });
   admin.command("rollback <module> <hash>").description("Roll back an approved module version").action(async (module: string, hash: string) => { await (await import("./admin")).runAdmin("rollback", [module, hash]); });
   admin.command("disable <module>").description("Pause a module").action(async (module: string) => { await (await import("./admin")).runAdmin("disable", [module]); });
+  admin.command("remove <module>").description("Request app and data removal while the service is stopped; requires separate admin approve")
+    .action(async (module: string) => { await (await import("./admin")).runAdmin("remove", [module]); });
   for (const command of ["approve", "reject"] as const) admin.command(`${command} <approvalId>`).description(`${command} a pending approval`).action(async (id: string) => { await (await import("./admin")).runAdmin(command, [id]); });
   admin.command("secret-set <name>").description("Save a module credential from a JSON object on stdin (never echoed)").action(async (name: string) => { await (await import("./admin")).setSecret(name, await Bun.stdin.text()); });
   admin.command("secret-remove <name>").description("Delete a saved module credential").action(async (name: string) => { await (await import("./admin")).removeSecret(name); });
@@ -73,6 +77,5 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       const { qqBindCode } = await import("./admin");
       console.log(JSON.stringify(await qqBindCode({ workspace: input.workspace, ttlMinutes: Number(input.ttl), replace: Boolean(input.replace) })));
     });
-  registerExecutorCommands(program);
   return program;
 }

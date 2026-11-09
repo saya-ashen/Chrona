@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { executionStartV2Schema, executionProjectGrantP2Schema, workCleanupInputSchema, workCleanupReceiptSchema, workWorkspaceSchema, executionSourceReceiptSchema, executionChangesSchema } from "@chrona/contracts/steward";
+import { executionStartV2Schema, localExecutionProjectGrantSchema, workCleanupInputSchema, workCleanupReceiptSchema, workWorkspaceSchema, executionSourceReceiptSchema, executionChangesSchema } from "@chrona/contracts/steward";
 import { z } from "zod";
 import type { StewardPorts, ServerWorkspaceRequest, PreparedServerWorkspace } from "./ports";
 import { CallError, registerLocalModule } from "./module-calls";
@@ -9,7 +9,7 @@ import { captureExecutionChanges, readExecutionChanges } from "./execution-resul
 import { captureRunFile } from "./workspace-files";
 
 const principalSchema = z.object({ workspaceId: z.string().min(1), ownerId: z.string().min(1), caller: z.discriminatedUnion("kind", [z.object({ kind: z.literal("owner") }).strict(), z.object({ kind: z.literal("module"), moduleId: z.string().min(1), hash: z.string().min(1) }).strict()]) }).strict();
-const requestSchema = z.object({ principal: principalSchema, input: executionStartV2Schema, grant: executionProjectGrantP2Schema, attemptId: z.string().uuid(), workspaceRef: z.string().uuid(), phase: z.enum(["admission", "claim"]) }).strict().refine(value => value.grant.executor === "server", "Server grant required");
+const requestSchema = z.object({ principal: principalSchema, input: executionStartV2Schema, grant: localExecutionProjectGrantSchema, attemptId: z.string().uuid(), workspaceRef: z.string().uuid(), phase: z.enum(["admission", "claim"]) }).strict();
 const preparedSchema = z.object({ lockId: z.string().uuid(), bindingDigest: z.string(), cwd: z.string(), projectDirectoryIdentity: z.string(), workspaceDirectoryIdentity: z.string(), workspace: workWorkspaceSchema, sourceReceipt: executionSourceReceiptSchema.nullable(), verifiedAt: z.string().datetime({ offset: true }) }).strict();
 const locks = new WeakMap<StewardPorts, Map<string, { workspaceId: string; prepared: PreparedServerWorkspace }>>();
 function held(ports: StewardPorts) {

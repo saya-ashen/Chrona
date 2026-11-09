@@ -1,0 +1,30 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@chrona/builtin-agent",
+      "dependencies": {
+        "@chrona/contracts": "file:vendor/@chrona/contracts",
+        "@chrona/logging": "file:vendor/@chrona/logging",
+        "@chrona/pi": "file:vendor/@chrona/pi",
+        "zod": "file:vendor/zod",
+      },
+    },
+  },
+  "packages": {
+    "@chrona/contracts": ["@chrona/contracts@file:vendor/@chrona/contracts", { "dependencies": { "zod": "file:../../zod" } }],
+
+    "@chrona/logging": ["@chrona/logging@file:vendor/@chrona/logging", {}],
+
+    "@chrona/pi": ["@chrona/pi@file:vendor/@chrona/pi", { "dependencies": { "@chrona/contracts": "file:../contracts", "zod": "file:../../zod" } }],
+
+    "zod": ["zod@file:vendor/zod", {}],
+
+    "@chrona/contracts/zod": ["zod@file:vendor/zod", {}],
+
+    "@chrona/pi/@chrona/contracts": ["@chrona/contracts@file:vendor/@chrona/contracts", {}],
+
+    "@chrona/pi/zod": ["zod@file:vendor/zod", {}],
+  }
+}

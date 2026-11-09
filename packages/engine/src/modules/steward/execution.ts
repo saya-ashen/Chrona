@@ -8,10 +8,10 @@ import { CallError } from "./module-calls";
 import { createRuns, createRunSession, liveRuns } from "./runs";
 import { createProviderControl, validateExecutionAnswer } from "./provider-channel";
 import { assertExecutionPrincipal } from "./execution-principal";
-import { reserveDeviceCommandIn } from "./execution-control-budget";
-import { remoteExecutionChanges } from "./execution-remote-completion";
+import { isExecutionControlValidationError, markExecutionControlRejected } from "./execution-control-error";
 import { registerWorkspaceModule } from "./local-workspace";
 import { runtimeCall } from "./local-runtime";
+import { createExecutionDelivery } from "./execution-delivery";
 
 import { executionBaseline, executionCallerKey, executionDigest, executionEventStore as events, executionRef, executionScope, executionView, executionNeverOfferedIn } from "./execution-state";
 export async function trustedExecutionProject(ports: StewardPorts, principal: ExecutionPrincipal, projectRef: string) {
@@ -92,12 +92,13 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
       const snapshot = await ports.db.$transaction(async tx => {
         await assertExecutionPrincipal(tx, principal);
         const row = await unique(tx, principal, { id: input.attemptId, runId: input.runId, workId: input.workId });
-        const changes = row.stopConfirmedAt && row.executorId !== "server" ? await remoteExecutionChanges(tx, row.id) : undefined;
+        const delivery = row.targetBinding && row.stopConfirmedAt ? await tx.executionDelivery.findUnique({ where: { attemptId: row.id } }) : null;
+        const changes = (delivery?.final as import("@chrona/contracts/steward").ExecutionDeliveryFinal | null)?.changes;
         return { row, changes };
       });
       const { row } = snapshot;
       registerWorkspaceModule();
-      const changes = row.stopConfirmedAt && row.executorId === "server"
+      const changes = row.stopConfirmedAt && !row.targetBinding
         ? await runtimeCall<import("@chrona/contracts/steward").ExecutionResultSource["changes"]>(ports, principal.workspaceId, "workspace-local.result", { attemptId: row.id })
         : snapshot.changes;
       await assertExecutionPrincipal(ports.db, principal);
@@ -116,6 +117,8 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
     async answer(principal, input) { await controlExecution(ports, principal, input); },
     cancel: (principal, input) => controlExecution(ports, principal, input),
     async admitControl(principal, input) {
+      const application = await admitApplicationControl(ports, principal, input);
+      if (application) return { perform: false, operationId: application.runId };
       const admitted = await admitExecutionControl(ports, principal, input);
       return { perform: !admitted.replay && admitted.row.run.status === "running", operationId: admitted.row.runId };
     },
@@ -124,7 +127,9 @@ export function createExecutions(ports: StewardPorts): ExecutionPorts {
 
 type Control = Extract<ExecutionCommand, { op: "send" | "answer" | "cancel" }>;
 async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
-    return ports.db.$transaction(async tx => {
+  const admission = { consuming: false };
+  try {
+    return await ports.db.$transaction(async tx => {
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${principal.workspaceId}`;
       await assertExecutionPrincipal(tx, principal);
       let row = await unique(tx, principal, { id: input.attemptId, workId: input.workId, runId: input.runId });
@@ -137,15 +142,27 @@ async function admitExecutionControl(ports: StewardPorts, principal: ExecutionPr
       await assertLiveControl(ports, tx, row, input);
       const now = ports.now();
       const command = { attemptId: row.id, commandKey: input.commandKey, operation: input.op, requestDigest: digest, receipt: { accepted: true, effect: "unknown" }, effect: "unknown", createdAt: now };
-      if (row.executorId !== "server") await reserveDeviceCommandIn(tx, row.executorId, command);
+      admission.consuming = true;
       await tx.executionCommand.create({ data: command });
       if (input.op === "cancel" && !row.stopConfirmedAt) row = await cancelExecutionIn(ports, tx, principal, row, now);
       return { row, replay: false };
     });
+  } catch (error) {
+    if (!admission.consuming && isExecutionControlValidationError(error)) throw markExecutionControlRejected(error);
+    throw error;
+  }
+}
+async function admitApplicationControl(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
+  const row = await unique(ports.db, principal, { id: input.attemptId, workId: input.workId, runId: input.runId });
+  if (!row.targetBinding) return null;
+  const payload = input.op === "cancel" ? { operation: "cancel" as const } : input.op === "send" ? { operation: "write" as const, text: input.text } : { operation: "answer" as const, requestId: input.requestId, answer: input.answer };
+  await createExecutionDelivery(ports).control(principal, row.workId, input.commandKey, payload);
+  return ports.db.executionAttempt.findUniqueOrThrow({ where: { id: row.id }, include: { run: true } });
 }
 async function controlExecution(ports: StewardPorts, principal: ExecutionPrincipal, input: Control) {
+    const application = await admitApplicationControl(ports, principal, input);
+    if (application) return executionView(application);
     const result = await admitExecutionControl(ports, principal, input);
-    if (input.op === "cancel" && result.row.executorId !== "server" && result.row.stopConfirmedAt) await ports.remoteCompletion?.committed(principal.workspaceId, result.row.runId);
     if (!result.replay) await deliverExecutionControl(ports, principal, input, result.row);
     return input.op === "cancel" ? ports.db.$transaction(async tx => { await assertExecutionPrincipal(tx, principal); return executionView(await unique(tx, principal, { id: result.row.id })); }) : executionView(result.row);
   }
@@ -169,15 +186,9 @@ async function cancelExecutionIn(ports: StewardPorts, tx: Prisma.TransactionClie
 async function deliverExecutionControl(ports: StewardPorts, principal: ExecutionPrincipal, input: Control, row: Attempt) {
   // A durable receipt means consumed, never proof of injection; uncertain effects are not resent.
   if (input.op === "send") {
-    if (row.executorId === "server") {
-      const handle = liveRuns.get(row.runId);
-      if (!handle) throw new CallError("unavailable", "Execution disconnected after command acceptance; delivery is unknown");
-      await handle.inject(input.text);
-    } else {
-      if (!ports.deliverRemoteControl) throw new CallError("unavailable", "Remote control delivery unavailable; delivery is unknown");
-      const assignment = await ports.db.executorAssignment.findUniqueOrThrow({ where: { attemptId: row.id } });
-      await ports.deliverRemoteControl({ target: { ...executionRef(row), assignmentId: assignment.assignmentId, generation: assignment.generation }, commandKey: input.commandKey, text: input.text });
-    }
+    const handle = liveRuns.get(row.runId);
+    if (!handle) throw new CallError("unavailable", "Execution disconnected after command acceptance; delivery is unknown");
+    await handle.inject(input.text);
   }
   if (input.op === "answer") await createProviderControl(ports, principal.workspaceId).answer(input.requestId, input.answer);
   if (input.op === "cancel" && row.run.status === "running") await liveRuns.get(row.runId)?.abort();

@@ -67,6 +67,8 @@ model Module {
   name String
   builtin Boolean @default(false)
   activeHash String?
+  activationId String @default(uuid())
+  executionFenceAt DateTime?
   dataSchema Int?
   status String @default("active")
   createdAt DateTime @default(now())
@@ -125,7 +127,11 @@ model ModuleRun {
 
 model ModuleCall {
   id String @id @default(uuid())
-  moduleId String
+  moduleId String?
+  /// Immutable budget attribution survives removal of the owning application.
+  accountingModuleId String?
+  workspaceId String?
+  moduleName String?
   hash String
   moduleRunId String?
   eventKey String?
@@ -134,7 +140,7 @@ model ModuleCall {
   status String
   error String?
   createdAt DateTime @default(now())
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  module Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   @@index([moduleId, method, key, status])
   @@index([moduleRunId])
 }
@@ -239,6 +245,10 @@ model ExecutionAttempt {
   callerKey String
   moduleId String?
   callerHash String?
+  callerActivationId String?
+  placement Json?
+  targetBinding Json?
+  capacityKey String @default("local")
   workId String
   commandKey String
   requestDigest String
@@ -278,11 +288,82 @@ model ExecutionAttempt {
   snapshot ExecutionSnapshot?
   controls ExecutionControl[]
   commands ExecutionCommand[]
-  assignment ExecutorAssignment?
+  delivery ExecutionDelivery?
+  @@index([capacityKey, stopConfirmedAt])
   @@index([executorId, stopConfirmedAt])
   @@index([moduleId, stopConfirmedAt])
   @@unique([workspaceId, ownerId, callerKey, commandKey])
   @@index([workspaceId, ownerId, workId, createdAt])
+}
+
+/// Approved receiver authority; subjectId remains stable across authority epochs.
+model ExecutionAuthority {
+  id String @id @default(uuid())
+  workspaceId String
+  ownerId String
+  receiverModuleId String
+  receiverHash String
+  receiverActivationId String
+  subjectId String
+  epoch Int
+  keyId String
+  publicKey String
+  verifierId String
+  verifierVersion String
+  scope Json
+  approvalId String
+  approvedAt DateTime
+  revokedAt DateTime?
+  deliveries ExecutionDelivery[]
+  @@unique([receiverModuleId, receiverActivationId, subjectId, epoch, keyId])
+  @@index([workspaceId, ownerId, revokedAt])
+  @@index([receiverModuleId, receiverActivationId, revokedAt])
+  @@index([subjectId, epoch])
+}
+
+/// Durable transport journal for an admitted attempt in the existing Run queue.
+model ExecutionDelivery {
+  id String @id @default(uuid())
+  attemptId String @unique
+  authorityId String
+  receiverModuleId String
+  receiverHash String
+  receiverActivationId String
+  launchDigest String
+  launch Json
+  createdAt DateTime @default(now())
+  offeredAt DateTime?
+  acceptedAt DateTime?
+  startedAt DateTime?
+  processIdentity Json?
+  sourceThrough Int @default(0)
+  finalDigest String?
+  final Json?
+  finalCommittedAt DateTime?
+  settledAt DateTime?
+  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  authority ExecutionAuthority @relation(fields: [authorityId], references: [id], onDelete: Restrict)
+  receipts ExecutionReceipt[]
+  @@index([authorityId, settledAt])
+  @@index([receiverModuleId, receiverActivationId, settledAt])
+}
+
+model ExecutionReceipt {
+  id String @id @default(cuid())
+  deliveryId String
+  operation String
+  requestKey String
+  requestDigest String
+  direction String @default("inbound")
+  bytes Int @default(0)
+  payload Json?
+  receipt Json
+  createdAt DateTime @default(now())
+  offeredAt DateTime?
+  acceptedAt DateTime?
+  delivery ExecutionDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  @@unique([deliveryId, operation, requestKey])
+  @@index([deliveryId, direction, acceptedAt])
 }
 
 /// Normalized, redacted v1 events only; no raw Provider envelopes.
@@ -329,78 +410,6 @@ model ExecutionCommand {
   createdAt DateTime @default(now())
   attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   @@id([attemptId, commandKey])
-}
-
-/// Device security generation and connection incarnation are distinct fences. No plaintext credentials.
-model ExecutionExecutor {
-  id String @id
-  workspaceId String
-  ownerId String
-  label String
-  credentialHash String @unique
-  generation Int @default(1)
-  revokedAt DateTime?
-  authorizedUntil DateTime?
-  incarnation String?
-  reconciledAt DateTime?
-  lastSeenAt DateTime?
-  createdAt DateTime @default(now())
-  pairings ExecutorPairing[]
-  assignments ExecutorAssignment[]
-  @@index([workspaceId, ownerId])
-}
-
-/// A consumed pairing is a stable receipt; the original credential hash cannot resurrect a revoked device.
-model ExecutorPairing {
-  codeHash String @id
-  workspaceId String
-  ownerId String
-  expiresAt DateTime
-  receiptExpiresAt DateTime
-  executorId String?
-  credentialHash String?
-  consumedAt DateTime?
-  executor ExecutionExecutor? @relation(fields: [executorId], references: [id], onDelete: Restrict)
-  @@index([receiptExpiresAt])
-}
-
-/// One transport journal for an already claimed Run, never another scheduling queue.
-model ExecutorAssignment {
-  attemptId String @id
-  assignmentId String @unique
-  executorId String
-  generation Int
-  incarnation String
-  launchDigest String?
-  launch Json?
-  preparedAt DateTime?
-  offeredAt DateTime?
-  startedAt DateTime?
-  processIdentity Json?
-  sourceHighWatermark Int @default(0)
-  sourceProducedThrough Int @default(0)
-  receiptCount Int @default(0)
-  receiptBytes Int @default(0)
-  finalDigest String?
-  final Json?
-  finalizedAt DateTime?
-  tombstoneDigest String?
-  attempt ExecutionAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
-  executor ExecutionExecutor @relation(fields: [executorId], references: [id], onDelete: Restrict)
-  receipts ExecutorSourceReceipt[]
-  @@index([executorId, generation])
-}
-
-/// Retained independently of detail retention; no payloads, credentials, questions or answers.
-model ExecutorSourceReceipt {
-  attemptId String
-  sourceSeq Int
-  digest String
-  throughSourceSeq Int
-  storedSeq Int?
-  bytes Int
-  assignment ExecutorAssignment @relation(fields: [attemptId], references: [attemptId], onDelete: Restrict)
-  @@id([attemptId, sourceSeq])
 }
 
 model Message {

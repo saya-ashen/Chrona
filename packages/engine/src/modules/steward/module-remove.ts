@@ -1,7 +1,8 @@
+import { fenceExecutionModule } from "./execution-delivery-controls";
 import { cp, mkdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Prisma } from "@chrona/db";
-import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { audit } from "./audit";
 import { createApprovals } from "./approvals";
 import { moduleRemovePayloadSchema } from "./module-remove-payload";
@@ -10,7 +11,7 @@ import { requireModule, type ModuleContext } from "./module-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { setStatusIn } from "./module-status";
 import type { ApprovedAction } from "./ports";
-import { assertModuleOperation, isRemovableMcp } from "./module-identity";
+import { assertModuleOperation } from "./module-identity";
 import { moduleGitPath } from "./module-git";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
 
@@ -25,9 +26,6 @@ async function assertRemovable(db: Db, module: Row) {
   assertModuleOperation(module, "remove");
   await assertExecutionModuleIdle(db, module.id);
   if (module.status === "migrating") throw new StewardError("conflict", "Module is migrating");
-  const versions = await db.moduleVersion.findMany({ where: { moduleId: module.id, hash: module.activeHash ?? "" } });
-  const manifest = moduleManifestSchema.safeParse(versions[0]?.manifest).data;
-  if (manifest && isEntryModule(manifest) && !isRemovableMcp(module)) throw new StewardError("conflict", `${module.name} 是入口应用，不能删除；可以停用`);
   await assertNoDependents(db, module);
   await assertNoPendingWork(db, module);
 }
@@ -41,7 +39,7 @@ async function assertNoDependents(db: Db, module: Row) {
 }
 async function removalSessions(db: Db, module: Row) {
   const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true, source: true, moduleId: true } });
-  const contexts = isRemovableMcp(module) ? await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } }) : [];
+  const contexts = await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } });
   const retainedContexts = new Set(contexts.map(row => row.subjectId));
   // Agent contexts retain continuation, not an application's private conversation state.
   // Their Runs and unknown-stop evidence still participate in every execution guard.
@@ -62,12 +60,14 @@ async function assertNoPendingWork(db: Db, module: Row) {
     { OR: [{ callerModuleId: module.id }, { target: module.name }] },
     { OR: [{ status: { in: ["queued", "running", "waiting", "unknown"] } }, { reply: true, repliedAt: null }] },
   ] } })) throw new StewardError("conflict", "应用仍有未结束、结果未知的调用或未处理回调，请先核对调用结果");
-  if (await db.moduleCall.count({ where: { moduleId: module.id, OR: [{ status: { in: ["queued", "running", "waiting", "unknown"] } }, { status: "failed", error: { in: ["unknown", "internal"] } }] } })) throw new StewardError("conflict", "应用仍有未核实的执行记录，请先核对已有结果");
+  if (await db.moduleCall.count({ where: { moduleId: module.id, OR: [{ status: { in: ["pending", "queued", "running", "waiting", "unknown"] } }, { status: "failed", error: { in: ["unknown", "internal"] } }] } })) throw new StewardError("conflict", "应用仍有未核实的执行记录，请先核对已有结果");
 }
 
 export async function requestRemove(context: ModuleContext, moduleId: string, reason: string) {
   const module = await requireModule(context, context.db, moduleId);
   if (!module.activeHash) throw new StewardError("conflict", "Module has no active version");
+  assertModuleOperation(module, "remove");
+  await fenceExecutionModule(context.ports, context.workspaceId, moduleId);
   await assertRemovable(context.db, module);
   const approval = await createApprovals(context).create({ action: "delete_data", title: `删除应用 ${module.name}`.slice(0, 200), detail: reason.slice(0, 4000),
     payload: { kind: "module_remove", moduleId, hash: module.activeHash, name: module.name },
@@ -78,6 +78,12 @@ export async function requestRemove(context: ModuleContext, moduleId: string, re
 const exists = (path: string) => stat(path).then(() => true, () => false);
 export async function removeApproved(context: ModuleContext, action: ApprovedAction) {
   const { workspaceId, ports, platform } = context, { moduleId, hash, name } = moduleRemovePayloadSchema.parse(action.payload);
+  const approved = await context.db.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "delete_data", status: "approved" } });
+  if (!approved || JSON.stringify(approved.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Removal approval does not match");
+  const initial = await requireModule(context, context.db, moduleId);
+  assertModuleOperation(initial, "remove");
+  if (initial.activeHash !== hash) throw new StewardError("conflict", "Application version changed before removal");
+  await fenceExecutionModule(ports, workspaceId, moduleId);
   await context.db.$transaction(async tx => {
     const approval = await tx.approval.findFirst({ where: { id: action.approvalId, workspaceId, action: "delete_data", status: "approved" } });
     if (!approval || JSON.stringify(approval.payload) !== JSON.stringify(action.payload)) throw new StewardError("conflict", "Removal approval does not match");
@@ -105,6 +111,8 @@ export async function removeApproved(context: ModuleContext, action: ApprovedAct
       const { [name]: _removed, ...rest } = settings.moduleSettings;
       await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...settings, moduleSettings: rest } as Prisma.InputJsonValue } });
     }
+    await tx.executionAuthority.updateMany({ where: { workspaceId, receiverModuleId: moduleId, revokedAt: null }, data: { revokedAt: ports.now() } });
+    await tx.executionAttempt.updateMany({ where: { workspaceId, moduleId, stopConfirmedAt: { not: null } }, data: { moduleId: null } });
     await tx.module.delete({ where: { id: moduleId } });
     await audit(tx, { workspaceId, actor: "user", kind: "module_removed", subjectId: moduleId, details: { name, hash, backup } });
   });

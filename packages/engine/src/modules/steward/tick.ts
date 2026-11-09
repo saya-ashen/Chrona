@@ -1,21 +1,18 @@
 import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { StewardPorts } from "./ports";
-import { createSchedules } from "./schedules";
 import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
-import { announceApprovals } from "./notify-user";
 import { callsSettled, drainCalls } from "./module-calls";
 import { createProviderChannel } from "./provider-channel";
 import { providerStartGate } from "./provider-start";
 import { startLocalProvider, runtimeCall } from "./local-runtime";
 import { registerWorkspaceModule } from "./local-workspace";
 import { BUILD_MODULE_TOOLS, BUILD_REFERENCE_PROMPT } from "./module-reference";
-import { EXECUTOR_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
-import { retireReflection } from "./reflection-retirement";
+import { KERNEL_EXECUTION_LIMITS, type ProviderAdapter } from "@chrona/contracts/steward";
 import { refreshInstallationReceipts } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
 import { executionRunInput } from "./execution-context";
@@ -51,26 +48,9 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
     try { await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
   });
 }
-async function launchDeviceRuns(ports: StewardPorts, workspaceId: string, now: Date) {
-  if (!ports.executorProvider || !ports.executorAdmission) return;
+async function claimApplicationRuns(ports: StewardPorts, workspaceId: string, now: Date) {
   const runs = createRuns(ports, workspaceId);
-  const devices = await ports.db.executionExecutor.findMany({ where: { workspaceId, revokedAt: null }, select: { id: true }, take: EXECUTOR_LIMITS.assignmentRecords, orderBy: { id: "asc" } });
-  for (const device of devices) {
-    const online = await ports.db.$transaction(tx => ports.executorAdmission!.online(tx, { executorId: device.id, now }));
-    if (!online) continue;
-    for (let index = 0; index < EXECUTOR_LIMITS.codingEnvironment; index++) {
-      const run = await runs.claimNext("background", now, { kind: "execution", executorId: device.id });
-      if (!run) break;
-      const attempt = await ports.db.executionAttempt.findUniqueOrThrow({ where: { runId: run.id } });
-      // This handle observes the existing remote assignment; it neither starts nor stops an OS process.
-      const handle = ports.executorProvider.start({ runId: run.id, token: run.token, lane: "background", cwd: run.cwd, sessionDir: run.cwd,
-        sessionId: null, prompt: run.prompt, systemPrompt: "", resources: "minimal", deadline: run.deadlineAt,
-        execution: { workId: attempt.workId, sessionId: run.sessionId!, runId: run.id, attemptId: attempt.id } });
-      liveRuns.set(run.id, handle);
-      // Remote completion already committed Q's original final; no local capture/finish or shutdown wait.
-      void handle.done.then(() => { if (liveRuns.get(run.id) === handle) liveRuns.delete(run.id); }).catch(() => {});
-    }
-  }
+  for (let i = 0; i < KERNEL_EXECUTION_LIMITS.codingGlobal; i++) if (!await runs.claimNext("background", now, { kind: "application" })) break;
 }
 
 function startBuild(ports: StewardPorts, builds: Map<string, Promise<void>>, buildFailures: Map<string, unknown>, workspaceId: string, now: Date) {
@@ -131,25 +111,22 @@ export function createTick(ports: StewardPorts) {
           const run = await runs.claimNext(lane, now, { kind: "ordinary" });
           if (run) await launchLocal(run, lane);
         }
-        if (ports.provider) for (let index = 0; index < EXECUTOR_LIMITS.codingEnvironment; index++) {
+        if (ports.provider) for (let index = 0; index < KERNEL_EXECUTION_LIMITS.codingEnvironment; index++) {
           const run = await runs.claimNext("background", now, { kind: "execution", executorId: "server" });
           if (!run) break;
           await launchLocal(run, "background");
         }
-        await launchDeviceRuns(ports, workspaceId, now);
+        await claimApplicationRuns(ports, workspaceId, now);
       }
       for (const [stage, action] of [
         ["builtins", async () => { await registerBuiltins(ports, workspaceId); }],
         // Keep unrelated startup stages running even if one shipped app fails registration.
         ["initialization", async () => { await refreshInstallationReceipts(ports, workspaceId); await ensureWorkspaceInitialized(ports, workspaceId); }],
-        ["retire-reflection", () => retireReflection(ports, workspaceId)],
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
         ["schedules", async () => {
-          await createSchedules(ports, workspaceId).fireDue(now, { waitForDelivery: false });
           void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
         }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); }],
-        ["approvals", () => announceApprovals(ports, workspaceId)],
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
       ] as const) {

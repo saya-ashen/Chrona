@@ -3,16 +3,17 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, compileModuleOutput, moduleOutputSchema, moduleManifestSchema, type ModuleTool } from "@chrona/contracts/steward";
+import { isModulePaused } from "./module-availability";
 import { createFiles } from "./external/files/files";
 import { createEvents, type Caller } from "./external/events/events";
-import { createNotify, type Caller as NotifyCaller } from "./builtin/notify/notify";
-import { openStore } from "./builtin/notify/store";
+import { createNotify, type Caller as NotifyCaller } from "./external/notify/notify";
+import { openStore } from "./external/notify/store";
 import { conversationMemory } from "./external/memory-local/conversation";
 import { preferences } from "./external/memory-local/preferences";
 
 const manifests = await Promise.all([
   ...BUILTIN_MODULE_NAMES.map(name => ({ name, directory: "builtin" })),
-  ...OFFICIAL_EXTERNAL_MODULE_NAMES.map(name => ({ name, directory: "external" })),
+  ...OFFICIAL_EXTERNAL_MODULE_NAMES.filter(name => !isModulePaused(name)).map(name => ({ name, directory: "external" })),
 ].map(async ({ name, directory }) => {
   const parsed = moduleManifestSchema.parse(await Bun.file(join(import.meta.dirname, directory, name, "module.json")).json());
   expect(parsed.name).toBe(name);
@@ -23,8 +24,8 @@ const tools = new Map<string, ModuleTool>(manifests.flatMap(([module, manifest])
   .map(tool => [`${module}.${tool.name}`, tool] as const)));
 
 test("every shipped built-in and official external owner/module tool declares a compilable output contract", () => {
-  expect(manifests.map(([name]) => name)).toEqual(expect.arrayContaining(["events", "files", "mcp", "memory-local", "mind", "notify", "qq", "remind", "web"]));
-  expect([...tools.keys()]).toEqual(expect.arrayContaining(["events.emit", "files.read", "mind.agenda", "notify.send", "qq.reply", "remind.list", "web.pages"]));
+  expect(manifests.map(([name]) => name)).toEqual(expect.arrayContaining(["author", "events", "files", "memory-local", "notify", "qq", "web"]));
+  expect([...tools.keys()]).toEqual(expect.arrayContaining(["author.prepare", "events.emit", "files.read", "notify.send", "qq.reply", "web.pages"]));
   expect(tools.size).toBeGreaterThanOrEqual(30);
   for (const [name, tool] of tools) {
     expect(tool.output, `${name} output`).toBeDefined();
@@ -56,9 +57,10 @@ test("actual files and events handler results satisfy declared outputs, includin
     check("files.restore", await files.tool("restore", { path: "moved.txt", version: versions.versions[0]!.version }, "2026-10-22T00:00:00Z"));
 
     const eventsDir = join(dir, "events"); await mkdir(eventsDir);
-    const events = createEvents({ dataDir: eventsDir, contributions: async () => [{ module: "sample", value: { emits: [{ name: "changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" } } } }] } }],
+    const events = createEvents({ dataDir: eventsDir,
       directory: async () => ({ modules: [{ id: "sample-id", name: "sample", status: "active", activeHash: "hash" }], tools: [{ target: "sample.receive", moduleId: "sample-id", hash: "hash", contractHash: "a".repeat(64), inputSchema: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] } }] }), call: async () => ({ callId: "call-1" }) });
     const caller: Caller = { kind: "module", module: "sample", moduleId: "sample-id", hash: "hash" };
+    check("events.register", await events.handle("register", { emits: JSON.stringify([{ name: "changed", payload: { type: "object", required: ["id"], properties: { id: { type: "string" } } } }]) }, caller));
     check("events.subscriptions", await events.handle("subscriptions", {}, caller));
     check("events.subscribe", await events.handle("subscribe", { event: "sample.changed", tool: "receive" }, caller));
     check("events.emit", await events.handle("emit", { event: "changed", payload: JSON.stringify({ id: "1" }), key: "k" }, caller));

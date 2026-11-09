@@ -1,20 +1,26 @@
+import { activationNotice } from "./module-activation-notice";
+export { activationNotice } from "./module-activation-notice";
+import { installDependencies } from "./module-dependencies";
+export { installDependencies } from "./module-dependencies";
+import { fenceExecutionVersionChange } from "./execution-delivery-controls";
+import { assertBuildOwnership, buildOwnershipError } from "./module-build-ownership";
 import { StewardError } from "./errors";
 import { checkoutModule, snapshotModule } from "./module-files";
 import { readVersionSource, versionSource } from "./module-source";
 import { moduleModelSettings } from "./settings";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
+import { ModuleUnavailableError } from "./module-availability";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { addsOAuthDefinitions } from "./oauth-definition";
 import { join } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
-import { createRuns, createRunSession } from "./runs";
 import { notifyLifecycle } from "./notify-user";
 import { intentSchema, groupPayloadSchema, json, requireModule, expireModuleApprovals, type ModuleContext, type ModuleVersion, type BuildReport, type Proposal } from "./module-context";
 import { runTests, checkContinuity } from "./module-continuity";
-import { isGroupCandidate, recordGroupReview } from "./module-group";
+import { advanceFixedCandidateSet, isGroupCandidate, recordGroupReview } from "./module-group";
+import { findCandidateSet } from "./module-candidate-records";
 import { dataEmpty } from "./module-data";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { activateIn } from "./module-generation";
@@ -22,12 +28,13 @@ import { audit } from "./audit";
 import { smokeRun } from "./module-probe";
 import { typecheckBuild, typecheckErrors } from "./module-typecheck";
 import { moduleOutputImpacts, outputImpactSummary } from "./module-output-impact";
-import { moduleToolExampleError } from "./module-calls";
+import { moduleToolExampleError } from "./module-tool-contract";
 import { codeDifference, compactDiff, continuityPreview, insertCodeDiff } from "./module-preview";
 
 async function stagingFiles(context: ModuleContext, version: ModuleVersion, report: BuildReport) {
   try {
     const staging = join(context.platform, "staging", version.id);
+    assertBuildOwnership(context, staging);
     const source = await versionSource(context, version, staging);
     report.git = source.revision;
     await rm(staging, { recursive: true, force: true });
@@ -44,14 +51,6 @@ async function stagingFiles(context: ModuleContext, version: ModuleVersion, repo
     return null;
   }
 }
-/** Lockfile libraries and system programs go into the staging copy before anything runs it. */
-export async function installDependencies(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, hash: string) {
-  if (!manifest.packages.length && !existsSync(join(staging, "package.json")) && !existsSync(join(staging, "pyproject.toml"))) return null;
-  // The host installer may execute package build backends; do not cross an explicitly required isolation boundary.
-  if (context.ports.sandbox?.executionMode === "required-isolation") return { errors: ["required-isolation: dependency installation is not isolated yet; builds with language or system packages are unavailable in this mode"], installed: { npm: false, python: false, packages: {} } };
-  if (!context.ports.packages) return { errors: ["Dependency installation is not available on this host"], installed: { npm: false, python: false, packages: {} } };
-  return context.ports.packages.install({ dir: staging, packages: manifest.packages, gcroot: join(context.platform, "gcroots", hash) });
-}
 async function installBuild(context: ModuleContext, staging: string, hash: string) {
   await mkdir(context.store, { recursive: true });
   try { await rename(staging, join(context.store, hash)); }
@@ -64,7 +63,7 @@ function exposedTools(manifest: ReturnType<typeof moduleManifestSchema.parse>) {
 function reviewPrefix(manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport, diff: string) {
   const libraries = [report.dependencies?.npm && "npm（bun.lock）", report.dependencies?.python && "Python（uv.lock）"].filter(Boolean).join("、") || "无";
   const exposed = exposedTools(manifest);
-  return `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.map(target => target === "*" ? "所有对你开放的工具（*）" : target).join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}${manifest.limits ? `；内存地址空间上限：${manifest.limits.virtualMemoryMb} MB（默认 1024）` : ""}\n${diff}\n`;
+  return `联网：${manifest.effects.includes("network") ? "是" : "否"}\n调用其他模块：${manifest.uses.map(target => target === "*" ? "所有对你开放的工具（*）" : target).join("、") || "无"}；供其他模块调用：${exposed.join("、") || "无"}\n系统程序：${manifest.packages.join("、") || "无"}；语言库：${libraries}\n${diff}\n`;
 }
 /** Output schemas and examples describe results, not authority: the review shows their digest, so declaring contracts still fits the preview. */
 export function reviewManifest(value: unknown) {
@@ -108,7 +107,9 @@ function addsCredentials(version: ModuleVersion, active: ModuleVersion | null) {
 /** Checks passed and nothing needs the owner: activate now and tell them afterwards. */
 async function activateChecked(context: ModuleContext, { version, module }: Review, update: boolean) {
   const { hash } = version, manifest = moduleManifestSchema.parse(version.manifest);
+  await fenceExecutionVersionChange(context.ports, context.workspaceId, module.id, hash);
   await context.db.$transaction(async tx => {
+    if (await findCandidateSet({ ...context, db: tx as ModuleContext["db"] }, version)) throw new StewardError("conflict", "Fixed candidates activate only through their receipt");
     const current = await assertExternalModule(tx, context.workspaceId, module.id, "activate");
     if (current.status === "migrating" || current.activeHash !== module.activeHash) throw new Error("Module changed during build; submit again");
     await expireModuleApprovals(context, module.id, tx);
@@ -119,6 +120,12 @@ async function activateChecked(context: ModuleContext, { version, module }: Revi
     await activationNotice(context, tx, version, update);
   });
   await supersedeCandidates(context, module.id, hash);
+}
+async function groupReview(context: ModuleContext, { version, module, report }: Review, parts: Parameters<typeof recordGroupReview>[2]): Promise<Proposal | null> {
+  if (!await recordGroupReview(context, version, parts)) return null;
+  const set = await advanceFixedCandidateSet(context, version);
+  const status = set?.state === "approved" ? "approved" : set?.state === "rejected" ? "rejected" : "pending_review";
+  return { moduleId: module.id, hash: version.hash, status, ...(set?.approvalId ? { approvalId: set.approvalId } : {}), report };
 }
 async function requestReview(context: ModuleContext, review: Review): Promise<Proposal> {
   const { db } = context, { version, module, report } = review, { hash } = version;
@@ -134,12 +141,13 @@ async function requestReview(context: ModuleContext, review: Review): Promise<Pr
     await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { status: "rejected", report: json(report) } });
     return { moduleId: module.id, hash, status: "rejected", report };
   }
-  await expireModuleApprovals(context, module.id);
-  await supersedeCandidates(context, module.id, hash);
   const card = { moduleId: module.id, action: "activate_module" as const, title: `启用模块 ${module.name}`,
     detail: review.needsMigration ? "此版本需要迁移已有数据" : addsCredentials(version, active) ? "此版本需要新的凭据" : "与同一构建的其他应用一起启用", payload: { kind: "activate_module" as const, moduleId: module.id, hash }, preview };
   // v2-15: one module of a group build waits for the group's single approval (modules.request-group), never alone or automatically.
-  if (await recordGroupReview(context, version, { ...parts, detail: card.detail, needsMigration: review.needsMigration })) return { moduleId: module.id, hash, status: "pending_review", report };
+  const group = await groupReview(context, review, { ...parts, detail: card.detail, needsMigration: review.needsMigration });
+  if (group) return group;
+  await expireModuleApprovals(context, module.id);
+  await supersedeCandidates(context, module.id, hash);
   const approval = await createApprovals(context).create(card);
   return { moduleId: module.id, hash, status: "pending_review", approvalId: approval.id, report };
 }
@@ -148,7 +156,6 @@ async function modelManifestError(context: ModuleContext, manifest: ReturnType<t
   const workspace = await context.db.workspace.findUniqueOrThrow({ where: { id: context.workspaceId } });
   const limits = moduleModelSettings(workspace.settings);
   return !limits ? "Module model capability unavailable: the owner must configure moduleModel first (web page Settings > 模块模型, or settings.update); Chrona cannot set it for them"
-    : !Object.hasOwn(limits.models, manifest.model.tier) ? `Module model tier "${manifest.model.tier}" is not configured in owner moduleModel settings (configured: ${Object.keys(limits.models).join(", ")})`
     : manifest.model.maxCalls > limits.maxCallsPerEvent || manifest.model.maxOutputTokens > limits.maxOutputTokens ? "Module model limits exceed owner moduleModel settings" : null;
 }
 async function validateBuildManifest(context: ModuleContext, version: ModuleVersion, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
@@ -164,10 +171,6 @@ async function validateBuildManifest(context: ModuleContext, version: ModuleVers
   await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
   return { moduleId: version.moduleId, hash: version.hash, status: "rejected" as const, report };
 }
-export async function activationNotice(context: ModuleContext, tx: Parameters<typeof notifyLifecycle>[0], version: ModuleVersion, update: boolean) {
-  const manifest = moduleManifestSchema.parse(version.manifest), intent = intentSchema.parse(version.intent);
-  await notifyLifecycle(tx, context.ports, context.workspaceId, `module-auto-activated:${version.id}`, { kind: "module-activated", app: manifest.name, update, changes: intent.changes, preserves: intent.preserves, hash: version.hash, module: version.moduleId });
-}
 /** v2-25: tests run only on an entry that type-checks against the SDK and call contracts. */
 async function typecheckAndTest(context: ModuleContext, staging: string, manifest: ReturnType<typeof moduleManifestSchema.parse>, report: BuildReport) {
   const typecheck = await typecheckBuild(context, staging, manifest);
@@ -178,12 +181,11 @@ async function typecheckAndTest(context: ModuleContext, staging: string, manifes
 }
 function buildHasErrors(report: BuildReport) { return Boolean(report.errors?.length); }
 async function checkBuildCandidate({ context, module, version, manifest, staging, report }: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; staging: string; report: BuildReport }): Promise<{ passed: boolean; needsMigration: boolean; dependencyFailure: boolean }> {
-  const { platform } = context, { hash } = version;
-  const dependencies = await installDependencies(context, staging, manifest, hash);
+  const { hash } = version;
+  const dependencies = await installDependencies(context, staging, manifest);
   if (dependencies) report.dependencies = dependencies.installed;
   if (dependencies?.errors.length) {
     report.errors = dependencies.errors.map(error => error.slice(0, 4000));
-    await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
     return { passed: false, needsMigration: false, dependencyFailure: true };
   }
   let passed = await typecheckAndTest(context, staging, manifest, report), needsMigration = false;
@@ -196,8 +198,6 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (buildHasErrors(report)) passed = false; else delete report.errors;
   // Only engine-owned immutable copies are tested, hashed and installed.
   if (passed) await installBuild(context, staging, hash);
-  // shortcut: GC roots of approved versions are kept until the version is deleted; nothing deletes versions yet.
-  if (!passed) await rm(join(platform, "gcroots", hash), { recursive: true, force: true });
   return { passed, needsMigration, dependencyFailure: false };
 }
 async function consumersBlock(context: ModuleContext, { manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {
@@ -244,6 +244,7 @@ async function finishBuild(input: { context: ModuleContext; module: Awaited<Retu
 async function buildVersion(context: ModuleContext, version: ModuleVersion): Promise<Proposal> {
   const { db, platform } = context, { hash } = version;
   const staging = join(platform, "staging", version.id), report: BuildReport = { tests: [], ...((version.report as BuildReport).git ? { git: (version.report as BuildReport).git } : {}) };
+  assertBuildOwnership(context, staging);
   try {
     const module = await assertExternalModule(db, context.workspaceId, version.moduleId, "build");
     const manifest = moduleManifestSchema.parse(version.manifest);
@@ -255,7 +256,7 @@ async function buildVersion(context: ModuleContext, version: ModuleVersion): Pro
     if (invalidManifest) return invalidManifest;
     const checks = await checkBuildCandidate({ context, module, version, manifest, staging, report });
     return await finishBuild({ context, module, version, manifest, report, checks, files });
-  } finally { await rm(staging, { recursive: true, force: true }); }
+  } finally { if (!buildOwnershipError(context, staging)) await rm(staging, { recursive: true, force: true }); }
 }
 async function recoverBuilds(context: ModuleContext, now: Date) {
   const { db, workspaceId } = context;
@@ -263,6 +264,7 @@ async function recoverBuilds(context: ModuleContext, now: Date) {
   await db.$transaction(async tx => {
     const testing = await tx.moduleVersion.findMany({ where: { module: { workspaceId }, status: "testing" } });
     for (const version of testing) {
+      if (buildOwnershipError(context, join(context.platform, "staging", version.id))) continue;
       const claim = await tx.audit.findFirst({ where: { workspaceId, kind: "module_build_started", subjectId: version.id }, orderBy: { createdAt: "desc" } });
       if ((claim?.createdAt ?? version.createdAt).getTime() <= now.getTime() - 15 * 60_000) await tx.moduleVersion.updateMany({ where: { id: version.id, status: "testing" }, data: { status: "building" } });
     }
@@ -282,10 +284,7 @@ async function reportFailure(context: ModuleContext, version: ModuleVersion, res
     // Keep continuity diagnostics visible even when successful tests printed a lot.
     const summary = result.report.continuity ? { continuity: result.report.continuity } : result.report;
     const publicReport = JSON.stringify(summary, (key, value: unknown) => ["stdout", "stderr"].includes(key) && typeof value === "string" ? value.slice(0, 1500) : value);
-    await db.$transaction(async tx => {
-      const session = await createRunSession(tx, workspaceId, "module", ports.now(), { moduleId: module.id });
-      await createRuns(ports, workspaceId).enqueue({ sessionId: session.id, lane: "background", trigger: "source", label: module.name, prompt: `Module ${module.name} build failed (untrusted test output):\n${publicReport.slice(0, 8000)}` }, tx);
-    });
+    await audit(db, { workspaceId, actor: "chrona", kind: "module_build_failed", subjectId: module.id, details: { versionId: version.id, hash: version.hash, report: publicReport.slice(0, 8000) } });
   }
 }
 function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
@@ -294,20 +293,29 @@ function approvalCoversVersion(payload: unknown, version: ModuleVersion) {
 }
 async function recoverReview(context: ModuleContext, version: ModuleVersion) {
   const { db, workspaceId } = context;
+  const fixed = await findCandidateSet(context, version);
+  if (fixed) {
+    const set = await advanceFixedCandidateSet(context, version);
+    if (!set || set.state !== "submitted") return;
+  }
   const module = await assertExternalModule(db, workspaceId, version.moduleId, "activate");
   const latest = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
-  if (latest?.id !== version.id || latest.status !== "pending_review" || await isGroupCandidate(context, version)) return;
+  if (version.status !== "pending_review" || (!fixed && (latest?.id !== version.id || await isGroupCandidate(context, version)))) return;
   const approvals = await db.approval.findMany({ where: { workspaceId, action: "activate_module" } });
   if (approvals.some(row => approvalCoversVersion(row.payload, version))) return;
   if (module.activeHash === version.hash) return;
+  const review = await recoveredReviewMaterial(context, version, module);
+  if (review) await requestReview(context, review);
+}
+async function recoveredReviewMaterial(context: ModuleContext, version: ModuleVersion, module: Review["module"]): Promise<Review | null> {
   const report = version.report as BuildReport | null;
-  if (!report?.continuity) return;
+  if (!report?.continuity) return null;
   const source = await versionSource(context, version);
   const files = source.files;
   report.git = source.revision;
   const manifest = moduleManifestSchema.parse(version.manifest);
   const needsMigration = module.dataSchema !== null && manifest.data.schema > module.dataSchema && !await dataEmpty(join(context.platform, "data", module.id));
-  await requestReview(context, { version, module, report, files, needsMigration });
+  return { version, module, report, files, needsMigration };
 }
 const recoveringReviews = new WeakMap<ModuleContext["db"], Set<string>>();
 /** Repair only never-created standalone reviews; a resolved/expired card is a deliberate decision, not a retry. */
@@ -318,12 +326,13 @@ async function recoverReviews(context: ModuleContext) {
   if (running.has(workspaceId)) return;
   running.add(workspaceId);
   try {
-    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: "pending_review" } });
+    const candidates = await db.moduleVersion.findMany({ where: { module: { workspaceId }, status: { in: ["pending_review", "rejected"] } } });
     for (const version of candidates) {
       try {
+        if (version.status === "rejected") { await advanceFixedCandidateSet(context, version); continue; }
         await recoverReview(context, version);
       } catch (error) {
-        if (error instanceof ModuleIdentityError) {
+        if (error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError) {
           await db.moduleVersion.updateMany({ where: { id: version.id, status: "pending_review" }, data: { status: "rejected", report: json({ ...(version.report as BuildReport), errors: [error.message] }) } });
           await expireModuleApprovals(context, version.moduleId);
           continue;
@@ -350,12 +359,13 @@ export async function buildPending(context: ModuleContext, now = context.ports.n
     let result: Proposal, identityRejected = false;
     try { result = await buildVersion(context, version); }
     catch (error) {
-      if (!(error instanceof ModuleIdentityError)) throw error;
+      if (!(error instanceof ModuleIdentityError || error instanceof ModuleUnavailableError)) throw error;
       identityRejected = true;
       const report: BuildReport = { tests: [], errors: [String(error).slice(0, 4000)] };
       await db.moduleVersion.update({ where: { id: version.id }, data: { status: "rejected", report: json(report) } });
       result = { moduleId: version.moduleId, hash: version.hash, status: "rejected", report };
     }
+    await advanceFixedCandidateSet(context, version);
     if (result.status === "rejected" && version.source === "provider" && !identityRejected) await reportFailure(context, version, result);
   }
 }

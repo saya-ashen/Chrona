@@ -1,5 +1,7 @@
 # Chrona 最小模块架构与 Agent Workbench：统一开发方案
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 2026-11-08 生命周期修订：用户已确认 web/mcp/files/notify/events 允许受检定制，Agent 保持不可动态替换；本文关于全部内置不可变的 M1 设计保留为历史。当前开发先做可使用的编码 Web 工作台，之后再按需要推进调用治理，见[统一路线](development-roadmap.md)。
 
 文档状态更新（2026-11-08）：本文是已完成 M1–M3 的阶段方案，不再是新任务派工入口。当前目标、差异与顺序见[统一开发路线](development-roadmap.md)；后续本机 V1 记录见[统一模块协议实施方案](unified-module-runtime-plan.md)。用户已授权亲自实施完整本机 V1，不调用 worker，允许中间状态暂时不可用；本机 Provider、执行控制、工作目录和内容调用已进入同一路由，最终验证见该方案。通用远端宿主留到后续版本。本文继续保存已验收 M1–M3 的设计、契约、分工和证据，不重写旧冻结记录；历史 ProviderAdapter 专用接口留作本机能力模块内部实现，现有固定设备接线保持其原有边界。

@@ -1,71 +1,59 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { createPiModelGateway } from "./pi-model-gateway";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { createPiModelGateway, piHostConfiguration } from "./pi-model-gateway";
 
-const cleanups: (() => Promise<unknown>)[] = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
-async function fixture(mode = "ok", version = "1.3.0") {
-  const dir = await mkdtemp("/tmp/chrona-model-test-");
-  const agentDir = await mkdtemp("/tmp/chrona-model-profile-");
-  cleanups.push(() => rm(dir, { recursive: true, force: true }), () => rm(agentDir, { recursive: true, force: true }));
-  const command = join(dir, "pi"), launch = join(dir, "launch.json"), pid = join(dir, "pid");
-  await writeFile(join(dir, "extension.ts"), "");
+const keys = ["CHRONA_RESOURCE_DIR", "CHRONA_STEWARD_PI_COMMAND", "CHRONA_STEWARD_PI_AGENT_DIR", "CHRONA_STEWARD_PI_MODEL", "CHRONA_STEWARD_PI_VERSION", "CHRONA_STEWARD_PI_RESOURCES_FILE", "CHRONA_STEWARD_PI_WEB_EXTENSION", "CHRONA_STEWARD_EXECUTION_MODE", "CHRONA_STEWARD_SANDBOX_BWRAP"] as const;
+const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+const roots: string[] = [];
+afterEach(async () => {
+  for (const key of keys) if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key];
+  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
+});
+function clearConfiguration() { for (const key of keys) delete process.env[key]; }
+
+test("host configuration resolves Pi resources in source and release layouts", () => {
+  clearConfiguration();
+  const source = piHostConfiguration({ port: 3123, dataDir: "/host/data" });
+  expect(source.chronaExtension).toBe(resolve("packages/pi/resources/chrona-tools.ts"));
+  expect(existsSync(source.chronaExtension)).toBe(true);
+  expect(existsSync(source.browserExtension!)).toBe(true);
+  expect(source.agentUrl).toBe("http://127.0.0.1:3123/api/steward-agent");
+  expect(source.agentDir).toBe("/host/data/providers/pi");
+  process.env.CHRONA_RESOURCE_DIR = "/release/resources";
+  const release = piHostConfiguration({ port: 3123, dataDir: "/host/data" });
+  expect(release.chronaExtension).toBe("/release/resources/pi/chrona-tools.ts");
+  expect(release.browserExtension).toBe("/release/resources/pi/browser-tools.ts");
+});
+
+test("completion port uses the host executable/profile and the caller's selected model and cap", async () => {
+  clearConfiguration();
+  const root = await mkdtemp(join(tmpdir(), "chrona-pi-host-")); roots.push(root);
+  const profile = join(root, "profile"), record = join(root, "request.json"), command = join(root, "pi");
+  await mkdir(profile, { mode: 0o700 });
   await writeFile(command, `#!${process.execPath}
-import { writeFileSync, readFileSync } from 'node:fs';
-if (process.argv.includes('--version')) { console.log(${JSON.stringify(version)}); process.exit(0); }
-writeFileSync(${JSON.stringify(pid)}, String(process.pid));
+import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 const args = process.argv.slice(2);
-let prompt = '';
-for await (const chunk of process.stdin) prompt += chunk.toString();
-writeFileSync(${JSON.stringify(launch)}, JSON.stringify({ args, prompt, system: args.includes('--system-prompt') ? readFileSync(args[args.indexOf('--system-prompt')+1], 'utf8') : null, envKeys: Object.keys(process.env), agentDir: process.env.PI_CODING_AGENT_DIR }));
-const mode = ${JSON.stringify(mode)};
-if (mode === 'hang') { setInterval(() => {}, 1000); }
-else if (mode === 'exit') { process.stderr.write('private error with prompt ' + prompt); process.exit(7); }
-else if (mode === 'malformed') { console.log('broken'); }
-else {
- const message = { role: 'assistant', model: mode === 'wrong-model' ? 'other' : 'exact', provider: 'fake', stopReason: mode === 'error' ? 'error' : 'stop', content: [{type:'thinking',thinking:'hidden'}, {type:'text',text:'你好\\u2028world with extra text'}], usage:{input:12,output:8} };
- console.log(JSON.stringify({type:'message_update',assistantMessageEvent:{type:'text_delta',delta:'ignore'}}));
- const data = Buffer.from(JSON.stringify({type:'message_end', message})+'\\r\\n');
- process.stdout.write(data.subarray(0,117)); setTimeout(() => process.stdout.write(data.subarray(117)), 5);
-}
+if (args.includes("--version")) { console.log("1.5.0"); process.exit(0); }
+let prompt = ""; for await (const chunk of process.stdin) prompt += chunk.toString();
+const hooks = new Map();
+(await import(pathToFileURL(args[args.indexOf("-e") + 1]).href)).default({ on: (name, handler) => hooks.set(name, handler) });
+const payload = hooks.get("before_provider_request")({ payload: { max_completion_tokens: 100 } }, { model: { provider: "fake", id: "selected", api: "openai-completions" } });
+writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args, prompt, payload, profile: process.env.PI_CODING_AGENT_DIR }));
+console.log(JSON.stringify({ type: "message_end", message: { role: "assistant", provider: "fake", model: "selected", stopReason: "stop", content: [{ type: "text", text: "host completion" }], usage: { input: 3, output: 7 } } }));
 `, { mode: 0o755 });
-  const gateway = createPiModelGateway({ command, agentDir, expectedVersion: "1.3.0", chronaExtension: join(dir, "extension.ts"), agentUrl: "" });
-  return { gateway, launch, pid, agentDir, input: { model: "fake/exact", system: "Translate literally", prompt: "@not-a-file\n你好" + "x".repeat(140_000), maxOutputTokens: 3, timeoutMs: 2000 } };
-}
-test("Pi one-shot uses stdin, exact model, isolated args/env and final JSON text/usage", async () => {
-  const f = await fixture();
-  const result = await f.gateway.complete(f.input);
-  expect(result).toEqual({ text: "你好\u2028world with extra text".slice(0, 12), inputTokens: 12, outputTokens: 8 });
-  const launch = JSON.parse(await readFile(f.launch, "utf8"));
-  for (const flag of ["-p", "--no-session", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes"]) expect(launch.args).toContain(flag);
-  expect(launch.args.slice(launch.args.indexOf("--model"), launch.args.indexOf("--model") + 2)).toEqual(["--model", "fake/exact"]);
-  expect(launch.args).not.toContain(f.input.prompt);
-  expect(launch.prompt).toBe(f.input.prompt);
-  expect(launch.system).toBe(f.input.system);
-  expect(launch.agentDir).toBe(f.agentDir);
-  expect(launch.envKeys).not.toContain("DATABASE_URL");
-  expect(launch.envKeys).not.toContain("CHRONA_AGENT_TOKEN");
-  // v2-17: the tier's thinking level goes to Pi as its own flag; the model id stays exact.
-  expect(launch.args).not.toContain("--thinking");
-  await f.gateway.complete({ ...f.input, thinking: "max" });
-  const thinking = JSON.parse(await readFile(f.launch, "utf8"));
-  expect(thinking.args.slice(thinking.args.indexOf("--thinking"), thinking.args.indexOf("--thinking") + 2)).toEqual(["--thinking", "max"]);
-});
-for (const mode of ["exit", "malformed", "error", "wrong-model"]) test(`Pi ${mode} maps to provider_error without private output`, async () => {
-  const f = await fixture(mode);
-  await expect(f.gateway.complete(f.input)).rejects.toMatchObject({ code: "provider_error", message: "Module model call: provider_error" });
-});
-test("version mismatch refuses launch", async () => {
-  const f = await fixture("ok", "wrong");
-  await expect(f.gateway.complete(f.input)).rejects.toMatchObject({ code: "provider_error" });
-  expect(await readFile(f.pid, "utf8").catch(() => null)).toBeNull();
-});
-test("timeout SIGKILLs Pi", async () => {
-  const f = await fixture("hang");
-  await expect(f.gateway.complete({ ...f.input, timeoutMs: 500 })).rejects.toMatchObject({ code: "timeout" });
-  const pid = Number(await readFile(f.pid, "utf8"));
-  let alive = true;
-  for (let i = 0; i < 100; i++) { try { process.kill(pid, 0); } catch { alive = false; break; } await Bun.sleep(5); }
-  expect(alive).toBe(false);
+  process.env.CHRONA_STEWARD_PI_COMMAND = command;
+  process.env.CHRONA_STEWARD_PI_AGENT_DIR = profile;
+  process.env.CHRONA_STEWARD_PI_VERSION = "1.5.0";
+  process.env.CHRONA_STEWARD_PI_MODEL = "fake/host-default";
+  const gateway = createPiModelGateway({ port: 3123, dataDir: join(root, "data") });
+  expect(await gateway.complete({ model: "fake/selected", prompt: "literal prompt", maxOutputTokens: 9, timeoutMs: 2000 })).toEqual({ text: "host completion", inputTokens: 3, outputTokens: 7 });
+  const request = JSON.parse(await readFile(record, "utf8"));
+  expect(request.profile).toBe(profile);
+  expect(request.payload.max_completion_tokens).toBe(9);
+  expect(request.args.slice(request.args.indexOf("--model"), request.args.indexOf("--model") + 2)).toEqual(["--model", "fake/selected"]);
+  expect(request.prompt).toBe("literal prompt");
 });

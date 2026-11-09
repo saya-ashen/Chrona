@@ -1,24 +1,21 @@
-import { spawn } from "node:child_process";
+import { requireDescendantStop, spawnSupervised } from "./process";
 import { existsSync, promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createConnection } from "node:net";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
+import { connectLoopbackChannel } from "./transport";
 import type { ChronaCalls } from "./calls";
 
 /** Who called a tool, as Chrona recorded it. */
 export type Caller = { kind: "module"; module: string; moduleId: string; hash: string } | { kind: "provider"; runId: string } | { kind: "owner"; via: string | null } | { kind: "kernel" };
-/** `scheduleId` and `payload` are set for timers the module arranged itself (`schedules.create`) and for reminders. */
-export type Trigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
+/** Private wire shape used to settle retained timer receipts. */
+type WireTrigger = { kind: "schedule"; id: string; firedAt: string; scheduleId?: string; payload?: Record<string, unknown> }
   | { kind: "tool"; id: string; firedAt: string; args: Record<string, unknown>; caller?: Caller; call?: { id: string; key: string | null; attempt: number; chain: string[] } }
-  | { kind: "content_edit"; id: "content"; firedAt: string; paths: string[]; by: "user" | "provider" }
   | { kind: "call_result"; id: "call"; firedAt: string; callId: string; target: string; key: string; status: "succeeded" | "failed" | "unknown"; output?: unknown; error?: string }
   /** Once per active version, and again when a module this one `uses` changes version: register with it here (e.g. web.page-set). */
-  | { kind: "activated"; id: "activated"; firedAt: string }
-  /** Diagnostic only: report readiness; do not send messages, modify projects or issue paid requests. */
-  | { kind: "health"; id: "health"; firedAt: string };
+  | { kind: "activated"; id: "activated"; firedAt: string };
+export type Trigger = Exclude<WireTrigger, { kind: "schedule" }>;
 type EventResult = { result?: unknown };
-type CallResult = { status: "executed" | "duplicate" };
 export type CallState = { callId: string; status: "queued" | "running" | "waiting" | "succeeded" | "failed" | "unknown"; duplicate?: boolean; output?: unknown; error?: string };
 export type CallOptions = { mode?: "sync" | "async"; key?: string; reply?: boolean; timeoutMs?: number; expectedTarget?: { moduleId: string; contractHash: string } };
 // v2-25: targets with a declared contract (calls.d.ts, generated per build) take typed arguments and give a typed result.
@@ -32,14 +29,12 @@ type Call = {
   /** A target without a declared contract: the result is unknown unless the caller states what it expects. */
   <T = unknown, S extends string = string>(target: S & (S extends Contract ? never : unknown), args?: Record<string, unknown>, options?: CallOptions): Promise<T>;
 };
-type Handler = (event: Trigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
-const handlers = new Map<Trigger["kind"], Handler>();
-export type ModelResult = { text: string; inputTokens: number | null; outputTokens: number | null };
+type Handler = (event: WireTrigger & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>;
+const handlers = new Map<WireTrigger["kind"], Handler>();
 export class ModelError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "ModelError"; }
 }
 const pending = new Map<string, { resolve(result: unknown): void; reject(error: Error): void }>();
-const socket = createConnection(process.env.CHRONA_SOCKET ?? "/chrona/chrona.sock");
 let stopped = false, queue = Promise.resolve();
 const disconnectHandlers = new Set<() => void>();
 /** Release module-owned resources when the kernel connection is lost; this does not prove cleanup to the kernel. */
@@ -47,59 +42,47 @@ export function onDisconnect(handler: () => void) { disconnectHandlers.add(handl
 function fail() {
   if (stopped) return;
   stopped = true;
-  for (const handler of disconnectHandlers) handler();
   for (const call of pending.values()) call.reject(new Error("Chrona disconnected"));
   pending.clear();
+  for (const handler of disconnectHandlers) handler();
 }
-socket.on("error", fail);
-socket.on("close", fail);
-function send(message: unknown) { socket.write(JSON.stringify(message) + "\n"); }
-// Events run one at a time; the shorthands below scope their keys to the event being handled, so a redelivered event
-// repeats them and another event does not (routed calls keep the caller's key as given).
-let current: string | null = null, modelSequence = 0;
+const endpoint = process.env.CHRONA_IPC_ENDPOINT, token = process.env.CHRONA_IPC_TOKEN;
+if (!endpoint || !token) throw new Error("CHRONA_IPC_ENDPOINT and CHRONA_IPC_TOKEN are required");
+const channel = connectLoopbackChannel({ endpoint, token, onMessage: receive, onDisconnect: fail });
+function send(message: unknown) { channel.send(message); }
+// Events run one at a time; emit scopes its key to the current event so redelivery repeats it.
+// Routed calls keep the caller's key as given.
+let current: string | null = null;
 const scoped = (key: string) => (current ? `${current}:${key}` : key);
-async function event(message: { id: string; event: { trigger: Trigger; now: string; params: Record<string, string | number | boolean> } }) {
+async function event(message: { id: string; event: { trigger: WireTrigger; now: string; params: Record<string, string | number | boolean> } }) {
   try {
     const handler = handlers.get(message.event.trigger.kind);
     // Results of async calls are optional to handle (callStatus reads them too), and so is `activated`.
     if (!handler && (message.event.trigger.kind === "call_result" || message.event.trigger.kind === "activated")) { send({ id: message.id, result: {} }); return; }
     if (!handler) throw new Error("No handler for " + message.event.trigger.kind);
     current = `${message.event.trigger.id}:${message.event.trigger.firedAt}`;
-    modelSequence = 0;
     const result = await handler({ ...message.event.trigger, now: message.event.now, params: message.event.params });
     send({ id: message.id, result: result ?? {} });
   } catch (error) { send({ id: message.id, error: (error instanceof Error ? error.message : String(error)).slice(0, 2000), ...(error instanceof ModelError ? { errorCode: error.code } : {}) }); }
   finally { current = null; }
 }
-// Lines may carry attachments (up to 32 MiB); collect chunks instead of re-copying the buffer.
-const MAX_LINE = 32 * 1024 * 1024;
-let parts: Buffer[] = [], size = 0;
-socket.on("data", (chunk: Buffer) => {
-  let start = 0, end: number;
-  while ((end = chunk.indexOf(10, start)) !== -1) {
-    if (size + end - start > MAX_LINE) { socket.destroy(); return; }
-    const text = Buffer.concat([...parts, chunk.subarray(start, end)]).toString("utf8");
-    parts = []; size = 0; start = end + 1;
-    try {
-      const message = JSON.parse(text);
-      if (message.ping === true && typeof message.id === "string") send({ id: message.id, result: {} });
-      else if (message.event) queue = queue.then(() => event(message)).catch(() => { socket.destroy(); });
-      else {
-        const call = pending.get(message.id);
-        if (!call) continue;
-        pending.delete(message.id);
-        if (message.error) call.reject(new ModelError(message.error.code, message.error.message ?? message.error.code));
-        else call.resolve(message.result);
-      }
-    } catch { socket.destroy(); return; }
+function receive(value: unknown) {
+  if (typeof value !== "object" || value === null || !("id" in value) || typeof value.id !== "string") throw new Error("Invalid Chrona message");
+  const message = value as { id: string; ping?: boolean; event?: Parameters<typeof event>[0]["event"]; error?: { code: string; message?: string }; result?: unknown };
+  if (message.ping === true) send({ id: message.id, result: {} });
+  else if (message.event) queue = queue.then(() => event({ id: message.id, event: message.event! })).catch(() => { void channel.close(); });
+  else {
+    const call = pending.get(message.id);
+    if (!call) return;
+    pending.delete(message.id);
+    if (message.error) call.reject(new ModelError(message.error.code, message.error.message ?? message.error.code));
+    else call.resolve(message.result);
   }
-  if (start < chunk.length) { parts.push(chunk.subarray(start)); size += chunk.length - start; }
-  if (size > MAX_LINE) socket.destroy();
-});
+}
 export function on<K extends Trigger["kind"]>(kind: K, handler: (event: Extract<Trigger, { kind: K }> & { now: string; params: Record<string, string | number | boolean> }) => EventResult | void | Promise<EventResult | void>) {
   handlers.set(kind, handler as Handler);
 }
-function call<T = CallResult>(method: string, params: unknown): Promise<T> {
+function call<T = unknown>(method: string, params: unknown): Promise<T> {
   if (stopped) return Promise.reject(new Error("Chrona disconnected"));
   const id = randomUUID();
   return new Promise((resolve, reject) => {
@@ -125,9 +108,6 @@ export const chrona = {
    */
   call: ((target: string, args: Record<string, unknown> = {}, { mode = "sync", ...options }: CallOptions = {}) =>
     call<{ output?: unknown } & CallState>("call", { target, args, mode, ...options }).then(result => (mode === "sync" ? result.output : result))) as Call,
-  /** Report this process's readiness after a read-only self-check, at startup/config changes and before expiry. Never include credentials or private data. */
-  reportHealth: (report: { status: "ready" | "needs_configuration" | "degraded" | "unknown"; summary: string; nextAction?: string; validForSeconds?: number }) =>
-    chrona.call<{ reportedAt: string; expiresAt: string }>("modules.report-health", report),
   /** State of an async call this module made. */
   callStatus: (callId: string) => call<CallState>("callStatus", { callId }),
   /**
@@ -142,8 +122,11 @@ export const chrona = {
   exec: async (command: string, args: string[] = [], options: {
     secretEnv?: Record<string, { secret: string; field: string }>; secretFiles?: Record<string, { secret: string; field: string }>;
     tokenEnv?: Record<string, { secret: string; provider: "google" | "microsoft"; account?: string }>;
-    env?: Record<string, string>; cwd?: string; stdin?: string; timeoutMs?: number; maxOutputBytes?: number;
+    env?: Record<string, string>; cwd?: string; stdin?: string; timeoutMs?: number; maxOutputBytes?: number; signal?: AbortSignal;
   } = {}): Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string; timedOut: boolean; truncated: boolean }> => {
+    if (stopped) throw new Error("Chrona disconnected");
+    options.signal?.throwIfAborted();
+    const helperPath = process.env.CHRONA_PROCESS_HELPER;
     const secrets = new Map<string, Record<string, string>>(), env = { ...process.env, ...options.env };
     for (const { secret, field } of [...Object.values(options.secretEnv ?? {}), ...Object.values(options.secretFiles ?? {})]) {
       if (!secrets.has(secret)) secrets.set(secret, (await chrona.secret({ name: secret })).value);
@@ -180,68 +163,57 @@ export const chrona = {
           env[name] = path;
         }
       }
-      return await new Promise((resolve, reject) => {
-        let child: ReturnType<typeof spawn>;
-        try { child = spawn(command, args, { env, cwd: options.cwd, detached: true, stdio: "pipe" }); }
-        catch { reject(new Error("Command failed to start")); return; }
-        const output: Buffer[][] = [[], []], sizes = [0, 0], cut = [false, false];
-        let timedOut = false, truncated = false, failed = false;
-        const timer = setTimeout(() => {
-          timedOut = true;
-          try { if (child.pid) process.kill(-child.pid, "SIGKILL"); } catch { /* Child may already have exited. */ }
-        }, options.timeoutMs ?? 60_000);
-        for (const [index, stream] of [child.stdout, child.stderr].entries()) stream!.on("data", (chunk: Buffer) => {
+      // Control credentials belong to this SDK process, even if an env/secret mapping tries to replace them.
+      for (const name of Object.keys(env)) if (name.startsWith("CHRONA_IPC_") || name.startsWith("CHRONA_HTTP_") || name === "CHRONA_SOCKET" || name === "CHRONA_PROCESS_HELPER") delete env[name];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- IPC disconnect can change this state while credentials/files are awaited.
+      if (stopped) throw new Error("Chrona disconnected");
+      options.signal?.throwIfAborted();
+      // The guardian reports execvp failure as 126/127, also valid command exit codes.
+      if (!Bun.which(command, { cwd: options.cwd, PATH: env.PATH })) throw new Error("Command failed to start");
+      const task = spawnSupervised(command, args, { env, cwd: options.cwd, helperPath, signal: options.signal });
+      const child = task.process;
+      const output: Buffer[][] = [[], []], sizes = [0, 0], cut = [false, false];
+      let timedOut = false, truncated = false;
+      const timer = setTimeout(() => { timedOut = true; task.stop(); }, options.timeoutMs ?? 60_000);
+      disconnectHandlers.add(task.stop);
+      try {
+        for (const [index, stream] of [child.stdout, child.stderr].entries()) stream.on("data", (chunk: Buffer) => {
           const remaining = Math.max(0, cap + slack - sizes[index]!);
           if (sizes[index]! + chunk.length > cap) truncated = true;
           if (chunk.length > remaining) cut[index] = true;
           if (remaining) { output[index]!.push(chunk.subarray(0, remaining)); sizes[index]! += Math.min(chunk.length, remaining); }
         });
-        child.once("error", () => { failed = true; });
-        child.once("close", (code, signal) => {
-          clearTimeout(timer);
-          if (failed) { reject(new Error("Command failed to start")); return; }
-          resolve({ code, signal, stdout: redact(Buffer.concat(output[0]!), cut[0]!), stderr: redact(Buffer.concat(output[1]!), cut[1]!), timedOut, truncated });
-        });
-        child.stdin!.on("error", () => {});
-        child.stdin!.end(options.stdin ?? "");
-      });
+        child.stdin.on("error", () => {});
+        child.stdin.end(options.stdin ?? "");
+        const exit = await task.exited.catch(() => { throw new Error("Command failed to start"); });
+        const { code, signal } = requireDescendantStop(exit);
+        options.signal?.throwIfAborted();
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- IPC disconnect can change this state while native stop evidence is awaited.
+        if (stopped) throw new Error("Chrona disconnected");
+        return { code, signal, stdout: redact(Buffer.concat(output[0]!), cut[0]!), stderr: redact(Buffer.concat(output[1]!), cut[1]!), timedOut, truncated };
+      } finally {
+        clearTimeout(timer);
+        disconnectHandlers.delete(task.stop);
+      }
     } finally { if (dir) await fs.rm(dir, { recursive: true, force: true }); }
   },
-  /** Serves the manifest's `listen` path. Long-poll entries use { idleTimeout: 30 }; omitted keeps Bun's default. */
-  // @ts-expect-error Installed bun-types rejects Unix idleTimeout; the real SDK 15s proxy probe verifies runtime support.
-  serve: (fetch: (request: Request) => Response | Promise<Response>, options: { idleTimeout?: number } = {}) => Bun.serve({ unix: process.env.CHRONA_HTTP_SOCKET ?? "/chrona/http/s", fetch, ...options }),
-  /** One completion through Agent, charged to this module's event and declared model limits. */
-  model: async (params: { system?: string; prompt: string; maxOutputTokens: number }): Promise<ModelResult> => {
-    try {
-      const started = await chrona.call<{ operationId: string }>("agent.complete", {
-        "command-key": current ? scoped(`model:${++modelSequence}`) : `model:${randomUUID()}`, prompt: params.prompt,
-        ...(params.system === undefined ? {} : { system: params.system }), "max-output-tokens": params.maxOutputTokens,
-      });
-      const deadline = Date.now() + 360_000;
-      while (Date.now() < deadline) {
-        const status = await chrona.call<{ result: ModelResult | null; failure: boolean }>("agent.completion", { "operation-id": started.operationId });
-        if (status.failure) throw new ModelError("provider_error", "Agent completion failed or remains unconfirmed");
-        if (status.result) return status.result;
-        await new Promise(resolve => setTimeout(resolve, 25));
-      }
-      throw new ModelError("timeout", "Agent completion remains unconfirmed");
-    } catch (error) {
-      const failure = error as ModelError;
-      throw new ModelError(/(?:^|: )(undeclared|unconfigured|budget_exceeded|provider_error|timeout):/.exec(failure.message)?.[1] ?? failure.code, failure.message);
-    }
-  },
-  /** Shorthand for an async call to `notify.send` (uses ["notify.send"]); `key` is the idempotency key. */
-  notify: (params: { key: string; level: "now" | "digest"; title: string; body: string }) => chrona.call<CallState>("notify.send", { ...params, key: scoped(params.key) }, { mode: "async", key: scoped(params.key) })
-    .then(result => ({ status: result.duplicate ? "duplicate" as const : "executed" as const })),
-  /** Create an event-keyed Agent context and enqueue the module's explicit prompt and selected tools. */
-  wakeProvider: async (params: { key: string; prompt: string; tools?: string[] }) => {
-    const key = scoped(params.key);
-    const context = await chrona.call<{ contextId: string }>("agent.context", { "request-key": key });
-    const run = await chrona.call<{ runId: string }>("agent.run", { "context-id": context.contextId, "request-key": key, prompt: params.prompt, lane: "background", tools: params.tools ?? [] });
-    return { status: "executed" as const, contextId: context.contextId, runId: run.runId };
+  /** Serves the manifest's `listen` path through the authenticated kernel proxy. */
+  serve: (fetch: (request: Request) => Response | Promise<Response>, options: { idleTimeout?: number } = {}) => {
+    if (stopped) throw new Error("Chrona disconnected");
+    const expected = Buffer.from(token);
+    const server = Bun.serve({ ...options, hostname: "127.0.0.1", port: 0, fetch(request) {
+      const supplied = Buffer.from(request.headers.get("x-chrona-module-token") ?? "");
+      if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return new Response("Unauthorized", { status: 401 });
+      const headers = new Headers(request.headers);
+      headers.delete("x-chrona-module-token");
+      return fetch(new Request(request, { headers }));
+    } });
+    onDisconnect(() => { void server.stop(true); });
+    send({ type: "http-ready", endpoint: `http://127.0.0.1:${server.port}` });
+    return server;
   },
   /**
-   * Emit an event this module declares in `contributes.events.emits` (v2-14): a sync call to `events.emit` (uses ["events.emit"]).
+   * Emit an event after registering its definition with the ordinary `events.register` tool; this calls `events.emit`.
    * `name` is the event's own name (the module name is added); `key` is the idempotency key, derived from the triggering event.
    */
   emit: (name: string, payload: Record<string, unknown>, options: { key: string }) =>

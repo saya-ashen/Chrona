@@ -46,6 +46,12 @@ jobs:
       - name: Verify source Windows ACL bridge
         run: bun test packages/db/src/sqlite-url.bun.test.ts
 
+      - name: Prepare Windows native compiler
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+
+      - name: Verify native release helper and staged SDK
+        run: bun test scripts/build-binaries.bun.test.ts
+
       - name: Build Windows binary
         run: bun scripts/chrona.ts build windows-x64
 

@@ -7,6 +7,7 @@ import { createExternalModuleInstaller, type StewardPorts } from "@chrona/engine
 import { readProtectedSecret } from "./protected-secret";
 import { createScriptSandbox } from "./script-sandbox";
 import { createModulePackages } from "./module-packages";
+import runtimeDeclarations from "./runtimes.json";
 
 function publicOrigin(): string | null {
   try {
@@ -25,25 +26,31 @@ export function resourcePath(relative: string, source = relative): string {
   const root = process.env.CHRONA_RESOURCE_DIR || (existsSync(join(dirname(process.execPath), "resources")) ? join(dirname(process.execPath), "resources") : null);
   return root ? join(root, relative) : fileURLToPath(new URL(`../../../../${source}`, import.meta.url));
 }
-export function executionMode(env = process.env): "trusted-local" | "required-isolation" {
+export function executionMode(env = process.env): "trusted-local" {
+  if (env.CHRONA_STEWARD_SANDBOX_BWRAP?.trim()) throw new Error("CHRONA_STEWARD_SANDBOX_BWRAP has been removed; remove the setting to use trusted-local execution");
   const configured = env.CHRONA_STEWARD_EXECUTION_MODE?.trim();
-  if (!configured) return "trusted-local";
-  if (configured === "trusted-local" || configured === "required-isolation") return configured;
-  throw new Error("Invalid CHRONA_STEWARD_EXECUTION_MODE; use trusted-local or required-isolation");
+  if (!configured || configured === "trusted-local") return "trusted-local";
+  throw new Error("CHRONA_STEWARD_EXECUTION_MODE supports only trusted-local; required-isolation has been removed");
 }
 async function configuredSecret(name: string) {
   const appId = process.env.CHRONA_QQ_APP_ID?.trim(), file = process.env.CHRONA_QQ_SECRET_FILE?.trim();
   return name === "qq_bot" && appId && file ? { appId, clientSecret: await readProtectedSecret(file) } : null;
 }
+export function processHelperPath(): string {
+  const executable = `chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`;
+  return process.env.CHRONA_PROCESS_HELPER ?? resourcePath(`process/${process.platform}-${process.arch}/${executable}`, `packages/process/bin/${process.platform}-${process.arch}/${executable}`);
+}
 /** Shared offline install/build resources; construction never starts a Provider, tick, or module. */
 export function createModuleRuntimePorts(db: PrismaClient, options: { dataDir?: string; now?: () => Date; sandbox?: StewardPorts["sandbox"] } = {}): StewardPorts {
   const moduleSdk = resourcePath("module-sdk", "packages/integrations/src/steward/module-sdk");
-  const scriptSandbox = createScriptSandbox({ bwrapPath: process.env.CHRONA_STEWARD_SANDBOX_BWRAP, executionMode: executionMode(), dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk });
+  const moduleTypecheck = resourcePath("module-typecheck", "packages/integrations/src/steward/module-typecheck");
+  const processHelper = processHelperPath();
+  const scriptSandbox = createScriptSandbox({ executionMode: executionMode(), dataDir: resolve(options.dataDir ?? stewardDataDir()), moduleSdk, moduleTypecheck, processHelper });
   const ports: StewardPorts = {
     db, now: options.now ?? (() => new Date()), dataDir: options.dataDir ?? stewardDataDir(), publicUrl: publicOrigin(),
     secrets: configuredSecret, secretConfigured: async name => name === "qq_bot" && !!process.env.CHRONA_QQ_APP_ID?.trim() && !!process.env.CHRONA_QQ_SECRET_FILE?.trim() && existsSync(process.env.CHRONA_QQ_SECRET_FILE.trim()),
-    packages: createModulePackages(), moduleSdk,
-    moduleTypecheck: resourcePath("module-typecheck", "packages/integrations/src/steward/module-typecheck"),
+    packages: createModulePackages({ processHelper }), moduleSdk,
+    moduleTypecheck, processHelper, moduleRuntimes: runtimeDeclarations,
     moduleBuiltinResources: resourcePath("builtin", "packages/engine/src/modules/steward/builtin"),
     moduleExternalResources: resourcePath("external", "packages/engine/src/modules/steward/external"),
     sandbox: options.sandbox ?? { ...scriptSandbox.health, executionMode: executionMode(), runModule: input => scriptSandbox.runModule(input), startModule: input => scriptSandbox.startModule(input) },

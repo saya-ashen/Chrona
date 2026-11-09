@@ -18,7 +18,7 @@ type ClaimedRun = NonNullable<Awaited<ReturnType<ReturnType<typeof createRuns>["
 export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): Promise<(ProviderRunInput & { onInteraction(request: ProviderInteraction): Promise<void> }) | null> {
   const row = await ports.db.executionAttempt.findUnique({ where: { runId: run.id }, include: { run: true } });
   if (!row) return null;
-  if (row.executorId !== "server" || row.resolvedCwd === null) throw new CallError("conflict", "Device execution requires the remote launch path");
+  if (row.targetBinding || row.executorId !== "server" || row.resolvedCwd === null) throw new CallError("conflict", "Application execution uses durable delivery");
   const attemptId = row.id;
   const principal = executionPrincipal(row);
   await assertExecutionPrincipal(ports.db, principal);

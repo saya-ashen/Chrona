@@ -6,6 +6,13 @@ import { commitModuleSource, moduleGitPath } from "./module-git";
 import { readModuleFiles } from "./module-preview";
 import { existsSync } from "node:fs";
 import type { StewardPorts } from "./ports";
+import runtimeDeclarations from "../../../../integrations/src/steward/runtimes.json";
+
+/** Use the shipped SDK and runtime checks; installation fixtures must not silently skip typechecking. */
+export function testReleaseRuntimeChecks(): Pick<StewardPorts, "moduleSdk" | "moduleTypecheck" | "moduleRuntimes"> {
+  const runtime = resolve(import.meta.dirname, "../../../../integrations/src/steward");
+  return { moduleSdk: join(runtime, "module-sdk"), moduleTypecheck: join(runtime, "module-typecheck"), moduleRuntimes: runtimeDeclarations };
+}
 
 /** Synthetic fixtures retain ancestry across release edits, without any network or user database. */
 export async function seedTestModuleRelease(resourcesRoot: string, name: string, repository: string | null = null) {
@@ -28,7 +35,7 @@ export async function seedTestModuleRelease(resourcesRoot: string, name: string,
 
 /** Reuse fixture resources' installed dependencies without package installation or network access. */
 export function testReleasePackages(resourcesRoot: string): NonNullable<StewardPorts["packages"]> {
-  return { backend: "system", async install({ dir, packages }) {
+  return { async install({ dir, packages }) {
     if (packages.length || existsSync(join(dir, "pyproject.toml"))) throw new Error("Release fixture adapter only reuses bundled npm dependencies");
     const npm = existsSync(join(dir, "package.json"));
     if (npm) {

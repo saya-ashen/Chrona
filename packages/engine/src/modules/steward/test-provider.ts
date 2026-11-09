@@ -5,7 +5,7 @@ import type { StewardPorts } from "./ports";
 import { CallError, callSync, kernelOrigin, registerLocalModule } from "./module-calls";
 import { tool, json } from "./system/shared";
 import { authenticateRun } from "./run-auth";
-import { injectedAgentTools, injectedAgentPrimitive } from "./agent-injected.fixtures";
+import { injectedAgentTools, injectedAgentPrimitive } from "../../../../../scripts/agent-integration/agent-injected.fixtures";
 
 const operations = new WeakMap<StewardPorts, Map<string, Operation>>();
 type Outcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;

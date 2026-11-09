@@ -38,7 +38,7 @@
 
 | 路径 | 关注内容 |
 | --- | --- |
-| `external-plugins/pi-steward-agent/chrona-tools.ts` | Pi 工具发现、注册与 HTTP 转发 |
+| `packages/pi/resources/chrona-tools.ts` | Pi 工具发现、注册与 HTTP 转发 |
 | `apps/server/src/routes/steward-agent.routes.ts` | 本机工具入口 |
 | `packages/engine/src/modules/steward/tools.ts` | Run 鉴权、预算、期限、执行记录及工具分发 |
 | `packages/engine/src/modules/steward/module-tools.ts` | 工具目录及路由入口 |

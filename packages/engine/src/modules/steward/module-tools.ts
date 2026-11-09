@@ -1,10 +1,11 @@
-import { z } from "zod";
+import { moduleToolContract } from "./module-tool-contract";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import type { ModuleTool } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
+import { isModulePaused } from "./module-availability";
 import { audit } from "./audit";
-import { CallError, callSync, listSystemModules, normalizedToolInputSchema, type SystemTool } from "./module-calls";
+import { CallError, callSync, listSystemModules, type SystemTool } from "./module-calls";
 
 /** Tools belong to the workspace; session focus controls only catalog exposure. `audience` is who will call them. */
 type Scope = { workspaceId: string; sessionId?: string | null; audience?: "provider" | "owner" | "modules" };
@@ -20,10 +21,12 @@ function systemEntries(audience: "provider" | "owner" | "modules"): Entry[] {
 async function addModuleTools(ports: StewardPorts, modules: Awaited<ReturnType<StewardPorts["db"]["module"]["findMany"]>>, audience: "provider" | "owner" | "modules", focus: unknown[], catalog: { tools: Entry[]; names: Set<string>; toolsets: Set<string> }) {
   const { db } = ports, { tools, names, toolsets } = catalog;
   for (const module of modules) {
+    if (isModulePaused(module.name)) continue;
     // One toolset per module name, like one MCP server per name.
     if (toolsets.has(module.name)) continue;
     const version = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
-    const parsed = moduleManifestSchema.safeParse(version?.manifest);
+    if (version?.status !== "approved") continue;
+    const parsed = moduleManifestSchema.safeParse(version.manifest);
     const visible = parsed.success ? parsed.data.tools.filter(tool => tool.visibility.includes(audience)) : [];
     if (!parsed.success || !visible.length) continue;
     toolsets.add(module.name);
@@ -49,18 +52,12 @@ type Resolved = Awaited<ReturnType<typeof moduleTools>>[number];
 function toolset({ module, manifest }: Resolved) {
   return { name: `module_${module.name.replaceAll("-", "_")}`, description: (manifest.description ?? manifest.tools.map(tool => tool.description).join("; ")).slice(0, 500) };
 }
-function catalogInput(tool: SystemTool | ModuleTool) {
-  return "input" in tool && tool.input ? z.toJSONSchema(tool.input) : normalizedToolInputSchema(tool as ModuleTool);
-}
-function catalogOutput(tool: SystemTool | ModuleTool, system: boolean) {
-  return tool.output ? (system ? z.toJSONSchema(tool.output as z.ZodType) : tool.output) : null;
-}
 export function catalogEntry(resolved: Resolved) {
   const { tool } = resolved;
   return { name: resolved.name, exposure: resolved.direct ? "direct" as const : "deferred" as const, namespace: toolset(resolved),
     description: tool.description,
-    inputSchema: { ...catalogInput(tool), additionalProperties: false, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` },
-    outputSchema: catalogOutput(tool, !!resolved.system), examples: "examples" in tool ? tool.examples ?? null : null,
+    inputSchema: { ...moduleToolContract(tool).input, additionalProperties: false, description: `[${resolved.system ? "Chrona" : "module"} ${resolved.module.name}] ${tool.description}` },
+    outputSchema: moduleToolContract(tool).output, examples: "examples" in tool ? tool.examples ?? null : null,
     sideEffects: "sideEffects" in tool ? tool.sideEffects ?? null : null, errors: "errors" in tool ? tool.errors ?? null : null,
     idempotent: tool.idempotent,
     retry: tool.idempotent ? "May be redelivered after an unknown async outcome; target declares idempotent." : "Unknown async outcomes are not redelivered automatically." };

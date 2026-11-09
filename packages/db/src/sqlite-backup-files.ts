@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile } from "./sqlite-url";
 
 export const backupDataRoots = ["platform", "sessions", "secrets", "qq-bot"] as const;
@@ -29,6 +28,63 @@ function assertRegularTree(dataDir: string, path: string, files: string[], omitt
   if (stat.isDirectory()) for (const name of readdirSync(join(dataDir, path))) assertRegularTree(dataDir, `${path}/${name}`, files, omitted);
 }
 
+// ustar stores UTF-8 paths in a 100-byte name and an optional 155-byte directory prefix.
+function archivePathFields(path: string): { name: string; prefix: string } {
+  if (Buffer.byteLength(path) <= 100) return { name: path, prefix: "" };
+  for (let split = path.lastIndexOf("/"); split > 0; split = path.lastIndexOf("/", split - 1)) {
+    const prefix = path.slice(0, split), name = path.slice(split + 1);
+    if (Buffer.byteLength(prefix) <= 155 && Buffer.byteLength(name) <= 100) return { name, prefix };
+  }
+  throw new Error(`Backup path exceeds ustar limits: ${path}`);
+}
+
+function archiveHeader(path: string, directory: boolean, size: number, executable: boolean): Buffer {
+  const { name, prefix } = archivePathFields(path);
+  if (!Number.isSafeInteger(size) || size < 0 || size > 0o77777777777) throw new Error("Backup file exceeds ustar size limits.");
+  const header = Buffer.alloc(512);
+  header.write(name, 0, 100);
+  header.write(prefix, 345, 155);
+  header.write(`${(directory || executable ? 0o700 : 0o600).toString(8).padStart(7, "0")}\0`, 100);
+  header.write("0000000\0", 108); // No host user/group identity is needed for private restores.
+  header.write("0000000\0", 116);
+  header.write(`${size.toString(8).padStart(11, "0")}\0`, 124);
+  header.write("00000000000\0", 136);
+  header.fill(32, 148, 156);
+  header[156] = directory ? 53 : 48;
+  header.write("ustar\0", 257);
+  header.write("00", 263);
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148);
+  return header;
+}
+
+function writeArchiveEntry(output: number, dataDir: string, path: string, buffer: Buffer): void {
+  const source = join(dataDir, path), stat = lstatSync(source);
+  if (stat.isDirectory()) {
+    writeFileSync(output, archiveHeader(path, true, 0, false));
+    return;
+  }
+  if (!stat.isFile()) throw new Error("Backup source is no longer a regular file.");
+  // POSIX flags prevent following a final symlink or blocking on a FIFO swapped in after traversal.
+  const flags = process.platform === "win32" ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK;
+  const input = openSync(source, flags);
+  try {
+    const opened = fstatSync(input);
+    if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("Backup source changed while opening.");
+    writeFileSync(output, archiveHeader(path, false, opened.size, Boolean(opened.mode & 0o111)));
+    let remaining = opened.size;
+    while (remaining > 0) {
+      const count = readSync(input, buffer, 0, Math.min(remaining, buffer.length), null);
+      if (count === 0) throw new Error("Backup source changed while reading.");
+      writeFileSync(output, buffer.subarray(0, count));
+      remaining -= count;
+    }
+    const after = fstatSync(input);
+    if (after.size !== opened.size || after.mtimeMs !== opened.mtimeMs) throw new Error("Backup source changed while reading.");
+    writeFileSync(output, Buffer.alloc((512 - opened.size % 512) % 512));
+  } finally { closeSync(input); }
+}
+
 /** Returns the links and special files left out of the archive. */
 export function backupDataFiles(dataDir: string, archivePath: string): string[] {
   if (existsSync(archivePath)) throw new Error("Backup archive already exists.");
@@ -38,10 +94,25 @@ export function backupDataFiles(dataDir: string, archivePath: string): string[] 
     if (!lstatSync(join(dataDir, root)).isDirectory()) throw new Error("Backup roots must be directories.");
     assertRegularTree(dataDir, root, files, omitted);
   }
-  // Reserve a private output before tar opens it, including under a permissive umask.
-  writeFileSync(archivePath, "", { flag: "wx", mode: 0o600 });
-  execFileSync("tar", ["--format=ustar", "--hard-dereference", "--no-recursion", "-cf", resolve(archivePath), "-C", resolve(dataDir), "--null", "--files-from=-"], { input: files.length ? `${files.join("\0")}\0` : "", stdio: "pipe" });
-  secureGeneratedPrivateFile(archivePath);
+  const seen = new Set<string>();
+  for (const path of files) {
+    if (!safePath(path, lstatSync(join(dataDir, path)).isDirectory(), seen)) throw new Error(`Invalid or unsafe backup path: ${path}`);
+    seen.add(path);
+    archivePathFields(path);
+  }
+  // Secure the exclusively created output before writing any content, including on Windows.
+  const output = openSync(archivePath, "wx", 0o600);
+  try {
+    try {
+      secureGeneratedPrivateFile(archivePath);
+      const buffer = Buffer.alloc(64 * 1024);
+      for (const path of files) writeArchiveEntry(output, dataDir, path, buffer);
+      writeFileSync(output, Buffer.alloc(1024));
+    } finally { closeSync(output); }
+  } catch (error) {
+    rmSync(archivePath, { force: true });
+    throw error;
+  }
   return omitted;
 }
 

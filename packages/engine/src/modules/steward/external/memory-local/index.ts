@@ -9,7 +9,7 @@ import { redactSensitiveText } from "./redaction";
  * mnemopi (pinned in bun.lock) keeps them in data/memory.db. Full-text recall unless the user saved the
  * memory_embedding credential ({ apiUrl, model, apiKey }: an OpenAI-compatible embeddings endpoint).
  */
-type Memory = { remember(content: string, options: { source: string; metadata: Record<string, string> }): string; recall(query: string, limit: number): Promise<{ id: string; content: string; timestamp: string | null; score: number }[]>; forget(id: string): boolean; sleep(dryRun?: boolean): unknown; close(): void };
+type Memory = { remember(content: string, options: { source: string; metadata: Record<string, string> }): string; recall(query: string, limit: number): Promise<{ id: string; content: string; timestamp: string | null; score: number }[]>; forget(id: string): boolean; close(): void };
 // A variable specifier: the package is installed with the module, not with Chrona.
 const PACKAGE = "@oh-my-pi/pi-mnemopi";
 let opened: Promise<Memory> | undefined;
@@ -71,5 +71,4 @@ on("tool", async (event: { id: string; args: Record<string, unknown>; now: strin
   const source = caller.kind === "module" ? `module:${caller.module}` : caller.kind === "provider" ? `run:${caller.runId}` : `owner:${caller.via ?? "direct"}`;
   return { result: await tools[event.id]!({ ...event.args, source, at: event.now }) };
 });
-// Daily consolidation with mnemopi's own rules (no model calls).
-on("schedule", async () => { (await memory()).sleep(false); return {}; });
+// Scheduled consolidation is temporarily paused. Recall and retention remain available.

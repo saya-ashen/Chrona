@@ -1,5 +1,6 @@
+import { fenceExecutionModule, fenceExecutionVersionChange } from "./execution-delivery-controls";
 import { z } from "zod";
-import { isEntryModule, moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { assertExternalModule, moduleIdentity } from "./module-identity";
 import { moduleUpstream } from "./module-upstream";
 import { moduleUpstreamRequestSchema } from "@chrona/contracts/steward";
@@ -47,8 +48,7 @@ async function currentContractFailures(db: StewardPorts["db"], workspaceId: stri
 
 function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | null; status: string }, version: { manifest: unknown } | null) {
   const manifest = moduleManifestSchema.safeParse(version?.manifest).data, supervisor = moduleSupervisor(ports);
-  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false),
-    readiness: supervisor.readiness(row.id, row.activeHash), healthCheck: manifest?.healthCheck ?? false };
+  return { runtime: row.status !== "active" ? { state: "paused", pid: null } : supervisor.status(row.id, row.activeHash, manifest?.keepAlive ?? false) };
 }
 
 function incidentSummary(current: ModuleIncident | undefined) {
@@ -72,7 +72,7 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
     contractFailureCount = failures.count;
     truncated = incident.truncated || failures.truncated;
   }
-  const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } } }) : null;
+  const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true } }) : null;
   return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
     ...runtimeOf(ports, moduleRow, version),
     activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status, activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
@@ -84,15 +84,21 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
 async function list(context: ModuleContext) {
   const { db, workspaceId } = context;
-  const rows = await db.module.findMany({ where: { workspaceId }, include: { versions: { select: { hash: true, status: true, intent: true, createdAt: true, manifest: true, report: true }, orderBy: { createdAt: "desc" } }, runs: { take: 5, orderBy: { createdAt: "desc" }, select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } } } });
-  return Promise.all(rows.map(async ({ versions, ...row }) => {
-    const manifest = moduleManifestSchema.safeParse(versions.find(version => version.hash === row.activeHash)?.manifest).data;
-    return { ...row, ...moduleIdentity(row, { configurable: !!manifest && Object.keys(manifest.settings).length > 0, removable: !manifest || !isEntryModule(manifest) }), description: manifest?.description ?? null,
+  const rows = await db.module.findMany({ where: { workspaceId }, select: {
+    id: true, name: true, builtin: true, status: true, activeHash: true,
+    versions: { take: 5, select: { hash: true, status: true, createdAt: true, report: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+    runs: { take: 5, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, hash: true, triggerId: true, firedAt: true, exitCode: true, error: true, createdAt: true } },
+  } });
+  return Promise.all(rows.map(async ({ versions, runs, ...row }) => {
+    const active = row.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: row.id, hash: row.activeHash } }, select: { manifest: true } }) : null;
+    const manifest = moduleManifestSchema.safeParse(active?.manifest).data;
+    return { id: row.id, name: row.name, builtin: row.builtin, status: row.status, activeHash: row.activeHash, ...moduleIdentity(row), description: manifest?.description ?? null,
       health: await moduleHealthSummary(context.ports, workspaceId, row),
-      versions: versions.map(({ manifest: _manifest, report, ...version }) => {
+      versions: versions.map(({ report, ...version }) => {
         const metadata = z.object({ errors: z.array(z.string()).optional(), git: z.object({ commit: z.string().regex(/^[a-f0-9]{40}$/), tree: z.string().regex(/^[a-f0-9]{40}$/) }).optional() }).safeParse(report).data;
-        return { ...version, errors: metadata?.errors ?? null, git: metadata?.git ?? null };
+        return { ...version, errors: metadata?.errors?.slice(0, 5).map(error => diagnosticText(error, 300).slice(0, 300)) ?? null, git: metadata?.git ?? null };
       }),
+      runs: runs.map(run => ({ ...run, error: run.error === null ? null : diagnosticText(run.error, 1000).slice(0, 1000) })),
     };
   }));
 }
@@ -123,21 +129,23 @@ export function createModules(ports: StewardPorts, workspaceId: string) {
     propose: (input: Parameters<typeof propose>[1], source: ModuleSource) => propose(context, input, source),
     buildPending: (now = ports.now()) => reconcile(buildPending(context, now)),
     recoverMigrations: (now = ports.now()) => reconcile(recoverMigrations(context, now)),
-    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile(ports.db.$transaction(async tx => {
-      await assertExternalModule(tx, workspaceId, moduleId, reason === "rollback" ? "rollback" : "activate");
-      return activateIn(context, tx, { moduleId, hash, reason });
-    })),
+    activate: (moduleId: string, hash: string, reason: "activate" | "rollback") => reconcile((async () => {
+      await assertExternalModule(ports.db, workspaceId, moduleId, reason);
+      if (!await ports.db.moduleVersion.findFirst({ where: { moduleId, hash, status: "approved" } })) throw new StewardError("conflict", "Module version is not approved");
+      await fenceExecutionVersionChange(ports, workspaceId, moduleId, hash);
+      return ports.db.$transaction(tx => activateIn(context, tx, { moduleId, hash, reason }));
+    })()),
     install: (request: Parameters<typeof installExternal>[2]) => installExternal(ports, workspaceId, request),
     catalog: () => externalPackageCatalog(ports, workspaceId),
     onApproved: (action: ApprovedAction) => reconcile(onApproved(context, action)),
     rollback: (moduleId: string, hash: string) => reconcile(rollback(context, moduleId, hash)),
-    disable: (moduleId: string, source: "cli") => reconcile(ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source))),
+    disable: (moduleId: string, source: "cli") => reconcile((async () => { await fenceExecutionModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, "paused", source)); })()),
     /** v2-26 `modules.rollback/disable/enable/remove`: the user pauses or resumes directly; Chrona (the Provider) only asks, and the user decides once; removing always asks (red). */
     lifecycle: (name: string, moduleId: string, args: Record<string, unknown>, asUser: boolean) => {
       if (name === "rollback") return reconcile(rollback(context, moduleId, String(args.hash)));
       if (name === "remove") return requestRemove(context, moduleId, String(args.reason ?? ""));
       const status = name === "disable" ? "paused" : "active";
-      return asUser ? reconcile(ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") }))) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
+      return asUser ? reconcile((async () => { if (status === "paused") await fenceExecutionModule(ports, workspaceId, moduleId); return ports.db.$transaction(tx => setStatusIn(context, tx, moduleId, status, { source: "owner", reason: String(args.reason ?? "owner") })); })()) : requestStatus(context, moduleId, status, String(args.reason ?? ""));
     },
     list: () => list(context),
     health: async (input: { open?: boolean; cursor?: string } = {}, targets?: string[]) => {

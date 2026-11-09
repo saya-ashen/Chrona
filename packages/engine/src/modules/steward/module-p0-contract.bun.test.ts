@@ -2,13 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, moduleInstallRequestSchema, modulePackageCatalogSchema } from "@chrona/contracts/steward";
+import { BUILTIN_MODULE_NAMES, KERNEL_MODULE_NAMES, MODULE_OPERATIONS, PREINSTALLED_MODULE_NAMES, moduleManifestSchema, moduleInstallRequestSchema, moduleInstallResultSchema } from "@chrona/contracts/steward";
 import { assertExternalName, assertExternalModule, assertModuleOperation, moduleIdentity } from "./module-identity";
 import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { installExternal, recordInstallationResult, externalPackageCatalog } from "./module-install";
 import { ensureWorkspaceInitialized } from "./module-initialization";
-import { moduleLifecycleFixtures as fixtures } from "./module-lifecycle.fixtures";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { createModules } from "./modules";
@@ -22,6 +21,18 @@ import { moduleInterfaces } from "./system-apps";
 import { createSecrets } from "./secrets";
 import { callSync, enqueueCall, kernelOrigin, moduleCallbackContractHash, runDueCalls } from "./module-calls";
 
+// Keep these private lifecycle fixtures valid under the current manifest contract.
+const manifest = (name: string) => moduleManifestSchema.parse({ name, description: `Fixture ${name}`, entry: "index.ts", keepAlive: true, effects: [], tests: ["test.ts"], tools: [] });
+const fixtures = {
+  builtin: { row: { id: "fixture-agent", name: "agent", builtin: true, status: "active", activeHash: "a".repeat(64) }, manifest: manifest("agent") },
+  external: { row: { id: "fixture-alpha", name: "alpha", builtin: false, status: "active", activeHash: "b".repeat(64) }, manifest: manifest("alpha") },
+  forgedRow: { id: "fixture-forged", name: "agent", builtin: false, status: "active", activeHash: "e".repeat(64) },
+  forgedManifest: { ...manifest("alpha"), builtin: true, origin: "builtin" },
+  install: moduleInstallRequestSchema.parse({ package: "qq", mode: "install", requestKey: "fixture-install-qq" }),
+  failedInstall: moduleInstallResultSchema.parse({ package: "qq", requestKey: "fixture-install-qq", status: "failed", moduleId: null, hash: null, approvalId: null, error: { code: "failed", reason: "dependency_unavailable", message: "Synthetic missing dependency" } }),
+  unknownInstall: moduleInstallResultSchema.parse({ package: "qq", requestKey: "fixture-unknown", status: "pending", moduleId: null, hash: null, approvalId: null, error: null }),
+};
+
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 async function fixture() {
@@ -32,7 +43,7 @@ async function fixture() {
   for (const [root, names] of [[ports.moduleBuiltinResources!, BUILTIN_MODULE_NAMES], [ports.moduleExternalResources!, [...PREINSTALLED_MODULE_NAMES, "memory-local"]]] as const) {
     for (const name of names) {
       const dir = join(root, name); await mkdir(dir, { recursive: true });
-      await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], triggers: [] })));
+      await writeFile(join(dir, "module.json"), JSON.stringify(moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] })));
       await writeFile(join(dir, "index.ts"), "// synthetic, never executed\n");
       await writeFile(join(dir, "test.ts"), "// synthetic author test\n");
       await seedTestModuleRelease(root, name);
@@ -41,7 +52,7 @@ async function fixture() {
   return { ports, db, workspaceId: workspace.id, dataDir };
 }
 
-test("identity is a database fact; built-ins update while removal, installation and forged identities stay protected", async () => {
+test("identity is a database fact; Agent and forged identities stay protected", async () => {
   const f = await fixture();
   for (const operation of MODULE_OPERATIONS) {
     for (const name of BUILTIN_MODULE_NAMES) {
@@ -64,17 +75,17 @@ test("identity is a database fact; built-ins update while removal, installation 
 });
 
 test("trusted release binds manifest and exact code hash; missing, drift, mismatches and symlinks fail closed", async () => {
-  const f = await fixture(), release = await resolveBuiltinRelease(f.ports, "web");
-  expect(release).toMatchObject({ name: "web", origin: "builtin", codeDir: join(f.ports.moduleBuiltinResources!, "web") });
+  const f = await fixture(), release = await resolveBuiltinRelease(f.ports, "agent");
+  expect(release).toMatchObject({ name: "agent", origin: "builtin", codeDir: join(f.ports.moduleBuiltinResources!, "agent") });
   expect(release.hash).toMatch(/^[a-f0-9]{40}$/);
   expect(release.git?.commit).toBe(release.hash);
   expect((await resolveExternalRelease(f.ports, "qq")).origin).toBe("external");
   await expect(resolveBuiltinRelease(f.ports, "../qq")).rejects.toMatchObject({ reason: "release_not_found" });
-  await expect(resolveBuiltinRelease({}, "web")).rejects.toMatchObject({ reason: "release_not_found" });
+  await expect(resolveBuiltinRelease({}, "agent")).rejects.toMatchObject({ reason: "release_not_found" });
   await writeFile(join(release.codeDir, "index.ts"), "changed\n");
-  await expect(resolveBuiltinRelease(f.ports, "web", release.hash)).rejects.toMatchObject({ reason: "release_drift" });
+  await expect(resolveBuiltinRelease(f.ports, "agent", release.hash)).rejects.toMatchObject({ reason: "release_drift" });
   await symlink(join(release.codeDir, "index.ts"), join(release.codeDir, "leak.ts"));
-  await expect(resolveBuiltinRelease(f.ports, "web")).rejects.toMatchObject({ code: "forbidden" });
+  await expect(resolveBuiltinRelease(f.ports, "agent")).rejects.toMatchObject({ code: "forbidden" });
   await writeFile(join(f.ports.moduleExternalResources!, "qq/module.json"), JSON.stringify(fixtures.external.manifest));
   await expect(resolveExternalRelease(f.ports, "qq")).rejects.toMatchObject({ reason: "invalid_release" });
 });
@@ -89,17 +100,17 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(first.status).toBe("building");
   expect(await installExternal(f.ports, f.workspaceId, fixtures.install)).toEqual(first);
   expect(calls).toBe(1);
-  await expect(installExternal(f.ports, f.workspaceId, { ...fixtures.install, package: "mind" })).rejects.toMatchObject({ code: "conflict" });
+  await expect(installExternal(f.ports, f.workspaceId, { ...fixtures.install, package: "notify" })).rejects.toMatchObject({ code: "conflict" });
   await recordInstallationResult(f.ports, f.workspaceId, { ...first, status: "failed", error: fixtures.failedInstall.error });
   expect((await installExternal(f.ports, f.workspaceId, fixtures.install)).status).toBe("failed");
   expect(calls).toBe(1);
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, dir: "/private" }).success).toBe(false);
-  expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(false);
-  expect(modulePackageCatalogSchema.parse(await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor", "mcp", "files", "events"]);
+  expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(true);
+  expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
   // Other packages' history cannot push this package out of a global latest-N window.
   for (let i = 0; i < 205; i++) await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "kernel", kind: "module_installation", details: { request: { package: "mind", mode: "install", requestKey: `noise-${i}` }, result: { ...fixtures.failedInstall, package: "mind", requestKey: `noise-${i}` } } } });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
-  const unavailable = await installExternal({ ...f.ports, moduleExternalInstaller: undefined }, f.workspaceId, { package: "mind", mode: "install", requestKey: "no-adapter" });
+  const unavailable = await installExternal({ ...f.ports, moduleExternalInstaller: undefined }, f.workspaceId, { package: "notify", mode: "install", requestKey: "no-adapter" });
   expect(unavailable).toMatchObject({ status: "unavailable", error: { reason: "installer_unavailable" } });
 });
 
@@ -111,10 +122,10 @@ test("initialization persists once, serializes concurrent starts and never resur
     return { package: request.package, requestKey: request.requestKey, status: "installed", moduleId: row.id, hash: release.hash, approvalId: null, error: null };
   };
   const [a, b] = await Promise.all([ensureWorkspaceInitialized(f.ports, f.workspaceId), ensureWorkspaceInitialized(f.ports, f.workspaceId)]);
-  expect(a).toEqual(b); expect(a.status).toBe("complete"); expect(calls).toBe(3);
+  expect(a).toEqual(b); expect(a.status).toBe("complete"); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
   await f.db.module.deleteMany({ where: { workspaceId: f.workspaceId, name: "qq" } });
   expect((await ensureWorkspaceInitialized({ ...f.ports }, f.workspaceId)).status).toBe("complete");
-  expect(calls).toBe(3);
+  expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
   expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "qq" } })).toBe(0);
   expect(await f.db.module.count({ where: { workspaceId: f.workspaceId, name: "memory-local" } })).toBe(0);
 });
@@ -123,13 +134,13 @@ test("failed initialization requires explicit retry; interrupted requests keep t
   const f = await fixture(); let calls = 0;
   f.ports.moduleExternalInstaller = async ({ request, release }) => { calls++; return { ...fixtures.failedInstall, package: request.package, requestKey: request.requestKey, hash: release.hash }; };
   const first = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
-  expect(first.status).toBe("pending"); expect(calls).toBe(3);
-  await ensureWorkspaceInitialized(f.ports, f.workspaceId); expect(calls).toBe(3);
+  expect(first.status).toBe("pending"); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
+  await ensureWorkspaceInitialized(f.ports, f.workspaceId); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length);
   const retry = await ensureWorkspaceInitialized(f.ports, f.workspaceId, { retryFailed: true });
-  expect(calls).toBe(6); expect(retry.packages.qq.attempts).toBe(2);
+  expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2); expect(retry.packages.qq.attempts).toBe(2);
   const waiting = await installExternal({ ...f.ports, moduleExternalInstaller: async ({ request }) => { calls++; return { ...fixtures.unknownInstall, package: request.package, requestKey: request.requestKey }; } }, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" });
   expect(waiting.status).toBe("pending");
-  await installExternal(f.ports, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" }); expect(calls).toBe(7);
+  await installExternal(f.ports, f.workspaceId, { package: "qq", mode: "install", requestKey: "interrupted" }); expect(calls).toBe(PREINSTALLED_MODULE_NAMES.length * 2 + 1);
 });
 
 test("queued callbacks cannot switch to a same-name reinstall or a changed tool contract", async () => {
@@ -193,42 +204,47 @@ test("build claim refuses changed identities and continues to a valid queued bui
   expect(starts).toEqual([queued[1]!]);
 });
 
-test("approval creation accepts built-in updates but refuses forged, kernel and removal requests without records", async () => {
+test("approval creation refuses Agent updates, removal and forged identities without records", async () => {
   const f = await fixture();
   const approvals = createApprovals({ ...f.ports, workspaceId: f.workspaceId });
-  const builtin = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: "a".repeat(64) } });
+  const builtin = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "agent", builtin: true, activeHash: "a".repeat(64) } });
   const external = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "b".repeat(64) } });
   for (const module of [builtin, external]) await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, source: "user", status: "approved", manifest: module.builtin ? fixtures.builtin.manifest : fixtures.external.manifest, intent: {}, report: {} } });
   const common = { title: "Fixture", detail: "", preview: "" };
   await expect(approvals.create({ ...common, action: "delete_data", payload: { kind: "module_remove", moduleId: builtin.id, name: builtin.name, hash: builtin.activeHash } })).rejects.toMatchObject({ reason: "immutable_module" });
   for (const identity of [{ name: "agent", builtin: false }, { name: "modules", builtin: true }]) {
-    const invalid = await f.db.module.create({ data: { workspaceId: f.workspaceId, ...identity, activeHash: "c".repeat(64) } });
+    const invalid = identity.name === "agent"
+      ? await f.db.module.update({ where: { id: builtin.id }, data: { builtin: false, activeHash: "c".repeat(64) } })
+      : await f.db.module.create({ data: { workspaceId: f.workspaceId, ...identity, activeHash: "c".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: invalid.id, hash: invalid.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
     for (const request of [
       { ...common, action: "activate_module", moduleId: invalid.id, payload: { kind: "activate_module", moduleId: invalid.id, hash: invalid.activeHash } },
       { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: invalid.id, hash: invalid.activeHash }] } },
     ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "module_identity_conflict" });
+    if (identity.name === "agent") await f.db.module.update({ where: { id: builtin.id }, data: { builtin: true, activeHash: builtin.activeHash } });
   }
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "approval_created" } })).toBe(0);
   for (const request of [
     { ...common, action: "activate_module", moduleId: builtin.id, payload: { kind: "activate_module", moduleId: builtin.id, hash: builtin.activeHash } },
     { ...common, action: "activate_module", payload: { kind: "activate_modules", versions: [{ moduleId: external.id, hash: external.activeHash }, { moduleId: builtin.id, hash: builtin.activeHash }] } },
-  ]) expect((await approvals.create(request)).status).toBe("open");
+  ]) await expect(approvals.create(request)).rejects.toMatchObject({ reason: "immutable_module" });
   const allowed = await approvals.create({ ...common, action: "activate_module", moduleId: external.id, payload: { kind: "activate_module", moduleId: external.id, hash: external.activeHash } });
   expect(allowed.status).toBe("open");
 });
 
-test("list, interface and kernel projections share lifecycle identity without overwriting permission descriptions", async () => {
+test.each(["web", "notify", "other-entry"])("list and interface projections expose ordinary entry %s removal without overwriting permission descriptions", async name => {
   const f = await fixture(); createStewardService(f.ports);
-  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "web", builtin: true, activeHash: "a".repeat(64) } });
-  await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest: fixtures.builtin.manifest, intent: {}, report: {} } });
+  const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name, builtin: false, activeHash: "a".repeat(64) } });
+  const manifest = moduleManifestSchema.parse({ ...fixtures.external.manifest, name, uses: ["*"] });
+  await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, source: "user", status: "approved", manifest, intent: {}, report: {} } });
   const [list] = await createModules(f.ports, f.workspaceId).list();
-  expect(list).toMatchObject({ origin: "builtin", capabilities: { build: true, rollback: true, remove: false, install: false } });
-  expect((await createApps(f.ports, f.workspaceId).list())[0]!.origin).toBe("builtin");
-  expect(await moduleInterfaces(f.ports, f.workspaceId, "web")).toMatchObject({ origin: "builtin", capabilities: { build: true, remove: false } });
-  expect(Array.isArray((await modulePermissions(f.ports, f.workspaceId, "web") as { capabilities: unknown }).capabilities)).toBe(true);
+  expect(list).toMatchObject({ origin: "external", capabilities: { build: true, rollback: true, remove: true, install: false } });
+  expect((await createApps(f.ports, f.workspaceId).list())[0]).toMatchObject({ origin: "external", capabilities: { remove: true } });
+  expect(await moduleInterfaces(f.ports, f.workspaceId, name)).toMatchObject({ origin: "external", capabilities: { build: true, remove: true } });
+  expect(Array.isArray((await modulePermissions(f.ports, f.workspaceId, name) as { capabilities: unknown }).capabilities)).toBe(true);
   expect(await moduleInterfaces(f.ports, f.workspaceId, "modules")).toMatchObject({ origin: "kernel", capabilities: { build: false } });
-  const catalog = modulePackageCatalogSchema.parse((await callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).output);
-  expect(catalog.map(item => item.name)).toEqual(["qq", "remind", "mind", "memory-local", "coding", "editor", "mcp", "files", "events"]);
+  await expect(callSync(f.ports, { workspaceId: f.workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, "modules.catalog", {})).rejects.toMatchObject({ code: "not_found" });
+  const catalog = await externalPackageCatalog(f.ports, f.workspaceId);
+  expect(catalog.map(item => item.name)).toEqual(["web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
 });

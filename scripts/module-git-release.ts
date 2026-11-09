@@ -81,7 +81,7 @@ async function readLock(seedDir: string, preparing = false): Promise<ReleaseLock
 export async function stageModuleGitLicense(resourcesRoot: string, licensePath: string, noticesPath: string) {
   for (const module of buildArtifacts.moduleGit.modules) {
     await cp(licensePath, join(resourcesRoot, module.source, "LICENSE"));
-    if (["web", "coding", "editor"].includes(module.name)) await cp(noticesPath, join(resourcesRoot, module.source, "THIRD-PARTY-NOTICES.txt"));
+    if (["web", "coding", "coding-web"].includes(module.name)) await cp(noticesPath, join(resourcesRoot, module.source, "THIRD-PARTY-NOTICES.txt"));
   }
 }
 
@@ -202,6 +202,8 @@ export async function verifyPublishedModuleGitRelease(seedDir: string) {
 if (import.meta.main) {
   const [command, directory, resources] = process.argv.slice(2);
   if (command === "prepare" && directory && resources) {
+    const { assembleAgentDependencies } = await import("../build/agent-dependencies");
+    await assembleAgentDependencies(resolve(resources, "builtin/agent"));
     await prepareModuleGitRelease({ root: resolve(import.meta.dirname, ".."), seedDir: resolve(directory), resourcesRoot: resolve(resources), hostCommit: process.env.CHRONA_MODULE_GIT_COMMIT, hostTimestamp: process.env.CHRONA_MODULE_GIT_TIMESTAMP });
   } else if (command === "verify-published" && directory && !resources) await verifyPublishedModuleGitRelease(resolve(directory));
   else throw new Error("Usage: bun scripts/module-git-release.ts prepare <seed-directory> <staged-resources-root> | verify-published <seed-directory>");

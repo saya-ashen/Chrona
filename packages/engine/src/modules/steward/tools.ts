@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { committedToolContract } from "./module-tool-contract";
 import { chronaToolInputSchemas as schemas, RUN_LIMITS } from "@chrona/contracts/steward";
 import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
@@ -74,6 +74,6 @@ export function createTools(ports: StewardPorts) {
     const context = await contextRunTools(ports, run);
     if (context) return context.catalog;
     if (session?.source !== "build") return [];
-    return [{ name: "chrona_reply", inputSchema: z.toJSONSchema(schemas.chrona_reply) }, ...await moduleToolCatalog(ports, run)];
+    return [{ name: "chrona_reply", inputSchema: committedToolContract("chrona_reply").input }, ...await moduleToolCatalog(ports, run)];
   }, call };
 }

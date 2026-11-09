@@ -1,25 +1,29 @@
+import { finishRunIn, runExpired } from "./run-finish";
+import { liveRuns } from "./run-live";
+import { claimApplicationExecutionIn } from "./execution-delivery-claim";
+import type { VerifiedExecutionStop } from "./execution-delivery-stop-types";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { Prisma } from "@chrona/db";
+import { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger, type SessionSource } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
-import type { ExecutionClaimSelection, VerifiedDeviceStop, StewardPorts } from "./ports";
+import type { ExecutionClaimSelection, StewardPorts } from "./ports";
 import { buildSettings, budgetTimezone } from "./settings";
-import { notifyLifecycle } from "./notify-user";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
 import { authenticateRun } from "./run-auth";
 import { assertBuildProvider, buildExecution } from "./build-execution";
 import { assertExternalName } from "./module-identity";
-import { declaredModules } from "./module-build-session";
-import { finishExecution, executionPrincipal, executionNeverOfferedIn } from "./execution-state";
+import { declaredModules } from "./module-build-targets";
+import { executionPrincipal, executionNeverOfferedIn } from "./execution-state";
 import { claimExecutionIn, prepareServerClaim } from "./execution-claim";
 import { assertExecutionPrincipal } from "./execution-principal";
 
+export { liveRuns } from "./run-live";
+
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
-export const liveRuns = new Map<string, ReturnType<ProviderAdapter["start"]>>();
 export function nextLocalMidnight(now: Date, timezone: string) {
   const day = localDayKey(now, timezone);
   let lo = now.getTime(), hi = lo + 48 * 3600000;
@@ -31,24 +35,11 @@ export type EnqueueRun = { sessionId?: string; lane: RunLane; trigger: RunTrigge
 type RunRow = Prisma.RunGetPayload<{ include: { session: true } }>;
 type RunOutcome = Awaited<ReturnType<ProviderAdapter["start"]>["done"]>;
 
-/** Stop uncertainty and owner cancellation take precedence over Provider output. */
-function finalRunOutcome(outcome: RunOutcome, state: { knownStop: boolean; cancelled: boolean; expired: boolean }) {
-  if (!state.knownStop) return { status: "failed", error: "Execution stop is unconfirmed" };
-  if (state.cancelled) return { status: "cancelled", error: "Cancelled by owner" };
-  if (state.expired) return { status: "timed_out", error: "Run lease expired" };
-  return { status: outcome.outcome === "unavailable" ? "provider_unavailable" : outcome.outcome, error: outcome.error };
-}
-
-function runExpired(run: { deadlineAt: Date | null; leaseUntil: Date | null }, now: Date) {
-  return !!((run.deadlineAt && run.deadlineAt <= now) || (run.leaseUntil && run.leaseUntil <= now));
-}
-async function runWasCancelled(tx: Prisma.TransactionClient, runId: string, attempt: { cancelRequestedAt: Date | null } | null) {
-  return !!attempt?.cancelRequestedAt || !!await tx.audit.findUnique({ where: { id: providerCancelKey(runId) } });
-}
 function claimSelection(selection?: ExecutionClaimSelection): Prisma.RunWhereInput {
   if (selection?.kind === "ordinary") return { execution: null };
-  if (selection?.kind === "execution") return { execution: { executorId: selection.executorId } };
-  return { OR: [{ execution: null }, { execution: { executorId: "server" } }] };
+  if (selection?.kind === "application") return { execution: { placement: { path: "$.kind", equals: "application" } } };
+  if (selection?.kind === "execution") return { execution: { executorId: selection.executorId, targetBinding: { equals: Prisma.DbNull } } };
+  return { OR: [{ execution: null }, { execution: { executorId: "server", targetBinding: { equals: Prisma.DbNull } } }] };
 }
 export function createRunSession(tx: Prisma.TransactionClient, workspaceId: string, source: SessionSource, now: Date, origin: { originSessionId?: string; moduleId?: string } = {}) {
   return tx.session.create({ data: { workspaceId, key: `${source}:${randomUUID()}`, source, ...origin, createdAt: now, lastActivityAt: now } });
@@ -158,7 +149,7 @@ class RunService {
       const scope = claimSelection(selection);
       for (const run of await tx.run.findMany({ where: { AND: [{ ...waiting, lane }, scope] }, include: { session: true, execution: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })) {
         if (run.execution) {
-          const claimed = await claimExecutionIn(this.ports, tx, run, fresh, prepared);
+          const claimed = run.execution.targetBinding ? await claimApplicationExecutionIn(this.ports, tx, run, fresh) : await claimExecutionIn(this.ports, tx, run, fresh, prepared);
           if (claimed) return claimed;
           continue;
         }
@@ -180,26 +171,8 @@ class RunService {
     await this.ports.onRunFinished?.(this.workspaceId, runId);
   }
   /** Actual Run finalization core, shared with trusted remote ingress; caller holds writer lock. */
-  async finishRunIn(tx: Prisma.TransactionClient, runId: string, outcome: RunOutcome, now: Date, evidence?: "provider_exited" | "never_started" | VerifiedDeviceStop): Promise<boolean> {
-    const { ports, workspaceId } = this;
-    const run = await tx.run.findFirst({ where: { id: runId, workspaceId }, include: { session: true } });
-    if (!run) throw new StewardError("not_found", "Run not found");
-    const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
-    const agentContext = await isAgentContext(tx, run.sessionId);
-    if (attempt?.stopConfirmedAt) return false;
-    if (run.status !== "running" && !canReconcileStop(!!evidence, !!attempt, agentContext, run.error)) return false;
-    const { status, error } = finalRunOutcome(outcome, { knownStop: (!attempt && !agentContext) || !!evidence, cancelled: await runWasCancelled(tx, runId, attempt), expired: runExpired(run, now) });
-    await tx.run.update({ where: { id: runId }, data: { status, error: error?.slice(0, 1000), endedAt: now, leaseUntil: null } });
-    if (run.sessionId) await tx.session.update({ where: { id: run.sessionId }, data: { lastActivityAt: now, ...(outcome.sessionId ? { providerSessionId: outcome.sessionId } : {}) } });
-    if (attempt) await finishExecution(ports, tx, runId, evidence, now);
-    else await this.finishOrdinaryRun(tx, run, status);
-    await audit(tx, { workspaceId, actor: "chrona", kind: "run_finished", subjectId: runId, details: { status } });
-    return true;
-  }
-  /** Application contexts own delivery and continuation; internal builds only publish lifecycle facts. */
-  private async finishOrdinaryRun(tx: Prisma.TransactionClient, run: RunRow, status: string) {
-    if (run.lane !== "build" || !["failed", "timed_out", "provider_unavailable"].includes(status)) return;
-    await notifyLifecycle(tx, this.ports, this.workspaceId, `build-paused:${run.id}`, { kind: "build-paused", status, outcome: status, ...(run.sessionId ? { session: run.sessionId } : {}) });
+  async finishRunIn(tx: Prisma.TransactionClient, runId: string, outcome: RunOutcome, now: Date, evidence?: "provider_exited" | "never_started" | VerifiedExecutionStop): Promise<boolean> {
+    return finishRunIn(this.ports, this.workspaceId, tx, runId, outcome, now, evidence);
   }
   async expireLeases(now = this.ports.now()) {
     const rows = await this.ports.db.run.findMany({ where: { workspaceId: this.workspaceId, status: "running", OR: [{ leaseUntil: { lte: now } }, { deadlineAt: { lte: now } }] } });
@@ -221,11 +194,10 @@ class RunService {
       if (!state) continue;
       const { execution } = state, handle = liveRuns.get(row.id);
       if (state.confirmed) {
-        await this.ports.remoteCompletion?.committed(this.workspaceId, row.id);
         continue;
       }
       if (execution) {
-        if (execution.executorId !== "server") {
+        if (execution.targetBinding) {
           // A waiting relay cannot observe remote process exit. Retain capacity and let device stop/reconcile finalize.
           await handle?.abort();
           continue;
@@ -243,12 +215,4 @@ class RunService {
     }
     return rows.length;
   }
-}
-
-function canReconcileStop(evidence: boolean, attempt: boolean, agentContext: boolean, error: string | null) {
-  return evidence && (attempt || agentContext && error === "Execution stop is unconfirmed");
-}
-
-async function isAgentContext(tx: Prisma.TransactionClient, sessionId: string | null) {
-  return !!(sessionId && await tx.audit.findUnique({ where: { id: `agent-context:${sessionId}` } }));
 }

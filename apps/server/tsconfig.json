@@ -11,6 +11,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@/generated/prisma/*": ["../../packages/db/src/generated/prisma/*"],
+      "@server/*": ["./src/*"],
+      "chrona": ["../../packages/integrations/src/steward/module-sdk/sdk.ts"],
       "@chrona/logging": ["../../packages/logging/src/index.ts"],
       "@chrona/i18n/*": ["../../packages/i18n/src/*"],
       "@chrona/i18n": ["../../packages/i18n/src/index.ts"],
@@ -18,6 +21,7 @@
       "@chrona/shared": ["../../packages/shared/src/index.ts"],
       "@chrona/engine/*": ["../../packages/engine/src/*"],
       "@chrona/engine": ["../../packages/engine/src/index.ts"],
+      "@chrona/workspaces": ["../../packages/workspaces/src/index.ts"],
       "@chrona/db/*": ["../../packages/db/src/*"],
       "@chrona/db": ["../../packages/db/src/index.ts"],
       "@chrona/contracts/*": ["../../packages/contracts/src/*"],

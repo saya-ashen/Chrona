@@ -59,8 +59,7 @@ bun run dev
 | `CHRONA_STEWARD_PI_RESOURCES_FILE` | 可选私有规范路径 JSON 清单：审核过的技能/扩展入口文件及额外工具名；不安装、不自动发现 |
 | `CHRONA_STEWARD_PI_MODEL` | 可选 Pi 模型选择 |
 | `CHRONA_STEWARD_PI_WEB_EXTENSION` | 可选显式网页工具扩展路径 |
-| `CHRONA_STEWARD_EXECUTION_MODE` | owner 选择 `trusted-local`（未设置/空值的默认值）或 `required-isolation`；其他值拒绝启动 |
-| `CHRONA_STEWARD_SANDBOX_BWRAP` | `required-isolation` 下 Provider 与模块隔离使用的 bubblewrap 可执行文件 |
+| `CHRONA_STEWARD_EXECUTION_MODE` | 可信本地执行；未设置、空值或 `trusted-local` 有效，旧隔离配置明确报错 |
 | `CHRONA_STEWARD_TICK_SECONDS` | 后台 tick 周期，默认 `30` 秒 |
 | `CHRONA_PUBLIC_URL` | 通知链接使用的 HTTP(S) origin |
 | `CHRONA_QQ_APP_ID` | 专用 QQ Bot 应用 ID |
@@ -69,7 +68,7 @@ bun run dev
 
 默认 `trusted-local` 下，Pi 的 bash、文件工具及模块以本地进程运行，使用服务用户的 OS 权限，即使安装了 bubblewrap 也不隔离。宿主文件不会被 OS 沙箱隐藏；`content/chat` 使用符号链接，因此附件只读是 Agent 行为规则，不是强制只读挂载。Chrona 的路由授权、审批与预算仍然生效；本地可访问不代表获准绕过它们。
 
-显式选择 `required-isolation` 后，Provider、模块及构建检查要求 bubblewrap 探测成功，不回退本地执行。Provider 隐藏 home 和 Chrona 数据，只读挂入附件，会话工作目录、专用 Pi profile 及已批准宿主路径可写；其他宿主挂载仍可读，也可联网。这不是阻止所有宿主读取的保密边界。此模式目前拒绝需要在宿主安装依赖的模块候选。Chrona 不重复提供 Provider 的网页和 shell 工具；周期执行工作由模块完成。
+应用与 Provider 直接使用宿主已安装的解释器和程序；Python、Shell 和浏览器按使用需要检测，浏览器不会自动下载。宿主操作系统权限不受 Manifest 限制。旧 `required-isolation` 模式及非空 `CHRONA_STEWARD_SANDBOX_BWRAP` 配置会明确报错，请移除。跨平台 IPC、进程树监管与三端验收仍在实施中。
 
 Pi 关闭资源自动发现及项目信任。可选的[受控资源清单](docs/zh/provider-runtime.md)通过 Pi 原生加载机制显式添加技能/扩展；原生 MCP 须明确固定 `1.3.0` 及以后的 `1.x`。发送提示前检查命令资源。这不是完整工具清单，也不能证明包装器/扩展安全，仍须独立审查入口、扩展代码和服务 profile。健康检查验证启动配置与版本，不代表认证有效或模型已成功响应。
 

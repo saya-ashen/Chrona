@@ -1,5 +1,7 @@
 # M3 签收后的 pre-push lint 修复（2026-11-06）
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 基线 `platform-v2@73339094`。这是签收后的新增代码修改，不追溯修改旧验收结论；此前构建的 binary 不覆盖本次源码或新 `pages.js`。未提交、未 push、未部署，persistent private preview 未重启。
 
 ## 修改边界

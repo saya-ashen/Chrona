@@ -33,15 +33,17 @@ export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPort
 type Start = NonNullable<NonNullable<StewardPorts["sandbox"]>["startModule"]>;
 /** In-process wire peer for engine tests. Production SDK/bwrap coverage lives in supervisor tests. */
 export function testModuleProcess(handler: (event: ModuleEvent, call: (method: ModuleCall["method"], params: ModuleCall["params"]) => Promise<unknown>, input: Parameters<Start>[0]) => Promise<unknown>) {
-  const processes: { socket: Socket; kill(): void; input: Parameters<Start>[0] }[] = [];
+  const processes: { socket: Socket; httpReady(endpoint: string): void; kill(): void; rejectExit(error: Error): void; input: Parameters<Start>[0] }[] = [];
   const startModule: Start = input => {
-    const socket = createConnection(input.socketPath);
+    const socket = createConnection({ host: "127.0.0.1", port: Number(new URL(input.ipcEndpoint).port) });
     let finish!: (value: { code: number | null; signal: string | null }) => void;
-    const exited = new Promise<{ code: number | null; signal: string | null }>(resolve => { finish = resolve; });
+    let rejectExit!: (error: Error) => void;
+    const exited = new Promise<{ code: number | null; signal: string | null }>((resolve, reject) => { finish = resolve; rejectExit = reject; });
     const pending = new Map<string, (value: unknown) => void>();
     const call = (method: ModuleCall["method"], params: ModuleCall["params"]) => new Promise(resolve => {
       const id = randomUUID(); pending.set(id, resolve); socket.write(JSON.stringify({ id, method, params }) + "\n");
     });
+    socket.on("connect", () => socket.write(JSON.stringify({ type: "auth", version: 1, token: input.ipcToken }) + "\n"));
     let buffer = "";
     socket.on("error", () => {});
     socket.on("close", () => { finish({ code: 1, signal: null }); });
@@ -50,6 +52,7 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
       let end: number;
       while ((end = buffer.indexOf("\n")) >= 0) {
         const message = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+        if (message.type === "ready") continue;
         if (message.ping === true) { socket.write(JSON.stringify({ id: message.id, result: {} }) + "\n"); continue; }
         if (message.event) {
           void handler(message.event, call, input).then(result => {
@@ -59,7 +62,7 @@ export function testModuleProcess(handler: (event: ModuleEvent, call: (method: M
       }
     });
     const kill = () => socket.destroy();
-    processes.push({ socket, kill, input });
+    processes.push({ socket, kill, input, rejectExit(error) { rejectExit(error); socket.destroy(); }, httpReady(endpoint) { socket.write(JSON.stringify({ type: "http-ready", endpoint }) + "\n"); } });
     return { pid: processes.length, exited, stderr: () => "", kill };
   };
   return { startModule, processes };

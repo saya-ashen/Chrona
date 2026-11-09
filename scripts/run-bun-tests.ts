@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { buildProcessHelper } from "../packages/process/scripts/build-helper";
 
 const include = new Bun.Glob("**/*.bun.test.ts");
 const ignoredSegments = new Set([
@@ -18,10 +19,16 @@ const concurrency = Math.max(
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
 );
 
+// These application sources are retained pending the owner's decision; boundary/pause tests still run.
+const pausedApplicationSuites = new Set([
+  "packages/engine/src/modules/steward/mind-agent.bun.test.ts",
+]);
 function shouldInclude(path: string) {
+  if (pausedApplicationSuites.has(path) || /^packages\/engine\/src\/modules\/steward\/external\/(mind|remind)\//.test(path)) return false;
 	const retained = [
+		"scripts/agent-integration/",
 		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",
-		"packages/integrations/src/steward/", "packages/contracts/src/steward/",
+		"packages/integrations/src/steward/", "packages/contracts/src/steward/", "packages/pi/", "packages/process/", "packages/workspaces/", "packages/remote-device/", "packages/remote-model/",
 		"packages/db/", "packages/shared/", "packages/logging/", "packages/i18n/",
 	];
 	const standalone = new Set([
@@ -134,9 +141,18 @@ async function main(): Promise<number> {
 		return 0;
 	}
 
+	// Source tests need the same prebuilt helper as development; runtime launch never invokes a compiler.
+	if (["linux", "darwin", "win32"].includes(process.platform)) {
+		buildProcessHelper(resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`));
+	} else {
+		console.log(`Native process supervision unavailable on ${process.platform}; no verified backend`);
+	}
+
 	let exitCode = 0;
 	const failedFiles: Array<{ file: string; code: number }> = [];
 	const workspace = createTestRunWorkspace(rootDir, files);
+	const helperPath = resolve(rootDir, `packages/process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`);
+	for (const item of workspace.files) item.env.CHRONA_PROCESS_HELPER = helperPath;
 	const pending = workspace.files;
 
 	console.log(

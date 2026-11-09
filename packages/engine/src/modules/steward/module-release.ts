@@ -7,6 +7,7 @@ import { verifyModuleGitBundle } from "./module-git-upstream";
 import type { StewardPorts } from "./ports";
 import { readModuleFiles } from "./module-preview";
 import { StewardError } from "./errors";
+import { assertModuleAvailable } from "./module-availability";
 
 export type ModuleReleaseGit = { repository: string | null; branch: string; commit: string; bundlePath: string };
 export type ModuleRelease = { name: string; origin: "builtin" | "external"; codeDir: string; hash: string; manifest: ModuleManifest; git: ModuleReleaseGit | null };
@@ -33,6 +34,7 @@ function verifyLegacyReleaseHash(files: { path: string; bytes: Buffer }[], expec
 /** Host-configured resources only. Neither a manifest nor a routed request can supply the root. */
 async function resolveRelease(rootPath: string | undefined, name: string, origin: ModuleRelease["origin"], expectedHash?: string): Promise<ModuleRelease> {
   const names: readonly string[] = origin === "builtin" ? BUILTIN_MODULE_NAMES : OFFICIAL_EXTERNAL_MODULE_NAMES;
+  assertModuleAvailable(name);
   if (!names.includes(name)) throw new ModuleReleaseError("not_found", "release_not_found", `Unknown ${origin} release ${name}`);
   if (!rootPath) throw new ModuleReleaseError("not_found", "release_not_found", `${origin} release resources are not configured`);
   try {

@@ -10,14 +10,6 @@ type DeliveryPool = { scan?: Promise<void>; jobs: Map<string, Promise<void>> };
 const active = new WeakMap<StewardPorts["db"], Map<string, DeliveryPool>>();
 const MAX_ATTEMPTS = 6;
 
-/** Commit the occurrence with the schedule advance; no effect can precede this record. */
-export async function enqueueSchedule(tx: Prisma.TransactionClient, workspaceId: string, row: Prisma.ScheduleGetPayload<object>, now: Date) {
-  const module = row.moduleId ? await tx.module.findFirst({ where: { id: row.moduleId, workspaceId } }) : null;
-  const activationId = module?.activeHash ? (await latestModuleEvolution(tx, workspaceId, module.id, module.activeHash))?.activationId ?? null : null;
-  const args: Occurrence = { scheduleId: row.id, moduleId: module?.id ?? null, hash: module?.activeHash ?? null, activationId, triggerId: row.triggerId, firedAt: row.nextAt!.toISOString(), claimedAt: now.toISOString(), payload: row.payload };
-  await tx.moduleInvocation.create({ data: { workspaceId, caller: "system:schedules", target: module?.name ?? "missing", tool: "schedule", key: `${row.id}:${args.firedAt}`, mode: "schedule", args, nextAttemptAt: now, createdAt: now } });
-}
-
 type Row = Prisma.ModuleInvocationGetPayload<object>;
 type Settled = "queued" | "succeeded" | "failed" | "unknown" | "cancelled";
 
@@ -76,7 +68,11 @@ async function deliver(ports: StewardPorts, row: Row, now: Date) {
   }
 }
 
-/** Four independent modules can progress; a slow module never holds the tick or another module's slot. */
+/**
+ * Private settlement of already-recorded occurrences; no public calendar API or producer remains.
+ * Keep version/activation binding, cancellation and unknown-outcome evidence until these deliveries settle.
+ * Four independent modules can progress; a slow module never holds the tick or another module's slot.
+ */
 export function drainSchedules(ports: StewardPorts, workspaceId: string, now = ports.now()): Promise<void> {
   let map = active.get(ports.db);
   if (!map) { map = new Map(); active.set(ports.db, map); }

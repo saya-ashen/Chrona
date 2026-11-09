@@ -21,8 +21,8 @@ test("events consumes kernel target binding: two real callback targets, one paus
   });
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T04:00:00Z"), sandbox: { available: true, isolated: false, startModule: peer.startModule } };
   const workspaceId = (await db.workspace.create({ data: { name: "events-routed" } })).id;
-  async function module(name: string, hash: string, tools: unknown[] = [], contributes = {}) {
-    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], triggers: [], tools, contributes, uses: ["modules.list", "modules.tools", "modules.contributions"] });
+  async function module(name: string, hash: string, tools: unknown[] = []) {
+    const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], tools, uses: ["modules.list", "modules.tools"] });
     const row = await db.module.create({ data: { workspaceId, name, activeHash: hash, builtin: name === "events" } });
     await db.moduleVersion.create({ data: { moduleId: row.id, hash, manifest, status: "approved", source: "user", intent: {}, report: {} } });
     const code = join(dataDir, "platform/store", hash); await mkdir(code, { recursive: true }); await writeFile(join(code, "index.ts"), "// offline wire peer\n");
@@ -32,15 +32,15 @@ test("events consumes kernel target binding: two real callback targets, one paus
     parameters: { type: "object", properties: { event: { type: "string" }, from: { type: "string" }, payload: { type: "string" } }, required: ["event", "from", "payload"] },
     output: { type: "object", properties: { received: { type: "boolean" } }, required: ["received"] } };
   try {
-    const eventsRow = await module("events", "e".repeat(64)), source = await module("source", "c".repeat(64), [], { events: { emits: [{ name: "changed" }] } });
+    const eventsRow = await module("events", "e".repeat(64)), source = await module("source", "c".repeat(64));
     const alpha = await module("alpha", "a".repeat(64), [tool]), beta = await module("beta", "b".repeat(64), [tool]);
     const origin: CallOrigin = { workspaceId, caller: { kind: "module", module: "events", moduleId: eventsRow.id, hash: eventsRow.activeHash! }, chain: [], path: [] };
     const read = async (target: string, args = {}) => (await callSync(ports, origin, target, args)).output;
     const dir = join(dataDir, "event-state"); await mkdir(dir);
     const events = createEvents({ dataDir: dir, directory: async () => ({ modules: await read("modules.list"), tools: await read("modules.tools") }) as Directory,
-      contributions: async () => await read("modules.contributions", { section: "events" }) as { module: string; value: unknown }[],
       call: (target, raw, options) => enqueueCall({ tx: db, ports, origin, target, raw }, options) });
     const from = (row: typeof alpha) => ({ kind: "module" as const, module: row.name, moduleId: row.id, hash: row.activeHash! });
+    await events.handle("register", { emits: JSON.stringify([{ name: "changed" }]) }, from(source));
     for (const row of [alpha, beta, alpha]) await events.handle("subscribe", { event: "source.changed", tool: "receive" }, from(row));
     const emit = (key: string) => events.handle("emit", { event: "changed", payload: '{"id":"one"}', key }, from(source));
     expect(await emit("first")).toEqual({ delivered: 2 });

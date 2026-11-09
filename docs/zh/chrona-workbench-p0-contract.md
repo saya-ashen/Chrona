@@ -1,5 +1,7 @@
 # M1 P0 契约与交接
 
+> 2026-11-09 当前状态：本文涉及旧 Editor 应用的架构、安装、接口、源码保留和验收结果均属于当时记录，相关运行指引已过时。Editor 已退役并移除；仅 Mind、Remind 整应用暂停并保留源码。现行编码接入见[客户端协议](coding-peer-clients-protocol.md)和[实施记录](coding-peer-clients-implementation.md)，删除范围及待补验证见[Editor 退役记录](editor-retirement.md)。保留本文的其他架构与历史证据；原测试计数、产物散列及部署事实不改写，也不证明本次清理已验证或部署。
+
 2026-11-08 后续决策：用户确认 web/mcp/files/notify/events 允许受检 build/propose/group/activate/update/rollback，继续禁止动态 remove/install；Agent 不可普通替换。下文保留 M1 冻结时的原始接口与验收背景，全部内置不可变条款不再是这五项的当前规则。参见[当前架构](architecture.md)与[统一路线](development-roadmap.md)。
 
 日期：2026-11-05。版本：`m1-p0-v1`（`MODULE_CONTRACT_VERSION`）。本文件冻结 A–E 消费的接口；P0 编译通过不等于 M1 完成。用户已授权开始实现，统一方案页首“仅编写方案”为历史授权记录；真实模型、账号、设备、迁移、部署、提交和推送仍无授权。

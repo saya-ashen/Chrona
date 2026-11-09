@@ -1,25 +1,47 @@
 import { redactSensitiveText } from "@chrona/logging/redaction";
+type MemoryPreferences = { provider: string | null; autoRecall: boolean; autoRetain: boolean };
 
 type Args = Record<string, unknown>;
 type Call = (target: string, args?: Args) => Promise<unknown>;
 type Message = { direction: string; text: string; createdAt: string };
 export type MemoryJournal = { provider: string; recalled: boolean; retainedThrough: string | null };
 type Session = { id: string; source: string; messages: Message[]; memory?: MemoryJournal };
-type Provider = { module: string; hash: string; value: unknown };
-const slug = /^[a-z][a-z0-9-]{0,40}$/;
+type Tool = { target: string; moduleId: string; hash: string; inputSchema: Args };
+const slug = /^[a-z][a-z0-9-]{1,40}$/;
+const object = (value: unknown): value is Args => !!value && typeof value === "object" && !Array.isArray(value);
 
-/** Entry-owned settings and restricted discovery; neither caller identity nor foreign contributions are requested. */
+function preferences(value: unknown): MemoryPreferences {
+  if (!object(value) || Object.keys(value).some(key => !["provider", "autoRecall", "autoRetain"].includes(key))
+    || (value.provider !== null && (typeof value.provider !== "string" || !slug.test(value.provider)))
+    || typeof value.autoRecall !== "boolean" || typeof value.autoRetain !== "boolean") throw new Error("Invalid app memory preferences");
+  return value as MemoryPreferences;
+}
+/** A memory app implements these ordinary tool contracts; no registry or manifest contribution grants admission. */
+function accepts(tool: Tool, argument?: string) {
+  const schema = tool.inputSchema;
+  if (!object(schema) || schema.type !== "object" || !object(schema.properties)
+    || Object.keys(schema).some(key => !["type", "properties", "required", "additionalProperties", "description", "title", "$schema"].includes(key))) return false;
+  const required = schema.required ?? [];
+  if (!Array.isArray(required) || required.some(key => key !== argument)) return false;
+  if (!argument) return required.length === 0;
+  const property = schema.properties[argument];
+  // The convention accepts arbitrary strings; narrowed enums or other constraints are incompatible.
+  return required.includes(argument) && object(property) && property.type === "string"
+    && Object.keys(property).every(key => ["type", "description", "title", "$comment", "default", "examples"].includes(key));
+}
+/** The app owns selection; tools discovery only describes currently routed, approved contracts. */
 export async function selectedMemory(call: Call, source: string) {
-  const { values } = await call("modules.settings-get", { module: source }) as { values: Args };
-  const name = values["memory-provider"];
-  if (typeof name !== "string" || !name) return null;
-  const providers = await call("modules.contributions", { section: "memory" }) as Provider[];
-  const provider = providers.find(item => item.module === name);
-  if (!provider?.value || typeof provider.value !== "object" || Array.isArray(provider.value)) return null;
-  const declaration = provider.value as Args;
-  if (declaration.interface !== 1 || [declaration.context, declaration.afterRun].some(tool => tool !== undefined && (typeof tool !== "string" || !slug.test(tool)))) return null;
-  const value = declaration as { interface: 1; context?: string; afterRun?: string };
-  return { module: provider.module, hash: provider.hash, value, autoRecall: values["memory-auto-recall"] !== false, autoRetain: values["memory-auto-retain"] !== false };
+  if (!slug.test(source)) throw new Error("Invalid entry app");
+  const config = preferences(await call(`${source}.settings`));
+  const tools = new Set<string>();
+  if (config.provider) {
+    const found = await call("modules.tools", { query: config.provider }) as Tool[];
+    for (const [name, argument] of [["conversation-context", "snapshot"], ["conversation-retain", "snapshot"], ["recall", "query"], ["forget", "id"], ["preferences", undefined]] as const) {
+      const tool = found.find(item => item.target === `${config.provider}.${name}`);
+      if (tool && typeof tool.moduleId === "string" && !!tool.moduleId && typeof tool.hash === "string" && !!tool.hash && accepts(tool, argument)) tools.add(name);
+    }
+  }
+  return { ...config, module: config.provider, tools, available: tools.has("conversation-context") && tools.has("conversation-retain") };
 }
 function messages(session: Session, through: string | null) {
   let remaining = 20_000;
@@ -42,9 +64,9 @@ function retainReceipt(output: Args, journal: MemoryJournal, sent: { at: string 
 export async function conversationMemory(call: Call, source: string, session: Session, operation: "context" | "retain" | "end", now: string) {
   try {
     const provider = await selectedMemory(call, source);
-    if (!provider || (operation === "context" ? !provider.autoRecall : !provider.autoRetain)) return "";
-    const tool = operation === "context" ? provider.value.context : provider.value.afterRun;
-    if (!tool) return "";
+    if (!provider.module || (operation === "context" ? !provider.autoRecall : !provider.autoRetain)) return "";
+    const tool = operation === "context" ? "conversation-context" : "conversation-retain";
+    if (!provider.tools.has(tool)) return "";
     if (session.memory?.provider !== provider.module) session.memory = { provider: provider.module, recalled: false, retainedThrough: null };
     const journal = session.memory!;
     const sent = messages(session, operation === "context" ? null : journal.retainedThrough);
@@ -57,12 +79,16 @@ export async function conversationMemory(call: Call, source: string, session: Se
 }
 export async function memoryView(call: Call, source: string, query?: string) {
   const provider = await selectedMemory(call, source);
-  if (!query) return { provider: provider?.module ?? null, available: !!provider, autoRecall: provider?.autoRecall ?? false, autoRetain: provider?.autoRetain ?? false };
-  if (!provider) return { items: [] };
+  if (!query) return { provider: provider.module, available: provider.available, autoRecall: provider.autoRecall, autoRetain: provider.autoRetain };
+  if (!provider.module || !provider.tools.has("recall")) return { items: [] };
   return call(`${provider.module}.recall`, { query });
 }
 export async function memoryForget(call: Call, source: string, id: unknown) {
   const provider = await selectedMemory(call, source);
-  if (!provider) throw new Error("Memory is not enabled in this app");
+  if (!provider.module || !provider.tools.has("forget")) throw new Error("Memory deletion is not available in this app");
   return call(`${provider.module}.forget`, { id });
+}
+export async function memoryPreferences(call: Call, source: string) {
+  const provider = await selectedMemory(call, source);
+  return provider.module && provider.tools.has("preferences") ? call(`${provider.module}.preferences`) : [];
 }

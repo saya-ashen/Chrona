@@ -1,10 +1,9 @@
 import { createHash } from "node:crypto";
 import type { StewardPorts } from "./ports";
-import { runtimeStartSchema } from "@chrona/contracts/steward";
+import { runtimeStartSchema, agentInput } from "@chrona/contracts/steward";
 import { authenticateRun } from "./run-auth";
 import { StewardError } from "./errors";
 import { CallError } from "./module-call-error";
-import { agentInput } from "./builtin/agent/contracts";
 import type { Caller } from "./module-system-types";
 
 /** Immutable identity is established by registration and checked again by the supervisor before delivery. */
@@ -15,6 +14,9 @@ export async function isAgentApplication(ports: StewardPorts, caller: { moduleId
   return version?.source === "builtin" && version.status === "approved";
 }
 export async function authorizeAgentRequest(ports: StewardPorts, workspaceId: string, name: string, raw: Record<string, unknown>, caller: Caller) {
+  if (name === "projects" && caller.kind !== "module") throw new StewardError("forbidden", "Agent projects requires an admitted module caller");
+  // Configure is an owner tool; routing and the live Agent callback both check its authority.
+  if (name === "configure" && caller.kind === "owner") return;
   if (caller.kind === "module") {
     if (!await ports.db.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active" }, select: { id: true } })) throw new StewardError("forbidden", "Agent caller is no longer active");
     return;

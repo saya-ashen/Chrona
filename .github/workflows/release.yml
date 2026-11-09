@@ -75,6 +75,13 @@ jobs:
 
       - run: bun run db:generate
 
+      - name: Prepare Windows native compiler
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+
+      - name: Verify native release helper and staged SDK
+        run: bun test scripts/build-binaries.bun.test.ts
+
       - name: Build binary
         run: bun scripts/chrona.ts build ${{ matrix.target }}
 
@@ -92,8 +99,50 @@ jobs:
           path: dist/releases/chrona-${{ matrix.target }}.*
           if-no-files-found: error
 
+  build-remote-device:
+    needs: verify
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build independent remote device with embedded Pi and native resources
+        run: bun run --cwd packages/remote-device build
+
+      - name: Smoke test copied standalone device without source or tool lookup
+        run: bun run --cwd packages/remote-device smoke:build
+
+      - name: Archive standalone device
+        shell: bash
+        run: |
+          mkdir -p dist/releases
+          tar -czf dist/releases/chrona-remote-device-${{ matrix.target }}.tar.gz -C packages/remote-device/dist chrona-remote-device
+
+      - name: Upload device artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: chrona-remote-device-${{ matrix.target }}
+          path: dist/releases/chrona-remote-device-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
   create-release:
-    needs: build-binary
+    needs: [build-binary, build-remote-device]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -128,4 +177,6 @@ jobs:
             .release-artifacts/chrona-darwin-x64/*
             .release-artifacts/chrona-darwin-arm64/*
             .release-artifacts/chrona-windows-x64/*
+            .release-artifacts/chrona-remote-device-linux-x64/*
+            .release-artifacts/chrona-remote-device-linux-arm64/*
             .release-artifacts/SHA256SUMS

@@ -10,3 +10,6 @@ export { handleModuleCall } from "./modules/steward/module-effects";
 export { builtinEntry, qqEntry } from "./modules/steward/test-entry";
 
 export { createQqConversations } from "./modules/steward/external/qq/conversations";
+
+export { agentFixture } from "../../../scripts/agent-integration/agent-application.fixtures";
+export { kernelOrigin } from "./modules/steward/module-calls";

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { cp, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { agentFixture } from "./agent-application.fixtures";
+import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { callSync, kernelOrigin } from "./module-calls";
 import { createQqConversations } from "./external/qq/conversations";
 import { createRelay } from "./external/qq/relay";
@@ -14,7 +14,7 @@ test("QQ owns attachment references, scoped contexts, quotes and delivery uncert
   try {
     await f.ports.db.run.delete({ where: { id: "agent-run" } });
     for (const [name, kind] of [["qq", "external"], ["notify", "builtin"]] as const) {
-      const source = join(import.meta.dir, kind, name), hash = `qq-agent-${name}`;
+      const source = join(import.meta.dir, "external", name), hash = `qq-agent-${name}`;
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       await cp(source, join(f.ports.dataDir, "platform/store", hash), { recursive: true });
       const module = await f.ports.db.module.upsert({ where: { workspaceId_name: { workspaceId: f.workspaceId, name } }, create: { workspaceId: f.workspaceId, name, activeHash: hash }, update: { activeHash: hash } });

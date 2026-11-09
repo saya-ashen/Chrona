@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "dependencies": { "@chrona/contracts": "workspace:*" },
-  "exports": { ".": "./src/index.ts", "./steward": "./src/steward/index.ts", "./executor": "./src/executor/index.ts" }
+  "dependencies": {
+    "@chrona/workspaces": "workspace:*",
+    "@chrona/contracts": "workspace:*",
+    "@chrona/pi": "workspace:*",
+    "@chrona/process": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./steward": "./src/steward/index.ts",
+    "./steward/module-sdk/transport": "./src/steward/module-sdk/transport.ts"
+  }
 }

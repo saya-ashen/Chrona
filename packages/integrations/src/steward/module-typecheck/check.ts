@@ -1,11 +1,13 @@
 // v2-25: type-checks a module's entry (and what it imports) against the `chrona` SDK and the generated call contracts.
-// Usage: bun check.ts <moduleDir> <sdkDir>. Only reads files, never runs module code. Prints { errors } as JSON; exits 1 on errors.
+// Usage: bun check.ts <moduleDir> <sdkDir>. Generates calls.d.ts in the writable SDK, never runs module code. Prints { errors } as JSON; exits 1 on errors.
 import ts from "typescript";
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { writeCallsDeclaration } from "./calls";
 
 const [moduleDir, sdkDir] = process.argv.slice(2).map(path => resolve(path));
 if (!moduleDir || !sdkDir) { console.error("Usage: bun check.ts <moduleDir> <sdkDir>"); process.exit(2); }
+await writeCallsDeclaration(sdkDir);
 const entry = join(moduleDir, (JSON.parse(readFileSync(join(moduleDir, "module.json"), "utf8")) as { entry: string }).entry);
 const options: ts.CompilerOptions = {
   strict: true, noEmit: true, skipLibCheck: true, isolatedModules: true, esModuleInterop: true, resolveJsonModule: true, allowImportingTsExtensions: true,

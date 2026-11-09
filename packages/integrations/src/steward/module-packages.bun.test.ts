@@ -1,10 +1,9 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createModulePackages } from "./module-packages";
-import { createScriptSandbox } from "./script-sandbox";
 
 async function workspace() {
   const root = await mkdtemp(join(tmpdir(), "chrona-packages-")), dir = join(root, "platform", "store", "v1");
@@ -17,54 +16,127 @@ test("npm libraries install only from bun.lock, without install scripts, and mod
   try {
     // A local file dependency keeps the test offline; its postinstall must never run.
     await mkdir(join(w.root, "dep"));
-    await writeFile(join(w.root, "dep", "package.json"), JSON.stringify({ name: "dep", version: "1.0.0", main: "index.js", scripts: { postinstall: "touch ../postinstall-ran" } }));
+    await writeFile(join(w.root, "dep", "package.json"), JSON.stringify({ name: "dep", version: "1.0.0", main: "index.js", scripts: { postinstall: "bun postinstall.cjs" } }));
+    await writeFile(join(w.root, "dep", "postinstall.cjs"), `require("node:fs").writeFileSync(${JSON.stringify(join(w.root, "postinstall-ran"))}, "ran");`);
     await writeFile(join(w.root, "dep", "index.js"), "module.exports = { answer: 42 };");
     await writeFile(join(w.dir, "package.json"), JSON.stringify({ name: "m", dependencies: { dep: `file:${join(w.root, "dep")}` } }));
-    const packages = createModulePackages({ backend: "system" });
-    expect((await packages.install({ dir: w.dir, packages: [], gcroot: join(w.root, "gc") })).errors[0]).toContain("bun.lock");
-    expect(Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: w.dir }).exitCode).toBe(0);
+    const packages = createModulePackages();
+    expect((await packages.install({ dir: w.dir, packages: [] })).errors[0]).toContain("bun.lock");
+    expect(Bun.spawnSync([process.execPath, "install", "--ignore-scripts"], { cwd: w.dir }).exitCode).toBe(0);
     await rm(join(w.dir, "node_modules"), { recursive: true });
-    const result = await packages.install({ dir: w.dir, packages: [], gcroot: join(w.root, "gc") });
+    const result = await packages.install({ dir: w.dir, packages: [] });
     expect(result).toEqual({ errors: [], installed: { npm: true, python: false, packages: {} } });
     expect(existsSync(join(w.root, "postinstall-ran"))).toBe(false);
     await writeFile(join(w.dir, "test.ts"), 'import dep from "dep"; console.log(dep.answer);');
-    const data = join(w.root, "data"); await mkdir(data);
-    expect(await createScriptSandbox({ dataDir: w.root }).runModule({ codeDir: w.dir, dataDir: data, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", output: "42\n" });
+    const run = Bun.spawnSync([process.execPath, "test.ts"], { cwd: w.dir });
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.toString()).toBe("42\n");
   } finally { await w.cleanup(); }
 }, 60_000);
 
-test.skipIf(!Bun.which("uv"))("Python modules run in the environment uv synced from uv.lock", async () => {
+test.skipIf(!Bun.which("uv") || !(Bun.which("python3") ?? Bun.which("python")))("Python modules run in the environment uv synced from uv.lock", async () => {
   const w = await workspace();
   try {
     await writeFile(join(w.dir, "pyproject.toml"), '[project]\nname = "m"\nversion = "0.1.0"\nrequires-python = ">=3.8"\ndependencies = []\n');
-    expect(Bun.spawnSync(["uv", "lock", "--offline", "--python", Bun.which("python3")!], { cwd: w.dir }).exitCode).toBe(0);
-    const result = await createModulePackages({ backend: "system" }).install({ dir: w.dir, packages: [], gcroot: join(w.root, "gc") });
+    expect(Bun.spawnSync(["uv", "lock", "--offline", "--python", (Bun.which("python3") ?? Bun.which("python"))!, "--no-python-downloads"], { cwd: w.dir }).exitCode).toBe(0);
+    const result = await createModulePackages().install({ dir: w.dir, packages: [] });
     expect(result.errors).toEqual([]);
     await writeFile(join(w.dir, "test.py"), "import sys; print(sys.prefix.endswith('.venv'))");
-    const data = join(w.root, "data"); await mkdir(data);
-    expect(await createScriptSandbox({ dataDir: w.root }).runModule({ codeDir: w.dir, dataDir: data, entry: "test.py", input: {} })).toMatchObject({ status: "succeeded", output: "True\n" });
+    expect(result.installed.python).toBe(true);
+    const interpreter = join(w.dir, ".venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
+    const run = Bun.spawnSync([interpreter, "test.py"], { cwd: w.dir });
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.toString().trim()).toBe("True");
   } finally { await w.cleanup(); }
 }, 60_000);
 
-test("system backend: present programs are recorded, missing ones fail with an install hint", async () => {
+test("host dependencies: present programs are recorded, missing ones fail with an install hint", async () => {
   const w = await workspace();
   try {
-    const result = await createModulePackages({ backend: "system" }).install({ dir: w.dir, packages: ["sh", "chrona-no-such-program"], gcroot: join(w.root, "gc") });
+    const result = await createModulePackages().install({ dir: w.dir, packages: ["bun", "chrona-no-such-program"] });
     expect(result.errors[0]).toContain("Missing system programs: chrona-no-such-program");
-    expect(result.installed.packages.sh).toEqual([Bun.which("sh")!]);
+    expect(result.installed.packages.bun).toEqual([Bun.which("bun")!]);
     expect(existsSync(join(w.dir, ".chrona"))).toBe(false);
   } finally { await w.cleanup(); }
 });
 
-test("recorded store bin directories join the module PATH; other entries are ignored", async () => {
-  const w = await workspace();
+test("empty modules and missing lockfiles never probe host programs", async () => {
+  const w = await workspace(), which = spyOn(Bun, "which");
   try {
-    await mkdir(join(w.dir, ".chrona"));
-    await writeFile(join(w.dir, ".chrona", "packages.json"), JSON.stringify({ backend: "nix", bin: ["/nix/store/fake-bin", "/etc", "/nix/store/x:/etc"] }));
-    await writeFile(join(w.dir, "test.sh"), 'printf "%s" "$PATH"');
-    const data = join(w.root, "data"); await mkdir(data);
-    const output = (await createScriptSandbox({ dataDir: w.root }).runModule({ codeDir: w.dir, dataDir: data, entry: "test.sh", input: {} })).output;
-    expect(output.split(":")[0]).toBe("/nix/store/fake-bin");
-    expect(output.split(":")).not.toContain("/etc");
-  } finally { await w.cleanup(); }
+    const packages = createModulePackages();
+    expect(which).not.toHaveBeenCalled();
+    expect(await packages.install({ dir: w.dir, packages: [] })).toEqual({ errors: [], installed: { npm: false, python: false, packages: {} } });
+    expect(which).not.toHaveBeenCalled();
+    await writeFile(join(w.dir, "package.json"), "{}");
+    await writeFile(join(w.dir, "pyproject.toml"), "[project]\n");
+    const result = await packages.install({ dir: w.dir, packages: [] });
+    expect(result.errors).toHaveLength(2);
+    expect(result.errors[0]).toContain("bun.lock");
+    expect(result.errors[1]).toContain("uv.lock");
+    expect(which).not.toHaveBeenCalled();
+    expect(existsSync(join(w.dir, ".chrona"))).toBe(false);
+  } finally { which.mockRestore(); await w.cleanup(); }
 });
+
+test("tools are resolved at install time, only as needed, without Nix or package manager probes", async () => {
+  const w = await workspace(), which = spyOn(Bun, "which").mockReturnValue(null);
+  try {
+    const packages = createModulePackages();
+    await writeFile(join(w.dir, "package.json"), "{}");
+    await writeFile(join(w.dir, "bun.lock"), "{}");
+    expect((await packages.install({ dir: w.dir, packages: [] })).errors).toEqual(["bun is not available on this host"]);
+    expect(which.mock.calls).toEqual([["bun"]]);
+    which.mockClear();
+    await rm(join(w.dir, "package.json"));
+    await writeFile(join(w.dir, "pyproject.toml"), "[project]\n");
+    await writeFile(join(w.dir, "uv.lock"), "version = 1\n");
+    expect((await packages.install({ dir: w.dir, packages: [] })).errors).toEqual(["uv is not available on this host"]);
+    expect(which.mock.calls).toEqual([["uv"]]);
+    which.mockClear();
+    which.mockImplementation(name => name === "uv" ? process.execPath : null);
+    expect((await packages.install({ dir: w.dir, packages: ["missing-program", "missing-program"] })).errors).toEqual([
+      "python3 or python is not available on this host",
+      "Missing system programs: missing-program. Ask the user to install them on the host, then submit the module again.",
+    ]);
+    expect(which.mock.calls).toEqual([["uv"], ["python3"], ["python"], ["missing-program"]]);
+  } finally { which.mockRestore(); await w.cleanup(); }
+});
+
+for (const installer of ["bun", "uv"] as const) {
+  for (const mode of ["exit", "timeout", "unknown"] as const) test.skipIf(process.platform !== "linux")(`${installer} installer ${mode} requires descendant-stop proof`, async () => {
+    const w = await workspace(), executable = join(w.root, "installer"), pidFile = join(w.dir, "descendant.pid");
+    const which = spyOn(Bun, "which").mockImplementation(name => name === installer ? executable : process.execPath);
+    try {
+      const files = installer === "bun" ? ["package.json", "bun.lock", ...(mode === "unknown" ? ["pyproject.toml", "uv.lock"] : [])] : ["pyproject.toml", "uv.lock"];
+      for (const file of files) await writeFile(join(w.dir, file), "");
+      const leaf = `require("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`;
+      await writeFile(executable, `#!${process.execPath}
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+if (${JSON.stringify(mode)} === "unknown") { process.kill(process.ppid, "SIGKILL"); process.exit(0); }
+spawn(process.execPath, ["-e", ${JSON.stringify(leaf)}], { detached: true, stdio: "ignore" });
+while (!existsSync(${JSON.stringify(pidFile)})) await Bun.sleep(5);
+if (${JSON.stringify(mode)} === "exit") process.exit(0);
+setInterval(() => {}, 1000);
+`);
+      await chmod(executable, 0o755);
+      const installing = createModulePackages({ timeoutMs: 700 }).install({ dir: w.dir, packages: ["next-program"] });
+      if (mode === "unknown") {
+        await expect(installing).rejects.toThrow("Process stop unknown");
+        // An unproven npm stop must not proceed to another installer or dependency probing.
+        expect(which.mock.calls.map(([name]) => name)).toEqual(installer === "bun" ? ["bun"] : ["uv", "python3"]);
+      } else {
+        const result = await installing;
+        expect(result.installed[installer === "bun" ? "npm" : "python"]).toBe(mode === "exit");
+        expect(result.errors.length).toBe(mode === "exit" ? 0 : 1);
+        const pid = Number(await readFile(pidFile, "utf8"));
+        expect(() => process.kill(pid, 0)).toThrow();
+      }
+    } finally {
+      which.mockRestore();
+      const pid = Number(await readFile(pidFile, "utf8").catch(() => "0"));
+      if (pid) try { process.kill(pid, "SIGKILL"); } catch { /* Guardian already reaped it. */ }
+      await w.cleanup();
+    }
+  });
+}

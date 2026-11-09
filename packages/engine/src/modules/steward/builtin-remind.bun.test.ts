@@ -1,101 +1,121 @@
-import { expect, test } from "bun:test";
-import { appendFile, cp, mkdtemp, rm } from "node:fs/promises";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
-import { seedTestModuleRelease, testReleasePackages } from "./module-release-test-fixture";
-import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
-import { buildPending } from "./module-build";
-import { propose } from "./module-proposal";
-import { resolveExternalRelease } from "./module-release";
-import { moduleContext } from "./module-context";
-import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
-import { registerBuiltins } from "./module-builtin";
-import { moduleSupervisor } from "./module-supervisor";
+import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { installationId, installExternal } from "./module-install";
+import { callSync, enqueueCall, runDueCalls } from "./module-calls";
+import { drainSchedules } from "./schedule-delivery";
 import { createStewardService } from "./service";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
-import { notice } from "./test-notices";
 
-const sandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
 const now = new Date("2026-10-22T12:00:00Z");
-const shippedResources = resolve(import.meta.dirname, "builtin");
-async function fixture(migrated = false) {
-  const dataDir = await mkdtemp("/tmp/chrona-remind-");
-  const resources = join(dataDir, "resources", "builtin"), externalResources = join(dataDir, "resources", "external");
-  await cp(shippedResources, resources, { recursive: true });
-  for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
-  await cp(resolve(import.meta.dirname, "external/remind"), join(externalResources, "remind"), { recursive: true });
-  await seedTestModuleRelease(externalResources, "remind");
-  const db = testDb();
-  await db.workspace.create({ data: { id: "w", name: "Reminders" } });
-  if (migrated) {
-    await db.module.create({ data: { id: "remind-id", workspaceId: "w", name: "remind", builtin: false } });
-    await db.schedule.create({ data: { workspaceId: "w", mode: "module", moduleId: "remind-id", rule: { kind: "at", at: now.toISOString() }, text: "legacy-00000000-0000-0000-0000-000000000001", label: "Old label", createdBy: "user", nextAt: now, payload: { text: "Migrated reminder" } } });
-  }
-  const runtime = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir });
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, packages: testReleasePackages(resources),
-    moduleExternalResources: externalResources, sandbox: { ...runtime.health, runModule: runtime.runModule, startModule: runtime.startModule } };
-  ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
-  async function install() {
-    await registerBuiltins(ports, "w");
-    if (migrated) {
-      const release = await resolveExternalRelease(ports, "remind");
-      await propose(moduleContext(ports, "w"), { root: externalResources, dir: "remind", intent: { changes: ["Installed reminder baseline"], preserves: [] }, expectedModuleId: "remind-id", sourceCommit: release.hash, gitBundle: release.git! }, "user");
-      await buildPending(moduleContext(ports, "w"));
-      expect(await db.module.findUniqueOrThrow({ where: { id: "remind-id" } })).toMatchObject({ activeHash: release.hash });
-      await appendFile(join(externalResources, "remind/index.ts"), "\n// Synthetic official update; preserve reminder behavior.\n");
-      const updated = await seedTestModuleRelease(externalResources, "remind");
-      expect(updated.commit).not.toBe(release.hash);
-    }
-    const expectedHash = (await resolveExternalRelease(ports, "remind")).hash;
-    expect(expectedHash).toMatch(/^[a-f0-9]{40}$/);
-    const request = { package: "remind" as const, mode: migrated ? "update" as const : "install" as const, requestKey: "remind-fixture" };
-    await installExternal(ports, "w", request);
-    await buildPending(moduleContext(ports, "w"));
-    await refreshInstallationReceipts(ports, "w");
-    expect(await installExternal(ports, "w", request)).toMatchObject({ status: "installed", hash: expectedHash });
-  }
-  const service = createStewardService(ports), api = service.forWorkspace("w");
-  return { db, ports, service, api, install, async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
+const source = resolve(import.meta.dirname, "external/remind");
+const retainedFiles = ["module.json", "index.ts", "test.ts", "page.ts", "activation-harness.ts"];
+const paused = { code: "unavailable", reason: "module_paused" };
+let db: ReturnType<typeof testDb>, ports: StewardPorts, resources: string;
+let installerCalls: number, processStarts: number;
+let manifest: Record<string, string | boolean | object>;
+const origin = { workspaceId: "w", caller: { kind: "owner", via: null }, chain: [], path: [] } as const;
+beforeEach(async () => {
+  db = testDb();
+  await db.workspace.create({ data: { id: "w", name: "Paused reminders" } });
+  const dataDir = await mkdtemp(join(tmpdir(), "chrona-remind-paused-"));
+  resources = join(dataDir, "resources/external");
+  await cp(source, join(resources, "remind"), { recursive: true });
+  manifest = JSON.parse(await readFile(join(resources, "remind/module.json"), "utf8"));
+  installerCalls = 0;
+  processStarts = 0;
+  ports = {
+    db, dataDir, now: () => now, publicUrl: null, moduleExternalResources: resources,
+    moduleExternalInstaller: async () => { installerCalls++; throw new Error("Paused remind reached installer"); },
+    sandbox: { available: true, isolated: false, startModule: () => { processStarts++; throw new Error("Paused remind started a process"); }, runModule: async () => { processStarts++; throw new Error("Paused remind ran author tests"); } },
+  };
+});
+afterEach(async () => {
+  await db.$disconnect();
+  await rm(ports.dataDir, { recursive: true, force: true });
+});
+async function retainedModule() {
+  const module = await db.module.create({ data: { workspaceId: "w", name: "remind", builtin: false, status: "active", activeHash: "a".repeat(64) } });
+  await db.moduleVersion.create({ data: { moduleId: module.id, hash: module.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
+  return module;
+}
+async function expectSourcesRetained() {
+  for (const file of retainedFiles) expect(await readFile(join(resources, "remind", file))).toEqual(await readFile(join(source, file)));
+  expect(installerCalls).toBe(0);
+  expect(processStarts).toBe(0);
+}
+async function expectNoExecution() {
+  expect(await db.moduleRun.count()).toBe(0);
+  expect(await db.moduleCall.count()).toBe(0);
+  expect(await db.run.count()).toBe(0);
+  expect(await db.message.count()).toBe(0);
+  expect(await db.approval.count()).toBe(0);
+  await expectSourcesRetained();
 }
 
-if (!sandbox.health.available) console.info("SKIP remind real process: bwrap sandbox unavailable");
-const sandboxTest = sandbox.health.available ? test : test.skip;
-sandboxTest("m_remind_create uses explicit external installation and author tests; its timer survives reactivation", async () => {
-  const f = await fixture();
-  try {
-    await f.install();
-    const module = await f.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: "w", name: "remind" } } });
-    expect(module).toMatchObject({ builtin: false, status: "active" });
-    expect(await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ report: { tests: [{ exitCode: 0 }] } });
-    expect(await f.db.approval.count()).toBe(0);
-    const session = await f.db.session.create({ data: { workspaceId: "w", key: "build:reminder-tools", source: "build" } });
-    await f.api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture" });
-    const run = (await f.api.runs.claimNext("foreground"))!;
-    await expect(f.service.tools.call(run.token, "chrona_schedule", { mode: "remind", rule: { kind: "at", at: now.toISOString() }, text: "喝水", label: "Drink water" })).rejects.toThrow();
-    const created = await f.service.tools.call(run.token, "m_remind_create", { rule: JSON.stringify({ kind: "at", at: now.toISOString() }), text: "喝水", label: "Drink water" }) as { result: { key: string } };
-    expect(await f.db.schedule.findFirstOrThrow({ where: { text: created.result.key } })).toMatchObject({ mode: "module", moduleId: module.id, payload: { text: "喝水" }, label: "Drink water" });
-    await f.api.runs.finish(run.id, { outcome: "finished", sessionId: null, error: null });
-    await f.api.modules.activate(module.id, module.activeHash!, "rollback");
-    expect(await f.api.schedules.fireDue()).toBe(1);
-    expect(await f.api.schedules.fireDue()).toBe(0);
-    expect(await notice(f.db, { moduleId: module.id, title: "提醒" })).toMatchObject({ title: "提醒", body: "喝水" });
-    expect(await f.db.moduleCall.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ method: "call", status: "executed" });
-    expect(await f.db.moduleRun.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ exitCode: 0 });
-    expect(await f.db.run.count()).toBe(1);
-  } finally { await f.close(); }
-}, 30_000);
+test.each(["install", "update"] as const)("external remind %s is gated before proposals, checks or source changes", async mode => {
+  const module = mode === "update" ? await retainedModule() : null;
+  // Retain the actual paused release. Do not rewrite its removed scheduler manifest into an installable app.
+  expect(manifest).toHaveProperty("triggers");
+  expect(moduleManifestSchema.safeParse(manifest).success).toBe(false);
+  await expect(installExternal(ports, "w", { package: "remind", mode, requestKey: `paused-${mode}` })).rejects.toMatchObject(paused);
+  expect(await db.module.count()).toBe(module ? 1 : 0);
+  expect(await db.moduleVersion.count()).toBe(module ? 1 : 0);
+  if (module) expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
+  expect(await db.audit.count({ where: { kind: { in: ["module_installation_submission", "module_proposed"] } } })).toBe(0);
+  await expectNoExecution();
+});
 
-sandboxTest("explicit external update preserves a stored reminder timer the module lists and fires", async () => {
-  const f = await fixture(true);
-  try {
-    expect(await f.db.schedule.findFirstOrThrow()).toMatchObject({ mode: "module", moduleId: "remind-id", text: "legacy-00000000-0000-0000-0000-000000000001", payload: { text: "Migrated reminder" }, label: "Old label" });
-    await f.install();
-    const module = await f.db.module.findUniqueOrThrow({ where: { workspaceId_name: { workspaceId: "w", name: "remind" } } });
-    expect(module).toMatchObject({ id: "remind-id", builtin: false, status: "active" });
-    expect(await f.api.schedules.forModule(module.id, "remind").list()).toMatchObject([{ key: "legacy-00000000-0000-0000-0000-000000000001", payload: { text: "Migrated reminder" } }]);
-    expect(await f.api.schedules.fireDue()).toBe(1);
-    expect(await notice(f.db, { moduleId: module.id, title: "提醒" })).toMatchObject({ title: "提醒", body: "Migrated reminder" });
-    expect(await f.db.run.count()).toBe(0);
-  } finally { await f.close(); }
-}, 30_000);
+test.each(["pending", "building", "installed"] as const)("replaying a retained %s install receipt reports paused without resubmission", async status => {
+  const module = await retainedModule();
+  const request = { package: "remind", mode: "install", requestKey: `retained-${status}` } as const;
+  const result = { package: "remind", requestKey: request.requestKey, status, moduleId: module.id, hash: module.activeHash, approvalId: null, error: null };
+  const id = installationId("w", request.requestKey);
+  await db.audit.create({ data: { id, workspaceId: "w", actorKey: "kernel", kind: "module_installation", subjectId: module.id, details: { request, result } } });
+  const unavailable = await installExternal(ports, "w", request);
+  expect(unavailable).toMatchObject({ ...result, status: "unavailable", error: paused });
+  expect(await installExternal(ports, "w", request)).toEqual(unavailable);
+  expect(await db.audit.findUniqueOrThrow({ where: { id } })).toMatchObject({ details: { request, result: unavailable } });
+  expect(await db.audit.count({ where: { kind: "module_installation" } })).toBe(1);
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
+  expect((await db.moduleVersion.findFirstOrThrow()).manifest).toEqual(manifest);
+  await expectNoExecution();
+});
+
+test("retained approved remind cannot receive synchronous or newly queued owner calls", async () => {
+  const module = await retainedModule();
+  for (const [tool, args] of [["create", { rule: JSON.stringify({ kind: "at", at: now.toISOString() }), text: "喝水", label: "Drink water" }], ["list", {}], ["cancel", { key: "old-reminder" }]] as const) {
+    await expect(callSync(ports, { ...origin, chain: [], path: [] }, `remind.${tool}`, args)).rejects.toMatchObject(paused);
+    await expect(db.$transaction(tx => enqueueCall({ tx, ports, origin: { ...origin, chain: [], path: [] }, target: `remind.${tool}`, raw: args }, { key: `paused-${tool}` }))).rejects.toMatchObject(paused);
+  }
+  expect(await db.moduleInvocation.count()).toBe(0);
+  expect(await db.schedule.count()).toBe(0);
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
+  await expectNoExecution();
+});
+
+test("due private reminder rows stay inert and an old async call backs off without dispatch", async () => {
+  const module = await retainedModule();
+  const timer = await db.schedule.create({ data: { workspaceId: "w", moduleId: module.id, mode: "module", rule: { kind: "at", at: now.toISOString() }, text: "retained-reminder", label: "Retained reminder", payload: { text: "喝水" }, createdBy: "user", nextAt: now } });
+  const api = createStewardService(ports).forWorkspace("w");
+  expect(api).not.toHaveProperty("schedules");
+  // These drains settle recorded deliveries; a retained timer is not a calendar producer.
+  await drainSchedules(ports, "w");
+  expect(await runDueCalls(ports, "w")).toBe(0);
+  expect(await db.moduleInvocation.count()).toBe(0);
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  const queued = await db.moduleInvocation.create({ data: { workspaceId: "w", caller: "owner", target: "remind", tool: "create", mode: "async", key: "retained-call", args: { text: "喝水" }, idempotent: true, nextAttemptAt: now } });
+  expect(await runDueCalls(ports, "w")).toBe(1);
+  const deferred = await db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.id } });
+  expect(deferred).toMatchObject({ status: "queued", attempts: 1, nextAttemptAt: new Date(now.getTime() + 30_000), leaseToken: null, leaseUntil: null, finishedAt: null });
+  expect(deferred.error).toContain("Module remind is unavailable");
+  expect(await runDueCalls(ports, "w")).toBe(0);
+  await drainSchedules(ports, "w");
+  expect(await db.moduleInvocation.count()).toBe(1);
+  expect(await db.schedule.findUniqueOrThrow({ where: { id: timer.id } })).toEqual(timer);
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
+  await expectNoExecution();
+});

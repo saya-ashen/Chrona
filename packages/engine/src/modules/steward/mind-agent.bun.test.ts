@@ -6,7 +6,7 @@ import { seedTestModuleRelease } from "./module-release-test-fixture";
 import { createExternalModuleInstaller, installExternal } from "./module-install";
 import { createModules } from "./modules";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
-import { agentFixture } from "./agent-application.fixtures";
+import { agentFixture } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { selectContextTools } from "./agent-context-tools";
 import { callSync, kernelOrigin } from "./module-calls";
 import { MIND_AGENT_TOOLS } from "./external/mind/execution";
@@ -15,7 +15,7 @@ test("Mind's actual manifest can read Web overview and select its Agent tools wi
   const f = await agentFixture();
   try {
     for (const [name, directory] of [["web", "builtin"], ["notify", "builtin"], ["mind", "external"]]) {
-      const source = join(import.meta.dir, directory!, name!);
+      const source = join(import.meta.dir, "external", name!);
       const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(source, "module.json"), "utf8")));
       const hash = `mind-agent-${name}`;
       await cp(source, join(f.ports.dataDir, "platform/store", hash), { recursive: true });

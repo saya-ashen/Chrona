@@ -1,7 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { callAgent } from "./agent";
-import { executionSnapshotSchema, type ExecutionSnapshot, type ExecutionEventPage, type ExecutionEventPayload, type ExecutionView } from "./contract.js";
+import { executionEventPageSchema, executionSnapshotSchema, type ExecutionSnapshot, type ExecutionEventPage, type ExecutionEventPayload, type ExecutionView } from "./contract.js";
 import { codingError, readCodingWork, writeCodingWork, type CodingContext } from "./storage";
 import { saveSessionFile } from "./sessions";
 import { getCodingWorkState } from "./work";
@@ -35,7 +35,7 @@ function progressText(payload: ExecutionEventPayload): string | null {
 }
 export async function loadHistory(context: CodingContext, workId: string): Promise<ConversationHistory> {
   let raw: unknown;
-  try { raw = JSON.parse(await readFile(join(context.dir, "sessions", `history-${workId}.json`), "utf8")); }
+  try { const path = join(context.dir, "sessions", `history-${workId}.json`); if ((await stat(path)).size > 64 * 1024 * 1024) throw codingError("too_large", "Coding history exceeds storage budget"); raw = JSON.parse(await readFile(path, "utf8")); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, sequence: 0, limited: false, messages: [], progress: [] }; throw error; }
   if (!validHistory(raw)) throw codingError("conflict", "Invalid conversation history");
   if (raw.snapshot) raw.snapshot = executionSnapshotSchema.parse(raw.snapshot);
@@ -88,17 +88,20 @@ function applySnapshot(history: ConversationHistory, snapshot: ExecutionSnapshot
   if (!final.truncated || found.content.length <= final.text.length) found.content = final.text;
   found.status = final.truncated ? "回复可能不完整" : "";
 }
+function matchesExecution(actual: Pick<ExecutionView, "workId" | "sessionId" | "runId" | "attemptId">, expected: ExecutionView): boolean {
+  return actual.workId === expected.workId && actual.sessionId === expected.sessionId && actual.runId === expected.runId && actual.attemptId === expected.attemptId;
+}
 /** Cache full replies and incremental cursors without re-running work on reads. */
 export async function refreshHistory(context: CodingContext, view: ExecutionView, history: ConversationHistory) {
   const target = { workId: view.workId, runId: view.runId, attemptId: view.attemptId };
-  if (history.snapshot && (history.snapshot.runId !== view.runId || history.snapshot.attemptId !== view.attemptId)) throw codingError("conflict", "Conversation execution identity changed");
+  if (history.snapshot && !matchesExecution(history.snapshot, view)) throw codingError("conflict", "Conversation execution identity changed");
   const page = await readPage(context, target, history);
   if (page) {
-    if (page.events.some(event => event.workId !== view.workId || event.sessionId !== view.sessionId || event.runId !== view.runId || event.attemptId !== view.attemptId)) throw codingError("conflict", "Conversation event identity changed");
+    if (!executionEventPageSchema.safeParse(page).success || page.events.some(event => !matchesExecution(event, view))) throw codingError("conflict", "Conversation event identity changed");
     applyPage(history, page);
   }
   const snapshot = await callAgent<ExecutionSnapshot>(context, "snapshot", target);
-  if (snapshot.workId !== view.workId || snapshot.runId !== view.runId || snapshot.attemptId !== view.attemptId || snapshot.sessionId !== view.sessionId) throw codingError("conflict", "Conversation snapshot identity changed");
+  if (!executionSnapshotSchema.safeParse(snapshot).success || !matchesExecution(snapshot, view)) throw codingError("conflict", "Conversation snapshot identity changed");
   applySnapshot(history, snapshot);
   await saveSessionFile(context, `history-${view.workId}.json`, history);
   return history;

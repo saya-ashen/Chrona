@@ -1,12 +1,11 @@
 import { startRescueListener } from "./rescue";
 import { createModuleRuntimePorts, resourcePath } from "../../../packages/integrations/src/steward/module-runtime";
 import type { PrismaClient } from "@chrona/db";
-import { createAgentClient, stopAgentRuns, moduleSupervisor, createExecutorAuth, resolveExecutionPrincipal, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, enqueueCall, CallError, type StewardPorts } from "@chrona/engine";
+import { createAgentClient, stopAgentRuns, moduleSupervisor, createStewardService, createExecutions, createExecutionV2Admission, createExecutionWorkspaceCleanup, createExecutionEventStore, createExternalModuleInstaller, CallError, type StewardPorts } from "@chrona/engine";
 import { loadExecutionProjects, loadExecutionPlacements } from "./config/execution-projects";
 import { createExecutionProjectRegistry } from "./config/execution-project-registry";
 import { createServerWorkspacePreparer } from "./execution-server-workspace";
 import { createExecutionWorkspaceCleanupHost } from "./execution-workspace-cleanup";
-import { installDeviceExecution } from "./execution-device-runtime";
 import type { ProviderAdapter } from "@chrona/contracts/steward";
 import { createAgentApplicationHost } from "../../../packages/integrations/src/steward/agent-application-host";
 
@@ -16,19 +15,6 @@ type RuntimeOptions = {
   sandbox?: StewardPorts["sandbox"];
   timers?: Pick<typeof globalThis, "setInterval" | "clearInterval">;
 };
-function executorOwnerPorts(ports: StewardPorts): NonNullable<StewardPorts["executorOwner"]> {
-  const auth = createExecutorAuth(ports);
-  const owner = async () => {
-    if (!await ports.db.workspace.findUnique({ where: { id: "ws_default" }, select: { id: true } })) throw new CallError("unavailable", "Owner workspace unavailable");
-    const principal = await resolveExecutionPrincipal(ports, "ws_default", { kind: "owner", via: null });
-    return { workspaceId: principal.workspaceId, ownerId: principal.ownerId };
-  };
-  return {
-    async createPairing(input) { return { ...await auth.createPairing(await owner()), label: input.label }; },
-    async revoke(input) { return auth.revoke(await owner(), input); },
-    async prepareIncarnation(input) { return auth.prepareIncarnation(await owner(), input); },
-  };
-}
 function executionInitialization(ports: StewardPorts) {
   let initialized: Promise<void> | undefined;
   let placements: Awaited<ReturnType<typeof loadExecutionPlacements>>;
@@ -43,11 +29,9 @@ function executionInitialization(ports: StewardPorts) {
   ports.executionServerWorkspace = createServerWorkspacePreparer(ports.dataDir, ports.now);
   const cleanup = createExecutionWorkspaceCleanup(ports, createExecutionWorkspaceCleanupHost(ports.dataDir));
   ports.executionWorkspaces = { cleanup: cleanup.cleanup };
-  ports.executionWorkspaceCleanupTransport = { poll: cleanup.poll, report: cleanup.report };
   return () => initialized ??= (async () => {
     // Configuration I/O precedes every writer transaction; placement resolution uses this host snapshot.
     placements = await loadExecutionPlacements(ports.dataDir);
-    await ports.db.executionExecutor.updateMany({ data: { authorizedUntil: null, reconciledAt: null } });
   })();
 }
 export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions = {}) {
@@ -69,7 +53,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   };
   // Factory closures must use the final runtime ports, including the selected Provider and wake callbacks.
   ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
-  ports.executorOwner = executorOwnerPorts(ports);
   const initialize = executionInitialization(ports);
   let projects: ReturnType<typeof loadExecutionProjects> | undefined;
   const registry = createExecutionProjectRegistry(ports.dataDir);
@@ -84,17 +67,6 @@ export function createStewardRuntime(db: PrismaClient, options: RuntimeOptions =
   ports.executionEvents = createExecutionEventStore(ports);
   ports.executions = createExecutions(ports);
   ports.executionV2Admission = createExecutionV2Admission(ports);
-  installDeviceExecution(ports);
-  ports.onExecutionFinishedIn = async (tx, workspaceId, runId) => {
-    const attempt = await tx.executionAttempt.findUnique({ where: { runId } });
-    if (attempt?.moduleId) {
-      const module = await tx.module.findUnique({ where: { id: attempt.moduleId } });
-      if (module?.name === "coding" && module.status === "active" && module.activeHash === attempt.callerHash) {
-        // Queue with the final state; publication runs after commit and never waits behind cancel.
-        await enqueueCall({ tx, ports, origin: { workspaceId, caller: { kind: "owner", via: null }, chain: [], path: [] }, target: "coding.get", raw: { input: JSON.stringify({ workId: attempt.workId }) } }, { key: `execution-result:${attempt.id}:${attempt.stopConfirmedAt ? "stopped" : "unknown"}` });
-      }
-    }
-  };
   ports.onRunFinished = async () => { wake(); };
   const service = createStewardService(ports), timers = options.timers ?? globalThis;
   let timer: ReturnType<typeof setInterval> | undefined, running: Promise<void> | undefined;

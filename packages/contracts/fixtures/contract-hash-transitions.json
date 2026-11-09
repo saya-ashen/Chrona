@@ -1,0 +1,37 @@
+[
+  {
+    "target": "modules.diagnostics",
+    "stage": "S1",
+    "reason": "Remove the retired virtualMemoryMb field from incident firstEvidence and evidence after removing address-space limits.",
+    "before": "8c6f9e1ef72df43a3bf328b3305a3a3628f0d0f4a5ed7601ecc75954f9d61f9d",
+    "after": "ef8ca202081862a1862df9d0563dfb4a395738bdfb38ff400ac686da297aeb71"
+  },
+  {
+    "target": "agent.run",
+    "stage": "S5",
+    "reason": "S5 local placement keeps enforced timeout/tool limits; application placement adds host-approved targets and durable shared model limits.",
+    "before": "5111a7f3e08fd92c4ac7cfb511f7f4a00301578c9e9a656c4b4fdd207a161ab9",
+    "after": "800d7ecb261eb72afd8a7c19f9c3b20e627ae5ee0e68106203b6ac3e0d1c9f4e"
+  },
+  {
+    "target": "agent.placement",
+    "stage": "S5",
+    "reason": "Replace device-specific placement with local or application placement and kernel-governed durable execution delivery.",
+    "before": "e4287a9226eb868cf0d2e8ae413fa883eee2cd929e6be74f767614260101d231",
+    "after": "1b5f277d013e9e9d67f54b5c6ea30d7e85de949a50473d8fd1576c4e4fb028d9"
+  },
+  {
+    "target": "agent.locations",
+    "stage": "S5",
+    "reason": "Replace device-specific placement with local or application placement and kernel-governed durable execution delivery.",
+    "before": "a7d070a0bd1ca25d2bc6cc83a00c0751af42ae63faf008175a4daf71854c29ac",
+    "after": "df9240bb5c279d7e665ee819c7f39182161a70ebe70f19f32a6c1e767b458d05"
+  },
+  {
+    "target": "agent.cleanup",
+    "stage": "S5",
+    "reason": "Replace device-specific placement with local or application placement and kernel-governed durable execution delivery.",
+    "before": "2933f7fc6b0e007e5e11def4e8d5c087266bf3839fa1eea8c15d8c4c220d954d",
+    "after": "7362959f3d0ff5f1b8065b04298c722ba80a5083f39093191bde6ab5b50a9ff1"
+  }
+]

@@ -22,17 +22,18 @@ test.each([false, true])("paused app migration preserves state and data (failure
   } } };
   const context = moduleContext(ports, workspace.id);
   const module = await db.module.create({ data: { workspaceId: workspace.id, name: "example", activeHash: "old", dataSchema: 1, status: "paused" } });
-  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], data: { schema: 2, migrate: "migrate.ts" }, triggers: [{ id: "daily", schedule: { kind: "daily", time: "09:00" } }] });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, data: { schema: 2, migrate: "migrate.ts" } });
   const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash: "next", source: "user", manifest, intent: {}, report: {}, status: "pending_review" } });
+  const timer = await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, mode: "module", triggerId: "daily", text: "retained legacy timer", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, status: "cancelled", nextAt: null } });
   const data = join(context.platform, "data", module.id);
   await mkdir(data, { recursive: true }); await writeFile(join(data, "value.txt"), "original");
   await db.$transaction(tx => startMigration(context, tx, module.id, version.hash, { from: 1, to: 2 }));
   await migrateData(context, { module, version, manifest, from: 1, to: 2 }, "activate");
   expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toMatchObject({ status: "paused", activeHash: failure ? "old" : "next", dataSchema: failure ? 1 : 2 });
   expect(await readFile(join(data, "value.txt"), "utf8")).toBe(failure ? "original" : "migrated");
-  if (!failure) {
-    expect(await db.schedule.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ status: "paused", nextAt: null });
-    await requestStatus(context, module.id, "active", "explicit enable");
-    expect(await db.schedule.findFirstOrThrow({ where: { moduleId: module.id } })).toMatchObject({ status: "active", nextAt: expect.any(Date) });
-  }
+  expect(await db.moduleVersion.findUniqueOrThrow({ where: { id: version.id } })).toMatchObject({ status: failure ? "rejected" : "approved" });
+  expect(await db.schedule.findMany({ where: { moduleId: module.id } })).toMatchObject([{ id: timer.id, status: "cancelled", nextAt: null }]);
+  await requestStatus(context, module.id, "active", "explicit enable");
+  expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toMatchObject({ status: "active", activeHash: failure ? "old" : "next", dataSchema: failure ? 1 : 2 });
+  expect(await db.schedule.findMany({ where: { moduleId: module.id } })).toMatchObject([{ id: timer.id, status: "cancelled", nextAt: null }]);
 });

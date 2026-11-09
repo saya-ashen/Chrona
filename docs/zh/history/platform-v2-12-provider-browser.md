@@ -8,7 +8,7 @@ Provider 写和改模块，但看不到页面：构建运行只能跑测试（�
 
 ## 2. 能力
 
-- **`browser_screenshot({ url, width?, height? })`**：Chrona 随发布带的 Pi 扩展（`external-plugins/pi-steward-agent/browser-tools.ts`）。只截本机页面（`http://127.0.0.1` / `localhost`）；无头浏览器先让页面脚本运行（虚拟时间 8 秒）再截图；结果作为图片交给模型（Pi 工具结果的 `ImageContent`），同时存到工作目录 `screenshots/`，模型不看图时也能引用路径。默认视口 1440×900。
+- **`browser_screenshot({ url, width?, height? })`**：Chrona 随发布带的 Pi 扩展（`packages/pi/resources/browser-tools.ts`）。只截本机页面（`http://127.0.0.1` / `localhost`）；无头浏览器先让页面脚本运行（虚拟时间 8 秒）再截图；结果作为图片交给模型（Pi 工具结果的 `ImageContent`），同时存到工作目录 `screenshots/`，模型不看图时也能引用路径。默认视口 1440×900。
 - **`node_modules/chrona/preview.ts <模块目录> [fixtures.json]`**：构建目录里的预览脚本。用测试内核（`chrona/testing`）启动模块，把它的 HTTP（`chrona.serve`）转发到 `http://127.0.0.1:<随机端口>/`。路由调用按 fixtures.json（`{ "<module>.<tool>": 输出 }`）回答，没有的返回 null，与作者测试相同，不产生任何真实效果。web 模块的数据接口不在模块内验证密钥，所以预览直接显示页面而不是登录页。
 - 构建提示：提供页面的模块在后台启动预览；有 `browser_screenshot` 时在 1440×900、1024×768、390×844 下检查页面再提交。
 

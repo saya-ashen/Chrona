@@ -17,7 +17,7 @@ async function fixture(name = "example", entry = false) {
   const ports: StewardPorts = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-05T12:00:00Z") };
   closes.push(async () => { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "version" } });
-  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], triggers: [], effects: [], ...(entry ? { uses: ["*"] } : {}) });
+  const manifest = moduleManifestSchema.parse({ name: module.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], ...(entry ? { uses: ["*"] } : {}) });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "version", manifest, source: "user", status: "approved", intent: {}, report: {} } });
   const context = moduleContext(ports, workspace.id);
   const data = join(context.platform, "data", module.id);
@@ -53,10 +53,12 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).not.toBeNull();
 });
 
-test.each(["other-entry", "files", "events"])("entry removal exception does not extend to %s", async name => {
+test.each(["web", "notify", "other-entry", "files", "events"])("ordinary entry %s can be removed after approval with a data backup", async name => {
   const f = await fixture(name, true);
-  await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });
-  expect(await f.db.approval.count()).toBe(0);
+  await removeApproved(f.context, await f.approved());
+  expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
+  const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
+  expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
 });
 
 test("official MCP entry can be removed only after the explicit data deletion approval", async () => {
@@ -121,4 +123,25 @@ test("ended history and completed calls do not block removal; backup preserves d
   expect(await f.db.session.findUniqueOrThrow({ where: { id: history.id } })).toMatchObject({ moduleId: null, entryModuleId: f.module.id, status: "ended" });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
   expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
+});
+
+test.each(["web", "notify", "other-entry"])("idle audited Agent context permits removal of %s", async name => {
+  const f = await fixture(name, true);
+  const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: "module", moduleId: f.module.id, entryModuleId: f.module.id } });
+  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: f.module.id, kind: "agent_context", subjectId: session.id, details: {} } });
+  await removeApproved(f.context, await f.approved());
+  expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ status: "active", moduleId: null });
+});
+
+test.each(["queued", "running", "unknown-stop", "held-directory", "wrong-actor", "wrong-session", "wrong-source", "wrong-module"])("ordinary context removal retains %s guard", async kind => {
+  const f = await fixture("web", true);
+  const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: kind === "wrong-source" ? "cli" : "module", moduleId: kind === "wrong-module" ? null : f.module.id, entryModuleId: f.module.id } });
+  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: kind === "wrong-actor" ? "other" : f.module.id, kind: "agent_context", subjectId: kind === "wrong-session" ? "other" : session.id, details: {} } });
+  if (["queued", "running", "unknown-stop", "held-directory"].includes(kind)) {
+    const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "foreground", trigger: "module", status: kind === "queued" || kind === "running" ? kind : "failed", error: kind === "unknown-stop" ? "Execution stop is unconfirmed" : null, provider: "fake", tokenHash: "context", prompt: "work", cwd: f.ports.dataDir } });
+    if (kind === "held-directory") await f.db.executionAttempt.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", callerKey: `module:${f.module.id}`, workId: "work", commandKey: "start", requestDigest: "fixture", runId: run.id, moduleId: f.module.id, projectRef: "fixture", projectDigest: "fixture", logDir: f.data, baseline: "fixture", budget: {}, heldDirectory: f.data } });
+  }
+  await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });
+  expect(await f.db.approval.count()).toBe(0);
+  expect(await readFile(join(f.data, "keep.txt"), "utf8")).toBe("valuable");
 });

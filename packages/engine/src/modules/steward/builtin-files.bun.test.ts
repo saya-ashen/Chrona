@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
 import { cp, mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { BUILTIN_MODULE_NAMES } from "@chrona/contracts/steward";
-import { seedTestModuleRelease, testReleasePackages } from "./module-release-test-fixture";
+import { seedTestModuleRelease, testReleasePackages, testReleaseRuntimeChecks } from "./module-release-test-fixture";
 import { createFiles } from "./external/files/files";
 import { registerBuiltins } from "./module-builtin";
 import { createExternalModuleInstaller, installExternal, refreshInstallationReceipts } from "./module-install";
@@ -20,7 +21,7 @@ const shippedResources = fileURLToPath(new URL("./builtin", import.meta.url));
 const now = new Date("2026-10-22T00:00:00Z");
 
 async function fixture(real = false) {
-  const db = testDb(), dataDir = await mkdtemp("/tmp/chrona-files-engine-");
+  const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-files-engine-"));
   const resources = join(dataDir, "resources", "builtin"), externalResources = join(dataDir, "resources", "external");
   await cp(shippedResources, resources, { recursive: true });
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
@@ -32,9 +33,9 @@ async function fixture(real = false) {
     if (event.trigger.kind === "tool") return { result: await app.tool(event.trigger.id, event.trigger.args, event.now) };
     throw new Error("Unexpected event");
   });
-  const sandbox = real ? createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined, dataDir }) : null;
-  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, moduleExternalResources: externalResources, packages: testReleasePackages(resources),
-    // Without bwrap, author tests run as plain processes exactly as on a host without a sandbox.
+  const sandbox = real ? createScriptSandbox({ dataDir }) : null;
+  const ports: StewardPorts = { db, dataDir, now: () => now, publicUrl: null, moduleBuiltinResources: resources, moduleExternalResources: externalResources, packages: testReleasePackages(resources), ...testReleaseRuntimeChecks(),
+    // Author tests use trusted local processes with host OS permissions.
     sandbox: { available: sandbox?.health.available ?? true, isolated: sandbox?.health.isolated ?? true, runModule: (sandbox ?? createScriptSandbox({ dataDir })).runModule, startModule: sandbox?.startModule ?? peer.startModule } };
   ports.moduleExternalInstaller = createExternalModuleInstaller(ports);
   const api = createStewardService(ports).forWorkspace(workspaceId);
@@ -63,7 +64,7 @@ test("files fresh workspace: explicit external installation, owner tools, histor
     expect(app).toMatchObject({ builtin: false, status: "active" });
     expect(await f.db.approval.count()).toBe(0);
     const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: app.id } });
-    expect(version).toMatchObject({ status: "approved", report: { tests: [{ exitCode: 0 }] } });
+    expect(version).toMatchObject({ status: "approved", report: { typecheck: { status: "passed" }, tests: [{ exitCode: 0 }] } });
     expect(app.activeHash).toBeTruthy();
     expect((await f.api.modules.tools()).tools.map(tool => tool.name).filter(name => name.startsWith("m_files_"))).toEqual(["list", "read", "write", "move", "delete", "history", "restore"].map(name => `m_files_${name}`));
     expect(await f.call("write", { path: "report.txt", content: "one" })).toEqual({ ok: true });
@@ -82,7 +83,7 @@ test("files fresh workspace: explicit external installation, owner tools, histor
 }, 30_000);
 
 test("files rejects unsafe paths, links, oversized output; caps persisted versions and restores after restart", async () => {
-  const root = await mkdtemp("/tmp/chrona-files-unit-");
+  const root = await mkdtemp(join(tmpdir(), "chrona-files-unit-"));
   const content = join(root, "content"), data = join(root, "data");
   await mkdir(content); await mkdir(data);
   try {
@@ -114,14 +115,14 @@ test("files rejects unsafe paths, links, oversized output; caps persisted versio
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-const realSandbox = createScriptSandbox({ bwrapPath: Bun.which("bwrap") ?? undefined });
+const realSandbox = createScriptSandbox({  });
 if (!realSandbox.health.available) console.info("SKIP files real process: module runtime unavailable");
 (realSandbox.health.available ? test : test.skip)("files real SDK process registers and reads/writes content", async () => {
   const f = await fixture(true);
   try {
     const app = await f.start();
     const version = await f.db.moduleVersion.findFirstOrThrow({ where: { moduleId: app.id } });
-    expect(version).toMatchObject({ status: "approved", report: { tests: [{ exitCode: 0 }] } });
+    expect(version).toMatchObject({ status: "approved", report: { typecheck: { status: "passed" }, tests: [{ exitCode: 0 }] } });
     const sandbox = createScriptSandbox({ dataDir: f.ports.dataDir });
     await mkdir(join(f.ports.dataDir, "platform/data", app.id), { recursive: true });
     await mkdir(join(f.ports.dataDir, "platform/content", app.id), { recursive: true });

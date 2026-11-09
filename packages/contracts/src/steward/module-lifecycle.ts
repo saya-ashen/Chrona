@@ -1,18 +1,20 @@
 import { z } from "zod";
 
-/** Reserved independently of database initialization. executions is reserved for P1 only. */
-export const KERNEL_MODULE_NAMES = ["modules", "schedules", "approvals", "settings", "secrets", "activity"] as const;
+/** Public kernel namespaces, reserved independently of database initialization. */
+export const KERNEL_MODULE_NAMES = ["modules", "approvals", "settings", "secrets", "activity"] as const;
 export const RESERVED_ENTRY_NAMES = ["rescue"] as const;
-/** Trusted local capability identities; same router, separate from kernel APIs and application installation. */
+/** Private kernel host identities routed internally; never installable applications. */
 export const LOCAL_CAPABILITY_NAMES = ["runtime-callback", "workspace-local"] as const;
-export const BUILTIN_MODULE_NAMES = ["web", "notify", "agent"] as const;
-export const PREINSTALLED_MODULE_NAMES = ["qq", "remind", "mind"] as const;
-export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "editor", "mcp", "files", "events"] as const;
+export const BUILTIN_MODULE_NAMES = ["agent"] as const;
+export const PREINSTALLED_MODULE_NAMES = ["web", "notify", "qq", "author"] as const;
+export const OPTIONAL_EXTERNAL_MODULE_NAMES = ["memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"] as const;
+/** Persisted initialization receipts retain explicit skipped entries for paused packages. */
+const INITIALIZATION_MODULE_NAMES = ["web", "notify", "qq", "author", "remind", "mind"] as const;
 export const OFFICIAL_EXTERNAL_MODULE_NAMES = [...PREINSTALLED_MODULE_NAMES, ...OPTIONAL_EXTERNAL_MODULE_NAMES] as const;
-export const MODULE_CONTRACT_VERSION = "m1-p0-v1";
 export const moduleVersionHashSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const moduleOriginSchema = z.enum(["kernel", "builtin", "external"]);
 export type ModuleOrigin = z.infer<typeof moduleOriginSchema>;
+/** Internal lifecycle enforcement vocabulary, including private build/install operations. */
 export const MODULE_OPERATIONS = ["build", "propose", "group", "activate", "update", "rollback", "remove", "install", "enable", "disable", "configure", "diagnose"] as const;
 export type ModuleOperation = (typeof MODULE_OPERATIONS)[number];
 export const moduleCapabilitiesSchema = z.object({
@@ -30,6 +32,7 @@ export const MODULE_OPERATION_ERRORS = {
   invalid: { code: "invalid", reason: "invalid_release" },
   unavailable: { code: "unavailable", reason: "installer_unavailable" },
 } as const;
+/** Used by private release installation, initialization and the local admin CLI. */
 export const moduleInstallRequestSchema = z.object({
   package: z.enum(OFFICIAL_EXTERNAL_MODULE_NAMES),
   mode: z.enum(["install", "update"]),
@@ -43,20 +46,17 @@ export const moduleInstallResultSchema = z.object({
   error: z.object({ code: z.enum(["invalid", "forbidden", "conflict", "not_found", "failed", "unavailable"]), reason: z.string(), message: z.string() }).strict().nullable(),
 }).strict();
 export type ModuleInstallResult = z.infer<typeof moduleInstallResultSchema>;
-export const modulePackageCatalogSchema = z.array(z.object({
-  name: z.enum(OFFICIAL_EXTERNAL_MODULE_NAMES), description: z.string().nullable(), available: z.boolean(), releaseHash: z.string().nullable(),
-  moduleId: z.string().nullable(), installation: moduleInstallResultSchema.nullable(), error: z.string().nullable(),
-  git: z.object({ repository: z.string().nullable(), branch: z.string(), commit: z.string().regex(/^[a-f0-9]{40}$/) }).strict().nullable().default(null),
-}).strict());
+/** Private initialization receipt parsing; not a public installation tool contract. */
 export const moduleInitializationStateSchema = z.object({
   version: z.literal(1), status: z.enum(["pending", "complete"]),
-  packages: z.record(z.enum(PREINSTALLED_MODULE_NAMES), z.object({
+  packages: z.record(z.enum(INITIALIZATION_MODULE_NAMES), z.object({
     requestKey: z.string(), attempts: z.number().int().min(1), status: z.enum(["pending", "building", "pending_approval", "installed", "failed", "unavailable", "skipped"]),
     moduleId: z.string().nullable(), hash: z.string().nullable(), approvalId: z.string().nullable(), error: moduleInstallResultSchema.shape.error,
   }).strict()),
 }).strict();
 export type ModuleInitializationState = z.infer<typeof moduleInitializationStateSchema>;
 
+/** Retained for the private Git source lifecycle; no public upstream tool. */
 export const moduleUpstreamRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("status"), moduleId: z.string().min(1) }).strict(),
   z.object({ action: z.literal("fetch"), moduleId: z.string().min(1) }).strict(),

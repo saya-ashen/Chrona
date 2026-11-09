@@ -12,14 +12,17 @@ const dirs: string[] = [];
 afterEach(async () => { for (const path of dirs.splice(0)) await rm(path, { recursive: true, force: true }); });
 async function directory() { const path = await mkdtemp("/tmp/chrona-entry-memory-"); dirs.push(path); return path; }
 const at = "2026-11-08T12:00:00.000Z";
-const provider = { module: "memory-local", hash: "approved", value: { interface: 1, context: "conversation-context", afterRun: "conversation-retain" } };
-function fixture(values: Args = { "memory-provider": "memory-local" }) {
+const memoryTools = [["conversation-context", "snapshot"], ["conversation-retain", "snapshot"], ["recall", "query"], ["forget", "id"], ["preferences", undefined]].map(([name, argument]) => ({
+  target: `memory-local.${name}`, moduleId: "memory-local-id", hash: "approved",
+  inputSchema: { type: "object", properties: argument ? { [argument]: { type: "string" } } : {}, required: argument ? [argument] : [], additionalProperties: false },
+}));
+function fixture(values: Args = { provider: "memory-local" }) {
   const calls: { target: string; args: Args }[] = [];
   const session: { id: string; source: string; messages: { direction: string; text: string; createdAt: string }[]; memory?: MemoryJournal } = { id: "web-agent:local", source: "web", messages: [{ direction: "in", text: "past choice", createdAt: at }] };
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
-    if (target === "modules.settings-get") return { values };
-    if (target === "modules.contributions") return [provider];
+    if (["qq.settings", "web.settings", "mcp.settings"].includes(target)) return { provider: null, autoRecall: true, autoRetain: true, ...values };
+    if (target === "modules.tools") return args.query === "memory-local" ? memoryTools : [];
     if (target.endsWith(".conversation-context")) return { text: "Earlier choice: local files", recalled: true };
     if (target.endsWith(".conversation-retain")) return { retained: true, through: JSON.parse(String(args.snapshot)).messages.at(-1)?.at, chars: 10 };
     if (target.endsWith(".recall")) return { items: [{ id: "memory-id", content: "remembered" }] };
@@ -28,26 +31,26 @@ function fixture(values: Args = { "memory-provider": "memory-local" }) {
   };
   return { calls, session, call };
 }
-test("entry selects only its configured approved contribution; discovery is restricted to memory", async () => {
+test("entry selects its app-owned preference and discovers currently approved tool contracts", async () => {
   const f = fixture();
-  expect((await selectedMemory(f.call, "qq"))?.module).toBe("memory-local");
-  expect(f.calls).toEqual([{ target: "modules.settings-get", args: { module: "qq" } }, { target: "modules.contributions", args: { section: "memory" } }]);
+  expect(await selectedMemory(f.call, "qq")).toMatchObject({ module: "memory-local", available: true });
+  expect(f.calls).toEqual([{ target: "qq.settings", args: {} }, { target: "modules.tools", args: { query: "memory-local" } }]);
   const off = fixture({});
-  expect(await selectedMemory(off.call, "web")).toBeNull();
-  expect(off.calls.map(call => call.target)).toEqual(["modules.settings-get"]);
-  const missing = fixture({ "memory-provider": "not-installed" });
-  expect(await selectedMemory(missing.call, "mcp")).toBeNull();
-  expect(missing.calls.some(call => call.target.includes("build") || call.target.startsWith("memory."))).toBe(false);
+  expect(await selectedMemory(off.call, "web")).toMatchObject({ module: null, available: false });
+  expect(off.calls.map(call => call.target)).toEqual(["web.settings"]);
+  const missing = fixture({ provider: "not-installed" });
+  expect(await selectedMemory(missing.call, "mcp")).toMatchObject({ module: "not-installed", available: false });
+  expect(missing.calls).toEqual([{ target: "mcp.settings", args: {} }, { target: "modules.tools", args: { query: "not-installed" } }]);
 });
-test.each([null, {}, { interface: 2 }, { interface: 1, context: "other-app.recall" }, { interface: 1, afterRun: 42 }])("entry rejects invalid contributed memory declarations: %j", async value => {
+test.each([null, {}, { type: "object", properties: {}, required: [] }, { type: "object", properties: { snapshot: { type: "number" } }, required: ["snapshot"] }, { type: "object", properties: { snapshot: { type: "string", enum: ["fixed"] } }, required: ["snapshot"] }])("entry rejects incompatible memory tool contracts: %j", async inputSchema => {
   const f = fixture();
-  const call = (target: string, args?: Args) => target === "modules.contributions" ? Promise.resolve([{ ...provider, value }]) : f.call(target, args);
-  expect(await selectedMemory(call, "web")).toBeNull();
+  const call = (target: string, args?: Args) => target === "modules.tools" ? Promise.resolve(memoryTools.map(tool => ({ ...tool, inputSchema }))) : f.call(target, args);
+  expect(await selectedMemory(call, "web")).toMatchObject({ module: "memory-local", available: false });
 });
 test.each(["context", "retain"] as const)("entry honors %s opt-out without sending conversation data", async operation => {
-  const f = fixture({ "memory-provider": "memory-local", "memory-auto-recall": false, "memory-auto-retain": false });
+  const f = fixture({ provider: "memory-local", autoRecall: false, autoRetain: false });
   expect(await conversationMemory(f.call, "web", f.session, operation, at)).toBe("");
-  expect(f.calls.every(call => call.target.startsWith("modules."))).toBe(true);
+  expect(f.calls.map(call => call.target)).toEqual(["web.settings", "modules.tools"]);
   expect(f.session.memory).toBeUndefined();
 });
 test("entry sanitizes before truncation, bounds snapshots, and advances only validated receipts", async () => {
@@ -79,7 +82,7 @@ test("Web/MCP manual memory operations route to the selected app with no identit
   expect(f.calls.filter(call => call.target.startsWith("memory-local."))).toEqual([{ target: "memory-local.recall", args: { query: "choice" } }, { target: "memory-local.forget", args: { id: "memory-id" } }]);
   const disabled = fixture({});
   expect(await memoryView(disabled.call, "web", "choice")).toEqual({ items: [] });
-  await expect(memoryForget(disabled.call, "web", "id")).rejects.toThrow("not enabled");
+  await expect(memoryForget(disabled.call, "web", "id")).rejects.toThrow("not available");
 });
 test("memory snapshot validates external data and attributes source to the real caller", () => {
   const snapshot = { session: { id: "s", source: "spoofed" }, messages: [{ direction: "in", text: "choice", at }], now: at, autoRecall: true, autoRetain: true, ending: false, recalled: false, retainedThrough: null };
@@ -169,10 +172,11 @@ test("memory-local SDK accepts direct callers and rejects kernel/lifecycle owner
 test("memory-local declares direct audiences and entry memory selection is private app configuration", async () => {
   const manifest = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, "external/memory-local/module.json"), "utf8")));
   for (const tool of manifest.tools) expect(tool.visibility).toEqual(tool.name.startsWith("conversation-") ? ["modules"] : ["modules", "owner", "provider"]);
-  for (const app of ["builtin/web", "external/mcp", "external/qq"]) {
+  for (const app of ["external/web", "external/qq"]) {
     const entry = moduleManifestSchema.parse(JSON.parse(await readFile(join(import.meta.dir, app, "module.json"), "utf8")));
-    expect(entry.settings["memory-provider"]?.default).toBe("");
-    expect(entry.uses).toContain("modules.contributions");
+    expect(entry).not.toHaveProperty("settings");
+    expect(entry.tools.find(tool => tool.name === "settings")).toMatchObject({ visibility: expect.arrayContaining(["owner"]) });
+    expect(entry.uses).not.toContain("modules.contributions");
     expect(entry.uses).not.toContain("settings.preferences");
   }
 });

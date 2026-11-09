@@ -25,8 +25,14 @@ node_modules/
 
 # production
 /build/*
+!/build/agent-dependencies.ts
+!/build/agent-declaration-bundle.ts
+!/build/portable-elf.ts
+!/build/entry-conversations.ts
 !/build/manifest.ts
 !/build/manifest.bun.test.ts
+!/build/agent-dependencies.ts
+!/build/agent-declaration-bundle.ts
 !/build/execution-contracts.ts
 !/build/execution-contract-types.ts
 !/build/execution-contracts.bun.test.ts
@@ -72,6 +78,9 @@ prisma/dev.db-shm.*
 prisma/dev.db-wal.*
 .env
 .env.local
+
+# Local seed repositories are regenerated from the versioned module bundles and lock.
+/resources/module-git/repos/
 
 # build output
 /dist/

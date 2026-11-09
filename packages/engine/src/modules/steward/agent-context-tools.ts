@@ -15,7 +15,7 @@ export async function selectContextTools(ports: StewardPorts, principal: Executi
   for (const target of new Set(targets)) {
     const entry = entries.find(entry => `${entry.module.name}.${entry.tool.name}` === target);
     if (!entry) throw new CallError("not_found", `Agent tool ${target} not found`);
-    if (!await admitted(ports.db, caller, entry.tool)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
+    if (!await admitted(ports.db, caller, entry.tool, principal.workspaceId)) throw new CallError("forbidden", `Agent caller cannot use ${target}`);
     selected.push(entry);
   }
   return { caller, entries: selected, catalog: selected.map(catalogEntry), runId: undefined as string | undefined, workspaceId: principal.workspaceId };

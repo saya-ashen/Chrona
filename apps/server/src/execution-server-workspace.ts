@@ -1,8 +1,6 @@
 import { join } from "node:path";
-import { createHash } from "node:crypto";
-import { executorCanonicalJson } from "@chrona/contracts/steward";
 import type { StewardPorts } from "@chrona/engine";
-import { prepareLockedLocalWorkspace } from "../../../packages/integrations/src/executor/workspaces";
+import { prepareLockedLocalWorkspace, workspaceDigest } from "@chrona/workspaces";
 
 /** Trusted host adapter. Only the engine's authorized, fixed preparation request reaches filesystem I/O. */
 export function createServerWorkspacePreparer(dataDir: string, now: () => Date): NonNullable<StewardPorts["executionServerWorkspace"]> {
@@ -18,7 +16,7 @@ export function createServerWorkspacePreparer(dataDir: string, now: () => Date):
       managedRoot: join(dataDir, "execution-workspaces"),
     });
     try {
-      return { bindingDigest: createHash("sha256").update(executorCanonicalJson(request)).digest("hex"),
+      return { bindingDigest: workspaceDigest(request),
         cwd: prepared.cwd, projectDirectoryIdentity: prepared.projectDirectoryIdentity,
         workspaceDirectoryIdentity: prepared.workspaceDirectoryIdentity,
         workspace: { ...prepared.workspace, sourceReceipt: prepared.sourceReceipt }, sourceReceipt: prepared.sourceReceipt,

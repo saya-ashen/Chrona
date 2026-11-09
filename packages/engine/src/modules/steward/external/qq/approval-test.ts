@@ -39,12 +39,16 @@ async function click(action: string) {
   return relay.resolveApproval(binding, decision);
 }
 assert.equal(await text("批准 abcdef12"), `【Chrona】已批准：${title}`);
-assert.equal(await text("批准 abcdef12 始终"), `【Chrona】已批准（始终允许）：${title}`);
+for (const command of ["批准 abcdef12 始终", "approve abcdef12 always", "拒绝 abcdef12 always", "同意 abcdef12 始终"]) {
+  const before = calls.length;
+  assert.match((await text(command))!, /不支持始终允许/);
+  assert.equal(calls.length, before);
+}
 assert.equal(await text("拒绝 abcdef12"), `【Chrona】已拒绝：${title}`);
 assert.equal(await click("once"), `【Chrona】已批准：${title}`);
-assert.equal(await click("always"), `【Chrona】已批准（始终允许）：${title}`);
+assert.equal(parseApprovalDecision({ button: `approval:${id}:always` }), null);
 assert.equal(await click("deny"), `【Chrona】已拒绝：${title}`);
-assert.equal(calls.at(-1).args.decision, "deny");
+assert.deepEqual(calls.at(-1), { target: "approvals.resolve", args: { approval: id, decision: "deny" } });
 failure = new Error("failed");
 assert.equal(await text("批准 abcdef12"), "【Chrona】审批未处理，请在网页上操作。");
 await assert.rejects(click("once"), e => e === failure);

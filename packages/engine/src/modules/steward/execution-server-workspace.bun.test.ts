@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecutionPrincipal, ExecutionStartV2 } from "@chrona/contracts/steward";
 import type { PreparedServerWorkspace, ServerWorkspaceRequest, StewardPorts } from "./ports";
-import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "../../../../integrations/src/executor/workspaces";
+import { localDirectoryIdentity, prepareLockedLocalWorkspace } from "@chrona/workspaces";
 import { createServerWorkspacePreparer } from "../../../../../apps/server/src/execution-server-workspace";
 import { testDb } from "./test-db";
 import { createExecutionV2Admission } from "./execution-admission";
@@ -166,4 +166,23 @@ test("claim preparation binds the full stored input before issuing a token", asy
   await expect(f.runs.claimNext("background")).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.run.findUnique({ where: { id: queued.id } })).toMatchObject({ status: "queued", startedAt: null, tokenHash: queued.tokenHash });
   expect(f.locks()).toBe(0);
+});
+
+test("public local placement admits and claims through the host without a receiver application", async () => {
+  const f = await fixture();
+  const { startKernelExecution } = await import("./kernel-execution-tools");
+  const { kernelExecutionStartSchema } = await import("@chrona/contracts/steward");
+  const original = f.input("public-local", "existing");
+  const input = { ...original, placement: { kind: "local" as const, projectRef: "repo", mappingRevision: 1 } };
+  expect(kernelExecutionStartSchema.safeParse({ ...input, budget: { ...input.budget, maxModelCalls: 1, maxOutputTokens: 100 } }).success).toBe(false);
+  const admitted = await startKernelExecution(f.ports, f.principal, input);
+  expect(admitted.placement.placement).toEqual(input.placement);
+  expect(await f.db.executionAuthority.count()).toBe(0);
+  expect(await startKernelExecution(f.ports, f.principal, input)).toEqual(admitted);
+  const claimed = await f.runs.claimNext("background");
+  expect(claimed?.id).toBe(admitted.execution.runId);
+  expect((await executionRunInput(f.ports, claimed!))?.executionBudget).toEqual({ maxToolCalls: input.budget.maxToolCalls });
+  expect(await f.db.executionDelivery.count()).toBe(0);
+  await f.runs.finish(claimed!.id, { outcome: "finished", sessionId: null, error: null }, { stopEvidence: "provider_exited" });
+  expect((await f.db.executionAttempt.findUniqueOrThrow({ where: { id: admitted.execution.attemptId } })).heldDirectory).toBeNull();
 });

@@ -1,34 +1,37 @@
 type Row = Record<string, unknown>;
 type Call = (target: string, args?: Row) => Promise<unknown>;
-type Interface = Row & { name: string };
+type Tool = Row & { target: string; moduleId?: string };
+type App = Row & { id: string; name: string };
+export const kernelNamespaces = ["modules", "approvals", "settings", "secrets", "activity"];
+const notFound = (module: string) => Object.assign(new Error(`App or kernel namespace ${module} not found`), { code: "not_found" });
+const boundedTools = (tools: Tool[]) => ({ tools: tools.slice(0, 50), truncated: tools.length > 50 });
 
-/** MCP owns its app summary; each source remains a separately authorized routed read. */
+type KernelEntry = { name: string; origin: string; tools: Tool[]; truncated: boolean };
+/** MCP owns this read-only projection. Discovery grants no invocation authority. */
+export function systemApps(call: Call, module: string): Promise<KernelEntry>;
+export function systemApps(call: Call, module?: undefined): Promise<KernelEntry[]>;
+export function systemApps(call: Call, module?: string): Promise<KernelEntry | KernelEntry[]>;
 export async function systemApps(call: Call, module?: string) {
-  const metadata = await call("modules.interfaces") as Interface[];
-  if (module === undefined) return metadata;
-  const entry = metadata.find(item => item.name === module);
-  if (!entry) throw Object.assign(new Error(`System module ${module} not found`), { code: "not_found" });
-  return withWork(call, entry);
+  const tools = await call("modules.tools", { audience: "user" }) as Tool[];
+  const entries = kernelNamespaces.flatMap(name => {
+    const contracts = tools.filter(tool => tool.moduleId === undefined && tool.target.startsWith(`${name}.`));
+    return contracts.length ? [{ name, origin: "kernel", ...boundedTools(contracts) }] : [];
+  });
+  if (module === undefined) return entries;
+  const entry = entries.find(item => item.name === module);
+  if (!entry) throw notFound(module);
+  return entry;
 }
-async function withWork(call: Call, entry: Interface) {
-  const work = entry.name === "modules" ? await call("modules.build-sessions", { limit: 20 }) : [];
-  return { ...entry, sessions: entry.name === "modules" ? "build" : null, work };
-}
+
+/** Bounded installed identity, user-facing contracts and observed diagnostics; no app execution. */
 export async function appOverview(call: Call, module: string) {
-  const interfaces = await call("modules.interfaces") as Interface[];
-  const system = interfaces.find(item => item.name === module);
-  if (system) {
-    const [settings, activity, entry] = await Promise.all([
-      call("modules.settings-get", { module }), call("notify.activity", { module, limit: 30 }), withWork(call, system),
-    ]);
-    return { kind: "system", ...entry as Row, settings, activity: (activity as { items: unknown[] }).items };
-  }
-  const apps = await call("modules.list") as (Row & { id: string; name: string })[];
+  if (kernelNamespaces.includes(module)) return { kind: "system" as const, ...await systemApps(call, module) };
+  const apps = await call("modules.list") as App[];
   const app = apps.find(item => item.id === module || item.name === module);
-  if (!app) throw Object.assign(new Error(`Module ${module} not found`), { code: "not_found" });
-  const args = { module: app.name };
-  const [metadata, permissions, settings, diagnostics, activity] = await Promise.all([
-    call("modules.interfaces", args), call("modules.permissions", args), call("modules.settings-get", args), call("modules.diagnostics", args), call("notify.activity", { ...args, limit: 30 }),
+  if (!app) throw notFound(module);
+  const [tools, diagnostics] = await Promise.all([
+    call("modules.tools", { query: `${app.name}.`, audience: "user" }) as Promise<Tool[]>,
+    call("modules.diagnostics", { module: app.name }) as Promise<(Row & { moduleId: string })[]>,
   ]);
-  return { kind: "app", app, tools: (metadata as Row).tools, permissions, settings, diagnostics: (diagnostics as unknown[])[0] ?? null, activity: (activity as { items: unknown[] }).items };
+  return { kind: "app" as const, app, ...boundedTools(tools.filter(tool => tool.moduleId === app.id && tool.target.startsWith(`${app.name}.`))), diagnostics: diagnostics.find(item => item.moduleId === app.id) ?? null };
 }

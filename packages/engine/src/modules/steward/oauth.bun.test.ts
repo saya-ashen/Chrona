@@ -16,14 +16,14 @@ const microsoft: OAuthDefinition = { provider: "microsoft", authorizationUrl: "h
 const cleanups: (() => Promise<unknown>)[] = [], realFetch = globalThis.fetch;
 afterEach(async () => { globalThis.fetch = realFetch; resetOAuth(); for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
-async function fixture(definition = google, publicUrl: string | null = "https://chrona.example") {
+async function fixture(definition = google, publicUrl: string | null = "https://chrona.example", name = "mail_google") {
   registerSystemModule(secrets);
   const db = testDb({ injectedAgent: false });
   const dataDir = await mkdtemp("/tmp/chrona-oauth-");
   cleanups.push(async () => { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); });
   const workspaceId = (await db.workspace.create({ data: { name: "oauth" } })).id;
   const ports: StewardPorts = { db, dataDir, now: () => new Date(), publicUrl };
-  const manifest = (oauth: OAuthDefinition) => moduleManifestSchema.parse({ name: "mail", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: ["network"], secrets: [{ name: "mail_google", oauth }] });
+  const manifest = (oauth: OAuthDefinition) => moduleManifestSchema.parse({ name: "mail", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: ["network"], secrets: [{ name, oauth }] });
   const initial = manifest(definition);
   const module = await db.module.create({ data: { workspaceId, name: "mail", activeHash: "v1" } });
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest: initial, source: "provider", intent: {}, report: {}, status: "approved" } });
@@ -36,23 +36,23 @@ async function fixture(definition = google, publicUrl: string | null = "https://
     return (reply as { result: { output: Record<string, any> } }).result.output;
   }
   const store = createSecrets(dataDir);
-  await store.write("mail_google", { clientId: "cid", clientSecret: "cs" });
+  await store.write(name, { clientId: "cid", clientSecret: "cs" });
   async function update(next: OAuthDefinition, hash = "v2") {
     await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest: manifest(next), source: "provider", intent: {}, report: {}, status: "approved" } });
     await db.module.update({ where: { id: module.id }, data: { activeHash: hash } });
   }
   async function bound(account = "", oauth = definition, token = "r-1") {
     const suffix = account ? `_${account}` : "";
-    await store.write("mail_google", { clientId: "cid", clientSecret: "cs", [`refreshToken${suffix}`]: token, [`oauthBinding${suffix}`]: oauthDefinitionIdentity("mail_google", oauth), oauthManaged: "1" });
+    await store.write(name, { clientId: "cid", clientSecret: "cs", [`refreshToken${suffix}`]: token, [`oauthBinding${suffix}`]: oauthDefinitionIdentity(name, oauth), oauthManaged: "1" });
   }
-  const args = { name: "mail_google", provider: definition.provider };
+  const args = { name, provider: definition.provider };
   async function authorize(account?: string) {
     const started = await call("secrets.authorize", { ...args, scopes: definition.scopes.join(" "), ...(account ? { account } : {}) });
     const url = new URL(started.url);
     return { started, url, state: url.searchParams.get("state")! };
   }
   async function owner() {
-    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], uses: ["*"] });
+    const manifest = moduleManifestSchema.parse({ name: "web", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], uses: ["*"] });
     const page = await db.module.create({ data: { workspaceId, name: "web", activeHash: "page" } });
     await db.moduleVersion.create({ data: { moduleId: page.id, hash: "page", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
     return (target: string, args: Record<string, unknown>) => call(target, args, page.id);
@@ -71,7 +71,7 @@ function provider(replies: (body: URLSearchParams) => { status?: number; json: R
 }
 
 test("manifest OAuth definitions require query-free HTTPS endpoints and cannot replace PKCE/state fields", () => {
-  const parse = (oauth: unknown) => moduleManifestSchema.safeParse({ name: "mail", entry: "index.ts", tests: ["test.ts"], effects: [], triggers: [], keepAlive: true, secrets: [{ name: "mail_google", oauth }] }).success;
+  const parse = (oauth: unknown) => moduleManifestSchema.safeParse({ name: "mail", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, secrets: [{ name: "mail_google", oauth }] }).success;
   expect(parse(google)).toBe(true);
   for (const authorizationUrl of ["http://example.com/auth", "https://u:p@example.com/auth", "https://example.com/auth?state=forged", "https://example.com/auth#fragment"]) expect(parse({ ...google, authorizationUrl })).toBe(false);
   for (const tokenUrl of ["http://example.com/token", "https://example.com/token?client_secret=x"]) expect(parse({ ...google, tokenUrl })).toBe(false);
@@ -112,6 +112,27 @@ test("PKCE/state, Google offline extras, bound callback, rotation and cache rema
   expect((await f.store.read("mail_google"))!.refreshToken_work).toBe("r-2");
 });
 
+test("credential names do not grant or block OAuth: qq_bot follows its approved definition", async () => {
+  const f = await fixture(google, "https://chrona.example", "qq_bot");
+  const requests = provider(body => body.get("grant_type") === "authorization_code"
+    ? { json: { refresh_token: "qq-refresh-private" } }
+    : { json: { access_token: "qq-access-private", expires_in: 3600 } });
+  const { state } = await f.authorize();
+  expect((await completeOAuth(f.ports, { state, code: "code" })).ok).toBe(true);
+  expect(await f.call("secrets.token", f.args)).toMatchObject({ accessToken: "qq-access-private" });
+  expect(await f.call("secrets.get", { name: "qq_bot" })).toEqual({ value: { clientId: "cid", oauthManaged: "1" } });
+  expect(requests.map(request => request.url)).toEqual([google.tokenUrl, google.tokenUrl]);
+  const records = JSON.stringify([await f.db.moduleInvocation.findMany(), await f.db.moduleCall.findMany(), await f.db.audit.findMany()]);
+  for (const value of ["qq-refresh-private", "qq-access-private"]) expect(records).not.toContain(value);
+
+  // The same name without an approved OAuth definition has no OAuth capability.
+  const where = { moduleId_hash: { moduleId: f.module.id, hash: "v1" } };
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where });
+  await f.db.moduleVersion.update({ where, data: { manifest: { ...moduleManifestSchema.parse(version.manifest), secrets: ["qq_bot"] } } });
+  await expect(f.call("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") })).rejects.toMatchObject({ code: "forbidden" });
+  await expect(f.call("secrets.token", f.args)).rejects.toMatchObject({ code: "forbidden" });
+});
+
 test("entry authorization uses the approved manifest; credential edits clear bindings and metadata stays private", async () => {
   const f = await fixture(), owner = await f.owner();
   const started = await owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") });
@@ -131,11 +152,30 @@ test("entry authorization uses the approved manifest; credential edits clear bin
 
 test("entry authorization refuses ambiguous definitions for the same declared secret", async () => {
   const f = await fixture(), owner = await f.owner();
-  const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], triggers: [], keepAlive: true, effects: [], secrets: [{ name: "mail_google", oauth: { ...google, tokenUrl: "https://other.example/token" } }] });
+  const manifest = moduleManifestSchema.parse({ name: "other", entry: "index.ts", tests: ["test.ts"], keepAlive: true, effects: [], secrets: [{ name: "mail_google", oauth: { ...google, tokenUrl: "https://other.example/token" } }] });
   const module = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "other", activeHash: "v1" } });
   await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "v1", manifest, source: "provider", intent: {}, report: {}, status: "approved" } });
   await expect(owner("secrets.authorize", { ...f.args, scopes: google.scopes.join(" ") })).rejects.toMatchObject({ code: "forbidden" });
   expect(new URL((await f.authorize()).started.url).origin).toBe("https://accounts.google.com");
+});
+
+test("undeclared OAuth authorization requires checked owner authority rather than entry inference", async () => {
+  const f = await fixture(), owner = await f.owner();
+  const page = await f.db.module.findFirstOrThrow({ where: { workspaceId: f.workspaceId, name: "web" } });
+  const where = { moduleId_hash: { moduleId: page.id, hash: "page" } };
+  const version = await f.db.moduleVersion.findUniqueOrThrow({ where });
+  const manifest = moduleManifestSchema.parse(version.manifest);
+  const args = { ...f.args, scopes: google.scopes.join(" ") };
+  for (const part of [{ uses: ["secrets.authorize"] }, { uses: ["chat.send"] }, { uses: [], listen: "/" }]) {
+    await f.db.moduleVersion.update({ where, data: { manifest: { ...manifest, ...part } } });
+    await expect(owner("secrets.authorize", args)).rejects.toMatchObject({ code: "forbidden" });
+  }
+  await f.db.moduleVersion.update({ where, data: { manifest, status: "candidate" } });
+  await expect(owner("secrets.authorize", args)).rejects.toMatchObject({ code: "forbidden" });
+  await f.db.moduleVersion.update({ where, data: { status: "approved" } });
+  expect(new URL((await owner("secrets.authorize", args)).url).origin).toBe("https://accounts.google.com");
+  const started = await secrets.handle({ ports: f.ports, workspaceId: f.workspaceId, caller: { kind: "owner", via: null } }, "authorize", args) as { url: string };
+  expect(new URL(started.url).origin).toBe("https://accounts.google.com");
 });
 
 test("Microsoft offline_access is declared, not inferred from provider name", async () => {

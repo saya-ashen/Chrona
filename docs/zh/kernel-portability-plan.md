@@ -1,10 +1,24 @@
 # 内核可移植、可信本地运行与远程执行应用化实施方案
 
-日期：2026-11-09。状态：**方案，尚未实施或验收**。
+日期：2026-11-09。状态：**S0–S3 已实施；S4 部分实现，原生平台矩阵未验收；S5 本机实际设备全链路与可靠性修复定向通过，仍为部分完成；S6 未验收**。
+
+当前验证快照核对至当日 **18:36（+08:00）**。物理存储改动后 root tsc final9、root lint final6 PASS（440 files、0 errors、1 个既有 doctor warning）、边界 final3 PASS（0 errors / 35 warnings、798 modules / 4175 dependencies）；schema `--check`、原始 hash 基线 9 pass / 147 断言、schema 生成测试 7 pass / 43 断言通过。新增有限物理存储、私有 journal 和设备回归 **7 文件 / 50 pass / 441 断言，无失败、无跳过**，包含真实 Pi 1.5.0、生产 HTTP、内核模型预留、签名停止及 cleanup。普通应用和设备均使用有限 SQLite 页数、实际证据预留与有界 DELETE 回滚日志；达到高水位后拒绝普通准入，保留终止/控制回执写入空间。安全归档与超过 100 项设备 journal 的持续恢复尚未完成。
+
+完整 API 曾通过 105 项 / 19 文件；第三轮 full Bun 在物理存储改动前结束 229 文件，最终文件结果为 2450 pass / 38 skip，包含 notify 首次失败后隔离重试通过，**不能称为无重试全绿**；持久化等待修复后定向回归 17 pass / 0 fail。helper 路径与 ELF RPATH/RUNPATH 泄漏已修复，18 项发行回归通过；17:55 默认 Linux CLI 经离线缓存、frozen lockfile、禁用安装脚本完成迁移/health/Web runtime smoke。包含最终物理存储改动的 14 seeds、核心和独立设备包已刷新，默认 Linux runtime、可选应用实际安装及复制设备 smoke 再次通过；883 个源码文件 sourceguard 与 archive 比对通过。分次结果及失败历史见[验证记录](kernel-portability-verification.md)。所有结果限本地，completion 为假实现，无真实外部模型、部署或生产验收。
 
 本文由两份方案合并而成：一份是《内核语言无关化实施方案》（提交 `38310f75`，已删除），另一份是《可信本地跨平台运行与远程执行应用化方案》（已归档至 [history](history/cross-platform-runtime-and-remote-execution-plan.md)）。两者都在改造内核，而且会改到同一批文件，因此合并为同一条实施路线。
 
-当前授权范围只是编写方案，不包括运行时改造、部署、真实设备配对、模型调用或迁移现有用户数据。文中的源码位置对应当日 `platform-v2` 工作区，行号只用于定位；macOS 和 Windows 尚未实际运行验证。
+当前已有运行时、合同、应用及独立设备实现；本文保留原始目标和阶段交付标准，以阶段状态区分已实施、待验证和未完成。实际 RemoteDevice→生产 HTTP→真实应用 SDK→内核预算预留→实际 Pi 1.5.0 原生文件工具→内核验证签名停止→cleanup 已定向通过，仅 completion I/O 使用假实现，无外部模型调用。实际程序在本机运行不等于跨主机、外部模型或生产验收；Windows 后端已实现但未原生验证，macOS 完整后代监管后端未实现并保守拒绝。现有用户数据迁移仍不在目标内。
+
+| 阶段 | 当前状态 | 已有证据与边界 |
+| --- | --- | --- |
+| S0 | 已实施，最终接受仍有门槛 | hash 基线、Agent 快照及故障合同已有实现与检查；晚到 baseline 9 pass；设计草案不能代替现行接口 |
+| S1 | 已实施，本机 Linux 发行 runtime 已通过 | 可信本地运行、外置 TS 检查、备份与显式 helper 路径已实现；实际编译 fixture 1 pass / 8 断言，checker 16 pass / 94 断言、installer 9 pass / 33 断言；2 个实际安装用例 filtered |
+| S2 | 已实施，本机 Linux 发行 runtime 已通过 | Agent 合同与 `@chrona/pi` 拆分、依赖约束已实施；root tsc/API 通过，第三轮 Bun 最终文件无失败清单但含 notify 重试 |
+| S3 | 已实施，最终接受仍有门槛 | 系统工具/Manifest JSON、hash 算法、schema `--check` 与基线检查通过；资源与 RUNPATH 修复后本机发行检查通过 |
+| S4 | 部分实现，原生平台验收未完成 | Linux 有真实后代停止证据；已选认证 loopback；Windows Job 后端待原生编译运行，macOS 仍仅进程组、缺更强后端 |
+| S5 | 部分完成，本机实际设备全链路与修复定向通过 | 17:36 设备最终 39 pass / 325 断言，cold cancel 后生产回归 1 pass / 36 断言；app 2 pass / 15 断言、native 21 pass / 179 断言、fairness 1 pass / 17 断言。逻辑/有限物理配额与治理/模型/cleanup 已接通，新增回归 50 pass / 441 断言；GC/retention、>100 delivery 恢复及完整平台发行矩阵仍未完成 |
+| S6 | 未验收 | 三端完整矩阵、完整场景回放及同一最终修订接受仍未完成；本地分次通过不代替接受 |
 
 ## 1. 目标与决策
 
@@ -34,13 +48,15 @@
 ### 1.4 全程适用的硬约束
 
 1. **合同 hash 稳定。** events 的订阅、notify 的渠道、web 的页面登记都持久化了 `contractHash`（`external/events/events.ts:151`、`external/notify/notify.ts:21`、`external/web/pages.ts:159`）。除了本方案明确列出要删除或修改的工具，任何工具的 hash 都不能改变。被修改的工具要在提交说明中逐项列出原因；遇到计划外的差异，修代码，不改 fixture。
-2. **跨进程边界语言中立。** 新增或修改的跨进程接口（模块传输、远程执行应用与内核之间的私有接口、设备协议）都必须能用任何语言实现：使用路由调用、JSON 合同、标准传输，不依赖 Bun 特有能力，也不 import TS 实现。进程如何获得连接信息（目前是 `CHRONA_SOCKET`、`CHRONA_HTTP_SOCKET`）属于合同的一部分。
+2. **跨进程边界语言中立。** 新增或修改的跨进程接口（模块传输、远程执行应用与内核之间的私有接口、设备协议）都必须能用任何语言实现：使用路由调用、JSON 合同、标准传输，不依赖 Bun 特有能力，也不 import TS 实现。进程如何获得连接信息也属于合同：现行模块传输使用 `CHRONA_IPC_ENDPOINT`、`CHRONA_IPC_TOKEN`，具体字段以 `module-wire.ts` 为准。
 3. **必须保留**：真实 caller、精确授权、凭据处理与日志脱敏、模型预算、单 Run 队列、租约、超时、输出与并发上限、取消、实际停止状态、持久化、备份恢复和受控应用生命周期。
 4. 按 `AGENTS.md`，被替代的代码、测试、文档和合同字段在同一次改动中删除，不保留转发 re-export 或兼容别名。
 
-## 2. 当前源码基线
+## 2. 实施前源码基线
 
-| 范围 | 当前实现 | 主要定位 |
+下表保留合并方案时的改造起点和影响范围，不表示这些旧路径仍是当前实现；部分文件已删除或迁移。现行实现入口及证据见 §10 和[验证记录](kernel-portability-verification.md)。历史行号只用于理解原始定位。
+
+| 范围 | 实施前实现 | 历史定位 |
 | --- | --- | --- |
 | 内核 import Agent 的 schema | 准入和解析时直接使用 Agent 的 zod | `agent-application.ts:7`、`agent-delegation.ts:9-13`、`agent-projects.ts:5`、`agent-primitives.ts:8` |
 | Agent import 宿主源码 | 通过相对路径引用 Pi、browser、脱敏工具 | `builtin/agent/runtime.ts:5,6,15`、`builtin/agent/primitives.ts:4` |
@@ -59,7 +75,7 @@
 | 独立 Executor | 依赖 Linux、systemd 262、flock、`/proc`、cgroup v2；与 Agent 共用 Pi Provider | `packages/cli/src/executor-*.ts`、`integrations/src/executor/process.ts`、`integrations/src/executor/daemon.ts:6` |
 | 设备与内核耦合 | 路由、认领、授权代次和远程完成路径直接认识 Executor 协议；Agent 原语带有 `placement` | `apps/server/src/executor-router.ts`、`execution-device-runtime.ts`、`execution-claim.ts`、`runs.ts`、`builtin/agent/primitives.ts:20,26` |
 
-已经满足、不需要改的部分：模块线消息格式（`@chrona/contracts` 中的 `moduleEventSchema`、`moduleCallSchema`）；普通模块的合同来自 `module.json`，hash 由手写规范化逻辑加排序键 JSON 计算（`module-tool-contract.ts:9-17,71-78`）；模块版本 hash 是 git tree hash；内核生产代码不 import 任何 `external/*`；Agent 运行时已经打包成 `runtime.js`。`packages/integrations/src/executor` 中有一部分代码服务器本地执行也在用（工作目录准备与清理），不能整体删除。
+实施前已经满足、不需要改的部分：模块线消息格式（`@chrona/contracts` 中的 `moduleEventSchema`、`moduleCallSchema`）；普通模块的合同来自 `module.json`，hash 由手写规范化逻辑加排序键 JSON 计算（`module-tool-contract.ts:9-17,71-78`）；模块版本 hash 是 git tree hash；内核生产代码不 import 任何 `external/*`；Agent 运行时已经打包成 `runtime.js`。实施前 `packages/integrations/src/executor` 中有一部分代码服务器本地执行也在用（工作目录准备与清理），因此 S5 先抽取为共享库再删除旧链路，不能连同本地能力一起删除。
 
 ## 3. 删减与保留清单
 
@@ -90,7 +106,7 @@
 
 ## 5. 远程执行目标架构
 
-普通应用暂定名为 `remote-execution`，最终名称在合同定稿时确定。它可以作为可选安装包或默认预装包交付，预装不增加任何权限。Agent 仍是唯一不可变的内置应用。
+普通应用已使用 `remote-execution` 名称，源码位于 [`external/remote-execution`](../../packages/engine/src/modules/steward/external/remote-execution/)。它已登记为普通可选安装包，实际固定 seed 安装通过（`builtin: false`、0 execution authority），未默认安装或增加权限；完整发行 runtime 尚未接受。Agent 仍是唯一不可变的内置应用。
 
 ```mermaid
 flowchart LR
@@ -104,7 +120,7 @@ flowchart LR
     A --> C
 ```
 
-图中的连线表示目标职责和控制路径，不代表已存在的 API。实现时优先复用现有的 Agent 和应用路由，不引入公共 Provider 注册框架，也不开放"任意应用都能写 Run 状态"的接口。
+图中的连线表示职责和控制路径。S5 已有通用 Run 交付、私有 receiver carrier、普通应用和设备认证入口；实际设备程序经生产 HTTP/真实应用/内核/实际 Pi 到签名停止和 cleanup 已通过确定性测试。模型网关和窄治理已接通，配额、公平性与 cancel-before-journal 修复后的定向回归已通过；有限物理存储已完成定向验证，安全归档、完整生命周期故障矩阵与跨平台发行仍待收口。当前接口以 [`kernel-execution.ts`](../../packages/contracts/src/steward/kernel-execution.ts) 和 [`execution-delivery-carrier.ts`](../../packages/engine/src/modules/steward/execution-delivery-carrier.ts) 为准。继续复用现有 Agent 和应用路由，不引入公共 Provider 注册框架，也不开放"任意应用都能写 Run 状态"的接口。
 
 ### 5.1 职责归属
 
@@ -137,7 +153,7 @@ flowchart LR
 
 ## 6. 必须先定稿的通用执行边界
 
-目前认领路径直接读取设备表、核对授权代次并准备远程 assignment，停止恢复路径也直接区分 server 和 device。这些耦合要按具体场景收缩，不能只是把代码挪到应用目录。实施前需要给出以下最小合同和故障状态表：
+实施前的认领路径直接读取设备表、核对授权代次并准备远程 assignment，停止恢复路径也直接区分 server 和 device。S5 已将内核路径改为同一 Run 队列上的通用持久交付，应用持有设备业务记录；旧内核/服务端路径已有替代并删除，窄治理及实际控制/cleanup 已接通，最终失效引用、可靠性和打包复核仍待收口。以下最小合同和故障状态表继续作为验收要求：
 
 1. **准入与交付**：一个获准的 Run 如何绑定远程目标；应用接收了任务不等于设备已经启动；哪一条持久化记录负责防止重复启动。
 2. **事件与结果**：进度和结果如何绑定 task/run/attempt、应用身份和执行代次；如何拒绝伪造、迟到或重复的报告。
@@ -163,15 +179,15 @@ flowchart LR
 
 `script-sandbox.ts` 和 `module-typecheck.ts` 只读取这张表，直接启动解释器，不再经过 `sh` 或 `ulimit`。表里没有声明 `check` 时，类型检查返回 `skipped`。入口名正则、Python venv 优先的规则保持不变；`.sh` 只在宿主有 Shell 时可用。以后换语言重写内核，可以继续读取同一张表和同一个 TS 运行包。
 
-需要统一实现的行为：启动、超时、取消、进程树清理、退出观察和能力报告。各平台的实现可以不同，但不能把直接子进程退出当作整个任务树已经停止。Linux 设备端可以保留 systemd 后端；Windows Job Objects 和 macOS 的进程监管方案作为候选，需要分别验证与 Bun 的集成、子进程逃逸和父进程异常退出时的行为，本文不承诺已有可用实现。普通本地运行不要求 systemd 262。
+需要统一实现的行为：启动、超时、取消、进程树清理、退出观察和能力报告。各平台的实现可以不同，但不能把直接子进程退出当作整个任务树已经停止。现有独立 [`@chrona/process`](../../packages/process/README.md) 在 Linux 使用原生 guardian/subreaper，已有实际后代清理证据，普通本地运行不要求 systemd 262。Windows Job Objects 后端已有代码但尚未原生编译运行；macOS 只有进程组能力，需要完整后代停止的调用方必须在启动前拒绝。SDK 监管包装副本已同步 Windows 分支；跨平台集成、同步检查与发行资源仍须验证。
 
 删除硬内存限制之后，健康检查和配置不能再声称有这项限制。模型 token 预算、工具调用上限、运行时限、输出上限和并发上限继续各自执行。
 
 ### 7.2 本地 IPC 与 HTTP
 
-候选方案是各平台的本地 IPC，或者只监听 loopback 的连接。以三端实际支持情况和最小改动为依据定稿，并满足 §1.4 第 2 条：不依赖 Bun 特有的 unix serve/fetch，连接方式通过环境变量合同告诉模块进程。
+已选择并实现仅监听 `127.0.0.1` 的认证 loopback TCP，内核通道与 SDK 共享 [`transport.ts`](../../packages/integrations/src/steward/module-sdk/transport.ts)，不再以 Bun unix serve/fetch 作为新协议前提。三端实际运行仍待验收，连接信息通过环境变量合同告诉模块进程，并满足 §1.4 第 2 条。
 
-如果改用 loopback，需要：每个实例一个不可猜测的凭据、绑定到目标实例、启动时的就绪握手、限制监听地址、限制消息大小、处理断连。不能仅凭"来自本机"就授予 caller 身份；内部凭据不能注入到应用自报的 caller 中，也不能写进日志。新增的握手消息纳入 wire schema。
+该实现必须持续满足：每个实例一个不可猜测的凭据、绑定到目标实例、启动时的就绪握手、限制监听地址、限制消息大小、处理断连。不能仅凭"来自本机"就授予 caller 身份；内部凭据不能注入到应用自报的 caller 中，也不能写进日志。新增的握手消息纳入 wire schema。
 
 模块 HTTP 继续经过现有的受控路由和代理，内部监听端点不能成为绕过鉴权的公开入口。预览、构建启动检查、SDK testing 和生产运行必须使用同一份合同。
 
@@ -182,7 +198,7 @@ flowchart LR
 ## 8. 合同冻结
 
 1. **基线 fixture**：`packages/contracts/fixtures/contract-hashes.json` 记录**改动前**以下工具的 `target → contractHash`：5 个内核命名空间下的全部系统工具、Agent 的全部工具、`external/*/module.json` 中的全部工具。另加几条合成用例，覆盖整数和浮点数、非 ASCII 字符、嵌套 object/array、`enum`、`required` 顺序、`visibility` 顺序。这组用例也是将来其他语言内核要通过的 golden 测试。Agent 的 `module.json` 中 tools 部分另存一份快照。
-2. **冻结的 JSON**：`build/` 中的生成脚本（参照 `build/execution-contracts.ts` 的写法）用 zod 生成以下文件并提交：
+2. **冻结的 JSON**：`scripts/generate-contract-schemas.ts` 用 zod 生成公共系统工具和 Manifest 合同（`bun scripts/generate-contract-schemas.ts --check` 检查仓库内内容）；S4 已补入 `module-wire.json` 与握手合同：
    - `packages/contracts/schemas/system-tools.json`：`target → { input, output, visibility, idempotent }`；
    - `module-manifest.json`：取代运行时生成的 `MANIFEST_SCHEMA`；
    - `module-wire.json`：模块线消息，包括 §7.2 新增的握手。
@@ -208,7 +224,7 @@ flowchart LR
 
 ## 10. 实施阶段
 
-每个阶段单独提交。阶段之间的先后顺序是由"共用文件"和"依赖关系"决定的，不能调换。
+原计划按阶段组织提交；当前实现仍在共享工作区集成，阶段状态不是已提交或已验收的证明。阶段之间的先后顺序由"共用文件"和"依赖关系"决定。下面保留各阶段目标，并附本次核实的进展。
 
 ### S0：基线与合同草案
 
@@ -217,6 +233,7 @@ flowchart LR
 - 完成 §6 远程执行的授权、预算、状态、收据、认证入口和生命周期设计，以及 §9 的故障状态表。
 - 确定本地和设备端在各平台上验证停止能力的办法。
 - 交付：fixture 测试、合同草案、故障状态表、源码影响表和可执行的验收用例清单。尚未定稿的项不能用空适配器掩盖。
+- **当前状态：已实施，最终接受仍有门槛。** 基线与合成向量位于 [`fixtures`](../../packages/contracts/fixtures/)，已有 foundation 定向日志；S5 的四项 Agent 变更及新增应用工具分别在 transitions/additions 清单登记，不能改写 S0 golden。早期 S0 合同草案中已被实现替换的签名/字段不能当作现行 API。
 
 ### S1：可信本地运行与 TS 工具链改为运行包
 
@@ -228,7 +245,8 @@ flowchart LR
 - 收缩 Nix 和浏览器自动获取（**在 S2 移动 `browser.ts` 之前完成**），移除 `pi-launch.ts` 中的 bwrap（**在 S2 移动 `pi-launch.ts` 之前完成**），开发辅助 `.sh` 改成 TS。
 - 修复路径、解释器和环境变量的构造；完成进程内备份。
 - 同步 Agent 生成产物、资源、配置、doctor/health、`AGENTS.md` 和运维说明。
-- 交付：本地功能的行为验证；增加一个 `.py` 入口模块完成安装和启动的测试。hash fixture 全部不变。此阶段不据此宣布三端完整支持。
+- 交付：本地功能的行为验证；增加一个 `.py` 入口模块完成安装和启动的测试。除显式登记的 S1 `modules.diagnostics` 变更外，hash 基线保持。此阶段不据此宣布三端完整支持。
+- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 运行时表、直接解释器启动、`calls.json` 与运行包内声明生成、可选工具检测及进程内备份已有实现。历史定向 110/130 项及 Python/合同 11 项分别通过，不累加。17:43–17:44 新修复显式可信宿主 `StewardPorts.processHelper`，贯通 checker、bun/uv installer 与父 build declaration helper；[实际编译回归](../../packages/integrations/src/steward/module-packaged-helper.bun.test.ts)从无关 cwd 验证 1 pass / 8 断言，既有 checker 16 pass / 94 断言、installer 9 pass / 33 断言（2 个实际安装用例 filtered）。受限子进程环境未放宽；normalized guardian 的 Nix RUNPATH 缺陷已在构建时修复，受限环境停止证据及 17:55 默认 Linux CLI 离线 runtime smoke 已通过。其他原生平台仍须单独验收。
 
 ### S2：Agent 自包含
 
@@ -239,17 +257,20 @@ flowchart LR
 - 在 `.dependency-cruiser.cjs` 中加入 §4 的两条禁止规则，测试和 fixture 也遵守。
 - 发布打包（`build/manifest.ts`、`build/portable-elf.ts`）纳入 `@chrona/pi`。
 - 交付：hash fixture 不变，Agent tools 快照一致；depcruise 不新增例外；在内核目录中 `grep builtin/agent` 没有生产代码命中；`release-smoke` 通过。
+- **当前状态：已实施，本机 Linux 发行 runtime 已通过。** 合同迁入 [`agent.ts`](../../packages/contracts/src/steward/agent.ts)，Pi 实现与资源迁入 [`packages/pi`](../../packages/pi/)，依赖规则和 Agent 自包含产物已改造。Pi 定向日志 139 通过、复核日志 51 通过；16:38–16:39 Agent 安装/设置页及脱离源码树的检查失败保留为 HISTORY。17:11:25 第二轮 full Bun 中设置页 3 通过、Agent 安装文件隔离重试 5 通过但有 callback 超时历史，最终失败清单已无 detached 文件；Agent module-calls/release 当轮仍失败。17:27 修复 manifest union 和 admission wake 后，原 module-call 4 项/release 1 项定向通过；完整 API 已确认通过；17:42 第三轮 full Bun 已完成 229 文件，最终无失败文件清单但包含 notify 首次失败后的隔离重试，17:55 在修复 helper 路径和 ELF 搜索路径后，本机默认 Linux CLI 通过离线 runtime smoke，详见[验证记录](kernel-portability-verification.md)。
 
 ### S3：冻结系统工具合同
 
 - 按 §8 第 2、3 条生成并提交 `system-tools.json`、`module-manifest.json`（此时 `virtualMemoryMb` 已经删除），运行时改为读取这些文件，并写出书面算法。
 - 交付：hash fixture 不变；`grep toJSONSchema` 中不再出现计算 hash 和工具发现结果的生产路径。
+- **当前状态：已实施，最终接受仍有门槛。** 生成器只导入独立公共声明，不导入处理器、Agent 或应用运行时；系统工具和 Manifest JSON 已落地，运行时发现、hash、构建提示读取 JSON，保留 zod 校验。早期生成器/合同定向检查通过，旧 golden 未重写；S4 wire JSON 也已生成。15:37:40 扩展消费面日志 41 通过、3 失败（旧 Unix 启动/清理及 notify 列表期望）保留为 HISTORY，第三轮 full Bun 最终文件结果及 notify 重试另记于验证记录；17:23:15 schema `--check` 已通过。构建资源问题已有后续通过证据：`module-build-session` 37 通过，SDK resources 5 通过；它们不是全仓通过。日志来源、先后关系及新 hash 清单见[验证记录](kernel-portability-verification.md)。
 
 ### S4：本地通信与进程监管跨平台
 
 - 按 §7.2 完成 IPC、HTTP、预览、测试 SDK 和构建检查的一致实现；SDK 的 `serve` 不再依赖 Bun unix serve；生成 `module-wire.json`（包括握手消息）。
 - 完成各平台的进程清理、取消和异常退出处理。
 - 交付：三端本地验收矩阵和未支持能力说明。
+- **当前状态：Linux 及认证 loopback 已有实现和定向证据，三端未验收。** Linux 原生测试含逃离原进程组的后代、owner 死亡和 guardian 死亡；后者必须返回 unknown 并保留占用。17:07:44 supervisor/lifecycle/build-session 组合日志 88 通过、636 断言，覆盖此前 supervisor 48、build-session 37 的部分用例，不累加；SDK resources 历史 5 通过。Windows Job 后端已实现、待原生编译运行；macOS 仍只有进程组，更强的后代监管后端未实现，要求后代证明时 fail closed。SDK Windows 包装副本已同步，native 资源分发与实际集成仍待验收。原生测试跳过项不能记为平台通过。
 
 ### S5：远程应用与设备端拆分
 
@@ -258,6 +279,7 @@ flowchart LR
 - 改造内核中直接认识 Executor 的认领、路由、恢复和完成路径，只保留最小的可信执行支撑。按 §6 调整 Agent 原语，hash 变化逐项列出。
 - 设备端程序依赖 `@chrona/pi`，独立打包；Linux 监管后端与核心解耦。
 - 交付：四种组合的验证证据——无远程应用的核心、本地 Coding、已安装远程应用、实际设备端。
+- **当前状态：部分完成，本机实际独立设备全链路与可靠性修复定向通过，S5 尚未整体接受。** [生产设备测试](../../packages/remote-device/src/production.bun.test.ts)实际执行 RemoteDevice→生产 HTTP→真实应用 SDK/native carrier→SQLite 内核模型预留→实际 Pi 1.5.0 原生文件工具→内核验证设备签名停止并释放占用→cleanup preview/confirm，仅 completion I/O 为假实现，无外部模型。17:36 设备最终 **39 pass / 325 断言、无 skip**；17:35 native cold-claim 修复后生产用例重跑 **1 pass / 36 断言**，包级 tsc、重建与复制二进制 smoke 通过。app 最终 **2 pass / 15 断言**、原生 **21 pass / 179 断言**、公平性 **1 pass / 17 断言**，最终完整 wire bytes 预留后再验证。历史 server 53 pass / 317 断言、actual Pi 1 pass / 91 断言、model 18 pass / 115 断言覆盖重叠，不累加。治理、模型网关、cleanup、source/终止证据独立逻辑配额与持久公平轮询已接通；认证 ready/reconcile 后 drain-only identity 先入 journal，再产生 never_started 签名及 cancel ACK，禁止 spawn，丢失回复后可安全重放。此前已授权但缺 journal、spawn_possible/running/unknown 仍保留未知停止与占用。有限 SQLite/回滚日志与实际证据预留已实现并通过 50 项回归；安全 GC/retention、>100 delivery 恢复、完整故障矩阵与跨平台发行验收仍未完成，见[验证记录 §4](kernel-portability-verification.md#4-s5-已贯通路径与尚未闭环的部分)。
 
 ### S6：三端远程验收与旧链路清理
 
@@ -265,6 +287,7 @@ flowchart LR
 - 删除被替代的设备专用内核协议、直接数据库耦合、配置和打包残留。
 - 发布矩阵分别列出服务端和设备端的支持情况。
 - 交付：准确的命令、修订、平台、通过项、失败项和限制；不用历史 smoke 代替本轮验收。
+- **当前状态：未验收。** 原生平台 workflow 已添加但未运行；Windows Job 源码未在原生平台编译运行，macOS 完整后代监管未实现，要求该能力的调用方拒绝启动。root tsc final7、lint final4、边界 final2、完整 API/schema 分次通过；第三轮 full Bun 跑完 229 文件，最终文件结果 2450 pass / 38 skip，但 notify 首次失败后重试通过。持久化等待修复后定向 17 pass / 0 fail，历史失败保留。最终 14 seeds、编译、资源、CLI、SDK checker、ELF 与 archive 检查通过；实际 remote-execution 固定 seed 安装使用正式打包 helper，通过且 builtin=false、authority=0。17:55 在修复 helper 路径及 RPATH 后，默认 Linux CLI 以离线冻结安装完成完整 runtime smoke。独立设备复制二进制 smoke 通过。foreign Linux/arm64、跨主机、外部模型、生产及完整场景回放均未接受，详见[验证记录](kernel-portability-verification.md)。
 
 ## 11. 验收标准
 
@@ -295,26 +318,28 @@ flowchart LR
 
 ### 11.4 检查方式
 
-- 按 `AGENTS.md` **串行**执行 `typecheck`、`lint`（含 depcruise 和 ratchet）、`test:bun`、`test:api`，每项都在带 `MemoryMax` 上限的 systemd-run 中运行。
+- 按 `AGENTS.md` **串行且限制内存**执行 `typecheck`、`lint`、`check:boundaries`、`test:bun`、`test:api`；Linux 可用带 `MemoryMax` 的 systemd-run，具体命令与原生 macOS/Windows 的执行条件见[验证记录](kernel-portability-verification.md)。不能把 systemd 作为产品运行依赖或原生平台测试的替代。
 - 端到端回放：在全新数据目录中完成一次 Agent 运行（普通对话请求和一次 Coding 项目工作）、一次 owner 发起的受控构建（生成、检查、激活）、events/notify/web 三类 hash 绑定各一次，并按 [steward-goals](steward-goals.md) §8 场景回放、保存截图。绿色 CI 不能替代这一步。
-- 开发阶段先用临时数据库、假设备传输和真实本地测试进程覆盖故障场景。真实设备、模型、账号和部署验收需要另行明确范围，本方案不授予这些操作权限。
+- 开发阶段用临时数据库、假 completion 和真实本地进程覆盖故障场景。当前已有实际设备程序、实际生产 HTTP/SDK/内核与 Pi 的本机确定性通过；跨主机设备、外部模型、账号或部署验收须另记范围、环境和证据。自动化测试遵守 `AGENTS.md`，不调用真实模型或 QQ。
 - 每个阶段结束时在本文追加一行状态，写明实际运行的命令和结果；没有运行的项要如实写明。
 
 ## 12. 主要待验证事项
 
-| 事项 | 定稿依据 |
+| 事项 | 当前进展与剩余验收 |
 | --- | --- |
-| 设备 HTTP 如何穿过现有代理 | 设备专用认证与 owner API key 分离，且不新增宽泛的鉴权例外 |
-| 通用 Run 交付与应用私有记录的一致性 | 响应丢失、崩溃点、重复认领和生命周期故障用例 |
-| 停止证据的可信适配边界 | 各平台的真实进程实验；普通应用不能随意提交可信的停止结论 |
-| 设备端模型预算的执行 | 准入与执行点约束的闭环验证，不能只验证结果累计 |
-| Windows/macOS 进程监管 | 与 Bun 的集成、进程树清理、异常退出和恢复证据 |
-| 最终 IPC 实现 | 三端运行、身份与代理边界验收、语言中立 |
-| 默认预装与设备端分发方式 | 不增加权限，不强制运行设备端，不影响核心离线启动 |
-| `@chrona/pi` 在设备端的打包 | 设备端程序的独立构建和 smoke 通过 |
+| 设备 HTTP 与 owner 鉴权分离 | 生产 pair/poll/report/reconcile/model 与真实 API key owner 入口已接通；server 17:12 定向通过。owner cleanup 不冒充 module caller；剩完整故障/生命周期及最终回归 |
+| Run 交付与应用私有记录一致性 | 固定 key、真实 SDK/carrier、窄 revoke/cancel/reconcile/retention、原 activation 排空已实现；两 slots、receiver 更替与 cold cancel 已修复，先 journal 后签名 never_started/ACK，禁止 spawn。最终设备 39 pass / 325 断言，native cold-claim 修复后生产 HTTP 1 pass / 36 断言；完整代次/故障组合待验收 |
+| 停止证据可信边界 | Linux 有真实后代实验、内核有签名验证；guardian 丢失仍 unknown，其他原生平台未验收 |
+| 设备端模型预算 | 实际 Pi→生产 HTTP→应用 SDK→内核模型预留/固定收据已通过，pending unknown 不重发；kernelPiDriver 已用于生产路径，缺 Pi/可信网关才拒绝。外部模型与跨主机验收未完成 |
+| Windows/macOS 进程监管 | Windows 已实现待原生编译运行；macOS group-only，完整后代监管后端未实现 |
+| loopback IPC/HTTP | 已选认证 loopback 并实现共享传输；三端模块 HTTP、预览、SDK testing 与构建须同修订验收 |
+| 分发及独立设备打包 | 最终 14 seeds、编译/资源/CLI/SDK checker/ELF/archive 检查通过；设备最终构建、仓库外复制二进制 smoke 与本地 archive 通过，二进制 hash `29e7868…`。完整 Pi CLI 1.5.0 是显式外部依赖。17:55 核心默认 Linux CLI 在 helper 路径、RPATH 修复后，以离线冻结安装通过完整 runtime smoke；兼容 Linux/libc、arm64、跨主机仍未接受，未发布 |
+| 全局回归与清理 | helper 修复后 root tsc final7 exit 0、lint final4 438 files / 0 errors / 1 既有 warning、边界 final2 0 errors / 35 warnings（796 modules / 4166 dependencies）；先前 schema/SDK 比对及 API 105 pass / 19 files 通过。第三轮 Bun 完成 229 文件，最终 2450 pass / 38 skip，notify 首次失败后重试；修复后新回归 17 pass / 0 fail。旧路径已替代删除，历史失败保留；不构成无重试全绿或 S6 接受结论 |
+| 应用存储与恢复容量 | source 完整 canonical bytes 上限及 gap/final/stop/cancel 独立逻辑配额、exact wire bytes 批次预留、app/native 持久公平轮询已完成；app 2 pass / 15 断言、native 21 pass / 179 断言、fairness 1 pass / 17 断言，cold cancel 生产回归通过。有限 SQLite/DELETE 回滚日志和实际证据预留已验证；GC/retention、超过 100 delivery journal 恢复未完成，>100 pending controls 回归不能替代恢复验收 |
 
 ## 13. 相关文档
 
+- [可移植性验证记录](kernel-portability-verification.md)：本轮实际证据、平台矩阵、复现命令与未完成验收。
 - [内核永久边界合同](kernel-permanent-boundary-contract.md)、[实施记录](kernel-permanent-boundary-implementation.md)：当前内核职责与应用生命周期的基线。
 - [当前架构](architecture.md)、[模块依赖方向](module-dependency-direction.md)：依赖与所有权规则。
 - [Coding 客户端协议](coding-peer-clients-protocol.md)：业务调用面；不借远程拆分重建 Coding 协议。

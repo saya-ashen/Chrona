@@ -1,19 +1,16 @@
-import { z } from "zod";
-import * as outputs from "../system-outputs";
+import { publicSystemTools } from "./tool-contract-declarations";
 import { createSettings } from "../settings";
 import { CallError, type SystemModule } from "../module-calls";
-import { tool, text, entry, json, parsed } from "./shared";
+import { entry, json, parsed, requireOwner } from "./shared";
 
 /** Kernel governance only. Applications own their settings and preferences. */
 export const settings: SystemModule = {
   name: "settings",
   description: "内核模型预算与预算日界时区。应用配置由各应用管理。",
-  tools: [
-    tool("get", "Model budgets, usage and governance timezone.", {}, [], { idempotent: true, output: z.lazy(() => outputs.settingsOutput) }),
-    tool("update", "Update model budgets or governance timezone.", { settings: text('JSON {"timezone"?: IANA timezone, "moduleModel"?: model budget configuration | null}') }, ["settings"], { idempotent: true, output: z.lazy(() => outputs.settingsOutput) }),
-  ],
+  tools: publicSystemTools.settings,
   async handle({ ports, workspaceId, caller }, name, args) {
-    entry(caller);
+    if (name === "update") await requireOwner(ports.db, workspaceId, caller);
+    else entry(caller);
     const service = createSettings({ db: ports.db, workspaceId, now: ports.now });
     if (name === "get") return json(await service.get());
     if (name === "update") return json(await service.update(parsed(args.settings, "settings")));

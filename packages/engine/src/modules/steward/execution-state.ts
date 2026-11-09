@@ -1,12 +1,12 @@
-import { createHash } from "node:crypto";
+import type { VerifiedExecutionStop } from "./execution-delivery-stop-types";
+import { assertVerifiedExecutionStop } from "./execution-delivery-stop";
+export { executionDigest } from "./execution-delivery-digest";
 import type { Prisma } from "@chrona/db";
 import { EXECUTION_EVENT_LIMITS, type ExecutionPrincipal, type ExecutionRef, type ExecutionSnapshot, type ExecutionView } from "@chrona/contracts/steward";
-import type { VerifiedDeviceStop, StewardPorts } from "./ports";
-import { deviceCommandBytes } from "./execution-control-budget";
-import { CallError } from "./module-calls";
+import type { StewardPorts } from "./ports";
+import { CallError } from "./module-call-error";
 
 type Attempt = Prisma.ExecutionAttemptGetPayload<{ include: { run: true } }>;
-export const executionDigest = (input: unknown): string => createHash("sha256").update(JSON.stringify(input, (_, value) => value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)).digest("hex");
 export const executionCallerKey = (principal: ExecutionPrincipal) => principal.caller.kind === "owner" ? "owner" : `module:${principal.caller.moduleId}`;
 export function executionScope(principal: ExecutionPrincipal): Prisma.ExecutionAttemptWhereInput {
   return { workspaceId: principal.workspaceId, ownerId: principal.ownerId, ...(principal.caller.kind === "module" ? { callerKey: executionCallerKey(principal), callerHash: principal.caller.hash } : {}) };
@@ -46,7 +46,7 @@ export async function executionSnapshot(tx: Prisma.TransactionClient, row: Attem
     missing: previous?.missing ?? false, expiresAt: new Date(now.getTime() + EXECUTION_EVENT_LIMITS.snapshotRetentionMs).toISOString() };
 }
 /** Called inside Run.finish's transaction; unknown completion never releases a writable directory. */
-export async function finishExecution(ports: StewardPorts, tx: Prisma.TransactionClient, runId: string, evidence?: "provider_exited" | "never_started" | VerifiedDeviceStop, now = ports.now()) {
+export async function finishExecution(ports: StewardPorts, tx: Prisma.TransactionClient, runId: string, evidence?: "provider_exited" | "never_started" | VerifiedExecutionStop, now = ports.now()) {
   let row = await tx.executionAttempt.findUnique({ where: { runId }, include: { run: true } });
   if (!row) return false;
   const principal = executionPrincipal(row);
@@ -61,34 +61,32 @@ export async function finishExecution(ports: StewardPorts, tx: Prisma.Transactio
 
 /** Caller holds the workspace writer lock; an offered response may have been lost. */
 export async function executionNeverOfferedIn(tx: Prisma.TransactionClient, row: Attempt) {
-  if (row.executorId === "server" || row.sourceReceipt) return false;
-  const a = await tx.executorAssignment.findUnique({ where: { attemptId: row.id } });
-  if (!a || a.executorId !== row.executorId || a.generation !== row.executorGeneration) return false;
-  if ([a.offeredAt, a.startedAt, a.processIdentity, a.final, a.finalDigest, a.finalizedAt, a.tombstoneDigest].some(value => value !== null)) return false;
-  if ([a.sourceHighWatermark, a.sourceProducedThrough, a.receiptCount].some(value => value !== 0)) return false;
-  const commands = await tx.executionCommand.findMany({ where: { attemptId: row.id } });
-  if (commands.some(command => command.operation !== "cancel" || command.offeredAt)) return false;
-  // Cancellation receipts consume shared metadata bytes, not source/process progress.
-  const cancelBytes = commands.reduce((bytes, command) => bytes + deviceCommandBytes({ ...command, receipt: command.receipt as Prisma.InputJsonValue }), 0);
-  return a.receiptBytes === cancelBytes && !await tx.executorSourceReceipt.count({ where: { attemptId: row.id } });
+  if (row.targetBinding) {
+    const delivery = await tx.executionDelivery.findUnique({ where: { attemptId: row.id } });
+    return !!delivery && !delivery.offeredAt && !delivery.acceptedAt && !delivery.startedAt && !delivery.finalDigest && !delivery.processIdentity && delivery.sourceThrough === 0;
+  }
+  return false;
 }
 
-async function assertExecutionStop(tx: Prisma.TransactionClient, row: Attempt, evidence?: "provider_exited" | "never_started" | VerifiedDeviceStop) {
-  if (!evidence) return;
-  if (evidence === "provider_exited") {
-    if (row.executorId !== "server") throw new CallError("conflict", "Device execution requires verified device stop evidence");
-    return;
-  }
-  const assignment = await tx.executorAssignment.findUnique({ where: { attemptId: row.id } });
-  if (evidence === "never_started") {
-    if (row.executorId === "server" && !row.run.startedAt || !row.run.startedAt && !assignment) return;
-    if (!assignment || !row.capabilityRevokedAt || !await executionNeverOfferedIn(tx, row)) throw new CallError("conflict", "A started run requires process exit evidence");
-    await tx.executorAssignment.update({ where: { attemptId: row.id }, data: { tombstoneDigest: executionDigest({ assignmentId: assignment.assignmentId, launchDigest: assignment.launchDigest, kind: "never_offered" }) } });
-    return;
-  }
-  assertDeviceStop(row, assignment, evidence);
+async function assertDeliveryStop(tx: Prisma.TransactionClient, row: Attempt, evidence: VerifiedExecutionStop) {
+  assertVerifiedExecutionStop(evidence, row.id);
+  const delivery = await tx.executionDelivery.findUniqueOrThrow({ where: { attemptId: row.id } });
+  if (delivery.id !== evidence.target.deliveryId || delivery.launchDigest !== evidence.target.launchDigest || delivery.finalDigest !== evidence.statement.finalDigest) throw new CallError("conflict", "Verified stop no longer matches delivery");
 }
-function assertDeviceStop(row: Attempt, assignment: { assignmentId: string; generation: number } | null, evidence: VerifiedDeviceStop) {
-  const { assignmentId, generation, ...ref } = evidence.target;
-  if (!assignment || evidence.executorId !== row.executorId || evidence.generation !== assignment.generation || assignmentId !== assignment.assignmentId || generation !== assignment.generation || executionDigest(ref) !== executionDigest(executionRef(row))) throw new CallError("conflict", "Verified stop reference mismatch");
+async function assertExecutionStop(tx: Prisma.TransactionClient, row: Attempt, evidence?: "provider_exited" | "never_started" | VerifiedExecutionStop) {
+  if (!evidence) return;
+  if (typeof evidence !== "string" && "statement" in evidence) {
+    await assertDeliveryStop(tx, row, evidence);
+    return;
+  }
+  if (row.targetBinding) {
+    if (evidence === "never_started" && (!row.run.startedAt || row.capabilityRevokedAt && await executionNeverOfferedIn(tx, row))) {
+      await tx.executionDelivery.updateMany({ where: { attemptId: row.id }, data: { settledAt: new Date() } });
+      return;
+    }
+    throw new CallError("forbidden", "Application execution requires kernel-verified stop evidence");
+  }
+  if (evidence === "provider_exited") return;
+  if (!row.run.startedAt) return;
+  throw new CallError("conflict", "A started run requires process exit evidence");
 }
