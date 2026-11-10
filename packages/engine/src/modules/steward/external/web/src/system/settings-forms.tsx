@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStateStore } from "@json-render/react";
 import { useAction } from "./action";
 import type { CapRow } from "./model-settings";
@@ -31,6 +31,17 @@ type Save = ReturnType<typeof useSaveSettings>;
 function Status({ save }: { save: Save }) { return <span role={save.error ? "alert" : "status"} className={save.error ? "error" : "muted"}>{save.error || save.message}</span>; }
 function NumberField({ name, label, value, min, max }: { name: string; label: string; value: number; min: number; max: number }) {
   return <label>{label} <input name={name} type="number" min={min} max={max} step={1} required defaultValue={value} /></label>;
+}
+export function RunTimeoutSettings({ props: { settings } }: { props: { settings: GlobalSettings } }) {
+  const save = useSaveSettings();
+  const [minutes, setMinutes] = useState(String(settings.runTimeoutMinutes ?? ""));
+  useEffect(() => { setMinutes(String(settings.runTimeoutMinutes ?? "")); }, [settings.runTimeoutMinutes]);
+  const persist = (value: string) => save.save({ runTimeoutMinutes: value === "" ? null : Number(value) }, value === "" ? "已取消任务总超时限制" : "任务总超时已保存");
+  return <form onSubmit={event => { event.preventDefault(); persist(minutes); }}>
+    <label>任务总超时（分钟）<input name="runTimeoutMinutes" type="number" min={1} max={525600} step={1} placeholder="留空表示不限时" value={minutes} disabled={save.pending} onChange={event => setMinutes(event.target.value)} /></label>
+    <p className="muted">默认不限时。填写 1–525600 的整数；留空并保存可取消限制。仅对新启动的前台和后台任务生效，已启动的任务不受影响。</p>
+    <div className="row"><button className="primary" disabled={save.pending}>保存任务总超时</button><button type="button" disabled={save.pending} onClick={() => { setMinutes(""); persist(""); }}>清除限制</button><Status save={save} /></div>
+  </form>;
 }
 /** This form edits only the kernel budget timezone. */
 export function NotificationSettings({ props: { settings } }: { props: { settings: GlobalSettings; section?: "budget" } }) {

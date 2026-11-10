@@ -18,7 +18,7 @@ import { buildPending } from "./module-build";
 import { onApproved, rollback } from "./module-activation";
 import { activateIn } from "./module-generation";
 import { recoverMigrations } from "./module-migration";
-import { readVersionSource } from "./module-source";
+import { readVersionMaterial } from "./module-source";
 import { callModuleTool, moduleToolsets, moduleToolCatalog } from "./module-tools";
 import { moduleIncidents, moduleOutputMismatches, moduleHealthSummarySchema, moduleOutputContractFailureSchema, incidentSchema, kind as moduleIncidentKind, diagnosticText, incidentNextAction, type ModuleIncident } from "./module-diagnostics";
 import { latestModuleEvolution, moduleEvolutionOutcomes } from "./module-evolution";
@@ -52,7 +52,11 @@ function runtimeOf(ports: StewardPorts, row: { id: string; activeHash: string | 
 }
 
 function incidentSummary(current: ModuleIncident | undefined) {
-  return current ? { id: current.id, revision: current.revision ?? 1, status: current.status, failures: current.failures, lastAt: current.lastAt, reason: diagnosticText(current.evidence.reason, 300), deliveryUnknown: current.deliveryUnknown, pendingTriggers: current.pendingTriggers } : null;
+  const reason = current ? diagnosticText(current.evidence.reason, 300) : "";
+  return {
+    incident: current ? { id: current.id, revision: current.revision ?? 1, status: current.status, failures: current.failures, lastAt: current.lastAt, reason: reason.slice(0, 300), deliveryUnknown: current.deliveryUnknown, pendingTriggers: current.pendingTriggers } : null,
+    truncated: reason.length > 300,
+  };
 }
 
 function hasOpenDiagnostics(current: ModuleIncident | undefined, contractFailureCount: number) {
@@ -73,12 +77,13 @@ export async function moduleHealthSummary(ports: StewardPorts, workspaceId: stri
     truncated = incident.truncated || failures.truncated;
   }
   const version = activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: activeHash } }, select: { manifest: true } }) : null;
+  const summary = incidentSummary(current);
   return moduleHealthSummarySchema.parse({ module: moduleRow.name, moduleId, activeHash, configuredStatus: moduleRow.status, observedAt: ports.now().toISOString(),
     ...runtimeOf(ports, moduleRow, version),
     activation: activation ? { activationId: activation.activationId, hash: activation.candidateHash, status: activation.status, activatedAt: activation.activatedAt, observedCapabilities: activation.observedCapabilities } : null,
     consecutiveFailures: policy?.consecutiveFailures ?? 0,
-    incident: incidentSummary(current),
-    contractFailureCount, open: hasOpenDiagnostics(current, contractFailureCount), nextAction: incidentNextAction(current), truncated });
+    incident: summary.incident,
+    contractFailureCount, open: hasOpenDiagnostics(current, contractFailureCount), nextAction: incidentNextAction(current), truncated: truncated || summary.truncated });
 }
 
 /** Apps as Chrona records them: description from the active manifest, versions with why they were rejected, recent runs. */
@@ -106,7 +111,7 @@ async function checkout(context: ModuleContext, moduleId: string, hash: string |
   const { db } = context;
   const module = await requireModule(context, db, moduleId), selected = hash ?? module.activeHash;
   if (!selected || !await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId, hash: selected } } })) throw new StewardError("not_found", "Module version not found");
-  const files = await readVersionSource(context, moduleId, selected);
+  const files = await readVersionMaterial(context, moduleId, selected);
   await checkoutModule(root, dir, files);
 }
 /** Approvals the module system carries out (activation, groups, removal); every path that resolves approvals must route these here. */

@@ -3,9 +3,10 @@ import { createHash } from "node:crypto";
 import { lstat, mkdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { StewardError } from "./errors";
-import { checkoutModule, INSTALLED_DIRS } from "./module-files";
+import { checkoutModule, INSTALLED_DIRS, type ModuleFile } from "./module-files";
+import { restoreModuleArtifacts, storeModuleArtifacts, validateModuleSourceRecord } from "./module-artifacts";
 
-export type ModuleGitFile = { path: string; bytes: Uint8Array };
+export type ModuleGitFile = ModuleFile;
 export type ModuleGitRevision = { commit: string; tree: string };
 type Repository = { platform: string; moduleId: string };
 const oid = /^[a-f0-9]{40}$/;
@@ -61,6 +62,7 @@ function validateFiles(files: ModuleGitFile[]) {
     paths.add(file.path); bytes += file.bytes.byteLength;
   }
   if (files.length > 200 || bytes > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
+  validateModuleSourceRecord(files);
 }
 async function revision(repo: string, commit: string): Promise<ModuleGitRevision> {
   if (!oid.test(commit)) throw new StewardError("invalid", "Invalid module Git commit");
@@ -92,11 +94,11 @@ async function writeTree(repo: string, files: ModuleGitFile[]) {
       tree = next;
     }
     if (tree.has(name)) throw new StewardError("invalid", "Conflicting module source paths");
-    tree.set(name, (await git(repo, ["hash-object", "-w", "--stdin"], file.bytes)).toString().trim());
+    tree.set(name, `${file.executable ? "100755" : "100644"} blob ${(await git(repo, ["hash-object", "-w", "--stdin"], file.bytes)).toString().trim()}`);
   }
   async function save(tree: Tree): Promise<string> {
     const entries: string[] = [];
-    for (const [name, value] of tree) entries.push(typeof value === "string" ? `100644 blob ${value}\t${name}\0` : `040000 tree ${await save(value)}\t${name}\0`);
+    for (const [name, value] of tree) entries.push(typeof value === "string" ? `${value}\t${name}\0` : `040000 tree ${await save(value)}\t${name}\0`);
     return (await git(repo, ["mktree", "-z"], Buffer.from(entries.join("")))).toString().trim();
   }
   return save(root);
@@ -118,7 +120,8 @@ export async function commitModuleSource(input: Repository & { versionId: string
   component(input.versionId);
   const repo = await ensureModuleGit(input.platform, input.moduleId), current = await localHead(repo);
   if (input.parent && current && input.parent !== current) throw new StewardError("conflict", "Module source changed; submit from the latest source");
-  const result = await createRevision(repo, input.files, input.message, input.parent ?? current);
+  const files = await storeModuleArtifacts(input.platform, input.files);
+  const result = await createRevision(repo, files, input.message, input.parent ?? current);
   // Pin first: a racing branch update must never discard the submitted source.
   await pin(repo, `refs/chrona/candidates/${input.versionId}`, result.commit);
   await git(repo, ["update-ref", "refs/heads/local", result.commit, current ?? zero]);
@@ -148,13 +151,17 @@ export async function readModuleSource(input: Repository & { commit: string }): 
     const bytes = await git(repo, ["cat-file", "blob", hash!]);
     total += bytes.byteLength;
     if (total > 1024 * 1024) throw new StewardError("invalid", "Module exceeds file limits");
-    files.push({ path: entry.slice(tab + 1), bytes });
+    files.push({ path: entry.slice(tab + 1), bytes, ...(mode === "100755" ? { executable: true } : {}) });
   }
   validateFiles(files);
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
+/** Full runtime material: Git sources plus digest-verified immutable artifacts. */
+export async function readModuleMaterial(input: Repository & { commit: string }): Promise<ModuleGitFile[]> {
+  return restoreModuleArtifacts(input.platform, await readModuleSource(input));
+}
 export async function exportModuleSource(input: Repository & { commit: string; root: string; dir: string }) {
-  await checkoutModule(input.root, input.dir, await readModuleSource(input));
+  await checkoutModule(input.root, input.dir, await readModuleMaterial(input));
 }
 export async function importLegacyModuleSource(input: Repository & { legacyHash: string; files: ModuleGitFile[] }): Promise<ModuleGitRevision> {
   if (!/^[a-f0-9]{64}$/.test(input.legacyHash)) throw new StewardError("invalid", "Invalid legacy module hash");

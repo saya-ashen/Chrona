@@ -68,7 +68,7 @@ test("two rounds retain provider Session/logs, isolate attempts and receipts, an
   expect(await readFile(join(logDir, "provider-log"), "utf8")).toBe("first round context");
   const run2 = (await runs.claimNext("background"))!;
   expect(run2).toMatchObject({ id: second.runId, prompt: "Second round", session: { id: first.sessionId, providerSessionId: "provider-context" } });
-  expect(run2.deadlineAt.getTime() - ports.now().getTime()).toBe(30_000);
+  expect(run2.deadlineAt!.getTime() - ports.now().getTime()).toBe(30_000);
   expect(run2.token).not.toBe(run1.token);
   await expect(runs.authenticate(run1.token)).rejects.toMatchObject({ code: "forbidden" });
   expect(await runs.authenticate(run2.token)).toMatchObject({ run: { id: second.runId } });

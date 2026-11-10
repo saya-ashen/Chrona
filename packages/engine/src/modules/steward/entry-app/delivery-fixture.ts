@@ -1,0 +1,4 @@
+// Synthetic offline proof fixtures; never production evidence.
+export const receiptFixture = () => ({ receiptId: "receipt-1", admissionId: "admission-1", requestKey: "submit-1", submitter: { moduleId: "author-id", hash: "a".repeat(40) }, state: "submitted" as const, approvalId: null, members: [{ name: "music", moduleId: "music-id", hash: "b".repeat(40), versionId: "version-1", expectedActiveHash: null, materialDigest: "c".repeat(64), status: "building" as const, selected: true }] });
+export const receiptItem = () => ({ at: "2026-11-09T00:00:03.000Z", kind: "result", tool: "m_author_submit", error: false, text: JSON.stringify({ result: receiptFixture() }) });
+export const healthFixture = () => ({ module: "music", moduleId: "music-id", activeHash: "b".repeat(40), configuredStatus: "active", runtime: { state: "idle" }, open: false, truncated: false });

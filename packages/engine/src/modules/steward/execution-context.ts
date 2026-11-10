@@ -23,7 +23,7 @@ export async function executionRunInput(ports: StewardPorts, run: ClaimedRun): P
   const principal = executionPrincipal(row);
   await assertExecutionPrincipal(ports.db, principal);
   await runProject(ports, row, row.resolvedCwd);
-  if (row.resolvedCwd !== run.cwd || row.capabilityRevokedAt || row.run.status !== "running") throw new CallError("conflict", "Execution authority changed before launch");
+  if (row.resolvedCwd !== run.cwd || row.capabilityRevokedAt || row.run.status !== "running" || run.deadlineAt === null) throw new CallError("conflict", "Execution authority changed before launch");
   if (!ports.executionEvents) throw new CallError("unavailable", "Execution event storage unavailable");
   const ref = executionRef(row), budget = row.budget as { timeoutMs: number; maxToolCalls: number };
   await mkdir(row.logDir, { recursive: true });

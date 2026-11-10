@@ -1,6 +1,6 @@
 {
   "name": "author",
-  "description": "Ordinary source authoring and local package distribution. Prepares owner admission drafts, edits bounded own source files, stages material and forwards stable kernel receipts. Model execution requires future bounded admission support.",
+  "description": "Ordinary source and binary material transport. Guides the current Agent, imports explicit workspace files, exports complete versions, stages material and forwards stable kernel receipts.",
   "entry": "index.ts",
   "content": true,
   "activated": true,
@@ -19,7 +19,7 @@
   "tools": [
     {
       "name": "prepare",
-      "description": "Prepare a material-only owner request and admission arguments. Never signs admission or starts Agent. The owner verifies the selected Author identity.",
+      "description": "Prepare current-Agent guidance to build/test in its existing workspace, import selected source and binary artifacts, and use fixed owner-entry admission, submit and receipt. Pure; no model, builder, submission or installation.",
       "visibility": [
         "owner"
       ],
@@ -29,7 +29,7 @@
         "properties": {
           "input": {
             "type": "string",
-            "description": "JSON {requestKey,submitter:{moduleId,hash},targets:[{name,moduleId,expectedActiveHash}],goal,intent:{changes,preserves?}}. New targets use null/null. Owner must verify submitter is the approved Author version."
+            "description": "JSON {requestKey,submitter:{moduleId,hash},targets:[{name,moduleId,expectedActiveHash}],goal,intent:{changes,preserves?}}. New targets use null/null. The real owner-entry principal must discover and verify the current approved Author identity via modules.list before issuing admission."
           }
         },
         "required": [
@@ -40,7 +40,7 @@
         "type": "object",
         "properties": {
           "kind": {
-            "const": "material-only"
+            "const": "material-preparation"
           },
           "request": {
             "type": "object",
@@ -168,30 +168,13 @@
           },
           "prompt": {
             "type": "string"
-          },
-          "execution": {
-            "type": "object",
-            "properties": {
-              "supported": {
-                "const": false
-              },
-              "limitation": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "supported",
-              "limitation"
-            ],
-            "additionalProperties": false
           }
         },
         "required": [
           "kind",
           "request",
           "admission",
-          "prompt",
-          "execution"
+          "prompt"
         ],
         "additionalProperties": false
       }
@@ -239,7 +222,7 @@
     },
     {
       "name": "read",
-      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1–2000. Rejects files over 64 KiB.",
+      "description": "Read a UTF-8 source or staged file in a bounded range. Offsets and limit count UTF-16 code units; limit is 1\u20132000. Rejects files over 64 KiB.",
       "visibility": [
         "provider",
         "modules",
@@ -354,7 +337,7 @@
     },
     {
       "name": "stage",
-      "description": "Copy a bounded local tree into a new package stage and record declared provenance. Verifies manifest name and entry; kernel checks remain required. No network or overwrite.",
+      "description": "Atomically copy complete recorded source and binary artifacts into a new package stage, preserving executable modes and declared provenance. Verifies manifest name and entry; kernel checks remain required. No overwrite.",
       "visibility": [
         "owner"
       ],
@@ -474,6 +457,102 @@
       "output": {
         "type": "object",
         "additionalProperties": true
+      }
+    },
+    {
+      "name": "import",
+      "description": "Copy explicitly selected source and binary artifacts from a trusted-local absolute workspace directory into a new own workspace. Computes artifact digests and chrona-material.json. Atomic, no overwrite; path grants no Run/caller authority.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {from:absoluteDirectory,to:\"sources/workspace\",source:[\"module.json\",...],artifacts:[{path,executable?}],build:{commands:string[],toolchain:string,target:string}}. Explicit files; digests and chrona-material.json generated. New destination only. Path grants no caller/Run authority."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "record": {
+            "type": "string"
+          },
+          "files": {
+            "type": "integer"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "materialDigest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "record",
+          "files",
+          "bytes",
+          "materialDigest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "export",
+      "description": "Atomically copy a complete own version including binary bytes and executable modes into a new trusted-local absolute directory. For updates first use author.source for the exact admitted baseline. No overwrite or caller/Run authority.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "JSON {path:\"sources/workspace\"|\"packages/stage/source\",to:absoluteNewDirectory}. Existing real parent required; destination must not exist. Workspace must be separate from SDK private content, data and module storage. No principal, Run or cwd arguments."
+          }
+        },
+        "required": [
+          "input"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "files": {
+            "type": "integer"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "materialDigest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "to",
+          "files",
+          "bytes",
+          "materialDigest"
+        ],
+        "additionalProperties": false
       }
     }
   ]

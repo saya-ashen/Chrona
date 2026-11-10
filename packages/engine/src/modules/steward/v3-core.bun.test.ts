@@ -84,13 +84,14 @@ test.each(["deadline", "lease", "cancel"] as const)("%s invalidates a capability
 });
 
 test("lease expiry releases both lane and session capacity exactly once", async () => {
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 1 } } });
   await enqueue();
   const running = (await api.runs.claimNext("foreground"))!;
   const background = await enqueue(sessionId, "background");
   expect(await api.runs.claimNext("background")).toBeNull();
-  now = new Date(running.leaseUntil.getTime() - 1);
+  now = new Date(running.leaseUntil!.getTime() - 1);
   expect(await api.runs.expireLeases()).toBe(0);
-  now = running.leaseUntil;
+  now = running.leaseUntil!;
   expect(await api.runs.expireLeases()).toBe(1);
   expect(await api.runs.expireLeases()).toBe(0);
   expect(await db.run.findUniqueOrThrow({ where: { id: running.id } })).toMatchObject({ status: "timed_out", error: "Run lease expired", leaseUntil: null });

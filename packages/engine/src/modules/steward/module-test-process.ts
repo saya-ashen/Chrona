@@ -13,6 +13,8 @@ const moduleOutputSchema = z.object({
 /** Adapts existing test result controls to a wire peer, not a production compatibility path. */
 export function testModuleSandbox(runModule: NonNullable<NonNullable<StewardPorts["sandbox"]>["runModule"]>) {
   const peer = testModuleProcess(async (event, call, input) => {
+    // This adapter emulates legacy offline script results; explicit processes need the wire-peer fixture.
+    if (typeof input.entry !== "string") throw new Error("Explicit entries require testModuleProcess or a real process runtime");
     let result;
     try { result = await runModule({ codeDir: input.codeDir, dataDir: input.dataDir, entry: input.entry, network: input.network, input: event, timeoutMs: RUN_LIMITS.jobTimeoutMs, maxOutputBytes: RUN_LIMITS.jobOutputBytes }); }
     catch { throw new Error("Module sandbox run failed"); }

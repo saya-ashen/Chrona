@@ -5,6 +5,7 @@ import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildArtifacts } from "../build/manifest";
+import { MODULE_ARTIFACT_MAX_BYTES, MODULE_ARTIFACT_MAX_FILE_BYTES, MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, MODULE_SOURCE_MAX_FILES, parseModuleMaterial } from "../packages/contracts/src/steward/module-material";
 
 export type ModuleGitReleaseEntry = { name: string; repository: string | null; branch: string; commit: string; bundle: string; bundleSha256: string };
 type ReleaseLock = { version: 1; modules: ModuleGitReleaseEntry[] };
@@ -23,36 +24,64 @@ function git(dir: string, args: string[], input?: Uint8Array, dates?: string): s
   } catch { throw new Error(`Module release Git command failed (${args[0]}); Git must be installed and the seed repository must be valid`); }
 }
 
-async function sourceFiles(root: string, relative = ""): Promise<{ path: string; bytes: Buffer }[]> {
-  const files: { path: string; bytes: Buffer }[] = [];
+type ReleaseFile = { path: string; bytes: Buffer; executable: boolean };
+async function sourceFiles(root: string, relative = ""): Promise<ReleaseFile[]> {
+  const files: ReleaseFile[] = [];
   const entries = await readdir(join(root, relative), { withFileTypes: true });
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!relative && ignored.has(entry.name)) continue;
     const path = relative ? `${relative}/${entry.name}` : entry.name;
     if (entry.name === ".git" || entry.name.includes("\\")) throw new Error("Unsafe module release source path");
     if (entry.isDirectory()) files.push(...await sourceFiles(root, path));
-    else if (entry.isFile()) files.push({ path, bytes: await readFile(join(root, path)) });
+    else if (entry.isFile()) files.push({ path, bytes: await readFile(join(root, path)), executable: !!((await lstat(join(root, path))).mode & 0o111) });
     else throw new Error("Module release sources must contain regular files and directories only");
   }
   return files;
 }
 
-type Tree = Map<string, string | Tree>;
+/** Verify complete explicit material before selecting source and the immutable record for Git. */
+export async function moduleGitReleaseSource(codeDir: string): Promise<ReleaseFile[]> {
+  const files = await sourceFiles(codeDir), material = files.find(file => file.path === MODULE_MATERIAL_FILE);
+  // Existing releases retain their all-files, non-executable Git representation.
+  if (!material) return files.map(file => ({ ...file, executable: false }));
+  if (material.bytes.byteLength > MODULE_SOURCE_MAX_BYTES) throw new Error("Module material record exceeds source limits");
+  const record = parseModuleMaterial(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(material.bytes)));
+  const byPath = new Map(files.map(file => [file.path, file]));
+  const source = [material, ...record.source.map(path => {
+    const file = byPath.get(path);
+    if (!file) throw new Error(`Declared module source is missing: ${path}`);
+    return file;
+  })];
+  if (source.length > MODULE_SOURCE_MAX_FILES || source.reduce((total, file) => total + file.bytes.byteLength, 0) > MODULE_SOURCE_MAX_BYTES) throw new Error("Module exceeds source file limits");
+  if (files.length !== source.length + record.artifacts.length) throw new Error("Module release contains undeclared material files");
+  let artifactBytes = 0;
+  for (const artifact of record.artifacts) {
+    const file = byPath.get(artifact.path);
+    if (!file) throw new Error(`Declared module artifact is missing: ${artifact.path}`);
+    artifactBytes += file.bytes.byteLength;
+    if (file.bytes.byteLength > MODULE_ARTIFACT_MAX_FILE_BYTES || artifactBytes > MODULE_ARTIFACT_MAX_BYTES) throw new Error("Module exceeds artifact file limits");
+    if (createHash("sha256").update(file.bytes).digest("hex") !== artifact.sha256 || file.executable !== !!artifact.executable) throw new Error(`Module artifact digest or executable mode mismatch: ${artifact.path}`);
+  }
+  return source.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+type Blob = { oid: string; executable: boolean };
+type Tree = Map<string, Blob | Tree>;
 async function sourceTree(repo: string, codeDir: string, name: string) {
   const manifest = JSON.parse(await readFile(join(codeDir, "module.json"), "utf8"));
   if (manifest.name !== name) throw new Error(`Module release manifest mismatch: ${name}`);
   const root: Tree = new Map();
-  for (const file of await sourceFiles(codeDir)) {
+  for (const file of await moduleGitReleaseSource(codeDir)) {
     const parts = file.path.split("/"), leaf = parts.pop()!;
     let tree = root;
     for (const part of parts) {
       if (!tree.has(part)) tree.set(part, new Map());
       tree = tree.get(part) as Tree;
     }
-    tree.set(leaf, git(repo, ["hash-object", "-w", "--stdin"], file.bytes));
+    tree.set(leaf, { oid: git(repo, ["hash-object", "-w", "--stdin"], file.bytes), executable: file.executable });
   }
   function save(tree: Tree): string {
-    const entries = [...tree].map(([name, value]) => typeof value === "string" ? `100644 blob ${value}\t${name}\0` : `040000 tree ${save(value)}\t${name}\0`);
+    const entries = [...tree].map(([name, value]) => value instanceof Map ? `040000 tree ${save(value)}\t${name}\0` : `${value.executable ? "100755" : "100644"} blob ${value.oid}\t${name}\0`);
     return git(repo, ["mktree", "-z"], Buffer.from(entries.join("")));
   }
   return save(root);

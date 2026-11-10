@@ -27,7 +27,7 @@ async function event(ports: StewardPorts, workspaceId: string, callbackId: strin
 }
 function providerInput(ports: StewardPorts, workspaceId: string, raw: unknown): ProviderRunInput {
   const { callbacks: callbackId, operationId: _id, deadline, ...input } = runtimeStartSchema.parse(raw);
-  return { ...input, deadline: new Date(deadline), ...(callbackId ? {
+  return { ...input, deadline: deadline === null ? null : new Date(deadline), ...(callbackId ? {
     events: {
       progress: async value => { await event(ports, workspaceId, callbackId, { kind: "progress", value }); },
       usage: async value => { await event(ports, workspaceId, callbackId, { kind: "usage", value }); },
@@ -53,7 +53,7 @@ async function reserveStart(ports: StewardPorts, workspaceId: string, input: z.i
   await ports.db.$transaction(async tx => {
     const authenticated = await authenticateRun(tx, input.token, ports.now());
     const { run } = authenticated;
-    if (authenticated.workspaceId !== workspaceId || run.id !== input.runId || input.operationId !== run.id || run.cwd !== input.cwd || run.lane !== input.lane || !run.deadlineAt || new Date(input.deadline) > run.deadlineAt) throw new CallError("forbidden", "Provider start exceeds the claimed Run");
+    if (authenticated.workspaceId !== workspaceId || run.id !== input.runId || input.operationId !== run.id || run.cwd !== input.cwd || run.lane !== input.lane || (run.deadlineAt !== null && (input.deadline === null || new Date(input.deadline) > run.deadlineAt))) throw new CallError("forbidden", "Provider start exceeds the claimed Run");
     const id = `local-provider-start:${run.id}`;
     if (await tx.audit.findUnique({ where: { id } })) throw new CallError("unknown", "Provider start was already offered; original outcome requires reconciliation");
     await tx.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "local_provider_start", subjectId: run.id, details: { digest }, createdAt: ports.now() } });

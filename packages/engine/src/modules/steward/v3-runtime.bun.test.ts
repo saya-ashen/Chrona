@@ -17,15 +17,47 @@ test("run cwd and context belong to the session", async () => {
   const run = await createRuns(ports, workspaceId).enqueue({ sessionId, lane: "foreground", trigger: "message", prompt: "Work" });
   expect(run.cwd).toBe(join(ports.dataDir, "sessions", sessionId));
 });
-test.each([['foreground', 5], ['background', 20], ['build', 60]] as const)("%s has its own %i minute deadline", async (lane, minutes) => {
-  const runs = createRuns(ports, workspaceId);
-  if (lane === "build") {
-    await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
-    await db.audit.create({ data: { id: `build-targets:${sessionId}`, workspaceId, subjectId: sessionId, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
-  }
-  await runs.enqueue({ sessionId, lane, trigger: lane === 'build' ? 'build' : 'message', prompt: 'Bounded work' });
+test.each(["foreground", "background"] as const)("%s defaults to no deadline past the former limits", async lane => {
+  const runs = createRuns(ports, workspaceId), started = ports.now();
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Long work" });
   const run = (await runs.claimNext(lane))!;
-  expect(run.deadlineAt.getTime() - ports.now().getTime()).toBe(minutes * 60_000);
+  expect(run).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  ports.now = () => new Date(started.getTime() + 21 * 60_000);
+  expect(await runs.expireLeases()).toBe(0);
+  expect((await runs.authenticate(run.token)).run.id).toBe(run.id);
+  expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status: "running", deadlineAt: null, leaseUntil: null });
+});
+test.each(["foreground", "background"] as const)("%s uses the setting at claim; clearing only affects new claims", async lane => {
+  const runs = createRuns(ports, workspaceId), started = ports.now();
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Configured work" });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 2 } } });
+  const bounded = (await runs.claimNext(lane))!;
+  const boundary = new Date(started.getTime() + 2 * 60_000);
+  expect(bounded).toMatchObject({ deadlineAt: boundary, leaseUntil: boundary });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: null } } });
+  expect(await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).toMatchObject({ deadlineAt: boundary, leaseUntil: boundary });
+  ports.now = () => new Date(boundary.getTime() - 1);
+  expect((await runs.authenticate(bounded.token)).run.id).toBe(bounded.id);
+  expect(await runs.expireLeases()).toBe(0);
+  ports.now = () => boundary;
+  await expect(runs.authenticate(bounded.token)).rejects.toMatchObject({ code: "forbidden" });
+  expect(await runs.expireLeases()).toBe(1);
+  expect((await db.run.findUniqueOrThrow({ where: { id: bounded.id } })).status).toBe("timed_out");
+  await runs.enqueue({ sessionId, lane, trigger: "message", prompt: "Unlimited work" });
+  const unlimited = (await runs.claimNext(lane))!;
+  expect(unlimited).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 1 } } });
+  ports.now = () => new Date(boundary.getTime() + 21 * 60_000);
+  expect(await runs.expireLeases()).toBe(0);
+  expect((await runs.authenticate(unlimited.token)).run.id).toBe(unlimited.id);
+});
+test("build keeps its explicit sixty minute budget when ordinary timeout is cleared", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
+  await db.audit.create({ data: { id: `build-targets:${sessionId}`, workspaceId, subjectId: sessionId, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
+  await runs.enqueue({ sessionId, lane: "build", trigger: "build", prompt: "Bounded work" });
+  const run = (await runs.claimNext("build"))!;
+  expect(run.deadlineAt!.getTime() - ports.now().getTime()).toBe(60 * 60_000);
   expect(run.leaseUntil).toEqual(run.deadlineAt);
 });
 test("one session never runs two lanes concurrently; other sessions remain independent", async () => {

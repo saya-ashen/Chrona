@@ -12,6 +12,7 @@ import { switchActiveIn } from "../../../../../packages/engine/src/modules/stewa
 import { seedTestModuleRelease, testReleasePackages } from "../../../../../packages/engine/src/modules/steward/module-release-test-fixture";
 import { requestRemove } from "../../../../../packages/engine/src/modules/steward/module-remove";
 import { requestStatus } from "../../../../../packages/engine/src/modules/steward/module-status";
+import { installAgentFixtureDependencies } from "../../../../../scripts/agent-integration/agent-application.fixtures";
 import { createServerApp } from "../../app";
 import { resetEnvCacheForTests } from "../../config/env";
 import { createStewardRuntime } from "../../steward-runtime";
@@ -86,6 +87,7 @@ beforeEach(async () => {
   workspaceId = (await db.workspace.create({ data: { name: "Generic execution acceptance", settings: { moduleInitialization: initialization } } })).id;
   const builtin = join(root, "builtin");
   await cp(resolve(import.meta.dirname, "../../../../../packages/engine/src/modules/steward/builtin"), builtin, { recursive: true });
+  await installAgentFixtureDependencies(join(builtin, "agent"));
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(builtin, name);
   const manifest = moduleManifestSchema.parse({ name: "execution-test", entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, listen: "/api/execution-test",
     uses: methods.map(method => `agent.${method}`), tools: [{ name: "dispatch", description: "Owner execution fixture", visibility: ["owner"], parameters: { type: "object", properties: { tool: { type: "string" }, input: { type: "string" } }, required: ["tool", "input"] } }] });

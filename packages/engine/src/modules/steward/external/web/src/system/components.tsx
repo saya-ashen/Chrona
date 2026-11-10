@@ -7,7 +7,7 @@ import { DiagnosticRefresh, MemoryPanel, SessionWork } from "./detail-components
 import { Time } from "../display";
 import type { Approval as ApprovalData, Interaction } from "./today";
 import { useAction } from "./action";
-import { NotificationSettings, ModuleModelSettings } from "./settings-forms";
+import { NotificationSettings, ModuleModelSettings, RunTimeoutSettings } from "./settings-forms";
 import { ChatStream } from "./chat-stream";
 
 type Args = Record<string, unknown>;
@@ -93,5 +93,5 @@ export function ActivityMore({ props }: { props: { module: string } }) {
 function component<P>(Render: (value: { props: P }) => ReactNode) {
   return ({ element }: ComponentRenderProps<P>) => <Render props={element.props} />;
 }
-export const systemComponents = { AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), ModuleModelSettings: component(ModuleModelSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
+export const systemComponents = { AppRemoval: component(AppRemoval), ChatStream: component(ChatStream), NotificationSettings: component(NotificationSettings), ModuleModelSettings: component(ModuleModelSettings), RunTimeoutSettings: component(RunTimeoutSettings), Approval: component(Approval), Question: component(Question), SystemAction: component(SystemAction), ActivityMore: component(ActivityMore), LoginForm,
   ToolForm: component(ToolForm), ToolContract: component(ToolContract), Credentials: component(Credentials), DiagnosticRefresh: component(DiagnosticRefresh), MemoryPanel, SessionWork: component(SessionWork) };

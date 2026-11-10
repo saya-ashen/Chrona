@@ -74,6 +74,13 @@ test("wrong workspace, invalid option and duplicate answer never reach the Provi
   const replies = await Promise.allSettled([api.provider.answer(request.id, { decision: "submit", value: 1 }), api.provider.answer(request.id, { decision: "cancel" })]);
   expect(replies.filter(item => item.status === "fulfilled")).toHaveLength(1); expect(await result).toEqual({ decision: "submit", value: 1 });
 });
+test.each([null, 1] as const)("question wait stays bounded with run timeout %s", async minutes => {
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: minutes } } });
+  const f = await fixture(), result = f.channel.events.question(question("confirm", 120_000), f.controller.signal), request = await waiting();
+  expect(Date.parse(request.expiresAt) - time.getTime()).toBe(minutes === null ? 120_000 : 60_000);
+  f.controller.abort();
+  expect(await result).toEqual({ decision: "cancel" });
+});
 test("expiry rejects late approval and returns cancellation; queued notice is suppressed", async () => {
   const f = await fixture(), result = f.channel.events.question(question("confirm", 80), f.controller.signal), request = await waiting();
   time = new Date(time.getTime() + 100);

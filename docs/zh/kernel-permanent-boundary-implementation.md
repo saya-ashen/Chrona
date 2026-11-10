@@ -32,9 +32,9 @@
 
 ### 当前材料作者能力
 
-`external/author/` 是普通默认预装应用，实际工具为 `prepare/write/read/list/stage/source/submit/receipt`。`prepare` 返回 `kind:"material-only"`、准入草案、prompt 和 `execution.supported:false`；没有开始模型，也没有自动签发准入。
+`external/author/` 是普通默认预装应用，实际工具为 `prepare/write/read/list/import/export/stage/source/submit/receipt`。`prepare` 返回 `kind:"material-preparation"`、准入草案和当前对话 Agent 的创作指引；它没有开始模型、写文件或自动签发准入。
 
-当前流程是 owner 核对 Author 的批准身份和全部目标 → owner 调用 `modules.admit-candidates` → 显式供给材料或导出准入内的精确 Git 基线 → Author 编辑/整理 → `modules.submit` → 以 receipt 或 admission/request 精确核对。准入仅授权一次完整材料提交，不授权指定模型、timeout 或 submission caps 的执行。`agent.context/run` 当前未强制 admission-bound 的这些精确执行条件，因此不能宣称自动模型作者已完成，不能自动续跑或付费重试。
+当前对话 Agent 使用既有 Run，在工作区开发、编译、测试，再通过 Author 显式导入源码与二进制（仍可直接写入小段文本）。`chrona-material.json` 将源码 Git commit 与独立内容寻址产物绑定，准确基线可导出后再次修改；Author 不提供分语言编译器。此扩展的隔离验证状态见[通用版本材料](author-version-materials.md)。Agent 以真实 owner 入口身份签发绑定批准 Author 版本、完整目标和精确活动基线的准入，再由 Author 以自己的实际身份提交并查询固定回执。材料准入与 Run 执行授权仍分别检查；不需要二次 Agent 执行器，不增加内核接口或放宽权限。检查与审批按现有队列执行，pending 不表示已激活。后续工程结果见[当前对话创作记录](author-current-conversation.md)。
 
 ### Pi completion 当前限制
 

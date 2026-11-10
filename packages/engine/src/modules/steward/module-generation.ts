@@ -10,6 +10,7 @@ import type { ModuleRelease } from "./module-release";
 import { pauseIn } from "./module-status";
 import { fenceExecutionModuleIn } from "./execution-delivery-controls";
 import { assertExecutionModuleIdle } from "./execution-module-guard";
+import { ensureVersionMaterial } from "./module-source";
 
 export async function activateIn(context: ModuleContext, tx: Prisma.TransactionClient, { moduleId, hash, reason, dataHandling }: { moduleId: string; hash: string; reason: "activate" | "rollback"; dataHandling?: string }) {
   const { activeHash: previousHash } = await switchActiveIn(context, tx, moduleId, hash, { preservePause: reason === "activate", operation: reason });
@@ -47,6 +48,7 @@ export async function switchActiveIn(context: ModuleContext, tx: Prisma.Transact
   if (!version || version.status !== "approved") throw new StewardError("conflict", "Module version is not approved");
   const manifest = moduleManifestSchema.parse(version.manifest);
   await assertListenAvailable(tx, moduleId, manifest);
+  await ensureVersionMaterial(context, version);
   await tx.module.update({ where: { id: moduleId }, data: { activeHash: hash, status: "active", ...(module.activeHash !== hash ? { activationId: randomUUID(), executionFenceAt: null } : {}) } });
   if (preservePause && module.status === "paused") await pauseIn(context, tx, moduleId, { source: "chrona", reason: "版本切换保留原停用状态" });
   return module;

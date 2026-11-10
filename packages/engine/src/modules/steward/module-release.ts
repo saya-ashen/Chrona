@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
-import { dirname, join, sep } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 import { BUILTIN_MODULE_NAMES, OFFICIAL_EXTERNAL_MODULE_NAMES, moduleManifestSchema, type ModuleManifest } from "@chrona/contracts/steward";
 import { z } from "zod";
 import { verifyModuleGitBundle } from "./module-git-upstream";
 import type { StewardPorts } from "./ports";
 import { readModuleFiles } from "./module-preview";
+import { moduleSourceFiles, snapshotModuleMaterial } from "./module-artifacts";
+import { openModuleDirectory, type ModuleFile } from "./module-files";
+import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES } from "../../../../contracts/src/steward/module-material";
 import { StewardError } from "./errors";
 import { assertModuleAvailable } from "./module-availability";
 
@@ -26,10 +29,22 @@ async function releaseDirectory(rootPath: string, name: string) {
   if (!stat.isDirectory() || stat.isSymbolicLink() || !(await realpath(codeDir)).startsWith(root + sep)) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release directory");
   return codeDir;
 }
-function verifyLegacyReleaseHash(files: { path: string; bytes: Buffer }[], expectedHash: string) {
+function verifyLegacyReleaseHash(files: ModuleFile[], expectedHash: string) {
   const digest = createHash("sha256");
   for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
   if (digest.digest("hex") !== expectedHash) throw new ModuleReleaseError("conflict", "release_drift", "Release contents differ from the registered hash");
+}
+/** Legacy releases retain their existing source representation and size policy. */
+export async function readReleaseMaterial(codeDir: string): Promise<ModuleFile[]> {
+  const directory = await openModuleDirectory(dirname(codeDir), basename(codeDir));
+  try {
+    try { await directory.read(MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return (await readModuleFiles(codeDir, "Unsafe release file")).sort((a, b) => a.path.localeCompare(b.path));
+    }
+    return snapshotModuleMaterial(dirname(codeDir), basename(codeDir));
+  } finally { await directory.close(); }
 }
 /** Host-configured resources only. Neither a manifest nor a routed request can supply the root. */
 async function resolveRelease(rootPath: string | undefined, name: string, origin: ModuleRelease["origin"], expectedHash?: string): Promise<ModuleRelease> {
@@ -39,10 +54,10 @@ async function resolveRelease(rootPath: string | undefined, name: string, origin
   if (!rootPath) throw new ModuleReleaseError("not_found", "release_not_found", `${origin} release resources are not configured`);
   try {
     const codeDir = await releaseDirectory(rootPath, name);
-    const files = (await readModuleFiles(codeDir, "Unsafe release file")).sort((a, b) => a.path.localeCompare(b.path));
+    const files = await readReleaseMaterial(codeDir);
     const file = files.find(file => file.path === "module.json");
     if (!file) throw new ModuleReleaseError("invalid", "invalid_release", "Release manifest missing");
-    const manifest = releaseManifest(file.bytes, name);
+    const manifest = releaseManifest(Buffer.from(file.bytes), name);
     // Legacy hashes remain approval identities; new releases use their authentic Git commit.
     if (expectedHash && /^[a-f0-9]{64}$/.test(expectedHash)) {
       verifyLegacyReleaseHash(files, expectedHash);
@@ -72,7 +87,8 @@ async function regularResource(root: string, path: string) {
   if (!stat.isFile() || stat.isSymbolicLink() || !(await realpath(path)).startsWith(root + sep)) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release Git resource");
   return readFile(path);
 }
-async function releaseGit(rootPath: string, name: string, files: { path: string; bytes: Buffer }[]): Promise<ModuleReleaseGit> {
+async function releaseGit(rootPath: string, name: string, material: ModuleFile[]): Promise<ModuleReleaseGit> {
+  const files = moduleSourceFiles(material);
   const parent = dirname(await realpath(rootPath)), seedPath = join(parent, "module-git");
   const stat = await lstat(seedPath);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new ModuleReleaseError("forbidden", "invalid_release", "Unsafe release Git directory");
@@ -88,6 +104,6 @@ async function releaseGit(rootPath: string, name: string, files: { path: string;
   const bundlePath = join(seedRoot, entry.bundle), bundle = await regularResource(seedRoot, bundlePath);
   if (createHash("sha256").update(bundle).digest("hex") !== entry.bundleSha256) throw new ModuleReleaseError("conflict", "release_drift", "Release Git bundle integrity mismatch");
   const revision = await verifyModuleGitBundle({ bundlePath, commit: entry.commit, branch: entry.branch, repository: entry.repository });
-  if (files.length !== revision.files.length || files.some((file, index) => file.path !== revision.files[index]?.path || !file.bytes.equals(Buffer.from(revision.files[index]!.bytes)))) throw new ModuleReleaseError("conflict", "release_drift", "Release source differs from pinned Git commit");
+  if (files.length !== revision.files.length || files.some((file, index) => file.path !== revision.files[index]?.path || !Buffer.from(file.bytes).equals(revision.files[index]!.bytes) || !!file.executable !== !!revision.files[index]!.executable)) throw new ModuleReleaseError("conflict", "release_drift", "Release source differs from pinned Git commit");
   return { repository: entry.repository, branch: entry.branch, commit: entry.commit, bundlePath };
 }

@@ -5,6 +5,7 @@ import { pageErrors } from "./pages";
 import { systemCall } from "./src/system/adapter";
 import { checkAttachments } from "./test-attachments";
 import { checkRasterContent } from "./test-content";
+import { checkExecutableComponents } from "./test-executable";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255]);
 // @ts-expect-error Chrona supplies the test kernel at run time.
 import { startModule } from "chrona/testing";
@@ -53,7 +54,7 @@ const module = await startModule("index.ts", { stubs: Object.fromEntries([
   stub("modules.list", () => inventoryFailure ? null : inventory),
   stub("modules.rollback", () => ({ status: "pending_approval", approvalId: "rollback-1" })),
   stub("planning.get", () => ({ plan: 1 })),
-  stub("settings.get", () => ({ timezone: "UTC", moduleModel: null, modelUsage: [] })), stub("notify.settings", () => ({ settings: {} })),
+  stub("settings.get", () => ({ timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] })), stub("notify.settings", () => ({ settings: {} })),
   stub("secrets.list", () => [{ name: "okx_demo", configured: false, updatedAt: null, modules: ["okx-ai-trader"] }]), stub("secrets.set", args => ({ name: args.name, configured: true })), stub("secrets.remove", args => ({ name: args.name, configured: false })), stub("secrets.authorize", () => ({ url: "https://accounts.example/auth", redirectUri: "https://chrona.example/oauth/callback", expiresAt: "2026-11-02T04:00:00Z" })),
   stub("settings.update", args => args), stub("agent.configure", () => ({ config: null, ready: false })),
   stub("files.read-image", args => {
@@ -186,7 +187,7 @@ try {
     assert.equal(module.calls.slice(before).some((call: { method: string; params: Args }) => call.method === "call" && call.params.target === target), false);
   }
   // Global Settings governs kernel budgets only; applications save through their own pages.
-  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { timezone: "UTC", moduleModel: null, modelUsage: [] } });
+  assert.deepEqual(await (await get("/api/web/settings")).json(), { settings: { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] } });
   const beforeOwnSettings = calls.length;
   for (const body of [{ memory: { provider: "memory-local", autoRecall: false, autoRetain: false } }, { agent: { clear: true } }, { notifications: { dailyCap: 3 } }]) {
     assert.equal((await post("/api/web/settings", body)).status, 400);
@@ -303,6 +304,7 @@ try {
   Object.assign(inventory[1]!, { id: "planning-reinstalled", status: "active" });
   assert.equal((await get("/api/web/pages/planning/main")).status, 404);
   assert.ok(!(await (await get("/api/web/pages")).json()).some((item: { module: string }) => item.module === "planning"));
+  await checkExecutableComponents(tool, get, post, files, inventory[0]!);
   await tool("page-remove", { id: "images" }, files);
   assert.match(JSON.stringify(await tool("pages", {}, files)), /"id":"main"/);
   assert.match(JSON.stringify(await tool("page-remove", { id: "main" }, files)), /"removed":true/);

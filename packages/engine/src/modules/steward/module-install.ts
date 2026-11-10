@@ -1,18 +1,19 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@chrona/db";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import { recordModuleUpstream, submitMergedCommit } from "./module-upstream";
 import { moduleContext } from "./module-context";
 import { verifyModuleGitBundle } from "./module-git-upstream";
 import { propose } from "./module-proposal";
-import { readModuleFiles } from "./module-preview";
+import { moduleSourceFiles, storeModuleArtifacts } from "./module-artifacts";
+import { checkoutModule } from "./module-files";
 import { moduleInstallRequestSchema, moduleInstallResultSchema, OFFICIAL_EXTERNAL_MODULE_NAMES, type ModuleInstallRequest, type ModuleInstallResult } from "@chrona/contracts/steward";
 import type { StewardPorts } from "./ports";
 import type { ExternalModuleInstaller } from "./module-install-types";
-import { resolveExternalRelease, type ModuleRelease } from "./module-release";
+import { readReleaseMaterial, resolveExternalRelease, type ModuleRelease } from "./module-release";
 import { assertExternalName } from "./module-identity";
 import { parseInput, StewardError } from "./errors";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
@@ -35,8 +36,8 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
     const { id, marker, submission } = await prepareSubmission(ports, workspaceId, request, release.hash);
     const root = await realpath(await mkdtemp(join(tmpdir(), "chrona-install-")));
     try {
-      await copyRelease(trusted, root, request.package);
       const context = moduleContext(ports, workspaceId), intent = { changes: [marker], preserves: [] };
+      await copyRelease(trusted, root, request.package, context.platform);
       const prepared = async (commit: string) => {
         submission.hash = commit;
         submission.existingVersionId = submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: submission.moduleId, hash: commit } } }))?.id ?? null : null;
@@ -84,18 +85,13 @@ async function prepareSubmission(ports: StewardPorts, workspaceId: string, reque
   await ports.db.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "module_installation_submission", subjectId: module?.id ?? null, details: submission, createdAt: ports.now() } });
   return { id, marker, submission };
 }
-async function copyRelease(trusted: Awaited<ReturnType<typeof resolveExternalRelease>>, root: string, name: string) {
-  const files = (await readModuleFiles(trusted.codeDir, "Unsafe official release file")).sort((a, b) => a.path.localeCompare(b.path));
+async function copyRelease(trusted: Awaited<ReturnType<typeof resolveExternalRelease>>, root: string, name: string, platform: string) {
+  const files = await readReleaseMaterial(trusted.codeDir), source = moduleSourceFiles(files);
   if (!trusted.git) throw new StewardError("invalid", "Official installation requires Git provenance");
   const revision = await verifyModuleGitBundle(trusted.git);
-  if (files.length !== revision.files.length || files.some((file, index) => file.path !== revision.files[index]?.path || !file.bytes.equals(Buffer.from(revision.files[index]!.bytes)))) throw new StewardError("conflict", "External release changed while copying");
-  const target = join(root, name);
-  await mkdir(target);
-  for (const file of files) {
-    const path = join(target, file.path);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, file.bytes, { mode: 0o600 });
-  }
+  if (source.length !== revision.files.length || source.some((file, index) => file.path !== revision.files[index]?.path || !Buffer.from(file.bytes).equals(revision.files[index]!.bytes) || !!file.executable !== !!revision.files[index]!.executable)) throw new StewardError("conflict", "External release changed while copying");
+  await storeModuleArtifacts(platform, files);
+  await checkoutModule(root, name, files);
 }
 async function installationFacts(ports: StewardPorts, workspaceId: string, result: ModuleInstallResult): Promise<ModuleInstallResult> {
   if (!result.moduleId || !result.hash) return result;

@@ -44,7 +44,8 @@ export function createTools(ports: StewardPorts) {
     });
     if (!claim) throw new StewardError("forbidden", "Chrona tool call limit reached");
     const { workspaceId, run, index } = claim;
-    const deadline = Math.min(now().getTime() + timeoutSeconds * 1000, run.deadlineAt!.getTime());
+    const waitUntil = now().getTime() + timeoutSeconds * 1000;
+    const deadline = run.deadlineAt ? Math.min(waitUntil, run.deadlineAt.getTime()) : waitUntil;
     let ok = false;
     try {
       const context = await contextRunTools(ports, run);

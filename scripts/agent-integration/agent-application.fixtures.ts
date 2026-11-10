@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, writeFile, rm, cp } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { assembleAgentDependencies } from "../../build/agent-dependencies";
 import { testDb } from "../../packages/engine/src/modules/steward/test-db";
 import { createScriptSandbox } from "../../packages/integrations/src/steward/script-sandbox";
 import { seedTestModuleRelease } from "../../packages/engine/src/modules/steward/module-release-test-fixture";
@@ -12,12 +13,21 @@ import { buildAgentApplication } from "../../packages/engine/src/modules/steward
 import type { StewardPorts } from "../../packages/engine/src/modules/steward/ports";
 import "../../packages/engine/src/modules/steward/module-effects";
 
+/** Assemble and install the release's real file:vendor closure, without registry access or scripts. */
+export async function installAgentFixtureDependencies(agentDir: string) {
+  await assembleAgentDependencies(agentDir);
+  const child = Bun.spawn([process.execPath, "install", "--offline", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], { cwd: agentDir, stdout: "pipe", stderr: "pipe" });
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  if (code !== 0) throw new Error(`Offline Agent fixture install failed (${code}):\n${stdout}\n${stderr}`);
+}
+
 export async function agentFixture() {
   const root = await mkdtemp("/tmp/chrona-agent-app-"), dataDir = join(root, "data"), resources = join(root, "builtin");
   await mkdir(dataDir); await mkdir(resources);
   await cp(resolve(import.meta.dir, "../../packages/engine/src/modules/steward/builtin/agent"), join(resources, "agent"), { recursive: true });
   // Build only the temporary release so the fake and gateway exercise the same current contract.
   await buildAgentApplication(join(resources, "agent"));
+  await installAgentFixtureDependencies(join(resources, "agent"));
   await seedTestModuleRelease(resources, "agent");
   const cwd = join(root, "work"), profile = join(root, "profile"); await mkdir(cwd); await mkdir(profile, { mode: 0o700 });
   const command = join(root, "pi"), extension = join(root, "extension.ts");

@@ -49,6 +49,7 @@ export const buildArtifacts = {
     { from: "packages/integrations/src/steward/module-sdk/process.ts", to: "resources/module-sdk/process.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/windows-transport.ts", to: "resources/module-sdk/windows-transport.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/testing.ts", to: "resources/module-sdk/testing.ts", required: true },
+    { from: "packages/integrations/src/steward/module-sdk/module-entry.ts", to: "resources/module-sdk/module-entry.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/preview.ts", to: "resources/module-sdk/preview.ts", required: true },
     { from: "packages/integrations/src/steward/module-sdk/build-contract.md", to: "resources/module-sdk/build-contract.md", required: true },
     { from: "packages/integrations/src/steward/module-sdk/group-build-contract.md", to: "resources/module-sdk/group-build-contract.md", required: true },

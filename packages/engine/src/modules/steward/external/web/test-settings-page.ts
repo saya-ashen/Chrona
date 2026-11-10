@@ -28,13 +28,14 @@ export function checkSettingsSpec() {
   assert.match(settingsUnavailable([], app), /尚未登记/);
   assert.equal(settingsPageForApp(pages, { ...app, activeHash: "" }), undefined);
   const caps = { maxCallsPerEvent: 3, maxOutputTokens: 4000, dailyCalls: 30, eventTimeoutMs: 120000, moduleDailyCalls: { example: 0 } };
-  const state = { settingsView: { settings: { timezone: "UTC", moduleModel: caps, modelUsage: [{ module: "example", calls: 0, inputTokens: 4, outputTokens: 8 }],
+  const state = { settingsView: { settings: { timezone: "UTC", runTimeoutMinutes: null, moduleModel: caps, modelUsage: [{ module: "example", calls: 0, inputTokens: 4, outputTokens: 8 }],
     // Stale application projections must not restore application forms.
     memory: { provider: "memory-local" }, notifications: { dailyCap: 5 } }, agent: { ready: true }, preferences: [{ id: "p", text: "旧偏好" }] }, apps: [app], pages };
   const spec = settingsSpec(state), nodes = Object.values(spec.elements), text = JSON.stringify(spec);
   assert.deepEqual(nodes.filter(node => node.type === "Card").map(node => node.props.title), ["内核", "应用设置"]);
   assert.ok(nodes.some(node => node.type === "Link" && node.props.href === "/apps/app%2F1?tab=settings"));
   assert.match(text, /上限 0/);
+  assert.deepEqual(nodes.find(node => node.type === "RunTimeoutSettings")!.props, { settings: { timezone: "UTC", runTimeoutMinutes: null } });
   assert.deepEqual(nodes.filter(node => ["NotificationSettings", "ModuleModelSettings"].includes(node.type)).map(node => node.props.section), ["budget", "caps"]);
   for (const removed of ["Agent", "通知设置", "旧偏好", "preference-forget", "autoRecall", "memory-local"]) assert.ok(!text.includes(removed), removed);
   assert.match(JSON.stringify(settingsSpec({ ...state, pages: [] })), /尚未登记/);

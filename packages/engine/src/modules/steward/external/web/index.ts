@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createPages, type Caller, type ModuleState, type PageTool } from "./pages";
 import { todayView } from "./today";
 import { createAgentConversations, isAgentConversation } from "./agent-conversations";
+import { readDeliveryPages } from "./delivery";
 import { memoryView, memoryForget } from "./memory";
 import { settingsView, updateSettings, webSettings, webPreferences, WEB_SETTINGS_PAGE } from "./settings";
 import { createPreferences } from "./settings-store";
@@ -18,7 +19,7 @@ type UserTool = { target: string; moduleId?: string; contractHash?: string; inpu
 type TargetPin = { moduleId: string; contractHash: string };
 const files: Record<string, string> = { "/app.js": "text/javascript; charset=utf-8", "/pages.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8" };
 const headers = { "cache-control": "no-cache", "x-content-type-options": "nosniff", "referrer-policy": "same-origin",
-  "content-security-policy": "default-src 'self'; img-src 'self' blob: data:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
+  "content-security-policy": "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" };
 const preferences = createPreferences(chrona.paths.data);
 const call = (target: string, args: Args = {}) => target === "web.settings" ? preferences.tool(args) : chrona.call(target, Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)));
 const ownSettings = new Map<string, (args: Args) => Promise<unknown>>([
@@ -38,7 +39,7 @@ function send(chunk: string) {
   for (const stream of streams) try { stream.enqueue(encoder.encode(chunk)); } catch { streams.delete(stream); }
 }
 const attachments = createAttachments(chrona.paths.content);
-const conversations = createAgentConversations({ dataDir: chrona.paths.data, call, reply: event => send(`data: ${JSON.stringify({ type: "reply", ...event })}\n\n`) });
+const conversations = createAgentConversations({ dataDir: chrona.paths.data, call, deliveryPages: () => readDeliveryPages(pages), reply: event => send(`data: ${JSON.stringify({ type: "reply", ...event })}\n\n`) });
 let polling = false;
 setInterval(() => {
   if (polling) return;
@@ -153,7 +154,11 @@ async function moduleRoute({ request, path, body }: ApiContext): Promise<ApiResu
   if (path[0] !== "modules" || path.length !== 3 || !Object.hasOwn(MODULE_ROUTES, route)) return NO_ROUTE;
   return MODULE_ROUTES[route]!(path[1]!, body);
 }
-async function pageRoute({ request, path }: ApiContext): Promise<ApiResult> {
+async function pageRoute({ request, path, url }: ApiContext): Promise<ApiResult> {
+  if (request.method === "GET" && path[0] === "components" && path.length === 3) {
+    const component = await pages.component(path[1]!, path[2]!, url.searchParams.get("revision"));
+    return Response.json(component, { headers: { "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+  }
   if (request.method !== "GET" || path[0] !== "pages" || path.length !== 3) return NO_ROUTE;
   const page = await pages.get(path[1]!, path[2]!);
   if (!page) throw Object.assign(new Error("没有这个页面"), { code: "not_found" });
@@ -283,7 +288,8 @@ async function apiResponse(request: Request, path: string[]) {
   }
   try {
     if (request.method === "POST" && parts === "attachments") return Response.json(await attachments.upload(await attachmentBody(request)));
-    return Response.json(await api(request, path) ?? null);
+    const result = await api(request, path);
+    return result instanceof Response ? result : Response.json(result ?? null);
   }
   catch (error) { return apiError(error); }
 }

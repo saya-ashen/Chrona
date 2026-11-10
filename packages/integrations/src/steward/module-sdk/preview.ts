@@ -15,7 +15,7 @@ process.env.CHRONA_MODULE = root;
 process.env.CHRONA_DATA = await mkdtemp(join(tmpdir(), "preview-data-"));
 process.env.CHRONA_CONTENT = await mkdtemp(join(tmpdir(), "preview-content-"));
 process.chdir(root);
-const manifest = JSON.parse(await readFile("module.json", "utf8")) as { entry: string };
+const manifest = JSON.parse(await readFile("module.json", "utf8")) as { entry: Parameters<typeof startModule>[0] };
 // After the environment is set: testing.ts reads it when loaded.
 const { startModule } = await import("./testing");
 const module = await startModule(manifest.entry, { stubs: Object.fromEntries(Object.entries(fixtures).map(([target, output]) => [target, () => output])) });

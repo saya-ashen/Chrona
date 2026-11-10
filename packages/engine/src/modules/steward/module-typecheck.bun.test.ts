@@ -346,3 +346,17 @@ process.kill(process.ppid, "SIGKILL"); process.exit(0);
   if (helper === "run-tests") expect(existsSync(join(owned, "../content"))).toBe(true);
   else expect(existsSync(join(owned, "calls.json"))).toBe(true);
 });
+
+test.each([{ path: "bin/program" }, { path: "main.custom", runtime: "python3", args: ["-u"] }])("generated checker skips object entries (%j)", async entry => {
+  const f = await fixture(), receipt = join(f.dir, "checker-ran");
+  const checker = join(f.dir, "checker.ts");
+  await writeFile(checker, `await Bun.write(${JSON.stringify(receipt)}, "ran"); process.exit(9);`);
+  const registry: ModuleRuntimes = { version: 1, runtimes: [{ extensions: [".custom"], programs: { default: [process.execPath] }, argv: [],
+    check: { programs: { default: [process.execPath] }, argv: [checker] } }] };
+  await writeBuildHelpers(f.dir, f.ports.moduleSdk!, { calls: {}, typecheck: f.ports.moduleTypecheck!, runtimes: registry });
+  await writeFile(join(f.dir, "module.json"), JSON.stringify({ entry }));
+  const result = await runHelper(f.dir, "typecheck", f.dir);
+  expect(result).toMatchObject({ code: 0, stderr: "" });
+  expect(JSON.parse(result.stdout)).toEqual({ status: "skipped", reason: "runtime has no declared check" });
+  expect(existsSync(receipt)).toBe(false);
+});

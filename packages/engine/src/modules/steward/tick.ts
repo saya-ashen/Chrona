@@ -28,8 +28,16 @@ function closedInput(run: ClaimedRun, sessionId: string | null) {
   if (run.session?.source === "build") return { ...base, searchTools: true, prompt: `${run.prompt}\n\n${BUILD_REFERENCE_PROMPT}`, extraTools: BUILD_MODULE_TOOLS };
   return null;
 }
-function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnType<typeof createProviderChannel>, handle: ReturnType<ProviderAdapter["start"]>, execution: boolean) {
-  const runs = createRuns(ports, run.workspaceId);
+type PendingFinalization = { run: ClaimedRun; outcome: Awaited<ReturnType<ProviderAdapter["start"]>["done"]>; stopEvidence?: "provider_exited" };
+async function finishProvider(ports: StewardPorts, pending: Map<string, PendingFinalization>, entry: PendingFinalization) {
+  const { run, outcome, stopEvidence } = entry;
+  try { await createRuns(ports, run.workspaceId).finish(run.id, outcome, { stopEvidence }); }
+  catch {
+    pending.set(run.id, entry);
+    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(() => {});
+  }
+}
+function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnType<typeof createProviderChannel>, handle: ReturnType<ProviderAdapter["start"]>, { pending, execution }: { pending: Map<string, PendingFinalization>; execution: boolean }) {
   // Only the actual Provider handle proves process exit; the start gate may resolve before launch.
   return handle.done.then(async outcome => {
     try { await channel.close(); }
@@ -41,11 +49,11 @@ function finalizeProvider(ports: StewardPorts, run: ClaimedRun, channel: ReturnT
         await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "execution_capture_failed", subjectId: run.id, details: {} }).catch(() => {});
       }
     }
-    await runs.finish(run.id, outcome, { stopEvidence: "provider_exited" });
+    await finishProvider(ports, pending, { run, outcome, stopEvidence: "provider_exited" });
   }, async () => {
-    try { await channel.close(); } finally { await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Provider completion failed" }); }
+    try { await channel.close(); } finally { await finishProvider(ports, pending, { run, outcome: { outcome: "failed", sessionId: null, error: "Provider completion failed" } }); }
   }).catch(async () => {
-    try { await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }); } catch { /* Lease expiry is the recovery path. */ }
+    await audit(ports.db, { workspaceId: run.workspaceId, actor: "chrona", kind: "run_finalize_failed", subjectId: run.id, details: {} }).catch(() => {});
   });
 }
 async function claimApplicationRuns(ports: StewardPorts, workspaceId: string, now: Date) {
@@ -60,6 +68,7 @@ function startBuild(ports: StewardPorts, builds: Map<string, Promise<void>>, bui
 export function createTick(ports: StewardPorts) {
   const builds = new Map<string, Promise<void>>(), buildFailures = new Map<string, unknown>();
   const finalizers = new Set<Promise<unknown>>();
+  const pendingFinalizations = new Map<string, PendingFinalization>();
   async function tick(now = ports.now()) {
     const failures: { workspaceId: string; stage: string; error: unknown }[] = [...buildFailures].map(([workspaceId, error]) => ({ workspaceId, stage: "modules", error }));
     buildFailures.clear();
@@ -97,7 +106,7 @@ export function createTick(ports: StewardPorts) {
               handle = await startLocalProvider(ports, workspaceId, { ...input, events: channel.events });
             } catch (error) { await channel.close(); throw error; }
             gate.attach(handle);
-            const finalized = finalizeProvider(ports, run, channel, handle, !!execution);
+            const finalized = finalizeProvider(ports, run, channel, handle, { pending: pendingFinalizations, execution: !!execution });
             finalizers.add(finalized);
             void finalized.finally(() => finalizers.delete(finalized));
             if (gate.stopped()) await handle.abort();
@@ -125,6 +134,13 @@ export function createTick(ports: StewardPorts) {
         ["modules", async () => { await createModules(ports, workspaceId).recoverMigrations(now); startBuild(ports, builds, buildFailures, workspaceId, now); }],
         ["schedules", async () => {
           void drainSchedules(ports, workspaceId, now).catch(error => { buildFailures.set(workspaceId, error); });
+        }],
+        ["finalize", async () => {
+          // Retry only persistence, even for unlimited Runs; close/capture already ran once.
+          for (const entry of [...pendingFinalizations.values()]) if (entry.run.workspaceId === workspaceId) {
+            pendingFinalizations.delete(entry.run.id);
+            await finishProvider(ports, pendingFinalizations, entry);
+          }
         }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); }],
         // Routed async calls (notifications among them) are delivered beside the tick.

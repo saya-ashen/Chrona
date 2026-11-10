@@ -20,7 +20,7 @@ export function hasLiveProviderInteraction(ports: StewardPorts, workspaceId: str
   return !!entry && entry.db === ports.db && entry.workspaceId === workspaceId && entry.runId === runId && !entry.closed && !entry.claimed && Date.parse(entry.request.expiresAt) > ports.now().getTime() && liveRuns.has(runId);
 }
 const alreadyClosed = (entry: Pending) => entry.closed;
-type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; deadlineAt: Date; token?: string };
+type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; deadlineAt: Date | null; token?: string };
 
 /** Technical event journal only: no raw RPC, answer body, new permission grant or replayable authorization. */
 export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onInteraction?: (request: ProviderInteraction) => Promise<void>, guard?: ProviderWriteGuard) {
@@ -43,7 +43,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
     const input = parseInput(providerQuestionSchema, raw);
     const safe = safeProviderQuestion(input, [run.token ?? ""]);
     if (!safe) throw new StewardError("invalid", "Sensitive request context cannot be approved here");
-    const at = now(), expires = new Date(Math.min(run.deadlineAt.getTime(), at.getTime() + input.timeoutMs));
+    const at = now(), expires = new Date(run.deadlineAt ? Math.min(run.deadlineAt.getTime(), at.getTime() + input.timeoutMs) : at.getTime() + input.timeoutMs);
     if (expires <= at) throw new StewardError("conflict", "Provider interaction expired");
     const request = providerInteractionSchema.parse({ id: randomUUID(), runId: run.id, sessionId: run.sessionId, question: safe, createdAt: at.toISOString(), expiresAt: expires.toISOString(), status: "pending" });
     let resolve!: (value: ProviderAnswer) => void;

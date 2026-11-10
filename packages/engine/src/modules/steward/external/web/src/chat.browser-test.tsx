@@ -1,7 +1,7 @@
 // Offline entry-chat fixture; only transport and durable service responses are doubled.
 import { mountSystem } from "./pages";
 import type { ReplyEvent, SystemHost } from "./system/adapter";
-import type { Execution, Message } from "./system/chat";
+import type { ApplicationDelivery, Execution, Message } from "./system/chat";
 
 type Args = Record<string, unknown>;
 type Request = { id: string; runId: string; requestKey: string };
@@ -289,5 +289,47 @@ async function reconcileOrdinaryAfterReload() {
   await layout("reconciled ordinary admission");
   return [...checks];
 }
+const deliveryFixture = (): ApplicationDelivery => ({
+  receipt: { receiptId: "saved-music-receipt", admissionId: "admission-music", requestKey: "submit-music", submitter: { moduleId: "author-id", hash: "a".repeat(40) }, state: "submitted", approvalId: null,
+    members: [{ name: "music", moduleId: "music-id", hash: "b".repeat(40), status: "building", versionId: "version-music", expectedActiveHash: null, materialDigest: "c".repeat(64), selected: true }] },
+  receiptCheck: "unknown", targets: [{ name: "music", moduleId: "music-id", hash: "b".repeat(40), activation: "unknown", health: "unknown", pages: [], pagesCheck: "unknown" }], browser: "unknown",
+});
+async function deliveryAfterTimeout() {
+  state = initial();
+  state.execution = { runId: sourceRun, status: "timed_out", active: false, canContinue: true, reason: "本次处理超时，尚未完成。", applicationDelivery: [deliveryFixture()] };
+  state.messages.push({ id: "delivery-reply", direction: "out", text: "", execution: structuredClone(state.execution) });
+  save(); open(); await settled();
+  assert(has("saved-music-receipt") && has("回执核对：未知") && has("激活状态：未知") && has("浏览器验证：未知"), "timeout shows saved receipt with unknown proof stages");
+  assert(has("本次处理超时，尚未完成") && !!button("继续处理") && !state.requests.length, "delivery never promotes timeout or continues automatically");
+  state.messages.push(...Array.from({ length: 24 }, (_, index) => ({ id: `scroll-${index}`, direction: "in", text: `历史消息 ${index}` })));
+  save(); await poll(); await until(() => has("历史消息 23"), "long transcript loaded");
+  const pane = element.querySelector<HTMLElement>('[aria-label="消息"]')!;
+  pane.style.maxHeight = "200px"; pane.style.overflowY = "auto";
+  await frame(); pane.scrollTop = 0; pane.dispatchEvent(new Event("scroll")); await frame();
+  assert(pane.scrollHeight > pane.clientHeight, "history fixture has a scrollable transcript");
+  await poll(); await frame();
+  assert(pane.scrollTop === 0, "unchanged delivery polls preserve reading position");
+  // Delivery belongs to an older reply while the latest Run stays identical. Drop SSE.
+  state.execution = { runId: nextRun, status: "running", active: true, canContinue: false }; save(); await poll();
+  const receipt = state.messages[1]!.execution!.applicationDelivery![0]!;
+  receipt.receiptCheck = "current";
+  receipt.targets[0] = { ...receipt.targets[0]!, activation: "active", health: "observed", pagesCheck: "current", pages: [{ id: "home", title: "打开音乐", href: "/p/music/home" }] };
+  save(); await poll();
+  await until(() => has("此版本已激活") && !!element.querySelector('a[href="/p/music/home"]'), "delivery update without SSE");
+  assert(pane.scrollTop === 0, "late delivery updates preserve reading position");
+  assert(has("已观察到运行状态") && has("不代表业务成功") && has("浏览器验证：未知"), "observed activation and health retain unknown browser acceptance");
+  assert(state.requests.length === 0 && state.createdRuns.length === 0 && state.messages[1]!.execution!.status === "timed_out", "read-only delivery polling preserves timeout and never starts a Run");
+  await layout("late delivery");
+  return [...checks];
+}
+async function deliveryAfterReload() {
+  await settled();
+  assert(has("saved-music-receipt") && has("本次处理超时，尚未完成") && !!element.querySelector('a[href="/p/music/home"]'), "reload reconstructs exact delivery independently of the current Run");
+  const target = state.messages[1]!.execution!.applicationDelivery![0]!.targets[0]!;
+  target.activation = "different"; target.health = "unknown"; target.pages = []; target.pagesCheck = "unknown"; save(); await poll();
+  await until(() => has("当前激活的是其他版本") && !element.querySelector('a[href="/p/music/home"]'), "mismatched hash removes delivery link");
+  assert(has("页面核对：未知") && has("浏览器验证：未知"), "mismatched active hash retains unknown page and browser proof");
+  await layout("changed delivery hash"); return [...checks];
+}
 open();
-Object.assign(window, { chatBrowserTest: { failureAndStates, afterFailureReload, loseContinue, reconcileAfterReload, loseOrdinaryMessage, reconcileOrdinaryAfterReload } });
+Object.assign(window, { chatBrowserTest: { failureAndStates, afterFailureReload, loseContinue, reconcileAfterReload, loseOrdinaryMessage, reconcileOrdinaryAfterReload, deliveryAfterTimeout, deliveryAfterReload } });

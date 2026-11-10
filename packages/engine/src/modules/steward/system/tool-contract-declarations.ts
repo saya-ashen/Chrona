@@ -55,7 +55,7 @@ export const publicSystemTools = {
       { name: text(), provider: text("google | microsoft"), account: text("Optional account key") }, ["name", "provider"], { idempotent: true, output: z.lazy(() => outputs.secretTokenOutput) }),
   ]),
   settings: declaredSystemTools("settings", [
-    tool("get", "Model budgets, usage and governance timezone.", {}, [], { idempotent: true, output: z.lazy(() => kernelSettingsSchema) }),
-    tool("update", "Update model budgets or governance timezone.", { settings: text('JSON {"timezone"?: IANA timezone, "moduleModel"?: {maxCallsPerEvent,maxOutputTokens,dailyCalls,eventTimeoutMs,moduleDailyCalls?} | null}') }, ["settings"], { visibility: ["owner"], idempotent: true, output: z.lazy(() => kernelSettingsSchema) }),
+    tool("get", "Model budgets, optional task timeout, usage and governance timezone.", {}, [], { idempotent: true, output: z.lazy(() => kernelSettingsSchema) }),
+    tool("update", "Update model budgets, optional task timeout or governance timezone.", { settings: text('JSON {"timezone"?: IANA timezone, "runTimeoutMinutes"?: integer 1..525600 | null (null clears the ordinary task time limit), "moduleModel"?: {maxCallsPerEvent,maxOutputTokens,dailyCalls,eventTimeoutMs,moduleDailyCalls?} | null}') }, ["settings"], { visibility: ["owner"], idempotent: true, output: z.lazy(() => kernelSettingsSchema) }),
   ]),
 };

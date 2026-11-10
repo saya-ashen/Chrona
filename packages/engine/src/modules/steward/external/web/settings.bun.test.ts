@@ -7,7 +7,7 @@ import { createPreferences } from "./settings-store";
 import { pageErrors } from "./pages";
 
 type Args = Record<string, unknown>;
-const kernel = { timezone: "UTC", moduleModel: null, modelUsage: [] };
+const kernel = { timezone: "UTC", runTimeoutMinutes: null, moduleModel: null, modelUsage: [] };
 function fixture() {
   const calls: [string, Args][] = [];
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
@@ -36,6 +36,17 @@ test("global saves only supplied kernel settings and empty input is read-only", 
   f.calls.length = 0;
   await updateSettings(f.call, {});
   expect(f.calls).toEqual([["settings.get", {}]]);
+});
+test.each([null, 1, 45, 525600])("global settings forwards explicit task timeout %j without changing other settings", async runTimeoutMinutes => {
+  const f = fixture();
+  const call = async (target: string, args?: Args) => target === "settings.get" ? { ...kernel, runTimeoutMinutes } : f.call(target, args);
+  expect(await updateSettings(call, { runTimeoutMinutes })).toEqual({ settings: { ...kernel, runTimeoutMinutes } });
+  expect(f.calls).toEqual([["settings.update", { settings: JSON.stringify({ runTimeoutMinutes }) }]]);
+});
+test.each([0, -1, 1.5, 525601, NaN, Infinity, "45", "", false, {}, [], undefined])("global settings rejects invalid task timeout %j before a write", async runTimeoutMinutes => {
+  const f = fixture();
+  await expect(updateSettings(f.call, { timezone: "UTC", runTimeoutMinutes })).rejects.toMatchObject({ code: "invalid" });
+  expect(f.calls).toEqual([]);
 });
 test("global settings rejects app fields before any write, even mixed with valid kernel fields", async () => {
   for (const body of [null, [], { agent: {} }, { notifications: {} }, { memory: {} }, { timezone: "UTC", agent: { clear: true } }, { timezone: 1 }, { moduleModel: [] }, { moduleModel: { models: {} } }, { sessions: {} }]) {

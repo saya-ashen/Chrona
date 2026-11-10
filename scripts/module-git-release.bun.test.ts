@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { expect, test } from "bun:test";
 import { buildArtifacts } from "../build/manifest";
-import { copyModuleGitRelease, prepareModuleGitRelease, verifyPublishedModuleGitRelease } from "./module-git-release";
+import { MODULE_MATERIAL_FILE, MODULE_SOURCE_MAX_BYTES, parseModuleMaterial, type ModuleMaterial } from "../packages/contracts/src/steward/module-material";
+import { copyModuleGitRelease, moduleGitReleaseSource, prepareModuleGitRelease, stageModuleGitLicense, verifyPublishedModuleGitRelease } from "./module-git-release";
 
 const base = { hostCommit: "a".repeat(40), hostTimestamp: "1735689600" };
 function git(dir: string, args: string[]) {
@@ -116,4 +118,123 @@ test.skipIf(process.platform === "win32")("public upstream verification never ma
     if (path === undefined) delete process.env.PATH; else process.env.PATH = path;
     await rm(f.root, { recursive: true, force: true });
   }
+}, 30_000);
+
+const webRoot = resolve(import.meta.dirname, "../packages/engine/src/modules/steward/external/web");
+const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+
+test("actual Web release preserves all source and verifies artifacts while Git contains source and record only", async () => {
+  const f = await fixture(), web = join(f.resourcesRoot, "external/web");
+  try {
+    await cp(webRoot, web, { recursive: true, filter: path => !path.split(/[\\/]/).some(part => ["node_modules", ".git", ".venv", ".chrona"].includes(part)) });
+    // A local checkout and installed dependencies are never part of release material.
+    for (const dir of [".git", "node_modules", ".venv", ".chrona"]) {
+      await mkdir(join(web, dir));
+      await writeFile(join(web, dir, "ignored"), "local state");
+    }
+    const record = parseModuleMaterial(JSON.parse(await readFile(join(web, MODULE_MATERIAL_FILE), "utf8")));
+    expect(record.artifacts.map(artifact => artifact.path)).toEqual(["pages.js", "style.css"]);
+    expect(record.source).toEqual(expect.arrayContaining(["build.ts", "bun.lock", "package.json", "src/pages.tsx", "src/pages.css", "src/base.css", "shell.css", "module.json"]));
+    expect(record.source.some(path => path.endsWith(".bun.test.ts"))).toBe(true);
+    expect(record.build.commands).toEqual(["bun run build.ts"]);
+    expect(record.build.toolchain).toMatch(/^Bun /);
+    expect(record.build.target).toBe("browser");
+    const selected = await moduleGitReleaseSource(web);
+    expect(selected.map(file => file.path)).toEqual([MODULE_MATERIAL_FILE, ...record.source].sort((a, b) => a.localeCompare(b)));
+    expect(selected.reduce((total, file) => total + file.bytes.byteLength, 0)).toBeLessThanOrEqual(MODULE_SOURCE_MAX_BYTES);
+    const lock = await prepareModuleGitRelease(f), entry = lock.modules.find(entry => entry.name === "web")!;
+    const clone = join(f.root, "web-clone");
+    git(f.root, ["clone", "--template=", "--branch", "main", join(f.seedDir, entry.bundle), clone]);
+    expect(git(clone, ["ls-tree", "-r", "--name-only", "HEAD"]).split("\n").sort()).toEqual(selected.map(file => file.path).sort());
+    for (const file of await moduleGitReleaseSource(web)) expect((await readFile(join(clone, file.path))).equals(file.bytes)).toBe(true);
+    for (const artifact of record.artifacts) {
+      expect(sha256(await readFile(join(web, artifact.path)))).toBe(artifact.sha256);
+      await expect(readFile(join(clone, artifact.path))).rejects.toThrow("ENOENT");
+    }
+    expect(await copyModuleGitRelease(f.seedDir, f.resourcesRoot)).toEqual(lock);
+    // Rebuild exported source with offline dependencies and no Chrona repository files.
+    execFileSync(process.execPath, ["install", "--offline", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], { cwd: clone, stdio: "pipe", timeout: 20_000 });
+    execFileSync(process.execPath, ["run", "build.ts"], { cwd: clone, stdio: "pipe", timeout: 20_000 });
+    const rebuilt = parseModuleMaterial(JSON.parse(await readFile(join(clone, MODULE_MATERIAL_FILE), "utf8")));
+    expect(rebuilt).toEqual(record);
+    for (const artifact of record.artifacts) expect(sha256(await readFile(join(clone, artifact.path)))).toBe(artifact.sha256);
+    const output = join(web, "pages.js"), original = await readFile(output);
+    const corrupt = Buffer.from(original); corrupt[corrupt.length - 1] = corrupt[corrupt.length - 1]! ^ 1;
+    await writeFile(output, corrupt);
+    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("artifact digest or executable mode mismatch");
+    await expect(prepareModuleGitRelease(f)).rejects.toThrow("artifact digest or executable mode mismatch");
+    await writeFile(output, original);
+    await writeFile(join(web, "src/unlisted.ts"), "// preserved input must be declared\n");
+    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("undeclared material");
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+}, 30_000);
+
+async function explicitFixture() {
+  const f = await fixture(), web = join(f.resourcesRoot, "external/web");
+  await stageModuleGitLicense(f.resourcesRoot, join(f.root, "LICENSE"), join(f.root, buildArtifacts.moduleGit.seedDir, "THIRD-PARTY-NOTICES.txt"));
+  const artifact = Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1, 0xab);
+  await writeFile(join(web, "runtime.bin"), artifact);
+  const record: ModuleMaterial = {
+    schema: 1, source: ["module.json", "index.ts", "LICENSE", "THIRD-PARTY-NOTICES.txt"],
+    artifacts: [{ path: "runtime.bin", sha256: sha256(artifact), executable: false }],
+    build: { commands: ["build-runtime"], toolchain: "fixture", target: "portable" },
+  };
+  await writeFile(join(web, MODULE_MATERIAL_FILE), JSON.stringify(record));
+  return { ...f, web, record };
+}
+
+test("explicit material verifies artifacts independently, limits source, and uses strict shared contracts", async () => {
+  const f = await explicitFixture(), recordPath = join(f.web, MODULE_MATERIAL_FILE);
+  try {
+    expect((await moduleGitReleaseSource(f.web)).map(file => file.path)).not.toContain("runtime.bin");
+    const invalidRecords = [
+      { ...f.record, extra: true },
+      { ...f.record, source: [...f.record.source, "index.ts"] },
+      { ...f.record, source: [...f.record.source, MODULE_MATERIAL_FILE] },
+      { ...f.record, source: [...f.record.source, "../outside"] },
+      { ...f.record, source: f.record.source.filter(path => path !== "module.json") },
+      { ...f.record, source: [...f.record.source, "runtime.bin"] },
+      { ...f.record, source: [...f.record.source, "index.ts/child"] },
+      { ...f.record, build: { ...f.record.build, extra: true } },
+      { ...f.record, artifacts: [{ ...f.record.artifacts[0], extra: true }] },
+    ];
+    for (const record of invalidRecords) {
+      await writeFile(recordPath, JSON.stringify(record));
+      await expect(moduleGitReleaseSource(f.web)).rejects.toThrow();
+    }
+    await writeFile(recordPath, JSON.stringify(f.record));
+    await writeFile(join(f.web, "index.ts"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES));
+    await expect(moduleGitReleaseSource(f.web)).rejects.toThrow("source file limits");
+    await writeFile(join(f.web, "index.ts"), "// restored\n");
+    await rm(join(f.web, "runtime.bin"));
+    await expect(moduleGitReleaseSource(f.web)).rejects.toThrow();
+    await writeFile(join(f.web, "runtime.bin"), Buffer.alloc(MODULE_SOURCE_MAX_BYTES + 1, 0xab));
+    await rm(join(f.web, "index.ts"));
+    await expect(moduleGitReleaseSource(f.web)).rejects.toThrow("Declared module source is missing");
+  } finally { await rm(f.root, { recursive: true, force: true }); }
+}, 30_000);
+
+test.skipIf(process.platform === "win32")("explicit source modes enter Git and artifact modes are checked; legacy Git remains unchanged", async () => {
+  const f = await explicitFixture();
+  try {
+    await chmod(join(f.web, "index.ts"), 0o755);
+    await chmod(join(f.web, "runtime.bin"), 0o755);
+    await expect(prepareModuleGitRelease(f)).rejects.toThrow("artifact digest or executable mode mismatch");
+    f.record.artifacts[0]!.executable = true;
+    await writeFile(join(f.web, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
+    const lock = await prepareModuleGitRelease(f), repo = join(f.seedDir, "repos/web.git");
+    expect(git(repo, ["ls-tree", "HEAD", "index.ts"])).toMatch(/^100755 blob /);
+    expect(await copyModuleGitRelease(f.seedDir, f.resourcesRoot)).toEqual(lock);
+    await chmod(join(f.web, "index.ts"), 0o644);
+    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("differs from packaged source");
+    await chmod(join(f.web, "index.ts"), 0o755);
+    await chmod(join(f.web, "runtime.bin"), 0o644);
+    await expect(copyModuleGitRelease(f.seedDir, f.resourcesRoot)).rejects.toThrow("artifact digest or executable mode mismatch");
+    await rm(join(f.web, MODULE_MATERIAL_FILE));
+    const legacy = await prepareModuleGitRelease(f);
+    expect(git(repo, ["ls-tree", "HEAD", "index.ts"])).toMatch(/^100644 blob /);
+    expect(git(repo, ["ls-tree", "HEAD", "runtime.bin"])).toMatch(/^100644 blob /);
+    // Legacy releases still include every file even when their total payload exceeds 1 MiB.
+    expect(await copyModuleGitRelease(f.seedDir, f.resourcesRoot)).toEqual(legacy);
+  } finally { await rm(f.root, { recursive: true, force: true }); }
 }, 30_000);

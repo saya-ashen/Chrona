@@ -104,3 +104,39 @@ ${mode === "unknown" ? "process.exit(0);" : ""}
     expect(() => process.kill(descendant, 0)).toThrow();
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 10_000);
+
+for (const mode of ["native", "interpreter"] as const) test.skipIf(process.platform !== "linux")(`copied SDK testing starts explicit ${mode} entries`, async () => {
+  const root = await mkdtemp("/tmp/chrona-sdk-explicit-release-");
+  try {
+    const { sdk, typecheck } = await releaseResources(root);
+    const codeDir = join(root, "app"), dataDir = join(root, "data");
+    await mkdir(join(codeDir, "dist"), { recursive: true }); await mkdir(dataDir);
+    await writeFile(join(codeDir, "module.json"), JSON.stringify({ effects: [], uses: [] }));
+    // An explicit interpreter owns its runtime integration: it loads the copied SDK directly.
+    await writeFile(join(codeDir, "dist/channel.js"), 'const { on } = await import(process.env.CHRONA_SDK + "/sdk.ts"); on("tool", () => ({ result: "explicit" }));');
+    if (mode === "native") await cp(process.execPath, join(codeDir, "dist/runner"));
+    const entry = mode === "native" ? { path: "dist/runner", args: ["--no-install", "dist/channel.js"] } : { path: "dist/channel.js", runtime: "bun", args: ["--no-install"] };
+    await writeFile(join(codeDir, "test.ts"), `import assert from "node:assert/strict";
+import { startModule } from "chrona/testing";
+const module = await startModule(${JSON.stringify(entry)});
+try {
+  const now = new Date().toISOString();
+  const reply = await module.send({ trigger: { kind: "tool", id: "probe", args: {}, firedAt: now }, now, params: {} });
+  assert.equal(reply.result?.result, "explicit");
+  console.log("verified");
+} finally { await module.stop(); }
+`);
+    const sandbox = createScriptSandbox({ dataDir, moduleSdk: sdk, moduleTypecheck: typecheck });
+    expect(await sandbox.runModule({ codeDir, dataDir, entry: "test.ts", input: {} })).toMatchObject({ status: "succeeded", output: "verified\n", stopEvidence: { treeClean: true } });
+  } finally { await rm(root, { recursive: true, force: true }); }
+}, 10_000);
+
+test("direct TypeScript checker skips explicit entries before reading SDK declarations", async () => {
+  const root = await mkdtemp("/tmp/chrona-explicit-typecheck-");
+  try {
+    await writeFile(join(root, "module.json"), JSON.stringify({ entry: { path: "dist/app.ts", runtime: "bun" } }));
+    const child = Bun.spawn([process.execPath, "--no-install", join(import.meta.dirname, "module-typecheck/check.ts"), root, join(root, "absent-sdk")], { stdout: "pipe", stderr: "pipe" });
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    expect({ code, stderr, report: JSON.parse(stdout) }).toEqual({ code: 0, stderr: "", report: { status: "skipped", reason: "explicit entry has no declared check" } });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

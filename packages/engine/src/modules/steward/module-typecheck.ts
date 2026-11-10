@@ -29,7 +29,7 @@ export async function typecheckBuild(context: ModuleContext, staging: string, ma
   const { ports } = context;
   // The host injects the registry as data; the engine never imports a runtime implementation.
   const { moduleRuntimes } = ports as typeof ports & { moduleRuntimes?: ModuleRuntimes };
-  const check = moduleRuntimes?.runtimes.find(runtime => runtime.extensions.includes(extname(manifest.entry)))?.check;
+  const check = moduleRuntimes?.runtimes.find(runtime => typeof manifest.entry === "string" && runtime.extensions.includes(extname(manifest.entry)))?.check;
   if (!check) return { status: "skipped", reason: "runtime has no declared check" };
   const programs = check.programs[process.platform] ?? check.programs.default;
   const program = programs.map(name => Bun.which(name)).find(Boolean);

@@ -183,7 +183,7 @@ function checkDisplayAndReach() {
   }
   assert.match(localTime("2026-11-04T09:00:00Z"), /2026.*11.*04/);
   assert.equal(Object.keys(loginSpec().elements).length, 3);
-  for (const type of ["AppSettings", "PackageInstall", "AppRemoval", "ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolContract", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
+  for (const type of ["AppSettings", "PackageInstall", "AppRemoval", "ChatStream", "NotificationSettings", "BuildSettings", "ModuleModelSettings", "RunTimeoutSettings", "Approval", "Question", "SystemAction", "ActivityMore", "LoginForm", "SettingsForm", "ToolContract", "ToolForm", "ModelCap", "Credentials", "DiagnosticRefresh", "MemoryPanel", "SessionWork"]) {
     assert.ok(pageErrors({ spec: { root: "x", elements: { x: { type, props: {}, children: [] } } } }, new Map(), "files").length);
   }
   const escaped = { root: "x", elements: { x: { type: "Button", props: { label: "x" }, children: [], on: { press: { action: "call", params: { tool: "$web.resolve" } } } } } };
@@ -193,6 +193,8 @@ async function checkSettingsAdapter() {
   const mapped: unknown[] = [];
   const call = systemCall({ web: async (...args) => { mapped.push(args); return {}; }, tool: async () => ({}), login: async () => {} });
   const patches = [
+    { runTimeoutMinutes: 45 },
+    { runTimeoutMinutes: null },
     { moduleModel: { maxCallsPerEvent: 3, maxOutputTokens: 4000, dailyCalls: 30, eventTimeoutMs: 120000, moduleDailyCalls: { example: 0 } } },
     { agent: { config: { tiers: { fast: { model: "fixture/model", thinking: "low" } }, "preferred-timeout-ms": 2000 } } },
     { agent: { clear: true } },

@@ -30,7 +30,7 @@ export async function authorizeAgentRequest(ports: StewardPorts, workspaceId: st
   await ports.db.$transaction(async tx => {
     const authenticated = await authenticateRun(tx, input.token, ports.now());
     const { run } = authenticated;
-    if ([authenticated.workspaceId !== workspaceId, run.id !== input.runId, input.operationId !== run.id, run.cwd !== input.cwd, run.lane !== input.lane, !run.deadlineAt, run.deadlineAt ? new Date(input.deadline) > run.deadlineAt : true].some(Boolean)) throw new StewardError("forbidden", "Agent start exceeds the claimed Run");
+    if ([authenticated.workspaceId !== workspaceId, run.id !== input.runId, input.operationId !== run.id, run.cwd !== input.cwd, run.lane !== input.lane, run.deadlineAt !== null && (input.deadline === null || new Date(input.deadline) > run.deadlineAt)].some(Boolean)) throw new StewardError("forbidden", "Agent start exceeds the claimed Run");
     const id = `local-provider-start:${run.id}`, existing = await tx.audit.findUnique({ where: { id } });
     if (existing) {
       if (!(existing.details as { agentApplication?: boolean } | null)?.agentApplication) throw new CallError("unknown", "Previous Provider launch requires reconciliation");

@@ -7,8 +7,13 @@ import { writeCallsDeclaration } from "./calls";
 
 const [moduleDir, sdkDir] = process.argv.slice(2).map(path => resolve(path));
 if (!moduleDir || !sdkDir) { console.error("Usage: bun check.ts <moduleDir> <sdkDir>"); process.exit(2); }
+const manifest = JSON.parse(readFileSync(join(moduleDir, "module.json"), "utf8")) as { entry: unknown };
+if (typeof manifest.entry !== "string") {
+  console.log(JSON.stringify({ status: "skipped", reason: "explicit entry has no declared check" }));
+  process.exit(0);
+}
 await writeCallsDeclaration(sdkDir);
-const entry = join(moduleDir, (JSON.parse(readFileSync(join(moduleDir, "module.json"), "utf8")) as { entry: string }).entry);
+const entry = join(moduleDir, manifest.entry);
 const options: ts.CompilerOptions = {
   strict: true, noEmit: true, skipLibCheck: true, isolatedModules: true, esModuleInterop: true, resolveJsonModule: true, allowImportingTsExtensions: true,
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.ReactJSX,

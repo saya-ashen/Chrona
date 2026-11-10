@@ -1,3 +1,4 @@
+import { moduleMaterialDigest, moduleMaterialRecord, snapshotModuleMaterial } from "./module-artifacts";
 import { activationNotice } from "./module-activation-notice";
 export { activationNotice } from "./module-activation-notice";
 import { installDependencies } from "./module-dependencies";
@@ -5,15 +6,15 @@ export { installDependencies } from "./module-dependencies";
 import { fenceExecutionVersionChange } from "./execution-delivery-controls";
 import { assertBuildOwnership, buildOwnershipError } from "./module-build-ownership";
 import { StewardError } from "./errors";
-import { checkoutModule, snapshotModule } from "./module-files";
-import { readVersionSource, versionSource } from "./module-source";
+import { checkoutModule } from "./module-files";
+import { readVersionSource, versionSource, versionMaterial } from "./module-source";
 import { moduleModelSettings } from "./settings";
 import { assertExternalModule, ModuleIdentityError } from "./module-identity";
 import { ModuleUnavailableError } from "./module-availability";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { addsOAuthDefinitions } from "./oauth-definition";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { isEntryModule, listenPaths, moduleManifestSchema, secretNames } from "@chrona/contracts/steward";
 import { createApprovals } from "./approvals";
 import { notifyLifecycle } from "./notify-user";
@@ -35,14 +36,14 @@ async function stagingFiles(context: ModuleContext, version: ModuleVersion, repo
   try {
     const staging = join(context.platform, "staging", version.id);
     assertBuildOwnership(context, staging);
-    const source = await versionSource(context, version, staging);
+    const source = await versionMaterial(context, version, staging);
     report.git = source.revision;
     await rm(staging, { recursive: true, force: true });
     await checkoutModule(context.platform, `staging/${version.id}`, source.files);
-    const checked = await snapshotModule(context.platform, `staging/${version.id}`);
-    if (checked.length !== source.files.length || checked.some((file, index) => file.path !== source.files[index]?.path || !Buffer.from(file.bytes).equals(source.files[index]!.bytes))) throw new StewardError("conflict", "Module staging differs from its Git source");
-    await Promise.all(source.files.map(file => chmod(join(staging, file.path), 0o444)));
-    return source.files;
+    const checked = await snapshotModuleMaterial(context.platform, `staging/${version.id}`, { verifyTree: true });
+    if (moduleMaterialDigest(checked) !== moduleMaterialDigest(source.files)) throw new StewardError("conflict", "Module staging differs from its Git source");
+    await Promise.all(source.files.map(file => chmod(join(staging, file.path), file.executable ? 0o555 : 0o444)));
+    return source.sourceFiles;
   }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" && !(error instanceof StewardError)) throw error;
@@ -51,10 +52,19 @@ async function stagingFiles(context: ModuleContext, version: ModuleVersion, repo
     return null;
   }
 }
-async function installBuild(context: ModuleContext, staging: string, hash: string) {
+async function installBuild(context: ModuleContext, staging: string, version: ModuleVersion) {
+  const source = await versionMaterial(context, version, staging), explicit = moduleMaterialRecord(source.sourceFiles);
+  const verify = async (path: string) => {
+    if (explicit && moduleMaterialDigest(await snapshotModuleMaterial(context.platform, relative(context.platform, path), { verifyTree: true })) !== moduleMaterialDigest(source.files)) throw new StewardError("conflict", "Checked material changed before installation; existing files preserved");
+  };
+  await verify(staging);
   await mkdir(context.store, { recursive: true });
-  try { await rename(staging, join(context.store, hash)); }
-  catch (error) { if (!["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error; }
+  const target = join(context.store, version.hash);
+  try { await rename(staging, target); }
+  catch (error) {
+    if (!["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+    await verify(target);
+  }
 }
 type Review = { version: ModuleVersion; module: Awaited<ReturnType<typeof requireModule>>; report: BuildReport; files: { path: string; bytes: Buffer }[]; needsMigration: boolean };
 function exposedTools(manifest: ReturnType<typeof moduleManifestSchema.parse>) {
@@ -181,7 +191,6 @@ async function typecheckAndTest(context: ModuleContext, staging: string, manifes
 }
 function buildHasErrors(report: BuildReport) { return Boolean(report.errors?.length); }
 async function checkBuildCandidate({ context, module, version, manifest, staging, report }: { context: ModuleContext; module: Awaited<ReturnType<typeof requireModule>>; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; staging: string; report: BuildReport }): Promise<{ passed: boolean; needsMigration: boolean; dependencyFailure: boolean }> {
-  const { hash } = version;
   const dependencies = await installDependencies(context, staging, manifest);
   if (dependencies) report.dependencies = dependencies.installed;
   if (dependencies?.errors.length) {
@@ -197,7 +206,13 @@ async function checkBuildCandidate({ context, module, version, manifest, staging
   if (passed) report.errors = await smokeRun(context, staging, manifest);
   if (buildHasErrors(report)) passed = false; else delete report.errors;
   // Only engine-owned immutable copies are tested, hashed and installed.
-  if (passed) await installBuild(context, staging, hash);
+  if (passed) {
+    try { await installBuild(context, staging, version); }
+    catch (error) {
+      if (!(error instanceof StewardError)) throw error;
+      passed = false; report.errors = [error.message];
+    }
+  }
   return { passed, needsMigration, dependencyFailure: false };
 }
 async function consumersBlock(context: ModuleContext, { manifest, report }: { module: { id: string; activeHash: string | null }; version: ModuleVersion; manifest: ReturnType<typeof moduleManifestSchema.parse>; report: BuildReport }) {

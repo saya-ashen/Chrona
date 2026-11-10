@@ -1,0 +1,226 @@
+{
+  "name": "desktop-demo",
+  "description": "Optional local GTK 4 desktop window, owned by an ordinary persistent SDK application.",
+  "entry": "main.ts",
+  "keepAlive": true,
+  "effects": [],
+  "uses": [],
+  "data": {
+    "schema": 1
+  },
+  "tests": [
+    "test.ts"
+  ],
+  "tools": [
+    {
+      "name": "open",
+      "description": "Open a local GTK window after toolkit map evidence, or request focus on the existing window. Compositor controls focus.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string"
+          },
+          "window": {
+            "type": "string"
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mappedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastExit": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "focusRequested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "module",
+          "window",
+          "pid",
+          "mappedAt",
+          "failure",
+          "lastExit",
+          "evidence",
+          "focus"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "close",
+      "description": "Close the window and wait for the child process to exit; keep the SDK module ready.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string"
+          },
+          "window": {
+            "type": "string"
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mappedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastExit": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "focusRequested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "module",
+          "window",
+          "pid",
+          "mappedAt",
+          "failure",
+          "lastExit",
+          "evidence",
+          "focus"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "status",
+      "description": "Read application window state; module connection and GTK map are distinct evidence.",
+      "visibility": [
+        "owner"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string"
+          },
+          "window": {
+            "type": "string"
+          },
+          "pid": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mappedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastExit": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "focusRequested": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "module",
+          "window",
+          "pid",
+          "mappedAt",
+          "failure",
+          "lastExit",
+          "evidence",
+          "focus"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

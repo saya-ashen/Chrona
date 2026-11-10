@@ -22,7 +22,7 @@ async function event(callbackId: string, value: RuntimeEvent) {
 }
 function input(raw: unknown): ProviderRunInput {
   const { operationId: _id, callbacks, deadline, ...request } = runtimeStartSchema.parse(raw);
-  return { ...request, deadline: new Date(deadline), ...(callbacks ? {
+  return { ...request, deadline: deadline === null ? null : new Date(deadline), ...(callbacks ? {
     events: {
       async progress(value) { await event(callbacks, { kind: "progress", value }); },
       async usage(value) { await event(callbacks, { kind: "usage", value }); },

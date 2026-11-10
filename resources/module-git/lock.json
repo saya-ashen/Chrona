@@ -5,17 +5,17 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "021c1933b58ab6b99ee4a5b6ac017035805d4fe9",
+      "commit": "93e2ab0df290cfac8842ff890c6164327b303d63",
       "bundle": "web.bundle",
-      "bundleSha256": "a765b590cf9d3dae888ae1cbd2a6ee5de6ea567939e8daaada400f497d4e03b1"
+      "bundleSha256": "aa9cfeaa340d809e2c06176cf13705d70ef28e7d8beaf9c52a3c135e18ed0a08"
     },
     {
       "name": "mcp",
       "repository": null,
       "branch": "main",
-      "commit": "29ac2a7865a2d598334111476fd1a7b0c30719ea",
+      "commit": "3767a05c54a8d975d1a3d3275853764dc871425b",
       "bundle": "mcp.bundle",
-      "bundleSha256": "892d897552f22b440f1830bc2632ceac1dad2e946a60c42133c36fe5067f42bb"
+      "bundleSha256": "96596d25f7816c04db61005bf012c36dc0726f86f59458dc230e0bcaa8e40455"
     },
     {
       "name": "files",
@@ -45,25 +45,25 @@
       "name": "agent",
       "repository": null,
       "branch": "main",
-      "commit": "2486d8c8c8e3ef4ebe2af168c42b11729b56b990",
+      "commit": "275c6a25f73be6923565918c4079f374a6f79989",
       "bundle": "agent.bundle",
-      "bundleSha256": "cd1e834b02a598874bf2119f5555fa45f1edf6a867230a019fcb69af658f6da3"
+      "bundleSha256": "b9664915cae28d5c0a1e05d07b9c180b090ebec06760c5aeb999246db8645cc8"
     },
     {
       "name": "qq",
       "repository": null,
       "branch": "main",
-      "commit": "6c3312c5f1a9d083465e465cd953f86af54b2ab1",
+      "commit": "d34e87d8b57882f748e9fde761df6d59e599830c",
       "bundle": "qq.bundle",
-      "bundleSha256": "bd274375fc0c309097b6e90e9d549ae4fc16bc231028b35b1609ac58f46ad0ac"
+      "bundleSha256": "977616655f8273c91644d2d661decf71ff8a737642b09cdddd629752cd3560b9"
     },
     {
       "name": "author",
       "repository": null,
       "branch": "main",
-      "commit": "c0e74db32c94a2ce1f20286d0aa390c11e5e55dd",
+      "commit": "6c9c45787cd6044ee8c25b989d52ef0eb3cd7ae3",
       "bundle": "author.bundle",
-      "bundleSha256": "ed3cd23f52f362e24b3f678d44928913fb8e3f1b3e07929957579958fe00cf64"
+      "bundleSha256": "c737376ff54b890ec7399684af014fb6d2860e729ca418645a47071d49f4aa54"
     },
     {
       "name": "remind",

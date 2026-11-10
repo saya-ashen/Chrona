@@ -1,5 +1,6 @@
 import { requireDescendantStop, spawnSupervised } from "./process";
 import { existsSync } from "node:fs";
+import { explicitModuleCommand, type ExplicitModuleEntry } from "./module-entry";
 import { readFile } from "node:fs/promises";
 import { createLoopbackChannel } from "./transport";
 import { randomUUID } from "node:crypto";
@@ -45,7 +46,7 @@ async function callReply(call: Call, stubs: Record<string, Stub>, manifest: { se
  * `stubs["<module>.<tool>"]` (sync: its value is the output), built-in Agent fixtures, or a queued call.
  * `stubs.secret` also supplies secrets.get.
  */
-export async function startModule(entry: string, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
+export async function startModule(entry: string | ExplicitModuleEntry, { stubs = {} }: { stubs?: Record<string, (params: Record<string, unknown>) => unknown | Promise<unknown>> } = {}) {
   const manifest = JSON.parse(await readFile(join(process.env.CHRONA_MODULE ?? process.cwd(), "module.json"), "utf8")) as { effects: string[]; uses?: string[]; secrets?: (string | { name: string })[] };
   const calls: Call[] = [], seen = new Set<string>(), completions = new Map<string, unknown>();
   let closed = false;
@@ -78,7 +79,10 @@ export async function startModule(entry: string, { stubs = {} }: { stubs?: Recor
   try {
     const env: NodeJS.ProcessEnv = { ...process.env, CHRONA_SDK: process.env.CHRONA_SDK ?? import.meta.dirname, CHRONA_IPC_ENDPOINT: channel.endpoint, CHRONA_IPC_TOKEN: channel.token };
     delete env.CHRONA_SOCKET; delete env.CHRONA_HTTP_SOCKET;
-    task = spawnSupervised(process.execPath, ["--no-install", ...(process.env.CHRONA_SDK_LOADER || existsSync(loader) ? ["--preload", loader] : []), entry], { env });
+    const command = typeof entry === "string"
+      ? { program: process.execPath, argv: ["--no-install", ...(process.env.CHRONA_SDK_LOADER || existsSync(loader) ? ["--preload", loader] : []), entry] }
+      : explicitModuleCommand(env.CHRONA_MODULE ?? process.cwd(), entry);
+    task = spawnSupervised(command.program, command.argv, { env, cwd: env.CHRONA_MODULE ?? process.cwd() });
     task.process.stdin.end();
     task.process.stdout.resume(); task.process.stderr.resume();
   } catch (error) { await channel.close(); throw error; }

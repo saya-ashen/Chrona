@@ -9,6 +9,7 @@ import { json, type ModuleContext, type ModuleVersion, type BuildReport, type Te
 import { prepareData, runOffline, type Restore } from "./module-data";
 import { activateIn } from "./module-generation";
 import { assertExternalModule } from "./module-identity";
+import { ensureVersionMaterial } from "./module-source";
 
 async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback") {
   const current = await assertExternalModule(db, context.workspaceId, prepared.module.id, reason);
@@ -67,6 +68,7 @@ export async function migrateData(context: ModuleContext, prepared: PreparedMigr
   const state: Swap = { moved: false, swapped: false, recoveryFailed: false };
   try {
     await assertMigrationOwner(context, db, prepared, reason);
+    await ensureVersionMaterial(context, prepared.version);
     await prepareData(context, moduleId, from, to, restore);
     if (!restore) {
       const migration = await runMigration(context, prepared, next);

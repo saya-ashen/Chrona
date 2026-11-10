@@ -3,6 +3,8 @@ import puppeteer from "puppeteer-core";
 import { join } from "node:path";
 
 type Fixture = {
+  deliveryAfterTimeout: () => Promise<string[]>;
+  deliveryAfterReload: () => Promise<string[]>;
   failureAndStates: () => Promise<string[]>;
   afterFailureReload: () => Promise<string[]>;
   loseContinue: () => Promise<string[]>;
@@ -84,6 +86,13 @@ test("entry chat preserves failure and reconciles continuation offline across re
         expect(ordinaryReconciled).toContain("ordinary reload and explicit retries retain the exact persisted request key and session");
         expect(ordinaryReconciled).toContain("ordinary reconciliation recovers one admitted run without sending another message");
         expect(ordinaryReconciled).toContain(`reconciled ordinary admission: no document horizontal overflow at ${viewport.width}x${viewport.height}`);
+        const delivered = await page.evaluate(() => window.chatBrowserTest.deliveryAfterTimeout());
+        expect(delivered).toContain("read-only delivery polling preserves timeout and never starts a Run");
+        await page.reload();
+        await page.waitForFunction(() => "chatBrowserTest" in window);
+        const deliveryReloaded = await page.evaluate(() => window.chatBrowserTest.deliveryAfterReload());
+        expect(deliveryReloaded).toContain("reload reconstructs exact delivery independently of the current Run");
+        expect(deliveryReloaded).toContain("mismatched active hash retains unknown page and browser proof");
         expect(errors).toEqual([]);
         expect(external).toEqual([]);
       } catch (error) {

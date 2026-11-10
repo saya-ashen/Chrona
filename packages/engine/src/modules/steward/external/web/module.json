@@ -268,6 +268,110 @@
       }
     },
     {
+      "name": "component-set",
+      "description": "Register a trusted same-page component for this app and active version. Supply self-contained ESM with default mount, optional CSS, strict props, events, slots and own tools. Use the returned type verbatim in spec.elements (for example music:Player for the caller app music); app is a placeholder, not a literal prefix. Trusted JavaScript runs without isolation; re-register pages after replacement.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "javascript": {
+            "type": "string",
+            "description": "Self-contained browser ESM with default export mount(element, {props, emit(event), call(tool,args), children?}); returns cleanup or {update?,destroy?}. Imports are unsupported. Runs trusted in the authenticated browser origin."
+          },
+          "css": {
+            "type": "string"
+          },
+          "props": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Strict object JSON schema with type, properties, required and additionalProperties:false. Web validates supported keywords and bounds."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "javascript",
+          "props"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Exact page element type with the actual caller module prefix, such as music:Player. Use this value verbatim."
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "component-remove",
+      "description": "Remove a component owned by the real active approved caller. Dependent pages become unavailable.",
+      "visibility": [
+        "modules"
+      ],
+      "idempotent": true,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "page-set",
       "output": {
         "type": "object",
@@ -285,7 +389,7 @@
         ],
         "additionalProperties": false
       },
-      "description": "Register or replace a caller-owned page. Optional declarative components expand before catalog/tool checks; layout controls only content. Register on every start.",
+      "description": "Register or replace a caller-owned page on every activation. Declarative components expand before catalog/tool checks; layout controls content. For executable elements use the exact type returned by component-set, including the actual caller module prefix. Web validates props, events and slots, pins component revision and active app hash, and adds declared own tools to page contract pins. Response extensions are keyed by full component type.",
       "visibility": [
         "modules"
       ],
@@ -312,7 +416,7 @@
             "type": "object",
             "properties": {},
             "additionalProperties": true,
-            "description": "App-private declarative templates keyed app:Name; see web.catalog."
+            "description": "App-private declarative templates keyed by the actual caller module name plus :Name (for example music:Card); app is only a placeholder. See web.catalog."
           },
           "content": {
             "type": "object",

@@ -4,6 +4,7 @@ import type { StewardPorts } from "./ports";
 import { admitted, callSync, CallError, type Caller, type CallOrigin } from "./module-calls";
 import { moduleTools, catalogEntry } from "./module-tools";
 import { assertExecutionPrincipal } from "./execution-principal";
+import { runExpired } from "./run-finish";
 import { providerCancelKey } from "./provider-journal";
 
 import { withAgentContextEntry } from "./agent-context-entry";
@@ -38,13 +39,13 @@ export async function contextRunTools(ports: StewardPorts, run: { id: string; se
 }
 export async function callContextTool(ports: StewardPorts, context: NonNullable<Awaited<ReturnType<typeof contextRunTools>>>, name: string, raw: unknown, deadline: number) {
   const now = ports.now();
-  const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId, workspaceId: context.workspaceId, status: "running", execution: null, deadlineAt: { gt: now }, leaseUntil: { gt: now } } }) : null;
-  if (!run || await ports.db.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) throw new CallError("forbidden", "Agent run is no longer active");
+  const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId, workspaceId: context.workspaceId, status: "running", execution: null } }) : null;
+  if (!run || runExpired(run, now) || await ports.db.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) throw new CallError("forbidden", "Agent run is no longer active");
   const current = await contextRunTools(ports, run);
   if (!current || current.caller.moduleId !== context.caller.moduleId || current.caller.hash !== context.caller.hash || current.caller.module !== context.caller.module) throw new CallError("forbidden", "Agent context caller changed");
   const entry = current.entries.find(entry => entry.name === name);
   if (!entry) throw new CallError("forbidden", "Tool is outside the module's Agent run selection");
-  const origin: CallOrigin = { workspaceId: current.workspaceId, caller: current.caller, chain: [], path: [], deadline: Math.min(deadline, run.deadlineAt!.getTime()), run: { executionRunId: run.id } };
+  const origin: CallOrigin = { workspaceId: current.workspaceId, caller: current.caller, chain: [], path: [], deadline: run.deadlineAt ? Math.min(deadline, run.deadlineAt.getTime()) : deadline, run: { executionRunId: run.id } };
   return withAgentContextEntry(ports, origin, async () => {
     const result = await callSync(ports, origin, `${entry.module.name}.${entry.tool.name}`, raw);
     return { result: result.output };

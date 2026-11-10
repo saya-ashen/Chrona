@@ -10,7 +10,7 @@ import { buildRequestSchema } from "./module-build-inputs";
 import type { StewardPorts } from "./ports";
 import { buildUsage, moduleModelSettings } from "./settings";
 import { StewardError } from "./errors";
-import { readVersionSource } from "./module-source";
+import { readVersionMaterial } from "./module-source";
 import { moduleContext } from "./module-context";
 import { checkoutModule } from "./module-files";
 import { writeBuildHelpers } from "./module-build-helpers";
@@ -159,10 +159,10 @@ async function prepareBuild(ports: StewardPorts, workspaceId: string, cwd: strin
   for (const name of names) {
     const module = await ports.db.module.findFirst({ where: { workspaceId, name } });
     if (!module?.activeHash) continue;
-    for (const file of await readVersionSource(moduleContext(ports, workspaceId), module.id, module.activeHash)) {
+    for (const file of await readVersionMaterial(moduleContext(ports, workspaceId), module.id, module.activeHash)) {
       const target = join(cwd, "current", ...(names.length > 1 ? [name] : []), file.path);
       await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, file.bytes);
+      await writeFile(target, file.bytes, { mode: file.executable ? 0o755 : 0o644 });
     }
   }
   const backend = ports.packages ? "system (programs the user installed with the distribution's package manager; missing ones fail the build until installed)" : "none (dependencies cannot be installed on this host)";

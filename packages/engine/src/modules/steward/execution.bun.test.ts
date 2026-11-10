@@ -96,7 +96,7 @@ test("queued cancel atomically proves never started; replay is safe; terminal ca
 test("cancel revokes capability before abort, failed stop retains directory, later actual exit releases atomically", async () => {
   const service = createExecutions(ports), ref = await service.start(principal, input), runs = createRuns(ports, principal.workspaceId);
   const run = (await runs.claimNext("background"))!;
-  expect(run.deadlineAt.getTime() - ports.now().getTime()).toBe(input.budget.timeoutMs);
+  expect(run.deadlineAt!.getTime() - ports.now().getTime()).toBe(input.budget.timeoutMs);
   liveRuns.set(run.id, { inject: async () => {}, done: new Promise(() => {}), abort: async () => {
     expect((await db.executionAttempt.findUniqueOrThrow({ where: { id: ref.attemptId } })).capabilityRevokedAt).not.toBeNull();
     await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });

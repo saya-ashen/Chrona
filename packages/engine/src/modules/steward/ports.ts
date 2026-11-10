@@ -1,6 +1,6 @@
 import type { VerifiedExecutionStop } from "./execution-delivery-stop-types";
 import type { Prisma, PrismaClient } from "@chrona/db";
-import type { ProviderAdapter, ExecutionPrincipal, ExecutionRef, ExecutionSnapshot, ExecutionControl, ExecutionEventStore, ExecutionPorts, ExecutionProjectGrant } from "@chrona/contracts/steward";
+import type { ProviderAdapter, ExecutionPrincipal, ExecutionRef, ExecutionSnapshot, ExecutionControl, ExecutionEventStore, ExecutionPorts, ExecutionProjectGrant, ModuleEntry } from "@chrona/contracts/steward";
 import type { ExternalModuleInstaller } from "./module-install-types";
 import type { LocalExecutionProjectGrant, WorkPlacement, ExecutionStartV2 } from "@chrona/contracts/steward";
 
@@ -111,7 +111,7 @@ export type StewardPorts = {
     available: boolean;
     /** Legacy health projection; trusted local execution uses OS permissions. */
     isolated: boolean;
-    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string>; entry: string; ipcEndpoint: string; ipcToken: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void };
+    startModule?(input: { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string>; entry: ModuleEntry; ipcEndpoint: string; ipcToken: string; network?: boolean }): { pid: number; exited: Promise<{ code: number | null; signal: string | null }>; stderr(): string; kill(): void };
     runModule?(input: { codeDir: string; dataDir: string; contentDir?: string; entry: string; input: unknown; network?: boolean; timeoutMs?: number; maxOutputBytes?: number }): Promise<{ status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number }>;
   };
 

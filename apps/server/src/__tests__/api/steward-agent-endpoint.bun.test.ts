@@ -36,7 +36,7 @@ async function fixture() {
     async close() { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); } };
 }
 
-test("live Agent capability exposes the modern 13 module tools and material-only Author through actual HTTP dispatch", async () => {
+test("live Agent capability exposes the modern 13 module tools and pure Author material preparation through actual HTTP dispatch", async () => {
   const f = await fixture();
   try {
     expect((await f.request("/catalog")).status).toBe(401);
@@ -52,9 +52,20 @@ test("live Agent capability exposes the modern 13 module tools and material-only
     expect(reference.status).toBe(200);
     const index: { target: string }[] = (await reference.json()).data.result;
     expect(index.filter(tool => tool.target.startsWith("modules.")).map(tool => tool.target).sort()).toEqual(moduleTools.map(tool => `modules.${tool}`).sort());
-    const prepare = await f.post("m_author_prepare", { input: JSON.stringify({ requestKey: "draft", submitter: { moduleId: f.author.id, hash: "c".repeat(64) }, targets: [{ name: "ordinary", moduleId: null, expectedActiveHash: null }], goal: "Prepare supplied material", intent: { changes: ["Fixture"], preserves: [] } }) });
+    const input = { requestKey: "draft", submitter: { moduleId: f.author.id, hash: "c".repeat(64) }, targets: [{ name: "ordinary", moduleId: null, expectedActiveHash: null }], goal: "Prepare supplied material", intent: { changes: ["Fixture"], preserves: [] } };
+    const prepare = await f.post("m_author_prepare", { input: JSON.stringify(input) });
     expect(prepare.status).toBe(200);
-    expect(await prepare.json()).toMatchObject({ ok: true, data: { result: { kind: "material-only", execution: { supported: false, limitation: expect.stringContaining("no model execution was started") } } } });
+    const body = await prepare.json(), { result } = body.data;
+    expect(Object.keys(result).sort()).toEqual(["admission", "kind", "prompt", "request"]);
+    expect(typeof result.prompt).toBe("string");
+    for (const guidance of ["current conversation's Agent Run", "prepare itself starts no model", "writes no files", "issues no admission", "author.import", "author.export", "existing tools and budgets", "do not start a nested Agent"]) expect(result.prompt).toContain(guidance);
+    expect(body).toMatchObject({ ok: true, data: { result: {
+      kind: "material-preparation",
+      admission: { requestKey: input.requestKey, submitter: input.submitter, targets: input.targets },
+      request: { goal: input.goal, targets: input.targets, intent: input.intent },
+      prompt: expect.any(String),
+    } } });
+    expect(await f.db.run.findMany({ select: { id: true, status: true } })).toEqual([{ id: f.run.id, status: "running" }]);
     expect(await f.db.run.count()).toBe(1);
     expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
     expect(await f.db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);

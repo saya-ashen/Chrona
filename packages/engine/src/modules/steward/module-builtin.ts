@@ -12,7 +12,7 @@ import { StewardError } from "./errors";
 import { importModuleGitBundle } from "./module-git-upstream";
 import { exportModuleSource } from "./module-git";
 import { recordModuleUpstream } from "./module-upstream";
-import { installDependencies } from "./module-dependencies";
+import { installDependencies, requiredHostPrograms } from "./module-dependencies";
 
 async function executable(name: string) {
   if (isAbsolute(name)) return access(name, constants.X_OK).then(() => true, () => false);
@@ -20,7 +20,8 @@ async function executable(name: string) {
 }
 async function entryErrors(release: ModuleRelease) {
   try {
-    const entry = await lstat(join(release.codeDir, release.manifest.entry));
+    const declared = release.manifest.entry;
+    const entry = await lstat(join(release.codeDir, typeof declared === "string" ? declared : declared.path));
     return !entry.isFile() || entry.isSymbolicLink() ? ["Release entry is not a regular file"] : [];
   } catch { return ["Release entry is missing"]; }
 }
@@ -28,7 +29,7 @@ async function runtimeErrors(ports: StewardPorts, release: ModuleRelease, module
   const errors: string[] = [];
   if (!ports.sandbox?.available || !ports.sandbox.startModule) errors.push("Module runtime unavailable; check the configured execution mode and interpreter");
   errors.push(...await entryErrors(release));
-  for (const name of release.manifest.packages) if (!await executable(name)) errors.push(`Required host program unavailable: ${name}`);
+  for (const name of requiredHostPrograms(release.manifest)) if (!await executable(name)) errors.push(`Required host program unavailable: ${name}`);
   if (module?.status === "migrating") errors.push("Module data migration is in progress; finish recovery before using this release");
   if (module && module.dataSchema !== release.manifest.data.schema && !await dataEmpty(join(ports.dataDir, "platform/data", module.id))) errors.push("Release data schema differs from existing data; back up and explicitly upgrade data before resuming");
   return errors;

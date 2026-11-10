@@ -97,10 +97,12 @@ Author 主要源码：`external/author/module.json`、`contracts.ts`、`workflow
 
 | Author 工具 | 实际输入 | 实际输出 | 权限/用途 |
 | --- | --- | --- | --- |
-| `author.prepare` | `{input:JSON文本}`，文本为 `{requestKey,submitter,targets,goal,intent}` | `{kind:"material-only",request:{goal,targets,intent},admission:{requestKey,submitter,targets},prompt,execution:{supported:false,limitation}}` | owner；只准备材料说明和准入草案，owner 核对 submitter 是当前批准 Author 身份 |
+| `author.prepare` | `{input:JSON文本}`，文本为 `{requestKey,submitter,targets,goal,intent}` | `{kind:"material-preparation",request:{goal,targets,intent},admission:{requestKey,submitter,targets},prompt}` | owner；只准备材料说明和准入草案，owner 核对 submitter 是当前批准 Author 身份 |
 | `author.write` | `{path,content}` | `{path,size}` | provider/modules/owner；Author 私有 content 内受限材料 |
 | `author.read` | `{path,offset?,limit?}` | `{path,size,offset,nextOffset,eof,content}` | provider/modules/owner；有界读取 |
 | `author.list` | `{path}` | `{path,entries:[{name,kind:file\|directory}]}` | provider/modules/owner；有界目录 |
+| `author.import` | `{input:JSON文本}`，文本为 `{from,to,source,artifacts,build}` | `{path,record,files,bytes,materialDigest}` | owner；从明确工作目录导入所选源码及二进制，自动记录摘要，整体发布到新的 Author 源码目录；不编译 |
+| `author.export` | `{input:JSON文本}`，文本为 `{path,to}` | `{path,to,files,bytes,materialDigest}` | owner；从 Author 自有源码/阶段材料导出到新的工作目录，保留完整源码、记录和产物；不覆盖现有目标 |
 | `author.stage` | `{input:JSON文本}`，文本为 `{name,from,to,provenance}` | `{name,dir,metadata,files,bytes,materialDigest}` | owner；from 为 `sources/<workspace>` 或 `packages/<stage>/source`，to 为 `packages/<stage>`；来源说明不是授权 |
 | `author.source` | `{input:JSON文本}`，文本为 `{admissionId,moduleId,hash,to}` | 原样转交 `modules.source` 结果 | owner；`to` 为 `sources/<workspace>`，内核看到的实际 caller 是 Author |
 | `author.submit` | `{input:JSON文本}`，文本为 `{admissionId,requestKey,items}` | 原样转交 `modules.submit` receipt | owner；`dir` 为 `sources/<workspace>` 或 `packages/<stage>/source`；重放不先读取可变材料 |
@@ -108,11 +110,9 @@ Author 主要源码：`external/author/module.json`、`contracts.ts`、`workflow
 
 `stage.provenance` 是 `{kind:"local",label}` 或 `{kind:"kernel-source",moduleId,hash,ref,materialDigest}`，属于调用者提供的材料说明。Author 不允许以 `agent` 为材料目标。
 
-当前闭环是：owner 检查 `prepare` 的草案 → owner 经 `modules.admit-candidates` 授权精确 Author 身份和完整目标 → 显式提供材料（已有目标可经 `author.source`）→ write/stage → `author.submit` → `author.receipt` 核对检查及审批状态。`prepare` 不自动调用准入，不执行模型。其源码限制原文为：
+当前闭环由当前对话 Agent 完成：经 `modules.list` 核对当前批准 Author 的 moduleId/hash 与全部目标 → 调用 `author.prepare` 获得草案和创作指引 → 以真实 owner 入口身份调用 `modules.admit-candidates`，绑定 Author 提交身份、完整目标和精确活动基线 → 在当前工作区使用已有文件/命令工具编写、编译、测试，再经 `author.import` 导入明确源码与产物（小段文本也可用 `author.write/read/list`；更新先经 `author.source` 取回获准精确基线，再用 `author.export` 导出重建）→ `author.submit` → `author.receipt` 核对固定回执、检查和审批状态。Author 转交 source/submit/candidate-check 时使用实际 Author 身份，不能通过参数冒充。调用准入的是当前 Agent 所代表的真实入口，而不是 Author。
 
-> Bounded author execution is unavailable: agent.context/run do not yet enforce admission-bound exact model, timeout, and submission caps. Supply source material explicitly; no model execution was started.
-
-因此不能把 Author 描述成已实现自动模型作者、自动续跑或分发服务；未来是否提供精确受限执行须另有实现和验收。
+`prepare` 是纯材料准备：不写文件、不启动模型、不签发准入、不提交或安装。当前 Agent 沿用已有 Run、工具权限、预算、取消与期限，无需另起 Agent、队列或新增内核能力。材料准入仍不授权模型执行；不能从 prompt、准备结果或 pending 回执推断检查、审批、激活成功。丢失回复后保留原 requestKey，按 receiptId 或 admissionId/requestKey 核对，不自动换 key 重投。工程验证与限制见[当前对话创作记录](author-current-conversation.md)。
 
 ## 5. 其余四个内核命名空间
 
@@ -219,7 +219,7 @@ Manifest 真正的严格 schema 位于 `packages/contracts/src/steward/index.ts`
 
 已移除 Manifest `settings`、`triggers`、`dynamicSchedules`、`channel`、`contributes`、`healthCheck`、`builds`，以及 S1 删除的 `limits` / `limits.virtualMemoryMb`。严格 schema 会拒绝旧字段；不再承诺硬虚拟内存限制，`model` 的额度仍是模型调用与输出预算。旧 schema 说明里的这些字段不能作为新材料模板。应用设置经各自工具（如 `web.settings`、`notify.settings`、`agent.configure`）写自己的私有 data。观察健康只来自 modules.health/diagnostics；没有公共自报健康或内核主动业务探测。
 
-Web 当前普通应用工具为 `today/reply/page-set/page-remove/pages/catalog/settings`，负责会话、页面与导航。Notify 当前普通应用工具为 `settings/lifecycle/activity/approval/send/withdraw/channel/list/status/feedback/retry/configure/import`；保留的 kernel 可见工具声明不表示内核仍直接调用它们。内核通知只提供有限 facts，Notify 持有本地存储、预算、quiet hours、digest、渠道登记和投递政策；应用仍可用 `notify.send`。SDK 已移除 `chrona.model`、`chrona.notify`、`chrona.wakeProvider` 助手；应用通过已声明的 routed tools 调用相应能力。
+Web 当前普通应用工具包含 `today/reply/component-set/component-remove/page-set/page-remove/pages/catalog/settings`；`component-set/remove` 为真实模块调用者注册/移除当前版本的可信同页组件，详细契约见 [Web 可执行组件](web-executable-components.md)。Web 负责会话、页面与导航。Notify 当前普通应用工具为 `settings/lifecycle/activity/approval/send/withdraw/channel/list/status/feedback/retry/configure/import`；保留的 kernel 可见工具声明不表示内核仍直接调用它们。内核通知只提供有限 facts，Notify 持有本地存储、预算、quiet hours、digest、渠道登记和投递政策；应用仍可用 `notify.send`。SDK 已移除 `chrona.model`、`chrona.notify`、`chrona.wakeProvider` 助手；应用通过已声明的 routed tools 调用相应能力。
 
 没有公开 `schedules.*`、`projects.*`、`history.*`、`chat.*`、`provider.*`、`executions.*`、`content.*` 或 `memory.*` 内核命名空间；应用私有工具与内部 host 不因此改成系统服务。SDK 导出的 `Trigger` 排除 schedule，`on` 不公开接受 schedule；私有 `WireTrigger`、schedule delivery 与 tick drain 仍接通，不能把公开接口移除写成内部 drain 已删除。Manifest 的 model 校验只针对 `agent.complete`；当前 modules schema 文案和 Web `uses` 已对齐收窄后的工具，不再列旧查询/构建或 schedules 目标。
 

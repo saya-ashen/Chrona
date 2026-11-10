@@ -19,7 +19,8 @@ export const runtimeStartSchema = z.object({
   runId: z.string().min(1).max(128), token: z.string().min(1).max(1024), lane: z.enum(["foreground", "background", "build"]),
   cwd: z.string().min(1).max(8192), sessionDir: z.string().min(1).max(8192), sessionId: z.string().nullable(),
   prompt: z.string().max(2 * 1024 * 1024), systemPrompt: z.string().max(200_000), resources: z.enum(["configured", "minimal"]),
-  deadline: z.string().datetime({ offset: true }), model: z.string().max(500).optional(),
+  /** null means no total Run time limit. */
+  deadline: z.string().datetime({ offset: true }).nullable(), model: z.string().max(500).optional(),
   images: z.array(runtimeImageSchema).max(10).optional(), extraTools: z.array(z.string().max(200)).max(2000).optional(), searchTools: z.boolean().optional(),
   hostPaths: z.array(z.string().max(8192)).max(1000).optional(),
   content: z.array(z.object({ name: z.string().max(200), dir: z.string().max(8192), writable: z.boolean() }).strict()).max(100).optional(),

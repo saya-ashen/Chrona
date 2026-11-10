@@ -35,7 +35,7 @@ export class PiEvents {
     this.dialogs.set(id, task);
   }
   private parseQuestion(event: RecordValue) {
-    const remaining = this.input.deadline.getTime() - Date.now();
+    const remaining = this.input.deadline === null ? Infinity : this.input.deadline.getTime() - Date.now();
     const timeout = typeof event.timeout === "number" && Number.isFinite(event.timeout) ? event.timeout : 300_000;
     const parsed = providerQuestionSchema.safeParse({ method: event.method, title: event.title ?? "Pi", message: event.message ?? event.placeholder ?? "", options: event.options ?? [], prefill: event.method === "editor" ? event.prefill : undefined, timeoutMs: Math.floor(Math.min(300_000, timeout, remaining)) });
     if (!parsed.success) return null; // Never offer approval of silently truncated context.

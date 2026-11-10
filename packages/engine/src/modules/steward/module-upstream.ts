@@ -8,6 +8,7 @@ import type { Prisma } from "@chrona/db";
 import type { StewardPorts } from "./ports";
 import { moduleContext, json, type ModuleContext, type Proposal } from "./module-context";
 import { assertExternalModule } from "./module-identity";
+import { restoreModuleArtifacts } from "./module-artifacts";
 import { checkoutModule } from "./module-files";
 import { getModuleLocalHead } from "./module-git";
 import { fetchModuleUpstream, getModuleUpstreamHead, importModuleGitBundle, mergeModuleUpstream } from "./module-git-upstream";
@@ -31,7 +32,7 @@ export async function submitMergedCommit(context: ModuleContext, input: { module
   const merged = await mergeModuleUpstream({ ...location, versionId: randomUUID(), upstreamCommit: input.commit });
   const root = await mkdtemp(join(tmpdir(), "chrona-module-merge-"));
   try {
-    await checkoutModule(root, module.name, merged.files);
+    await checkoutModule(root, module.name, await restoreModuleArtifacts(context.platform, merged.files));
     const current = await assertExternalModule(context.db, context.workspaceId, module.id, "update");
     if (current.activeHash !== module.activeHash) throw new StewardError("conflict", "Active module version changed during upstream merge");
     await input.onPrepared(merged.commit);

@@ -12,6 +12,10 @@ export function moduleModelSettings(settings: unknown) {
   const value = settings as { moduleModel?: unknown } | null;
   return kernelModuleModelSettingsSchema.nullable().parse(value?.moduleModel ?? null);
 }
+export function runTimeoutMinutes(settings: unknown): number | null {
+  const value = settings as { runTimeoutMinutes?: unknown } | null;
+  return settingsSchema.shape.runTimeoutMinutes.parse(value?.runTimeoutMinutes);
+}
 export function buildSettings(settings: unknown) {
   const value = settings as { builds?: unknown } | null;
   return buildSettingsSchema.parse(value?.builds ?? { dailyLimit: RUN_LIMITS.maxBuildRunsPerDay, timeoutMinutes: RUN_LIMITS.buildTimeoutMs / 60_000, maxSubmissions: RUN_LIMITS.maxBuildSubmissionsPerRun });
@@ -52,7 +56,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext) {
   async function get() {
     const row = await db.workspace.findUnique({ where: { id: workspaceId } });
     if (!row) throw new StewardError("not_found", "Workspace not found");
-    return { timezone: budgetTimezone(row.settings), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings) };
+    return { timezone: budgetTimezone(row.settings), runTimeoutMinutes: runTimeoutMinutes(row.settings), modelUsage: await modelUsage(db, workspaceId, row.settings, now()), moduleModel: moduleModelSettings(row.settings) };
   }
   return { get, update: async (raw: unknown) => {
     const input = parseInput(kernelUpdateSettingsSchema, raw);
@@ -62,7 +66,7 @@ export function createSettings({ db, workspaceId, now }: RecordContext) {
       const timezone = input.timezone ?? budgetTimezone(row.settings);
       validateTimezone(timezone, now());
       const previous = row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings : {};
-      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, timezone, moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel } } });
+      await tx.workspace.update({ where: { id: workspaceId }, data: { settings: { ...previous, timezone, runTimeoutMinutes: input.runTimeoutMinutes === undefined ? runTimeoutMinutes(row.settings) : input.runTimeoutMinutes, moduleModel: input.moduleModel === undefined ? moduleModelSettings(row.settings) : input.moduleModel } } });
       await audit(tx, { workspaceId, kind: "settings_updated", actor: "user", subjectId: workspaceId, details: input });
     });
     return get();

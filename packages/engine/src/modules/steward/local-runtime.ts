@@ -36,7 +36,7 @@ export async function startLocalProvider(ports: StewardPorts, workspaceId: strin
   const callback = retainProviderCallbacks(ports, workspaceId, { events: input.events, detail: input.detail });
   const { events: _events, detail: _detail, deadline, ...request } = input;
   const operationId = input.runId;
-  try { await runtimeCall(ports, workspaceId, "agent.start", { ...request, operationId, deadline: deadline.toISOString(), callbacks: callback.id }); }
+  try { await runtimeCall(ports, workspaceId, "agent.start", { ...request, operationId, deadline: deadline?.toISOString() ?? null, callbacks: callback.id }); }
   catch (error) { callback.release(); throw error; }
   const done = (async () => {
     try {

@@ -10,10 +10,11 @@ const hardCaps = new Set(["maxCallsPerEvent", "maxOutputTokens", "dailyCalls", "
 /** Global Settings reads and writes kernel governance only. Applications own their pages and saves. */
 export async function settingsView(call: Call) {
   const kernel = await call("settings.get") as Args;
-  return { settings: { timezone: kernel.timezone, moduleModel: kernel.moduleModel, modelUsage: kernel.modelUsage } };
+  return { settings: { timezone: kernel.timezone, runTimeoutMinutes: kernel.runTimeoutMinutes, moduleModel: kernel.moduleModel, modelUsage: kernel.modelUsage } };
 }
 export async function updateSettings(call: Call, body: unknown) {
   if (!object(body) || Object.entries(body).some(([key, value]) => key === "timezone" ? typeof value !== "string"
+    : key === "runTimeoutMinutes" ? value !== null && (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 525600)
     : key === "moduleModel" ? value !== null && (!object(value) || Object.keys(value).some(field => !hardCaps.has(field))) : true)) throw invalid();
   if (Object.keys(body).length) await call("settings.update", { settings: JSON.stringify(body) });
   return settingsView(call);

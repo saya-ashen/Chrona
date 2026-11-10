@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
+import { receiptFixture, receiptItem, healthFixture } from "./delivery-fixture";
 
 type Args = Record<string, unknown>;
 type Run = { runId: string; status: string; active: boolean };
@@ -16,7 +17,9 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
   const admitted = new Map<string, string>();
   let failRun = false, failWrite = false, failStream = false;
   const current = { status: "finished", active: false };
-  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: { type: string; value: { phase: string } } }[], after: 0 };
+  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }] as { at: string; kind: string; text?: string; tool?: string; error?: boolean }[], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: { type: string; value: { phase: string } } }[], after: 0 };
+  let clock = "2026-11-09T00:00:02.000Z";
+  const delivery = { receipt: null as unknown, health: [] as unknown[], pages: [] as { module: string; moduleId: string; hash: string; id: string; title: string }[], unavailable: false };
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
     if (target === `${source}.settings`) return { provider: memory ? "memory-local" : null, autoRecall: true, autoRetain: true };
@@ -38,14 +41,16 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
       if (failRun) { failRun = false; throw new Error("response lost"); }
       return runs.get(key);
     }
+    if (target === "modules.candidate-check") { if (delivery.unavailable) throw new Error("denied"); return delivery.receipt; }
+    if (target === "modules.health") { if (delivery.unavailable) throw new Error("offline"); return { items: delivery.health, nextCursor: null }; }
     if (target === "agent.get") return current;
     if (target === "agent.stream") { if (failStream) { failStream = false; throw new Error("stream unavailable"); } return stream; }
     if (target === "agent.write") { if (failWrite) throw new Error("write response lost"); return { ok: true }; }
     if (target === "agent.respond" || target === "agent.interrupt") return { ok: true };
     throw new Error(`Unexpected call: ${target}`);
   };
-  const restart = () => createAgentConversations({ source, dataDir, call, ...(discovered === undefined ? { tools: [] } : {}), reply: event => { replies.push(event); }, now: () => new Date("2026-11-09T00:00:02.000Z") });
-  return { path, journal, calls, runs, replies, restart, current, stream, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; }, loseStreamResponse: () => { failStream = true; } };
+  const restart = () => createAgentConversations({ source, dataDir, call, ...(discovered === undefined ? { tools: [] } : {}), reply: event => { replies.push(event); }, now: () => new Date(clock), deliveryPages: async () => { if (delivery.unavailable) throw new Error("offline"); return delivery.pages; } });
+  return { path, journal, calls, runs, replies, restart, current, stream, delivery, advance: () => { clock = new Date(Date.parse(clock) + 2000).toISOString(); }, loseRunResponse: () => { failRun = true; }, loseWriteResponse: () => { failWrite = true; }, loseStreamResponse: () => { failStream = true; } };
 }
 
 for (const source of ["web", "qq", "mcp"] as const) test(`${source}: foreground sends preserve private context, replay identity and persisted replies`, async () => {
@@ -312,4 +317,44 @@ test("ordinary lost admission exposes only explicit reconciliation of the frozen
   expect(await app.reconcile(session.id, { requestKey: "original" })).toMatchObject({ runId: "run-1", sessionId: session.id });
   expect(await f.restart().reconcile(session.id, { requestKey: "original" })).toMatchObject({ runId: "run-1" });
   expect(f.runs.size).toBe(1);
+});
+
+test("timeout receipt survives restart and later activation reconciles without another Run", async () => {
+  const f = await fixture("web", ["author.submit"]);
+  const first = await f.restart().send({ text: "创建音乐应用", requestKey: "music" });
+  f.current.status = "timed_out";
+  f.stream.transcript = [receiptItem(), { at: "2026-11-09T00:00:04.000Z", kind: "text", text: "提交成功，正在等待激活" }];
+  f.delivery.receipt = receiptFixture();
+  await f.restart().poll();
+  const pending = (await f.restart().messages(first.sessionId)).at(-1)!;
+  expect(pending.execution).toMatchObject({ status: "timed_out", canContinue: true, applicationDelivery: [{ receipt: receiptFixture(), targets: [{ activation: "unknown" }], browser: "unknown" }] });
+  expect((await f.journal()).sessions[0].turns[0].applicationDelivery[0].receipt).toEqual(receiptFixture());
+  const before = f.calls.length;
+  f.advance();
+  f.delivery.health = [healthFixture()];
+  f.delivery.pages = [{ module: "music", moduleId: "music-id", hash: "b".repeat(40), id: "home", title: "音乐" }];
+  const observed = await f.restart().execution(first.sessionId);
+  expect(observed).toMatchObject({ status: "timed_out", active: false, canContinue: true, applicationDelivery: [{ targets: [{ activation: "active", health: "observed", pages: [{ href: "/p/music/home" }] }], browser: "unknown" }] });
+  expect(f.calls.slice(before).map(call => call.target)).toEqual(["modules.health", "modules.candidate-check"]);
+  const reloaded = (await f.restart().messages(first.sessionId)).at(-1)!;
+  expect(reloaded.id).toBe(pending.id);
+  expect(reloaded.execution?.applicationDelivery).toEqual(observed?.applicationDelivery);
+  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.some(call => /submit|health-probe|recover/.test(call.target))).toBe(false);
+  f.advance(); f.delivery.health = [{ ...healthFixture(), activeHash: "e".repeat(40) }];
+  const replaced = await f.restart().execution(first.sessionId);
+  expect(replaced?.applicationDelivery?.[0]?.targets[0]).toMatchObject({ activation: "different", health: "unknown", pages: [], pagesCheck: "unknown" });
+  f.advance(); f.delivery.unavailable = true;
+  expect((await f.restart().execution(first.sessionId))?.applicationDelivery?.[0]).toMatchObject({ receiptCheck: "unknown", targets: [{ activation: "unknown", health: "unknown", pages: [], pagesCheck: "unknown" }], browser: "unknown" });
+});
+
+test("assistant receipt text and unrelated active applications never establish delivery linkage", async () => {
+  const f = await fixture("web", ["author.submit"]);
+  const sent = await f.restart().send({ text: "创建应用", requestKey: "unproven" });
+  f.current.status = "timed_out";
+  f.stream.transcript = [{ ...receiptItem(), kind: "text" }];
+  f.delivery.health = [healthFixture()];
+  await f.restart().poll();
+  expect((await f.restart().execution(sent.sessionId))?.applicationDelivery).toBeUndefined();
+  expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.candidate-check")).toBe(false);
 });

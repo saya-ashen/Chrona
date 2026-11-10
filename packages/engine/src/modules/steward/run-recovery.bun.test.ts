@@ -45,6 +45,8 @@ test("unknown Agent stop holds the context until actual Provider exit, without a
   const runs = createRuns(ports, workspaceId);
   await queueContext();
   const run = (await runs.claimNext("foreground"))!;
+  expect(run).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  time = new Date(time.getTime() + 21 * 60_000);
   await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Interrupted" });
   expect(await admitContextPrimitive(ports, principal, "get", { runId: run.id })).toMatchObject({ status: "unknown", active: true });
   await expect(queueContext("blocked-retry")).rejects.toMatchObject({ code: "conflict" });
@@ -62,7 +64,7 @@ test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as con
   await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Keep this draft" });
   const run = (await runs.claimNext("build"))!;
   await writeFile(join(run.cwd, "draft.txt"), "kept");
-  if (outcome === "timed_out") time = new Date(run.deadlineAt.getTime() + 1);
+  if (outcome === "timed_out") time = new Date(run.deadlineAt!.getTime() + 1);
   if (outcome === "cancelled") await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: run.id, details: {} } });
   await runs.finish(run.id, { outcome: outcome === "cancelled" ? "failed" : outcome, sessionId: "provider-context", error: outcome === "finished" ? null : "Synthetic" }, { stopEvidence: "provider_exited" });
   const status = outcome === "unavailable" ? "provider_unavailable" : outcome;
@@ -79,12 +81,13 @@ test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as con
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
 });
 test("expired Agent lease aborts and revokes capability but retains unknown stop until Provider exit", async () => {
+  await db.workspace.update({ where: { id: workspaceId }, data: { settings: { runTimeoutMinutes: 1 } } });
   const runs = createRuns(ports, workspaceId);
   await queueContext();
   const run = (await runs.claimNext("foreground"))!;
   let aborted = false;
   liveRuns.set(run.id, { done: new Promise(() => {}), inject: async () => {}, abort: async () => { aborted = true; } });
-  time = new Date(run.deadlineAt.getTime() + 1);
+  time = new Date(run.deadlineAt!.getTime() + 1);
   expect(await runs.expireLeases()).toBe(1); expect(aborted).toBe(true);
   expect(await admitContextPrimitive(ports, principal, "get", { runId: run.id })).toMatchObject({ status: "unknown", active: true });
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });

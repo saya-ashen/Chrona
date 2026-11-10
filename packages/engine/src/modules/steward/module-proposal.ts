@@ -5,7 +5,9 @@ import { z } from "zod";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
 import { parseInput, StewardError } from "./errors";
 import { intentSchema, json, type ModuleContext, type BuildReport, type Proposal, type ModuleSource } from "./module-context";
-import { snapshotModule } from "./module-files";
+import { snapshotModuleMaterial, storeModuleArtifacts } from "./module-artifacts";
+import { moduleMaterialEntryPath } from "../../../../contracts/src/steward/module-material";
+import type { ModuleFile } from "./module-files";
 import { versionSource } from "./module-source";
 import { adoptModuleGitCandidate, commitModuleSource, getModuleLocalHead, readModuleSource } from "./module-git";
 import { importModuleGitBundle } from "./module-git-upstream";
@@ -65,17 +67,17 @@ function proposedModule(context: ModuleContext, manifest: Manifest, expectedModu
     return existing ?? tx.module.create({ data: { workspaceId, name: manifest.name, builtin: false, createdAt: ports.now() } });
   });
 }
-async function writeStaging(staging: string, files: { path: string; bytes: Uint8Array }[]) {
+async function writeStaging(staging: string, files: ModuleFile[]) {
   for (const file of files) {
     const target = join(staging, file.path);
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, file.bytes, { mode: 0o444 });
+    await writeFile(target, file.bytes, { mode: file.executable ? 0o555 : 0o444 });
   }
 }
 function assertDeclared(name: string, allowed?: string[]) {
   if (allowed && !allowed.includes(name)) throw new StewardError("forbidden", `This build may submit only ${allowed.join(", ")}`);
 }
-async function sourceRevision(context: ModuleContext, module: Awaited<ReturnType<typeof proposedModule>>, files: { path: string; bytes: Uint8Array }[], submission: Omit<Submission, "moduleId" | "manifest">, input: ProposalInput) {
+async function sourceRevision(context: ModuleContext, module: Awaited<ReturnType<typeof proposedModule>>, files: ModuleFile[], submission: Omit<Submission, "moduleId" | "manifest">, input: ProposalInput) {
   const repository = { platform: context.platform, moduleId: module.id };
   if (input.gitBundle) {
     if (input.gitBundle.commit !== input.sourceCommit) throw new StewardError("invalid", "Official source commit does not match bundle");
@@ -83,7 +85,8 @@ async function sourceRevision(context: ModuleContext, module: Awaited<ReturnType
   }
   if (input.sourceCommit) {
     const pinned = await readModuleSource({ ...repository, commit: input.sourceCommit });
-    if (pinned.length !== files.length || pinned.some((file, index) => file.path !== files[index]?.path || !Buffer.from(file.bytes).equals(Buffer.from(files[index]!.bytes)))) throw new StewardError("conflict", "Submitted source differs from its selected Git commit");
+    const source = await storeModuleArtifacts(context.platform, files);
+    if (pinned.length !== source.length || pinned.some((file, index) => file.path !== source[index]?.path || !!file.executable !== !!source[index]?.executable || !Buffer.from(file.bytes).equals(Buffer.from(source[index]!.bytes)))) throw new StewardError("conflict", "Submitted source differs from its selected Git commit");
     return adoptModuleGitCandidate({ ...repository, versionId: submission.versionId, commit: input.sourceCommit, parent: input.expectedLocal });
   }
   let parent: string | undefined;
@@ -93,7 +96,7 @@ async function sourceRevision(context: ModuleContext, module: Awaited<ReturnType
   }
   return commitModuleSource({ ...repository, parent, versionId: submission.versionId, files, message: submission.intent.changes.join("; ") });
 }
-async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: { path: string; bytes: Uint8Array }[], input: ProposalInput): Promise<Proposal & { retained?: boolean }> {
+async function submitStaging(context: ModuleContext, submission: Omit<Submission, "moduleId" | "manifest">, staging: string, files: ModuleFile[], input: ProposalInput): Promise<Proposal & { retained?: boolean }> {
   const { db } = context, { report, versionId } = submission;
   let { hash } = submission;
   await writeStaging(staging, files);
@@ -106,7 +109,7 @@ async function submitStaging(context: ModuleContext, submission: Omit<Submission
   hash = revision.commit;
   report.git = revision;
   const existing = await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } });
-  const hasEntry = files.some(file => file.path === manifest.entry);
+  const hasEntry = files.some(file => file.path === moduleMaterialEntryPath(manifest.entry));
   const hasMigrate = hasMigration(manifest, files);
   if (existing?.status === "approved") return { moduleId: module.id, hash, status: "approved", report: existing.report as BuildReport };
   if (!hasEntry || !hasMigrate) return { moduleId: module.id, hash, status: "rejected", report: { ...report, errors: submissionErrors(manifest, hasEntry, hasMigrate) } };
@@ -124,7 +127,7 @@ export async function propose(context: ModuleContext, input: ProposalInput, sour
 async function submitProposal(context: ModuleContext, input: ProposalInput, source: ModuleSource): Promise<Proposal> {
   const { platform } = context;
   const intent = parseInput(intentSchema, input.intent);
-  const files = await snapshotModule(input.root, input.dir);
+  const files = await snapshotModuleMaterial(input.root, input.dir);
   const hash = input.sourceCommit ?? "", report: BuildReport = { tests: [] };
   const versionId = randomUUID(), staging = join(platform, "staging", versionId);
   let retained = false;

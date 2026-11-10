@@ -140,6 +140,46 @@ test("offline diagnostics survive new service objects, are read-only and workspa
   expect(await createModules(f.ports, other.id).diagnostics()).toEqual([]);
 });
 
+test.each([299, 300, 301, 800])("%i-character incident reasons satisfy routed health and diagnostics contracts without blocking later calls", async length => {
+  const f = await fixture(); registerSystemModules();
+  const reason = "x".repeat(length);
+  await f.fail({ evidence: { ...evidence, reason } });
+  const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
+  const healthCall = await callSync(f.ports, origin, "modules.health", {});
+  const health = moduleHealthOutputSchema.parse(healthCall.output);
+  expect(health.items[0]).toMatchObject({ incident: { reason: reason.slice(0, 300) }, truncated: length > 300, open: true });
+  const diagnosticsCall = await callSync(f.ports, origin, "modules.diagnostics", { module: "example" });
+  const diagnostics = moduleDiagnosticsOutputSchema.parse(diagnosticsCall.output);
+  expect(diagnostics[0]!.incident).toEqual(health.items[0]!.incident);
+  expect(diagnostics[0]!.truncated).toBe(length > 300);
+  expect(diagnostics[0]!.incidents[0]).toMatchObject({ firstEvidence: { reason }, evidence: { reason }, attempts: [{ detail: reason }] });
+  const listed = await createModules(f.ports, f.workspace.id).list();
+  expect(listed[0]!.health).toEqual(health.items[0]!);
+  // Exercise another legitimate routed request after both diagnostic outputs were validated.
+  const next = await callSync(f.ports, origin, "modules.tools", { query: "modules.health" });
+  expect(next.output).toEqual(expect.arrayContaining([expect.objectContaining({ target: "modules.health" })]));
+  const invocations = await f.db.moduleInvocation.findMany({ where: { id: { in: [healthCall.callId, diagnosticsCall.callId, next.callId] } } });
+  expect(invocations).toHaveLength(3);
+  expect(invocations.every(item => item.status === "succeeded")).toBe(true);
+});
+
+test("long incident summaries redact credentials before clipping and retain detailed redacted evidence", async () => {
+  const f = await fixture(); registerSystemModules();
+  const prefix = "x".repeat(285), suffix = " y".repeat(200);
+  await f.fail({ evidence: { ...evidence, reason: `${prefix} password=private-example${suffix}` } });
+  const origin = { workspaceId: f.workspace.id, caller: { kind: "owner" as const, via: null }, chain: [], path: [] };
+  const output = (await callSync(f.ports, origin, "modules.diagnostics", { module: "example" })).output;
+  const [view] = moduleDiagnosticsOutputSchema.parse(output);
+  expect(view).toMatchObject({ truncated: true, incident: { reason: `${prefix} credential=[Re` } });
+  expect(view!.incident!.reason).toHaveLength(300);
+  const detailed = `${prefix} credential=[Redacted]${suffix}`;
+  expect(view!.incidents[0]).toMatchObject({ firstEvidence: { reason: detailed }, evidence: { reason: detailed }, attempts: [{ detail: detailed }] });
+  expect(JSON.stringify(output)).not.toContain("private-example");
+  expect(JSON.stringify(await f.incidents())).not.toContain("private-example");
+  const health = moduleHealthOutputSchema.parse((await callSync(f.ports, origin, "modules.health", {})).output);
+  expect(health.items[0]!.incident).toEqual(view!.incident);
+});
+
 test("health separates same-hash activations and legacy history, counts only attributed mismatches and omits stderr", async () => {
   const f = await fixture(), api = createModules(f.ports, f.workspace.id);
   const old = (await f.fail({ retry: false }))!;

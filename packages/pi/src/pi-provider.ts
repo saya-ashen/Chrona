@@ -195,11 +195,11 @@ class PiRun {
   readonly done = new Promise<Result>((resolveDone, rejectDone) => { this.complete = resolveDone; this.rejectDone = rejectDone; });
   private pending = new Map<string, { resolve(value: RecordValue): void; reject(error: Error): void }>();
 
-  constructor(private input: ProviderRunInput, private idleMs = 5 * 60_000) {
+  constructor(private input: ProviderRunInput, private idleMs?: number) {
     this.sessionId = input.sessionId;
     this.resumeSessionId = input.execution ? input.sessionId : null;
   }
-  /** A stalled model request otherwise holds the run until its deadline (20 min in background). */
+  /** Idle cancellation is opt-in; silent model turns have no implicit Run time limit. */
   private touch(event?: RecordValue) {
     if (event?.type === "tool_execution_start") {
       this.runningTools++;
@@ -209,12 +209,13 @@ class PiRun {
     }
     if (event?.type === "tool_execution_end") this.runningTools = Math.max(0, this.runningTools - 1);
     clearTimeout(this.idle);
-    if (this.inactive()) return;
+    const idleMs = this.idleMs;
+    if (this.inactive() || idleMs === undefined) return;
     this.idle = setTimeout(() => {
       // Long tool runs and open user questions are progress the RPC stream does not show.
       if (this.runningTools > 0 || this.events?.waiting) { this.touch(); return; }
-      void this.abortWith("timed_out", `Pi produced no output for ${Math.round(this.idleMs / 1000)}s`).catch(() => {});
-    }, this.idleMs);
+      void this.abortWith("timed_out", `Pi produced no output for ${Math.round(idleMs / 1000)}s`).catch(() => {});
+    }, idleMs);
   }
   private redact(text: string) {
     return providerText(stripVTControlCharacters(text), this.secrets, 1000);
@@ -442,10 +443,18 @@ class PiRun {
       this.detail = new PiDetail(this.input, this.secrets);
       this.detail.emit({ type: "state", status: "running", cancelRequested: false, stopConfirmed: false });
     }
-    const remaining = this.input.deadline.getTime() - Date.now();
-    if (!Number.isFinite(remaining) || remaining <= 0) { this.stop("timed_out", "Pi deadline exceeded"); return; }
-    this.timer = setTimeout(() => { void this.abortWith("timed_out").catch(() => {}); }, Math.min(remaining, 2_147_483_647));
+    if (this.input.deadline !== null) {
+      const remaining = this.input.deadline.getTime() - Date.now();
+      if (!Number.isFinite(remaining) || remaining <= 0) { this.stop("timed_out", "Pi deadline exceeded"); return; }
+      this.armDeadline();
+    }
     this.startup = this.prepare(config);
+  }
+  private armDeadline() {
+    if (this.inactive() || this.input.deadline === null) return;
+    const remaining = this.input.deadline.getTime() - Date.now();
+    if (remaining <= 0) { void this.abortWith("timed_out").catch(() => {}); return; }
+    this.timer = setTimeout(() => this.armDeadline(), Math.min(remaining, 2_147_483_647));
   }
   async inject(message: string, images?: ProviderRunInput["images"]) {
     if (this.inactive()) throw new Error("Pi run is not active");

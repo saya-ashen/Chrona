@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { chmod, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -159,6 +159,64 @@ test("deadline uses the same queue clearing without relabelling it as an explici
   expect((await handle.done).outcome).toBe("timed_out");
   expect((await f.commands()).map(c => c.type)).toContain("clear_queue");
   expect(await f.marked("restarted-queued")).toBe(false);
+});
+test("a Run without a deadline can finish normally", async () => {
+  const f = await fixture();
+  expect((await f.provider.start({ ...f.input, deadline: null }).done).outcome).toBe("finished");
+  expect(await f.marked("settled-1")).toBe(true);
+});
+test("a silent Run without a deadline has no default idle cancellation and remains cancellable", async () => {
+  const f = await fixture("queued");
+  // Accelerate the former five-minute watchdog so this regression stays offline and fast.
+  const schedule = globalThis.setTimeout;
+  const accelerated = Object.assign((...args: Parameters<typeof setTimeout>) => {
+    const [callback, delay, ...values] = args;
+    return schedule(callback, delay === 300_000 ? 40 : delay, ...values);
+  }, schedule);
+  const timer = spyOn(globalThis, "setTimeout").mockImplementation(accelerated);
+  const handle = f.provider.start({ ...f.input, deadline: null });
+  let completed = false;
+  void handle.done.then(() => { completed = true; });
+  try {
+    await until(async () => (await f.commands()).some(c => c.type === "prompt"));
+    await Bun.sleep(150);
+    expect(completed).toBe(false);
+    await handle.inject("Persisted input during an unlimited Run");
+    expect((await f.commands()).map(c => c.type)).not.toContain("clear_queue");
+  } finally {
+    timer.mockRestore();
+    await handle.abort();
+  }
+  expect(await handle.done).toMatchObject({ outcome: "failed", error: "Pi run aborted" });
+  expect((await f.commands()).map(c => c.type)).toContain("clear_queue");
+  expect(await f.marked("last-write")).toBe(true);
+});
+test("a deadline beyond the timer range rearms instead of expiring early", async () => {
+  const f = await fixture("queued"), schedule = globalThis.setTimeout;
+  let chunks = 0, completed = false;
+  const accelerated = Object.assign((...args: Parameters<typeof setTimeout>) => {
+    const [callback, delay, ...values] = args;
+    if (delay === 2_147_483_647) chunks++;
+    return schedule(callback, delay === 2_147_483_647 ? 40 : delay, ...values);
+  }, schedule);
+  const timer = spyOn(globalThis, "setTimeout").mockImplementation(accelerated);
+  const handle = f.provider.start({ ...f.input, deadline: new Date(Date.now() + 31_536_000_000) });
+  void handle.done.then(() => { completed = true; });
+  try {
+    await until(async () => (await f.commands()).some(c => c.type === "prompt"));
+    await Bun.sleep(130);
+    expect(chunks).toBeGreaterThan(1);
+    expect(completed).toBe(false);
+    await handle.inject("Still within the explicit deadline");
+  } finally { timer.mockRestore(); await handle.abort(); }
+  expect((await handle.done).outcome).toBe("failed");
+});
+test("an explicit idle timeout still cancels a Run without a deadline", async () => {
+  const f = await fixture("queued");
+  const handle = createPiProvider({ ...f.options, idleTimeoutMs: 100 }).start({ ...f.input, deadline: null });
+  expect(await handle.done).toMatchObject({ outcome: "timed_out", error: expect.stringContaining("Pi produced no output") });
+  expect((await f.commands()).map(c => c.type)).toContain("clear_queue");
+  expect(await f.marked("last-write")).toBe(true);
 });
 test("a silent model turn ends on the idle timeout, long before the deadline", async () => {
   const f = await fixture("queued"), started = Date.now();

@@ -1,8 +1,11 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { defineCatalog } from "@json-render/core";
+import { schema } from "@json-render/react/schema";
 import { BUILTIN_ACTIONS, CATALOG_VERSION, callParams, catalog, components as definitions } from "./catalog";
 import { expandComponents, type PageSpec } from "./composition";
+import { componentOwner, createExecutableComponents, executablePropErrors, extension, type ComponentExtension, type ExecutableComponent } from "./executable-components";
 
 /**
  * Pages apps register with web (module-dependency-direction §4): an app sends a json-render spec plus references to its
@@ -10,11 +13,11 @@ import { expandComponents, type PageSpec } from "./composition";
  */
 type Args = Record<string, unknown>;
 type Schema = { properties?: Record<string, unknown>; required?: string[] };
-export type Caller = { kind: string; module?: string; moduleId?: string };
+export type Caller = { kind: string; module?: string; moduleId?: string; hash?: string };
 export type ModuleState = { id: string; name: string; status: string; activeHash: string | null };
 export type PageTool = { inputSchema: Schema; moduleId: string; contractHash: string };
 /** `keyed`: the app's tools that take a request key (the page sends a fresh one per press); `needs`: each source's required arguments (not read while one is empty). */
-export type Page = { module: string; moduleId: string; revision: string; contracts: Record<string, string>; id: string; title: string; purpose?: "settings"; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace"; content?: { tool: string } };
+export type Page = { module: string; moduleId: string; hash?: string; extensions?: Record<string, ComponentExtension>; templates?: string[]; revision: string; contracts: Record<string, string>; id: string; title: string; purpose?: "settings"; data: Record<string, Source>; spec: Spec; keyed: string[]; needs: Record<string, string[]>; catalog: string; updatedAt: string; layout?: "document" | "workspace"; content?: { tool: string } };
 type Source = { tool: string; args?: Args; refresh?: number };
 type Spec = { root: string; elements: Record<string, Element>; state?: Args };
 type Element = { type: string; props?: Args; children?: string[]; on?: Record<string, unknown>; [key: string]: unknown };
@@ -47,7 +50,7 @@ function checkBinding(where: string, binding: unknown, tools: Map<string, Schema
 }
 /** catalog.validate checks only the spec's structure, so components, props and actions are checked here. */
 // eslint-disable-next-line complexity -- Keep app-supplied spec validation and its ordered diagnostics together.
-export function pageErrors(input: { spec: unknown; data?: unknown; components?: unknown; layout?: unknown; content?: unknown; purpose?: unknown }, tools: Map<string, Schema>, module: string) {
+export function pageErrors(input: { spec: unknown; data?: unknown; components?: unknown; layout?: unknown; content?: unknown; purpose?: unknown }, tools: Map<string, Schema>, module: string, extensions: Map<string, ComponentExtension> = new Map()) {
   if (input.purpose !== undefined && input.purpose !== "settings") return ["purpose 须为 settings 或不填写"];
   if (input.layout !== undefined && input.layout !== "document" && input.layout !== "workspace") return ["layout 须为 document 或 workspace"];
   if (input.components !== undefined) {
@@ -55,7 +58,19 @@ export function pageErrors(input: { spec: unknown; data?: unknown; components?: 
     catch (error) { return [(error as Error).message]; }
   }
   if (Buffer.byteLength(JSON.stringify({ spec: input.spec, data: input.data })) > MAX_BYTES) return ["展开后的页面最多 64 KiB"];
-  const errors: string[] = [], structure = catalog.validate(input.spec);
+  // The catalog's type enum otherwise prints every built-in for an unknown app component.
+  if (record(input.spec) && record(input.spec.elements)) {
+    const unknown = Object.entries(input.spec.elements).flatMap(([key, element]) => {
+      if (!record(element) || typeof element.type !== "string" || !element.type.includes(":") || Object.hasOwn(definitions, element.type) || extensions.has(element.type)) return [];
+      return [`elements.${key.slice(0, 80)}: 未知自定义组件 ${element.type.slice(0, 80)}；请先调用 web.component-set 并原样使用返回的 type（当前应用前缀 ${module}:），或在 components 中声明本应用模板`];
+    });
+    if (unknown.length) return unknown.slice(0, 5);
+  }
+  const extended = extensions.size ? defineCatalog(schema, {
+    components: { ...definitions, ...Object.fromEntries([...extensions].map(([name, component]) => [name, { props: z.object({}).catchall(z.unknown()), events: component.events, slots: component.slots, description: "Trusted app executable component" }])) },
+    actions: { call: { params: callParams, description: "Call a pinned app tool" } },
+  }) : catalog;
+  const errors: string[] = [], structure = extended.validate(input.spec);
   if (input.content !== undefined) {
     if (!record(input.content) || Object.keys(input.content).some(key => key !== "tool") || typeof input.content.tool !== "string" || !SLUG.test(input.content.tool)) errors.push("content 须为 {tool: 本应用工具名}");
     else {
@@ -68,10 +83,15 @@ export function pageErrors(input: { spec: unknown; data?: unknown; components?: 
   const elements = (input.spec as Spec).elements;
   if (Object.keys(elements).length > MAX_ELEMENTS) errors.push(`元素最多 ${MAX_ELEMENTS} 个`);
   for (const [key, element] of Object.entries(elements)) {
-    const definition = (definitions as Partial<typeof definitions>)[element.type], where = `elements.${key}`;
+    const builtin = Object.hasOwn(definitions, element.type) ? (definitions as Partial<typeof definitions>)[element.type] : undefined;
+    const custom = extensions.get(element.type), definition = builtin ?? custom, where = `elements.${key}`;
     if (!definition) { errors.push(`${where}: 未知组件 ${element.type}`); continue; }
-    for (const [name, value] of Object.entries(element.props ?? {})) {
-      const prop = (definition.props.shape as Partial<typeof definition.props.shape>)[name];
+    if (custom) {
+      errors.push(...executablePropErrors(where, custom, element.props ?? {}));
+      if (element.children?.length && !custom.slots.includes("default")) errors.push(`${where}: ${element.type} 没有 default 插槽`);
+      for (const tool of custom.tools) checkArgs(where, tool, undefined, tools, errors);
+    } else if (builtin) for (const [name, value] of Object.entries(element.props ?? {})) {
+      const prop = (builtin.props.shape as Partial<typeof builtin.props.shape>)[name];
       if (!prop) errors.push(`${where}.props.${name}: ${element.type} 没有这个属性`);
       else if (!dynamic(value) && !prop.safeParse(value).success) errors.push(`${where}.props.${name}: 值不符合 ${element.type} 的定义`);
     }
@@ -113,8 +133,77 @@ function assertRegistration(args: Args) {
 }
 const stalePage = () => Object.assign(new Error("页面登记已失效，请应用重新登记页面"), { code: "conflict" });
 
+type PageOwner = { module: string; moduleId: string; caller: Caller };
+function pageOwner(caller: Caller | undefined): PageOwner {
+  const module = caller?.kind === "module" ? caller.module : undefined, moduleId = caller?.moduleId;
+  if (!module || !moduleId) throw Object.assign(new Error("只有身份完整的应用可以登记页面"), { code: "forbidden" });
+  return { module, moduleId, caller: caller! };
+}
+type PageStore = {
+  load: () => Promise<Page[]>;
+  save: (pages: Page[]) => Promise<void>;
+  knownPages: () => Promise<{ modules: ModuleState[]; pages: Page[] }>;
+};
+async function pageComposition(components: ReturnType<typeof createExecutableComponents>, owner: PageOwner, args: Args, modules: ModuleState[]) {
+  const { module, moduleId, caller } = owner;
+  const available = await components.available(module, moduleId, modules);
+  const templates = record(args.components) ? Object.keys(args.components) : [];
+  const registered = await components.names(module, moduleId);
+  if (templates.some(name => registered.has(name))) throw invalid("声明式组件不能与已登记的可执行组件重名");
+  const spec: PageSpec = expandComponents(args.spec, args.components, module);
+  const used = new Set(Object.values(spec.elements).map(element => element.type));
+  const extensions = new Map([...available].filter(([name]) => used.has(name)).map(([name, component]) => [name, extension(component)]));
+  // Preserve the registering version even for ordinary declarative pages. Legacy
+  // callers without a version can register those pages, but cannot prove delivery.
+  const hash = extensions.size || caller.hash !== undefined ? componentOwner(caller, modules).hash : undefined;
+  return { spec, templates, extensions, hash };
+}
+function assertPageCapacity(others: Page[], module: string, moduleId: string, purpose: unknown) {
+  if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
+  if (purpose === "settings" && others.some(page => page.moduleId === moduleId && page.purpose === "settings")) throw Object.assign(new Error("每个应用只能登记一个设置页面，请更新原页面或先移除原登记"), { code: "conflict" });
+}
+async function registerPage(deps: Deps, store: PageStore, components: ReturnType<typeof createExecutableComponents>, owner: PageOwner, args: Args) {
+  const { module, moduleId } = owner;
+  const { knownPages, load, save } = store;
+  const { data, content, purpose } = args, { id, title } = assertRegistration(args);
+  const { modules } = await knownPages();
+  if (!activeOwner(modules, moduleId, module)) throw Object.assign(new Error("应用身份已失效或尚未启用，请启用后重新登记页面"), { code: "conflict" });
+  const { spec, templates, extensions, hash } = await pageComposition(components, owner, args, modules);
+  const layout = args.layout === undefined ? "document" : args.layout;
+  const current = await deps.tools(module);
+  if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
+  // Discovery includes only tools Web may actually call, with the real caller's visibility.
+  const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
+  const errors = pageErrors({ spec, data, layout, content, purpose }, tools, module, extensions);
+  if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
+  const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
+  assertPageCapacity(others, module, moduleId, purpose);
+  const keyed = [...tools].filter(([, schema]) => schema.properties && Object.hasOwn(schema.properties, "request-key")).map(([name]) => name);
+  const sources = (data ?? {}) as Record<string, Source>;
+  const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
+  const provider = content as Page["content"];
+  const contracts = Object.fromEntries([...references(spec as Spec, sources), ...[...extensions.values()].flatMap(component => component.tools), ...(provider ? [provider.tool] : [])].map(name => [name, current.get(name)!.contractHash]));
+  const revision = crypto.randomUUID();
+  const page: Page = { module, moduleId, ...(hash ? { hash } : {}), ...(extensions.size ? { extensions: Object.fromEntries(extensions) } : {}), ...(templates.length ? { templates } : {}), revision, contracts, id, title: title.trim(), ...(purpose === "settings" ? { purpose } : {}), data: sources, content: provider, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
+  await save([...others, page]);
+  return { id, catalog: CATALOG_VERSION };
+}
+
+function pinnedPageExtensions(page: Page, owner: ModuleState, available: Map<string, ExecutableComponent>) {
+  const extensions = new Map<string, ComponentExtension>();
+  if (page.extensions) {
+    if (page.hash !== owner.activeHash || owner.name !== page.module) throw stalePage();
+    for (const [name, pinned] of Object.entries(page.extensions)) {
+      const component = available.get(name);
+      if (!component || JSON.stringify(extension(component)) !== JSON.stringify(pinned) || component.tools.some(tool => !Object.hasOwn(page.contracts, tool))) throw stalePage();
+      extensions.set(name, extension(component));
+    }
+  }
+  return extensions;
+}
+
 export function createPages(deps: Deps) {
-  const file = join(deps.dataDir, "pages.json");
+  const file = join(deps.dataDir, "pages.json"), components = createExecutableComponents(deps.dataDir);
   let pages: Page[] | undefined;
   async function load() {
     if (pages) return pages;
@@ -137,31 +226,6 @@ export function createPages(deps: Deps) {
     if (kept.length !== all.length) await save(kept);
     return { modules, pages: kept };
   }
-  async function set(module: string, moduleId: string, args: Args) {
-    const { data, content, purpose } = args, { id, title } = assertRegistration(args);
-    const spec: PageSpec = expandComponents(args.spec, args.components, module);
-    const layout = args.layout === undefined ? "document" : args.layout;
-    const { modules } = await knownPages();
-    if (!activeOwner(modules, moduleId, module)) throw Object.assign(new Error("应用身份已失效或尚未启用，请启用后重新登记页面"), { code: "conflict" });
-    const current = await deps.tools(module);
-    if ([...current.values()].some(tool => tool.moduleId !== moduleId || !/^[a-f0-9]{64}$/.test(tool.contractHash))) throw Object.assign(new Error("应用工具身份不匹配，请重新登记页面"), { code: "conflict" });
-    // Discovery includes only tools Web may actually call, with the real caller's visibility.
-    const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
-    const errors = pageErrors({ spec, data, layout, content, purpose }, tools, module);
-    if (errors.length) throw invalid(`页面无效：${errors.slice(0, 10).join("；")}`);
-    const all = await load(), others = all.filter(page => !(page.module === module && page.id === id));
-    if (others.filter(page => page.module === module).length >= MAX_PAGES) throw invalid(`每个应用最多 ${MAX_PAGES} 个页面`);
-    if (purpose === "settings" && others.some(page => page.moduleId === moduleId && page.purpose === "settings")) throw Object.assign(new Error("每个应用只能登记一个设置页面，请更新原页面或先移除原登记"), { code: "conflict" });
-    const keyed = [...tools].filter(([, schema]) => schema.properties && Object.hasOwn(schema.properties, "request-key")).map(([name]) => name);
-    const sources = (data ?? {}) as Record<string, Source>;
-    const needs = Object.fromEntries(Object.entries(sources).map(([key, source]) => [key, tools.get(source.tool)?.required ?? []]));
-    const provider = content as Page["content"];
-    const contracts = Object.fromEntries([...references(spec as Spec, sources), ...(provider ? [provider.tool] : [])].map(name => [name, current.get(name)!.contractHash]));
-    const revision = crypto.randomUUID();
-    const page: Page = { module, moduleId, revision, contracts, id, title: title.trim(), ...(purpose === "settings" ? { purpose } : {}), data: sources, content: provider, spec: spec as Spec, layout: layout as Page["layout"], keyed, needs, catalog: CATALOG_VERSION, updatedAt: (deps.now?.() ?? new Date()).toISOString() };
-    await save([...others, page]);
-    return { id, catalog: CATALOG_VERSION };
-  }
   async function validatedTools(page: Page, modules: ModuleState[]) {
     assertPageIdentity(page);
     const owner = modules.find(item => item.id === page.moduleId);
@@ -172,8 +236,18 @@ export function createPages(deps: Deps) {
       if (!tool || tool.moduleId !== owner.id || tool.contractHash !== contract) throw stalePage();
     }
     const tools = new Map([...current].map(([name, tool]) => [name, tool.inputSchema]));
-    if (pageErrors(page, tools, page.module).length) throw stalePage();
+    const available = await components.available(page.module, page.moduleId, modules);
+    const extensions = pinnedPageExtensions(page, owner, available);
+    if (pageErrors(page, tools, page.module, extensions).length) throw stalePage();
     return tools;
+  }
+  async function mutateComponent(name: string, args: Args, owner: PageOwner) {
+    const { module, moduleId, caller } = owner;
+    const { modules, pages } = await knownPages();
+    componentOwner(caller, modules);
+    if (name === "component-remove") return components.remove(args, caller, modules);
+    if (pages.some(page => page.moduleId === moduleId && page.templates?.includes(`${module}:${String(args.name)}`))) throw invalid("可执行组件不能与已登记的声明式组件重名");
+    return components.set(args, caller, modules);
   }
   // Page reads may prune deleted owners; serialize them with registration/removal saves.
   let pending: Promise<unknown> = Promise.resolve();
@@ -184,9 +258,9 @@ export function createPages(deps: Deps) {
     /** Tools other modules call. Pages belong to the caller Chrona recorded, never to a name in the arguments. */
     tool(name: string, args: Args, caller: Caller | undefined) { return exclusive(async () => {
       if (name === "catalog") return describeCatalog();
-      const module = caller?.kind === "module" ? caller.module : undefined, moduleId = caller?.moduleId;
-      if (!module || !moduleId) throw Object.assign(new Error("只有身份完整的应用可以登记页面"), { code: "forbidden" });
-      if (name === "page-set") return set(module, moduleId, args);
+      const owner = pageOwner(caller), { moduleId } = owner;
+      if (name === "component-set" || name === "component-remove") return mutateComponent(name, args, owner);
+      if (name === "page-set") return registerPage(deps, { knownPages, load, save }, components, owner, args);
       if (name === "page-remove") {
         const all = await load(), next = all.filter(page => !(page.moduleId === moduleId && page.id === args.id));
         if (next.length !== all.length) await save(next);
@@ -204,6 +278,10 @@ export function createPages(deps: Deps) {
         available.push(page);
       }
       return available.map(({ module, moduleId, id, title, purpose }) => ({ module, moduleId, id, title, ...(purpose ? { purpose } : {}) }));
+    }); },
+    component(module: string, name: string, revision: string | null) { return exclusive(async () => {
+      const { modules } = await knownPages();
+      return components.get(module, name, revision, modules);
     }); },
     get(module: string, id: string) { return exclusive(async () => {
       const { modules, pages } = await knownPages(), page = pages.find(page => page.module === module && page.id === id);
@@ -239,7 +317,8 @@ export function describeCatalog() {
     rules: [
       "page-set {id, title, purpose?: settings, layout?: document|workspace, components?, data?, content?: {tool}, spec}: spec is a json-render spec {root, elements:{key:{type, props, children:[keys], slots?:{name:[keys]}, on?}}}. Workspace accepts slots.sidebar alongside default children.",
       "purpose: settings marks the app-owned settings page. At most one per app; updating the same id replaces it. Omit purpose for ordinary pages. Settings navigation uses this metadata, never a tool or page id convention.",
-      "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Names must use your app prefix; definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",
+      "components: {app:Name:{props:{type:object,properties:{name:JSONSchema},required?:[names],additionalProperties:false},events?:[names],slots?:[names],spec:{root,elements}}}. Use {$prop:name} for a passed prop, {$event:name} for a caller event binding, and child key $slot:name for supplied children. Here app is a placeholder for your actual module name (e.g. music:Card); definitions belong to this page revision, expand before tool checks, and cannot contain scripts or private state. Max 16 definitions, 8 nesting levels, 300 expanded nodes.",
+      "component-set {name: AudioPlayer, javascript, css?, props: {type: object, properties, required?, additionalProperties: false}, events?, slots?, tools?} registers trusted self-contained browser ESM default export mount(element, {props, emit(event), call(tool,args), children?}) returning cleanup or {update?,destroy?}. Returns {name, type, revision}; use the returned type verbatim in spec.elements (e.g. music:AudioPlayer for an app named music). The app prefix is the caller's actual module name, never the literal placeholder app. Default children require slot default. Only the real active approved app version can register. Prop schemas support primitive types, scalar enum/const, typed string/number constraints, nested objects/arrays (max 16 levels); unsupported keywords including refs, schema combinators, format and contains are rejected. Max 256 KiB and 16/app. component-remove {name} invalidates dependent pages. Re-register pages after component changes. Declared tools are own app tool names, must be visible to Web, and are pinned by the page; call uses the existing page-bound call route. Executable code runs trusted in the authenticated browser origin, without isolation. GET /api/web/components/:app/:name?revision=... serves JSON source under existing API authentication. Page extensions provide revision, props, events, slots, tools.",
       "content: {tool} explicitly declares your own readable tool for Image. Web calls it with {ref}, restricted to your app/ prefix, pinned to the registered module identity and tool contract. Return null or {base64, mime}; only bounded PNG/JPEG/GIF/WebP raster images (max 8 MiB) are accepted. Without content, images cannot be read. Tool visibility must admit Web; no global content reader.",
       "data: {name: {tool, args?, refresh?}} calls one of your own tools when the page opens (and every refresh seconds, 5-3600); the result is state /name. args may use {\"$state\": \"/path\"}; data is re-read when such a value changes.",
       "Props may use {\"$state\": \"/path\"}, {\"$bindState\": \"/path\"} for inputs, {\"$template\": \"${field}/\"}, and repeat/$item for lists. In a top-level action param $item is the item's state path; use {\"$template\": \"${field}\"} for its value (nested call args resolve $item to the value).",

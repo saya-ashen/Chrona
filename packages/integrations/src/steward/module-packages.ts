@@ -18,13 +18,22 @@ async function run(command: string[], cwd: string, timeoutMs: number, processHel
   return { code: exit.signal || exit.stop.reason !== "exit" ? 1 : exit.code, output };
 }
 
+/** Classify only explicit installer evidence; ambiguous failures retain the original diagnostic. */
+function installFailure(command: string, output: string) {
+  const cause = /lockfile had changes, but lockfile is frozen/i.test(output)
+    ? "lockfile mismatch"
+    : /(?:offline mode|network connectivity is disabled)/i.test(output) && /(?:(?:not|wasn't) (?:found|available).*cache|could not find.*cache|cache.*(?:miss|not found))/i.test(output)
+      ? "offline dependency unavailable in cache" : null;
+  return `${command} failed${cause ? ` (${cause})` : ""}:\n${output}`;
+}
+
 async function installNpm(dir: string, timeoutMs: number, has: (file: string) => boolean, processHelper?: string) {
   if (!has("package.json")) return undefined;
   if (!has("bun.lock")) return "package.json needs bun.lock: run bun install and submit the lockfile";
   const bun = Bun.which("bun");
   if (!bun) return "bun is not available on this host";
   const result = await run([bun, "install", "--frozen-lockfile", "--ignore-scripts", "--no-progress"], dir, timeoutMs, processHelper);
-  return result.code === 0 ? true : `bun install --frozen-lockfile failed:\n${result.output}`;
+  return result.code === 0 ? true : installFailure("bun install --frozen-lockfile", result.output);
 }
 
 async function installPython(dir: string, timeoutMs: number, has: (file: string) => boolean, processHelper?: string) {
@@ -36,7 +45,7 @@ async function installPython(dir: string, timeoutMs: number, has: (file: string)
   if (!python) return "python3 or python is not available on this host";
   // uv creates .venv/bin on POSIX and .venv/Scripts on Windows using this host interpreter.
   const result = await run([uv, "sync", "--frozen", "--python", python, "--no-python-downloads"], dir, timeoutMs, processHelper);
-  return result.code === 0 ? true : `uv sync --frozen failed:\n${result.output}`;
+  return result.code === 0 ? true : installFailure("uv sync --frozen", result.output);
 }
 
 /** Language libraries come from lockfiles; declared programs must already be installed on the host. */

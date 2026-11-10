@@ -4,16 +4,16 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/web.git",
+      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/web.git",
       "branch": "main",
-      "commit": "021c1933b58ab6b99ee4a5b6ac017035805d4fe9"
+      "commit": "93e2ab0df290cfac8842ff890c6164327b303d63"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/mcp.git",
+      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/mcp.git",
       "branch": "main",
-      "commit": "29ac2a7865a2d598334111476fd1a7b0c30719ea"
+      "commit": "3767a05c54a8d975d1a3d3275853764dc871425b"
     },
     {
       "name": "files",
@@ -39,23 +39,23 @@
     {
       "name": "agent",
       "proposedRepository": "chrona-core/chrona-module-agent",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/agent.git",
+      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/agent.git",
       "branch": "main",
-      "commit": "2486d8c8c8e3ef4ebe2af168c42b11729b56b990"
+      "commit": "275c6a25f73be6923565918c4079f374a6f79989"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/qq.git",
+      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/qq.git",
       "branch": "main",
-      "commit": "6c3312c5f1a9d083465e465cd953f86af54b2ab1"
+      "commit": "d34e87d8b57882f748e9fde761df6d59e599830c"
     },
     {
       "name": "author",
       "proposedRepository": "chrona-core/chrona-module-author",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/author.git",
+      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/author.git",
       "branch": "main",
-      "commit": "c0e74db32c94a2ce1f20286d0aa390c11e5e55dd"
+      "commit": "6c9c45787cd6044ee8c25b989d52ef0eb3cd7ae3"
     },
     {
       "name": "remind",

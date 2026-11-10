@@ -38,6 +38,25 @@ test("internal build governance defaults to 20/60/5; partial edits preserve unre
   expect(await f.db.audit.findFirst({ where: { kind: "settings_updated" } })).not.toBeNull();
 });
 
+test("task timeout defaults to unlimited, persists only explicit values, and can be cleared", async () => {
+  const f = await fixture();
+  expect((await f.settings().get()).runTimeoutMinutes).toBeNull();
+  expect((await f.settings().update({ runTimeoutMinutes: 45 })).runTimeoutMinutes).toBe(45);
+  expect((await f.settings().update({ timezone: "UTC" })).runTimeoutMinutes).toBe(45);
+  expect((await f.settings().update({ runTimeoutMinutes: null })).runTimeoutMinutes).toBeNull();
+  expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toMatchObject({ custom: "preserve", runTimeoutMinutes: null });
+});
+
+test("invalid task timeouts leave persisted settings unchanged", async () => {
+  const f = await fixture();
+  await f.settings().update({ runTimeoutMinutes: 30 });
+  const before = await f.settings().get();
+  for (const runTimeoutMinutes of [0, -1, 1.5, 525601, "5"]) {
+    await expect(f.settings().update({ runTimeoutMinutes })).rejects.toMatchObject({ code: "invalid" });
+    expect(await f.settings().get()).toEqual(before);
+  }
+});
+
 test("kernel settings reject application authoring policy atomically", async () => {
   const f = await fixture();
   const before = await f.settings().get();
@@ -89,7 +108,7 @@ test("build claim snapshots owner budgets, leaves running work unchanged and inf
   await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Build" });
   await f.builds().update({ timeoutMinutes: 17, maxSubmissions: 3 });
   const first = (await runs.claimNext("build"))!;
-  expect(first.deadlineAt.getTime() - f.ports.now().getTime()).toBe(17 * 60_000);
+  expect(first.deadlineAt!.getTime() - f.ports.now().getTime()).toBe(17 * 60_000);
   expect(first.leaseUntil).toEqual(first.deadlineAt);
   expect(first.prompt).toContain("at most 3 candidate submissions");
   const snapshot = await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: first.id } });
@@ -100,16 +119,17 @@ test("build claim snapshots owner budgets, leaves running work unchanged and inf
   await f.db.run.update({ where: { id: first.id }, data: { status: "finished" } });
   await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "build", prompt: "Continue" });
   const next = (await runs.claimNext("build"))!;
-  expect(next.deadlineAt.getTime() - f.ports.now().getTime()).toBe(90 * 60_000);
+  expect(next.deadlineAt!.getTime() - f.ports.now().getTime()).toBe(90 * 60_000);
   expect(next.prompt).toContain("at most 7 candidate submissions");
 });
 
-for (const [lane, minutes] of [["foreground", 5], ["background", 20]] as const) test(`build settings do not change ${lane}`, async () => {
+for (const lane of ["foreground", "background"] as const) test(`build settings do not impose a timeout on ${lane}`, async () => {
   const f = await fixture();
   await f.builds().update({ timeoutMinutes: 120 });
   const runs = createRuns(f.ports, f.workspaceId);
   const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, key: "web:other", source: "web" } });
   await runs.enqueue({ sessionId: session.id, lane, trigger: "message", prompt: "Other work" });
   const run = (await runs.claimNext(lane))!;
-  expect(run.deadlineAt.getTime() - f.ports.now().getTime()).toBe(minutes * 60_000);
+  expect(run.deadlineAt).toBeNull();
+  expect(run.leaseUntil).toBeNull();
 });

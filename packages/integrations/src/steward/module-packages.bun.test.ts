@@ -31,6 +31,14 @@ test("npm libraries install only from bun.lock, without install scripts, and mod
     const run = Bun.spawnSync([process.execPath, "test.ts"], { cwd: w.dir });
     expect(run.exitCode).toBe(0);
     expect(run.stdout.toString()).toBe("42\n");
+    const lock = await readFile(join(w.dir, "bun.lock"), "utf8");
+    await writeFile(join(w.dir, "package.json"), JSON.stringify({ name: "m", dependencies: { dep: `file:${join(w.root, "dep")}`, second: `file:${join(w.root, "dep")}` } }));
+    const mismatch = await packages.install({ dir: w.dir, packages: [] });
+    expect(mismatch.installed.npm).toBe(false);
+    expect(mismatch.errors).toHaveLength(1);
+    expect(mismatch.errors[0]).toContain("bun install --frozen-lockfile failed (lockfile mismatch):");
+    expect(await readFile(join(w.dir, "bun.lock"), "utf8")).toBe(lock);
+    expect(existsSync(join(w.root, "postinstall-ran"))).toBe(false);
   } finally { await w.cleanup(); }
 }, 60_000);
 
@@ -103,6 +111,36 @@ test("tools are resolved at install time, only as needed, without Nix or package
 });
 
 for (const installer of ["bun", "uv"] as const) {
+  test.skipIf(process.platform !== "linux").each([
+    { output: "error: lockfile had changes, but lockfile is frozen", cause: "lockfile mismatch" },
+    { output: "Network connectivity is disabled, but the requested package wasn't found in the cache", cause: "offline dependency unavailable in cache" },
+    { output: "error: package not found in the package cache (offline mode)", cause: "offline dependency unavailable in cache" },
+    { output: "error: registry request failed: connection refused", cause: null },
+    { output: "error: cache miss while downloading package", cause: null },
+    { output: "error: offline mode: permission denied reading lockfile", cause: null },
+  ])(`${installer} reports precise evidenced install failures: %p`, async ({ output, cause }) => {
+    const w = await workspace(), executable = join(w.root, "installer"), record = join(w.dir, "invocation.json");
+    const which = spyOn(Bun, "which").mockImplementation(name => name === installer ? executable : process.execPath);
+    const key = "CHRONA_DEPENDENCY_TEST_TOKEN", previous = process.env[key];
+    process.env[key] = "synthetic-private-dependency-token";
+    try {
+      for (const file of installer === "bun" ? ["package.json", "bun.lock"] : ["pyproject.toml", "uv.lock"]) await writeFile(join(w.dir, file), "");
+      await writeFile(executable, `#!${process.execPath}
+import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), secret: process.env.${key} ?? null }));
+console.error(${JSON.stringify(output)});
+process.exit(1);
+`);
+      await chmod(executable, 0o755);
+      const result = await createModulePackages().install({ dir: w.dir, packages: [] });
+      const command = installer === "bun" ? "bun install --frozen-lockfile" : "uv sync --frozen";
+      expect(result).toEqual({ errors: [`${command} failed${cause ? ` (${cause})` : ""}:\n${output}\n`], installed: { npm: false, python: false, packages: {} } });
+      expect(JSON.parse(await readFile(record, "utf8"))).toEqual({ args: installer === "bun" ? ["install", "--frozen-lockfile", "--ignore-scripts", "--no-progress"] : ["sync", "--frozen", "--python", process.execPath, "--no-python-downloads"], cwd: w.dir, secret: null });
+    } finally {
+      if (previous === undefined) delete process.env[key]; else process.env[key] = previous;
+      which.mockRestore(); await w.cleanup();
+    }
+  });
   for (const mode of ["exit", "timeout", "unknown"] as const) test.skipIf(process.platform !== "linux")(`${installer} installer ${mode} requires descendant-stop proof`, async () => {
     const w = await workspace(), executable = join(w.root, "installer"), pidFile = join(w.dir, "descendant.pid");
     const which = spyOn(Bun, "which").mockImplementation(name => name === installer ? executable : process.execPath);

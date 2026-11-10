@@ -11,6 +11,7 @@ import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
 import { providerCancelKey } from "./provider-journal";
 import { createRuns } from "./runs";
+import { createTools } from "./tools";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -55,6 +56,8 @@ async function fixture() {
 test("detached entry preserves the original principal for self-owned and cross-module tools", async () => {
   const f = await fixture();
   const caller = { ...f.principal.caller, module: f.origin.name };
+  expect(f.run).toMatchObject({ deadlineAt: null, leaseUntil: null });
+  expect(await createTools(f.ports).call(f.run.token, "m_context_origin_observe", {}, { timeoutSeconds: 5 })).toEqual({ result: { caller } });
   expect(await f.invoke("m_context_origin_observe")).toEqual({ result: { caller } });
   // The peer can call back into the original module: that module has no waiting event.
   expect(await f.invoke("m_context_peer_back")).toMatchObject({ result: { result: { output: { caller: { kind: "module", moduleId: f.other.id, module: f.other.name, hash: f.other.activeHash } } } } });

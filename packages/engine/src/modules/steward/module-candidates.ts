@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { moduleMaterialEntryPath } from "../../../../contracts/src/steward/module-material";
+import { randomUUID } from "node:crypto";
 import { lstat, mkdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -7,8 +8,9 @@ import type { Caller } from "./module-call-types";
 import type { StewardPorts } from "./ports";
 import { parseInput, StewardError } from "./errors";
 import { json, moduleContext, type ModuleContext } from "./module-context";
-import { checkoutModule, snapshotModule } from "./module-files";
-import { commitModuleSource, readModuleSource, type ModuleGitFile, type ModuleGitRevision } from "./module-git";
+import { checkoutModule } from "./module-files";
+import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
+import { commitModuleSource, readModuleMaterial, type ModuleGitRevision } from "./module-git";
 import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRecordSchema, candidateRequestId, readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb, type CandidateSet } from "./module-candidate-records";
 export { findCandidateSet } from "./module-candidate-records";
 
@@ -19,11 +21,6 @@ async function confinedMaterial<T>(operation: () => Promise<T>): Promise<T> {
     const code = (error as NodeJS.ErrnoException).code;
     throw new StewardError(code === "ENOENT" ? "not_found" : "invalid", "Candidate material is unavailable or unsafe");
   }
-}
-function materialDigest(files: ModuleGitFile[]) {
-  const digest = createHash("sha256");
-  for (const file of files) digest.update(file.path).update("\0").update(file.bytes).update("\0");
-  return digest.digest("hex");
 }
 async function ownContent(context: ModuleContext, moduleId: string) {
   if (!/^[a-zA-Z0-9_-]+$/.test(moduleId)) throw new StewardError("forbidden", "Unsafe content identity");
@@ -98,15 +95,15 @@ async function freezeItems(context: ModuleContext, admission: CandidateAdmission
   const root = await ownContent(context, admission.input.submitter.moduleId);
   const frozen = [];
   for (const item of input.items) {
-    const files = await snapshotModule(root, item.dir);
+    const files = await snapshotModuleMaterial(root, item.dir);
     const manifestFile = files.find(file => file.path === "module.json");
     let rawManifest: unknown;
     try { rawManifest = JSON.parse(Buffer.from(manifestFile?.bytes ?? []).toString("utf8")); }
     catch { throw new StewardError("invalid", "Candidate module.json is missing or invalid"); }
     const manifest = parseInput(moduleManifestSchema, rawManifest);
-    if (manifest.name !== item.name || !files.some(file => file.path === manifest.entry) || (manifest.data.migrate && !files.some(file => file.path === manifest.data.migrate))) throw new StewardError("invalid", "Candidate name, entry or migration material does not match its manifest");
+    if (manifest.name !== item.name || !files.some(file => file.path === moduleMaterialEntryPath(manifest.entry)) || (manifest.data.migrate && !files.some(file => file.path === manifest.data.migrate))) throw new StewardError("invalid", "Candidate name, entry or migration material does not match its manifest");
     const target = admission.input.targets.find(target => target.name === item.name)!;
-    frozen.push({ item, target, manifest, files, moduleId: target.moduleId ?? randomUUID(), versionId: randomUUID(), materialDigest: materialDigest(files) });
+    frozen.push({ item, target, manifest, files, moduleId: target.moduleId ?? randomUUID(), versionId: randomUUID(), materialDigest: moduleMaterialDigest(files) });
   }
   return frozen;
 }
@@ -178,14 +175,14 @@ export async function candidateSource(ports: StewardPorts, workspaceId: string, 
     return admission;
   };
   const admission = await ports.db.$transaction(authorize);
-  const files = await confinedMaterial(() => readModuleSource({ platform: context.platform, moduleId: input.moduleId, commit: input.hash }));
+  const files = await confinedMaterial(() => readModuleMaterial({ platform: context.platform, moduleId: input.moduleId, commit: input.hash }));
   const root = await confinedMaterial(() => ownContent(context, admission.input.submitter.moduleId));
   await ports.db.$transaction(async tx => {
     await authorize(tx);
     await confinedMaterial(() => checkoutModule(root, input.to, files));
     await authorize(tx);
   });
-  return { moduleId: input.moduleId, hash: input.hash, materialDigest: materialDigest(files) };
+  return { moduleId: input.moduleId, hash: input.hash, materialDigest: moduleMaterialDigest(files) };
 }
 /** Query a fixed receipt. This never selects latest, retries a build or authorizes execution. */
 export async function checkCandidates(ports: StewardPorts, workspaceId: string, caller: Caller, raw: unknown): Promise<CandidateReceipt> {

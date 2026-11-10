@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "source": [
+    ".gitignore",
+    "README.md",
+    "build.ts",
+    "desktop-window.py",
+    "entry.ts",
+    "main.ts",
+    "module.json",
+    "test.ts",
+    "desktop-demo.bun.test.ts",
+    "check.ts",
+    "preview.ts"
+  ],
+  "artifacts": [
+    {
+      "path": "dist/entry.js",
+      "sha256": "29cc4e31423f09529072bf1850879e381cd85b0711b595f307103b94b1f42666",
+      "executable": false
+    },
+    {
+      "path": "dist/backend.json",
+      "sha256": "6632fb0e1188d5c2863ea8642b1fadce077f332487f0457631f95ea3b2aa3662",
+      "executable": false
+    }
+  ],
+  "build": {
+    "commands": [
+      "bun --no-install run build.ts"
+    ],
+    "toolchain": "Bun 1.4.2; Python 3 stdlib ctypes; GTK 4 C ABI",
+    "target": "linux-x64; GTK library /nix/store/6d3v90p73c3qx6axdlqnm5xfd4w93w20-gtk4-4.22.4/lib/libgtk-4.so.1"
+  }
+}

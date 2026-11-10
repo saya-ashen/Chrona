@@ -4,7 +4,7 @@ import { builder } from "./spec";
 
 export type ChatSession = { id: string; title?: string | null; createdAt: string; source: string };
 import type { Execution } from "./chat-execution";
-export type { Execution } from "./chat-execution";
+export type { ApplicationDelivery, Execution } from "./chat-execution";
 export const continueRequest = (runId: string) => ({ runId, requestKey: `web-continue:${runId}` });
 export type Message = { id: string; direction: string; text: string; execution?: Execution; progress?: string; attachments?: { name: string; ref?: string | null }[] };
 export const chatData = { sessions: { tool: "sessions" } };
@@ -29,7 +29,7 @@ export function chatSpec(state: Record<string, unknown>, path: string): Spec {
 /** Subscribe before the initial read; reconcile buffered replies against persisted message ids. */
 export function openMessages(session: string, subscribe: Subscribe, load: () => Promise<Message[]>, handlers: { show: (items: Message[]) => void; reply: () => void; fail: (error: Error) => void }) {
   const { show, reply, fail } = handlers;
-  let stopped = false, loaded = false;
+  let stopped = false, loaded = false, reading: Promise<void> | null = null;
   const messages: Message[] = [], early: Message[] = [];
   const append = (message: Message) => {
     const index = messages.findIndex(item => item.id === message.id);
@@ -41,12 +41,19 @@ export function openMessages(session: string, subscribe: Subscribe, load: () => 
     try {
       const message: Message = { id: event.message, direction: "out", text: event.text ?? "", attachments: JSON.parse(event.attachments ?? "[]"), ...(event.execution ? { execution: event.execution, progress: event.progress } : {}) };
       reply();
-      if (loaded) { append(message); show([...messages]); } else early.push(message);
+      if (!loaded || reading) early.push(message);
+      if (loaded) { append(message); show([...messages]); }
     } catch (error) { fail(error as Error); }
   });
-  const ready = load().then(items => {
-    if (stopped) return;
-    items.forEach(append); early.forEach(append); loaded = true; show([...messages]);
-  }).catch((error: Error) => { if (!stopped) fail(error); });
-  return { ready, append: (message: Message) => { append(message); if (!stopped) show([...messages]); }, close: () => { stopped = true; unsubscribe(); } };
+  const reload = (): Promise<void> => {
+    if (stopped) return Promise.resolve();
+    if (reading) return reading;
+    reading = load().then(items => {
+      if (stopped) return;
+      items.forEach(append); early.forEach(append); early.length = 0; loaded = true; show([...messages]);
+    }).catch((error: Error) => { if (!stopped) fail(error); }).finally(() => { reading = null; });
+    return reading;
+  };
+  const ready = reload();
+  return { ready, reload, append: (message: Message) => { append(message); if (!stopped) show([...messages]); }, close: () => { stopped = true; unsubscribe(); } };
 }

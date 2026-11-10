@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { StringDecoder } from "node:string_decoder";
 import { redactSensitiveText } from "@chrona/logging/redaction";
 import runtimeTable from "./runtimes.json";
+import { moduleEntrySchema, type ModuleEntry } from "@chrona/contracts/steward";
+import { explicitModuleCommand, moduleEntryFile } from "./module-sdk/module-entry";
 
 type Runtime = { extensions: string[]; programs: { default: string[]; win32?: string[] }; argv: string[]; sdk?: boolean; preload?: string; venv?: { default: string; win32?: string } };
 export type ScriptSandboxResult = { status: "succeeded" | "failed" | "timed_out" | "unavailable"; output: string; error: string | null; exitCode?: number; stopEvidence?: ProcessStopEvidence };
@@ -51,15 +53,24 @@ function runtimeInterpreter(declared: Runtime, code: string) {
   if (!interpreter) throw new Error(`模块运行环境不可用：需要 ${programs.join(" / ")}`);
   return interpreter;
 }
-function moduleEnvironment(dirs: ModuleDirs, declared: Runtime, interpreter: string, sdk: string, helper: string): Record<string, string> {
+function moduleCommand(code: string, entry: ModuleEntry, typecheck: string): { program: string; argv: string[]; sdk?: boolean } {
+  if (typeof entry !== "string") return explicitModuleCommand(code, entry);
+  const declared = runtime(entry);
+  return { program: runtimeInterpreter(declared, code), sdk: declared.sdk,
+    argv: [...declared.argv, ...(declared.preload ? ["--preload", join(typecheck, declared.preload)] : []), moduleEntryFile(code, entry)] };
+}
+function moduleEnvironment(dirs: ModuleDirs, sdkEnabled: boolean, interpreter: string, sdk: string, helper: string): Record<string, string> {
   const excluded = new Set(["CHRONA_SOCKET", "CHRONA_HTTP_SOCKET", "CHRONA_IPC_ENDPOINT", "CHRONA_IPC_TOKEN"]);
   const extra = Object.fromEntries(Object.entries(dirs.env ?? {}).filter(([key]) => /^CHRONA_[A-Z_]+$/.test(key) && !excluded.has(key)));
-  const host = Object.fromEntries(["HOME", ...(process.platform === "win32" ? ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "PATHEXT"] : [])].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : []));
+  // Desktop connection paths come only from the host session, never module extras.
+  const hostKeys = ["HOME", ...(process.platform === "win32" ? ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "PATHEXT"]
+    : process.platform === "linux" ? ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] : [])];
+  const host = Object.fromEntries(hostKeys.flatMap(key => process.env[key] ? [[key, process.env[key]!]] : []));
   return { ...extra, ...host, PATH: [dirname(interpreter), process.env.PATH ?? ""].join(delimiter), LANG: "C.UTF-8",
     CHRONA_PROCESS_HELPER: helper, CHRONA_MODULE: dirs.codeDir, CHRONA_DATA: dirs.dataDir,
     ...(dirs.contentDir ? { CHRONA_CONTENT: dirs.contentDir } : {}),
     ...(dirs.ipcEndpoint ? { CHRONA_IPC_ENDPOINT: dirs.ipcEndpoint, CHRONA_IPC_TOKEN: dirs.ipcToken! } : {}),
-    ...(declared.sdk ? { CHRONA_SDK: sdk } : {}) };
+    ...(sdkEnabled ? { CHRONA_SDK: sdk } : {}) };
 }
 /** Trusted local processes retain OS permissions; routed declarations govern only Chrona calls. */
 export function createScriptSandbox({ executionMode = "trusted-local", dataDir, timeoutMs = 60_000, maxOutputBytes = 64 * 1024, moduleSdk = fileURLToPath(new URL("./module-sdk", import.meta.url)), moduleTypecheck = fileURLToPath(new URL("./module-typecheck", import.meta.url)), processHelper }: {
@@ -69,24 +80,25 @@ export function createScriptSandbox({ executionMode = "trusted-local", dataDir, 
   assertExecutionMode(executionMode);
   limits(timeoutMs, maxOutputBytes);
   installLocalSdk(dataDir, moduleSdk);
-  function spawnModule(dirs: ModuleDirs, entry: string) {
-    const declared = runtime(entry), code = directory(dirs.codeDir), data = directory(dirs.dataDir);
+  function spawnModule(dirs: ModuleDirs, entry: ModuleEntry) {
+    const validated = moduleEntrySchema.parse(entry);
+    const code = directory(dirs.codeDir), data = directory(dirs.dataDir);
     const content = dirs.contentDir ? directory(dirs.contentDir) : undefined;
-    const interpreter = runtimeInterpreter(declared, code);
+    const command = moduleCommand(code, validated, moduleTypecheck);
+    const interpreter = command.program;
     const sdk = dataDir ? join(resolve(dataDir), "platform/node_modules/chrona") : resolve(moduleSdk);
     const helper = processHelper ?? process.env.CHRONA_PROCESS_HELPER ?? fileURLToPath(new URL(`../../../process/bin/${process.platform}-${process.arch}/chrona-process-guardian${process.platform === "win32" ? ".exe" : ""}`, import.meta.url));
-    const env = moduleEnvironment({ ...dirs, codeDir: code, dataDir: data, contentDir: content }, declared, interpreter, sdk, helper);
-    if (declared.sdk) env.CHRONA_SDK_LOADER = join(moduleTypecheck, "chrona-sdk-loader.ts");
+    const env = moduleEnvironment({ ...dirs, codeDir: code, dataDir: data, contentDir: content }, command.sdk === true, interpreter, sdk, helper);
+    if (command.sdk) env.CHRONA_SDK_LOADER = join(moduleTypecheck, "chrona-sdk-loader.ts");
     const supervision = processCapability({ helperPath: processHelper });
     if (!supervision.available || supervision.scope !== "descendants") throw new Error(supervision.reason ?? "Full descendant supervision is not verified for this platform");
-    return spawnSupervised(interpreter, [...declared.argv, ...(declared.preload ? ["--preload", join(moduleTypecheck, declared.preload)] : []), join(code, entry)],
-      { cwd: code, env, helperPath: processHelper });
+    return spawnSupervised(interpreter, command.argv, { cwd: code, env, helperPath: processHelper });
   }
   const supervision = processCapability({ helperPath: processHelper });
   return {
     health: { available: supervision.available && supervision.scope === "descendants", isolated: false },
     supervision,
-    startModule({ codeDir, dataDir: moduleData, contentDir, env, entry, ipcEndpoint, ipcToken }: { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string>; entry: string; network?: boolean } & ModuleTransport) {
+    startModule({ codeDir, dataDir: moduleData, contentDir, env, entry, ipcEndpoint, ipcToken }: { codeDir: string; dataDir: string; contentDir?: string; env?: Record<string, string>; entry: ModuleEntry; network?: boolean } & ModuleTransport) {
       const endpoint = /^tcp:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})$/.exec(ipcEndpoint);
       if (!endpoint || Number(endpoint[1]) > 65535 || !/^[0-9a-f]{64}$/.test(ipcToken)) throw new Error("Invalid module transport credentials");
       const task = spawnModule({ codeDir, dataDir: moduleData, contentDir, ipcEndpoint, ipcToken, env }, entry), child = task.process;

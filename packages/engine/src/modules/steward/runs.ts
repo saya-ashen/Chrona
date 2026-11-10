@@ -9,7 +9,7 @@ import { Prisma } from "@chrona/db";
 import { RUN_LIMITS, type ProviderAdapter, type RunLane, type RunTrigger, type SessionSource } from "@chrona/contracts/steward";
 import { localDayKey } from "@chrona/domain/steward/local-day";
 import type { ExecutionClaimSelection, StewardPorts } from "./ports";
-import { buildSettings, budgetTimezone } from "./settings";
+import { buildSettings, budgetTimezone, runTimeoutMinutes } from "./settings";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
 import { providerCancelKey } from "./provider-journal";
@@ -92,9 +92,12 @@ class RunService {
       }
     return true;
   }
-  private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, now: Date, builds: ReturnType<typeof buildSettings> | null) {
-    if (lane === "build" && !await this.checkBuildTargets(tx, run, now)) return null;
-    const execution = lane === "build" ? await buildExecution(tx, run.id) : null;
+  private async claimQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, builds: ReturnType<typeof buildSettings> | null, ordinaryTimeoutMinutes: number | null) {
+    let execution: Awaited<ReturnType<typeof buildExecution>> = null;
+    if (run.lane === "build") {
+      if (!await this.checkBuildTargets(tx, run, now)) return null;
+      execution = await buildExecution(tx, run.id);
+    }
     if (execution) {
       try { assertBuildProvider(this.ports, execution); }
       catch {
@@ -103,37 +106,39 @@ class RunService {
       }
       builds = { ...builds!, timeoutMinutes: execution.timeoutMinutes, maxSubmissions: execution.maxSubmissions };
     }
-    const timeoutMs = await this.claimTimeout(tx, run, lane, builds);
-    if (timeoutMs === null) return null;
-    const token = randomBytes(32).toString("hex"), deadlineAt = new Date(now.getTime() + timeoutMs);
-    const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
+    const timeoutMs = await this.claimTimeout(tx, run, builds, ordinaryTimeoutMinutes);
+    if (timeoutMs === undefined) return null;
+    const token = randomBytes(32).toString("hex"), deadlineAt = timeoutMs === null ? null : new Date(now.getTime() + timeoutMs);
+    const prompt = builds ? `${run.prompt}\n\nCurrent kernel limits for this run (override earlier numeric build limits): at most ${builds.maxSubmissions} candidate submissions; deadline ${deadlineAt!.toISOString()} (${builds.timeoutMinutes} minutes). Report before the deadline; do not start an automatic continuation.` : run.prompt;
     if (!(await tx.run.updateMany({ where: { id: run.id, status: "queued" }, data: { status: "running", tokenHash: hash(token), startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt } })).count) return null;
-    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane, ...(builds ? { builds } : {}), ...(execution ? { execution } : {}) } });
+    await audit(tx, { workspaceId: this.workspaceId, actor: "chrona", kind: "run_claimed", subjectId: run.id, details: { lane: run.lane, ...(builds ? { builds } : {}), ...(execution ? { execution } : {}) } });
     return { ...run, status: "running", startedAt: now, deadlineAt, leaseUntil: deadlineAt, prompt, token, runId: run.id, ...(execution ? { model: execution.model } : {}) };
   }
   /** Authorize the admitted execution before selecting its stored budget or lane limits. */
-  private async claimTimeout(tx: Prisma.TransactionClient, run: RunRow, lane: RunLane, builds: ReturnType<typeof buildSettings> | null) {
+  private async claimTimeout(tx: Prisma.TransactionClient, run: RunRow, builds: ReturnType<typeof buildSettings> | null, ordinaryTimeoutMinutes: number | null) {
     const coding = await tx.executionAttempt.findUnique({ where: { runId: run.id }, include: { run: true } });
     if (coding) {
-      if (coding.capabilityRevokedAt) return null;
+      if (coding.capabilityRevokedAt) return undefined;
       await assertExecutionPrincipal(tx, executionPrincipal(coding));
       return (coding.budget as { timeoutMs: number }).timeoutMs;
     }
-    return builds ? builds.timeoutMinutes * 60_000 : { foreground: RUN_LIMITS.foregroundTimeoutMs, background: RUN_LIMITS.backgroundTimeoutMs, build: RUN_LIMITS.buildTimeoutMs }[lane];
+    if (builds) return builds.timeoutMinutes * 60_000;
+    if (run.lane === "build") return RUN_LIMITS.buildTimeoutMs;
+    return ordinaryTimeoutMinutes === null ? null : ordinaryTimeoutMinutes * 60_000;
   }
   private async foregroundHasPriority(tx: Prisma.TransactionClient, now: Date) {
     const { workspaceId } = this;
     return !await tx.run.count({ where: { workspaceId, lane: "foreground", status: "running" } }) && await tx.run.count({ where: { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }], lane: "foreground" } });
   }
-  private async claimOrdinaryQueued(tx: Prisma.TransactionClient, run: RunRow, state: { lane: RunLane; now: Date; today: { sessionId: string | null }[]; timezone: string; builds: ReturnType<typeof buildSettings> | null }) {
-    const { lane, now, today, timezone, builds } = state;
+  private async claimOrdinaryQueued(tx: Prisma.TransactionClient, run: RunRow, state: { lane: RunLane; now: Date; today: { sessionId: string | null }[]; timezone: string; builds: ReturnType<typeof buildSettings> | null; ordinaryTimeoutMinutes: number | null }) {
+    const { lane, now, today, timezone, builds, ordinaryTimeoutMinutes } = state;
     const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
     if (admission === "blocked") return "blocked" as const;
     if (admission === "skip") return null;
     if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
-    return this.claimQueued(tx, run, lane, now, builds);
+    return this.claimQueued(tx, run, now, builds, ordinaryTimeoutMinutes);
   }
-  async claimNext(lane: RunLane, now = this.ports.now(), selection?: ExecutionClaimSelection): Promise<(RunRow & { token: string; runId: string; startedAt: Date; deadlineAt: Date; leaseUntil: Date; model?: string }) | null> {
+  async claimNext(lane: RunLane, now = this.ports.now(), selection?: ExecutionClaimSelection): Promise<(RunRow & { token: string; runId: string; startedAt: Date; deadlineAt: Date | null; leaseUntil: Date | null; model?: string }) | null> {
     const prepared = await prepareServerClaim(this.ports, this.workspaceId, lane, selection);
     try { return await this.ports.db.$transaction(async tx => {
       const { workspaceId } = this;
@@ -143,6 +148,7 @@ class RunService {
       const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
       const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
       const timezone = budgetTimezone(settings), builds = lane === "build" ? buildSettings(settings) : null;
+      const ordinaryTimeoutMinutes = runTimeoutMinutes(settings);
       const recent = await tx.run.findMany({ where: { workspaceId, execution: null, startedAt: { gte: new Date(now.getTime() - 48 * 3600000), lte: now } }, select: { startedAt: true, sessionId: true } });
       const today = recent.filter(r => r.startedAt && localDayKey(r.startedAt, timezone) === localDayKey(now, timezone));
       const waiting = lane === "build" ? { workspaceId, status: "queued" } : eligible;
@@ -154,7 +160,7 @@ class RunService {
           continue;
         }
         if (ordinaryBusy || lane === "background" && await this.foregroundHasPriority(tx, now)) continue;
-        const claimed = await this.claimOrdinaryQueued(tx, run, { lane, now, today, timezone, builds });
+        const claimed = await this.claimOrdinaryQueued(tx, run, { lane, now, today, timezone, builds, ordinaryTimeoutMinutes });
         if (claimed === "blocked") return null;
         if (claimed) return claimed;
       }

@@ -77,7 +77,7 @@ if (process.argv.length !== 3) { console.error("Usage: bun chrona/typecheck.ts <
 const moduleDir = resolve(process.argv[2]);
 const runtimes = ${JSON.stringify(runtimes?.runtimes ?? [])};
 const manifest = await Bun.file(join(moduleDir, "module.json")).json();
-const check = runtimes.find(runtime => runtime.extensions.includes(extname(manifest.entry)))?.check;
+const check = typeof manifest.entry === "string" ? runtimes.find(runtime => runtime.extensions.includes(extname(manifest.entry)))?.check : undefined;
 if (!check) { console.log(JSON.stringify({ status: "skipped", reason: "runtime has no declared check" })); process.exit(0); }
 const programs = check.programs[process.platform] ?? check.programs.default;
 const program = programs.map(name => Bun.which(name)).find(Boolean);

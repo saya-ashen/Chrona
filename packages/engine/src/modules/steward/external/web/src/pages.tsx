@@ -1,6 +1,6 @@
 // System and registered app pages share the same json-render components and data lifecycle.
 import "./schema-config";
-import { Children, createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Children, createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { JSONUIProvider, Renderer, defineRegistry, useBoundProp, type ComponentRenderProps } from "@json-render/react";
 import { createStateStore, type Spec, type StateStore } from "@json-render/core";
@@ -12,6 +12,7 @@ import { systemComponents } from "./system/components";
 import { systemPage, type SystemParams } from "./system/page";
 import { ChatHost } from "./system/chat-stream";
 import { registeredDeps, type Page, type Deps, type Source } from "./registered-page";
+import { executableRegistry } from "./executable-components";
 import { settingsHref, type RegisteredPage } from "./system/registered-pages";
 export { registeredDeps } from "./registered-page";
 export type { Page, Deps } from "./registered-page";
@@ -189,7 +190,7 @@ function PageContent({ page, deps, system, embedded, retry }: PageViewProps) {
   const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(false);
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const currentRegistry = system ? systemRegistry : registry;
+  const currentRegistry = useMemo(() => system ? systemRegistry : { ...registry, ...executableRegistry(page, deps) }, [system, page, deps]);
   const spec = system ? system.spec(state) : page.spec;
   const refresh = () => setLoadedAt(value => value + 1);
   const target = (tool: string) => `${page.module}.${tool}`;

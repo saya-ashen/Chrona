@@ -11,7 +11,7 @@ export type PiProviderOptions = {
   /** The browser tool (v2-12): its extension, and where runs get a browser from; without either runs have no browser tool. */
   browserExtension?: string | null; browsers?: { ensure(): string | null };
   workspaceRoot?: string;
-  /** End a run whose Pi RPC stream is silent this long outside tool runs and user questions (default 5 min). */
+  /** Opt-in: end a run whose Pi RPC stream is silent this long outside tool runs and user questions. No default. */
   idleTimeoutMs?: number;
   /** Trusted launcher; closed must reject if its owned process tree cannot be proven stopped. */
   launch?: (input: PiProcessInput) => PiProcess;

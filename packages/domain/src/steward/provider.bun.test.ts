@@ -35,3 +35,13 @@ test.each([
   expect(providerRequestStatus(request, receipt, alive, waiting, new Date(request.createdAt))).toBe(status);
   if (!receipt) expect(providerRequestStatus(request, receipt, alive, waiting, new Date(request.expiresAt))).toBe("expired");
 });
+
+test.each([
+  [null, null, true], [1000, null, true], [null, 1000, true],
+  [0, null, false], [null, 0, false], [-1, 1000, false], [1000, -1, false],
+] as const)("active run deadline=%s lease=%s", (deadline, lease, active) => {
+  const now = new Date("2026-10-17T04:00:00Z");
+  const run = { status: "running", deadlineAt: deadline === null ? null : new Date(now.getTime() + deadline), leaseUntil: lease === null ? null : new Date(now.getTime() + lease) };
+  expect(providerRunActive(run, true, now)).toBe(active);
+  expect(providerRunActive(run, false, now)).toBe(false);
+});

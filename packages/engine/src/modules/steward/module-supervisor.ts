@@ -10,6 +10,7 @@ import { diagnosticText, recordModuleFailure, recordModuleRecovery, type ModuleF
 import { currentModuleEvolution } from "./module-evolution";
 import { moduleFailurePolicy } from "./module-failure-policy";
 import { moduleContext } from "./module-context";
+import { ensureVersionMaterial } from "./module-source";
 import { rollbackFailedStart } from "./module-generation";
 import { resolveBuiltinRelease, resolveExternalRelease } from "./module-release";
 import { assertModuleOperation } from "./module-identity";
@@ -178,7 +179,7 @@ class ModuleSupervisor {
       const release = module.builtin ? await resolveBuiltinRelease(ports, module.name, instance.hash) : await resolveExternalRelease(ports, module.name, instance.hash);
       if (JSON.stringify(release.manifest) !== JSON.stringify(instance.manifest)) throw new Error("Built-in release manifest differs from registered metadata");
       codeDir = release.codeDir;
-    }
+    } else await ensureVersionMaterial(moduleContext(ports, instance.scope.workspaceId), version);
     return codeDir;
   }
   private async agentHost(instance: Instance) {

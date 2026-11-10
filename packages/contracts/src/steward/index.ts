@@ -7,6 +7,8 @@
 import { z } from "zod";
 import { THINKING_LEVELS } from "./agent";
 import { slug, moduleToolSchema } from "./module-tool";
+import { moduleEntrySchema } from "./module-entry";
+export { moduleEntrySchema, type ModuleEntry } from "./module-entry";
 export { slug, TOOL_VISIBILITY, type ModuleTool } from "./module-tool";
 import { moduleOriginSchema, moduleCapabilitiesSchema, moduleVersionHashSchema } from "./module-lifecycle";
 export * from "./module-lifecycle";
@@ -54,7 +56,7 @@ export const DEFAULT_POLICY = {
 export const DELIVERY_CHANNELS = ["in_app", "chrona_qqbot"] as const;
 
 export const RUN_LIMITS = {
-  foregroundTimeoutMs: 5 * 60_000, backgroundTimeoutMs: 20 * 60_000, buildTimeoutMs: 60 * 60_000,
+  buildTimeoutMs: 60 * 60_000,
   maxChronaToolCalls: 60, maxRunsPerSessionPerDay: 24, maxRunsPerDay: 200, maxFailures: 3,
   jobTimeoutMs: 60_000, jobOutputBytes: 64 * 1024,
   /** Author tests compile frontend dependencies; runtime modules keep their smaller sandbox limit. */
@@ -124,7 +126,8 @@ export const moduleManifestSchema = z.object({
   name: slug,
   /** What the module's toolset offers; callers find its tools by this, like an MCP server's description. */
   description: z.string().min(1).max(300).optional(),
-  entry: z.string().regex(/^[A-Za-z0-9_-]+\.(ts|py|sh)$/),
+  /** Existing script entry, or a fixed module-local native/interpreted artifact and literal arguments. */
+  entry: moduleEntrySchema,
   tools: z.array(moduleToolSchema).max(30).default([]),
   /** Run from activation and restart on exit (long connections); otherwise started per event and stopped when idle. */
   keepAlive: z.boolean().default(false),
@@ -369,6 +372,8 @@ export const buildSettingsSchema = z.object({
 }).strict();
 export const settingsSchema = z.object({
   timezone: z.string().min(1).max(80),
+  /** null: ordinary foreground/background Runs have no total execution deadline. */
+  runTimeoutMinutes: z.number().int().min(1).max(525_600).nullable().default(null),
   /** v2-17: today's module model calls (local day), per module. */
   modelUsage: z.array(z.object({ module: z.string(), calls: z.number().int().min(0), inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) }).strict()),
   /** null: modules cannot use the `model` effect (builds declaring it fail). */
@@ -386,7 +391,7 @@ export const healthSchema = z.object({
 
 export const resolveApprovalSchema = z.object({ decision: z.enum(["approve", "deny"]), scope: z.enum(APPROVAL_SCOPES).default("once") }).strict();
 export const createGrantSchema = z.object({ action: z.enum(ACTIONS), mode: z.enum(GRANT_MODES), scope: grantScopeSchema, expiresAt: iso.optional() }).strict();
-export const updateSettingsSchema = z.object({ timezone: z.string().min(1).max(80).optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
+export const updateSettingsSchema = z.object({ timezone: z.string().min(1).max(80).optional(), runTimeoutMinutes: settingsSchema.shape.runTimeoutMinutes.removeDefault().optional(), moduleModel: moduleModelSettingsSchema.nullable().optional() }).strict();
 
 /** Short codes (e.g. QQ binding codes): no 0/O/1/I/L. */
 export const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -416,7 +421,7 @@ export * from "./local-runtime";
 /** Provider adapter (Pi first). Chrona owns when and where a run happens; the Provider owns how it works. */
 export type ProviderRunInput = {
   runId: string; token: string; lane: RunLane; cwd: string; sessionDir: string; sessionId: string | null;
-  prompt: string; images?: { mime: string; base64: string }[]; deadline: Date;
+  prompt: string; images?: { mime: string; base64: string }[]; deadline: Date | null;
   /** Trusted platform instructions; module/user task text belongs in prompt, never here. */
   systemPrompt: string;
   /** Kernel-selected resource scope; minimal excludes Chrona tools and configured skills/extensions. */

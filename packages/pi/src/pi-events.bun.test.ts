@@ -49,6 +49,28 @@ for (const [method, answer, expected] of [
   expect(f.seen).toContainEqual({ phase: "searching", tool: "web_search" });
   expect(f.seen).toContainEqual(expect.objectContaining({ scope: "run", total: 90, cost: 0.09000000000000001 }));
 });
+test("an unlimited Run still bounds questions and accepts an explicit reply", async () => {
+  const f = await fixture(), handle = f.provider.start({ ...f.input, deadline: null });
+  try {
+    await f.question;
+    expect(f.seen).toContainEqual(expect.objectContaining({ method: "confirm", timeoutMs: 300_000 }));
+    f.answer({ decision: "submit", value: false });
+    expect((await handle.done).outcome).toBe("finished");
+    expect(JSON.parse(await readFile(join(f.cwd, "answer.json"), "utf8"))).toMatchObject({ confirmed: false });
+  } finally { await handle.abort(); }
+});
+test("a question timeout stays within an explicit Run deadline", async () => {
+  const f = await fixture(), handle = f.provider.start({ ...f.input, deadline: new Date(Date.now() + 2000) });
+  try {
+    await f.question;
+    expect(f.seen).toContainEqual(expect.objectContaining({ method: "confirm", timeoutMs: expect.any(Number) }));
+    const question = f.seen.find(value => typeof value === "object" && value !== null && "timeoutMs" in value) as { timeoutMs: number };
+    expect(question.timeoutMs).toBeGreaterThan(0);
+    expect(question.timeoutMs).toBeLessThanOrEqual(2000);
+    f.answer({ decision: "cancel" });
+    expect((await handle.done).outcome).toBe("finished");
+  } finally { await handle.abort(); }
+});
 test("abort cannot turn an outstanding confirmation into a positive response", async () => {
   const f = await fixture(), handle = f.provider.start(f.input); await f.question;
   await handle.abort(); f.answer({ decision: "submit", value: true });

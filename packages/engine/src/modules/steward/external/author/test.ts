@@ -29,7 +29,8 @@ try {
   assert.deepEqual(prepareMaterial(parsePrepare(prepare)).admission, { requestKey: prepare.requestKey, submitter: prepare.submitter, targets: prepare.targets });
   assert.equal(Object.hasOwn(prepareMaterial(parsePrepare(prepare)).admission, "execution"), false);
   assert.match(prepareMaterial(parsePrepare(prepare)).prompt, /checks actually run/);
-  assert.equal(prepareMaterial(parsePrepare(prepare)).execution.supported, false);
+  assert.equal(prepareMaterial(parsePrepare(prepare)).kind, "material-preparation");
+  assert.equal(Object.hasOwn(prepareMaterial(parsePrepare(prepare)), "execution"), false);
   for (const bad of [
     { ...prepare, cwd: "/host" }, { ...prepare, execution: { model: "fake" } },
     { ...prepare, targets: [prepare.targets[0], prepare.targets[0]] },
@@ -117,9 +118,9 @@ try {
   const deepEntry = `${Array.from({ length: 13 }, (_, i) => `d${i}`).join("/")}/index.ts`;
   await files.write("sources/deep/module.json", JSON.stringify({ name: "fixture", entry: deepEntry }));
   await files.write(`sources/deep/${deepEntry}`, "export const deep = true;");
-  await assert.rejects(stagePackage(files, parseStage({ ...stage, from: "sources/deep", to: "packages/deep" })), { code: "invalid" });
-  await assert.rejects(readFile(join(content, "packages/deep/provenance.json")), { code: "ENOENT" });
-  assert.ok(!(await files.list("packages")).entries.some(entry => entry.name === "deep"), "invalid expanded paths fail before creating a stage");
+  const deep = await stagePackage(files, parseStage({ ...stage, from: "sources/deep", to: "packages/deep" }));
+  assert.equal(await readFile(join(content, deep.dir, deepEntry), "utf8"), "export const deep = true;");
+  assert.ok((await files.list("packages")).entries.some(entry => entry.name === "deep"), "portable nested source paths survive staging");
 
   const upstreamError = Object.assign(new Error("lost receipt"), { code: "unknown" });
   const calls: { target: string; args: Record<string, unknown> }[] = [];
@@ -153,7 +154,7 @@ async function tool(id: string, args: Record<string, unknown>, caller: typeof ow
   return runtime.send({ trigger: { kind: "tool", id, firedAt: now, args, caller }, now, params: {} });
 }
 const outputExamples: { tool: string; output: unknown }[] = [];
-async function result(id: string, args: Record<string, unknown>, caller: typeof owner | typeof provider = owner) {
+async function result(id: string, args: Record<string, unknown>, caller: Parameters<typeof tool>[2] = owner) {
   const reply = await tool(id, args, caller);
   assert.equal(reply.error, undefined);
   outputExamples.push({ tool: id, output: reply.result!.result });
@@ -163,15 +164,33 @@ try {
   assert.deepEqual(await result("list", { path: "" }, provider), { path: "", entries: [] });
   assert.deepEqual(await result("list", { path: "." }, provider), { path: "", entries: [] });
   assert.equal((await tool("list", { path: "sources" }, provider)).errorCode, "not_found");
-  const draft = await result("prepare", input(prepare));
+  const entry = { kind: "module" as const, module: "web", moduleId: "web-id", hash: version };
+  const draft = await result("prepare", input(prepare), entry);
   assert.deepEqual(draft, prepareMaterial(parsePrepare(prepare)));
-  assert.deepEqual(runtime.calls, [], "prepare never calls owner admission or Agent");
+  assert.deepEqual(await result("prepare", input(prepare), entry), draft, "preparation is repeatable without effects");
+  assert.deepEqual(runtime.calls, [], "prepare never calls discovery, owner admission or Agent");
+  assert.deepEqual(await result("list", { path: "" }, provider), { path: "", entries: [] }, "prepare never writes source material");
   assert.ok((await tool("prepare", input(prepare), provider)).error);
   assert.ok((await tool("stage", input(stage), provider)).error);
   assert.ok((await tool("submit", input(submission), provider)).error);
   assert.ok((await tool("receipt", input({ receiptId: receipt.receiptId }), provider)).error);
   assert.ok((await tool("source", input(source), provider)).error);
-  assert.deepEqual(await result("source", input(source)), sourceResult);
+  assert.ok((await tool("import", {}, provider)).error);
+  assert.ok((await tool("export", {}, provider)).error);
+  const workspace = await mkdtemp(join(tmpdir(), "author-sdk-workspace-"));
+  try {
+    const binary = Buffer.from([0, 255, 128, 42]);
+    await writeFile(join(workspace, "module.json"), manifestText);
+    await writeFile(join(workspace, "index.ts"), "export const fixture = true;\n");
+    await writeFile(join(workspace, "payload.bin"), binary);
+    await writeFile(join(workspace, ".gitignore"), "payload.bin\n");
+    await result("import", input({ from: workspace, to: "sources/binary", source: ["module.json", "index.ts", ".gitignore"], artifacts: [{ path: "payload.bin" }], build: { commands: ["existing build"], toolchain: "existing tools", target: "fixture" } }), entry);
+    const binaryStage = await result("stage", input({ ...stage, from: "sources/binary", to: "packages/binary" }), entry) as { dir: string };
+    await result("export", input({ path: binaryStage.dir, to: join(workspace, "exported") }), entry);
+    assert.deepEqual(await readFile(join(workspace, "exported/payload.bin")), binary);
+    assert.ok((await tool("export", input({ path: binaryStage.dir, to: join(workspace, "exported") }), entry)).error);
+  } finally { await rm(workspace, { recursive: true, force: true }); }
+  assert.deepEqual(await result("source", input(source), entry), sourceResult);
   assert.equal((await result("read", { path: "sources/imported/index.ts" }, provider) as { content: string }).content, "export const imported = true;\n");
   await result("write", { path: "sources/work/module.json", content: manifestText }, provider);
   await result("write", { path: "sources/work/index.ts", content: "export const fixture = true;\n" }, provider);
@@ -180,17 +199,14 @@ try {
   assert.equal((await result("list", { path: "sources/work" }, provider) as { entries: unknown[] }).entries.length, 2);
   const staged = await result("stage", input(stage)) as { dir: string };
   assert.equal(staged.dir, submission.items[0].dir);
-  assert.deepEqual(await result("submit", input(submission)), receipt);
+  assert.deepEqual(await result("submit", input(submission), entry), receipt);
   // Replay must still reach kernel even if local staged files changed or disappeared.
   await rm(join(paths.content, staged.dir), { recursive: true });
   assert.deepEqual(await result("submit", input(submission)), receipt);
-  assert.deepEqual(await result("receipt", input({ receiptId: receipt.receiptId })), receipt);
+  assert.deepEqual(await result("receipt", input({ receiptId: receipt.receiptId }), entry), receipt);
   assert.deepEqual(await result("receipt", input({ admissionId: submission.admissionId, requestKey: submission.requestKey })), receipt);
-  const entry = { kind: "module" as const, module: "web", moduleId: "web-id", hash: version };
-  assert.equal((await tool("prepare", input(prepare), entry)).error, undefined, "kernel-admitted owner entry retains real module caller identity");
-  const authorCaller = { kind: "module" as const, module: "author", moduleId: prepare.submitter.moduleId, hash: version };
-  assert.equal((await tool("write", { path: "sources/from-agent/note.txt", content: "explicit material only" }, authorCaller)).error, undefined, "Agent-selected file tools retain the originating module identity");
-  assert.equal((await tool("read", { path: "sources/from-agent/note.txt" }, authorCaller)).error, undefined);
+  await result("write", { path: "sources/from-agent/note.txt", content: "current Agent material" }, entry);
+  assert.equal((await result("read", { path: "sources/from-agent/note.txt" }, entry) as { content: string }).content, "current Agent material", "current Agent-selected file tools accept the originating owner-entry module identity");
   const targets = runtime.calls.map((call: { params: { target?: string } }) => call.params.target);
   assert.deepEqual(targets, ["modules.source", "modules.submit", "modules.submit", "modules.candidate-check", "modules.candidate-check"]);
   assert.ok(!targets.some((target: string) => target.startsWith("agent.") || target.includes("admit") || target.startsWith("secrets.")));

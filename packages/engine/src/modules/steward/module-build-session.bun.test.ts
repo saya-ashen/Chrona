@@ -143,7 +143,7 @@ test("persistent FIFO survives service recreation and tied clocks; waiting has n
   for (const build of builds) {
     const run = (await api.runs.claimNext("build"))!;
     expect(run.sessionId).toBe(build.sessionId);
-    expect(run.deadlineAt.getTime() - run.startedAt.getTime()).toBe(75 * 60_000);
+    expect(run.deadlineAt!.getTime() - run.startedAt.getTime()).toBe(75 * 60_000);
     expect(run.prompt).toContain("at most 3 candidate submissions");
     expect(await api.runs.claimNext("build")).toBeNull();
     await api.runs.finish(run.id, { outcome: "failed", sessionId: null, error: "fixture failure" });
@@ -233,7 +233,7 @@ test("owner builds pin their own limits and model, deduplicate even after comple
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120, dailyLimit: 20, maxSubmissions: 20 } } } });
   const claimed = (await f.api.runs.claimNext("build"))!;
   expect(claimed.model).toBe("openai/gpt-6.1-sol");
-  expect(claimed.deadlineAt.getTime() - claimed.startedAt.getTime()).toBe(600_000);
+  expect(claimed.deadlineAt!.getTime() - claimed.startedAt.getTime()).toBe(600_000);
   expect((await f.db.audit.findFirstOrThrow({ where: { kind: "run_claimed", subjectId: claimed.id } })).details).toMatchObject({ builds: { timeoutMinutes: 10, maxSubmissions: 1 } });
   await f.api.runs.finish(claimed.id, { outcome: "timed_out", sessionId: null, error: "deadline" });
   expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: claimed.id, status: "timed_out", duplicate: true });

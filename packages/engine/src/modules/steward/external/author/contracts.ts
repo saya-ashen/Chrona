@@ -52,9 +52,9 @@ function group<T>(value: unknown, parse: (value: unknown) => T & { name: string 
   return rows;
 }
 export function relative(value: unknown): string {
-  const result = text(value, 1000);
+  const result = text(value, 4096);
   const parts = result.split("/");
-  if (result.includes("\\") || result.includes(":") || hasControl(result) || parts.length > 16 || parts.some(part => !part || part === "." || part === ".." || part.startsWith(".") || ["node_modules", "__proto__", "prototype", "constructor"].includes(part))) return fail("Expected a safe relative source path.");
+  if (result.includes("\\") || result.includes(":") || hasControl(result) || parts.some(part => !part || part === "." || part === ".." || part === ".git")) return fail("Expected a safe relative source path.");
   return result;
 }
 export function sourceDir(value: unknown): string {
@@ -115,9 +115,9 @@ export function parseStage(value: unknown): Stage {
   }
   return { name: name(row.name), from: submitDir(row.from), to, provenance };
 }
-export function jsonInput(args: Record<string, unknown>): unknown {
+export function jsonInput(args: Record<string, unknown>, max = 24000): unknown {
   object(args, ["input"]);
-  const input = text(args.input, 24000);
+  const input = text(args.input, max);
   try { return JSON.parse(input); } catch { return fail("Expected JSON input."); }
 }
 export function integer(value: unknown, fallback: number, max: number): number {

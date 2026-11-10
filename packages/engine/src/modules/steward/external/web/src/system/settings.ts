@@ -16,6 +16,8 @@ export function settingsSpec(state: Record<string, unknown>) {
   const settings = view?.settings, current = settings?.moduleModel;
   const spec = b.finish("设置", [
     section("内核", settings ? [
+      b.heading("任务时限"),
+      b.node("RunTimeoutSettings", { settings: { timezone: settings.timezone, runTimeoutMinutes: settings.runTimeoutMinutes } }),
       b.heading("模型调用硬上限"),
       ...(!current ? [b.text("尚未启用模型调用额度；应用配置模型后仍需启用内核额度。", "muted")] : []),
       b.node("NotificationSettings", { settings: { timezone: settings.timezone }, section: "budget" }),
