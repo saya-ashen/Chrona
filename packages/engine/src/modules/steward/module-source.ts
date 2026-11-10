@@ -29,32 +29,33 @@ async function legacyFiles(context: ModuleContext, version: ModuleVersion, dir: 
 
 /** Old approval hashes stay unchanged; only verified legacy source enters Git. */
 export async function versionSource(context: ModuleContext, version: ModuleVersion, legacyDir = join(context.store, version.hash)) {
-  const report = version.report as BuildReport;
-  let revision = report.git ? revisionSchema.parse(report.git) : null;
-  if (/^[a-f0-9]{40}$/.test(version.hash)) {
-    if (!revision || revision.commit !== version.hash) throw new StewardError("conflict", "Git source provenance does not match module version");
-  } else if (!revision) {
-    if (!/^[a-f0-9]{64}$/.test(version.hash)) throw new StewardError("invalid", "Invalid legacy module hash");
-    const files = await legacyFiles(context, version, legacyDir);
-    revision = await importLegacyModuleSource({ platform: context.platform, moduleId: version.moduleId, legacyHash: version.hash, files });
-    const imported = revision;
-    await context.db.$transaction(async tx => {
-      const current = await tx.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
-      await tx.moduleVersion.update({ where: { id: current.id }, data: { report: json({ ...(current.report as BuildReport), git: imported }) } });
-    });
+  try {
+    const report = version.report as BuildReport;
+    let revision = report.git ? revisionSchema.parse(report.git) : null;
+    if (/^[a-f0-9]{40}$/.test(version.hash)) {
+      if (!revision || revision.commit !== version.hash) throw new StewardError("conflict", "Git source provenance does not match module version");
+    } else if (!revision) {
+      if (!/^[a-f0-9]{64}$/.test(version.hash)) throw new StewardError("invalid", "Invalid legacy module hash");
+      const files = await legacyFiles(context, version, legacyDir);
+      revision = await importLegacyModuleSource({ platform: context.platform, moduleId: version.moduleId, legacyHash: version.hash, files });
+      const imported = revision;
+      await context.db.$transaction(async tx => {
+        const current = await tx.moduleVersion.findUniqueOrThrow({ where: { id: version.id } });
+        await tx.moduleVersion.update({ where: { id: current.id }, data: { report: json({ ...(current.report as BuildReport), git: imported }) } });
+      });
+    }
+    const files = await readModuleSource({ platform: context.platform, moduleId: version.moduleId, commit: revision!.commit });
+    return { revision: revision!, files: files.map(file => ({ ...file, bytes: Buffer.from(file.bytes) })) };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new StewardError("not_found", `Version ${version.hash} has no stored source; rebuild it from the active version or your own copy`);
+    throw error;
   }
-  const files = await readModuleSource({ platform: context.platform, moduleId: version.moduleId, commit: revision!.commit });
-  return { revision: revision!, files: files.map(file => ({ ...file, bytes: Buffer.from(file.bytes) })) };
 }
 
 export async function readVersionSource(context: ModuleContext, moduleId: string, hash: string) {
   const version = await context.db.moduleVersion.findFirst({ where: { moduleId, hash, module: { workspaceId: context.workspaceId } } });
   if (!version) throw new StewardError("not_found", "Module version not found");
-  try { return (await versionSource(context, version)).files; }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new StewardError("not_found", `Version ${hash} has no stored source; rebuild it from the active version or your own copy`);
-    throw error;
-  }
+  return (await versionSource(context, version)).files;
 }
 
 /** Full immutable checkout material, also used when selecting an approved rollback. */

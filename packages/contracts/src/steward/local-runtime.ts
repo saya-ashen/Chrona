@@ -28,6 +28,7 @@ export const runtimeStartSchema = z.object({
   callbacks: z.string().uuid().optional(),
 }).strict();
 export const runtimeEventSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("settled"), operationId: runtimeOperationSchema.shape.operationId, outcome: runtimeOutcomeSchema }).strict(),
   z.object({ kind: z.literal("progress"), value: providerProgressSchema }).strict(),
   z.object({ kind: z.literal("usage"), value: providerUsageSchema }).strict(),
   z.object({ kind: z.literal("resources"), value: providerResourcesSchema }).strict(),

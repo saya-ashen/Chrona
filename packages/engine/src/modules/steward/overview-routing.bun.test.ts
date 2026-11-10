@@ -39,11 +39,11 @@ test("web.today routes through the real web and notify modules without recursion
     await recordApprovalFact(db, approval);
     await recordApprovalFact(db, approval);
     await notifyLifecycle(db, ports, workspaceId, "paused-fixture", { kind: "module-paused", app: "fixture" });
-    expect(await db.audit.count({ where: { kind: "kernel_fact_pending" } })).toBe(2);
+    expect(await db.kernelFact.count({ where: { consumedAt: null } })).toBe(2);
     expect(await db.moduleInvocation.count({ where: { target: "notify", tool: "approval" } })).toBe(0);
     await callSync(ports, kernelOrigin(workspaceId), "notify.list", {});
-    for (let i = 0; i < 100 && await db.audit.count({ where: { kind: "kernel_fact_consumed" } }) < 2; i++) await new Promise(resolve => setTimeout(resolve, 50));
-    expect(await db.audit.count({ where: { kind: "kernel_fact_consumed" } })).toBe(2);
+    for (let i = 0; i < 100 && await db.kernelFact.count({ where: { consumedAt: { not: null } } }) < 2; i++) await new Promise(resolve => setTimeout(resolve, 50));
+    expect(await db.kernelFact.count({ where: { consumedAt: { not: null } } })).toBe(2);
     const origin = { workspaceId, caller: { kind: "module" as const, module: entry.name, moduleId: entry.id, hash: entry.activeHash! }, chain: [], path: [] };
     const view = (await callSync(ports, origin, "web.today", {})).output;
     expect(view).toMatchObject({

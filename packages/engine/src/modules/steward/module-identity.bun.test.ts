@@ -160,14 +160,15 @@ test("trusted Git seed is idempotent and rejects untrusted metadata or replacing
 test("a real automatically activated group cannot partially roll back after start failure", async () => {
   const f = await fixture(), apps = [await f.app("first"), await f.app("second")];
   const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "build", source: "build" } });
-  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "build_request", subjectId: session.id, details: { name: "first", modules: ["first", "second"] } } });
+  await f.db.buildTargets.create({ data: { sessionId: session.id, name: "first", modules: ["first", "second"] } });
   for (const app of apps) {
     const version = await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: app.id, hash: "next" } }, data: { source: "build", status: "pending_review" } });
-    await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_submission", subjectId: app.id, details: { hash: "next", sessionId: session.id } } });
-    await f.db.audit.create({ data: { id: `module-review:${version.id}`, workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_review", details: { prefix: "", suffix: "", codeDiff: "", detail: "", needsMigration: false } } });
+    await f.db.moduleVersion.update({ where: { id: version.id }, data: { buildSessionId: session.id } });
+    await f.db.moduleReview.create({ data: { versionId: version.id, prefix: "", suffix: "", codeDiff: "", detail: "", needsMigration: false } });
   }
   expect(await requestGroup(f.ports, f.workspace.id, session.id, apps.map(app => ({ module: app.name, hash: "next" })))).toEqual({ status: "approved" });
   expect(await f.db.approval.count()).toBe(0);
+  await f.db.audit.deleteMany();
   const app = apps[0]!, activation = await currentModuleEvolution(f.db, f.workspace.id, app.id, "next");
   await updateModuleEvolution(f.db, { workspaceId: f.workspace.id, moduleId: app.id, activationId: activation!.activationId, hash: "next", status: "failed", now: f.ports.now() });
   expect(await rollbackFailedStart(f.context, app.id, "next", activation!.activationId)).toMatchObject({ rolledBack: false, reason: expect.stringContaining("group") });

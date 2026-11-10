@@ -8,7 +8,6 @@ import { createRuns, liveRuns, nextLocalMidnight } from "./runs";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 import { notices } from "./test-notices";
-import { providerCancelKey } from "./provider-journal";
 let db: ReturnType<typeof testDb>, ports: StewardPorts, workspaceId: string, sessionId: string, time: Date, principal: ExecutionPrincipal;
 beforeEach(async () => {
   db = testDb(); time = new Date("2026-10-15T04:00:00Z");
@@ -60,12 +59,12 @@ test("unknown Agent stop holds the context until actual Provider exit, without a
 test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as const)("build %s preserves work and never resumes the originating Agent context", async outcome => {
   const runs = createRuns(ports, workspaceId);
   const build = await db.session.create({ data: { workspaceId, key: "build:sample", source: "build", originSessionId: sessionId } });
-  await db.audit.create({ data: { id: `build-targets:${build.id}`, workspaceId, subjectId: build.id, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
+  await db.buildTargets.create({ data: { sessionId: build.id, name: "sample", modules: ["sample"] } });
   await runs.enqueue({ sessionId: build.id, lane: "build", trigger: "build", prompt: "Keep this draft" });
   const run = (await runs.claimNext("build"))!;
   await writeFile(join(run.cwd, "draft.txt"), "kept");
   if (outcome === "timed_out") time = new Date(run.deadlineAt!.getTime() + 1);
-  if (outcome === "cancelled") await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: run.id, details: {} } });
+  if (outcome === "cancelled") await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: new Date() } });
   await runs.finish(run.id, { outcome: outcome === "cancelled" ? "failed" : outcome, sessionId: "provider-context", error: outcome === "finished" ? null : "Synthetic" }, { stopEvidence: "provider_exited" });
   const status = outcome === "unavailable" ? "provider_unavailable" : outcome;
   expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ status });
@@ -73,10 +72,10 @@ test.each(["failed", "timed_out", "unavailable", "cancelled", "finished"] as con
   expect(await db.audit.count({ where: { kind: "run_continuation" } })).toBe(0);
   expect(await db.message.count({ where: { sessionId } })).toBe(0);
   expect(await readFile(join(run.cwd, "draft.txt"), "utf8")).toBe("kept");
-  const facts = await db.audit.findMany({ where: { kind: "kernel_fact_pending" } });
+  const facts = await db.kernelFact.findMany({ where: { consumedAt: null } });
   if (["failed", "timed_out", "unavailable"].includes(outcome)) {
     expect(facts).toHaveLength(1);
-    expect(facts[0]!.details).toMatchObject({ type: "lifecycle", data: { key: `build-paused:${run.id}`, session: build.id, fact: { kind: "build-paused", status } } });
+    expect(facts[0]!.payload).toMatchObject({ type: "lifecycle", data: { key: `build-paused:${run.id}`, session: build.id, fact: { kind: "build-paused", status } } });
   } else expect(facts).toHaveLength(0);
   await expect(runs.authenticate(run.token)).rejects.toMatchObject({ code: "forbidden" });
 });
@@ -102,4 +101,19 @@ for (const [zone, at, expected] of [
   ["America/New_York", "2026-11-01T04:00:00Z", "2026-11-02T05:00:00.000Z"],
 ]) test(`daily reset respects local midnight and DST: ${zone}`, () => {
   expect(nextLocalMidnight(new Date(at!), zone!).toISOString()).toBe(expected!);
+});
+
+test("stop authority survives diagnostic edits and audit deletion; error wording alone never occupies capacity", async () => {
+  const runs = createRuns(ports, workspaceId);
+  await queueContext();
+  const run = (await runs.claimNext("foreground"))!;
+  await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "lost process" });
+  await db.run.update({ where: { id: run.id }, data: { error: "different diagnostic" } });
+  await db.audit.deleteMany();
+  expect(await admitContextPrimitive(ports, principal, "get", { runId: run.id })).toMatchObject({ status: "unknown", active: true });
+  await expect(queueContext("still-blocked")).rejects.toMatchObject({ code: "conflict" });
+  await runs.finish(run.id, { outcome: "failed", sessionId: null, error: "Execution stop is unconfirmed" }, { stopEvidence: "provider_exited" });
+  expect(await admitContextPrimitive(ports, principal, "get", { runId: run.id })).toMatchObject({ status: "failed", active: false });
+  await queueContext("confirmed");
+  expect(await runs.claimNext("foreground")).not.toBeNull();
 });

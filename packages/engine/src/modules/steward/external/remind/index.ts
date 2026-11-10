@@ -1,32 +1,15 @@
-import { createHash } from "node:crypto";
-import { on, chrona } from "chrona";
+import { on, onDisconnect, chrona, ModelError } from "chrona";
 import { PAGE } from "./page";
+import { Reminders } from "./reminders";
 
-on("activated", async () => {
-  await chrona.call("web.page-set", PAGE);
-  return {};
-});
-
-type Timer = { key: string; label: string | null; status: string; nextAt: string | null; rule: unknown; payload: { text?: unknown } };
-
-on("schedule", async event => {
-  // The key names this firing: a redelivered event returns the same call instead of reminding twice.
-  const key = `${event.scheduleId}:${event.firedAt}`;
-  await chrona.call("notify.send", { key, level: "now", title: "提醒", body: String(event.payload?.text ?? "") }, { mode: "async", key });
-});
-
+const reminders = new Reminders(chrona.paths.data, args => chrona.call("notify.send", args));
+on("activated", async () => { await chrona.call("web.page-set", PAGE); return {}; });
 on("tool", async event => {
-  const args = event.args as Record<string, string | undefined>;
-  if (event.id === "create") {
-    // Derived from the content: a retried create replaces the same timer instead of adding a second one.
-    const key = `r-${createHash("sha256").update(JSON.stringify([args.rule, args.text, args.label])).digest("hex").slice(0, 24)}`;
-    const created = await chrona.call("schedules.create", { key, rule: String(args.rule), payload: JSON.stringify({ text: String(args.text ?? "") }), label: String(args.label), ...(args.until ? { until: args.until } : {}) }) as Record<string, unknown> | null;
-    return { result: { key, nextAt: created?.nextAt ?? null, status: created?.status ?? null } };
-  }
-  if (event.id === "list") {
-    const timers = await chrona.call("schedules.mine", {}) as Timer[] | null;
-    return { result: { reminders: (timers ?? []).map(timer => ({ key: timer.key, label: timer.label, text: String(timer.payload.text ?? ""), rule: timer.rule, status: timer.status, nextAt: timer.nextAt })) } };
-  }
-  if (event.id === "cancel") return { result: await chrona.call("schedules.cancel", { key: String(args.key) }) };
-  throw new Error(`Unknown tool ${event.id}`);
+  if (!event.caller) throw new ModelError("forbidden", "Missing actual caller");
+  if (event.id === "create") return { result: reminders.create(event.args, new Date(event.now)) };
+  if (event.id === "list") return { result: reminders.list() };
+  if (event.id === "cancel") return { result: reminders.cancel(event.args) };
+  throw new ModelError("invalid", `Unknown tool ${event.id}`);
 });
+const timer = setInterval(() => { void reminders.tick(new Date()).catch(() => console.error("Remind delivery failed; inspect private receipt")); }, 1000);
+onDisconnect(async () => { clearInterval(timer); await reminders.close(); });

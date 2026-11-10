@@ -27,6 +27,15 @@ model Workspace {
   invocations ModuleInvocation[]
   audits Audit[]
   stewardState StewardState?
+  agentCommands AgentCommand[]
+  kernelFacts KernelFact[]
+  factConsumer KernelFactConsumer?
+  candidateAdmissions CandidateAdmission[]
+  upstreamMerges ModuleUpstreamMerge[]
+  installations ModuleInstallation[]
+  installationHeads ModuleInstallationHead[]
+  moduleRemovals ModuleRemoval[]
+  buildRequests BuildRequest[]
   executions ExecutionAttempt[]
 }
 
@@ -56,6 +65,10 @@ model Session {
   spawned Session[] @relation("SessionOrigin")
   messages Message[]
   runs Run[]
+  agentContext AgentContext?
+  submittedVersions ModuleVersion[]
+  buildTargets BuildTargets?
+  buildRequests BuildRequest[]
   schedules Schedule[]
   @@index([workspaceId, key, status])
   @@index([workspaceId, source, lastActivityAt])
@@ -80,11 +93,18 @@ model Module {
   schedules Schedule[]
   sessions Session[]
   approvals Approval[]
+  executionResults ModuleExecutionResult[]
+  activations ModuleActivation[]
+  upstream ModuleUpstream?
+  migration ModuleMigration?
   @@unique([workspaceId, name])
   @@index([workspaceId, status])
 }
 
 model ModuleVersion {
+  buildSessionId String?
+  buildSession Session? @relation(fields: [buildSessionId], references: [id], onDelete: SetNull)
+  review ModuleReview?
   id String @id @default(uuid())
   moduleId String
   hash String
@@ -153,7 +173,14 @@ model ModuleInvocation {
   caller String
   callerModuleId String?
   callerHash String?
+  /// Actual originating Agent Run, bound by the kernel before tool delivery.
+  runId String?
+  run Run? @relation(fields: [runId], references: [id], onDelete: SetNull)
   target String
+  targetBound Boolean @default(false)
+  targetModuleId String?
+  targetHash String?
+  targetContractHash String?
   tool String
   args Json
   key String
@@ -178,6 +205,7 @@ model ModuleInvocation {
   @@unique([workspaceId, caller, target, tool, key])
   @@index([workspaceId, status, nextAttemptAt])
   @@index([workspaceId, reply, repliedAt])
+  @@index([runId, status])
 }
 
 model Schedule {
@@ -216,6 +244,17 @@ model Run {
   status String @default("queued")
   provider String
   execution ExecutionAttempt?
+  agentAdmission AgentRunAdmission?
+  providerLaunch ProviderLaunch?
+  buildAdmission BuildExecutionAdmission?
+  invocations ModuleInvocation[]
+  events RunEvent[]
+  eventSequence Int @default(0)
+  interactions RunInteraction[]
+  /// Cancellation is durable authority, never inferred from audit history.
+  cancelRequestedAt DateTime?
+  /// pending | unknown | confirmed; error text is presentation only.
+  stopStatus String @default("pending")
   tokenHash String @unique
   leaseUntil DateTime?
   deadlineAt DateTime?
@@ -503,4 +542,291 @@ model StewardState {
   providerSandboxed Boolean @default(false)
   providerLastError String?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// Version-bound application ownership of a Provider context, independent of audit retention.
+model AgentContext {
+  sessionId String @id
+  workspaceId String
+  moduleId String
+  hash String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, moduleId])
+}
+
+/// Exact tool/content selection admitted for one Run and its original application.
+model AgentRunAdmission {
+  runId String @id
+  moduleId String
+  hash String
+  targets Json
+  content Json
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+/// Fixed idempotency receipt; stores the argument digest, never control input or answers.
+model AgentCommand {
+  id String @id
+  workspaceId String
+  moduleId String
+  hash String
+  operation String
+  requestDigest String
+  output Json
+  settled Boolean
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, moduleId])
+}
+
+/// Admission of the immutable builtin Agent's exact Provider launch.
+model ProviderLaunch {
+  runId String @id
+  digest String
+  createdAt DateTime @default(now())
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+/// Bounded redacted structured events; not Provider transcript text or audit records.
+model RunEvent {
+  runId String
+  sequence Int
+  kind String
+  payload Json
+  createdAt DateTime @default(now())
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@id([runId, sequence])
+}
+
+/// Safe question metadata and terminal receipt. Answer bodies are never persisted.
+model RunInteraction {
+  id String @id
+  runId String
+  request Json
+  status String @default("pending")
+  createdAt DateTime @default(now())
+  settledAt DateTime?
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@index([runId, createdAt, id])
+}
+
+/// Immutable finite kernel fact, with an independent consumption receipt.
+model KernelFact {
+  id String @id
+  workspaceId String
+  payload Json
+  consumedBy String?
+  consumedAt DateTime?
+  createdAt DateTime
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, consumedAt, createdAt, id])
+}
+
+model KernelFactConsumer {
+  workspaceId String @id
+  moduleId String?
+  revision String
+  updatedAt DateTime
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// Owner-issued exact material admission, not a model execution grant.
+model CandidateAdmission {
+  id String @id
+  workspaceId String
+  requestKey String
+  submitterModuleId String
+  submitterHash String
+  targets Json
+  issuer Json
+  createdAt DateTime
+  receipt CandidateReceipt?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model CandidateReceipt {
+  id String @id
+  admissionId String @unique
+  requestKey String
+  requestDigest String
+  state String
+  approvalId String?
+  createdAt DateTime
+  admission CandidateAdmission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  /// Canonical complete immutable set; missing lookup bindings cannot erase membership.
+  members Json
+  memberBindings CandidateMember[]
+}
+
+/// Exact immutable candidate identities; retained even after an application is removed.
+model CandidateMember {
+  versionId String @id
+  receiptId String
+  receipt CandidateReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  @@index([receiptId])
+}
+
+/// Execution policy receipts, independent of optional audit retention.
+model ModuleExecutionResult {
+  id String @id
+  moduleId String
+  hash String
+  activationId String
+  resultId String
+  outcome String
+  consecutiveFailures Int
+  createdAt DateTime
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@unique([activationId, resultId])
+  @@index([moduleId, activationId, createdAt])
+}
+
+/// One governed activation epoch; updates never replace its identity or ordering.
+model ModuleActivation {
+  grouped Boolean @default(false)
+  activationId String @id
+  moduleId String
+  previousHash String?
+  candidateHash String
+  generationId String
+  activatedAt String
+  status String
+  changes Json
+  checks Json
+  affectedCallers Json
+  observedCapabilities Json
+  dataHandling String
+  nextAction String
+  rollback Json
+  createdAt DateTime
+  updatedAt DateTime
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  @@index([moduleId, candidateHash, createdAt])
+  @@index([moduleId, updatedAt])
+}
+
+model ModuleUpstream {
+  moduleId String @id
+  repository String?
+  branch String
+  commit String
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+/// Retained after module removal so a request key cannot authorize a second merge.
+model ModuleUpstreamMerge {
+  id String @id
+  workspaceId String
+  requestKey String
+  moduleId String
+  baseHash String
+  requestedCommit String
+  preparedCommit String?
+  result Json?
+  failed Boolean @default(false)
+  createdAt DateTime
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, requestKey])
+}
+
+/// Private installation request and its current bounded receipt, retained after removal.
+model ModuleInstallation {
+  id String @id
+  workspaceId String
+  requestKey String
+  package String
+  mode String
+  status String
+  moduleId String?
+  hash String?
+  approvalId String?
+  errorCode String?
+  errorReason String?
+  errorMessage String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  heads ModuleInstallationHead[]
+  submission ModuleInstallationSubmission?
+  @@unique([workspaceId, requestKey])
+}
+
+model ModuleInstallationHead {
+  workspaceId String
+  package String
+  installationId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  installation ModuleInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, package])
+}
+
+model ModuleInstallationSubmission {
+  id String @id
+  installationId String @unique
+  hash String
+  moduleId String?
+  existingVersionId String?
+  marker String
+  phase String
+  error String?
+  installation ModuleInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+}
+
+/// Removal evidence survives application deletion and audit retention.
+model ModuleRemoval {
+  moduleId String @id
+  workspaceId String
+  name String
+  hash String?
+  createdAt DateTime
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, name, hash, createdAt])
+}
+
+/// Owner-bound exact execution caps; build workspace files cannot change them.
+model BuildExecutionAdmission {
+  runId String @id
+  provider String
+  model String
+  timeoutMinutes Int
+  maxSubmissions Int
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model BuildTargets {
+  sessionId String @id
+  name String
+  modules Json
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model BuildRequest {
+  id String @id
+  workspaceId String
+  sessionId String
+  fingerprint String?
+  cause Json?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, sessionId])
+}
+
+model ModuleReview {
+  versionId String @id
+  prefix String
+  suffix String
+  codeDiff String
+  detail String
+  needsMigration Boolean
+  version ModuleVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+}
+
+model ModuleMigration {
+  moduleId String @id
+  hash String
+  fromSchema Int?
+  toSchema Int
+  previousStatus String
+  createdAt DateTime
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 }

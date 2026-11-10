@@ -168,7 +168,7 @@ test("claim, final and stop settlement roll back together with the real completi
   expect(await f.db.moduleInvocation.findMany()).toEqual(unknownCallbacks);
   expect(await f.db.executionDelivery.findUniqueOrThrow({ where: { id: d.target.deliveryId } })).toMatchObject({ finalDigest: final.finalDigest, settledAt: null });
   expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: d.target.attemptId } })).toMatchObject({ stopConfirmedAt: null, heldDirectory: expect.any(String) });
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: d.target.runId } })).toMatchObject({ status: "failed", error: "Execution stop is unconfirmed" });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: d.target.runId } })).toMatchObject({ status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" });
   expect(await f.db.executionSnapshot.findUniqueOrThrow({ where: { attemptId: d.target.attemptId } })).toEqual(beforeStop);
   expect(await f.db.executionReceipt.count({ where: { operation: "stop" } })).toBe(0);
   f.ports.onExecutionFinishedIn = enqueueCompletion;
@@ -405,7 +405,7 @@ test.each(["caller", "receiver"] as const)("automatic %s pause commits its drain
   expect(await f.db.executionReceipt.count({ where: { operation: "control", requestKey: `fence:${module.id}` } })).toBe(1);
   // A committed final with no proof still cannot release capacity or complete the pause.
   const committed = await f.service.final(f.receiver, d.target, "final", { ...f.final, outcome: "cancelled" });
-  expect(await f.db.run.findUniqueOrThrow({ where: { id: admitted.execution.runId } })).toMatchObject({ status: "failed", error: "Execution stop is unconfirmed" });
+  expect(await f.db.run.findUniqueOrThrow({ where: { id: admitted.execution.runId } })).toMatchObject({ status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" });
   await expect(pauseFailedModule(f.ports, pause.execution, "failure-3")).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.executionAttempt.findUniqueOrThrow({ where: { id: admitted.execution.attemptId } })).toMatchObject({ stopConfirmedAt: null, heldDirectory: expect.any(String) });
   if (role === "caller") await expect(f.service.admit(f.owner, { ...f.input, workId: "occupied", commandKey: "occupied" })).rejects.toMatchObject({ code: "conflict" });

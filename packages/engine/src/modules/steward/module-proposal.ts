@@ -29,7 +29,10 @@ async function queueVersion(context: ModuleContext, submission: Submission) {
     // A concurrent same-hash proposal owns its staging; never overwrite it.
     if (row.id !== versionId && row.status === "rejected") {
       const changed = await tx.moduleVersion.updateMany({ where: { id: row.id, status: "rejected" }, data: { id: versionId, status: "building", intent: json(intent), source, report: json(report), createdAt } });
-      if (changed.count) return { ...row, id: versionId, status: "building" };
+      if (changed.count) {
+        await tx.moduleReview.deleteMany({ where: { versionId } });
+        return { ...row, id: versionId, status: "building" };
+      }
     }
     return row;
   });

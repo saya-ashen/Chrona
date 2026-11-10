@@ -38,7 +38,7 @@ test.each(["owned-session", "entry-session", "queued-run", "build-target", "depe
   }
   if (kind === "build-target") {
     const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "build", source: "build" } });
-    await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "build_request", subjectId: session.id, details: { modules: [f.module.name, "second"] } } });
+    await f.db.buildTargets.create({ data: { sessionId: session.id, name: f.module.name, modules: [f.module.name, "second"] } });
     await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "build", trigger: "build", status: "running", provider: "fake", tokenHash: "two", prompt: "build", cwd: f.ports.dataDir } });
   }
   if (kind === "dependency") {
@@ -57,6 +57,7 @@ test.each(["web", "notify", "other-entry", "files", "events"])("ordinary entry %
   const f = await fixture(name, true);
   await removeApproved(f.context, await f.approved());
   expect(await f.db.module.findUnique({ where: { id: f.module.id } })).toBeNull();
+  expect(await f.db.moduleRemoval.findUniqueOrThrow({ where: { moduleId: f.module.id } })).toMatchObject({ workspaceId: f.workspace.id, name: f.module.name, hash: f.module.activeHash });
   const removal = await f.db.audit.findFirstOrThrow({ where: { kind: "module_removed", subjectId: f.module.id } });
   expect(await readFile(join((removal.details as { backup: string }).backup, "data/keep.txt"), "utf8")).toBe("valuable");
 });
@@ -128,7 +129,7 @@ test("ended history and completed calls do not block removal; backup preserves d
 test.each(["web", "notify", "other-entry"])("idle audited Agent context permits removal of %s", async name => {
   const f = await fixture(name, true);
   const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: "module", moduleId: f.module.id, entryModuleId: f.module.id } });
-  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: f.module.id, kind: "agent_context", subjectId: session.id, details: {} } });
+  await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: f.module.id, sessionId: session.id, hash: "" } });
   await removeApproved(f.context, await f.approved());
   expect(await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({ status: "active", moduleId: null });
 });
@@ -136,9 +137,9 @@ test.each(["web", "notify", "other-entry"])("idle audited Agent context permits 
 test.each(["queued", "running", "unknown-stop", "held-directory", "wrong-actor", "wrong-session", "wrong-source", "wrong-module"])("ordinary context removal retains %s guard", async kind => {
   const f = await fixture("web", true);
   const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, key: "context", source: kind === "wrong-source" ? "cli" : "module", moduleId: kind === "wrong-module" ? null : f.module.id, entryModuleId: f.module.id } });
-  await f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: kind === "wrong-actor" ? "other" : f.module.id, kind: "agent_context", subjectId: kind === "wrong-session" ? "other" : session.id, details: {} } });
+  if (kind !== "wrong-session") await f.db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: kind === "wrong-actor" ? "other" : f.module.id, sessionId: session.id, hash: "" } });
   if (["queued", "running", "unknown-stop", "held-directory"].includes(kind)) {
-    const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "foreground", trigger: "module", status: kind === "queued" || kind === "running" ? kind : "failed", error: kind === "unknown-stop" ? "Execution stop is unconfirmed" : null, provider: "fake", tokenHash: "context", prompt: "work", cwd: f.ports.dataDir } });
+    const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "foreground", trigger: "module", status: kind === "queued" || kind === "running" ? kind : "failed", stopStatus: kind === "unknown-stop" ? "unknown" : "pending", error: kind === "unknown-stop" ? "Execution stop is unconfirmed" : null, provider: "fake", tokenHash: "context", prompt: "work", cwd: f.ports.dataDir } });
     if (kind === "held-directory") await f.db.executionAttempt.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", callerKey: `module:${f.module.id}`, workId: "work", commandKey: "start", requestDigest: "fixture", runId: run.id, moduleId: f.module.id, projectRef: "fixture", projectDigest: "fixture", logDir: f.data, baseline: "fixture", budget: {}, heldDirectory: f.data } });
   }
   await expect(requestRemove(f.context, f.module.id, "remove")).rejects.toMatchObject({ code: "conflict" });

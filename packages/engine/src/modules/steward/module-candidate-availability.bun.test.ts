@@ -34,7 +34,7 @@ async function storedAdmission(f: Awaited<ReturnType<typeof fixture>>, target: {
   const input = { ...f.input, targets: [target] };
   const admissionId = candidateRequestId("admission", f.workspace.id, issuer, input.requestKey);
   const admission: CandidateAdmissionRecord = { input, issuer, receiptId: null };
-  await f.db.audit.create({ data: { id: admissionId, workspaceId: f.workspace.id, actorKey: "owner", kind: "candidate_admission", details: json(admission) } });
+  await f.db.candidateAdmission.create({ data: { id: admissionId, workspaceId: f.workspace.id, requestKey: input.requestKey, submitterModuleId: input.submitter.moduleId, submitterHash: input.submitter.hash, targets: json(input.targets), issuer: json(issuer), createdAt: f.ports.now() } });
   const submission = { admissionId, requestKey: "submit", items: [{ name: target.name, dir: "missing-material", intent: { changes: ["Stored before pause"], preserves: [] } }] };
   return { input, admissionId, admission, submission };
 }
@@ -45,9 +45,7 @@ async function storedReceipt(f: Awaited<ReturnType<typeof fixture>>, stored: Awa
   const version = await f.db.moduleVersion.create({ data: { moduleId: module.id, hash: "b".repeat(40), manifest: moduleManifestSchema.parse({ name: target.name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [] }), status: "building", source: "candidate", intent: {}, report: {} } });
   const receiptId = candidateRequestId("submission", f.workspace.id, f.caller, stored.submission.requestKey);
   const set: CandidateSet = { receiptId, admissionId: stored.admissionId, requestKey: stored.submission.requestKey, submitter: stored.input.submitter, members: [{ name: target.name, moduleId: module.id, versionId: version.id, hash: version.hash, expectedActiveHash: target.expectedActiveHash, materialDigest: "c".repeat(64) }], state: "submitted", approvalId: null };
-  await f.db.audit.create({ data: { id: receiptId, workspaceId: f.workspace.id, actorKey: "chrona", kind: "candidate_receipt", details: json({ set, requestDigest: candidateDigest(stored.submission) }) } });
-  await f.db.audit.create({ data: { id: `candidate-member:${version.id}`, workspaceId: f.workspace.id, actorKey: "chrona", kind: "candidate_member", details: { receiptId, moduleId: module.id, hash: version.hash } } });
-  await f.db.audit.update({ where: { id: stored.admissionId }, data: { details: json({ ...stored.admission, receiptId }) } });
+  await f.db.candidateReceipt.create({ data: { id: receiptId, admissionId: stored.admissionId, requestKey: set.requestKey, requestDigest: candidateDigest(stored.submission), state: set.state, createdAt: f.ports.now(), members: json(set.members), memberBindings: { create: set.members.map(member => ({ versionId: member.versionId })) } } });
   return set;
 }
 
@@ -60,7 +58,7 @@ test.each([...PAUSED_MODULE_NAMES])("new and installed %s targets cannot receive
   expect(await f.db.module.count({ where: { name } })).toBe(0);
   const installed = await f.app(name);
   await expect(admitCandidates(f.ports, f.workspace.id, owner, { ...f.input, targets: [{ ...target, moduleId: installed.id, expectedActiveHash: hash }] })).rejects.toMatchObject(unavailable);
-  expect(await f.db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);
+  expect(await f.db.candidateAdmission.count()).toBe(0);
   expect(await f.db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
   expect(await f.db.approval.count()).toBe(0);
   expect(await f.db.run.count()).toBe(0);
@@ -94,7 +92,7 @@ test.each([...PAUSED_MODULE_NAMES])("stored %s admission, source export, receipt
   await expect(f.db.$transaction(tx => assertCandidateSetIn(f.context, tx, set))).rejects.toMatchObject(unavailable);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({ activeHash: hash });
   expect(await f.db.moduleVersion.count({ where: { source: "candidate", status: "building" } })).toBe(1);
-  expect(await f.db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(1);
+  expect(await f.db.candidateReceipt.count()).toBe(1);
   expect(await f.db.approval.count()).toBe(0);
 });
 

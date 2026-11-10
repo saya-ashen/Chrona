@@ -39,8 +39,8 @@ async function assertNoDependents(db: Db, module: Row) {
 }
 async function removalSessions(db: Db, module: Row) {
   const sessions = await db.session.findMany({ where: { workspaceId: module.workspaceId, OR: [{ moduleId: module.id }, { entryModuleId: module.id }] }, select: { id: true, status: true, source: true, moduleId: true } });
-  const contexts = await db.audit.findMany({ where: { workspaceId: module.workspaceId, actorKey: module.id, kind: "agent_context", subjectId: { in: sessions.map(session => session.id) } }, select: { subjectId: true } });
-  const retainedContexts = new Set(contexts.map(row => row.subjectId));
+  const contexts = await db.agentContext.findMany({ where: { workspaceId: module.workspaceId, moduleId: module.id, sessionId: { in: sessions.map(session => session.id) } }, select: { sessionId: true } });
+  const retainedContexts = new Set(contexts.map(row => row.sessionId));
   // Agent contexts retain continuation, not an application's private conversation state.
   // Their Runs and unknown-stop evidence still participate in every execution guard.
   const active = sessions.filter(session => session.status === "active");
@@ -50,11 +50,11 @@ async function removalSessions(db: Db, module: Row) {
 async function assertNoPendingWork(db: Db, module: Row) {
   const sessions = await removalSessions(db, module);
   if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: sessions.map(session => session.id) }, status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "关联会话仍有排队或运行中的工作，请先停止并核对结果");
-  const builds = await db.audit.findMany({ where: { workspaceId: module.workspaceId, kind: { in: ["build_request", "build_targets"] } }, select: { subjectId: true, details: true } });
+  const builds = await db.buildTargets.findMany({ where: { session: { workspaceId: module.workspaceId } }, select: { sessionId: true, name: true, modules: true } });
   const targets = builds.filter(row => {
-    const request = row.details as { name?: unknown; modules?: unknown } | null;
-    return request?.name === module.name || Array.isArray(request?.modules) && request.modules.includes(module.name);
-  }).flatMap(row => row.subjectId ? [row.subjectId] : []);
+    const request = row;
+    return request.name === module.name || Array.isArray(request.modules) && request.modules.includes(module.name);
+  }).map(row => row.sessionId);
   if (await db.run.count({ where: { workspaceId: module.workspaceId, sessionId: { in: targets }, lane: "build", status: { in: ["queued", "running"] } } })) throw new StewardError("conflict", "应用仍有排队或运行中的构建，请先停止构建");
   if (await db.moduleInvocation.count({ where: { workspaceId: module.workspaceId, AND: [
     { OR: [{ callerModuleId: module.id }, { target: module.name }] },
@@ -113,6 +113,7 @@ export async function removeApproved(context: ModuleContext, action: ApprovedAct
     }
     await tx.executionAuthority.updateMany({ where: { workspaceId, receiverModuleId: moduleId, revokedAt: null }, data: { revokedAt: ports.now() } });
     await tx.executionAttempt.updateMany({ where: { workspaceId, moduleId, stopConfirmedAt: { not: null } }, data: { moduleId: null } });
+    await tx.moduleRemoval.create({ data: { moduleId, workspaceId, name, hash, createdAt: ports.now() } });
     await tx.module.delete({ where: { id: moduleId } });
     await audit(tx, { workspaceId, actor: "user", kind: "module_removed", subjectId: moduleId, details: { name, hash, backup } });
   });

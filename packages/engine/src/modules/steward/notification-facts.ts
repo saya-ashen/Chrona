@@ -29,8 +29,6 @@ export const kernelFactSchema = z.discriminatedUnion("type", [
 ]);
 export type KernelFact = z.infer<typeof kernelFactSchema>;
 const consumerSchema = z.object({ moduleId: z.string().nullable(), revision: z.string() }).strict();
-const consumerId = (workspaceId: string) => `kernel-fact-consumer:${workspaceId}`;
-const pending = "kernel_fact_pending", consumed = "kernel_fact_consumed";
 function safeData(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value, (key, item: unknown) => {
     const limit = key === "preview" ? 20000 : key === "title" ? 200 : 4000;
@@ -42,7 +40,7 @@ const factId = (workspaceId: string, type: string, key: string) => `kernel-fact:
 export function recordKernelFact(db: Db, workspaceId: string, key: string, fact: KernelFact, at: Date) {
   const details = kernelFactSchema.parse(safeData(fact));
   const id = factId(workspaceId, fact.type, details.type === "withdraw" ? details.data.key : key);
-  return db.audit.upsert({ where: { id }, create: { id, workspaceId, kind: pending, actorKey: "kernel", details, createdAt: at }, update: {} });
+  return db.kernelFact.upsert({ where: { id }, create: { id, workspaceId, payload: details, createdAt: at }, update: {} });
 }
 export function recordApprovalFact(db: Db, row: { workspaceId: string; id: string; title: string; action: string; detail: string; preview: string; moduleId: string | null; createdAt: Date }) {
   return recordKernelFact(db, row.workspaceId, row.id, { type: "approval", data: { approval: row.id, title: row.title.slice(0, 4000), action: z.enum(ACTIONS).parse(row.action), detail: row.detail.slice(0, 4000), preview: row.preview.slice(0, 20000), ...(row.moduleId ? { module: row.moduleId } : {}) } }, row.createdAt);
@@ -51,12 +49,12 @@ export function recordWithdrawal(db: Db, workspaceId: string, key: string, at: D
   return recordKernelFact(db, workspaceId, key, { type: "withdraw", data: { key } }, at);
 }
 export async function factConsumer(db: Db, workspaceId: string) {
-  const row = await db.audit.findUnique({ where: { id: consumerId(workspaceId) } });
-  return row ? consumerSchema.parse(row.details) : { moduleId: null, revision: "unselected" };
+  const row = await db.kernelFactConsumer.findUnique({ where: { workspaceId } });
+  return row ? consumerSchema.parse({ moduleId: row.moduleId, revision: row.revision }) : { moduleId: null, revision: "unselected" };
 }
 /** Release installer alone chooses the initial app. An explicit null selection is never overwritten. */
 export function seedFactConsumer(db: Db, workspaceId: string, moduleId: string, at: Date) {
-  return db.audit.upsert({ where: { id: consumerId(workspaceId) }, create: { id: consumerId(workspaceId), workspaceId, kind: "kernel_fact_consumer", actorKey: "release", details: { moduleId, revision: randomUUID() }, createdAt: at }, update: {} });
+  return db.kernelFactConsumer.upsert({ where: { workspaceId }, create: { workspaceId, moduleId, revision: randomUUID(), updatedAt: at }, update: {} });
 }
 export async function selectFactConsumer(db: StewardPorts["db"], workspaceId: string, moduleId: string | null, at: Date) {
   return db.$transaction(async tx => {
@@ -65,7 +63,7 @@ export async function selectFactConsumer(db: StewardPorts["db"], workspaceId: st
     if (current.moduleId && (await tx.module.findFirst({ where: { workspaceId, id: current.moduleId } }))?.status === "active") throw new CallError("conflict", "Pause the previous fact consumer before switching");
     if (moduleId && !await tx.module.findFirst({ where: { workspaceId, id: moduleId, status: "active", activeHash: { not: null } } })) throw new CallError("not_found", "Active consumer module not found");
     const next = { moduleId, revision: randomUUID() };
-    await tx.audit.upsert({ where: { id: consumerId(workspaceId) }, create: { id: consumerId(workspaceId), workspaceId, kind: "kernel_fact_consumer", actorKey: "owner", details: next, createdAt: at }, update: { details: next, actorKey: "owner" } });
+    await tx.kernelFactConsumer.upsert({ where: { workspaceId }, create: { workspaceId, ...next, updatedAt: at }, update: { ...next, updatedAt: at } });
     return next;
   });
 }
@@ -80,8 +78,8 @@ async function selectedCaller(db: Db, workspaceId: string, caller: Caller, revis
 export async function readKernelFacts(db: StewardPorts["db"], workspaceId: string, caller: Caller) {
   return db.$transaction(async tx => {
     const selected = await selectedCaller(tx, workspaceId, caller);
-    const rows = await tx.audit.findMany({ where: { workspaceId, kind: pending }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 50 });
-    return { revision: selected.revision, facts: rows.map(row => ({ id: row.id, at: row.createdAt.toISOString(), ...kernelFactSchema.parse(row.details) })) };
+    const rows = await tx.kernelFact.findMany({ where: { workspaceId, consumedAt: null }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 50 });
+    return { revision: selected.revision, facts: rows.map(row => ({ id: row.id, at: row.createdAt.toISOString(), ...kernelFactSchema.parse(row.payload) })) };
   });
 }
 /** Withdrawals remain authoritative after consumption, including across consumer switches. */
@@ -89,15 +87,15 @@ export async function withdrawnKernelKeys(db: StewardPorts["db"], workspaceId: s
   return db.$transaction(async tx => {
     await selectedCaller(tx, workspaceId, caller, revision);
     const identities = new Map(keys.map(key => [factId(workspaceId, "withdraw", key), key]));
-    const rows = await tx.audit.findMany({ where: { workspaceId, id: { in: [...identities.keys()] }, kind: { in: [pending, consumed] } }, select: { id: true } });
+    const rows = await tx.kernelFact.findMany({ where: { workspaceId, id: { in: [...identities.keys()] } }, select: { id: true } });
     return { withdrawn: rows.map(row => identities.get(row.id)!) };
   });
 }
 export async function acknowledgeKernelFacts(db: StewardPorts["db"], workspaceId: string, caller: Caller, revision: string, ids: string[]) {
   return db.$transaction(async tx => {
-    const selected = await selectedCaller(tx, workspaceId, caller, revision), actorKey = `consumer:${selected.moduleId}`;
-    await tx.audit.updateMany({ where: { workspaceId, kind: pending, id: { in: ids } }, data: { kind: consumed, actorKey } });
-    const accepted = await tx.audit.findMany({ where: { workspaceId, kind: consumed, actorKey, id: { in: ids } }, select: { id: true } });
+    const selected = await selectedCaller(tx, workspaceId, caller, revision);
+    await tx.kernelFact.updateMany({ where: { workspaceId, consumedAt: null, id: { in: ids } }, data: { consumedBy: selected.moduleId, consumedAt: new Date() } });
+    const accepted = await tx.kernelFact.findMany({ where: { workspaceId, consumedBy: selected.moduleId, consumedAt: { not: null }, id: { in: ids } }, select: { id: true } });
     return { acknowledged: accepted.map(row => row.id) };
   });
 }

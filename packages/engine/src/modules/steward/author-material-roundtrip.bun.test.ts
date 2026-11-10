@@ -11,7 +11,7 @@ import { candidateReceiptSchema } from "../../../../contracts/src/steward/module
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import runtimes from "../../../../integrations/src/steward/runtimes.json";
 import type { ModuleGitFile } from "./module-git";
-import type { BuildReport } from "./module-context";
+import { moduleContext, type BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
 const input = (value: unknown) => ({ input: JSON.stringify(value) });
@@ -27,13 +27,13 @@ async function workspaceFixture(root: string) {
   await mkdir(join(from, "dist"));
   const c = "int main(void) { return 0; }\n";
   await writeFile(join(from, "source/probe.c"), c);
-  const compiler = Bun.which("cc");
+  const compiler = Bun.which(process.env.CC ?? "cc");
   const executable = join(from, "dist/probe");
   let commands: string[], toolchain: string;
   if (compiler) {
     const result = Bun.spawnSync([compiler, "source/probe.c", "-o", "dist/probe"], { cwd: from, stdout: "pipe", stderr: "pipe" });
     expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toEqual({ exitCode: 0, stderr: "" });
-    commands = ["cc source/probe.c -o dist/probe"]; toolchain = "host cc, offline acceptance fixture";
+    commands = [`${compiler} source/probe.c -o dist/probe`]; toolchain = "host cc, offline acceptance fixture";
   } else {
     const native = Bun.which("true");
     if (!native) throw new Error("Material acceptance requires an offline C compiler or an actual native true executable");
@@ -95,7 +95,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     const shared = await import("@chrona/db");
     const singletonDatabases = await shared.db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
     if (singletonDatabases.find(item => item.name === "main")?.file === join(root, "test.db")) importedDatabase = shared.db;
-    const [{ admitContextPrimitive }, { callContextTool, contextRunTools, selectContextTools }, { admissionRecordSchema, candidateRecordSchema }, { checkoutModule, snapshotModule }, { commitModuleSource, readModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }, { createRuns }] = await Promise.all([
+    const [{ admitContextPrimitive }, { callContextTool, contextRunTools, selectContextTools }, { readCandidateAdmissionIn, readCandidateSetIn }, { checkoutModule, snapshotModule }, { commitModuleSource, readModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }, { createRuns }] = await Promise.all([
       import("./agent-context"), import("./agent-context-tools"), import("./module-candidate-records"), import("./module-files"), import("./module-git"), import("./module-supervisor"), import("./modules"), import("./local-runtime"), import("./system-modules"), import("./runs"),
     ]);
     await import("./module-effects");
@@ -174,7 +174,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       const prepared = await invoke("author.prepare", input({ ...admissionInput, goal: "Install and re-edit the exact imported material in this conversation", intent })) as { admission: typeof admissionInput; prompt: string };
       expect(prepared.admission).toEqual(admissionInput);
       const admission = await invoke("modules.admit-candidates", prepared.admission) as { admissionId: string };
-      expect(admissionRecordSchema.parse((await db!.audit.findUniqueOrThrow({ where: { id: admission.admissionId } })).details)).toMatchObject({ input: admissionInput, issuer: { kind: "module", moduleId: entry.id, hash: entry.activeHash }, receiptId: null });
+      expect((await readCandidateAdmissionIn(moduleContext(ports!, workspaceId), db!, admission.admissionId))).toMatchObject({ input: admissionInput, issuer: { kind: "module", moduleId: entry.id, hash: entry.activeHash }, receiptId: null });
       return admission;
     };
     const initial = await prepare("import-admission", [{ name: material.manifest.name, moduleId: null, expectedActiveHash: null }]);
@@ -188,16 +188,16 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     await writeFile(mutableBinary, Buffer.concat([material.binary, Buffer.from("tampered")]));
     await expect(invoke("author.submit", input(submission))).rejects.toMatchObject({ code: "conflict" });
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
-    expect(await db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(0);
-    expect(admissionRecordSchema.parse((await db.audit.findUniqueOrThrow({ where: { id: initial.admissionId } })).details).receiptId).toBeNull();
+    expect(await db.candidateReceipt.count()).toBe(0);
+    expect((await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, initial.admissionId)).receiptId).toBeNull();
     await writeFile(mutableBinary, material.binary);
     const receipt = candidateReceiptSchema.parse(await invoke("author.submit", input(submission)));
     expect(receipt).toMatchObject({ submitter, state: "submitted", approvalId: null, members: [{ name: material.manifest.name, expectedActiveHash: null, status: "building", selected: false }] });
     const first = receipt.members[0]!;
     expect(first.hash).toMatch(/^[a-f0-9]{40}$/);
     expect(first.materialDigest).toMatch(/^[a-f0-9]{64}$/);
-    expect((await db.audit.findUniqueOrThrow({ where: { id: receipt.receiptId } })).actorKey).toBe(`module:${author.id}`);
-    expect(candidateRecordSchema.parse((await db.audit.findUniqueOrThrow({ where: { id: receipt.receiptId } })).details).set.submitter).toEqual(submitter);
+    expect((await db.candidateReceipt.findUniqueOrThrow({ where: { id: receipt.receiptId }, include: { admission: true } })).admission.submitterModuleId).toBe(author.id);
+    expect((await readCandidateSetIn(moduleContext(ports, workspaceId), db, receipt.receiptId))!.submitter).toEqual(submitter);
     const source = await readModuleSource({ platform, moduleId: first.moduleId, commit: first.hash });
     expect(source.map(file => file.path).sort()).toEqual([...material.source, "chrona-material.json"].sort());
     expect(source.some(file => file.path.startsWith("dist/"))).toBe(false);
@@ -221,7 +221,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
       expect(report.tests).toEqual([{ exitCode: 0, stderr: "", stdout: "checked actual native runtime asset\n" }]);
       expect(report.git?.commit).toBe(member.hash);
       expect(await db!.module.findUniqueOrThrow({ where: { id: member.moduleId } })).toMatchObject({ activeHash: member.hash, status: "active" });
-      expect(await db!.audit.count({ where: { id: `module-review:${member.versionId}`, kind: "module_review" } })).toBe(1);
+      expect(await db!.moduleReview.count({ where: { versionId: member.versionId } })).toBe(1);
     };
     await check(first);
     const approved = candidateReceiptSchema.parse(await invoke("author.receipt", input({ receiptId: receipt.receiptId })));
@@ -261,7 +261,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     expect(second).toMatchObject({ moduleId: first.moduleId, expectedActiveHash: first.hash, status: "building", selected: false });
     expect(second.hash).not.toBe(first.hash);
     expect(second.materialDigest).not.toBe(first.materialDigest);
-    expect(admissionRecordSchema.parse((await db.audit.findUniqueOrThrow({ where: { id: next.admissionId } })).details).input.targets).toEqual([{ name: material.manifest.name, moduleId: first.moduleId, expectedActiveHash: first.hash }]);
+    expect((await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, next.admissionId)).input.targets).toEqual([{ name: material.manifest.name, moduleId: first.moduleId, expectedActiveHash: first.hash }]);
     await check(second);
     // The old SDK process must release ownership with real descendant-stop evidence before replacement.
     await moduleSupervisor(ports).settleModule(first.moduleId);
@@ -304,7 +304,7 @@ test("current Agent imports source and ignored native assets, checks/installs fi
     expect(await readFile(nextBlob, "utf8")).toBe("corrupt immutable artifact");
     expect(await invoke("author.receipt", input({ receiptId: corruptReceipt.receiptId }))).toMatchObject({ state: "rejected", members: [{ hash: corrupt.hash, selected: false }] });
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(3);
-    expect(await db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(3);
+    expect(await db.candidateReceipt.count()).toBe(3);
     expect(await db.approval.count()).toBe(0);
     expect(await db.generation.count({ where: { workspaceId } })).toBe(2);
     // Router evidence retains the entry caller and the actual Author identity across nested SDK calls.

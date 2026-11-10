@@ -4,6 +4,7 @@ import hashes from "../../../../contracts/fixtures/contract-hashes.json";
 import transitions from "../../../../contracts/fixtures/contract-hash-transitions.json";
 import additions from "../../../../contracts/fixtures/contract-hash-additions.json";
 import mainMerge from "../../../../contracts/fixtures/contract-hash-main-merge.json";
+import migration from "../../../../contracts/fixtures/contract-hash-kernel-app-migration.json";
 import agentTools from "../../../../contracts/fixtures/agent-tools.json";
 import cases from "../../../../contracts/fixtures/contract-hash-cases.json";
 import { moduleManifestSchema } from "@chrona/contracts/steward";
@@ -32,7 +33,7 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expected[change.target] = change.after;
   }
   const newTargets = Object.keys(current).filter(target => !Object.hasOwn(expected, target)).sort();
-  expect(newTargets).toEqual(additions.map(addition => addition.target).sort());
+  expect(newTargets).toEqual([...additions.map(addition => addition.target), ...migration.changes.filter(change => change.before === null).map(change => change.target)].sort());
   for (const addition of additions) {
     expect(addition.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(addition.stage).toBe("S5");
@@ -41,20 +42,27 @@ test("all tool hashes preserve the baseline except explicitly enumerated plan ch
     expect(Object.hasOwn(expected, addition.target)).toBe(false);
     expected[addition.target] = addition.hash;
   }
+  expect(migration.changes.map(change => change.target)).toEqual(["agent.complete", "agent.completion", "author.export", "author.import", "author.prepare", "remind.create", "web.component-remove", "web.component-set", "web.page-set"]);
+  for (const change of migration.changes) {
+    expect((expected as Record<string, string | null>)[change.target] ?? null).toBe(change.before);
+    expect(change.reason.length).toBeGreaterThan(20);
+    expect(change.after).toMatch(/^[a-f0-9]{64}$/);
+    expected[change.target] = change.after;
+  }
   expect(current).toEqual(expected);
   expect([...new Set(Object.keys(hashes).map(target => target.split(".")[0]))].sort()).toEqual([
     "activity", "agent", "approvals", "author", "coding", "coding-web", "events", "files", "mcp", "memory-local", "mind", "modules", "notify", "qq", "remind", "secrets", "settings", "web",
   ]);
 });
 
-test("Agent preserves every snapshot tool except the four explicit S5 placement transitions", async () => {
+test("Agent preserves snapshot tools except explicit placement and kernel/app migration changes", async () => {
   const changed = transitions.filter(transition => transition.stage === "S5").map(transition => transition.target);
   expect(changed.sort()).toEqual(["agent.cleanup", "agent.locations", "agent.placement", "agent.run"]);
   const current = moduleManifestSchema.shape.tools.parse(await readAgentTools());
-  expect(current.map(tool => tool.name)).toEqual(agentTools.map(tool => tool.name));
+  expect(current.map(tool => tool.name).sort()).toEqual(agentTools.map(tool => tool.name).sort());
   for (const original of agentTools) {
     const tool = current.find(tool => tool.name === original.name)!;
-    const transition = transitions.find(transition => transition.target === `agent.${tool.name}` && transition.stage === "S5");
+    const transition = migration.changes.find(change => change.target === `agent.${tool.name}`) ?? transitions.find(transition => transition.target === `agent.${tool.name}` && transition.stage === "S5");
     if (transition) expect(moduleCallbackContractHash(tool)).toBe(transition.after);
     else expect(tool).toEqual(moduleManifestSchema.shape.tools.parse([original])[0]);
   }

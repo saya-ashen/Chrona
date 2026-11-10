@@ -36,6 +36,8 @@ CREATE TABLE "Module" (
     "name" TEXT NOT NULL,
     "builtin" BOOLEAN NOT NULL DEFAULT false,
     "activeHash" TEXT,
+    "activationId" TEXT NOT NULL,
+    "executionFenceAt" DATETIME,
     "dataSchema" INTEGER,
     "status" TEXT NOT NULL DEFAULT 'active',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -44,6 +46,7 @@ CREATE TABLE "Module" (
 
 -- CreateTable
 CREATE TABLE "ModuleVersion" (
+    "buildSessionId" TEXT,
     "id" TEXT NOT NULL PRIMARY KEY,
     "moduleId" TEXT NOT NULL,
     "hash" TEXT NOT NULL,
@@ -53,6 +56,7 @@ CREATE TABLE "ModuleVersion" (
     "report" JSONB NOT NULL,
     "status" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ModuleVersion_buildSessionId_fkey" FOREIGN KEY ("buildSessionId") REFERENCES "Session" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "ModuleVersion_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -84,7 +88,10 @@ CREATE TABLE "ModuleRun" (
 -- CreateTable
 CREATE TABLE "ModuleCall" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "moduleId" TEXT NOT NULL,
+    "moduleId" TEXT,
+    "accountingModuleId" TEXT,
+    "workspaceId" TEXT,
+    "moduleName" TEXT,
     "hash" TEXT NOT NULL,
     "moduleRunId" TEXT,
     "eventKey" TEXT,
@@ -93,7 +100,7 @@ CREATE TABLE "ModuleCall" (
     "status" TEXT NOT NULL,
     "error" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "ModuleCall_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "ModuleCall_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -103,7 +110,12 @@ CREATE TABLE "ModuleInvocation" (
     "caller" TEXT NOT NULL,
     "callerModuleId" TEXT,
     "callerHash" TEXT,
+    "runId" TEXT,
     "target" TEXT NOT NULL,
+    "targetBound" BOOLEAN NOT NULL DEFAULT false,
+    "targetModuleId" TEXT,
+    "targetHash" TEXT,
+    "targetContractHash" TEXT,
     "tool" TEXT NOT NULL,
     "args" JSONB NOT NULL,
     "key" TEXT NOT NULL,
@@ -122,6 +134,7 @@ CREATE TABLE "ModuleInvocation" (
     "repliedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "finishedAt" DATETIME,
+    CONSTRAINT "ModuleInvocation_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "ModuleInvocation_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -159,6 +172,9 @@ CREATE TABLE "Run" (
     "trigger" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'queued',
     "provider" TEXT NOT NULL,
+    "eventSequence" INTEGER NOT NULL DEFAULT 0,
+    "cancelRequestedAt" DATETIME,
+    "stopStatus" TEXT NOT NULL DEFAULT 'pending',
     "tokenHash" TEXT NOT NULL,
     "leaseUntil" DATETIME,
     "deadlineAt" DATETIME,
@@ -183,6 +199,10 @@ CREATE TABLE "ExecutionAttempt" (
     "callerKey" TEXT NOT NULL,
     "moduleId" TEXT,
     "callerHash" TEXT,
+    "callerActivationId" TEXT,
+    "placement" JSONB,
+    "targetBinding" JSONB,
+    "capacityKey" TEXT NOT NULL DEFAULT 'local',
     "workId" TEXT NOT NULL,
     "commandKey" TEXT NOT NULL,
     "requestDigest" TEXT NOT NULL,
@@ -215,6 +235,67 @@ CREATE TABLE "ExecutionAttempt" (
     CONSTRAINT "ExecutionAttempt_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "ExecutionAttempt_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "ExecutionAttempt_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ExecutionAuthority" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "receiverModuleId" TEXT NOT NULL,
+    "receiverHash" TEXT NOT NULL,
+    "receiverActivationId" TEXT NOT NULL,
+    "subjectId" TEXT NOT NULL,
+    "epoch" INTEGER NOT NULL,
+    "keyId" TEXT NOT NULL,
+    "publicKey" TEXT NOT NULL,
+    "verifierId" TEXT NOT NULL,
+    "verifierVersion" TEXT NOT NULL,
+    "scope" JSONB NOT NULL,
+    "approvalId" TEXT NOT NULL,
+    "approvedAt" DATETIME NOT NULL,
+    "revokedAt" DATETIME
+);
+
+-- CreateTable
+CREATE TABLE "ExecutionDelivery" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "attemptId" TEXT NOT NULL,
+    "authorityId" TEXT NOT NULL,
+    "receiverModuleId" TEXT NOT NULL,
+    "receiverHash" TEXT NOT NULL,
+    "receiverActivationId" TEXT NOT NULL,
+    "launchDigest" TEXT NOT NULL,
+    "launch" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "offeredAt" DATETIME,
+    "acceptedAt" DATETIME,
+    "startedAt" DATETIME,
+    "processIdentity" JSONB,
+    "sourceThrough" INTEGER NOT NULL DEFAULT 0,
+    "finalDigest" TEXT,
+    "final" JSONB,
+    "finalCommittedAt" DATETIME,
+    "settledAt" DATETIME,
+    CONSTRAINT "ExecutionDelivery_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExecutionAttempt" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ExecutionDelivery_authorityId_fkey" FOREIGN KEY ("authorityId") REFERENCES "ExecutionAuthority" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ExecutionReceipt" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "deliveryId" TEXT NOT NULL,
+    "operation" TEXT NOT NULL,
+    "requestKey" TEXT NOT NULL,
+    "requestDigest" TEXT NOT NULL,
+    "direction" TEXT NOT NULL DEFAULT 'inbound',
+    "bytes" INTEGER NOT NULL DEFAULT 0,
+    "payload" JSONB,
+    "receipt" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "offeredAt" DATETIME,
+    "acceptedAt" DATETIME,
+    CONSTRAINT "ExecutionReceipt_deliveryId_fkey" FOREIGN KEY ("deliveryId") REFERENCES "ExecutionDelivery" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -262,73 +343,6 @@ CREATE TABLE "ExecutionCommand" (
 
     PRIMARY KEY ("attemptId", "commandKey"),
     CONSTRAINT "ExecutionCommand_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExecutionAttempt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "ExecutionExecutor" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "ownerId" TEXT NOT NULL,
-    "label" TEXT NOT NULL,
-    "credentialHash" TEXT NOT NULL,
-    "generation" INTEGER NOT NULL DEFAULT 1,
-    "revokedAt" DATETIME,
-    "authorizedUntil" DATETIME,
-    "incarnation" TEXT,
-    "reconciledAt" DATETIME,
-    "lastSeenAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- CreateTable
-CREATE TABLE "ExecutorPairing" (
-    "codeHash" TEXT NOT NULL PRIMARY KEY,
-    "workspaceId" TEXT NOT NULL,
-    "ownerId" TEXT NOT NULL,
-    "expiresAt" DATETIME NOT NULL,
-    "receiptExpiresAt" DATETIME NOT NULL,
-    "executorId" TEXT,
-    "credentialHash" TEXT,
-    "consumedAt" DATETIME,
-    CONSTRAINT "ExecutorPairing_executorId_fkey" FOREIGN KEY ("executorId") REFERENCES "ExecutionExecutor" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "ExecutorAssignment" (
-    "attemptId" TEXT NOT NULL PRIMARY KEY,
-    "assignmentId" TEXT NOT NULL,
-    "executorId" TEXT NOT NULL,
-    "generation" INTEGER NOT NULL,
-    "incarnation" TEXT NOT NULL,
-    "launchDigest" TEXT,
-    "launch" JSONB,
-    "preparedAt" DATETIME,
-    "offeredAt" DATETIME,
-    "startedAt" DATETIME,
-    "processIdentity" JSONB,
-    "sourceHighWatermark" INTEGER NOT NULL DEFAULT 0,
-    "sourceProducedThrough" INTEGER NOT NULL DEFAULT 0,
-    "receiptCount" INTEGER NOT NULL DEFAULT 0,
-    "receiptBytes" INTEGER NOT NULL DEFAULT 0,
-    "finalDigest" TEXT,
-    "final" JSONB,
-    "finalizedAt" DATETIME,
-    "tombstoneDigest" TEXT,
-    CONSTRAINT "ExecutorAssignment_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExecutionAttempt" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "ExecutorAssignment_executorId_fkey" FOREIGN KEY ("executorId") REFERENCES "ExecutionExecutor" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "ExecutorSourceReceipt" (
-    "attemptId" TEXT NOT NULL,
-    "sourceSeq" INTEGER NOT NULL,
-    "digest" TEXT NOT NULL,
-    "throughSourceSeq" INTEGER NOT NULL,
-    "storedSeq" INTEGER,
-    "bytes" INTEGER NOT NULL,
-
-    PRIMARY KEY ("attemptId", "sourceSeq"),
-    CONSTRAINT "ExecutorSourceReceipt_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExecutorAssignment" ("attemptId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -420,6 +434,286 @@ CREATE TABLE "StewardState" (
     CONSTRAINT "StewardState_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "AgentContext" (
+    "sessionId" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    CONSTRAINT "AgentContext_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentRunAdmission" (
+    "runId" TEXT NOT NULL PRIMARY KEY,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "targets" JSONB NOT NULL,
+    "content" JSONB NOT NULL,
+    CONSTRAINT "AgentRunAdmission_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AgentCommand" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "operation" TEXT NOT NULL,
+    "requestDigest" TEXT NOT NULL,
+    "output" JSONB NOT NULL,
+    "settled" BOOLEAN NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AgentCommand_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ProviderLaunch" (
+    "runId" TEXT NOT NULL PRIMARY KEY,
+    "digest" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ProviderLaunch_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RunEvent" (
+    "runId" TEXT NOT NULL,
+    "sequence" INTEGER NOT NULL,
+    "kind" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("runId", "sequence"),
+    CONSTRAINT "RunEvent_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RunInteraction" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "runId" TEXT NOT NULL,
+    "request" JSONB NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "settledAt" DATETIME,
+    CONSTRAINT "RunInteraction_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "KernelFact" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "consumedBy" TEXT,
+    "consumedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "KernelFact_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "KernelFactConsumer" (
+    "workspaceId" TEXT NOT NULL PRIMARY KEY,
+    "moduleId" TEXT,
+    "revision" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "KernelFactConsumer_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CandidateAdmission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "requestKey" TEXT NOT NULL,
+    "submitterModuleId" TEXT NOT NULL,
+    "submitterHash" TEXT NOT NULL,
+    "targets" JSONB NOT NULL,
+    "issuer" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "CandidateAdmission_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CandidateReceipt" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "admissionId" TEXT NOT NULL,
+    "requestKey" TEXT NOT NULL,
+    "requestDigest" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "approvalId" TEXT,
+    "createdAt" DATETIME NOT NULL,
+    "members" JSONB NOT NULL,
+    CONSTRAINT "CandidateReceipt_admissionId_fkey" FOREIGN KEY ("admissionId") REFERENCES "CandidateAdmission" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CandidateMember" (
+    "versionId" TEXT NOT NULL PRIMARY KEY,
+    "receiptId" TEXT NOT NULL,
+    CONSTRAINT "CandidateMember_receiptId_fkey" FOREIGN KEY ("receiptId") REFERENCES "CandidateReceipt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleExecutionResult" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "moduleId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "activationId" TEXT NOT NULL,
+    "resultId" TEXT NOT NULL,
+    "outcome" TEXT NOT NULL,
+    "consecutiveFailures" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "ModuleExecutionResult_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleActivation" (
+    "grouped" BOOLEAN NOT NULL DEFAULT false,
+    "activationId" TEXT NOT NULL PRIMARY KEY,
+    "moduleId" TEXT NOT NULL,
+    "previousHash" TEXT,
+    "candidateHash" TEXT NOT NULL,
+    "generationId" TEXT NOT NULL,
+    "activatedAt" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "changes" JSONB NOT NULL,
+    "checks" JSONB NOT NULL,
+    "affectedCallers" JSONB NOT NULL,
+    "observedCapabilities" JSONB NOT NULL,
+    "dataHandling" TEXT NOT NULL,
+    "nextAction" TEXT NOT NULL,
+    "rollback" JSONB NOT NULL,
+    "createdAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ModuleActivation_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleUpstream" (
+    "moduleId" TEXT NOT NULL PRIMARY KEY,
+    "repository" TEXT,
+    "branch" TEXT NOT NULL,
+    "commit" TEXT NOT NULL,
+    CONSTRAINT "ModuleUpstream_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleUpstreamMerge" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "requestKey" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "baseHash" TEXT NOT NULL,
+    "requestedCommit" TEXT NOT NULL,
+    "preparedCommit" TEXT,
+    "result" JSONB,
+    "failed" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "ModuleUpstreamMerge_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleInstallation" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "requestKey" TEXT NOT NULL,
+    "package" TEXT NOT NULL,
+    "mode" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "moduleId" TEXT,
+    "hash" TEXT,
+    "approvalId" TEXT,
+    "errorCode" TEXT,
+    "errorReason" TEXT,
+    "errorMessage" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ModuleInstallation_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleInstallationHead" (
+    "workspaceId" TEXT NOT NULL,
+    "package" TEXT NOT NULL,
+    "installationId" TEXT NOT NULL,
+
+    PRIMARY KEY ("workspaceId", "package"),
+    CONSTRAINT "ModuleInstallationHead_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ModuleInstallationHead_installationId_fkey" FOREIGN KEY ("installationId") REFERENCES "ModuleInstallation" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleInstallationSubmission" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "installationId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "moduleId" TEXT,
+    "existingVersionId" TEXT,
+    "marker" TEXT NOT NULL,
+    "phase" TEXT NOT NULL,
+    "error" TEXT,
+    CONSTRAINT "ModuleInstallationSubmission_installationId_fkey" FOREIGN KEY ("installationId") REFERENCES "ModuleInstallation" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleRemoval" (
+    "moduleId" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "hash" TEXT,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "ModuleRemoval_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "BuildExecutionAdmission" (
+    "runId" TEXT NOT NULL PRIMARY KEY,
+    "provider" TEXT NOT NULL,
+    "model" TEXT NOT NULL,
+    "timeoutMinutes" INTEGER NOT NULL,
+    "maxSubmissions" INTEGER NOT NULL,
+    CONSTRAINT "BuildExecutionAdmission_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "BuildTargets" (
+    "sessionId" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "modules" JSONB NOT NULL,
+    CONSTRAINT "BuildTargets_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "BuildRequest" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "fingerprint" TEXT,
+    "cause" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "BuildRequest_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "BuildRequest_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleReview" (
+    "versionId" TEXT NOT NULL PRIMARY KEY,
+    "prefix" TEXT NOT NULL,
+    "suffix" TEXT NOT NULL,
+    "codeDiff" TEXT NOT NULL,
+    "detail" TEXT NOT NULL,
+    "needsMigration" BOOLEAN NOT NULL,
+    CONSTRAINT "ModuleReview_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "ModuleVersion" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModuleMigration" (
+    "moduleId" TEXT NOT NULL PRIMARY KEY,
+    "hash" TEXT NOT NULL,
+    "fromSchema" INTEGER,
+    "toSchema" INTEGER NOT NULL,
+    "previousStatus" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL,
+    CONSTRAINT "ModuleMigration_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE INDEX "Session_workspaceId_key_status_idx" ON "Session"("workspaceId", "key", "status");
 
@@ -460,6 +754,9 @@ CREATE INDEX "ModuleInvocation_workspaceId_status_nextAttemptAt_idx" ON "ModuleI
 CREATE INDEX "ModuleInvocation_workspaceId_reply_repliedAt_idx" ON "ModuleInvocation"("workspaceId", "reply", "repliedAt");
 
 -- CreateIndex
+CREATE INDEX "ModuleInvocation_runId_status_idx" ON "ModuleInvocation"("runId", "status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "ModuleInvocation_workspaceId_caller_target_tool_key_key" ON "ModuleInvocation"("workspaceId", "caller", "target", "tool", "key");
 
 -- CreateIndex
@@ -490,6 +787,9 @@ CREATE UNIQUE INDEX "ExecutionAttempt_runId_key" ON "ExecutionAttempt"("runId");
 CREATE UNIQUE INDEX "ExecutionAttempt_heldDirectory_key" ON "ExecutionAttempt"("heldDirectory");
 
 -- CreateIndex
+CREATE INDEX "ExecutionAttempt_capacityKey_stopConfirmedAt_idx" ON "ExecutionAttempt"("capacityKey", "stopConfirmedAt");
+
+-- CreateIndex
 CREATE INDEX "ExecutionAttempt_executorId_stopConfirmedAt_idx" ON "ExecutionAttempt"("executorId", "stopConfirmedAt");
 
 -- CreateIndex
@@ -502,25 +802,37 @@ CREATE INDEX "ExecutionAttempt_workspaceId_ownerId_workId_createdAt_idx" ON "Exe
 CREATE UNIQUE INDEX "ExecutionAttempt_workspaceId_ownerId_callerKey_commandKey_key" ON "ExecutionAttempt"("workspaceId", "ownerId", "callerKey", "commandKey");
 
 -- CreateIndex
+CREATE INDEX "ExecutionAuthority_workspaceId_ownerId_revokedAt_idx" ON "ExecutionAuthority"("workspaceId", "ownerId", "revokedAt");
+
+-- CreateIndex
+CREATE INDEX "ExecutionAuthority_receiverModuleId_receiverActivationId_revokedAt_idx" ON "ExecutionAuthority"("receiverModuleId", "receiverActivationId", "revokedAt");
+
+-- CreateIndex
+CREATE INDEX "ExecutionAuthority_subjectId_epoch_idx" ON "ExecutionAuthority"("subjectId", "epoch");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ExecutionAuthority_receiverModuleId_receiverActivationId_subjectId_epoch_keyId_key" ON "ExecutionAuthority"("receiverModuleId", "receiverActivationId", "subjectId", "epoch", "keyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ExecutionDelivery_attemptId_key" ON "ExecutionDelivery"("attemptId");
+
+-- CreateIndex
+CREATE INDEX "ExecutionDelivery_authorityId_settledAt_idx" ON "ExecutionDelivery"("authorityId", "settledAt");
+
+-- CreateIndex
+CREATE INDEX "ExecutionDelivery_receiverModuleId_receiverActivationId_settledAt_idx" ON "ExecutionDelivery"("receiverModuleId", "receiverActivationId", "settledAt");
+
+-- CreateIndex
+CREATE INDEX "ExecutionReceipt_deliveryId_direction_acceptedAt_idx" ON "ExecutionReceipt"("deliveryId", "direction", "acceptedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ExecutionReceipt_deliveryId_operation_requestKey_key" ON "ExecutionReceipt"("deliveryId", "operation", "requestKey");
+
+-- CreateIndex
 CREATE INDEX "ExecutionDetail_expiresAt_idx" ON "ExecutionDetail"("expiresAt");
 
 -- CreateIndex
 CREATE INDEX "ExecutionSnapshot_expiresAt_idx" ON "ExecutionSnapshot"("expiresAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExecutionExecutor_credentialHash_key" ON "ExecutionExecutor"("credentialHash");
-
--- CreateIndex
-CREATE INDEX "ExecutionExecutor_workspaceId_ownerId_idx" ON "ExecutionExecutor"("workspaceId", "ownerId");
-
--- CreateIndex
-CREATE INDEX "ExecutorPairing_receiptExpiresAt_idx" ON "ExecutorPairing"("receiptExpiresAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExecutorAssignment_assignmentId_key" ON "ExecutorAssignment"("assignmentId");
-
--- CreateIndex
-CREATE INDEX "ExecutorAssignment_executorId_generation_idx" ON "ExecutorAssignment"("executorId", "generation");
 
 -- CreateIndex
 CREATE INDEX "Message_sessionId_at_idx" ON "Message"("sessionId", "at");
@@ -545,3 +857,48 @@ CREATE INDEX "Audit_workspaceId_createdAt_idx" ON "Audit"("workspaceId", "create
 
 -- CreateIndex
 CREATE INDEX "Audit_workspaceId_subjectId_createdAt_idx" ON "Audit"("workspaceId", "subjectId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "AgentContext_workspaceId_moduleId_idx" ON "AgentContext"("workspaceId", "moduleId");
+
+-- CreateIndex
+CREATE INDEX "AgentCommand_workspaceId_moduleId_idx" ON "AgentCommand"("workspaceId", "moduleId");
+
+-- CreateIndex
+CREATE INDEX "RunInteraction_runId_createdAt_id_idx" ON "RunInteraction"("runId", "createdAt", "id");
+
+-- CreateIndex
+CREATE INDEX "KernelFact_workspaceId_consumedAt_createdAt_id_idx" ON "KernelFact"("workspaceId", "consumedAt", "createdAt", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CandidateReceipt_admissionId_key" ON "CandidateReceipt"("admissionId");
+
+-- CreateIndex
+CREATE INDEX "CandidateMember_receiptId_idx" ON "CandidateMember"("receiptId");
+
+-- CreateIndex
+CREATE INDEX "ModuleExecutionResult_moduleId_activationId_createdAt_idx" ON "ModuleExecutionResult"("moduleId", "activationId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModuleExecutionResult_activationId_resultId_key" ON "ModuleExecutionResult"("activationId", "resultId");
+
+-- CreateIndex
+CREATE INDEX "ModuleActivation_moduleId_candidateHash_createdAt_idx" ON "ModuleActivation"("moduleId", "candidateHash", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ModuleActivation_moduleId_updatedAt_idx" ON "ModuleActivation"("moduleId", "updatedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModuleUpstreamMerge_workspaceId_requestKey_key" ON "ModuleUpstreamMerge"("workspaceId", "requestKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModuleInstallation_workspaceId_requestKey_key" ON "ModuleInstallation"("workspaceId", "requestKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModuleInstallationSubmission_installationId_key" ON "ModuleInstallationSubmission"("installationId");
+
+-- CreateIndex
+CREATE INDEX "ModuleRemoval_workspaceId_name_hash_createdAt_idx" ON "ModuleRemoval"("workspaceId", "name", "hash", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "BuildRequest_workspaceId_sessionId_idx" ON "BuildRequest"("workspaceId", "sessionId");

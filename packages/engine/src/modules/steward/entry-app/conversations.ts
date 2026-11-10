@@ -10,7 +10,7 @@ type Transcript = { at: string; kind: string; text?: string; tool?: string; erro
 type Execution = { runId: string; status: string; active: boolean; phase?: string; reason?: string; canContinue: boolean; replyPending?: boolean; pendingAdmission?: { requestKey: string }; pendingContinuation?: { runId: string; requestKey: string }; applicationDelivery?: ApplicationDelivery[] };
 type Message = { id: string; direction: "in" | "out"; text: string; createdAt: string; attachments: unknown[]; externalId?: string; inReplyTo?: string; input?: string; requestKey?: string; runId?: string; delivery?: "pending" | "accepted"; execution?: Execution; progress?: string };
 type RunRequest = { prompt: string; tools: string[]; content: string[] };
-type Turn = { applicationDelivery?: ApplicationDelivery[]; deliveryCheckedAt?: string; id: string; key: string; text: string; prompt?: string; memoryContext?: string; input?: string; content?: string[]; at: string; runId?: string; status: string; active: boolean; phase?: string; reason?: string; after?: number; streamPending?: boolean; continuationOf?: string; runRequest?: RunRequest; baseline: Transcript; transcript: Transcript; interactions: { id: string; status: string }[] };
+type Turn = { pendingToolResults?: string[]; applicationDelivery?: ApplicationDelivery[]; deliveryCheckedAt?: string; id: string; key: string; text: string; prompt?: string; memoryContext?: string; input?: string; content?: string[]; at: string; runId?: string; status: string; active: boolean; phase?: string; reason?: string; after?: number; streamPending?: boolean; continuationOf?: string; runRequest?: RunRequest; baseline: Transcript; transcript: Transcript; interactions: { id: string; status: string }[] };
 type Conversation = { id: string; memory?: MemoryJournal; contextId?: string; key: string; title: string; status: "active" | "ended"; source: "web" | "mcp" | "qq"; createdAt: string; lastActivityAt: string; messages: Message[]; turns: Turn[] };
 type State = { version: 1; sessions: Conversation[] };
 type Options = { dataDir: string; call: Call; reply: (event: Args) => void; now?: () => Date; source?: "web" | "mcp" | "qq"; guidance?: string; tools?: string[]; deliveryPages?: DeliveryPages };
@@ -50,6 +50,7 @@ async function load(dataDir: string): Promise<State> {
   const state = JSON.parse(text) as { version?: number; sessions?: (Conversation | null)[] } | null;
   if (state?.version !== 1 || !Array.isArray(state.sessions) || state.sessions.some(s => !s || !isAgentConversation(s.id) || !Array.isArray(s.messages) || !Array.isArray(s.turns)
     || (s.memory !== undefined && !isMemoryJournal(s.memory))
+    || s.turns.some(turn => turn.pendingToolResults !== undefined && (!Array.isArray(turn.pendingToolResults) || turn.pendingToolResults.some(id => typeof id !== "string" || !id || id.length > 128)))
     || s.turns.some(turn => turn.runRequest !== undefined && !isRunRequest(turn.runRequest))
     || s.turns.some(turn => turn.applicationDelivery !== undefined && !validApplicationDelivery(turn.applicationDelivery))
     || s.turns.some(turn => turn.deliveryCheckedAt !== undefined && !Number.isFinite(Date.parse(turn.deliveryCheckedAt)))
@@ -118,7 +119,7 @@ async function readTranscript(call: Call, turn: Turn, before?: string) {
       // not attach the next turn's results or prose to this turn.
       turn.transcript = before === undefined ? stream.transcript : stream.transcript.filter(item => Date.parse(item.at) < Date.parse(before));
       turn.interactions = stream.interactions;
-      captureApplicationDelivery(turn, turn.transcript, before);
+      captureApplicationDelivery(turn, stream.items);
     } while (stream.items.length === 100);
     return true;
   } catch { /* The known execution status remains authoritative; reads can reconcile the transcript later. */
@@ -173,7 +174,7 @@ async function reconcileDelivery(options: Runtime, state: State, session: Conver
   } else await save(options.dataDir, state);
 }
 function needsRefresh(session: Conversation, turn: Turn) {
-  return turn.runId && (turn.active || turn.streamPending || !session.messages.find(message => message.id === `reply:${turn.id}`)?.execution);
+  return turn.runId && (turn.active || turn.streamPending || turn.pendingToolResults?.length || !session.messages.find(message => message.id === `reply:${turn.id}`)?.execution);
 }
 async function refreshSession(options: Runtime, state: State, session: Conversation) {
   for (const turn of session.turns) {

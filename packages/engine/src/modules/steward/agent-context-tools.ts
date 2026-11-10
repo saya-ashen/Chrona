@@ -5,7 +5,6 @@ import { admitted, callSync, CallError, type Caller, type CallOrigin } from "./m
 import { moduleTools, catalogEntry } from "./module-tools";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { runExpired } from "./run-finish";
-import { providerCancelKey } from "./provider-journal";
 
 import { withAgentContextEntry } from "./agent-context-entry";
 
@@ -26,21 +25,21 @@ export async function selectContextTools(ports: StewardPorts, principal: Executi
 }
 export async function contextRunTools(ports: StewardPorts, run: { id: string; sessionId: string | null; workspaceId: string }) {
   if (!run.sessionId) return null;
-  const grant = await ports.db.audit.findFirst({ where: { id: `agent-context:${run.sessionId}`, workspaceId: run.workspaceId, kind: "agent_context", subjectId: run.sessionId } });
+  const grant = await ports.db.agentContext.findFirst({ where: { sessionId: run.sessionId, workspaceId: run.workspaceId } });
   if (!grant) return null;
-  const hash = z.object({ hash: z.string() }).parse(grant.details).hash;
+  const { hash } = grant;
   const session = await ports.db.session.findFirstOrThrow({ where: { id: run.sessionId, workspaceId: run.workspaceId, source: "module" } });
-  if (!session.moduleId || grant.actorKey !== session.moduleId) throw new CallError("forbidden", "Agent context owner is missing");
+  if (!session.moduleId || grant.moduleId !== session.moduleId) throw new CallError("forbidden", "Agent context owner is missing");
   const principal: ExecutionPrincipal = { workspaceId: run.workspaceId, ownerId: "owner", caller: { kind: "module", moduleId: session.moduleId, hash } };
   await assertExecutionPrincipal(ports.db, principal);
-  const tools = await ports.db.audit.findFirstOrThrow({ where: { id: `agent-tools:${run.id}`, workspaceId: run.workspaceId, kind: "agent_tools", subjectId: run.id, actorKey: session.moduleId } });
-  const { targets } = z.object({ targets: z.array(z.string()).max(100) }).parse(tools.details);
+  const tools = await ports.db.agentRunAdmission.findFirstOrThrow({ where: { runId: run.id, moduleId: session.moduleId, hash } });
+  const { targets } = z.object({ targets: z.array(z.string()).max(100) }).parse(tools);
   return { ...await selectContextTools(ports, principal, targets), runId: run.id };
 }
 export async function callContextTool(ports: StewardPorts, context: NonNullable<Awaited<ReturnType<typeof contextRunTools>>>, name: string, raw: unknown, deadline: number) {
   const now = ports.now();
   const run = context.runId && context.workspaceId ? await ports.db.run.findFirst({ where: { id: context.runId, workspaceId: context.workspaceId, status: "running", execution: null } }) : null;
-  if (!run || runExpired(run, now) || await ports.db.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) throw new CallError("forbidden", "Agent run is no longer active");
+  if (!run || runExpired(run, now) || run.cancelRequestedAt) throw new CallError("forbidden", "Agent run is no longer active");
   const current = await contextRunTools(ports, run);
   if (!current || current.caller.moduleId !== context.caller.moduleId || current.caller.hash !== context.caller.hash || current.caller.module !== context.caller.module) throw new CallError("forbidden", "Agent context caller changed");
   const entry = current.entries.find(entry => entry.name === name);

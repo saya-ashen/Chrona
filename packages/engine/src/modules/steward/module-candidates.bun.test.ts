@@ -100,7 +100,7 @@ test("target name drift and partial submissions leave no runnable versions or re
   await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "beta" } });
   await expect(submitCandidates(f.ports, f.workspace.id, f.caller, f.submission)).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
-  expect(await f.db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(0);
+  expect(await f.db.candidateReceipt.count()).toBe(0);
   expect(await f.db.module.count({ where: { name: "alpha" } })).toBe(0);
 });
 
@@ -211,7 +211,7 @@ test.each(["baseline", "submitter", "issuer"])("fixed credential approval rechec
 test("a missing durable member binding fails closed instead of becoming a standalone candidate", async () => {
   const f = await fixture(["alpha"]), receipt = await submitCandidates(f.ports, f.workspace.id, f.caller, f.submission);
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { id: receipt.members[0]!.versionId } });
-  await f.db.audit.delete({ where: { id: `candidate-member:${version.id}` } });
+  await f.db.candidateMember.delete({ where: { versionId: version.id } });
   await expect(findCandidateSet(f.context, version)).rejects.toMatchObject({ code: "conflict" });
   expect(await f.db.generation.count()).toBe(0);
 });

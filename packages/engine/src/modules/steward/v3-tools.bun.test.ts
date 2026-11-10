@@ -39,11 +39,11 @@ test("build reports stay in their build, and removed native tools stay unavailab
 test("service approvals persist facts transactionally without a notification app or backfill", async () => {
   const approvals = createApprovals({ ...ports, workspaceId });
   const requested = await approvals.create({ action: "delete_data", title: "请求", detail: "说明", preview: "摘要", payload: { privateArgument: "not-a-fact" } });
-  const facts = await db.audit.findMany({ where: { workspaceId, kind: "kernel_fact_pending" } });
-  expect(facts.map(row => (row.details as { data: { approval: string } }).data.approval).sort()).toEqual([requested.id]);
+  const facts = await db.kernelFact.findMany({ where: { workspaceId, consumedAt: null } });
+  expect(facts.map(row => (row.payload as { data: { approval: string } }).data.approval).sort()).toEqual([requested.id]);
   expect(JSON.stringify(facts)).not.toContain("privateArgument");
   await approvals.resolve(requested.id, { decision: "deny", scope: "once" });
-  expect(await db.audit.findFirst({ where: { workspaceId, kind: "kernel_fact_pending", details: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ details: { data: { key: `approval:${requested.id}` } } });
+  expect(await db.kernelFact.findFirst({ where: { workspaceId, consumedAt: null, payload: { path: "$.type", equals: "withdraw" } } })).toMatchObject({ payload: { data: { key: `approval:${requested.id}` } } });
   expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
 });
 test("reply files go to their recipient, never a shared attachment store or arbitrary app ref", async () => {

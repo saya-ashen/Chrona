@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createProviderChannel } from "./provider-channel";
-import { providerCancelKey, providerRuns } from "./provider-journal";
+import { providerRuns } from "./provider-journal";
 import { providerStartGate } from "./provider-start";
 import { createStewardService } from "./service";
 import { testDb } from "./test-db";
@@ -88,7 +88,7 @@ test("expiry rejects late approval and returns cancellation; queued notice is su
   expect(await result).toEqual({ decision: "cancel" });
   expect((await api.provider.list())[0]!.interactions[0]!.status).toBe("expired");
   // A durable withdrawal exists even if no notification application is running.
-  expect((await db.audit.findMany({ where: { kind: "kernel_fact_pending" } })).map(row => row.details)).toContainEqual({ type: "withdraw", data: { key: `provider-input:${f.run.id}` } });
+  expect((await db.kernelFact.findMany({ where: { consumedAt: null } })).map(row => row.payload)).toContainEqual({ type: "withdraw", data: { key: `provider-input:${f.run.id}` } });
   expect(await db.moduleInvocation.count({ where: { target: "notify", tool: "withdraw" } })).toBe(0);
 });
 test("restart/no live process cannot reuse pending requests", async () => {
@@ -113,7 +113,7 @@ test("owner cancel blocks tools immediately, retains input and never retries the
 test("progress is safe, deduplicated and bounded; requests publish durable notification facts", async () => {
   const f = await fixture();
   for (let i = 0; i < 350; i++) await f.channel.events.progress({ phase: i % 2 ? "reading" : "writing", tool: null });
-  expect(await db.audit.count({ where: { kind: "provider_event" } })).toBe(300);
+  expect(await db.runEvent.count()).toBe(300);
   const result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   // Notification budgets belong to notify; the kernel publishes a normal request fact.
   expect(await notice(db)).toMatchObject({ level: "now", idempotencyKey: `provider-input:${f.run.id}` });
@@ -122,7 +122,7 @@ test("progress is safe, deduplicated and bounded; requests publish durable notif
 test("telemetry cannot crowd a live question or the latest usage out of the projection", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
   const usage = { scope: "session", input: 10, output: 20, cacheRead: 0, cacheWrite: 0, total: 30, cost: 0, contextTokens: null, contextWindow: null };
-  await db.audit.createMany({ data: Array.from({ length: 450 }, (_, index) => ({ id: `provider:${f.run.id}:${String(index).padStart(8, "0")}`, workspaceId, kind: "provider_event", actorKey: "chrona", subjectId: f.run.id, details: { type: "usage", value: { ...usage, total: index + 30 } } })) });
+  await db.runEvent.createMany({ data: Array.from({ length: 450 }, (_, index) => ({ runId: f.run.id, sequence: index + 1, kind: "usage", payload: { type: "usage", value: { ...usage, total: index + 30 } } })) });
   const projected = (await api.provider.list())[0]!;
   expect(projected.interactions[0]?.id).toBe(request.id); expect(projected.usage?.total).toBe(479);
   await api.provider.answer(request.id, { decision: "cancel" }); expect(await result).toEqual({ decision: "cancel" });
@@ -130,7 +130,7 @@ test("telemetry cannot crowd a live question or the latest usage out of the proj
 test("sensitive request context fails closed before publication", async () => {
   const f = await fixture();
   await expect(f.channel.events.question({ ...question(), message: `password=bad ${f.run.token}` }, f.controller.signal)).rejects.toMatchObject({ code: "invalid" });
-  expect(await db.audit.count({ where: { kind: "provider_question" } })).toBe(0);
+  expect(await db.runInteraction.count()).toBe(0);
   expect((await notices(db)).length).toBe(0);
 });
 test("a pending launch publishes cancellation before it can start work", async () => {
@@ -145,24 +145,24 @@ test("a failed run creates no kernel retry and late cancellation leaves app time
   const module = await db.module.create({ data: { workspaceId, name: "timer-owner" } });
   // Private legacy row: cancellation must not mutate unrelated stored state.
   const schedule = await db.schedule.create({ data: { workspaceId, moduleId: module.id, triggerId: "future", mode: "module", label: "Future arrangement", text: "legacy inert fixture", createdBy: "chrona", rule: { kind: "every", minutes: 60 }, payload: {}, nextAt: new Date("2030-01-01Z") } });
-  await db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: f.run.id, details: {} } });
+  await db.run.update({ where: { id: f.run.id }, data: { cancelRequestedAt: new Date() } });
   await api.provider.cancel(f.run.id);
   expect((await db.run.findUniqueOrThrow({ where: { id: unrelated.id } })).status).toBe("queued");
   expect((await db.schedule.findUniqueOrThrow({ where: { id: schedule.id } })).status).toBe("active");
 });
 test("a failed reply receipt never releases a positive answer", async () => {
   const f = await fixture(), result = f.channel.events.question(question(), f.controller.signal), request = await waiting();
-  await db.$executeRawUnsafe("CREATE TRIGGER fail_provider_receipt BEFORE INSERT ON Audit WHEN NEW.kind = 'provider_answer' BEGIN SELECT RAISE(ABORT, 'Synthetic storage failure'); END");
+  await db.$executeRawUnsafe("CREATE TRIGGER fail_provider_receipt BEFORE UPDATE OF status ON RunInteraction WHEN NEW.status != 'pending' BEGIN SELECT RAISE(ABORT, 'Synthetic storage failure'); END");
   try {
     await expect(api.provider.answer(request.id, { decision: "submit", value: true })).rejects.toThrow();
     expect(await result).toEqual({ decision: "cancel" });
-    expect(await db.audit.count({ where: { kind: "provider_answer" } })).toBe(0);
+    expect(await db.runInteraction.count({ where: { status: { not: "pending" } } })).toBe(0);
   } finally { await db.$executeRawUnsafe("DROP TRIGGER fail_provider_receipt"); }
 });
 test("a durable queued cancel is never claimed after restart", async () => {
   const session = await db.session.create({ data: { workspaceId, key: "web:queued", source: "web" } });
   const run = await api.runs.enqueue({ sessionId: session.id, lane: "background", trigger: "schedule", prompt: "Keep" });
-  await db.audit.create({ data: { id: providerCancelKey(run.id), workspaceId, actorKey: "user", kind: "provider_cancel", subjectId: run.id, details: {} } });
+  await db.run.update({ where: { id: run.id }, data: { cancelRequestedAt: new Date() } });
   expect(await api.runs.claimNext("background")).toBeNull();
   expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("cancelled");
 });

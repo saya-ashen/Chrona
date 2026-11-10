@@ -4,7 +4,7 @@ import type { Prisma } from "@chrona/db";
 import { callerSchema, moduleManifestSchema } from "@chrona/contracts/steward";
 import { candidateAdmissionInputSchema, candidateReceiptSchema } from "../../../../contracts/src/steward/module-candidates";
 import type { Caller } from "./module-call-types";
-import { json, type ModuleContext, type ModuleVersion } from "./module-context";
+import { type ModuleContext, type ModuleVersion } from "./module-context";
 import { StewardError } from "./errors";
 import { isOwnerCaller } from "./module-owner";
 import { assertExternalModule, assertExternalName } from "./module-identity";
@@ -15,7 +15,6 @@ export const admissionRecordSchema = z.object({ input: candidateAdmissionInputSc
 export type CandidateAdmissionRecord = z.infer<typeof admissionRecordSchema>;
 export const candidateSetSchema = candidateReceiptSchema.omit({ members: true }).extend({ members: z.array(candidateReceiptSchema.shape.members.element.omit({ status: true, selected: true })).min(1).max(4) }).strict();
 export type CandidateSet = z.infer<typeof candidateSetSchema>;
-export const candidateRecordSchema = z.object({ set: candidateSetSchema, requestDigest: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 export function candidateDigest(value: unknown) {
   const canonical = JSON.stringify(value, (_key, item: unknown) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
   return createHash("sha256").update(canonical).digest("hex");
@@ -39,9 +38,9 @@ export async function assertCandidateSubmitter(db: CandidateDb, workspaceId: str
   return module;
 }
 export async function readCandidateAdmissionIn(context: ModuleContext, db: CandidateDb, admissionId: string) {
-  const row = await db.audit.findFirst({ where: { id: admissionId, workspaceId: context.workspaceId, kind: "candidate_admission" } });
+  const row = await db.candidateAdmission.findFirst({ where: { id: admissionId, workspaceId: context.workspaceId }, include: { receipt: { select: { id: true } } } });
   if (!row) throw new StewardError("not_found", "Candidate admission not found");
-  const admission = admissionRecordSchema.parse(row.details);
+  const admission = admissionRecordSchema.parse({ input: { requestKey: row.requestKey, submitter: { moduleId: row.submitterModuleId, hash: row.submitterHash }, targets: row.targets }, issuer: row.issuer, receiptId: row.receipt?.id ?? null });
   // Replays read this record without repeating the baseline fence; availability still applies.
   for (const target of admission.input.targets) assertModuleAvailable(target.name);
   return admission;
@@ -57,18 +56,17 @@ export async function assertCandidateAdmissionIn(context: ModuleContext, db: Can
   }
 }
 export async function readCandidateSetIn(context: ModuleContext, db: CandidateDb, receiptId: string): Promise<CandidateSet | null> {
-  const row = await db.audit.findFirst({ where: { id: receiptId, workspaceId: context.workspaceId, kind: "candidate_receipt" } });
-  return row ? candidateRecordSchema.parse(row.details).set : null;
+  const row = await db.candidateReceipt.findFirst({ where: { id: receiptId, admission: { workspaceId: context.workspaceId } }, include: { admission: true } });
+  return row ? candidateSetSchema.parse({ receiptId: row.id, admissionId: row.admissionId, requestKey: row.requestKey, submitter: { moduleId: row.admission.submitterModuleId, hash: row.admission.submitterHash }, state: row.state, approvalId: row.approvalId, members: row.members }) : null;
 }
 export async function findCandidateSet(context: ModuleContext, version: Pick<ModuleVersion, "id" | "moduleId" | "hash">): Promise<CandidateSet | null> {
-  const binding = await context.db.audit.findFirst({ where: { id: `candidate-member:${version.id}`, workspaceId: context.workspaceId, kind: "candidate_member" } });
+  const binding = await context.db.candidateMember.findFirst({ where: { versionId: version.id, receipt: { admission: { workspaceId: context.workspaceId } } } });
   if (!binding) {
     const stored = await context.db.moduleVersion.findFirst({ where: { id: version.id, module: { workspaceId: context.workspaceId } }, select: { source: true } });
     if (stored?.source === "candidate") throw new StewardError("conflict", "Fixed candidate member binding is missing");
     return null;
   }
-  const ref = z.object({ receiptId: z.string(), moduleId: z.string(), hash: z.string() }).strict().parse(binding.details);
-  if (ref.moduleId !== version.moduleId || ref.hash !== version.hash) throw new StewardError("conflict", "Candidate member binding changed");
+  const ref = binding;
   const set = await readCandidateSetIn(context, context.db, ref.receiptId);
   if (!set || !set.members.some(member => member.versionId === version.id && member.moduleId === version.moduleId && member.hash === version.hash)) throw new StewardError("conflict", "Candidate set binding is missing");
   return set;
@@ -80,8 +78,8 @@ async function assertCandidateMemberIn(context: ModuleContext, db: CandidateDb, 
   const module = await assertExternalModule(db, context.workspaceId, member.moduleId, "group");
   const target = admission.input.targets.find(item => item.name === member.name);
   const version = await db.moduleVersion.findUnique({ where: { id: member.versionId } });
-  const binding = await db.audit.findFirst({ where: { id: `candidate-member:${member.versionId}`, workspaceId: context.workspaceId, kind: "candidate_member" } });
-  if (!matchesCandidateTarget(member, target, module) || !version || version.moduleId !== module.id || version.hash !== member.hash || !binding || candidateDigest(binding.details) !== candidateDigest({ receiptId: set.receiptId, moduleId: module.id, hash: member.hash })) throw new StewardError("conflict", "Candidate identity, baseline or member binding changed");
+  const binding = await db.candidateMember.findFirst({ where: { versionId: member.versionId, receipt: { admission: { workspaceId: context.workspaceId } } } });
+  if (!matchesCandidateTarget(member, target, module) || !version || version.moduleId !== module.id || version.hash !== member.hash || !binding || binding.receiptId !== set.receiptId) throw new StewardError("conflict", "Candidate identity, baseline or member binding changed");
 }
 /** Final transaction fence, also called after a credential approval. */
 export async function assertCandidateSetIn(context: ModuleContext, db: CandidateDb, set: CandidateSet) {
@@ -94,12 +92,11 @@ export async function assertCandidateSetIn(context: ModuleContext, db: Candidate
   for (const member of set.members) await assertCandidateMemberIn(context, db, set, admission, member);
 }
 export async function setCandidateSetStateIn(context: ModuleContext, db: CandidateDb, set: CandidateSet, state: CandidateSet["state"], approvalId: string | null = null) {
-  const row = await db.audit.findFirst({ where: { id: set.receiptId, workspaceId: context.workspaceId, kind: "candidate_receipt" } });
-  if (!row) throw new StewardError("conflict", "Candidate receipt is missing");
-  const record = candidateRecordSchema.parse(row.details);
-  if (record.set.state === "approved" || record.set.state === "rejected") {
-    if (state !== record.set.state) throw new StewardError("conflict", "Candidate receipt is terminal");
+  const stored = await readCandidateSetIn(context, db, set.receiptId);
+  if (!stored) throw new StewardError("conflict", "Candidate receipt is missing");
+  if (stored.state === "approved" || stored.state === "rejected") {
+    if (state !== stored.state) throw new StewardError("conflict", "Candidate receipt is terminal");
     return;
   }
-  await db.audit.update({ where: { id: row.id }, data: { details: json({ ...record, set: { ...record.set, state, approvalId } }) } });
+  await db.candidateReceipt.update({ where: { id: set.receiptId }, data: { state, approvalId } });
 }

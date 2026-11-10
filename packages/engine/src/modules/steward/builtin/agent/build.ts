@@ -36,12 +36,12 @@ export function parameters(value: unknown): Parameter {
   if (Array.isArray(variants)) return unionParameters(variants.map(parameters));
   return { type: schema.type === "integer" ? "number" : schema.type, ...(schema.type === "object" ? objectParameters(schema) : {}), ...(schema.items ? { items: parameters(schema.items) } : {}) };
 }
-const tools = agentTools.map(([name, _input, output]) => {
+const tools = [...agentTools.map(([name, _input, output]) => {
   if (!isModuleAgentTool(name)) return { name, description: `Agent ${name}: kernel-only execution control`, visibility: ["kernel"], parameters: { type: "object", properties: { input: { type: "string", description: "Kernel-only encoded request" } }, required: ["input"] }, output: outputShape(z.toJSONSchema(output)) };
   const publicInput = parameters(z.toJSONSchema(moduleAgentInputs[name])) as { properties: Record<string, unknown> };
   const result = { anyOf: [outputShape(z.toJSONSchema(output)), outputShape(z.toJSONSchema(moduleAgentOutputs[name]))] };
   return { name, description: `Agent ${name}: modules use structured arguments and own their operations; input is reserved for kernel calls`, visibility: ["kernel", "modules"], parameters: { type: "object", properties: { ...publicInput.properties, input: { type: "string", description: "Kernel-only encoded request" } }, required: [] }, output: result };
-});
+}), ...(["complete", "completion"] as const).map(name => ({ name, description: `Agent ${name}: application-owned completion`, visibility: ["modules"], parameters: parameters(z.toJSONSchema(moduleAgentInputs[name])), output: outputShape(z.toJSONSchema(moduleAgentOutputs[name])) }))];
 const primitives = Object.entries(primitiveInputs).map(([name, input]) => {
   const shape = parameters(z.toJSONSchema(input));
   return { name, description: `Low-level Agent ${name}; caller owns business sessions and orchestration`, visibility: ["modules"], parameters: { type: "object", properties: shape.properties, required: [] }, output: outputShape(z.toJSONSchema(primitiveOutputs[name as keyof typeof primitiveOutputs])) };

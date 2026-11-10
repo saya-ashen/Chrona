@@ -12,7 +12,7 @@ import type { StewardPorts } from "./ports";
 
 const now = new Date("2026-10-22T12:00:00Z");
 const source = resolve(import.meta.dirname, "external/remind");
-const retainedFiles = ["module.json", "index.ts", "test.ts", "page.ts", "activation-harness.ts"];
+const retainedFiles = ["module.json", "index.ts", "test.ts", "page.ts", "activation-harness.ts", "package.json", "bun.lock", "reminders.ts", "rules.ts", "reminders.test.ts", "reminders.bun.test.ts"];
 const paused = { code: "unavailable", reason: "module_paused" };
 let db: ReturnType<typeof testDb>, ports: StewardPorts, resources: string;
 let installerCalls: number, processStarts: number;
@@ -58,14 +58,15 @@ async function expectNoExecution() {
 
 test.each(["install", "update"] as const)("external remind %s is gated before proposals, checks or source changes", async mode => {
   const module = mode === "update" ? await retainedModule() : null;
-  // Retain the actual paused release. Do not rewrite its removed scheduler manifest into an installable app.
-  expect(manifest).toHaveProperty("triggers");
-  expect(moduleManifestSchema.safeParse(manifest).success).toBe(false);
+  // Source compatibility does not grant installation authority to a paused application.
+  expect(manifest).not.toHaveProperty("triggers");
+  expect(moduleManifestSchema.safeParse(manifest).success).toBe(true);
   await expect(installExternal(ports, "w", { package: "remind", mode, requestKey: `paused-${mode}` })).rejects.toMatchObject(paused);
   expect(await db.module.count()).toBe(module ? 1 : 0);
   expect(await db.moduleVersion.count()).toBe(module ? 1 : 0);
   if (module) expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
-  expect(await db.audit.count({ where: { kind: { in: ["module_installation_submission", "module_proposed"] } } })).toBe(0);
+  expect(await db.moduleInstallationSubmission.count()).toBe(0);
+  expect(await db.audit.count({ where: { kind: "module_proposed" } })).toBe(0);
   await expectNoExecution();
 });
 
@@ -74,12 +75,12 @@ test.each(["pending", "building", "installed"] as const)("replaying a retained %
   const request = { package: "remind", mode: "install", requestKey: `retained-${status}` } as const;
   const result = { package: "remind", requestKey: request.requestKey, status, moduleId: module.id, hash: module.activeHash, approvalId: null, error: null };
   const id = installationId("w", request.requestKey);
-  await db.audit.create({ data: { id, workspaceId: "w", actorKey: "kernel", kind: "module_installation", subjectId: module.id, details: { request, result } } });
+  await db.moduleInstallation.create({ data: { id, workspaceId: "w", ...request, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId } });
   const unavailable = await installExternal(ports, "w", request);
   expect(unavailable).toMatchObject({ ...result, status: "unavailable", error: paused });
   expect(await installExternal(ports, "w", request)).toEqual(unavailable);
-  expect(await db.audit.findUniqueOrThrow({ where: { id } })).toMatchObject({ details: { request, result: unavailable } });
-  expect(await db.audit.count({ where: { kind: "module_installation" } })).toBe(1);
+  expect(await db.moduleInstallation.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: "unavailable", errorReason: unavailable.error?.reason });
+  expect(await db.moduleInstallation.count()).toBe(1);
   expect(await db.module.findUniqueOrThrow({ where: { id: module.id } })).toEqual(module);
   expect((await db.moduleVersion.findFirstOrThrow()).manifest).toEqual(manifest);
   await expectNoExecution();

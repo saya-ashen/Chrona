@@ -6,10 +6,13 @@ import { join, resolve } from "node:path";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 
 const models = [
-  "Workspace", "Session", "Module", "ModuleVersion", "Generation", "ModuleRun", "ModuleCall", "ModuleInvocation",
-  "Schedule", "Run", "Message", "Approval", "Grant", "Preference", "Audit", "StewardState",
-  "ExecutionAttempt", "ExecutionDetail", "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand",
-  "ExecutionExecutor", "ExecutorPairing", "ExecutorAssignment", "ExecutorSourceReceipt",
+  "Workspace", "Session", "Module", "ModuleVersion", "Generation",
+  "ModuleRun", "ModuleCall", "ModuleInvocation", "Schedule", "Run",
+  "ExecutionAttempt", "ExecutionAuthority", "ExecutionDelivery", "ExecutionReceipt", "ExecutionDetail",
+  "ExecutionSnapshot", "ExecutionControl", "ExecutionCommand", "Message", "Approval",
+  "Grant", "Preference", "Audit", "StewardState", "AgentContext",
+  "AgentRunAdmission", "AgentCommand", "ProviderLaunch", "RunEvent", "RunInteraction",
+  "ModuleMigration", "ModuleReview", "BuildTargets", "BuildRequest", "BuildExecutionAdmission", "ModuleInstallation", "ModuleInstallationHead", "ModuleInstallationSubmission", "ModuleRemoval", "ModuleUpstream", "ModuleUpstreamMerge", "ModuleActivation", "ModuleExecutionResult", "KernelFact", "KernelFactConsumer", "CandidateAdmission", "CandidateReceipt", "CandidateMember",
 ];
 
 function fixture() {
@@ -59,10 +62,10 @@ describe("clean steward SQLite baseline", () => {
       expect(db.query('PRAGMA table_info("ModuleRun")').all()).not.toContainEqual(expect.objectContaining({ name: "inboundItemId" }));
       const tables = db.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(row => row.name);
       expect(tables).not.toContain("Connector"); expect(tables).not.toContain("InboundItem");
-      expect(db.query('SELECT name FROM "_chrona_migrations" ORDER BY name').all()).toEqual([{ name: "0001_initial" }, { name: "0002_s5_kernel_execution" }]);
+      expect(db.query('SELECT name FROM "_chrona_migrations" ORDER BY name').all()).toEqual([{ name: "0001_initial" }]);
       const retired = ["ExecutionExecutor", "ExecutorPairing", "ExecutorAssignment", "ExecutorSourceReceipt"];
       for (const name of retired) expect(tables).not.toContain(name);
-      expect(tables.filter(name => name !== "_chrona_migrations").sort()).toEqual([...models.filter(name => !retired.includes(name)), "ExecutionAuthority", "ExecutionDelivery", "ExecutionReceipt"].sort());
+      expect(tables.filter(name => name !== "_chrona_migrations").sort()).toEqual([...models].sort());
     });
   });
 

@@ -3,7 +3,6 @@ import type { StewardPorts } from "./ports";
 import { runtimeStartSchema, agentInput } from "@chrona/contracts/steward";
 import { authenticateRun } from "./run-auth";
 import { StewardError } from "./errors";
-import { CallError } from "./module-call-error";
 import type { Caller } from "./module-system-types";
 
 /** Immutable identity is established by registration and checked again by the supervisor before delivery. */
@@ -21,6 +20,7 @@ export async function authorizeAgentRequest(ports: StewardPorts, workspaceId: st
     if (!await ports.db.module.findFirst({ where: { workspaceId, id: caller.moduleId, activeHash: caller.hash, status: "active" }, select: { id: true } })) throw new StewardError("forbidden", "Agent caller is no longer active");
     return;
   }
+  if (name === "complete" || name === "completion") throw new StewardError("forbidden", "Completion requires an admitted application caller");
   if (caller.kind !== "kernel") throw new StewardError("forbidden", "Agent requires an admitted caller");
   let args: Record<string, unknown>;
   try { args = agentInput(name, JSON.parse(String(raw.input))); }
@@ -31,12 +31,11 @@ export async function authorizeAgentRequest(ports: StewardPorts, workspaceId: st
     const authenticated = await authenticateRun(tx, input.token, ports.now());
     const { run } = authenticated;
     if ([authenticated.workspaceId !== workspaceId, run.id !== input.runId, input.operationId !== run.id, run.cwd !== input.cwd, run.lane !== input.lane, run.deadlineAt !== null && (input.deadline === null || new Date(input.deadline) > run.deadlineAt)].some(Boolean)) throw new StewardError("forbidden", "Agent start exceeds the claimed Run");
-    const id = `local-provider-start:${run.id}`, existing = await tx.audit.findUnique({ where: { id } });
+    const existing = await tx.providerLaunch.findUnique({ where: { runId: run.id } });
     if (existing) {
-      if (!(existing.details as { agentApplication?: boolean } | null)?.agentApplication) throw new CallError("unknown", "Previous Provider launch requires reconciliation");
-      if ((existing.details as { digest?: string } | null)?.digest !== digest) throw new StewardError("conflict", "Agent operation identity changed");
+      if (existing.digest !== digest) throw new StewardError("conflict", "Agent operation identity changed");
       return;
     }
-    await tx.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "local_provider_start", subjectId: run.id, details: { digest, agentApplication: true }, createdAt: ports.now() } });
+    await tx.providerLaunch.create({ data: { runId: run.id, digest, createdAt: ports.now() } });
   });
 }

@@ -31,7 +31,7 @@ for (const boundary of ["agent", "provider"] as const) test.each([
       : runtimeCall(ports, workspaceId, "agent.start", input);
     if (accepted) {
       await start;
-      expect(await db.audit.count({ where: { id: `local-provider-start:${run.id}` } })).toBe(1);
+      expect(await db.providerLaunch.count({ where: { runId: run.id } })).toBe(1);
       if (boundary === "provider") {
         expect(seen).toEqual([deadline === null ? null : new Date(deadline)]);
         await runtimeCall(ports, workspaceId, "agent.wait", { operationId: run.id });
@@ -40,7 +40,7 @@ for (const boundary of ["agent", "provider"] as const) test.each([
     } else {
       await expect(start).rejects.toMatchObject({ code: "forbidden" });
       expect(seen).toEqual([]);
-      expect(await db.audit.count({ where: { id: `local-provider-start:${run.id}` } })).toBe(0);
+      expect(await db.providerLaunch.count({ where: { runId: run.id } })).toBe(0);
     }
     expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ deadlineAt: run.deadlineAt, leaseUntil: run.leaseUntil });
   } finally { await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }

@@ -192,5 +192,5 @@ test("registrar never selects an existing ordinary Notify as default fact consum
   const f = await fixture();
   await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "notify", activeHash: "owner-notify", builtin: false } });
   await f.start(); await f.start();
-  expect(await f.db.audit.count({ where: { kind: "kernel_fact_consumer" } })).toBe(0);
+  expect(await f.db.kernelFactConsumer.count()).toBe(0);
 });

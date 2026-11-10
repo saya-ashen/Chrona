@@ -62,13 +62,13 @@ type Fixture = Awaited<ReturnType<typeof fixture>>;
 async function blockExecution(f: Fixture, state: "queued" | "unknown", agent = false) {
   const moduleId = f.receipt.members.at(-1)!.moduleId;
   const session = await f.db.session.create({ data: { workspaceId: f.workspace.id, moduleId, source: "module", key: "execution-context" } });
-  if (agent) await f.db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId: f.workspace.id, actorKey: moduleId, kind: "agent_context", subjectId: session.id, details: {} } });
+  if (agent) await f.db.agentContext.create({ data: { sessionId: session.id, workspaceId: f.workspace.id, moduleId: moduleId, hash: "" } });
   const run = await f.db.run.create({ data: { workspaceId: f.workspace.id, sessionId: session.id, lane: "background", trigger: "source", provider: "fixture", tokenHash: crypto.randomUUID(), prompt: "fixture", cwd: f.ports.dataDir, status: state === "queued" ? "queued" : "running", startedAt: state === "unknown" ? f.ports.now() : null } });
   const attempt = agent ? null : await f.db.executionAttempt.create({ data: { workspaceId: f.workspace.id, ownerId: "owner", callerKey: `module:${moduleId}`, moduleId, callerHash: baseline, workId: "work", commandKey: "start", requestDigest: "fixture", runId: run.id, projectRef: "project", projectDigest: "fixture", logDir: join(f.ports.dataDir, "logs"), baseline: `commit:${baseline}`, budget: {}, heldDirectory: join(f.ports.dataDir, "occupied") } });
   const runs = createRuns(f.ports, f.workspace.id);
   if (state === "unknown") {
     await runs.finish(run.id, { outcome: "failed", sessionId: null, error: null });
-    expect(await f.db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ error: "Execution stop is unconfirmed" });
+    expect(await f.db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({ stopStatus: "unknown", error: "Execution stop is unconfirmed" });
   }
   return {
     attempt,
@@ -130,7 +130,7 @@ test.each(["baseline", "submitter", "issuer", "binding", "subset", "duplicate", 
   if (drift === "baseline") await f.db.module.update({ where: { id: last.moduleId }, data: { activeHash: "c".repeat(40) } });
   if (drift === "submitter") await f.db.module.update({ where: { id: f.author.id }, data: { status: "paused" } });
   if (drift === "issuer") await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: f.author.id, hash: baseline } }, data: { manifest: manifest("author") } });
-  if (drift === "binding") await f.db.audit.delete({ where: { id: `candidate-member:${last.versionId}` } });
+  if (drift === "binding") await f.db.candidateMember.delete({ where: { versionId: last.versionId } });
   if (["subset", "duplicate", "hash"].includes(drift)) {
     const versions = f.receipt.members.map(member => ({ moduleId: member.moduleId, hash: member.hash }));
     if (drift === "subset") versions.pop();

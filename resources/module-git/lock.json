@@ -5,17 +5,17 @@
       "name": "web",
       "repository": null,
       "branch": "main",
-      "commit": "93e2ab0df290cfac8842ff890c6164327b303d63",
+      "commit": "7d795302698f8253dc90ef8e619bb1ee9c91046f",
       "bundle": "web.bundle",
-      "bundleSha256": "aa9cfeaa340d809e2c06176cf13705d70ef28e7d8beaf9c52a3c135e18ed0a08"
+      "bundleSha256": "aed826b08a9a2a62a564972a1341dba80b8923753cf330214f0d1ce44b73da99"
     },
     {
       "name": "mcp",
       "repository": null,
       "branch": "main",
-      "commit": "3767a05c54a8d975d1a3d3275853764dc871425b",
+      "commit": "d08f27f6c6b1ca22f23663b04d57906cee23c9e3",
       "bundle": "mcp.bundle",
-      "bundleSha256": "96596d25f7816c04db61005bf012c36dc0726f86f59458dc230e0bcaa8e40455"
+      "bundleSha256": "e8b33a3b3393dc122a6359102c9420a55b4794e6e2dde5078ec64a17f70dd9f5"
     },
     {
       "name": "files",
@@ -45,17 +45,17 @@
       "name": "agent",
       "repository": null,
       "branch": "main",
-      "commit": "275c6a25f73be6923565918c4079f374a6f79989",
+      "commit": "03a4300c1138e686a3cd1f8076c11307cc6540a5",
       "bundle": "agent.bundle",
-      "bundleSha256": "b9664915cae28d5c0a1e05d07b9c180b090ebec06760c5aeb999246db8645cc8"
+      "bundleSha256": "3cb10f1e2d92294a14e8c455d82ed25ef33a53d9d5192f666cac7d623c2f2fb8"
     },
     {
       "name": "qq",
       "repository": null,
       "branch": "main",
-      "commit": "d34e87d8b57882f748e9fde761df6d59e599830c",
+      "commit": "cc162ac7c6e170a449d3b03a24bf7a87c3cc75cb",
       "bundle": "qq.bundle",
-      "bundleSha256": "977616655f8273c91644d2d661decf71ff8a737642b09cdddd629752cd3560b9"
+      "bundleSha256": "9494fcded91214de5356cb3bdc2bf631aa2e97297e3cd002378cee33ee048dad"
     },
     {
       "name": "author",
@@ -67,19 +67,19 @@
     },
     {
       "name": "remind",
-      "repository": "https://github.com/chrona-core/chrona-module-remind",
+      "repository": null,
       "branch": "main",
-      "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61",
+      "commit": "ed09965476071a58fd99ae3b29a75c813787abe2",
       "bundle": "remind.bundle",
-      "bundleSha256": "76b9620368bee6ef6be875ee55a07dba9733b634ae4fe197da58f4902af7c808"
+      "bundleSha256": "6b817498f01fc685b9a182185508a8a776751cb2f5c610ec7e934bd8b57adf9e"
     },
     {
       "name": "mind",
       "repository": null,
       "branch": "main",
-      "commit": "1049976aec72ce099e67803c004586f477832857",
+      "commit": "ceaa8847a2ed2c3d4b5788e0ff3c8a899070c3cc",
       "bundle": "mind.bundle",
-      "bundleSha256": "986d1b2e6d330a4db3240bc9511282e943b954aab95ee528f406aa0515d2c299"
+      "bundleSha256": "b385ba08b76a93891642109754d04e42d1591caa0ddf352f77b4d72b88f55b0e"
     },
     {
       "name": "memory-local",

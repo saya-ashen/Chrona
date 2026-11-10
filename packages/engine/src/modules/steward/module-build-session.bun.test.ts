@@ -227,10 +227,13 @@ test("owner builds pin their own limits and model, deduplicate even after comple
   const before = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings;
   const started = await startOwnerBuild(f.ports, f.workspaceId, ownerRequest);
   expect((await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings).toEqual(before);
+  await f.db.audit.deleteMany();
   expect(await startOwnerBuild(f.ports, f.workspaceId, ownerRequest)).toMatchObject({ runId: started.runId, duplicate: true });
   await expect(startOwnerBuild(f.ports, f.workspaceId, { ...ownerRequest, goal: "different" })).rejects.toMatchObject({ code: "conflict" });
   // Global settings change after admission cannot inflate the single-run authorization.
   await f.db.workspace.update({ where: { id: f.workspaceId }, data: { settings: { builds: { timeoutMinutes: 120, dailyLimit: 20, maxSubmissions: 20 } } } });
+  await f.db.audit.create({ data: { id: `build-execution:${started.runId}`, workspaceId: f.workspaceId, actorKey: "user", kind: "build_execution", details: { ...ownerRequest.execution, model: "other/model", maxSubmissions: 20, timeoutMinutes: 120 } } });
+  expect(await f.db.buildExecutionAdmission.findUniqueOrThrow({ where: { runId: started.runId } })).toMatchObject(ownerRequest.execution);
   const claimed = (await f.api.runs.claimNext("build"))!;
   expect(claimed.model).toBe("openai/gpt-6.1-sol");
   expect(claimed.deadlineAt!.getTime() - claimed.startedAt.getTime()).toBe(600_000);
@@ -402,10 +405,10 @@ test("private build material pins references, SDK files and durable diagnostic a
   await expect(buildDiagnostics(f.ports, f.workspaceId, caller, "other")).rejects.toMatchObject({ code: "forbidden" });
   await expect(buildDiagnostics(f.ports, f.workspaceId, { kind: "provider", runId: f.requester.id })).rejects.toMatchObject({ code: "forbidden" });
   await expect(buildDiagnostics(f.ports, f.workspaceId, { kind: "owner" })).rejects.toMatchObject({ code: "forbidden" });
-  const authority = await f.db.audit.findUniqueOrThrow({ where: { id: `build-targets:${started.sessionId}` } });
-  await f.db.audit.update({ where: { id: authority.id }, data: { details: { name: [] } } });
+  const authority = await f.db.buildTargets.findUniqueOrThrow({ where: { sessionId: started.sessionId } });
+  await f.db.buildTargets.update({ where: { sessionId: authority.sessionId }, data: { modules: [] } });
   await expect(buildDiagnostics(f.ports, f.workspaceId, caller)).rejects.toMatchObject({ code: "forbidden" });
-  await f.db.audit.update({ where: { id: authority.id }, data: { details: { originSessionId: f.session.id, name: request.name } } });
+  await f.db.buildTargets.update({ where: { sessionId: authority.sessionId }, data: { name: request.name, modules: [request.name] } });
   expect(await declaredModules(f.db, f.workspaceId, started.sessionId)).toEqual([request.name]);
   await f.writeModule(run.cwd);
   const modules = createModules(f.ports, f.workspaceId);
@@ -428,7 +431,7 @@ test("private multi-module diagnostics require a declared target and fail closed
   await expect(buildDiagnostics(f.ports, f.workspaceId, caller, outsider.id)).rejects.toMatchObject({ code: "forbidden" });
   expect(await buildDiagnostics(f.ports, f.workspaceId, caller, targets[1]!.id)).toMatchObject([{ module: "second-target", moduleId: targets[1]!.id, configuredStatus: "paused" }]);
   expect(await createModules(f.ports, f.workspaceId).health({}, await buildHealthTargets(f.ports, f.workspaceId, caller))).toMatchObject({ items: [{ module: "first-target" }, { module: "second-target" }], nextCursor: null });
-  await f.db.audit.update({ where: { id: `build-targets:${started.sessionId}` }, data: { details: { name: "first-target", modules: "malformed" } } });
+  await f.db.buildTargets.update({ where: { sessionId: started.sessionId }, data: { modules: "malformed" } });
   await expect(buildDiagnostics(f.ports, f.workspaceId, caller, "first-target")).rejects.toMatchObject({ code: "forbidden" });
   await expect(buildHealthTargets(f.ports, f.workspaceId, caller)).rejects.toMatchObject({ code: "forbidden" });
 });
@@ -517,7 +520,7 @@ test("private transcripts redact credentials and clip tool results; facts exclud
     await expect(read(f.ports, other.id, started.sessionId)).rejects.toMatchObject({ code: "not_found" });
     await expect(read(f.ports, f.workspaceId, f.session.id)).rejects.toMatchObject({ code: "not_found" });
   }
-  await f.db.audit.create({ data: { id: `agent-context:${started.sessionId}`, workspaceId: f.workspaceId, kind: "agent_context", actorKey: "test", subjectId: started.sessionId, details: {} } });
+  await f.db.agentContext.create({ data: { sessionId: started.sessionId, workspaceId: f.workspaceId, moduleId: "test", hash: "" } });
   for (const read of [readBuildFacts, readBuildTranscript]) await expect(read(f.ports, f.workspaceId, started.sessionId)).rejects.toMatchObject({ code: "not_found" });
 });
 
@@ -545,7 +548,7 @@ async function groupBuild(f: Awaited<ReturnType<typeof fixture>>, includeImpact 
     expect(proposal.status).toBe("building");
     hashes[name] = proposal.hash;
     // The retained private proposal primitive accepts source material; its caller records the owning build.
-    await f.db.audit.create({ data: { workspaceId: f.workspaceId, kind: "module_submission", actorKey: `provider:${run.id}`, subjectId: proposal.moduleId!, details: { hash: proposal.hash, sessionId: started.sessionId } } });
+    await f.db.moduleVersion.update({ where: { moduleId_hash: { moduleId: proposal.moduleId!, hash: proposal.hash } }, data: { buildSessionId: started.sessionId } });
   }
   await modules.buildPending();
   for (const name of names) expect(await f.db.moduleVersion.findFirstOrThrow({ where: { hash: hashes[name], module: { workspaceId: f.workspaceId, name } } })).toMatchObject({ status: "pending_review" });
@@ -669,6 +672,6 @@ test("private queue and run facts report database outcomes without kernel-author
     expect(await readBuildFacts(f.ports, f.workspaceId, second.sessionId)).toMatchObject({ queue: null, runs: [{ status }] });
   }
   expect(await f.db.message.count({ where: { sessionId: f.session.id, direction: "out" } })).toBe(0);
-  expect(await f.db.audit.count({ where: { kind: "kernel_fact_pending", subjectId: `session-result:${running.id}` } })).toBe(0);
+  expect(await f.db.kernelFact.count({ where: { consumedAt: null, payload: { path: "$.data.key", equals: `session-result:${running.id}` } } })).toBe(0);
   expect(f.starts).toHaveLength(0);
 });

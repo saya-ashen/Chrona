@@ -4,6 +4,7 @@ import type { StewardPorts } from "./ports";
 import { drainSchedules, schedulesSettled } from "./schedule-delivery";
 import { createModules } from "./modules";
 import { registerBuiltins } from "./module-builtin";
+import { reconcileAgentStops } from "./agent-recovery";
 import { createRuns, liveRuns } from "./runs";
 import { audit } from "./audit";
 import { callsSettled, drainCalls } from "./module-calls";
@@ -142,6 +143,7 @@ export function createTick(ports: StewardPorts) {
             await finishProvider(ports, pendingFinalizations, entry);
           }
         }],
+        ["reconcile", async () => { await reconcileAgentStops(ports, workspaceId); }],
         ["launch", launch], ["expire", async () => { await runs.expireLeases(now); }],
         // Routed async calls (notifications among them) are delivered beside the tick.
         ["calls", async () => { void drainCalls(ports, workspaceId).catch(() => {}); }],
@@ -160,6 +162,6 @@ export function createTick(ports: StewardPorts) {
 }
 
 async function genericInput(ports: StewardPorts, run: ClaimedRun, sessionId: string | null) {
-  if (!run.sessionId || !await ports.db.audit.findUnique({ where: { id: `agent-context:${run.sessionId}` } })) return null;
+  if (!run.sessionId || !await ports.db.agentContext.findUnique({ where: { sessionId: run.sessionId } })) return null;
   return { images: await contextRunImages(ports, run), prompt: run.prompt, inbound: null, extraTools: (await contextRunTools(ports, run))!.catalog.map(tool => tool.name), searchTools: false, sessionId, hostPaths: [], content: [], systemPrompt: "", resources: "minimal" as const };
 }

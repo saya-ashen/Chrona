@@ -25,7 +25,7 @@ const cleanup: (() => Promise<void> | void)[] = [];
 beforeAll(() => {
   helperRoot = realpathSync(mkdtempSync(join(tmpdir(), "chrona-device-helper-"))); helper = join(helperRoot, "guardian");
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.resolve("@chrona/process"))), "..");
-  const result = spawnSync("cc", ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", join(packageRoot, "native/guardian.c"), "-o", helper], { encoding: "utf8" });
+  const result = spawnSync(process.env.CC ?? "cc", ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", join(packageRoot, "native/guardian.c"), "-o", helper], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(result.stderr); chmodSync(helper, 0o700);
 });
 afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await dispose(); });

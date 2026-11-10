@@ -85,12 +85,9 @@ if (scenario === "kernel") {
   assert.deepEqual(await kernelTool("transcript", { sessionDir: data, limit: 20 }), [{ at: "2026-11-08T00:00:00Z", kind: "text", text: "fixture transcript" }]);
   assert.deepEqual(transcripts, [{ sessionDir: data, limit: 20 }]);
   assert.equal((await kernelTool("health") as { available: boolean }).available, true);
-  const completion = await kernelTool("complete", { model: "kernel/model", prompt: "fixture", maxOutputTokens: 20, timeoutMs: 1000 }) as { operationId: string };
-  assert.deepEqual(await eventually(() => kernelTool("completion", completion), value => !!(value as { result: unknown }).result), { result: { text: "answer", inputTokens: 1, outputTokens: 1 }, failure: false });
-  assert.equal(completions[0].model, "kernel/model");
-  const tierCompletion = await kernelTool("complete", { declaredTier: "fast", effectiveHardLimits: { maxCallsPerEvent: 1, maxOutputTokens: 10, eventTimeoutMs: 500 }, prompt: "tier", maxOutputTokens: 20, timeoutMs: 1000 }) as { operationId: string };
-  await eventually(() => kernelTool("completion", tierCompletion), value => !!(value as { result: unknown }).result);
-  assert.deepEqual(completions[1], { prompt: "tier", system: undefined, model: "budget/model", thinking: "high", timeoutMs: 500, maxOutputTokens: 10 }); assert.deepEqual(calls, []);
+  await assert.rejects(kernelTool("complete", { prompt: "forged", model: "kernel/model" }), { code: "forbidden" });
+  await assert.rejects(kernelTool("completion", { operationId: "forged" }), { code: "forbidden" });
+  assert.deepEqual(completions, []); assert.deepEqual(calls, []);
 }
 if (scenario === "context") {
   await kernelTool("start", start);

@@ -33,7 +33,7 @@ test("facts outlive a paused or absent consumer, require current identity and ke
   await db.module.update({ where: { id: first.moduleId }, data: { status: "active" } });
   const back = await selectFactConsumer(db, workspaceId, first.moduleId, now);
   expect(await acknowledgeKernelFacts(db, workspaceId, first, back.revision, [fact.id])).toEqual({ acknowledged: [] });
-  expect((await recordKernelFact(db, workspaceId, "result", { type: "lifecycle", data: { key: "result", fact: { kind: "module-paused", app: "result" } } }, now)).kind).toBe("kernel_fact_consumed");
+  expect((await recordKernelFact(db, workspaceId, "result", { type: "lifecycle", data: { key: "result", fact: { kind: "module-paused", app: "result" } } }, now)).consumedBy).toBe(second.moduleId);
   expect(await db.moduleInvocation.count({ where: { workspaceId } })).toBe(0);
 });
 test("an explicit no-consumer selection survives trusted seeding and preserves pending facts", async () => {
@@ -67,7 +67,7 @@ for (const base of [providerNotice, pausedLifecycle]) {
     const { db, workspaceId, first, now } = await fixture();
     const invalid = { ...base, data: { ...base.data, [field]: value } };
     expect(() => recordKernelFact(db, workspaceId, "invalid", invalid as unknown as Parameters<typeof recordKernelFact>[3], now)).toThrow();
-    expect(await db.audit.count({ where: { workspaceId, kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } } })).toBe(0);
+    expect(await db.kernelFact.count({ where: { workspaceId } })).toBe(0);
     expect((await readKernelFacts(db, workspaceId, first)).facts).toEqual([]);
   });
 }
@@ -105,20 +105,20 @@ const invalidFacts: [string, unknown][] = [
 for (const [name, invalid] of invalidFacts) test(`rejects ${name} before persistence`, async () => {
   const { db, workspaceId, first, now } = await fixture();
   expect(() => recordKernelFact(db, workspaceId, "invalid", invalid as Parameters<typeof recordKernelFact>[3], now)).toThrow();
-  expect(await db.audit.count({ where: { workspaceId, kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } } })).toBe(0);
+  expect(await db.kernelFact.count({ where: { workspaceId } })).toBe(0);
   expect((await readKernelFacts(db, workspaceId, first)).facts).toEqual([]);
 });
 test("provider input notice roundtrips its structural references", async () => {
   const { db, workspaceId, first, now } = await fixture();
   const saved = await recordKernelFact(db, workspaceId, providerNotice.data.key, providerNotice, now);
-  expect(saved.details).toEqual(providerNotice);
+  expect(saved.payload).toEqual(providerNotice);
   expect((await readKernelFacts(db, workspaceId, first)).facts).toEqual([{ id: saved.id, at: now.toISOString(), ...providerNotice }]);
 });
 test("technical schedule errors are bounded and redacted before persistence and remain readable", async () => {
   const { db, workspaceId, first, now } = await fixture();
   for (const [index, error] of ["x".repeat(9000), `Authorization: Bearer ${"s".repeat(80)} ${"y".repeat(9000)}`].entries()) {
     const saved = await recordKernelFact(db, workspaceId, `error-${index}`, { type: "lifecycle", data: { key: `error-${index}`, fact: { kind: "schedule-failed", target: "target", status: "failed", error } } }, now);
-    expect(JSON.stringify(saved.details)).not.toContain("s".repeat(80));
+    expect(JSON.stringify(saved.payload)).not.toContain("s".repeat(80));
   }
   const page = await readKernelFacts(db, workspaceId, first);
   expect(page.facts).toHaveLength(2);

@@ -63,7 +63,8 @@ test("Web uploads preserve image MIME through the owning Agent receipt", async (
     const storage = createAttachments(f.content);
     const image = await storage.upload({ name: "no-extension", mime: "image/png", base64 });
     expect(image.ref).toEndWith(".png");
-    await f.db.audit.create({ data: { id: "agent-tools:image-run", workspaceId: f.workspaceId, actorKey: f.moduleId, kind: "agent_tools", details: { content: (await storage.accept([image])).map(file => file.ref) } } });
+    await f.db.run.create({ data: { id: "image-run", workspaceId: f.workspaceId, lane: "foreground", trigger: "source", provider: "fake", tokenHash: "image", prompt: "", cwd: f.cwd } });
+    await f.db.agentRunAdmission.create({ data: { runId: "image-run", moduleId: f.moduleId, hash: "approved", targets: [], content: (await storage.accept([image])).map(file => file.ref) } });
     expect(await contextRunImages(f.ports, { id: "image-run", workspaceId: f.workspaceId })).toEqual([{ mime: "image/png", base64 }]);
   } finally { await f.close(); }
 });

@@ -1,36 +1,34 @@
 import type { PrismaClient, Prisma } from "@chrona/db";
 import { providerInteractionSchema, providerProgressSchema, providerResourcesSchema, providerRunViewSchema, providerUsageSchema, type ProviderInteraction, type ProviderRunView, type ProviderQuestion } from "@chrona/contracts/steward";
 import { providerRequestStatus, providerRunActive } from "@chrona/domain/steward/provider";
+import { appendRunEventIn } from "./run-events";
 import type { StewardPorts } from "./ports";
 type RecordContext = Pick<StewardPorts, "db" | "now"> & { workspaceId: string };
 
-export const providerCancelKey = (runId: string) => `provider-cancel:${runId}`;
-export const providerAnswerKey = (id: string) => `provider-answer:${id}`;
-export async function providerReceipt(db: Prisma.TransactionClient, workspaceId: string, id: string, status: ProviderInteraction["status"], now: Date) {
-  return db.audit.upsert({ where: { id: providerAnswerKey(id) }, update: {}, create: { id: providerAnswerKey(id), workspaceId, kind: "provider_answer", actorKey: status === "answered" ? "user" : "chrona", subjectId: id, details: { status, at: now.toISOString() } } });
+export async function providerReceipt(db: Prisma.TransactionClient, _workspaceId: string, id: string, status: ProviderInteraction["status"], now: Date) {
+  return db.runInteraction.updateMany({ where: { id, status: "pending" }, data: { status, settledAt: now } });
 }
 export type ProviderWriteGuard = (tx: Prisma.TransactionClient) => Promise<void>;
 /** Acquire SQLite's writer before checking an optional device fence and applying the effect. */
 export function providerWrite<T>(db: PrismaClient, guard: ProviderWriteGuard | undefined, effect: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   return db.$transaction(async tx => {
     if (guard) {
-      await tx.$executeRaw`UPDATE "Audit" SET "id" = "id" WHERE 0`;
+      await tx.$executeRaw`UPDATE "Run" SET "id" = "id" WHERE 0`;
       await guard(tx);
     }
     return effect(tx);
   });
 }
-export function providerJournal(db: PrismaClient, workspaceId: string, runId: string, now: () => Date, guard?: ProviderWriteGuard) {
-  let sequence = 0;
+export function providerJournal(db: PrismaClient, runId: string, now: () => Date, guard?: ProviderWriteGuard) {
+  let progress = 0;
   return async (type: "progress" | "usage" | "resources", value: Prisma.InputJsonValue) => {
-    if (++sequence > 300 && type === "progress") return;
-    const data = { id: `provider:${runId}:${String(sequence).padStart(8, "0")}`, workspaceId, kind: "provider_event", actorKey: "chrona", subjectId: runId, details: { type, value, at: now().toISOString() } };
-    if (guard) await providerWrite(db, guard, tx => tx.audit.create({ data }));
-    else await db.audit.create({ data });
+    if (type === "progress" && ++progress > 300) return;
+    const at = now();
+    await providerWrite(db, guard, tx => appendRunEventIn(tx, runId, type, { type, value, at: at.toISOString() }, at));
   };
 }
-function eventValue(row: { details: unknown }) {
-  const details = row.details as { type?: unknown; value?: unknown; at?: string } | null;
+function eventValue(row: { payload: unknown }) {
+  const details = row.payload as { type?: unknown; value?: unknown; at?: string } | null;
   return details ?? {};
 }
 export async function providerRuns(ctx: RecordContext, sessionId: string | undefined, connected: (id: string) => boolean, waiting: (id: string) => boolean, liveQuestion: (id: string) => ProviderQuestion | null = () => null): Promise<ProviderRunView[]>  {
@@ -43,20 +41,18 @@ export async function providerRuns(ctx: RecordContext, sessionId: string | undef
   const runs = [...new Map([...active, ...recent].map(run => [run.id, run])).values()];
   return Promise.all(runs.map(async run => {
     const [latest, requested] = await Promise.all([
-      db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: "provider_event" }, orderBy: { id: "desc" }, take: 400 }),
-      db.audit.findMany({ where: { workspaceId, subjectId: run.id, kind: "provider_question" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 12 }),
+      db.runEvent.findMany({ where: { runId: run.id }, orderBy: { sequence: "desc" }, take: 400 }),
+      db.runInteraction.findMany({ where: { runId: run.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 12 }),
     ]);
     const records = latest.reverse();
-    const questions = requested.flatMap(row => { const parsed = providerInteractionSchema.safeParse(row.details); return parsed.success ? [parsed.data] : []; });
-    const receipts = await db.audit.findMany({ where: { workspaceId, kind: "provider_answer", subjectId: { in: questions.map(q => q.id) } } });
-    const cancelling = await db.audit.findUnique({ where: { id: providerCancelKey(run.id) } });
-    const alive = providerRunActive(run, connected(run.id) && !cancelling, now());
+    const questions = requested.flatMap(row => { const parsed = providerInteractionSchema.safeParse(row.request); return parsed.success ? [parsed.data] : []; });
+    const alive = providerRunActive(run, connected(run.id) && !run.cancelRequestedAt, now());
     const interactions = questions.map(question => {
-      const receipt = receipts.find(row => row.subjectId === question.id)?.details as { status?: ProviderInteraction["status"] } | undefined;
-      const status = providerRequestStatus(question, receipt?.status, alive, waiting(question.id), now());
+      const receipt = requested.find(row => row.id === question.id);
+      const status = providerRequestStatus(question, receipt?.status === "pending" ? undefined : receipt?.status as ProviderInteraction["status"], alive, waiting(question.id), now());
       return { ...question, status, question: status === "pending" ? liveQuestion(question.id) ?? question.question : question.question };
     });
-    const last = (type: string) => records.filter(row => row.kind === "provider_event").map(eventValue).findLast(value => value.type === type)?.value;
+    const last = (type: string) => records.map(eventValue).findLast(value => value.type === type)?.value;
     const progress = providerProgressSchema.safeParse(last("progress")), usage = providerUsageSchema.safeParse(last("usage")), resources = providerResourcesSchema.safeParse(last("resources"));
     return providerRunViewSchema.parse({ id: run.id, sessionId: run.sessionId, sessionTitle: run.session?.title ?? null, active: alive, status: run.status,
       progress: progress.success ? progress.data : null, usage: usage.success ? usage.data : null, resources: resources.success ? resources.data : null,

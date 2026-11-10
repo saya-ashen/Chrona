@@ -19,10 +19,10 @@ test("trusted Agent release upgrade preserves data and pause, waits for active r
     await expect(upgradeAgentRelease(f.ports, f.workspaceId)).rejects.toThrow("unconfirmed executions");
     expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).activeHash).toBe(previous);
     await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "finished" } });
-    await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "failed", error: "Execution stop is unconfirmed" } });
+    await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" } });
     await expect(upgradeAgentRelease(f.ports, f.workspaceId)).rejects.toThrow("unconfirmed executions");
     expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).activeHash).toBe(previous);
-    await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "finished", error: null } });
+    await f.ports.db.run.update({ where: { id: f.input.runId }, data: { status: "finished", stopStatus: "confirmed", error: null } });
     await upgradeAgentRelease(f.ports, f.workspaceId);
     const current = await f.ports.db.module.findUniqueOrThrow({ where: { id: f.module.id } });
     expect(current).toMatchObject({ activeHash: release.commit, status: "paused", dataSchema: 1 });

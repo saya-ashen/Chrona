@@ -4,98 +4,98 @@
     {
       "name": "web",
       "proposedRepository": "chrona-core/chrona-module-web",
-      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/web.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/web.git",
       "branch": "main",
-      "commit": "93e2ab0df290cfac8842ff890c6164327b303d63"
+      "commit": "7d795302698f8253dc90ef8e619bb1ee9c91046f"
     },
     {
       "name": "mcp",
       "proposedRepository": "chrona-core/chrona-module-mcp",
-      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/mcp.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/mcp.git",
       "branch": "main",
-      "commit": "3767a05c54a8d975d1a3d3275853764dc871425b"
+      "commit": "d08f27f6c6b1ca22f23663b04d57906cee23c9e3"
     },
     {
       "name": "files",
       "proposedRepository": "chrona-core/chrona-module-files",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/files.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/files.git",
       "branch": "main",
       "commit": "6a0b949567d2b7c333b2beb919fc4d988bc889ca"
     },
     {
       "name": "notify",
       "proposedRepository": "chrona-core/chrona-module-notify",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/notify.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/notify.git",
       "branch": "main",
       "commit": "c91818ad49c6a9ac3b7983e172067d3575896dde"
     },
     {
       "name": "events",
       "proposedRepository": "chrona-core/chrona-module-events",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/events.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/events.git",
       "branch": "main",
       "commit": "a2d1acd90efc68b439882afad86c7783e790c028"
     },
     {
       "name": "agent",
       "proposedRepository": "chrona-core/chrona-module-agent",
-      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/agent.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/agent.git",
       "branch": "main",
-      "commit": "275c6a25f73be6923565918c4079f374a6f79989"
+      "commit": "03a4300c1138e686a3cd1f8076c11307cc6540a5"
     },
     {
       "name": "qq",
       "proposedRepository": "chrona-core/chrona-module-qq",
-      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/qq.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/qq.git",
       "branch": "main",
-      "commit": "d34e87d8b57882f748e9fde761df6d59e599830c"
+      "commit": "cc162ac7c6e170a449d3b03a24bf7a87c3cc75cb"
     },
     {
       "name": "author",
       "proposedRepository": "chrona-core/chrona-module-author",
-      "localRepository": "/home/saya/workspace/Chrona/.tmp/author-version-materials/packaging/seeds/repos/author.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/author.git",
       "branch": "main",
       "commit": "6c9c45787cd6044ee8c25b989d52ef0eb3cd7ae3"
     },
     {
       "name": "remind",
       "proposedRepository": "chrona-core/chrona-module-remind",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/remind.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/remind.git",
       "branch": "main",
-      "commit": "21a56eb59508c4e04ca842a0094edc0b9afb1b61"
+      "commit": "ed09965476071a58fd99ae3b29a75c813787abe2"
     },
     {
       "name": "mind",
       "proposedRepository": "chrona-core/chrona-module-mind",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/mind.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/mind.git",
       "branch": "main",
-      "commit": "1049976aec72ce099e67803c004586f477832857"
+      "commit": "ceaa8847a2ed2c3d4b5788e0ff3c8a899070c3cc"
     },
     {
       "name": "memory-local",
       "proposedRepository": "chrona-core/chrona-module-memory-local",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/memory-local.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/memory-local.git",
       "branch": "main",
       "commit": "381f348078d4b520eae561f4d1f9b60cab2b7803"
     },
     {
       "name": "coding",
       "proposedRepository": "chrona-core/chrona-module-coding",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/coding.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/coding.git",
       "branch": "main",
       "commit": "b3a65705a025932dfe66f8a3099d99d331a8c278"
     },
     {
       "name": "coding-web",
       "proposedRepository": "chrona-core/chrona-module-coding-web",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/coding-web.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/coding-web.git",
       "branch": "main",
       "commit": "049ef7481c90bbd511bc892ef7b64e79f664c748"
     },
     {
       "name": "remote-execution",
       "proposedRepository": "chrona-core/chrona-module-remote-execution",
-      "localRepository": "/home/saya/workspace/Chrona-kernel-portability/resources/module-git/repos/remote-execution.git",
+      "localRepository": "/home/saya/workspace/Chrona/.worktrees/kernel-agent-migration/resources/module-git/repos/remote-execution.git",
       "branch": "main",
       "commit": "da462b853373262cb24479394979fb8348a3f039"
     }

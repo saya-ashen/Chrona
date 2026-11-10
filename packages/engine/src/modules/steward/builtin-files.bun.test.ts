@@ -24,6 +24,7 @@ async function fixture(real = false) {
   const db = testDb(), dataDir = await mkdtemp(join(tmpdir(), "chrona-files-engine-"));
   const resources = join(dataDir, "resources", "builtin"), externalResources = join(dataDir, "resources", "external");
   await cp(shippedResources, resources, { recursive: true });
+  await symlink(join(import.meta.dirname, "../../../../../node_modules"), join(resources, "agent/node_modules"), "dir");
   for (const name of BUILTIN_MODULE_NAMES) await seedTestModuleRelease(resources, name);
   await cp(join(import.meta.dirname, "external/files"), join(externalResources, "files"), { recursive: true });
   await seedTestModuleRelease(externalResources, "files");

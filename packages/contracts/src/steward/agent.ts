@@ -10,16 +10,11 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 export const hardLimitsSchema = z.object({ maxCallsPerEvent: z.number().int().positive(), maxOutputTokens: z.number().int().positive().max(32_000), eventTimeoutMs: z.number().int().positive().max(600_000) }).strict();
 export type HardLimits = z.infer<typeof hardLimitsSchema>;
 
-const directCompletionInput = z.object({ model: z.string().min(1).max(500), thinking: z.enum(THINKING_LEVELS).optional(), system: z.string().max(200_000).optional(), prompt: z.string().max(2 * 1024 * 1024), maxOutputTokens: z.number().int().positive().max(32_000), timeoutMs: z.number().int().positive().max(300_000) }).strict();
-const tierCompletionInput = directCompletionInput.omit({ model: true, thinking: true }).extend({ declaredTier: z.string().min(1).max(40), effectiveHardLimits: hardLimitsSchema, timeoutMs: z.number().int().positive().max(600_000) }).strict();
-export const agentCompletionInput = z.union([directCompletionInput, tierCompletionInput]);
 export const agentTools = [
   ["health", z.object({}).strict(), runtimeHealthSchema], ["start", runtimeStartSchema, runtimeOperationSchema],
   ["status", runtimeOperationSchema, runtimeOperationSchema.extend({ outcome: runtimeOutcomeSchema.nullable(), failure: z.boolean() })],
   ["inject", runtimeOperationSchema.extend({ message: z.string().max(2 * 1024 * 1024), images: runtimeStartSchema.shape.images }), z.object({ accepted: z.literal(true) }).strict()],
   ["abort", runtimeOperationSchema, z.object({ requested: z.literal(true) }).strict()], ["release", runtimeOperationSchema, z.object({ released: z.literal(true) }).strict()],
-  ["complete", agentCompletionInput, runtimeOperationSchema],
-  ["completion", runtimeOperationSchema, z.object({ result: runtimeCompletionSchema.nullable(), failure: z.boolean() }).strict()],
   ["transcript", z.object({ sessionDir: z.string().max(8192), limit: z.number().int().min(1).max(300) }).strict(), runtimeTranscriptSchema],
 ] as const;
 export function agentInput(name: string, raw: unknown): Record<string, unknown> {
@@ -40,6 +35,10 @@ export const contextRespondInput = contextRunTarget.extend({ requestKey, questio
 export const contextStreamInput = contextRunTarget.extend({ after: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(100).default(50) });
 export const contextOutput = z.object({ contextId: id }).strict();
 export const contextRunOutput = z.object({ runId: id, contextId: id, status: z.string(), active: z.boolean() }).strict();
+export const runToolResultSchema = z.object({
+  runId: id, callId: id, target: z.string().min(1), moduleId: id, hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/),
+  status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.json().nullable(),
+}).strict();
 export const contextStreamOutput = z.object({ items: z.array(z.object({ sequence: z.number().int(), at: z.string(), kind: z.string(), payload: z.unknown() }).strict()), after: z.number().int(), ended: z.boolean(), transcript: runtimeTranscriptSchema, interactions: z.array(providerInteractionSchema).max(12) }).strict();
 
 const operation = z.object({ operationId: z.string().regex(/^[a-f0-9]{64}$/) }).strict();

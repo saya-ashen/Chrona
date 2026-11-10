@@ -331,200 +331,6 @@
       }
     },
     {
-      "name": "complete",
-      "description": "Agent complete: modules use structured arguments and own their operations; input is reserved for kernel calls",
-      "visibility": [
-        "kernel",
-        "modules"
-      ],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "command-key": {
-            "type": "string"
-          },
-          "prompt": {
-            "type": "string"
-          },
-          "system": {
-            "type": "string"
-          },
-          "max-output-tokens": {
-            "type": "number"
-          },
-          "input": {
-            "type": "string",
-            "description": "Kernel-only encoded request"
-          }
-        },
-        "required": []
-      },
-      "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "operationId"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "operationId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "operationId"
-            ],
-            "additionalProperties": false
-          }
-        ]
-      }
-    },
-    {
-      "name": "completion",
-      "description": "Agent completion: modules use structured arguments and own their operations; input is reserved for kernel calls",
-      "visibility": [
-        "kernel",
-        "modules"
-      ],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "operation-id": {
-            "type": "string"
-          },
-          "input": {
-            "type": "string",
-            "description": "Kernel-only encoded request"
-          }
-        },
-        "required": []
-      },
-      "output": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "result": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "text": {
-                        "type": "string"
-                      },
-                      "inputTokens": {
-                        "anyOf": [
-                          {
-                            "type": "integer"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "outputTokens": {
-                        "anyOf": [
-                          {
-                            "type": "integer"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "text",
-                      "inputTokens",
-                      "outputTokens"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "failure": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "result",
-              "failure"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "result": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "text": {
-                        "type": "string"
-                      },
-                      "inputTokens": {
-                        "anyOf": [
-                          {
-                            "type": "integer"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "outputTokens": {
-                        "anyOf": [
-                          {
-                            "type": "integer"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "text",
-                      "inputTokens",
-                      "outputTokens"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "failure": {
-                "type": "boolean"
-              },
-              "unknown": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "result",
-              "failure"
-            ],
-            "additionalProperties": false
-          }
-        ]
-      }
-    },
-    {
       "name": "transcript",
       "description": "Agent transcript: kernel-only execution control",
       "visibility": [
@@ -545,6 +351,122 @@
       "output": {
         "type": "array",
         "items": {}
+      }
+    },
+    {
+      "name": "complete",
+      "description": "Agent complete: application-owned completion",
+      "visibility": [
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command-key": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "max-output-tokens": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "command-key",
+          "prompt",
+          "max-output-tokens"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "completion",
+      "description": "Agent completion: application-owned completion",
+      "visibility": [
+        "modules"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation-id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation-id"
+        ]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "inputTokens": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "outputTokens": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "text",
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "type": "boolean"
+          },
+          "unknown": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "result",
+          "failure"
+        ],
+        "additionalProperties": false
       }
     },
     {

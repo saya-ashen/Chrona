@@ -36,7 +36,8 @@ async function candidate(f: Awaited<ReturnType<typeof fixture>>, patch: Partial<
   return { decision, receipt };
 }
 function agent(f: Awaited<ReturnType<typeof fixture>>) {
-  let status = "running", active = true, transcript: unknown[] = [], interactions: unknown[] = [];
+  let status = "running", active = true, interactions: unknown[] = [];
+  const items: { sequence: number; kind: string; payload: unknown }[] = [];
   let loseContext = false, loseRun = false, loseNotify = false;
   const calls: { target: string; args: Record<string, unknown> }[] = [];
   const contexts = new Map<string, string>(), runs = new Map<string, string>();
@@ -59,7 +60,7 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
       return { contextId: "context-1", runId: runs.get(key), status, active };
     }
     if (target === "agent.get") return { contextId: "context-1", runId: "run-1", status, active };
-    if (target === "agent.stream") return { transcript, interactions };
+    if (target === "agent.stream") return { items: items.filter(item => item.sequence > Number(args.after ?? 0)), after: Math.max(Number(args.after ?? 0), ...items.map(item => item.sequence)), interactions };
     if (target === "notify.send") {
       assert.ok(state.decisions.some(d => d.notification !== null && d.notification.key === args.key && d.notification.status === "unknown"), "notification uncertainty must be durable before effect");
       if (loseNotify) throw new Error("notify reply lost");
@@ -71,8 +72,8 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
     call, calls, contexts, runs,
     loseContext: () => { loseContext = true; }, loseRun: () => { loseRun = true; }, loseNotify: () => { loseNotify = true; },
     finish: (value = "finished") => { status = value; active = false; }, unknown: () => { status = "unknown"; active = true; },
-    text: (text: string) => { transcript = [{ kind: "text", text }]; },
-    verify: (receipt: unknown, error = false) => { transcript = [{ kind: "result", tool: "m_mind_report", error, text: JSON.stringify({ result: receipt }) }]; },
+    text: (text: string) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "progress", payload: { text } }); },
+    verify: (receipt: unknown, error = false) => { items.push({ sequence: (items.at(-1)?.sequence ?? 0) + 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", contractHash: "a".repeat(64), status: error ? "failed" : "succeeded", outputState: "complete", output: receipt } } }); },
     wait: () => { interactions = [{ id: "question-1", status: "pending", expiresAt: later(60_000), question: { title: "Please sign in", message: "Source access needs your action." } }]; },
   };
 }

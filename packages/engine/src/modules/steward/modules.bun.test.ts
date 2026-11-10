@@ -199,7 +199,7 @@ async function dataFixture(credentials = false) {
   else expect(first.status).toBe("approved");
   // Start data tests after setup's activation notice; the auto-activation test covers that notice.
   await f.db.moduleInvocation.deleteMany({ where: { target: "notify", tool: "send" } });
-  await f.db.audit.deleteMany({ where: { kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } } });
+  await f.db.kernelFact.deleteMany();
   const live = join(f.dataDir, "platform/data", first.moduleId!), original = f.ports.sandbox!.runModule!;
   f.ports.sandbox!.runModule = async input => {
     await mkdir(join(input.dataDir, "nested"));
@@ -462,7 +462,7 @@ test.each(["live", "rename-back", "swapped", "recent"])("tick skips migrating mo
   const f = await dataFixture(), moduleId = f.first.moduleId!;
   const now = new Date("2026-10-22T01:00:00Z"), next = join(f.dataDir, "platform/data-next", moduleId), old = join(f.dataDir, "platform/data-old", moduleId);
   await f.db.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
-  const record = (minutes: number) => f.db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash: "new", from: 1, to: 2 }, createdAt: new Date(now.getTime() - minutes * 60_000) } });
+  const record = (minutes: number) => f.db.moduleMigration.upsert({ where: { moduleId }, create: { moduleId, hash: "new", fromSchema: 1, toSchema: 2, previousStatus: "active", createdAt: new Date(now.getTime() - minutes * 60_000) }, update: { createdAt: new Date(now.getTime() - minutes * 60_000) } });
   await record(30); if (kind === "recent") await record(14);
   await mkdir(next, { recursive: true }); await writeFile(join(next, "partial"), "incomplete");
   if (kind === "rename-back" || kind === "swapped") { await mkdir(join(f.dataDir, "platform/data-old"), { recursive: true }); await rename(f.live, old); }
@@ -772,7 +772,10 @@ test("user proposals emit no provider failure audit and rejected hashes can be r
   expect(await f.db.run.count()).toBe(0);
   expect(await f.db.audit.count({ where: { kind: "module_build_failed" } })).toBe(0);
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ status: "rejected" });
+  const rejected = await f.db.moduleVersion.findFirstOrThrow();
+  await f.db.moduleReview.create({ data: { versionId: rejected.id, prefix: "stale review", suffix: "", codeDiff: "", detail: "old", needsMigration: false } });
   expect(await f.submit()).toMatchObject({ hash: first.hash, status: "building" });
+  expect(await f.db.moduleReview.count()).toBe(0);
   const version = await f.db.moduleVersion.findFirstOrThrow();
   expect(await readdir(join(f.dataDir, "platform/staging"))).toEqual([version.id]);
   await f.service.modules.buildPending();

@@ -15,25 +15,15 @@ export async function runtimeCall<T>(ports: StewardPorts, workspaceId: string, t
   registerLocalRuntime();
   if (target.startsWith("agent.") && ports.agentApplication) {
     await registerBuiltins(ports, workspaceId);
-    const result = (await callSync(ports, kernelOrigin(workspaceId), target, { input: JSON.stringify(args) })).output;
-    if (target !== "agent.complete") return result as T;
-    return await waitAgentCompletion(ports, workspaceId, result as { operationId: string }, Number(args.timeoutMs)) as T;
+    return (await callSync(ports, kernelOrigin(workspaceId), target, { input: JSON.stringify(args) })).output as T;
   }
   return (await callSync(ports, kernelOrigin(workspaceId), target, args)).output as T;
 }
-async function waitAgentCompletion(ports: StewardPorts, workspaceId: string, operation: { operationId: string }, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const value = await runtimeCall<{ result: unknown; failure: boolean }>(ports, workspaceId, "agent.completion", operation);
-    if (value.failure) throw new CallError("failed", "provider_error");
-    if (value.result) return value.result;
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  throw new CallError("failed", "timeout");
-}
 /** Only the module's final response proves Provider completion; cancelling a launch gate never does. */
 export async function startLocalProvider(ports: StewardPorts, workspaceId: string, input: ProviderRunInput): Promise<ReturnType<ProviderAdapter["start"]>> {
-  const callback = retainProviderCallbacks(ports, workspaceId, { events: input.events, detail: input.detail });
+  let settle!: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void;
+  const completion = new Promise<import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }>(resolve => { settle = resolve; });
+  const callback = retainProviderCallbacks(ports, workspaceId, { events: input.events, detail: input.detail, operationId: input.runId, settled: settle });
   const { events: _events, detail: _detail, deadline, ...request } = input;
   const operationId = input.runId;
   try { await runtimeCall(ports, workspaceId, "agent.start", { ...request, operationId, deadline: deadline?.toISOString() ?? null, callbacks: callback.id }); }
@@ -42,10 +32,13 @@ export async function startLocalProvider(ports: StewardPorts, workspaceId: strin
     try {
       if (!ports.agentApplication) return runtimeOutcomeSchema.parse(await runtimeCall(ports, workspaceId, "agent.wait", { operationId }));
       for (;;) {
+        // Events are the fast path; a lost wake is reconciled against the durable Agent receipt.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const wake = await Promise.race([completion, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 5_000); })]).finally(() => clearTimeout(timer));
+        if (wake) return wake.outcome;
         const status = await runtimeCall<{ outcome: unknown; failure: boolean }>(ports, workspaceId, "agent.status", { operationId });
         if (status.outcome) return runtimeOutcomeSchema.parse(status.outcome);
         if (status.failure) throw new CallError("unknown", "Agent completion requires reconciliation");
-        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } finally {
       callback.release();

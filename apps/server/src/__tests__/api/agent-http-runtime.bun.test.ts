@@ -21,9 +21,9 @@ async function fixture() {
   await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", source: "user", status: "approved", intent: {}, report: {},
     manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["modules.list"] }) } });
   const session = await db.session.create({ data: { workspaceId: f.workspaceId, source: "module", moduleId: entry.id, key: "fake-pi-http" } });
-  await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId: f.workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
+  await db.agentContext.create({ data: { sessionId: session.id, workspaceId: f.workspaceId, moduleId: entry.id, hash: "v1" } });
   await db.run.update({ where: { id: f.input.runId }, data: { sessionId: session.id } });
-  await db.audit.create({ data: { id: `agent-tools:${f.input.runId}`, workspaceId: f.workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: f.input.runId, details: { targets: ["modules.list"] } } });
+  await db.agentRunAdmission.create({ data: { runId: f.input.runId, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: f.input.runId } })).sessionId! } })).hash, targets: ["modules.list"], content: [] } });
   const app = await createServerApp({ steward: runtime });
   const headers = { authorization: `Bearer ${f.input.token}`, "content-type": "application/json" };
   const peer = { server: { requestIP: () => ({ address: "127.0.0.1" }) } };

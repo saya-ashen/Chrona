@@ -1,0 +1,7 @@
+{
+  "name": "chrona-remind",
+  "private": true,
+  "dependencies": {
+    "zod": "4.4.3"
+  }
+}

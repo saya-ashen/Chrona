@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@chrona/db";
+import { z } from "zod";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,11 +20,18 @@ import { parseInput, StewardError } from "./errors";
 import { isModulePaused, ModuleUnavailableError } from "./module-availability";
 
 export const installationId = (workspaceId: string, requestKey: string) => `module-install:${createHash("sha256").update(workspaceId).update("\0").update(requestKey).digest("hex")}`;
-const detailsOf = (request: ModuleInstallRequest, result: ModuleInstallResult) => ({ request, result });
-const latestInstallationId = (workspaceId: string, name: string) => `module-install-latest:${createHash("sha256").update(workspaceId).update("\0").update(name).digest("hex")}`;
 const submissionId = (workspaceId: string, key: string) => `${installationId(workspaceId, key)}:submission`;
 const activeSubmissions = new WeakMap<StewardPorts["db"], Set<string>>();
-type Submission = { hash: string; moduleId: string | null; existingVersionId: string | null; marker: string; phase: "prepared" | "proposing" | "submitted"; error?: string };
+const submissionSchema = z.object({ hash: z.string(), moduleId: z.string().nullable(), existingVersionId: z.string().nullable(), marker: z.string(), phase: z.enum(["prepared", "proposing", "submitted"]), error: z.string().nullable() });
+type Submission = z.infer<typeof submissionSchema>;
+function installationResult(row: Prisma.ModuleInstallationGetPayload<object>): ModuleInstallResult {
+  return moduleInstallResultSchema.parse({ package: row.package, requestKey: row.requestKey, status: row.status, moduleId: row.moduleId, hash: row.hash, approvalId: row.approvalId,
+    error: row.errorCode === null ? null : { code: row.errorCode, reason: row.errorReason, message: row.errorMessage } });
+}
+function resultData(result: ModuleInstallResult) {
+  const { error, ...data } = result;
+  return { ...data, errorCode: error?.code ?? null, errorReason: error?.reason ?? null, errorMessage: error?.message ?? null };
+}
 function failure(result: ModuleInstallResult, reason: string, message: string, code: NonNullable<ModuleInstallResult["error"]>["code"] = "failed"): ModuleInstallResult {
   return { ...result, status: "failed", approvalId: null, error: { code, reason, message: redactSensitiveText(message).slice(0, 1000) } };
 }
@@ -42,7 +50,7 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
         submission.hash = commit;
         submission.existingVersionId = submission.moduleId ? (await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: submission.moduleId, hash: commit } } }))?.id ?? null : null;
         submission.phase = "proposing";
-        await ports.db.audit.update({ where: { id }, data: { details: submission } });
+        await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       };
       let proposal;
       if (request.mode === "update" && submission.moduleId) {
@@ -55,13 +63,13 @@ export function createExternalModuleInstaller(ports: StewardPorts): ExternalModu
       if (proposal.moduleId) await recordModuleUpstream(ports, workspaceId, proposal.moduleId, trusted.git);
       submission.moduleId = proposal.moduleId ?? submission.moduleId;
       submission.phase = "submitted";
-      await ports.db.audit.update({ where: { id }, data: { subjectId: submission.moduleId, details: submission } });
+      await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       const result: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "building", moduleId: submission.moduleId, hash: proposal.hash, approvalId: proposal.approvalId ?? null, error: null };
       return proposal.status === "rejected" ? failure(result, "installation_rejected", proposalRejection(proposal.report.errors)) : installationFacts(ports, workspaceId, result);
     } catch (error) {
       if (submission.phase === "prepared") {
         submission.error = redactSensitiveText(error instanceof Error ? error.message : "Release copy failed").slice(0, 1000);
-        await ports.db.audit.update({ where: { id }, data: { details: submission } });
+        await ports.db.moduleInstallationSubmission.update({ where: { id }, data: submission });
       }
       throw error;
     } finally { await rm(root, { recursive: true, force: true }); }
@@ -74,15 +82,15 @@ async function revalidateInstallationRelease(ports: StewardPorts, name: ModuleIn
 }
 async function prepareSubmission(ports: StewardPorts, workspaceId: string, request: ModuleInstallRequest, hash: string) {
   const id = submissionId(workspaceId, request.requestKey);
-  const previous = await ports.db.audit.findUnique({ where: { id } });
+  const previous = await ports.db.moduleInstallationSubmission.findUnique({ where: { id } });
   if (previous) throw new StewardError("conflict", "Installation submission already exists; reconcile the original request");
   const module = await assertExternalName(ports.db, workspaceId, request.package, "install");
   if ((request.mode === "install") === Boolean(module)) throw new StewardError("conflict", "Module identity changed before installation; reconcile the original request");
   const existing = module ? await ports.db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash } } }) : null;
   const marker = `Official installation ${installationId(workspaceId, request.requestKey)}`;
-  const submission: Submission = { hash, moduleId: module?.id ?? null, existingVersionId: existing?.id ?? null, marker, phase: "prepared" };
+  const submission: Submission = { hash, moduleId: module?.id ?? null, existingVersionId: existing?.id ?? null, marker, phase: "prepared", error: null };
   // This evidence survives a crash after propose has queued a version but before the receipt returns.
-  await ports.db.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "module_installation_submission", subjectId: module?.id ?? null, details: submission, createdAt: ports.now() } });
+  await ports.db.moduleInstallationSubmission.create({ data: { id, installationId: installationId(workspaceId, request.requestKey), ...submission } });
   return { id, marker, submission };
 }
 async function copyRelease(trusted: Awaited<ReturnType<typeof resolveExternalRelease>>, root: string, name: string, platform: string) {
@@ -123,17 +131,14 @@ async function installationApproval(ports: StewardPorts, workspaceId: string, mo
 /** Recover from persisted proposal/version facts, never repeat a possibly executed proposal. */
 export async function refreshInstallationReceipts(ports: StewardPorts, workspaceId: string): Promise<void> {
   // Refresh official packages' latest receipts in ticks. Older keys reconcile on explicit lookup.
-  const pointers = await Promise.all(OFFICIAL_EXTERNAL_MODULE_NAMES.map(name => ports.db.audit.findUnique({ where: { id: latestInstallationId(workspaceId, name) } })));
-  const ids = pointers.flatMap(pointer => {
-    const id = (pointer?.details as { installationId?: unknown } | null)?.installationId;
-    return typeof id === "string" ? [id] : [];
-  });
+  const pointers = await ports.db.moduleInstallationHead.findMany({ where: { workspaceId, package: { in: [...OFFICIAL_EXTERNAL_MODULE_NAMES] } }, select: { installationId: true } });
+  const ids = pointers.map(pointer => pointer.installationId);
   await refreshReceipts(ports, workspaceId, ids);
 }
 async function refreshReceipts(ports: StewardPorts, workspaceId: string, ids: string[]): Promise<void> {
-  const rows = await ports.db.audit.findMany({ where: { workspaceId, kind: "module_installation", id: { in: ids } } });
+  const rows = await ports.db.moduleInstallation.findMany({ where: { workspaceId, id: { in: ids } } });
   for (const row of rows) {
-    const result = moduleInstallResultSchema.parse((row.details as unknown as ReturnType<typeof detailsOf>).result);
+    const result = installationResult(row);
     if (!["pending", "building", "pending_approval"].includes(result.status) || activeSubmissions.get(ports.db)?.has(row.id)) continue;
     if (isModulePaused(result.package)) {
       await recordInstallationResult(ports, workspaceId, installationFailure(result, new ModuleUnavailableError(result.package)));
@@ -148,25 +153,24 @@ async function refreshReceipts(ports: StewardPorts, workspaceId: string, ids: st
   }
 }
 async function removedSubmission(ports: StewardPorts, workspaceId: string, createdAt: Date, name: string, hash: string) {
-  const removals = await ports.db.audit.findMany({ where: { workspaceId, kind: "module_removed", createdAt: { gte: createdAt } } });
-  return removals.find(event => (event.details as { name?: unknown; hash?: unknown } | null)?.name === name && (event.details as { hash?: unknown } | null)?.hash === hash);
+  return ports.db.moduleRemoval.findFirst({ where: { workspaceId, name, hash, createdAt: { gte: createdAt } }, orderBy: { createdAt: "asc" } });
 }
 function attributedVersion(version: { id: string; intent: unknown } | null, submission: Submission): version is NonNullable<typeof version> {
   const changes = (version?.intent as { changes?: unknown } | null)?.changes;
   return !!version && (version.id === submission.existingVersionId || Array.isArray(changes) && changes.includes(submission.marker));
 }
 async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: { createdAt: Date }, result: ModuleInstallResult) {
-  const audit = await ports.db.audit.findUnique({ where: { id: submissionId(workspaceId, result.requestKey) } });
-  if (!audit) return null; // An adapter may report an unknown outcome without our proposal evidence; do not guess.
-  const submission = audit.details as unknown as Submission;
+  const stored = await ports.db.moduleInstallationSubmission.findUnique({ where: { id: submissionId(workspaceId, result.requestKey) } });
+  if (!stored) return null; // An adapter may report an unknown outcome without our proposal evidence; do not guess.
+  const submission = submissionSchema.parse(stored);
   if (submission.phase === "prepared") {
     await recordInstallationResult(ports, workspaceId, failure(result, "submission_not_started", submission.error ?? "Resource preparation was interrupted before proposal; explicitly retry with a new request key"));
     return null;
   }
   if (!submission.moduleId) {
     const removed = await removedSubmission(ports, workspaceId, row.createdAt, result.package, submission.hash);
-    if (removed?.subjectId) {
-      await recordInstallationResult(ports, workspaceId, failure({ ...result, moduleId: removed.subjectId, hash: submission.hash }, "module_removed", "The submitted module was removed; a same-name installation cannot take over its receipt", "not_found"));
+    if (removed?.moduleId) {
+      await recordInstallationResult(ports, workspaceId, failure({ ...result, moduleId: removed.moduleId, hash: submission.hash }, "module_removed", "The submitted module was removed; a same-name installation cannot take over its receipt", "not_found"));
       return null;
     }
   }
@@ -187,18 +191,17 @@ async function recoverSubmission(ports: StewardPorts, workspaceId: string, row: 
   }
   return { moduleId: module.id, hash: version.hash };
 }
-async function resumeInstallation(tx: Prisma.TransactionClient, request: ModuleInstallRequest, previous: { id: string; details: unknown }) {
-  const details = previous.details as ReturnType<typeof detailsOf>;
-  if (details.request.package !== request.package || details.request.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
-  const previousResult = moduleInstallResultSchema.parse(details.result);
+async function resumeInstallation(tx: Prisma.TransactionClient, request: ModuleInstallRequest, previous: Prisma.ModuleInstallationGetPayload<object>) {
+  if (previous.package !== request.package || previous.mode !== request.mode) throw new StewardError("conflict", "Install requestKey already belongs to another request");
+  const previousResult = installationResult(previous);
   const result = isModulePaused(request.package) ? installationFailure(previousResult, new ModuleUnavailableError(request.package)) : previousResult;
-  if (isModulePaused(request.package)) await tx.audit.update({ where: { id: previous.id }, data: { details: detailsOf(request, result) } });
+  if (isModulePaused(request.package)) await tx.moduleInstallation.update({ where: { id: previous.id }, data: resultData(result) });
   return { result, claimed: false };
 }
 export async function installExternal(ports: StewardPorts, workspaceId: string, raw: ModuleInstallRequest): Promise<ModuleInstallResult> {
   const request = parseInput(moduleInstallRequestSchema, raw), id = installationId(workspaceId, request.requestKey);
   const claim = await ports.db.$transaction(async tx => {
-    const previous = await tx.audit.findUnique({ where: { id } });
+    const previous = await tx.moduleInstallation.findUnique({ where: { id } });
     if (previous) return resumeInstallation(tx, request, previous);
     const module = await assertExternalName(tx, workspaceId, request.package, "install");
     const paused = isModulePaused(request.package);
@@ -207,15 +210,15 @@ export async function installExternal(ports: StewardPorts, workspaceId: string, 
     const moduleId = module?.id ?? null;
     const pending: ModuleInstallResult = { package: request.package, requestKey: request.requestKey, status: "pending", moduleId, hash: null, approvalId: null, error: null };
     const result = paused ? installationFailure(pending, new ModuleUnavailableError(request.package)) : pending;
-    await tx.audit.create({ data: { id, workspaceId, actorKey: "kernel", kind: "module_installation", subjectId: moduleId, details: detailsOf(request, result), createdAt: ports.now() } });
-    await tx.audit.upsert({ where: { id: latestInstallationId(workspaceId, request.package) }, create: { id: latestInstallationId(workspaceId, request.package), workspaceId, actorKey: "kernel", kind: "module_installation_latest", details: { installationId: id }, createdAt: ports.now() }, update: { details: { installationId: id } } });
+    await tx.moduleInstallation.create({ data: { id, workspaceId, mode: request.mode, ...resultData(result), createdAt: ports.now() } });
+    await tx.moduleInstallationHead.upsert({ where: { workspaceId_package: { workspaceId, package: request.package } }, create: { workspaceId, package: request.package, installationId: id }, update: { installationId: id } });
     return { result, claimed: !paused };
   });
   if (!claim.claimed) {
     if (["pending", "building", "pending_approval"].includes(claim.result.status)) {
       await refreshReceipts(ports, workspaceId, [id]);
-      const row = await ports.db.audit.findUniqueOrThrow({ where: { id } });
-      return moduleInstallResultSchema.parse((row.details as unknown as ReturnType<typeof detailsOf>).result);
+      const row = await ports.db.moduleInstallation.findUniqueOrThrow({ where: { id } });
+      return installationResult(row);
     }
     return claim.result;
   }
@@ -230,7 +233,7 @@ export async function installExternal(ports: StewardPorts, workspaceId: string, 
     };
     if (result.package !== request.package || result.requestKey !== request.requestKey) throw new StewardError("invalid", "Installer returned a different request identity");
   } catch (error) {
-    const submission = await ports.db.audit.findUnique({ where: { id: submissionId(workspaceId, request.requestKey) } });
+    const submission = await ports.db.moduleInstallationSubmission.findUnique({ where: { id: submissionId(workspaceId, request.requestKey) } });
     result = submission ? { ...claim.result, status: "pending", error: null } : installationFailure(claim.result, error);
   }
   try {
@@ -238,8 +241,8 @@ export async function installExternal(ports: StewardPorts, workspaceId: string, 
   } finally { active.delete(id); }
   if (result.status === "pending") {
     await refreshReceipts(ports, workspaceId, [id]);
-    const row = await ports.db.audit.findUniqueOrThrow({ where: { id } });
-    return moduleInstallResultSchema.parse((row.details as unknown as ReturnType<typeof detailsOf>).result);
+    const row = await ports.db.moduleInstallation.findUniqueOrThrow({ where: { id } });
+    return installationResult(row);
   }
   return result;
 }
@@ -247,19 +250,16 @@ export async function installExternal(ports: StewardPorts, workspaceId: string, 
 export async function recordInstallationResult(ports: StewardPorts, workspaceId: string, raw: ModuleInstallResult) {
   const result = moduleInstallResultSchema.parse(raw), id = installationId(workspaceId, result.requestKey);
   await ports.db.$transaction(async tx => {
-    const row = await tx.audit.findUniqueOrThrow({ where: { id } });
-    const previous = row.details as unknown as ReturnType<typeof detailsOf>;
-    if (previous.request.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
-    await tx.audit.update({ where: { id }, data: { subjectId: result.moduleId, details: detailsOf(previous.request, result) } });
+    const row = await tx.moduleInstallation.findUniqueOrThrow({ where: { id } });
+    if (row.package !== result.package) throw new StewardError("conflict", "Installation receipt identity mismatch");
+    await tx.moduleInstallation.update({ where: { id }, data: resultData(result) });
   });
 }
 export async function externalPackageCatalog(ports: StewardPorts, workspaceId: string) {
   return Promise.all(OFFICIAL_EXTERNAL_MODULE_NAMES.map(async name => {
     const module = await ports.db.module.findUnique({ where: { workspaceId_name: { workspaceId, name } } });
-    const pointer = await ports.db.audit.findUnique({ where: { id: latestInstallationId(workspaceId, name) } });
-    const receiptId = (pointer?.details as { installationId?: string } | null)?.installationId;
-    const receipt = receiptId ? await ports.db.audit.findUnique({ where: { id: receiptId } }) : null;
-    const installation = receipt ? moduleInstallResultSchema.parse((receipt.details as unknown as ReturnType<typeof detailsOf>).result) : null;
+    const pointer = await ports.db.moduleInstallationHead.findUnique({ where: { workspaceId_package: { workspaceId, package: name } }, include: { installation: true } });
+    const installation = pointer ? installationResult(pointer.installation) : null;
     try {
       const release = await resolveExternalRelease(ports, name);
       return { name, ...releaseCatalogDetails(release), moduleId: module?.id ?? null, installation, error: null };

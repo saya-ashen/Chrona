@@ -1,7 +1,7 @@
+import { appendRunToolResultIn } from "./run-events";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@chrona/db";
 import { compileModuleOutput, MAX_CALL_DEPTH, moduleManifestSchema, RUN_LIMITS, type ModuleEvent, expectedModuleTargetSchema, type ExpectedModuleTarget } from "@chrona/contracts/steward";
-import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { moduleSupervisor, type DeliveryStage } from "./module-supervisor";
 import { recordModuleOutputMismatch } from "./module-diagnostics";
@@ -53,9 +53,8 @@ function targetFence(ports: StewardPorts, workspaceId: string, resolved: Target,
     } catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { stage: "unavailable" }); }
   };
 }
-const targetBindingId = (callId: string) => `module-invocation-target:${callId}`;
-async function bindInvocationTarget(tx: Db, input: { workspaceId: string; callId: string; resolved: Target | CallError; target: string; now: Date }) {
-  const { workspaceId, callId, resolved, target, now } = input;
+async function bindInvocationTarget(tx: Db, input: { workspaceId: string; callId: string; resolved: Target | CallError; target: string }) {
+  const { workspaceId, callId, resolved, target } = input;
   // An unavailable known app still has an identity. Bind it before a later same-name reinstall can take over.
   const module = resolved instanceof CallError ? await tx.module.findFirst({ where: { workspaceId, name: splitTarget(target).module } }) : resolved.module;
   let contractHash: string | null = resolved instanceof CallError ? null : moduleCallbackContractHash(resolved.tool as Tool | SystemTool);
@@ -67,7 +66,7 @@ async function bindInvocationTarget(tx: Db, input: { workspaceId: string; callId
   }
   // Explicit null identity authorizes only a never-sent missing target to bind later; absence is legacy, not permission.
   const binding = { moduleId: module?.id ?? null, contractHash };
-  await tx.audit.create({ data: { id: targetBindingId(callId), workspaceId, actorKey: "kernel", kind: "module_invocation_target", subjectId: callId, details: binding, createdAt: now } });
+  await tx.moduleInvocation.update({ where: { id: callId }, data: { targetBound: true, targetModuleId: binding.moduleId, targetContractHash: binding.contractHash } });
 }
 const differentBinding = (binding: { moduleId: string | null; contractHash: string | null }, current: { moduleId: string; contractHash: string }) =>
   binding.moduleId !== null && binding.moduleId !== current.moduleId || binding.contractHash !== null && binding.contractHash !== current.contractHash;
@@ -75,20 +74,16 @@ const differentActivation = (active: Target | CallError, resolved: Target, contr
   active instanceof CallError || active.module.id !== resolved.module.id || active.module.activeHash !== resolved.module.activeHash || moduleCallbackContractHash(active.tool as Tool | SystemTool) !== contractHash;
 async function checkInvocationTarget(ports: StewardPorts, row: Row, resolved: Target) {
   return ports.db.$transaction(async tx => {
-    const previous = await tx.audit.findUnique({ where: { id: targetBindingId(row.id) } });
-    if (!previous) return false; // No migration or inference for legacy calls lacking attribution.
-    const parsed = z.object({ moduleId: z.string().nullable(), contractHash: z.string().nullable() }).strict().safeParse(previous.details);
-    if (!parsed.success) return false;
+    const previous = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running", leaseToken: row.leaseToken } });
+    if (!previous?.targetBound) return false;
     const current = { moduleId: resolved.module.id, contractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) };
-    const binding = parsed.data;
+    const binding = { moduleId: previous.targetModuleId, contractHash: previous.targetContractHash };
     if (differentBinding(binding, current)) return false;
     // Resolve and claim the exact identity inside the transaction. Supervisor rechecks id/hash before sending.
     const active = await resolveTarget(tx, row.workspaceId, `${row.target}.${row.tool}`);
     if (differentActivation(active, resolved, current.contractHash)) return false;
-    const claimed = await tx.moduleInvocation.findFirst({ where: { id: row.id, workspaceId: row.workspaceId, status: "running", leaseToken: row.leaseToken } });
-    if (!claimed) return false;
-    if (binding.moduleId === null || binding.contractHash === null) await tx.audit.update({ where: { id: previous.id }, data: { details: current } });
-    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent } });
+
+    await tx.moduleInvocation.update({ where: { id: row.id }, data: { idempotent: resolved.tool.idempotent, targetModuleId: current.moduleId, targetContractHash: current.contractHash } });
     return true;
   });
 }
@@ -268,8 +263,13 @@ async function validateSyncRoute(ports: StewardPorts, origin: CallOrigin, target
   if (route.path.length >= MAX_CALL_DEPTH) throw new CallError("cycle", `Call path too deep (${route.path.join(" → ")})`);
   return { resolved, route };
 }
-function privateInvocationFinish(ports: StewardPorts, id: string, agent: boolean | undefined) {
-  return (data: Prisma.ModuleInvocationUpdateInput) => ports.db.moduleInvocation.update({ where: { id }, data: { ...data, ...(agent ? { output: {}, ...(data.error ? { error: "Agent operation failed" } : {}) } : {}), finishedAt: ports.now() } });
+function privateInvocationFinish(ports: StewardPorts, id: string, resolved: Target) {
+  return (data: Prisma.ModuleInvocationUpdateInput) => ports.db.$transaction(async tx => {
+    const at = ports.now();
+    const row = await tx.moduleInvocation.update({ where: { id }, data: { ...data, ...(resolved.agent ? { output: {}, ...(data.error ? { error: "Agent operation failed" } : {}) } : {}), finishedAt: at } });
+    await appendRunToolResultIn(tx, row, at, unrecorded(resolved) || resolved.module.name === "secrets");
+    return row;
+  }).catch(() => { throw new CallError("unknown", `Tool receipt could not be committed; reconcile call ${id}`); });
 }
 function unrecorded(resolved: Target) { return resolved.agent || resolved.system?.unrecorded?.includes(resolved.tool.name) || false; }
 export async function callSync(ports: StewardPorts, origin: CallOrigin, target: string, raw: unknown, { timeoutMs, expectedTarget }: { timeoutMs?: number; expectedTarget?: ExpectedModuleTarget } = {}) {
@@ -277,8 +277,9 @@ export async function callSync(ports: StewardPorts, origin: CallOrigin, target: 
   const args = validArgs(resolved.tool, raw), now = ports.now(), quiet = unrecorded(resolved);
   if (resolved.agent) await authorizeAgentRequest(ports, origin.workspaceId, resolved.tool.name, args, origin.caller);
   const row = await ports.db.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller: callerKey(origin.caller), ...callerIdentity(origin.caller),
+    ...(isAgentContextEntry(ports, origin) ? { runId: origin.run!.executionRunId, targetBound: true, targetModuleId: resolved.module.id, targetHash: resolved.module.activeHash, targetContractHash: moduleCallbackContractHash(resolved.tool as Tool | SystemTool) } : {}),
     target: resolved.module.name, tool: resolved.tool.name, args: (quiet ? {} : args) as Prisma.InputJsonValue, key: randomUUID(), chain: path, mode: "sync", idempotent: resolved.tool.idempotent, status: "running", attempts: 1, createdAt: now } });
-  const finish = privateInvocationFinish(ports, row.id, resolved.agent);
+  const finish = privateInvocationFinish(ports, row.id, resolved);
   const activationId = resolved.system ? undefined : (await currentModuleEvolution(ports.db, origin.workspaceId, resolved.module.id, resolved.module.activeHash))?.activationId ?? null;
   const invocation = { ports, origin, resolved, target, args, chain, path, now, ...(activationId !== undefined ? { activationId } : {}) };
   if (resolved.system) return invokeSystemSync({ ...invocation, rowId: row.id, finish, quiet });
@@ -310,20 +311,18 @@ export async function enqueueCall(input: EnqueueInput, options: EnqueueOptions):
     ? client.$transaction(tx => enqueueIn({ ...input, tx }, options))
     : enqueueIn(input, options);
 }
-async function checkDuplicateTarget(tx: Db, callId: string, expectedTarget?: ExpectedModuleTarget) {
+function checkDuplicateTarget(binding: { targetModuleId: string | null; targetContractHash: string | null }, expectedTarget?: ExpectedModuleTarget) {
   if (!expectedTarget) return;
   const parsed = expectedModuleTargetSchema.safeParse(expectedTarget);
   if (!parsed.success) throw new CallError("invalid", "Invalid expected target identity");
-  const binding = await tx.audit.findUnique({ where: { id: targetBindingId(callId) } });
-  const identity = binding?.details as { moduleId?: unknown; contractHash?: unknown } | null | undefined;
-  if (!identity || identity.moduleId !== parsed.data.moduleId || identity.contractHash !== parsed.data.contractHash) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
+  if (binding.targetModuleId !== parsed.data.moduleId || binding.targetContractHash !== parsed.data.contractHash) throw new CallError("conflict", "Duplicate key belongs to a different registered target");
 }
 async function enqueueIn({ tx, ports, origin, target, raw }: EnqueueInput, { key, reply = false, expectedTarget }: EnqueueOptions): Promise<EnqueuedCall> {
   if (origin.caller.kind === "module" && isModulePaused(origin.caller.module)) throw new CallError("forbidden", "Paused modules cannot enqueue calls");
   const name = splitTarget(target), caller = callerKey(origin.caller);
   const existing = await tx.moduleInvocation.findUnique({ where: { workspaceId_caller_target_tool_key: { workspaceId: origin.workspaceId, caller, target: name.module, tool: name.tool, key } } });
   if (existing) {
-    await checkDuplicateTarget(tx, existing.id, expectedTarget);
+    checkDuplicateTarget(existing, expectedTarget);
     return { callId: existing.id, status: existing.status as "queued", duplicate: true };
   }
   const resolved = await resolveEnqueueTarget(tx, origin, target);
@@ -334,7 +333,7 @@ async function enqueueIn({ tx, ports, origin, target, raw }: EnqueueInput, { key
   const row = await tx.moduleInvocation.create({ data: { workspaceId: origin.workspaceId, caller, ...callerIdentity(origin.caller),
     target: name.module, tool: name.tool, args: (args ?? {}) as Prisma.InputJsonValue, key, chain: path, mode: "async", idempotent: resolved instanceof CallError ? false : resolved.tool.idempotent,
     reply: reply && origin.caller.kind === "module", nextAttemptAt: now, createdAt: now } });
-  await bindInvocationTarget(tx, { workspaceId: origin.workspaceId, callId: row.id, resolved, target, now });
+  await bindInvocationTarget(tx, { workspaceId: origin.workspaceId, callId: row.id, resolved, target });
   return { callId: row.id, status: "queued" as const, duplicate: false };
 }
 
@@ -426,9 +425,8 @@ export async function runDueCalls(ports: StewardPorts, workspaceId: string) {
   const { db } = ports, now = ports.now();
   for (const row of await db.moduleInvocation.findMany({ where: { workspaceId, mode: "async", status: "running", leaseUntil: { lte: now } } })) {
     // Chrona stopped or lost the delivery mid-flight: the target may have acted.
-    const binding = await db.audit.findUnique({ where: { id: targetBindingId(row.id) } });
-    const identity = z.object({ moduleId: z.string(), contractHash: z.string() }).strict().safeParse(binding?.details);
-    await db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: row.leaseToken }, data: identity.success && row.idempotent && row.attempts < MAX_ATTEMPTS
+    const identityBound = row.targetBound && row.targetModuleId !== null && row.targetContractHash !== null;
+    await db.moduleInvocation.updateMany({ where: { id: row.id, status: "running", leaseToken: row.leaseToken }, data: identityBound && row.idempotent && row.attempts < MAX_ATTEMPTS
       ? { status: "queued", leaseToken: null, leaseUntil: null, nextAttemptAt: now, error: "Delivery interrupted; retrying an idempotent call" }
       : { status: "unknown", leaseToken: null, leaseUntil: null, error: "Delivery interrupted; outcome unknown", finishedAt: now } });
   }

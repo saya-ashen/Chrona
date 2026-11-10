@@ -12,7 +12,6 @@ import type { ExecutionClaimSelection, StewardPorts } from "./ports";
 import { buildSettings, budgetTimezone, runTimeoutMinutes } from "./settings";
 import { audit } from "./audit";
 import { StewardError } from "./errors";
-import { providerCancelKey } from "./provider-journal";
 import { authenticateRun } from "./run-auth";
 import { assertBuildProvider, buildExecution } from "./build-execution";
 import { assertExternalName } from "./module-identity";
@@ -67,7 +66,7 @@ class RunService {
     return tx.run.create({ data: { ...input, workspaceId, provider: ports.provider?.name ?? "unconfigured", tokenHash: hash(randomBytes(32).toString("hex")), cwd, createdAt } });
   }
   private async admitQueued(tx: Prisma.TransactionClient, run: RunRow, now: Date, { lane, today, timezone }: { lane: RunLane; today: { sessionId: string | null }[]; timezone: string }) {
-    if ((run.session && run.session.status !== "active") || await tx.audit.findUnique({ where: { id: providerCancelKey(run.id) } })) {
+    if ((run.session && run.session.status !== "active") || run.cancelRequestedAt) {
       await tx.run.update({ where: { id: run.id }, data: { status: "cancelled", endedAt: now } });
       return "skip";
     }
@@ -135,7 +134,7 @@ class RunService {
     const admission = await this.admitQueued(tx, run, now, { lane, today, timezone });
     if (admission === "blocked") return "blocked" as const;
     if (admission === "skip") return null;
-    if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
+    if (run.sessionId && await tx.run.count({ where: { workspaceId: this.workspaceId, sessionId: run.sessionId, OR: [{ status: "running" }, { stopStatus: "unknown" }, { startedAt: { not: null }, execution: { stopConfirmedAt: null } }] } })) return null;
     return this.claimQueued(tx, run, now, builds, ordinaryTimeoutMinutes);
   }
   async claimNext(lane: RunLane, now = this.ports.now(), selection?: ExecutionClaimSelection): Promise<(RunRow & { token: string; runId: string; startedAt: Date; deadlineAt: Date | null; leaseUntil: Date | null; model?: string }) | null> {
@@ -144,7 +143,7 @@ class RunService {
       const { workspaceId } = this;
       await tx.$executeRaw`UPDATE "Workspace" SET "id" = "id" WHERE "id" = ${workspaceId}`;
       const fresh = this.ports.now();
-      const ordinaryBusy = await tx.run.count({ where: { workspaceId, lane, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }], execution: null } });
+      const ordinaryBusy = await tx.run.count({ where: { workspaceId, lane, OR: [{ status: "running" }, { stopStatus: "unknown" }], execution: null } });
       const eligible = { workspaceId, status: "queued", OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
       const settings = (await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).settings;
       const timezone = budgetTimezone(settings), builds = lane === "build" ? buildSettings(settings) : null;

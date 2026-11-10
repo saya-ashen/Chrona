@@ -6,12 +6,12 @@ export type Notice = { title: string; body: string; level: string; idempotencyKe
 /** Test-only presentation: application sends plus finite kernel facts, without a live notification app. */
 export async function notices(db: StewardPorts["db"], filter: Partial<Notice> = {}) {
   const calls = await db.moduleInvocation.findMany({ where: { target: "notify", tool: "send" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
-  const facts = await db.audit.findMany({ where: { kind: { in: ["kernel_fact_pending", "kernel_fact_consumed"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+  const facts = await db.kernelFact.findMany({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
   const rows = [...calls.map(row => ({ ...row, raw: row.args as Record<string, unknown> })), ...facts.flatMap(row => {
-    const fact = kernelFactSchema.parse(row.details);
+    const fact = kernelFactSchema.parse(row.payload);
     if (fact.type !== "notice" && fact.type !== "lifecycle") return [];
     const raw = fact.type === "notice" ? { ...fact.data, title: "处理需要你的输入", body: `运行 ${fact.data.run} 正在等待输入，请打开会话查看并回答。`, level: "now" } : { ...fact.data, ...lifecycleNotice(fact.data.fact.kind, fact.data.fact) };
-    return [{ id: row.id, createdAt: row.createdAt, raw, caller: "kernel", callerModuleId: null, status: row.kind === "kernel_fact_pending" ? "pending" : "consumed" }];
+    return [{ id: row.id, createdAt: row.createdAt, raw, caller: "kernel", callerModuleId: null, status: !row.consumedAt ? "pending" : "consumed" }];
   })].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
   return rows.map(row => {
     const args = row.raw as Record<string, string | undefined>;

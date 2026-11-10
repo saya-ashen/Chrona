@@ -111,8 +111,8 @@ async function initializePackage(ports: StewardPorts, workspaceId: string, name:
   try {
     // A retry can start as an install and acquire its moduleId while building. Resume
     // that receipt's original mode rather than turning the same requestKey into an update.
-    const receipt = await ports.db.audit.findUnique({ where: { id: installationId(workspaceId, previous.requestKey) } });
-    const mode = receipt ? moduleInstallRequestSchema.parse((receipt.details as { request?: unknown } | null)?.request).mode : previous.attempts > 1 && previous.moduleId ? "update" : "install";
+    const receipt = await ports.db.moduleInstallation.findUnique({ where: { id: installationId(workspaceId, previous.requestKey) } });
+    const mode = receipt ? moduleInstallRequestSchema.shape.mode.parse(receipt.mode) : previous.attempts > 1 && previous.moduleId ? "update" : "install";
     const result = await installExternal(ports, workspaceId, { package: name, mode, requestKey: previous.requestKey });
     return {
       requestKey: result.requestKey, attempts: previous.attempts, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId, error: result.error,

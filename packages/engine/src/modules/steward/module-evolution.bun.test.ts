@@ -21,14 +21,10 @@ async function rollbackFixture(options: { paused?: boolean; migrating?: boolean;
   await db.moduleVersion.create({ data: { moduleId: module.id, hash: "candidate", manifest, source: "user", status: "approved", intent: { changes: ["safe fix"] }, report: { tests: [], continuity: { status: "passed", fromSchema: 1, toSchema: 1, migrated: options.migrated ?? false } } } });
   const ports = { db, dataDir, publicUrl: null, now: () => new Date("2026-10-30T12:00:00Z") };
   const context = moduleContext(ports, workspace.id);
-  const activation = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: options.firstInstall ? null : "previous", hash: "candidate", generationId: "gen-candidate" }));
+  const activation = await db.$transaction(tx => recordModuleActivation(context, tx, { moduleId: module.id, previousHash: options.firstInstall ? null : "previous", hash: "candidate", generationId: "gen-candidate", grouped: options.group }));
   await updateModuleEvolution(db, { workspaceId: workspace.id, moduleId: module.id, activationId: activation.activationId, hash: "candidate", status: "failed", now: ports.now() });
   if (options.verified) await updateModuleEvolution(db, { workspaceId: workspace.id, moduleId: module.id, activationId: activation.activationId, hash: "candidate", capability: "tool:read", now: ports.now() });
-  if (options.group) {
-    const approval = await db.approval.create({ data: { workspaceId: workspace.id, action: "activate_module", title: "group", detail: "", preview: "", payload: { kind: "activate_modules", versions: [{ moduleId: module.id, hash: "candidate" }, { moduleId: "other", hash: "other" }] } } });
-    await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_activate", details: { hash: "candidate", generationId: "gen-candidate", approvalId: approval.id } } });
-  }
-  if (options.migration) await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", subjectId: module.id, kind: "module_migration_started", details: { hash: "candidate", from: 1, to: 1 } } });
+  if (options.migration) await db.moduleMigration.create({ data: { moduleId: module.id, hash: "candidate", fromSchema: 1, toSchema: 1, previousStatus: "active", createdAt: ports.now() } });
   if (options.recordedDelivery) {
     const schedule = await db.schedule.create({ data: { workspaceId: workspace.id, moduleId: module.id, triggerId: "previous-occurrence", mode: "module", rule: {}, text: "Recorded delivery", createdBy: "chrona", status: "done" } });
     await db.moduleInvocation.create({ data: { workspaceId: workspace.id, caller: "system:schedules", target: module.name, tool: "schedule", mode: "schedule", key: `${schedule.id}:recorded`, args: { scheduleId: schedule.id }, status: "unknown", error: "Delivery interrupted; outcome unknown" } });
@@ -79,10 +75,10 @@ test("a same-hash activation cannot interleave between mismatch epoch check and 
   const interceptAudit = (delegate: object) => new Proxy(delegate, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
-      if (property !== "findMany") return typeof value === "function" ? value.bind(target) : value;
+      if (property !== "findFirst") return typeof value === "function" ? value.bind(target) : value;
       return async (...args: unknown[]) => {
         const rows = await value.apply(target, args);
-        if ((args[0] as { where?: { kind?: string } })?.where?.kind === "module_evolution_outcome") {
+        if ((args[0] as { where?: { candidateHash?: string } })?.where?.candidateHash === "candidate") {
           queryReached();
           await continuation;
         }
@@ -92,11 +88,11 @@ test("a same-hash activation cannot interleave between mismatch epoch check and 
   });
   const interceptDb = (client: typeof f.db) => new Proxy(client, {
     get(target, property, receiver) {
-      if (property === "audit") return interceptAudit(Reflect.get(target, property, receiver));
+      if (property === "moduleActivation") return interceptAudit(Reflect.get(target, property, receiver));
       const value = Reflect.get(target, property, receiver);
       if (property !== "$transaction") return typeof value === "function" ? value.bind(target) : value;
       return (callback: (tx: unknown) => unknown) => value.call(target, (tx: object) => callback(new Proxy(tx, {
-        get(transaction, key, txReceiver) { return key === "audit" ? interceptAudit(Reflect.get(transaction, key, txReceiver)) : Reflect.get(transaction, key, txReceiver); },
+        get(transaction, key, txReceiver) { return key === "moduleActivation" ? interceptAudit(Reflect.get(transaction, key, txReceiver)) : Reflect.get(transaction, key, txReceiver); },
       })));
     },
   });

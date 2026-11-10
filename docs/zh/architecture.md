@@ -12,7 +12,9 @@ Coding 的当前接入见[统一业务服务与平级客户端实施记录](codi
 
 当前本机实现统一经 `module-calls.ts` 调用受信任能力：`agent` 负责 Provider 启动、等待、注入、取消、completion 与 transcript；`runtime-callback` 提供绑定 workspace 的短期事件／问答引用；`workspace-local` 负责项目准备、锁释放、成果捕获与清理；对话附件由入口应用私有内容区持有；Agent 输入按真实发起方的准入回执读取，运行输出由 `workspace-local.capture-file` 捕获进实际接收应用；不再有全局内容读取接口。物理适配器、文件 I/O 与进程内 handle 留在能力实现内部，消费端使用 JSON 契约及路由代理。内核保留唯一 Run 队列、授权、事务、预算、停止证据和启动持久化。
 
-受信任能力使用发行代码与进程内投递，应用模块继续通过 SDK/socket 独立运行；双方复用身份、visibility、schema、调用记录与错误机制。`agent` 已从进程内能力拆为发行内置 SDK 应用：应用进程持有 Pi Provider、操作状态和启动回执，内核经 `agent.start/status/inject/abort/release` 调用，并保留 Run 授权、预算和持久状态。补全使用短启动请求与结果查询，等待不占住取消通道。Agent 的工具向内核和模块开放，模块通过普通 `chrona.call` 使用结构化参数；操作归属由 SDK 真实 caller 绑定，执行准入与模型额度仍按原模块身份检查；`runtime-callback` 仍在内核进程，除内核外仅接受当前受信任内置 Agent 的真实 moduleId/hash/source。其余本机能力 `runtime-callback`、`workspace-local` 继续以进程内方式实现，目录单列“运行能力”。应用页把 Agent 列在内置应用，复用进程诊断与只读自检；模块执行接口不向 owner 暴露操作表单。配置仍来自现有服务启动参数和全局模型／预算设置；当前不新增宿主配置写入口。详见 [Agent 内置应用](agent-builtin-application.md)。平台快照和数据库保持内核内部实现。通用远端宿主留到后续版本，现有设备协议保持有效。实施范围、验证进度与限制见[统一模块协议实施方案](unified-module-runtime-plan.md)。
+`agent` 是发行内置的独立 SDK 应用，持有唯一 Pi Provider、私有模型策略与操作回执；内核经 `agent.start/status/inject/abort/release` 控制真实 Run，并保留唯一队列、实际 caller、授权、硬预算、租约、取消及停止证据。Run 结果先由 Agent 持久化再发送绑定操作的事件；丢失通知时核对原回执，重启不重新执行。`agent.complete/completion` 只向应用提供结构化操作；没有生产调用方的旧内核补全网关及 100ms 轮询已删除。应用补全复用已有私有 journal 和 `agent-admit/agent-settle`，未知结果不结算为停止。全局设置只管内核硬预算，模型选择由 Agent 的 `configure` 私有策略决定。`runtime-callback` 与 `workspace-local` 保留为私有内核宿主，不参与公开发现；回调从真实路由调用推导身份，不接受应用自称 caller。通用远端宿主仍推迟。详见 [Agent 内置应用](agent-builtin-application.md)和[本分支内核迁移及离线验收](kernel-agent-migration.md)。
+
+控制状态使用明确记录：`AgentContext/AgentRunAdmission/AgentCommand/ProviderLaunch` 固定身份与准入，`RunEvent/RunInteraction` 保存有界事件和交互状态，Run 自身保存取消与停止状态；候选、安装、激活、失败策略、构建和迁移归属各有专用记录。审计保存观察与展示历史，不作为这些状态的回退授权来源。普通应用私有存储与入口业务留待后续迁移。
 
 ## Agent 原语与应用编排
 

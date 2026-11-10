@@ -62,7 +62,7 @@ function refs(attachments: unknown) {
 function assertStoppedRuns(runs: Prisma.RunGetPayload<{ include: { execution: true } }>[], workspaceId: string) {
   for (const run of runs) {
     if (run.workspaceId !== workspaceId) continue;
-    if (!["finished", "failed", "timed_out", "cancelled", "provider_unavailable"].includes(run.status) || run.error === "Execution stop is unconfirmed" || (run.startedAt && !run.endedAt)) fail("live or unknown Run/execution evidence");
+    if (!["finished", "failed", "timed_out", "cancelled", "provider_unavailable"].includes(run.status) || run.stopStatus === "unknown" || (run.startedAt && !run.endedAt)) fail("live or unknown Run/execution evidence");
     if (run.execution && (!run.execution.stopConfirmedAt || !run.execution.stopEvidence || run.execution.heldDirectory)) fail("live or unknown Run/execution evidence");
   }
 }
@@ -72,8 +72,9 @@ async function snapshot(tx: Tx, options: LegacyConversationExportOptions) {
   const sessions = await tx.session.findMany({ where: { workspaceId, id: { in: sessionIds } }, orderBy: { id: "asc" } });
   if (sessions.length !== sessionIds.length) fail("session not found in workspace");
   const audits = await tx.audit.findMany({ orderBy: { id: "asc" } });
+  const contexts = await tx.agentContext.findMany({ where: { sessionId: { in: sessionIds } }, select: { sessionId: true } });
   for (const session of sessions) {
-    if (!(LEGACY_CONVERSATION_SOURCES as readonly string[]).includes(session.source) || session.executionHeadAttemptId || audits.some(row => row.id === `agent-context:${session.id}` || (row.kind === "agent_context" && row.subjectId === session.id))) fail("protected Agent/current execution context");
+    if (!(LEGACY_CONVERSATION_SOURCES as readonly string[]).includes(session.source) || session.executionHeadAttemptId || contexts.some(row => row.sessionId === session.id)) fail("protected Agent/current execution context");
   }
   const runs = await tx.run.findMany({ orderBy: { id: "asc" }, include: { execution: true } });
   assertStoppedRuns(runs, workspaceId);

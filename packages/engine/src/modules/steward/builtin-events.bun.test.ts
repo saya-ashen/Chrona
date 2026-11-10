@@ -49,11 +49,11 @@ test("events consumes kernel target binding: two real callback targets, one paus
     const firstCalls = await db.moduleInvocation.findMany({ where: { workspaceId, tool: "receive" } });
     expect(firstCalls).toHaveLength(2);
     const alphaCall = firstCalls.find(call => call.target === "alpha")!;
-    const alphaBinding = (await db.audit.findUniqueOrThrow({ where: { id: `module-invocation-target:${alphaCall.id}` } })).details as { moduleId: string; contractHash: string };
+    const alphaBinding = { moduleId: alphaCall.targetModuleId!, contractHash: alphaCall.targetContractHash! };
     expect(alphaBinding.moduleId).toBe(alpha.id);
     expect((await enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: { event: "source.changed", from: "source", payload: '{}' } }, { key: alphaCall.key!, expectedTarget: alphaBinding })).duplicate).toBe(true);
     await expect(enqueueCall({ tx: db, ports, origin, target: "alpha.receive", raw: {} }, { key: alphaCall.key!, expectedTarget: { ...alphaBinding, moduleId: beta.id } })).rejects.toThrow("different registered target");
-    expect(await db.audit.count({ where: { workspaceId, kind: "module_invocation_target", id: { in: firstCalls.map(call => `module-invocation-target:${call.id}`) } } })).toBe(2);
+    expect(await db.moduleInvocation.count({ where: { workspaceId, targetBound: true, id: { in: firstCalls.map(call => call.id) } } })).toBe(2);
     let rolledBackId = "";
     await expect(db.$transaction(async tx => {
       const result = await enqueueCall({ tx, ports, origin, target: "alpha.receive", raw: { event: "source.changed", from: "source", payload: '{}' } }, { key: "rollback", expectedTarget: alphaBinding });
@@ -62,7 +62,7 @@ test("events consumes kernel target binding: two real callback targets, one paus
     })).rejects.toThrow("rollback-fixture");
     expect(rolledBackId).not.toBe("");
     expect(await db.moduleInvocation.findUnique({ where: { id: rolledBackId } })).toBeNull();
-    expect(await db.audit.findUnique({ where: { id: `module-invocation-target:${rolledBackId}` } })).toBeNull();
+    expect(await db.moduleInvocation.findUnique({ where: { id: rolledBackId } })).toBeNull();
     expect(await db.moduleInvocation.count({ where: { workspaceId, tool: "receive" } })).toBe(2);
     await db.module.update({ where: { id: alpha.id }, data: { status: "paused" } });
     expect(await emit("paused")).toEqual({ delivered: 1 }); await runDueCalls(ports, workspaceId);

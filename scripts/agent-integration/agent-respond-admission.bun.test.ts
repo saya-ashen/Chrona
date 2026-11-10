@@ -88,13 +88,13 @@ test("admitted answer with lost response replays accepted after question and run
   liveRuns.delete(f.args.runId);
   expect(await f.respond()).toEqual({ accepted: true });
   expect(await f.db.executionCommand.count()).toBe(1);
-  expect(await f.db.audit.count({ where: { kind: "provider_answer" } })).toBe(1);
+  expect(await f.db.runInteraction.count({ where: { status: { not: "pending" } } })).toBe(1);
   expect(f.answers()).toBe(1);
 });
 
 test("unknown delivery storage failure stays thrown after durable acceptance", async () => {
   const f = await fixture();
-  await f.db.$executeRawUnsafe("CREATE TRIGGER fail_answer_delivery BEFORE INSERT ON Audit WHEN NEW.kind = 'provider_answer' BEGIN SELECT RAISE(ABORT, 'Synthetic delivery failure'); END");
+  await f.db.$executeRawUnsafe("CREATE TRIGGER fail_answer_delivery BEFORE UPDATE OF status ON RunInteraction WHEN NEW.status != 'pending' BEGIN SELECT RAISE(ABORT, 'Synthetic delivery failure'); END");
   try {
     await expect(f.respond()).rejects.toThrow();
     expect(await f.db.executionCommand.count()).toBe(1);
@@ -102,7 +102,7 @@ test("unknown delivery storage failure stays thrown after durable acceptance", a
     expect(f.answers()).toBe(0);
     f.expire();
     expect(await f.respond()).toEqual({ accepted: true });
-    expect(await f.db.audit.count({ where: { kind: "provider_answer" } })).toBe(0);
+    expect(await f.db.runInteraction.count({ where: { status: { not: "pending" } } })).toBe(0);
   } finally { await f.db.$executeRawUnsafe("DROP TRIGGER fail_answer_delivery"); }
 });
 

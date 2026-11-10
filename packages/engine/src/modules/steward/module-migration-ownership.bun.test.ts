@@ -35,13 +35,14 @@ for (const reason of ["activate", "rollback"] as const) test(`paused cross-schem
   const f = await fixture();
   await f.db.module.update({ where: { id: f.module.id }, data: { status: "paused" } });
   f.prepared.module.status = "paused";
-  await f.start(); await migrateData(f.context, f.prepared, reason);
+  await f.start(); await f.db.audit.deleteMany(); await migrateData(f.context, f.prepared, reason);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ activeHash: "next", dataSchema: 2, status: reason === "activate" ? "paused" : "active" });
   expect(await readFile(join(f.live, "state"), "utf8")).toBe("migrated");
 });
 for (const offset of [-60_000, 0, 60_000]) test(`migration admission orders same-clock transactions after prior offset ${offset}`, async () => {
   const f = await fixture();
   await f.db.audit.create({ data: { workspaceId: f.workspaceId, subjectId: f.module.id, actorKey: "chrona", kind: "module_migration_started", details: { hash: "history" }, createdAt: new Date(f.now.getTime() + offset) } });
+  await f.db.moduleMigration.create({ data: { moduleId: f.module.id, hash: "history", fromSchema: 1, toSchema: 2, previousStatus: "active", createdAt: new Date(f.now.getTime() + offset) } });
   // Real database transactions serialize concurrent writers; each reads the preceding committed timestamp.
   await Promise.all([f.start("first"), f.start("next")]);
   const rows = await f.db.audit.findMany({ where: { subjectId: f.module.id, kind: "module_migration_started" }, orderBy: { createdAt: "asc" } });

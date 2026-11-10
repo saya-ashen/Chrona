@@ -54,7 +54,7 @@ test.each(["foreground", "background"] as const)("%s uses the setting at claim; 
 test("build keeps its explicit sixty minute budget when ordinary timeout is cleared", async () => {
   const runs = createRuns(ports, workspaceId);
   await db.session.update({ where: { id: sessionId }, data: { source: "build" } });
-  await db.audit.create({ data: { id: `build-targets:${sessionId}`, workspaceId, subjectId: sessionId, kind: "build_targets", actorKey: "user", details: { name: "sample", modules: ["sample"] } } });
+  await db.buildTargets.create({ data: { sessionId, name: "sample", modules: ["sample"] } });
   await runs.enqueue({ sessionId, lane: "build", trigger: "build", prompt: "Bounded work" });
   const run = (await runs.claimNext("build"))!;
   expect(run.deadlineAt!.getTime() - ports.now().getTime()).toBe(60 * 60_000);

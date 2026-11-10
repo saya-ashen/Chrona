@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { chrona, on, onDisconnect, ModelError } from "chrona";
-import { providerAnswerSchema, runtimeStartSchema, runtimeCompletionSchema, type RuntimeEvent, type ProviderRunInput } from "@chrona/contracts/steward";
+import { providerAnswerSchema, runtimeStartSchema, type RuntimeEvent, type ProviderRunInput } from "@chrona/contracts/steward";
 import { createPiProvider, PI_MODEL_ENVIRONMENT_KEYS, type PiProviderOptions } from "@chrona/pi";
 import { createBrowsers } from "./browser";
 import { createAgentOperations, AgentError } from "./operations";
@@ -38,27 +38,13 @@ function input(raw: unknown): ProviderRunInput {
     detail: { async append(value) { await event(callbacks, { kind: "detail", value }); } },
   } : {}) };
 }
-const operations = createAgentOperations(provider, chrona.paths.data, input);
+const operations = createAgentOperations(provider, chrona.paths.data, input, async (operationId, callbackId, outcome) => {
+  await event(callbackId, { kind: "settled", operationId, outcome });
+});
 const policy = createModelPolicy(chrona.paths.data, callId => chrona.call("runtime-callback.agent-admit", { callId, operation: "configure" }), async () => !!provider?.complete && !!(await provider.health()).available);
 const settingsPage = settingsRegistration((target, args) => chrona.call(target, args));
 on("activated", async () => { await settingsPage.activate(); return {}; });
 setInterval(() => void settingsPage.refresh(), 60_000).unref();
-const completions = new Map<string, { result: unknown; failure: boolean }>();
-function complete(args: Record<string, unknown>) {
-  if (!provider?.complete) throw new AgentError("unavailable", "Completion unconfigured");
-  if (completions.size >= 64) throw new AgentError("capacity", "Agent completions full");
-  const operationId = randomUUID(), row = { result: null as unknown, failure: false };
-  completions.set(operationId, row);
-  const timeout = setTimeout(() => completions.delete(operationId), 360000);
-  void provider.complete(args as unknown as Parameters<NonNullable<typeof provider.complete>>[0]).then(result => { row.result = runtimeCompletionSchema.parse(result); }).catch(error => { if ((error as { code?: string } | null)?.code !== "unknown") row.failure = true; }).finally(() => timeout.unref());
-  return { operationId };
-}
-function completion(operationId: string) {
-  const row = completions.get(operationId);
-  if (!row) throw new AgentError("not_found", "Completion not found");
-  if (row.result || row.failure) completions.delete(operationId);
-  return row;
-}
 const moduleOperations = createModuleAgentOperations(chrona.paths.data, (target, args) => chrona.call(target, args), async args => {
   if (!provider?.complete) throw new AgentError("unavailable", "Completion unconfigured");
   return provider.complete(args as unknown as Parameters<NonNullable<typeof provider.complete>>[0]);
@@ -68,19 +54,12 @@ async function health() {
   return { name: provider?.name ?? "unconfigured", supportsRunModel: provider?.supportsRunModel ?? false, complete: await policy.ready(), ...await (provider?.health() ?? { available: false, sandboxed: false, error: null }) };
 }
 async function kernelTool(name: string, raw: unknown) {
+  if (name === "complete" || name === "completion") throw new ModelError("forbidden", "Completion requires an admitted application caller");
   const args = agentInput(name, JSON.parse(String(raw)));
   if (name === "health") return health();
   if (name === "start") return operations.start(args);
   if (["status", "abort", "inject", "release"].includes(name)) return operations.control(name, args as { operationId: string });
   if (!provider) throw new AgentError("unavailable", "Agent backend unconfigured");
-  if (name === "complete") {
-    if (typeof args.declaredTier === "string") {
-      const target = await policy.select(args.declaredTier, args.effectiveHardLimits as Parameters<typeof policy.select>[1], Number(args.maxOutputTokens));
-      return complete({ prompt: args.prompt, system: args.system, ...target });
-    }
-    return complete(args);
-  }
-  if (name === "completion") return completion(String(args.operationId));
   if (name === "transcript") return await provider.transcript?.(args as { sessionDir: string; limit: number }) ?? [];
   throw new AgentError("not_found", "Agent tool not found");
 }

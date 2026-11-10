@@ -11,7 +11,7 @@ import { json, moduleContext, type ModuleContext } from "./module-context";
 import { checkoutModule } from "./module-files";
 import { moduleMaterialDigest, snapshotModuleMaterial } from "./module-artifacts";
 import { commitModuleSource, readModuleMaterial, type ModuleGitRevision } from "./module-git";
-import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRecordSchema, candidateRequestId, readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb, type CandidateSet } from "./module-candidate-records";
+import { assertCandidateAdmissionIn, assertCandidateOwner, assertCandidateSubmitter, candidateDigest, candidateRequestId, readCandidateAdmissionIn, readCandidateSetIn, type CandidateAdmissionRecord, type CandidateDb, type CandidateSet } from "./module-candidate-records";
 export { findCandidateSet } from "./module-candidate-records";
 
 async function confinedMaterial<T>(operation: () => Promise<T>): Promise<T> {
@@ -37,7 +37,7 @@ export async function admitCandidates(ports: StewardPorts, workspaceId: string, 
   const admissionId = candidateRequestId("admission", workspaceId, caller, input.requestKey);
   return ports.db.$transaction(async tx => {
     await assertCandidateOwner(tx, workspaceId, caller);
-    const previous = await tx.audit.findFirst({ where: { id: admissionId, workspaceId, kind: "candidate_admission" } });
+    const previous = await tx.candidateAdmission.findFirst({ where: { id: admissionId, workspaceId } });
     if (previous) {
       const stored = await readCandidateAdmissionIn(context, tx, admissionId);
       if (candidateDigest(stored.input) !== candidateDigest(input)) throw new StewardError("conflict", "Admission request key was already used with different arguments");
@@ -46,7 +46,7 @@ export async function admitCandidates(ports: StewardPorts, workspaceId: string, 
     }
     const admission: CandidateAdmissionRecord = { input, issuer: caller, receiptId: null };
     await assertCandidateAdmissionIn(context, tx, admission);
-    await tx.audit.create({ data: { id: admissionId, workspaceId, kind: "candidate_admission", actorKey: "owner", subjectId: input.submitter.moduleId, details: json(admission), createdAt: ports.now() } });
+    await tx.candidateAdmission.create({ data: { id: admissionId, workspaceId, requestKey: input.requestKey, submitterModuleId: input.submitter.moduleId, submitterHash: input.submitter.hash, targets: json(input.targets), issuer: json(caller), createdAt: ports.now() } });
     return { admissionId, ...input };
   });
 }
@@ -73,20 +73,18 @@ async function receiptView(context: ModuleContext, db: CandidateDb, set: Candida
   }
   // The stable receipt carries a persistent final result; selected remains a current projection.
   if (state !== set.state) {
-    const row = await db.audit.findUniqueOrThrow({ where: { id: set.receiptId } });
-    const record = candidateRecordSchema.parse(row.details);
-    await db.audit.update({ where: { id: set.receiptId }, data: { details: json({ ...record, set: { ...record.set, state } }) } });
+    await db.candidateReceipt.update({ where: { id: set.receiptId }, data: { state } });
   }
   return { ...set, state, members };
 }
 async function replay(context: ModuleContext, db: CandidateDb, caller: Caller, input: CandidateSubmitInput) {
   const receiptId = candidateRequestId("submission", context.workspaceId, caller, input.requestKey);
-  const row = await db.audit.findFirst({ where: { id: receiptId, workspaceId: context.workspaceId, kind: "candidate_receipt" } });
+  const row = await db.candidateReceipt.findFirst({ where: { id: receiptId, admission: { workspaceId: context.workspaceId } } });
   if (!row) return null;
-  const record = candidateRecordSchema.parse(row.details);
-  if (record.requestDigest !== candidateDigest(input)) throw new StewardError("conflict", "Submission request key was already used with different arguments");
+  if (row.requestDigest !== candidateDigest(input)) throw new StewardError("conflict", "Submission request key was already used with different arguments");
   await authorizedAdmission(context, db, caller, input.admissionId);
-  return receiptView(context, db, record.set);
+  const set = (await readCandidateSetIn(context, db, receiptId))!;
+  return receiptView(context, db, set);
 }
 function exactItems(admission: CandidateAdmissionRecord, input: CandidateSubmitInput) {
   if (admission.input.targets.length !== input.items.length || !admission.input.targets.every(target => input.items.some(item => item.name === target.name))) throw new StewardError("conflict", "Submit exactly the complete admitted target set");
@@ -155,10 +153,8 @@ export async function submitCandidates(ports: StewardPorts, workspaceId: string,
       if (item.target.moduleId === null) await tx.module.create({ data: { id: item.moduleId, workspaceId, name: item.item.name } });
       await tx.moduleVersion.create({ data: { id: item.versionId, moduleId: item.moduleId, hash: revision.commit, manifest: json(item.manifest), intent: json(item.item.intent), report: json({ tests: [], git: revision }), status: "building", source: "candidate", createdAt: ports.now() } });
       set.members.push({ name: item.item.name, moduleId: item.moduleId, hash: revision.commit, versionId: item.versionId, materialDigest: item.materialDigest, expectedActiveHash: item.target.expectedActiveHash });
-      await tx.audit.create({ data: { id: `candidate-member:${item.versionId}`, workspaceId, actorKey: "chrona", kind: "candidate_member", subjectId: item.versionId, details: { receiptId, moduleId: item.moduleId, hash: revision.commit }, createdAt: ports.now() } });
     }
-    await tx.audit.create({ data: { id: receiptId, workspaceId, actorKey: `module:${admission.input.submitter.moduleId}`, kind: "candidate_receipt", subjectId: input.admissionId, details: json({ set, requestDigest: candidateDigest(input) }), createdAt: ports.now() } });
-    await tx.audit.update({ where: { id: input.admissionId }, data: { details: json({ ...admission, receiptId }) } });
+    await tx.candidateReceipt.create({ data: { id: receiptId, admissionId: input.admissionId, requestKey: input.requestKey, requestDigest: candidateDigest(input), state: set.state, approvalId: null, createdAt: ports.now(), members: json(set.members), memberBindings: { create: set.members.map(member => ({ versionId: member.versionId })) } } });
     return receiptView(context, tx, set);
   });
 }

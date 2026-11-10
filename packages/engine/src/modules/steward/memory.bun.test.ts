@@ -114,7 +114,7 @@ test.each(["web", "mcp", "qq"] as const)("%s retains its own journal/context and
     if (target === "agent.context") return { contextId: "private-context" };
     if (target === "agent.run") { prompts.push(String(args.prompt)); if (failRun) { failRun = false; throw new Error("lost run receipt"); } return { runId: "run-1", status: "running", active: true }; }
     if (target === "agent.get") return { status: "finished", active };
-    if (target === "agent.stream") return { transcript: [{ at, kind: "text", text: "done" }], interactions: [] };
+    if (target === "agent.stream") return { items: [], after: 0, transcript: [{ at, kind: "text", text: "done" }], interactions: [] };
     return f.call(target, args);
   };
   const options = { source, dataDir, call, tools: ["memory-local.recall"], reply: (reply: Args) => { replies.push(reply); }, now: () => new Date(Date.parse(at) + clock++ * 1000) };

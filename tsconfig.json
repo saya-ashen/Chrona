@@ -97,7 +97,6 @@
     "result",
     "dist",
     "artifacts",
-    "packages/pi/resources",
-    "packages/engine/src/modules/steward/external/remind"
+    "packages/pi/resources"
   ]
 }

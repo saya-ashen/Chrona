@@ -40,10 +40,10 @@ async function fixture() {
     const entry = await db.module.create({ data: { workspaceId, name: "author-file-client", activeHash: "v1", status: "active" } });
     await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "v1", manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: targets }), source: "user", status: "approved", intent: {}, report: {} } });
     const session = await db.session.create({ data: { workspaceId, source: "module", moduleId: entry.id, key: "author-offline" } });
-    await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
+    await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "v1" } });
     const token = "author-offline-run", expires = new Date(Date.now() + 120_000);
     const run = await db.run.create({ data: { workspaceId, sessionId: session.id, lane: "foreground", trigger: "message", status: "running", provider: "offline-fixture", tokenHash: createHash("sha256").update(token).digest("hex"), cwd: root, prompt: "No model execution", deadlineAt: expires, leaseUntil: expires } });
-    await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets } } });
+    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets, content: [] } });
     const app = await createServerApp({ steward: runtime });
     const request = async (tool: string, args: unknown, capability = token) => {
       const started = performance.now();

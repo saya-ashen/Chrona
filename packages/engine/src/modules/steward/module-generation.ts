@@ -63,7 +63,7 @@ function assertBuiltinSeedVersion(version: ModuleVersion | null, release: Module
 async function assertAgentReleaseUpgrade(tx: Prisma.TransactionClient, module: { id: string; workspaceId: string; activeHash: string | null; dataSchema: number | null; status: string }, release: ModuleRelease, releaseUpgrade: boolean) {
   if (!releaseUpgrade || release.name !== "agent") throw new StewardError("conflict", "Trusted release activation is only allowed for the initial seed");
   if (module.dataSchema !== release.manifest.data.schema || module.status === "migrating") throw new StewardError("conflict", "Agent release requires compatible data");
-  if (await tx.run.count({ where: { workspaceId: module.workspaceId, OR: [{ status: "running" }, { error: "Execution stop is unconfirmed" }] } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
+  if (await tx.run.count({ where: { workspaceId: module.workspaceId, OR: [{ status: "running" }, { stopStatus: "unknown" }] } }) || await tx.executionAttempt.count({ where: { workspaceId: module.workspaceId, stopConfirmedAt: null, run: { status: { not: "queued" } } } })) throw new StewardError("conflict", "Agent release waits for running or unconfirmed executions to stop");
   const old = await tx.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash! } } });
   if (old?.source !== "builtin" || old.status !== "approved") throw new StewardError("conflict", "Agent release requires a trusted prior version");
 }
@@ -102,21 +102,15 @@ async function automaticRollbackVersionError(input: AutomaticRollbackInput) {
   return automaticRollbackDataError(candidate, previous, moduleSchema, current) ?? automaticRollbackScheduleError(candidate, previous);
 }
 async function automaticRollbackMigrationError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string) {
-  const migration = await tx.audit.findFirst({ where: { workspaceId, subjectId: moduleId, kind: "module_migration_started" }, orderBy: { createdAt: "desc" }, select: { details: true } });
-  return migration?.details && typeof migration.details === "object" && !Array.isArray(migration.details) && migration.details.hash === hash
-    ? "This activation used migration or restore." : null;
+  const migration = await tx.moduleMigration.findFirst({ where: { moduleId, module: { workspaceId } }, select: { hash: true } });
+  return migration?.hash === hash ? "This activation used migration or restore." : null;
 }
 function automaticRollbackScheduleError(candidate: ReturnType<typeof moduleManifestSchema.parse>, previous: ReturnType<typeof moduleManifestSchema.parse>) {
   return candidate.uses.includes("schedules.create") || previous.uses.includes("schedules.create")
     ? "Removed calendar scheduler dependency; automatic rollback requires manual review." : null;
 }
 async function automaticRollbackGroupError(tx: Prisma.TransactionClient, workspaceId: string, moduleId: string, hash: string, generationId: string) {
-  if (await tx.audit.findFirst({ where: { workspaceId, subjectId: generationId, kind: "module_group_activation" } })) return "This version was activated as a group; partial automatic rollback is disabled.";
-  const activationAudit = await tx.audit.findMany({ where: { workspaceId, subjectId: moduleId, kind: "module_activate" }, orderBy: { createdAt: "desc" }, take: 20, select: { details: true } });
-  const groupApproval = activationAudit.map(row => row.details).find(details => details && typeof details === "object" && !Array.isArray(details) && details.hash === hash && details.generationId === generationId && typeof details.approvalId === "string") as { approvalId: string } | undefined;
-  if (!groupApproval) return null;
-  const approval = await tx.approval.findUnique({ where: { id: groupApproval.approvalId }, select: { payload: true } });
-  return approval?.payload && typeof approval.payload === "object" && !Array.isArray(approval.payload) && approval.payload.kind === "activate_modules"
+  return await tx.moduleActivation.findFirst({ where: { moduleId, candidateHash: hash, generationId, grouped: true, module: { workspaceId } }, select: { activationId: true } })
     ? "This version was activated as a group; partial automatic rollback is disabled." : null;
 }
 async function automaticRollbackEligibility(input: AutomaticRollbackInput) {
@@ -190,7 +184,9 @@ export async function startMigration(context: ModuleContext, tx: Prisma.Transact
   const module = await assertExternalModule(tx, context.workspaceId, moduleId, "activate");
   await assertExecutionModuleIdle(tx, moduleId);
   await tx.module.update({ where: { id: moduleId }, data: { status: "migrating" } });
-  const previous = await tx.audit.findFirst({ where: { workspaceId: context.workspaceId, kind: "module_migration_started", subjectId: moduleId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  const previous = await tx.moduleMigration.findUnique({ where: { moduleId } });
   const createdAt = new Date(Math.max(context.ports.now().getTime(), previous ? previous.createdAt.getTime() + 1 : 0));
+  const admission = { hash, fromSchema: from, toSchema: to, previousStatus: module.status, createdAt };
+  await tx.moduleMigration.upsert({ where: { moduleId }, create: { moduleId, ...admission }, update: admission });
   await tx.audit.create({ data: { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_migration_started", subjectId: moduleId, details: { hash, from, to, previousStatus: module.status }, createdAt } });
 }

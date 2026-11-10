@@ -36,7 +36,7 @@ test.each([...PAUSED_MODULE_NAMES])("retained %s sources cannot become an instal
   for (const attempt of [request, request, { ...request, mode: "update" as const, requestKey: "paused-update" }]) {
     await expect(installExternal(ports, workspace.id, attempt)).rejects.toMatchObject(unavailable);
   }
-  expect(await db.audit.count({ where: { kind: "module_installation" } })).toBe(0);
+  expect(await db.moduleInstallation.count()).toBe(0);
   expect((await externalPackageCatalog(ports, workspace.id)).find(item => item.name === name)).toMatchObject({ available: false, releaseHash: null, installation: null, error: expect.stringContaining("unavailable: paused") });
   await expect(resolveExternalRelease(ports, name)).rejects.toMatchObject(unavailable);
   expect(submissions).toBe(0);
@@ -48,11 +48,11 @@ test.each([...PAUSED_MODULE_NAMES])("retained %s sources cannot become an instal
   const existing = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "a".repeat(40) } });
   const result = { package: name, requestKey: request.requestKey, status: "installed", moduleId: existing.id, hash: existing.activeHash, approvalId: null, error: null };
   const id = installationId(workspace.id, request.requestKey);
-  await db.audit.create({ data: { id, workspaceId: workspace.id, actorKey: "kernel", kind: "module_installation", subjectId: existing.id, details: { request, result } } });
+  await db.moduleInstallation.create({ data: { id, workspaceId: workspace.id, ...request, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId } });
   const replay = await installExternal(ports, workspace.id, request);
   expect(replay).toMatchObject({ ...result, status: "unavailable", error: unavailable });
   expect(await installExternal(ports, workspace.id, request)).toEqual(replay);
-  expect(await db.audit.findUniqueOrThrow({ where: { id } })).toMatchObject({ details: { request, result: replay } });
+  expect(await db.moduleInstallation.findUniqueOrThrow({ where: { id } })).toMatchObject({ status: "unavailable", errorReason: replay.error?.reason });
   await expect(installExternal(ports, workspace.id, { ...request, mode: "update" })).rejects.toMatchObject({ code: "conflict" });
   await expect(installExternal(ports, workspace.id, { ...request, mode: "update", requestKey: "existing-paused-update" })).rejects.toMatchObject(unavailable);
   expect(await db.module.findUniqueOrThrow({ where: { id: existing.id } })).toEqual(existing);

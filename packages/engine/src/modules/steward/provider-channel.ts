@@ -8,7 +8,7 @@ import { liveRuns } from "./runs";
 import { cancelProviderRun } from "./provider-cancel";
 import { notifyUser, withdrawNotice } from "./notify-user";
 import { drainCalls } from "./module-calls";
-import { providerAnswerKey, providerCancelKey, providerJournal, providerReceipt, providerRuns, providerWrite, type ProviderWriteGuard } from "./provider-journal";
+import { providerJournal, providerReceipt, providerRuns, providerWrite, type ProviderWriteGuard } from "./provider-journal";
 
 type Pending = { runId: string; workspaceId: string; db: StewardPorts["db"]; request: ProviderInteraction; claimed: boolean; closed: boolean; settle(value: ProviderAnswer, status: ProviderInteraction["status"]): Promise<void> };
 const pending = new Map<string, Pending>();
@@ -24,7 +24,7 @@ type RunIdentity = { id: string; workspaceId: string; sessionId: string | null; 
 
 /** Technical event journal only: no raw RPC, answer body, new permission grant or replayable authorization. */
 export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onInteraction?: (request: ProviderInteraction) => Promise<void>, guard?: ProviderWriteGuard) {
-  const { db, now } = ports, write = providerJournal(db, run.workspaceId, run.id, now, guard);
+  const { db, now } = ports, write = providerJournal(db, run.id, now, guard);
   const withdraw = () => guard
     ? providerWrite(db, guard, tx => withdrawNotice(tx, ports, run.workspaceId, `provider-input:${run.id}`))
     : withdrawNotice(db, ports, run.workspaceId, `provider-input:${run.id}`);
@@ -69,7 +69,7 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
       await providerWrite(db, guard, async tx => {
         const { method, title, message, options, timeoutMs } = safe;
         const stored = { ...request, question: { method, title, message, options, timeoutMs } };
-        await tx.audit.create({ data: { id: `provider-request:${request.id}`, workspaceId: run.workspaceId, actorKey: "chrona", subjectId: run.id, kind: "provider_question", details: stored } });
+        await tx.runInteraction.create({ data: { id: request.id, runId: run.id, request: stored, createdAt: at } });
         if (!signal.aborted && !closed && !entry.closed) await notifyUser(tx, ports, run.workspaceId, { kind: "provider-input-required", run: run.id, ...(run.sessionId ? { session: run.sessionId } : {}), key: `provider-input:${run.id}` });
       });
       if (!entry.closed) await observe(request);
@@ -106,13 +106,13 @@ export function createProviderChannel(ports: StewardPorts, run: RunIdentity, onI
 
 /** Validate the real live question using F's transaction, before consuming its command key. */
 export async function validateExecutionAnswer(ports: StewardPorts, tx: Prisma.TransactionClient, input: { workspaceId: string; runId: string; requestId: string; answer: ProviderAnswer }): Promise<void> {
-  const row = await tx.audit.findFirst({ where: { id: `provider-request:${input.requestId}`, workspaceId: input.workspaceId, subjectId: input.runId, kind: "provider_question" } });
+  const row = await tx.runInteraction.findFirst({ where: { id: input.requestId, runId: input.runId, run: { workspaceId: input.workspaceId } } });
   if (!row) throw new StewardError("not_found", "Provider interaction not found");
-  const request = parseInput(providerInteractionSchema, row.details), entry = pending.get(input.requestId);
+  const request = parseInput(providerInteractionSchema, row.request), entry = pending.get(input.requestId);
   assertPending(entry, input.workspaceId, ports.db, ports.now());
   if (entry.runId !== input.runId || request.runId !== input.runId) throw new StewardError("conflict", "Provider interaction belongs to another run");
   if (!validProviderAnswer(entry.request.question, input.answer)) throw new StewardError("invalid", "Answer does not match question");
-  if (await tx.audit.findUnique({ where: { id: providerAnswerKey(input.requestId) } })) throw new StewardError("conflict", "Provider interaction already resolved");
+  if (row.status !== "pending") throw new StewardError("conflict", "Provider interaction already resolved");
 }
 
 export function createProviderControl(ports: StewardPorts, workspaceId: string) {
@@ -130,16 +130,16 @@ export function createProviderControl(ports: StewardPorts, workspaceId: string) 
       return entry && entry.db === db && entry.workspaceId === workspaceId ? entry.request.question : null;
     }),
     async answer(id: string, raw: unknown) {
-      const row = await db.audit.findFirst({ where: { id: `provider-request:${id}`, workspaceId, kind: "provider_question" } });
+      const row = await db.runInteraction.findFirst({ where: { id, run: { workspaceId } } });
       if (!row) throw new StewardError("not_found", "Provider interaction not found");
-      const request = parseInput(providerInteractionSchema, row.details), entry = pending.get(id);
+      const request = parseInput(providerInteractionSchema, row.request), entry = pending.get(id);
       const answer = parseInput(providerAnswerSchema, raw);
       if (!validProviderAnswer(request.question, answer)) throw new StewardError("invalid", "Answer does not match question");
       assertPending(entry, workspaceId, db, now());
       entry.claimed = true;
       try {
-        await activeRun(request.runId);
-        if (await db.audit.findUnique({ where: { id: providerCancelKey(request.runId) } }) || await db.audit.findUnique({ where: { id: providerAnswerKey(id) } }) || alreadyClosed(entry)) throw new StewardError("conflict", "Provider interaction already resolved");
+        const run = await activeRun(request.runId);
+        if (run.cancelRequestedAt || row.status !== "pending" || alreadyClosed(entry)) throw new StewardError("conflict", "Provider interaction already resolved");
         await entry.settle(answer, answer.decision === "cancel" ? "cancelled" : "answered");
         return { ok: true as const };
       } catch (error) { entry.claimed = false; throw error; }

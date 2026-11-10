@@ -12,10 +12,10 @@
 
 ## 调用
 
-- `start` 立即返回 operationId；`status` 返回未结束、已结束或无法确认。内核等待期间短查询状态，不在 SDK handler 中等待整个任务。
+- `start` 立即返回 operationId；`status` 返回未结束、已结束或无法确认。本次迁移中，实际 Provider Run 优先通过绑定操作的结果事件唤醒，丢失通知时每五秒核对原持久回执；无调用方的旧内核 completion 网关已删除，应用补全走唯一的私有操作与预算结算链路。SDK handler 不等待整个任务。迁移进度与未完成门禁见[内核与 Agent 重构](kernel-agent-migration.md)。
 - `inject` 补充输入；`abort` 确认收到请求，不能据此确认任务已停止。
 - `release` 只接受已有完成回执的操作；磁盘回执保留，防止同一 Run 再次启动。
-- `complete` 启动独立补全操作，`completion` 短查询结果，避免付费模型等待阻塞其他执行的取消。
+- `complete/completion` 是 modules 可见的结构化应用工具，不再接受内核 encoded input。补全使用既有应用私有持久操作和 `agent-admit/agent-settle`，绑定真实 caller/version/commandKey，重启不重放未知模型执行；没有实际终态证据时预算预留继续占用。
 - `transcript` 与 `health` 提供现有只读能力；诊断 `health` 事件通过现有 `modules.report-health` 报告就绪。
 - 工具参数使用 JSON 字符串包裹，应用使用原有 zod 输入校验，保留 nullable、嵌套参数和限制；输出复用运行时 schema 的结构化 manifest 契约。
 

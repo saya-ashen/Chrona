@@ -7,7 +7,7 @@ import { MindService } from "./service";
 import { MindRuntime, REASONING_TOOLS } from "./runtime";
 import { DAY, selectWork } from "./policy";
 import { freshState, stateSchema } from "./schema";
-import { addReportCandidate, selectTranscriptReport } from "./report-candidates";
+import { addReportCandidate, selectRunReport } from "./report-candidates";
 import { archiveSignals, archivedSignal, MAX_STATE_BYTES } from "./retention";
 import type { Call, Caller, Decision, ReportResult, Signal } from "./types";
 
@@ -33,12 +33,12 @@ function result(row: Decision): ReportResult {
 }
 function receipt(row: Decision, reportId: string) { return { accepted: true, reportId, decisionId: row.id, pendingVerification: true }; }
 function transcript(value: unknown, patch: Record<string, unknown> = {}) {
-  return { kind: "result", tool: "m_mind_report", error: false, text: JSON.stringify({ result: value }), ...patch };
+  return { sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId: "run-1", callId: "call-1", target: "mind.report", moduleId: "mind-test", hash: "mind-test-hash", contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: value, ...patch } } };
 }
 
 // The external Agent is the only fake: all receipts, report staging and settlement use the real private store.
 function agent(f: Awaited<ReturnType<typeof fixture>>) {
-  let active = true, output: unknown[] = [];
+  let active = true, output: ReturnType<typeof transcript>[] = [];
   const calls: { target: string; args: Record<string, unknown> }[] = [];
   const call: Call = async (target, args) => {
     calls.push({ target, args });
@@ -49,7 +49,7 @@ function agent(f: Awaited<ReturnType<typeof fixture>>) {
     if (target === "agent.run" || target === "agent.get") return identity;
     if (target === "agent.stream") {
       expect(args["run-id"]).toBe(row.runId);
-      return { transcript: output, interactions: [] };
+      return { items: output.map(item => ({ ...item, payload: { ...item.payload, value: { ...item.payload.value, runId: row.runId } } })), after: output.length, interactions: [] };
     }
     throw new Error(`Unexpected effect ${target}`);
   };
@@ -125,7 +125,7 @@ test.each(["run", "context"] as const)("a mismatched Agent %s identity cannot au
   await new MindRuntime(f.store, async target => {
     effects.push(target);
     if (target === "agent.get") return { runId: mismatch === "run" ? "wrong-run" : row.runId, contextId: mismatch === "context" ? "wrong-context" : row.contextId, active: false, status: "finished" };
-    if (target === "agent.stream") return { transcript: [transcript(receipt(row, reportId))], interactions: [] };
+    if (target === "agent.stream") return { items: [transcript(receipt(row, reportId))], interactions: [] };
     throw new Error(`Unexpected Agent call ${target}`);
   }).tick(NOW);
   const state = await new MindStore(f.root).read();
@@ -154,20 +154,20 @@ test("bounded candidates require the exact successful receipt and preserve selec
   addReportCandidate(row, { reportId: actual, result: { ...report, summary: "Actual current run" }, verified: false });
   expect(row.reportCandidates).toHaveLength(2);
   for (const wrong of [
-    transcript(receipt(row, actual), { error: true }),
-    transcript(receipt(row, actual), { tool: "m_other_report" }),
+    transcript(receipt(row, actual), { status: "failed" }),
+    transcript(receipt(row, actual), { target: "other.report" }),
     transcript({ ...receipt(row, actual), decisionId: "other-decision" }),
     transcript({ ...receipt(row, actual), reportId: digest("unknown") }),
     transcript({ ...receipt(row, actual), accepted: false }),
     transcript({ ...receipt(row, actual), pendingVerification: false }),
-    transcript(receipt(row, actual), { kind: "text" }),
-    transcript(receipt(row, actual), { text: "not JSON" }),
-  ]) selectTranscriptReport(row, [wrong]);
+    transcript(receipt(row, actual), { outputState: "filtered" }),
+    transcript(receipt(row, actual), { runId: "other-run" }),
+  ]) selectRunReport(row, [wrong]);
   expect(row.report?.verified).toBe(false);
-  selectTranscriptReport(row, [transcript(receipt(row, actual))]);
+  selectRunReport(row, [transcript(receipt(row, actual))]);
   expect(row.report).toMatchObject({ reportId: actual, verified: true, result: { summary: "Actual current run" } });
   expect(() => addReportCandidate(row, { reportId: digest("late"), result: report, verified: false })).toThrow("verified report");
-  selectTranscriptReport(row, [transcript(receipt(row, digest("seeded")))]);
+  selectRunReport(row, [transcript(receipt(row, digest("seeded")))]);
   expect(row.report?.reportId).toBe(actual);
 });
 
@@ -236,4 +236,27 @@ test("decision identity capacity fails closed without forgetting old run keys or
   expect(effects).toEqual([]);
   expect(state.decisions.map(d => d.runKey)).toEqual(keys);
   expect(state.runtime.currentDecisionId).toBeNull();
+});
+
+test("Mind resumes its persisted result cursor after a later page fails; transcript cannot authenticate", async () => {
+  const f = await fixture(), row = decision(), reportId = digest("paged-report");
+  addReportCandidate(row, { reportId, result: result(row), verified: false });
+  await f.store.update(state => { state.decisions.push(row); state.runtime.currentDecisionId = row.id; });
+  let unavailable = true;
+  const cursors: unknown[] = [];
+  const call: Call = async (target, args) => {
+    if (target === "agent.get") return { runId: row.runId, contextId: row.contextId, active: false, status: "finished" };
+    if (target !== "agent.stream") throw new Error(`Unexpected effect ${target}`);
+    cursors.push(args.after);
+    if (args.after === 0) return { items: Array.from({ length: 100 }, (_, index) => ({ sequence: index + 1, kind: "progress", payload: {} })), after: 100, interactions: [], transcript: [transcript(receipt(row, reportId))] };
+    if (unavailable) throw new Error("lost second page");
+    return { items: [{ ...transcript(receipt(row, reportId)), sequence: 101 }], after: 101, interactions: [] };
+  };
+  await new MindRuntime(f.store, call).tick(NOW);
+  const pending = (await f.store.read()).decisions[0]!;
+  expect(pending.after).toBe(100); expect(pending.report?.verified).not.toBe(true);
+  unavailable = false;
+  await new MindRuntime(new MindStore(f.root), call).tick(NOW);
+  expect(cursors).toEqual([0, 100, 100]);
+  expect((await f.store.read()).decisions[0]).toMatchObject({ phase: "completed", after: 101, report: { verified: true, reportId } });
 });

@@ -118,7 +118,7 @@ export function createExecutionDelivery(ports: StewardPorts) {
         await tx.executionDelivery.update({ where: { id: row.id }, data: { finalDigest: digest, final: json(final), finalCommittedAt: now } });
         await tx.executionAttempt.update({ where: { id: row.attempt.id }, data: { capabilityRevokedAt: row.attempt.capabilityRevokedAt ?? now } });
         // The final is durable even when process stop is still unknown. Directory and capacity remain held.
-        await tx.run.update({ where: { id: row.attempt.runId }, data: { status: "failed", error: "Execution stop is unconfirmed", endedAt: now, leaseUntil: null } });
+        await tx.run.update({ where: { id: row.attempt.runId }, data: { status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed", endedAt: now, leaseUntil: null } });
         await finishExecution(ports, tx, row.attempt.runId, undefined, now);
         const a = await tx.executionAttempt.findUniqueOrThrow({ where: { id: row.attempt.id }, include: { run: true } });
         await executionEventStore(ports).saveSnapshot(tx, executionPrincipal(a), { ...await executionSnapshot(tx, a, now), finalMessage: final.finalMessage, missing: final.missing });

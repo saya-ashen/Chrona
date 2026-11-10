@@ -2,18 +2,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { MindStore, capacity } from "./store";
 import { advanceEscalation, currentSignal, DAY, matches, openConcern, runtimeView, selectWork, type Selection } from "./policy";
-import { selectTranscriptReport } from "./report-candidates";
+import { selectRunReport } from "./report-candidates";
 import { compactTerminalPrompts, SETTLEMENT_RESERVE_BYTES } from "./retention";
 import type { Call, Decision, State } from "./types";
 
 const contextResponse = z.object({ contextId: z.string().min(1).max(128) });
 const runResponse = z.object({ runId: z.string().min(1).max(128), contextId: z.string(), status: z.string(), active: z.boolean() });
 const streamResponse = z.object({
-  transcript: z.array(z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("text"), text: z.string() }),
-    z.object({ kind: z.literal("tool"), tool: z.string(), args: z.string() }),
-    z.object({ kind: z.literal("result"), tool: z.string(), text: z.string(), error: z.boolean() }),
-  ])).max(300),
+  items: z.array(z.object({ sequence: z.number().int().nonnegative(), payload: z.unknown(), kind: z.string() })).max(100), after: z.number().int().nonnegative(),
   interactions: z.array(z.object({ id: z.string(), status: z.string(), expiresAt: z.string(), question: z.object({ title: z.string().optional(), message: z.string() }) })).max(100),
 });
 export const REASONING_TOOLS: Decision["tools"] = ["mind.agenda", "mind.propose", "mind.report"];
@@ -131,11 +127,18 @@ export class MindRuntime {
       }
       const run = runResponse.parse(await this.call("agent.get", { "run-id": decision.runId }));
       if (run.runId !== decision.runId || run.contextId !== decision.contextId) throw new Error("Agent returned a different reasoning run");
-      const page = streamResponse.parse(await this.call("agent.stream", { "run-id": decision.runId, after: 0, limit: 100 }));
+      let page: z.infer<typeof streamResponse>, after = decision.after ?? 0;
+      do {
+        page = streamResponse.parse(await this.call("agent.stream", { "run-id": decision.runId, after, limit: 100 }));
+        if (page.items.length && page.after <= after) throw new Error("Agent stream did not advance");
+        decision = await this.change(decision.id, row => {
+          selectRunReport(row, page.items); row.after = page.after;
+        }, true);
+        after = page.after;
+      } while (page.items.length === 100);
       await this.store.update(state => {
         const row = state.decisions.find(d => d.id === decision.id)!;
         if (state.runtime.currentDecisionId !== row.id || row.finishedAt) return;
-        selectTranscriptReport(row, page.transcript);
         row.interactions = page.interactions.filter(i => i.status === "pending").slice(0, 12).map(i => ({ id: i.id.slice(0, 128), title: (i.question.title || "User action required").slice(0, 200), message: i.question.message.slice(0, 2000), expiresAt: i.expiresAt }));
         row.error = null;
         if (run.status === "unknown") row.phase = "unknown";

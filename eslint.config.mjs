@@ -182,9 +182,6 @@ const eslintConfig = defineConfig([
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",
-    // Remind retains removed kernel contracts until its separate restoration.
-    // Match tsconfig.json: retained source is not an active build input.
-    "packages/engine/src/modules/steward/external/remind/**",
     // Generated browser bundle; lint its src/pages.tsx source instead.
     "packages/engine/src/modules/steward/external/web/pages.js",
     // Generated Agent bundles; lint their TypeScript sources instead.

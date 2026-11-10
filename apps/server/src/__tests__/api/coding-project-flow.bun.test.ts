@@ -55,10 +55,10 @@ test.each(["remind"] as const)("%s retains source but cannot be released, execut
     await db.moduleVersion.create({ data: { moduleId: entry.id, hash: "a".repeat(64), status: "approved", source: "user", intent: {}, report: {},
       manifest: moduleManifestSchema.parse({ name: entry.name, entry: "index.ts", tests: ["test.ts"], effects: [], keepAlive: true, uses: ["*"] }) } });
     const session = await db.session.create({ data: { workspaceId, source: "module", key: "pause-test", moduleId: entry.id } });
-    await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "a".repeat(64) } } });
+    await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "a".repeat(64) } });
     await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "No model" });
     const run = (await api.runs.claimNext("foreground"))!;
-    await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets: ["modules.tools", "modules.admit-candidates"] } } });
+    await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: ["modules.tools", "modules.admit-candidates"], content: [] } });
     const post = (tool: string, body: unknown) => app.request(`/tools/${tool}`, { method: "POST", headers: { authorization: `Bearer ${run.token}`, "content-type": "application/json" }, body: JSON.stringify(body) }, peer);
     const search = await post("m_modules_tools", { query: name });
     expect(search.status).toBe(200);
@@ -66,7 +66,7 @@ test.each(["remind"] as const)("%s retains source but cannot be released, execut
     const admission = await post("m_modules_admit_candidates", { requestKey: "paused-admission", submitter: { moduleId: entry.id, hash: "a".repeat(64) }, targets: [{ name, moduleId: paused.id, expectedActiveHash: "b".repeat(64) }] });
     expect(admission.status).toBe(503);
     expect(await admission.json()).toMatchObject({ ok: false, error: { code: "unavailable", message: expect.stringContaining("source is retained") } });
-    expect(await db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);
+    expect(await db.candidateAdmission.count()).toBe(0);
     expect(await db.approval.count()).toBe(0);
     expect(await db.run.count({ where: { lane: "build" } })).toBe(0);
     expect(await db.moduleVersion.count()).toBe(2);

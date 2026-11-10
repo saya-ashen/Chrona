@@ -133,7 +133,7 @@ localTest("ordinary desktop candidate activation, update and disable stop actual
     const submit = async (admissionId: string, requestKey: string, dir: string) => {
       const receipt = candidateReceiptSchema.parse(await call("author.submit", input({ admissionId, requestKey, items: [{ name: "desktop-lifecycle", dir, intent }] })));
       expect(receipt).toMatchObject({ submitter, state: "submitted", approvalId: null, members: [{ status: "building", selected: false }] });
-      expect((await db!.audit.findUniqueOrThrow({ where: { id: receipt.receiptId } })).actorKey).toBe(`module:${author.id}`);
+      expect((await db!.candidateReceipt.findUniqueOrThrow({ where: { id: receipt.receiptId }, include: { admission: true } })).admission.submitterModuleId).toBe(author.id);
       await createModules(ports, workspaceId).buildPending(ports.now());
       const member = receipt.members[0]!;
       const checked = await db!.moduleVersion.findUniqueOrThrow({ where: { id: member.versionId } });

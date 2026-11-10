@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { capacity, conflict } from "./store";
 import { receiptResultSchema } from "./schema";
 import type { Decision, ReportResult } from "./types";
@@ -19,23 +20,20 @@ export function addReportCandidate(decision: Decision, candidate: Candidate): vo
   candidates.push({ ...candidate, verified: false });
 }
 
-function transcriptReceipt(text: string | undefined) {
-  let raw: unknown;
-  try { raw = JSON.parse(text ?? ""); } catch { return null; }
-  if (raw !== null && typeof raw === "object" && "result" in raw) raw = raw.result;
-  const parsed = receiptResultSchema.safeParse(raw);
-  return parsed.success && "reportId" in parsed.data ? parsed.data : null;
-}
+const resultEvent = z.object({ kind: z.literal("tool-result"), payload: z.object({ type: z.literal("tool-result"), value: z.object({
+  runId: z.string(), callId: z.string().min(1), target: z.literal("mind.report"), moduleId: z.string().min(1), hash: z.string().min(1), contractHash: z.string().regex(/^[a-f0-9]{64}$/),
+  status: z.literal("succeeded"), outputState: z.literal("complete"), output: receiptResultSchema,
+}).strict() }) });
 
-/** Caller must fetch this transcript from the exact current run after checking its identity. */
-// eslint-disable-next-line complexity -- Successful receipt, tool and candidate checks form one authentication boundary.
-export function selectTranscriptReport(decision: Decision, transcript: readonly { kind: string; tool?: string; error?: boolean; text?: string }[]): void {
+/** Only a persisted routed result bound to this decision's Run authenticates a candidate. */
+export function selectRunReport(decision: Decision, events: readonly unknown[]): void {
   if (decision.report?.verified) return;
   const candidates = [...(decision.reportCandidates ?? []), ...(decision.report ? [decision.report] : [])];
-  for (const item of transcript) {
-    if (item.kind !== "result" || item.error !== false || !["m_mind_report", "mind.report"].includes(item.tool ?? "")) continue;
-    const receipt = transcriptReceipt(item.text);
-    if (!receipt || receipt.decisionId !== decision.id) continue;
+  for (const event of events) {
+    const parsed = resultEvent.safeParse(event);
+    if (!parsed.success || parsed.data.payload.value.runId !== decision.runId) continue;
+    const receipt = parsed.data.payload.value.output;
+    if (!("reportId" in receipt) || receipt.decisionId !== decision.id) continue;
     const selected = candidates.find(c => c.reportId === receipt.reportId);
     if (!selected) continue;
     decision.report = { ...selected, verified: true };

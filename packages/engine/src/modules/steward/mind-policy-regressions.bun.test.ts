@@ -14,7 +14,7 @@ const NOW = "2026-11-09T12:00:00.000Z";
 const at = (milliseconds: number) => new Date(Date.parse(NOW) + milliseconds).toISOString();
 const owner: Caller = { kind: "owner", via: "test" };
 const source: Caller = { kind: "module", module: "calendar", moduleId: "calendar-id", hash: "source-hash" };
-const mind: Caller = { kind: "module", module: "mind", moduleId: "mind-id", hash: "mind-hash" };
+const mind = { kind: "module", module: "mind", moduleId: "mind-id", hash: "mind-hash" } as const satisfies Caller;
 const rule = { source: "calendar", moduleId: "calendar-id", event: "changed", ref: "application-7", thread: "thread-1", from: "office", domain: "example.test", textAll: ["received"] };
 const observation = { "request-key": "signal-original", "event-id": "event-original", event: rule.event, ref: rule.ref, version: "v1", thread: rule.thread, from: rule.from, domain: rule.domain, kind: "event", text: "Documents received", "occurred-at": NOW };
 const dimensions: ReportResult["feedback"] = { newEvidence: true, progress: false, internal: false, redundant: false, unavailable: false, userVisible: false };
@@ -35,7 +35,7 @@ type Fixture = Awaited<ReturnType<typeof fixture>>;
 // No execution/storage simulation: identities come from the runtime's durable current decision.
 function agent(f: Fixture) {
   let active = true;
-  let transcript: unknown[] = [];
+  let receipt: unknown;
   const calls: string[] = [];
   const call: Call = async (target, args) => {
     calls.push(target);
@@ -53,12 +53,12 @@ function agent(f: Fixture) {
       return { contextId, runId, active, status: active ? "running" : "finished" };
     }
     if (target === "agent.get") return { contextId, runId, active, status: active ? "running" : "finished" };
-    if (target === "agent.stream") return { transcript, interactions: [] };
+    if (target === "agent.stream") return { items: receipt && Number(args.after ?? 0) < 1 ? [{ sequence: 1, kind: "tool-result", payload: { type: "tool-result", value: { runId, callId: "call-report", target: "mind.report", moduleId: mind.moduleId, hash: mind.hash, contractHash: "a".repeat(64), status: "succeeded", outputState: "complete", output: receipt } } }] : [], after: receipt ? 1 : 0, interactions: [] };
     throw new Error(`Unexpected external call: ${target}`);
   };
-  return { call, calls, finish(receipt: unknown) {
+  return { call, calls, finish(value: unknown) {
     active = false;
-    transcript = [{ kind: "result", tool: "m_mind_report", error: false, text: JSON.stringify({ result: receipt }) }];
+    receipt = value;
   } };
 }
 async function currentDecision(f: Fixture) {
@@ -306,7 +306,7 @@ test("terminal history compaction leaves room to settle the outstanding run with
   expect((await stat(f.store.path)).size).toBeLessThanOrEqual(8 * 1024 * 1024);
 });
 
-test("an unverified self-report cannot deny the successful current Agent transcript candidate", async () => {
+test("an unverified self-report cannot deny the successful current Agent persisted result candidate", async () => {
   const f = await fixture();
   await f.note();
   const a = agent(f), runtime = new MindRuntime(f.store, a.call);

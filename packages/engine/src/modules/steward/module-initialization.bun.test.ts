@@ -63,7 +63,7 @@ test.each(["skipped", "failed", "unavailable", "missing-id", "missing-hash", "pa
   await f.save();
   await f.initialize();
   expect(await factConsumer(f.db, f.workspaceId)).toEqual({ moduleId: null, revision: "unselected" });
-  expect(await f.db.audit.count({ where: { kind: "kernel_fact_consumer" } })).toBe(0);
+  expect(await f.db.kernelFactConsumer.count()).toBe(0);
 });
 
 test.each(["null", "custom", "deleted-id"])("initialization preserves the owner's explicit %s consumer selection and revision", async kind => {

@@ -11,7 +11,7 @@ export class AgentError extends Error {
   constructor(readonly code: "conflict" | "unknown" | "not_found" | "capacity" | "unavailable" | "invalid", message: string) { super(message); }
 }
 /** The journal contains identity digests and stop-confirmed outcomes, never prompts, tokens or profiles. */
-export function createAgentOperations(provider: ProviderAdapter | undefined, data: string, input: (raw: unknown) => ProviderRunInput) {
+export function createAgentOperations(provider: ProviderAdapter | undefined, data: string, input: (raw: unknown) => ProviderRunInput, settled?: (operationId: string, callbacks: string, outcome: Outcome) => Promise<void>) {
   const rows = new Map<string, Row>();
   const path = (id: string) => join(data, "operations", createHash("sha256").update(id).digest("hex") + ".json");
   async function owned(id: string) {
@@ -47,6 +47,8 @@ export function createAgentOperations(provider: ProviderAdapter | undefined, dat
       await writeFile(path(id) + ".pending", JSON.stringify({ digest, outcome: checked }), { mode: 0o600 });
       await rename(path(id) + ".pending", path(id));
       row.outcome = checked;
+      // The durable receipt remains authoritative if the wake event cannot be delivered.
+      if (request.callbacks) await settled?.(id, request.callbacks, checked).catch(() => {});
     }).catch(() => { row.failure = true; });
     return { operationId: id };
   }

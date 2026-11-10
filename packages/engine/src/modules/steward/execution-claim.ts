@@ -5,7 +5,6 @@ import { prepareLocalWorkspace } from "./local-workspace";
 import type { ExecutionClaimSelection, StewardPorts } from "./ports";
 import { assertPreparedServerWorkspace, serverClaimRequest, type ServerClaimPreparation } from "./execution-server-workspace";
 import { audit } from "./audit";
-import { providerCancelKey } from "./provider-journal";
 import { CallError } from "./module-calls";
 import { assertExecutionPrincipal } from "./execution-principal";
 import { executionDigest, executionPrincipal, executionSnapshot, executionEventStore, finishExecution } from "./execution-state";
@@ -41,7 +40,7 @@ export async function codingGrant(ports: StewardPorts, tx: Prisma.TransactionCli
 async function activeQueuedCoding(tx: Prisma.TransactionClient, a: Attempt) {
   if (a.capabilityRevokedAt || a.cancelRequestedAt || a.stopConfirmedAt) return false;
   if (!a.run.sessionId || !await tx.session.count({ where: { id: a.run.sessionId, status: "active" } })) return false;
-  return !await tx.audit.findUnique({ where: { id: providerCancelKey(a.runId) } });
+  return !(await tx.run.findUniqueOrThrow({ where: { id: a.runId }, select: { cancelRequestedAt: true } })).cancelRequestedAt;
 }
 export async function claimExecutionIn(ports: StewardPorts, tx: Prisma.TransactionClient, run: Prisma.RunGetPayload<{ include: { session: true } }>, now: Date, server?: ServerClaimPreparation | null) {
   const a = await tx.executionAttempt.findUniqueOrThrow({ where: { runId: run.id }, include: { run: true } });

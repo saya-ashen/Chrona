@@ -7,7 +7,7 @@ import { createAgentPrimitives } from "../builtin/agent/primitives";
 import { createPages } from "../external/web/pages";
 import { createAgentConversations } from "./conversations";
 import { captureApplicationDelivery, deliveryReceiptSchema, readDeliveryPages, reconcileApplicationDelivery, type ApplicationDelivery } from "./delivery";
-import { healthFixture, receiptFixture, receiptItem } from "./delivery-fixture";
+import { healthFixture, receiptFixture, receiptItem, receiptEvent } from "./delivery-fixture";
 
 type Args = Record<string, unknown>;
 const directories: string[] = [];
@@ -16,8 +16,8 @@ async function directory() {
   const path = await mkdtemp(join(tmpdir(), "chrona-delivery-integration-")); directories.push(path); return path;
 }
 // Exercise the actual Agent admission/validation/redaction boundary with offline Provider records.
-function agentStream(items: () => unknown[]) {
-  const primitive = createAgentPrimitives(async () => ({ items: [], after: 0, ended: true, interactions: [], transcript: { sessionDir: "/offline-fixture", limit: 100 } }), async () => { throw new Error("Unexpected control"); }, async () => runtimeTranscriptSchema.parse(items()));
+function agentStream(items: () => unknown[], events: () => unknown[] = () => []) {
+  const primitive = createAgentPrimitives(async () => ({ items: events(), after: events().length, ended: true, interactions: [], transcript: { sessionDir: "/offline-fixture", limit: 100 } }), async () => { throw new Error("Unexpected control"); }, async () => runtimeTranscriptSchema.parse(items()));
   return async (runId = "run-1") => contextStreamOutput.parse(await primitive("stream", { runId, after: 0, limit: 100 }, "offline-stream"));
 }
 
@@ -29,21 +29,19 @@ for (const size of [2000, 2001]) test(`actual Agent stream receipt envelope at $
   deliveryReceiptSchema.parse(receipt);
   const item = { ...receiptItem(), text: JSON.stringify({ result: receipt }) };
   expect(item.text).toHaveLength(size);
-  const stream = await agentStream(() => [item])();
-  const turn = { at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
-  captureApplicationDelivery(turn, stream.transcript);
-  if (size === 2000) expect(turn.applicationDelivery[0]?.receipt).toEqual(receipt);
-  else {
-    expect(stream.transcript[0]).toMatchObject({ text: `${item.text.slice(0, 2000)}…（已截断）` });
-    expect(turn.applicationDelivery).toEqual([]);
-  }
+  const event = receiptEvent(); event.payload.value.output = receipt;
+  const stream = await agentStream(() => [item], () => [event])();
+  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
+  captureApplicationDelivery(turn, stream.items);
+  expect(turn.applicationDelivery[0]?.receipt).toEqual(receipt);
+  if (size > 2000) expect(stream.transcript[0]).toMatchObject({ text: `${item.text.slice(0, 2000)}…（已截断）` });
 });
 
 async function conversationFixture() {
   const dataDir = await directory(), calls: { target: string; args: Args }[] = [], replies: Args[] = [];
   const runs = new Map<string, { runId: string; status: string; active: boolean }>();
-  const state = { items: [] as unknown[], streamUnavailable: false, loseRunResponse: false, health: [] as ReturnType<typeof healthFixture>[], pages: [] as { module: string; moduleId: string; hash: string; id: string; title: string }[] };
-  const stream = agentStream(() => state.items);
+  const state = { items: [] as unknown[], events: [] as ReturnType<typeof receiptEvent>[], streamUnavailable: false, loseRunResponse: false, health: [] as ReturnType<typeof healthFixture>[], pages: [] as { module: string; moduleId: string; hash: string; id: string; title: string }[] };
+  const stream = agentStream(() => state.items, () => state.events);
   let clock = Date.parse("2026-11-09T00:00:02.000Z");
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
     calls.push({ target, args });
@@ -75,6 +73,7 @@ for (const pendingAdmission of [false, true]) test(`old timeout delivery reconci
   const first = await f.restart().send({ text: "创建应用", requestKey: "first" });
   Object.assign(f.runs.get(first.runId!)!, { status: "timed_out", active: false });
   f.state.items = [receiptItem()];
+  f.state.events = [receiptEvent()];
   await f.restart().poll();
   const saved = (await f.restart().messages(first.sessionId)).find(message => message.execution?.runId === first.runId)!;
   expect(saved.execution).toMatchObject({ status: "timed_out", applicationDelivery: [{ targets: [{ activation: "unknown" }] }] });
@@ -107,7 +106,8 @@ test("a delayed terminal transcript cannot capture a later Run's receipt or pros
   f.state.streamUnavailable = false;
   expect(second.runId).toBe("run-2");
   f.state.items = [{ ...receiptItem(), at: "2026-11-09T00:00:04.000Z" }, { kind: "text", text: "第二轮回复", at: "2026-11-09T00:00:05.000Z" }];
-  // Results at the next turn's start are conservatively owned only by that next turn.
+  f.state.events = [receiptEvent(second.runId!)];
+  // Persisted result ownership comes from Run identity, independently of transcript times.
   await f.restart().poll();
   const journal = await f.journal(), turns = journal.sessions[0].turns;
   expect(turns[0].applicationDelivery).toBeUndefined();
@@ -126,8 +126,8 @@ test("Web private list/get reader proves only the full current page identity", a
   await pages.tool("page-set", page, owner);
   expect((await pages.list())[0]).not.toHaveProperty("hash");
   expect(await readDeliveryPages(pages)).toEqual([{ module: "music", moduleId: "music-id", hash, id: "home", title: "音乐" }]);
-  const turn = { at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
-  captureApplicationDelivery(turn, [receiptItem()]);
+  const turn = { runId: "run-1", at: "2026-11-09T00:00:02.000Z", baseline: [], runRequest: { tools: ["author.submit"] }, applicationDelivery: [] as ApplicationDelivery[] };
+  captureApplicationDelivery(turn, [receiptEvent()]);
   const call = async (target: string) => target === "modules.health" ? { items: [healthFixture()], nextCursor: null } : receiptFixture();
   await reconcileApplicationDelivery(call, turn.applicationDelivery, "2026-11-09T00:00:05.000Z", () => readDeliveryPages(pages));
   expect(turn.applicationDelivery[0]!.targets[0]!.pages).toEqual([{ id: "home", title: "音乐", href: "/p/music/home" }]);
@@ -148,8 +148,8 @@ test("declarative pages retain the real registering version; legacy callers rema
   const evidence = [{ module: "music", moduleId: "music-id", hash, id: "home", title: "Music" }];
   expect(await readDeliveryPages(createPages(dependencies))).toEqual(evidence);
   inventory[0]!.activeHash = "d".repeat(40);
-  const turn = { runRequest: { tools: ["author.submit"] }, baseline: [], at: "2026-11-09T00:00:00.000Z", applicationDelivery: [] as ApplicationDelivery[] };
-  captureApplicationDelivery(turn, [receiptItem()]);
+  const turn = { runId: "run-1", runRequest: { tools: ["author.submit"] }, baseline: [], at: "2026-11-09T00:00:00.000Z", applicationDelivery: [] as ApplicationDelivery[] };
+  captureApplicationDelivery(turn, [receiptEvent()]);
   await reconcileApplicationDelivery(async (name: string) => name === "modules.health" ? { items: [{ ...healthFixture(), activeHash: inventory[0]!.activeHash }], nextCursor: null } : receiptFixture(), turn.applicationDelivery, "2026-11-09T00:00:07.000Z", () => readDeliveryPages(pages));
   expect(turn.applicationDelivery[0]!.targets[0]).toMatchObject({ activation: "different", pages: [], pagesCheck: "unknown" });
   const { hash: _hash, ...legacyCaller } = caller;

@@ -19,9 +19,8 @@ const concurrency = Math.max(
 	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
 );
 
-// Remind's source remains retained; its boundary/pause tests still run.
+// Retained applications run offline checks without changing their installation/pause policy.
 function shouldInclude(path: string) {
-  if (path.startsWith("packages/engine/src/modules/steward/external/remind/")) return false;
 	const retained = [
 		"scripts/agent-integration/",
 		"packages/engine/src/modules/steward/", "packages/domain/src/steward/",

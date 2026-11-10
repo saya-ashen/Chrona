@@ -43,7 +43,7 @@ test("isolated EXPORT → VERIFY → DELETE scrubs old transcript metadata and u
     await db.executionDetail.create({ data: { attemptId: attempt.id, seq: 1, event: { evidence: "retained" }, bytes: 23, expiresAt: new Date("2099-01-01") } });
     await db.executionSnapshot.create({ data: { attemptId: attempt.id, snapshot: { artifact: "immutable.json" }, bytes: 25, expiresAt: new Date("2099-01-01") } });
     const context = await db.session.create({ data: { workspaceId: f.workspace.id, source: "module", key: "current", providerSessionId: "current-provider-continuation", executionHeadAttemptId: attempt.id } });
-    await db.audit.create({ data: { id: `agent-context:${context.id}`, workspaceId: f.workspace.id, actorKey: "agent", kind: "agent_context", subjectId: context.id, details: {} } });
+    await db.agentContext.create({ data: { sessionId: context.id, workspaceId: f.workspace.id, moduleId: "agent", hash: "" } });
     const currentMessage = await db.message.create({ data: { workspaceId: f.workspace.id, sessionId: context.id, direction: "in", channel: "web", text: "current input" } });
     const module = await db.module.create({ data: { workspaceId: f.workspace.id, name: "memory-local" } });
     const preference = await db.preference.create({ data: { workspaceId: f.workspace.id, text: "remember", origin: "user" } });
@@ -86,7 +86,7 @@ test("explicit legacy source allowlist; module, audit-protected, unknown and for
       await expect(exportLegacyConversations(f.options)).rejects.toThrow("protected");
     }
     await db.session.update({ where: { id: f.session.id }, data: { source: "web" } });
-    await db.audit.create({ data: { workspaceId: f.workspace.id, actorKey: "agent", kind: "agent_context", subjectId: f.session.id, details: {} } });
+    await db.agentContext.create({ data: { workspaceId: f.workspace.id, moduleId: "agent", sessionId: f.session.id, hash: "" } });
     await expect(exportLegacyConversations(f.options)).rejects.toThrow("protected");
     await expect(exportLegacyConversations({ ...f.options, workspaceId: "foreign" })).rejects.toThrow("not found");
   } finally { await f.close(); }
@@ -97,7 +97,7 @@ for (const state of ["queued", "running", "unknown", "unconfirmed", "execution",
   try {
     const run = await finishedRun(f);
     if (["queued", "running", "unknown"].includes(state)) await db.run.update({ where: { id: run.id }, data: { status: state } });
-    if (state === "unconfirmed") await db.run.update({ where: { id: run.id }, data: { error: "Execution stop is unconfirmed" } });
+    if (state === "unconfirmed") await db.run.update({ where: { id: run.id }, data: { stopStatus: "unknown", error: "Execution stop is unconfirmed" } });
     if (state === "execution") { const attempt = await execution(f, run.id); await db.executionAttempt.update({ where: { id: attempt.id }, data: { stopConfirmedAt: null } }); }
     if (state === "head") await db.session.update({ where: { id: f.session.id }, data: { executionHeadAttemptId: "current" } });
     await expect(exportLegacyConversations(f.options)).rejects.toThrow(state === "head" ? "protected" : "live or unknown");
@@ -119,7 +119,7 @@ for (const mutation of ["message", "source-bytes", "missing-source", "manifest",
     if (mutation === "archive-bytes") await writeFile(archivedFile, "corrupted");
     if (mutation === "archive-conversations") await writeFile(join(f.options.outputDir, "conversations.json"), "{}");
     if (mutation === "missing-archive") await unlink(archivedFile);
-    if (mutation === "new-context") await db.audit.create({ data: { id: `agent-context:${f.session.id}`, workspaceId: f.workspace.id, actorKey: "agent", kind: "other", details: {} } });
+    if (mutation === "new-context") await db.agentContext.create({ data: { sessionId: f.session.id, workspaceId: f.workspace.id, moduleId: "agent", hash: "" } });
     if (mutation === "new-live-run") { const run = await finishedRun(f); await db.run.update({ where: { id: run.id }, data: { status: "running" } }); }
     await expect(deleteExportedLegacyConversations(f.options, { manifestSha256: exported.manifestSha256, authorizeDelete: true })).rejects.toThrow();
     expect(await db.message.count({ where: { sessionId: f.session.id } })).toBe(1);

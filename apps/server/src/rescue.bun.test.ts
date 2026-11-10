@@ -57,7 +57,7 @@ test("rescue approvals and kernel tick work with both web and notify disabled", 
     expect((await result.json()).status).toBe("approved");
   }
   expect(await f.db.grant.count()).toBe(0);
-  expect(await f.db.audit.count({ where: { workspaceId: "ws_default", kind: "kernel_fact_pending" } })).toBeGreaterThanOrEqual(4);
+  expect(await f.db.kernelFact.count({ where: { workspaceId: "ws_default" } })).toBeGreaterThanOrEqual(4);
   expect(await f.db.moduleInvocation.count({ where: { workspaceId: "ws_default", target: { in: ["web", "notify"] } } })).toBe(0);
 });
 test("rescue exposes governed recovery controls, never conversations", async () => {

@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { StewardPorts } from "./ports";
 import { StewardError } from "./errors";
 import { createRuns, liveRuns } from "./runs";
-import { providerCancelKey } from "./provider-journal";
 const continuation = z.object({ runId: z.string().min(1).max(128) }).strict();
 
 /** Cancel only this attempt's automatic continuations, never unrelated work or future schedules. */
@@ -35,12 +34,12 @@ async function cancelAttempt(ports: StewardPorts, workspaceId: string, id: strin
 }
 
 /** Persist the ordinary run's cancel marker before stopping it or discovering retries. */
-async function cancelOrdinaryRun(ports: StewardPorts, workspaceId: string, run: { id: string; status: string }, allowEnded: boolean) {
+async function cancelOrdinaryRun(ports: StewardPorts, workspaceId: string, run: { id: string; status: string; cancelRequestedAt: Date | null }, allowEnded: boolean) {
   const { db, now } = ports, { id } = run;
-  const prior = await db.audit.findUnique({ where: { id: providerCancelKey(id) } });
+  const prior = run.cancelRequestedAt;
   if (!allowEnded && !prior && !["running", "queued"].includes(run.status)) throw new StewardError("conflict", "Run already ended");
-  await db.audit.upsert({ where: { id: providerCancelKey(id) }, update: {}, create: { id: providerCancelKey(id), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: id, details: {} } });
-  const queued = await db.run.updateMany({ where: { id, workspaceId, status: "queued" }, data: { status: "cancelled", endedAt: now(), leaseUntil: null } });
+  await db.run.update({ where: { id }, data: { cancelRequestedAt: prior ?? now() } });
+  const queued = await db.run.updateMany({ where: { id, workspaceId, status: "queued" }, data: { status: "cancelled", stopStatus: "confirmed", endedAt: now(), leaseUntil: null } });
   if (queued.count) await ports.onRunFinished?.(workspaceId, id);
   else {
     await liveRuns.get(id)?.abort();

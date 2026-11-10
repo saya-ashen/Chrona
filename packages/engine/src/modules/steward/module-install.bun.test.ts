@@ -65,12 +65,12 @@ test.each(["files", "events", "remote-execution", "mind"] as const)("optional %s
   if (name === "files") {
     const session = await f.db.session.create({ data: { workspaceId: f.workspaceId, moduleId: first.moduleId, source: "module", key: "retained-context", title: "Ended private Files conversation" } });
     await expect(requestRemove(context, first.moduleId!, "unmarked active session")).rejects.toMatchObject({ code: "conflict" });
-    await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: first.moduleId!, kind: "agent_context", subjectId: session.id, details: {} } });
+    await f.db.agentContext.create({ data: { workspaceId: f.workspaceId, moduleId: first.moduleId!, sessionId: session.id, hash: "" } });
     const run = await f.db.run.create({ data: { workspaceId: f.workspaceId, sessionId: session.id, lane: "foreground", trigger: "module", provider: "fixture", tokenHash: `files-${session.id}`, prompt: "fixture", cwd: f.ports.dataDir } });
     await expect(requestRemove(context, first.moduleId!, "queued context")).rejects.toMatchObject({ code: "conflict" });
-    await f.db.run.update({ where: { id: run.id }, data: { status: "failed", error: "Execution stop is unconfirmed" } });
+    await f.db.run.update({ where: { id: run.id }, data: { status: "failed", stopStatus: "unknown", error: "Execution stop is unconfirmed" } });
     await expect(requestRemove(context, first.moduleId!, "unknown context stop")).rejects.toMatchObject({ code: "conflict" });
-    await f.db.run.update({ where: { id: run.id }, data: { status: "succeeded", error: null, endedAt: f.ports.now() } });
+    await f.db.run.update({ where: { id: run.id }, data: { status: "succeeded", stopStatus: "confirmed", error: null, endedAt: f.ports.now() } });
     expect((await f.db.session.findUniqueOrThrow({ where: { id: session.id } })).status).toBe("active");
   }
   const removal = await requestRemove(context, first.moduleId!, "remove optional app");
@@ -111,10 +111,11 @@ test("pending receipt recovers an actual proposal after the adapter response was
   const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "lost-response" };
   await installExternal(f.ports, f.workspaceId, request);
   const id = installationId(f.workspaceId, request.requestKey);
-  await f.db.audit.update({ where: { id }, data: { subjectId: null, details: { request, result: { package: request.package, requestKey: request.requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null } } } });
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
   // Simulate the earlier crash boundary: submission evidence exists, but its final moduleId write was lost.
-  const row = await f.db.audit.findUniqueOrThrow({ where: { id: `${id}:submission` } });
-  await f.db.audit.update({ where: { id: row.id }, data: { details: { ...(row.details as object), moduleId: null } } });
+  const row = await f.db.moduleInstallationSubmission.findUniqueOrThrow({ where: { id: `${id}:submission` } });
+  await f.db.moduleInstallationSubmission.update({ where: { id: row.id }, data: { moduleId: null } });
+  await f.db.audit.deleteMany();
   f.ports.moduleExternalInstaller = async () => { throw new Error("must not repeat proposal"); };
   await refreshInstallationReceipts(f.ports, f.workspaceId);
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "building", moduleId: expect.any(String), hash: expect.any(String) });
@@ -125,11 +126,11 @@ test("prepared copy failures are failed with an explicit retry while uncertain p
   const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "preparation" };
   const result = await installExternal(f.ports, f.workspaceId, request);
   const id = installationId(f.workspaceId, request.requestKey);
-  const row = await f.db.audit.findUniqueOrThrow({ where: { id: `${id}:submission` } });
+  const row = await f.db.moduleInstallationSubmission.findUniqueOrThrow({ where: { id: `${id}:submission` } });
   // Simulate the persisted prepared phase before any propose side effect.
   await f.db.module.delete({ where: { id: result.moduleId! } });
-  await f.db.audit.update({ where: { id: row.id }, data: { details: { ...(row.details as object), phase: "prepared", moduleId: null, error: "Copy failed; explicitly retry" } } });
-  await f.db.audit.update({ where: { id }, data: { details: { request, result: { ...result, status: "pending", moduleId: null, hash: null } } } });
+  await f.db.moduleInstallationSubmission.update({ where: { id: row.id }, data: { phase: "prepared", moduleId: null, error: "Copy failed; explicitly retry" } });
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
   const failed = await installExternal(f.ports, f.workspaceId, request);
   expect(failed).toMatchObject({ status: "failed", error: { reason: "submission_not_started", message: "Copy failed; explicitly retry" } });
   expect(await installExternal(f.ports, f.workspaceId, { ...request, requestKey: "preparation-retry" })).toMatchObject({ status: "building" });
@@ -142,7 +143,7 @@ test("same-hash existing version is reconciled by version id when propose preser
   const request = { package: "files" as const, mode: "update" as const, requestKey: "existing-version" };
   await installExternal(f.ports, f.workspaceId, request);
   const id = installationId(f.workspaceId, request.requestKey);
-  await f.db.audit.update({ where: { id }, data: { details: { request, result: { package: "files", requestKey: request.requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null } } } });
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "building", moduleId: local.moduleId, hash: local.hash });
   expect(await f.db.moduleVersion.findFirstOrThrow()).toMatchObject({ intent: { changes: ["Original owner intent"] } });
   expect(await f.db.moduleVersion.count()).toBe(1);
@@ -152,12 +153,13 @@ test("lost receipt cannot bind a same-name reinstall with the same hash", async 
   const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "removed-old" };
   const old = await installExternal(f.ports, f.workspaceId, request), id = installationId(f.workspaceId, request.requestKey);
   await f.db.module.delete({ where: { id: old.moduleId! } });
-  await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "user", kind: "module_removed", subjectId: old.moduleId, details: { name: "files", hash: old.hash }, createdAt: f.ports.now() } });
+  await f.db.moduleRemoval.create({ data: { workspaceId: f.workspaceId, moduleId: old.moduleId!, name: "files", hash: old.hash, createdAt: f.ports.now() } });
   const selected = await resolveExternalRelease(f.ports, "files");
   const replacement = await propose(moduleContext(f.ports, f.workspaceId), { sourceCommit: selected.hash, gitBundle: selected.git!, root: f.ports.moduleExternalResources!, dir: "files", intent: { changes: ["Same name new installation"] } }, "user");
-  const submission = await f.db.audit.findUniqueOrThrow({ where: { id: `${id}:submission` } });
-  await f.db.audit.update({ where: { id: submission.id }, data: { details: { ...(submission.details as object), moduleId: null } } });
-  await f.db.audit.update({ where: { id }, data: { details: { request, result: { package: "files", requestKey: request.requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null } } } });
+  const submission = await f.db.moduleInstallationSubmission.findUniqueOrThrow({ where: { id: `${id}:submission` } });
+  await f.db.moduleInstallationSubmission.update({ where: { id: submission.id }, data: { moduleId: null } });
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
+  await f.db.audit.deleteMany();
   const reconciled = await installExternal(f.ports, f.workspaceId, request);
   expect(reconciled.status).toBe("failed");
   expect(reconciled.moduleId).toBe(old.moduleId);
@@ -168,7 +170,7 @@ test("lost receipt cannot bind a same-name reinstall with the same hash", async 
 test("accepted request without submission evidence stays pending without invoking adapter", async () => {
   const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "accepted" };
   const result = { package: request.package, requestKey: request.requestKey, status: "pending" as const, moduleId: null, hash: null, approvalId: null, error: null };
-  await f.db.audit.create({ data: { id: installationId(f.workspaceId, request.requestKey), workspaceId: f.workspaceId, kind: "module_installation", actorKey: "kernel", details: { request, result } } });
+  await f.db.moduleInstallation.create({ data: { id: installationId(f.workspaceId, request.requestKey), workspaceId: f.workspaceId, ...request, status: result.status, moduleId: result.moduleId, hash: result.hash, approvalId: result.approvalId } });
   f.ports.moduleExternalInstaller = async () => { throw new Error("must not run"); };
   expect(await installExternal(f.ports, f.workspaceId, request)).toEqual(result);
   expect(await f.db.moduleVersion.count()).toBe(0);
@@ -282,8 +284,7 @@ test("a removed submission after a lost receipt is reconciled by its original id
   const first = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   const requestKey = first.packages.qq.requestKey, moduleId = first.packages.qq.moduleId!;
   const id = installationId(f.workspaceId, requestKey);
-  const request = { package: "qq" as const, mode: "install" as const, requestKey };
-  await f.db.audit.update({ where: { id }, data: { subjectId: null, details: { request, result: { package: "qq", requestKey, status: "pending", moduleId: null, hash: null, approvalId: null, error: null } } } });
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending", moduleId: null, hash: null, approvalId: null, errorCode: null, errorReason: null, errorMessage: null } });
   await f.db.module.delete({ where: { id: moduleId } });
   const settings = (await f.db.workspace.findUniqueOrThrow({ where: { id: f.workspaceId } })).settings as Record<string, unknown>;
   const state = JSON.parse(JSON.stringify(first));
@@ -293,7 +294,7 @@ test("a removed submission after a lost receipt is reconciled by its original id
   const recovered = await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(recovered.packages.qq).toMatchObject({ status: "skipped", moduleId });
   expect(await f.db.module.findFirst({ where: { name: "qq" } })).toBeNull();
-  expect(await f.db.audit.count({ where: { kind: "module_installation_submission", id: `${id}:submission` } })).toBe(1);
+  expect(await f.db.moduleInstallationSubmission.count({ where: { id: `${id}:submission` } })).toBe(1);
 });
 
 test("an explicit checked external update preserves paused selection", async () => {
@@ -386,4 +387,15 @@ test.each(["web", "notify", "author"] as const)("preinstalled %s uses checks, st
   expect(await installExternal(f.ports, f.workspaceId, request)).toMatchObject({ status: "installed", moduleId: next.moduleId });
   await ensureWorkspaceInitialized(f.ports, f.workspaceId);
   expect(await factConsumer(f.db, f.workspaceId)).toEqual(selected);
+});
+
+test("corrupt persisted submission phase fails closed instead of inferring a successful proposal", async () => {
+  const f = await fixture(), request = { package: "files" as const, mode: "install" as const, requestKey: "corrupt-phase" };
+  await installExternal(f.ports, f.workspaceId, request);
+  const id = installationId(f.workspaceId, request.requestKey);
+  await f.db.moduleInstallation.update({ where: { id }, data: { status: "pending" } });
+  await f.db.moduleInstallationSubmission.update({ where: { id: `${id}:submission` }, data: { phase: "corrupt" } });
+  await expect(installExternal(f.ports, f.workspaceId, request)).rejects.toThrow();
+  expect(await f.db.moduleVersion.count()).toBe(1);
+  expect((await f.db.moduleInstallation.findUniqueOrThrow({ where: { id } })).status).toBe("pending");
 });

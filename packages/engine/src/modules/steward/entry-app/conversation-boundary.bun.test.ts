@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentConversations } from "./conversations";
-import { receiptFixture, receiptItem, healthFixture } from "./delivery-fixture";
+import { receiptFixture, receiptItem, receiptEvent, healthFixture } from "./delivery-fixture";
 
 type Args = Record<string, unknown>;
 type Run = { runId: string; status: string; active: boolean };
@@ -17,7 +17,7 @@ async function fixture(source: "web" | "mcp" | "qq" = "web", discovered?: string
   const admitted = new Map<string, string>();
   let failRun = false, failWrite = false, failStream = false;
   const current = { status: "finished", active: false };
-  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }] as { at: string; kind: string; text?: string; tool?: string; error?: boolean }[], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: { type: string; value: { phase: string } } }[], after: 0 };
+  const stream = { transcript: [{ at: "2026-11-09T00:00:01.000Z", kind: "text", text: "已核对" }] as { at: string; kind: string; text?: string; tool?: string; error?: boolean }[], interactions: [{ id: "question-1", status: "waiting" }], items: [] as { sequence: number; payload: unknown }[], after: 0 };
   let clock = "2026-11-09T00:00:02.000Z";
   const delivery = { receipt: null as unknown, health: [] as unknown[], pages: [] as { module: string; moduleId: string; hash: string; id: string; title: string }[], unavailable: false };
   const call = async (target: string, args: Args = {}): Promise<unknown> => {
@@ -323,6 +323,7 @@ test("timeout receipt survives restart and later activation reconciles without a
   const f = await fixture("web", ["author.submit"]);
   const first = await f.restart().send({ text: "创建音乐应用", requestKey: "music" });
   f.current.status = "timed_out";
+  f.stream.items = [receiptEvent(first.runId!)];
   f.stream.transcript = [receiptItem(), { at: "2026-11-09T00:00:04.000Z", kind: "text", text: "提交成功，正在等待激活" }];
   f.delivery.receipt = receiptFixture();
   await f.restart().poll();
@@ -357,4 +358,23 @@ test("assistant receipt text and unrelated active applications never establish d
   await f.restart().poll();
   expect((await f.restart().execution(sent.sessionId))?.applicationDelivery).toBeUndefined();
   expect(f.calls.some(call => call.target === "modules.health" || call.target === "modules.candidate-check")).toBe(false);
+});
+
+for (const source of ["web", "qq", "mcp"] as const) test(`${source} reconciles a late real receipt after terminal Run and restart without replay`, async () => {
+  const f = await fixture(source, ["author.submit"]);
+  const sent = await f.restart().send({ text: "创建应用", requestKey: "late-receipt" });
+  f.current.status = "timed_out";
+  const event = receiptEvent(sent.runId!);
+  f.stream.items = [{ ...event, payload: { ...event.payload, value: { ...event.payload.value, status: "unknown", outputState: "omitted", output: null } } }];
+  f.stream.after = 1;
+  await f.restart().poll();
+  expect((await f.journal()).sessions[0].turns[0].pendingToolResults).toEqual(["call-1"]);
+  f.stream.items = [{ ...event, sequence: 2 }]; f.stream.after = 2;
+  f.delivery.receipt = receiptFixture();
+  await f.restart().poll();
+  const turn = (await f.journal()).sessions[0].turns[0];
+  expect(turn.pendingToolResults).toEqual([]);
+  expect(turn.applicationDelivery[0].receipt).toEqual(receiptFixture());
+  expect(f.calls.filter(call => call.target === "agent.run")).toHaveLength(1);
+  expect(f.calls.some(call => call.target === "author.submit" || call.target === "modules.submit")).toBe(false);
 });

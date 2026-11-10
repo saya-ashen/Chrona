@@ -17,16 +17,17 @@ test("Agent manifest keeps legacy execution controls kernel-only and retains app
     expect(tool.visibility).toEqual(["kernel"]);
     expect(tool.parameters).toEqual({ type: "object", properties: { input: { type: "string", description: "Kernel-only encoded request" } }, required: ["input"] });
   }
-  for (const name of ["health", "complete", "completion"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["kernel", "modules"]);
+  expect(parsed.tools.find(tool => tool.name === "health")!.visibility).toEqual(["kernel", "modules"]);
+  for (const name of ["complete", "completion"]) expect(parsed.tools.find(tool => tool.name === name)!.visibility).toEqual(["modules"]);
   expect(parsed.tools.find(tool => tool.name === "configure")!.visibility).toEqual(["owner"]);
   const complete = parsed.tools.find(tool => tool.name === "complete")!;
-  expect(Object.keys(complete.parameters.properties)).toEqual(["command-key", "prompt", "system", "max-output-tokens", "input"]);
+  expect(Object.keys(complete.parameters.properties)).toEqual(["command-key", "prompt", "system", "max-output-tokens"]);
 });
 
 for (const [scenario, description] of [
   ["denial", "runtime denies modules all six legacy controls before any execution or callback"],
   ["artifact-denial", "checked runtime artifact independently denies modules kernel execution controls"],
-  ["kernel", "kernel encoded calls retain start, control, confirmed release, transcript and completion"],
+  ["kernel", "kernel encoded calls retain start, control, confirmed release and transcript; kernel completion is retired"],
   ["context", "app context primitives retain admission, transcript and private write/interrupt control"],
   ["configure", "Agent configuration uses the routed live owner callback"],
   ["projects", "Agent projects routes a live call without configuring a model"],

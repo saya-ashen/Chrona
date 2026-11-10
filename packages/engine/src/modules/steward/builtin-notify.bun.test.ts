@@ -66,6 +66,6 @@ on("tool",async ev=>{appendFileSync(join(chrona.paths.data,"sent.jsonl"),JSON.st
     expect((await sent(beta))[0].caller).toMatchObject({ kind: "module", module: "notify", moduleId: notify.id });
     const calls = await db.moduleInvocation.findMany({ where: { workspaceId, tool: "deliver" } });
     expect(calls).toHaveLength(2);
-    for (const invocation of calls) expect(await db.audit.findUnique({ where: { id: `module-invocation-target:${invocation.id}` } })).toMatchObject({ details: { moduleId: invocation.target === "alpha" ? alpha.id : beta.id, contractHash: moduleCallbackContractHash(transportManifest(invocation.target).tools[0]!) } });
+    for (const invocation of calls) expect(await db.moduleInvocation.findUnique({ where: { id: invocation.id } })).toMatchObject({ targetModuleId: invocation.target === "alpha" ? alpha.id : beta.id, targetContractHash: moduleCallbackContractHash(transportManifest(invocation.target).tools[0]!) });
   } finally { await moduleSupervisor(ports).stop(); await db.$disconnect(); await rm(dataDir, { recursive: true, force: true }); }
 }, 60_000);

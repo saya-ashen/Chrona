@@ -25,10 +25,10 @@ async function fixture() {
   await mkdir(join(dataDir, "platform/store"), { recursive: true });
   await cp(authorRoot, join(dataDir, "platform/store", "c".repeat(64)), { recursive: true });
   const session = await db.session.create({ data: { workspaceId, source: "module", key: "module:http-test", moduleId: entry.id } });
-  await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: entry.id, kind: "agent_context", subjectId: session.id, details: { hash: "v1" } } });
+  await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: entry.id, hash: "v1" } });
   await api.runs.enqueue({ sessionId: session.id, lane: "foreground", trigger: "message", prompt: "Fixture; never launch a model" });
   const run = (await api.runs.claimNext("foreground"))!;
-  await db.audit.create({ data: { id: `agent-tools:${run.id}`, workspaceId, actorKey: entry.id, kind: "agent_tools", subjectId: run.id, details: { targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"] } } });
+  await db.agentRunAdmission.create({ data: { runId: run.id, moduleId: entry.id, hash: (await db.agentContext.findUniqueOrThrow({ where: { sessionId: (await db.run.findUniqueOrThrow({ where: { id: run.id } })).sessionId! } })).hash, targets: [...moduleTools.map(tool => `modules.${tool}`), "author.prepare"], content: [] } });
   const headers = { authorization: `Bearer ${run.token}`, "content-type": "application/json" };
   const request = (path: string, init?: RequestInit) => app.request(path, init, peer);
   const post = (name: string, body: unknown) => request(`/tools/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
@@ -68,7 +68,7 @@ test("live Agent capability exposes the modern 13 module tools and pure Author m
     expect(await f.db.run.findMany({ select: { id: true, status: true } })).toEqual([{ id: f.run.id, status: "running" }]);
     expect(await f.db.run.count()).toBe(1);
     expect(await f.db.run.count({ where: { lane: "build" } })).toBe(0);
-    expect(await f.db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);
+    expect(await f.db.candidateAdmission.count()).toBe(0);
     expect((await f.request("/tools/m_modules_tools", { method: "POST", headers: f.headers, body: "{" })).status).toBe(400);
     const outside = await f.post("m_activity_runtime", {});
     expect(outside.status).toBe(409);

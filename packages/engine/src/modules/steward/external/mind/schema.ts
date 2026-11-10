@@ -58,7 +58,7 @@ export const decisionSchema = z.object({
   revisions: z.record(id, z.number().int().positive()), sourceKinds: z.array(z.object({ source: id, kind: id }).strict()).max(40),
   phase: z.enum(["prepared", "running", "waiting", "unknown", "completed", "unreported", "failed"]),
   contextKey: key, runKey: key, contextId: id.nullable(), runId: id.nullable(), prompt: z.string().min(1).max(100_000), tools: z.array(z.enum(["mind.agenda", "mind.propose", "mind.report"])).length(3),
-  report: reportCandidateSchema.nullable(), reportCandidates: z.array(reportCandidateSchema).max(8).default([]).optional(), retryAt: time.optional(), finishedAt: time.nullable(), error: z.string().max(500).nullable(),
+  after: z.number().int().nonnegative().optional(), report: reportCandidateSchema.nullable(), reportCandidates: z.array(reportCandidateSchema).max(8).default([]).optional(), retryAt: time.optional(), finishedAt: time.nullable(), error: z.string().max(500).nullable(),
   interactions: z.array(z.object({ id, title: short, message: z.string().max(2000), expiresAt: time }).strict()).max(12),
   notification: notificationSchema.nullable(),
 }).strict();

@@ -3,13 +3,12 @@ import "./module-effects";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { moduleManifestSchema } from "@chrona/contracts/steward";
+import { moduleManifestSchema, runToolResultSchema } from "@chrona/contracts/steward";
 import { admitContextPrimitive } from "./agent-context";
 import { callContextTool, contextRunTools, selectContextTools } from "./agent-context-tools";
 import { callSync, kernelOrigin } from "./module-calls";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleProcess } from "./module-test-process";
-import { providerCancelKey } from "./provider-journal";
 import { createRuns } from "./runs";
 import { createTools } from "./tools";
 import { testDb } from "./test-db";
@@ -99,7 +98,7 @@ test("detached entry uses persisted selection and never acquires owner mutation 
   await expect(f.invoke("m_context_origin_unselected", forged)).rejects.toMatchObject({ code: "forbidden" });
   await expect(selectContextTools(f.ports, f.principal, ["context-origin.mutate"])).rejects.toMatchObject({ code: "forbidden" });
   await expect(f.invoke("m_context_origin_mutate")).rejects.toMatchObject({ code: "forbidden" });
-  await f.db.audit.update({ where: { id: `agent-tools:${f.run.id}` }, data: { details: { targets: [] } } });
+  await f.db.agentRunAdmission.update({ where: { runId: f.run.id }, data: { targets: [] } });
   await expect(f.invoke("m_context_origin_observe")).rejects.toMatchObject({ code: "forbidden" });
   expect(await f.db.moduleInvocation.count()).toBe(0);
 });
@@ -118,7 +117,34 @@ test("ended, unclaimed, expired and cancelled Runs cannot admit detached tools",
     await expect(f.invoke("m_context_origin_observe")).rejects.toMatchObject({ code: "forbidden" });
   }
   await f.db.run.update({ where: { id: f.run.id }, data: { status: "running", deadlineAt: f.run.deadlineAt, leaseUntil: f.run.leaseUntil } });
-  await f.db.audit.create({ data: { id: providerCancelKey(f.run.id), workspaceId: f.workspaceId, actorKey: f.origin.id, kind: "provider_cancel", subjectId: f.run.id, details: {} } });
+  await f.db.run.update({ where: { id: f.run.id }, data: { cancelRequestedAt: new Date() } });
   await expect(f.invoke("m_context_origin_observe")).rejects.toMatchObject({ code: "forbidden" });
   expect(await f.db.moduleInvocation.count()).toBe(0);
+});
+
+test("audit retention does not change context ownership, admitted tools or fixed command receipts", async () => {
+  const f = await fixture();
+  await f.db.audit.deleteMany();
+  const replay = await admitContextPrimitive(f.ports, f.principal, "context", { requestKey: "context" });
+  expect(replay).toEqual({ contextId: f.run.sessionId });
+  expect((await contextRunTools(f.ports, f.run))?.caller).toEqual(f.context.caller);
+  expect(await f.invoke("m_context_origin_observe")).toMatchObject({ result: { caller: f.context.caller } });
+  const event = await f.db.runEvent.findFirstOrThrow({ where: { runId: f.run.id, kind: "tool-result" } });
+  expect(runToolResultSchema.parse((event.payload as { value: unknown }).value).contractHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(event.payload).toMatchObject({ type: "tool-result", value: { runId: f.run.id, target: "context-origin.observe", moduleId: f.origin.id, hash: f.origin.activeHash, status: "succeeded", outputState: "complete", output: { caller: f.context.caller } } });
+  const page = await admitContextPrimitive(f.ports, f.principal, "stream", { runId: f.run.id, after: 0, limit: 10 }) as { items: { sequence: number; payload: unknown }[] };
+  expect(page.items).toEqual([expect.objectContaining({ sequence: event.sequence, payload: event.payload })]);
+});
+
+test("a receipt persistence failure cannot turn an executed tool into retryable failure or fabricated success", async () => {
+  const f = await fixture();
+  await f.db.$executeRawUnsafe("CREATE TRIGGER fail_tool_receipt BEFORE INSERT ON RunEvent BEGIN SELECT RAISE(ABORT, 'Synthetic event storage failure'); END");
+  await expect(f.invoke("m_context_origin_observe")).rejects.toMatchObject({ code: "unknown" });
+  const call = await f.db.moduleInvocation.findFirstOrThrow({ where: { runId: f.run.id, target: f.origin.name, tool: "observe" } });
+  expect(call).toMatchObject({ status: "running", targetModuleId: f.origin.id, targetHash: f.origin.activeHash });
+  await f.db.$executeRawUnsafe("DROP TRIGGER fail_tool_receipt");
+  await createRuns(f.ports, f.workspaceId).finish(f.run.id, { outcome: "failed", sessionId: null, error: "Provider disconnected" }, { stopEvidence: "provider_exited" });
+  expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: call.id } })).toMatchObject({ status: "unknown" });
+  expect(await f.db.moduleRun.count({ where: { moduleId: f.origin.id, triggerId: "tool:observe" } })).toBe(1);
+  expect(await f.db.runEvent.findFirstOrThrow({ where: { runId: f.run.id, kind: "tool-result" } })).toMatchObject({ payload: { value: { callId: call.id, status: "unknown", outputState: "omitted" } } });
 });

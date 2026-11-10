@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RUN_LIMITS } from "@chrona/contracts/steward";
 import { createStewardService } from "./service";
-import { providerCancelKey } from "./provider-journal";
 import { testDb } from "./test-db";
 import type { StewardPorts } from "./ports";
 
@@ -27,7 +26,7 @@ afterEach(async () => {
 });
 const enqueue = (id = sessionId, lane: "foreground" | "background" = "foreground") => api.runs.enqueue({ sessionId: id, lane, trigger: "message", prompt: "Bounded work" });
 async function cancel(runId: string) {
-  await db.audit.create({ data: { id: providerCancelKey(runId), workspaceId, subjectId: runId, actorKey: "user", kind: "provider_cancel", details: {} } });
+  await db.run.update({ where: { id: runId }, data: { cancelRequestedAt: new Date() } });
 }
 
 test("the service admits only active workspace sessions and stores their private cwd", async () => {

@@ -22,7 +22,7 @@ async function fixture(after: Secrets, before: Secrets = [credential()]) {
   const ports = { db, dataDir, publicUrl: null, now: () => new Date("2026-11-08T12:00:00Z") };
   const context = moduleContext(ports, workspace.id), approvals = createApprovals(context);
   const session = await db.session.create({ data: { workspaceId: workspace.id, key: "build", source: "build" } });
-  await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", kind: "build_request", subjectId: session.id, details: { name: "alpha", modules: ["alpha", "beta"] } } });
+  await db.buildTargets.create({ data: { sessionId: session.id, name: "alpha", modules: ["alpha", "beta"] } });
   const versions: { module: string; moduleId: string; hash: string }[] = [];
   for (const [index, name] of ["alpha", "beta"].entries()) {
     const module = await db.module.create({ data: { workspaceId: workspace.id, name, activeHash: "a".repeat(64), dataSchema: 1 } });
@@ -30,7 +30,7 @@ async function fixture(after: Secrets, before: Secrets = [credential()]) {
       const manifest = moduleManifestSchema.parse({ name, entry: "index.ts", keepAlive: true, tests: ["test.ts"], effects: [], secrets: index === 1 ? secrets : [] });
       const version = await db.moduleVersion.create({ data: { moduleId: module.id, hash, manifest, source: hash.startsWith("a") ? "user" : "build", status: hash.startsWith("a") ? "approved" : "pending_review", intent: { changes: ["Update group member"], preserves: [] }, report: {} } });
       if (version.status === "pending_review") {
-        await db.audit.create({ data: { workspaceId: workspace.id, actorKey: "chrona", kind: "module_submission", subjectId: module.id, details: { hash, sessionId: session.id } } });
+        await db.moduleVersion.update({ where: { moduleId_hash: { moduleId: module.id, hash } }, data: { buildSessionId: session.id } });
         expect(await recordGroupReview(context, version, { prefix: name, suffix: "", codeDiff: "", detail: "credential review", needsMigration: false })).toBe(true);
       }
     }

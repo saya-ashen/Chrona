@@ -13,7 +13,7 @@ import { notices } from "./test-notices";
 import { moduleIncidents } from "./module-diagnostics";
 import { moduleContext } from "./module-context";
 import { recordModuleActivation, moduleEvolutionOutcomes, updateModuleEvolution } from "./module-evolution";
-import { moduleFailurePolicy } from "./module-failure-policy";
+import { moduleFailurePolicy, recordModuleExecution } from "./module-failure-policy";
 import { resolveBuiltinRelease } from "./module-release";
 
 const cleanups: (() => Promise<unknown>)[] = [];
@@ -642,4 +642,15 @@ test.each(["user", "build", "builtin"])("approved Git builtin from %s runs from 
   await f.supervisor.reconcile();
   expect(f.processes.map(process => process.input.codeDir)).toEqual([join(f.ports.dataDir, "platform/store", hash)]);
   expect(await f.db.module.findUniqueOrThrow({ where: { id: f.module.id } })).toMatchObject({ builtin: true, activeHash: hash, status: "active" });
+});
+
+test("audit retention cannot reset activation ownership, failure streak or receipt deduplication", async () => {
+  const f = await fixture();
+  const input = { workspaceId: f.module.workspaceId, moduleId: f.module.id, hash: "v1", activationId: f.activation.activationId, outcome: "failure" as const, now: f.ports.now() };
+  await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "first" }));
+  await f.db.audit.deleteMany();
+  expect(await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "first" }))).toMatchObject({ consecutiveFailures: 1, duplicate: true });
+  await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "second" }));
+  expect(await f.db.$transaction(tx => recordModuleExecution(tx, { ...input, resultId: "third" }))).toMatchObject({ consecutiveFailures: 3, shouldPause: true });
+  expect(await f.db.moduleExecutionResult.count()).toBe(3);
 });

@@ -34,8 +34,6 @@ export async function readDeliveryPages(registry: { list(): Promise<Omit<Deliver
   return pages;
 }
 type Call = (target: string, args?: Record<string, unknown>) => Promise<unknown>;
-type TranscriptItem = { at: string; kind: string; text?: string; tool?: string; error?: boolean };
-const receiptTools: Record<string, string> = { m_author_submit: "author.submit", m_author_receipt: "author.receipt", m_modules_submit: "modules.submit", m_modules_candidate_check: "modules.candidate-check" };
 export function validApplicationDelivery(value: unknown) {
   const parsed = z.array(deliverySchema).max(4).safeParse(value);
   return parsed.success && parsed.data.every(delivery => delivery.targets.length === delivery.receipt.members.length && delivery.targets.every((target, index) => {
@@ -47,24 +45,32 @@ export function validApplicationDelivery(value: unknown) {
 const targetsFor = (receipt: ApplicationDelivery["receipt"]): ApplicationDelivery["targets"] => receipt.members.map(item => ({ name: item.name, moduleId: item.moduleId, hash: item.hash, activation: "unknown", health: "unknown", pages: [], pagesCheck: "unknown" }));
 const identity = (receipt: ApplicationDelivery["receipt"]) => JSON.stringify([receipt.receiptId, receipt.admissionId, receipt.requestKey, receipt.submitter, receipt.members.map(({ status: _status, selected: _selected, ...item }) => item)]);
 
-/** agent.stream transcript has Pi toolResult JSON in text; detail events contain no results.
- * The current context bridge wraps output in {result}. Truncated/redacted JSON is not proof.
- */
-type ReceiptSource = { applicationDelivery?: ApplicationDelivery[]; at: string; baseline: TranscriptItem[]; runRequest?: { tools: string[] } };
-const successfulResultSchema = z.object({ kind: z.literal("result"), error: z.literal(false), tool: z.string().min(1), text: z.string().min(1).max(30_000) });
-function resultReceipt(input: ReceiptSource, item: TranscriptItem, baseline: Set<string>, before?: string) {
-  const result = successfulResultSchema.safeParse(item);
-  if (!result.success) return;
-  const target = receiptTools[result.data.tool];
-  if (!target || !input.runRequest?.tools.includes(target) || baseline.has(JSON.stringify(item))) return;
-  const at = Date.parse(item.at), start = Date.parse(input.at), end = before === undefined ? Number.MAX_VALUE : Date.parse(before);
-  if (![at, start, end].every(Number.isFinite) || at < start || at >= end) return;
-  try { return z.object({ result: deliveryReceiptSchema }).strict().parse(JSON.parse(result.data.text)).result; } catch { return; }
+/** Only complete persisted results from this Run establish delivery; transcript is display only. */
+type ReceiptSource = { applicationDelivery?: ApplicationDelivery[]; pendingToolResults?: string[]; runId?: string; runRequest?: { tools: string[] } };
+const resultEvent = z.object({
+  kind: z.literal("tool-result"), payload: z.object({ type: z.literal("tool-result"), value: z.object({
+    runId: id, callId: id, target: z.enum(["author.submit", "author.receipt", "modules.submit", "modules.candidate-check"]),
+    moduleId: id, hash, contractHash: z.string().regex(/^[a-f0-9]{64}$/), status: z.enum(["succeeded", "failed", "unknown"]), outputState: z.enum(["complete", "filtered", "omitted"]), output: z.unknown(),
+  }).strict() }),
+});
+function completeReceipt(result: z.infer<typeof resultEvent>["payload"]["value"]) {
+  if (result.status !== "succeeded" || result.outputState !== "complete") return;
+  const parsed = deliveryReceiptSchema.safeParse(result.output);
+  if (!parsed.success) return;
+  const receipt = parsed.data;
+  if (result.target.startsWith("author.") && (result.moduleId !== receipt.submitter.moduleId || result.hash !== receipt.submitter.hash)) return;
+  return receipt;
 }
-export function captureApplicationDelivery(input: ReceiptSource, transcript: TranscriptItem[], before?: string) {
-  const baseline = new Set(input.baseline.map(item => JSON.stringify(item)));
-  for (const item of transcript) {
-    const receipt = resultReceipt(input, item, baseline, before);
+export function captureApplicationDelivery(input: ReceiptSource, events: unknown[]) {
+  for (const event of events) {
+    const parsed = resultEvent.safeParse(event);
+    if (!parsed.success) continue;
+    const result = parsed.data.payload.value;
+    if (result.runId !== input.runId || !input.runRequest?.tools.includes(result.target)) continue;
+    const pending = new Set(input.pendingToolResults);
+    if (result.status === "unknown") pending.add(result.callId); else pending.delete(result.callId);
+    input.pendingToolResults = [...pending];
+    const receipt = completeReceipt(result);
     if (!receipt) continue;
     const deliveries = input.applicationDelivery ??= [];
     const prior = deliveries.find(delivery => delivery.receipt.receiptId === receipt.receiptId);

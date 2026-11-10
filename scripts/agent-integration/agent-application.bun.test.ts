@@ -138,3 +138,49 @@ test("Agent journal preserves uncertain starts across restart without launching 
     expect(starts).toBe(1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("Agent completion wake follows durable receipt and a lost wake cannot erase actual stop evidence", async () => {
+  const root = await mkdtemp("/tmp/chrona-agent-settled-");
+  const outcome = { outcome: "finished" as const, sessionId: "continued", error: null };
+  let resolve!: (value: typeof outcome) => void, starts = 0, wake = false;
+  const provider = { name: "fixture", async health() { return { available: true, sandboxed: false, error: null }; }, start() { starts++; return { done: new Promise<typeof outcome>(done => { resolve = done; }), async inject() {}, async abort() {} }; } };
+  const input = { operationId: "settled-run", runId: "settled-run", token: "private-token", lane: "foreground", cwd: root, sessionDir: root, sessionId: null, prompt: "private-prompt", systemPrompt: "", resources: "minimal", deadline: new Date(Date.now() + 1000).toISOString(), callbacks: crypto.randomUUID() };
+  try {
+    const operations = createAgentOperations(provider, root, value => value as never, async (operationId, callbacks, result) => {
+      expect(callbacks).toBe(input.callbacks);
+      const reopened = createAgentOperations(provider, root, value => value as never);
+      expect(await reopened.control("status", { operationId })).toMatchObject({ outcome: result, failure: false });
+      wake = true;
+      throw new Error("lost wake");
+    });
+    await operations.start(input); resolve(outcome);
+    for (let i = 0; i < 100 && !wake; i++) await Bun.sleep(5);
+    expect(wake).toBe(true);
+    expect(await operations.control("status", { operationId: input.operationId })).toMatchObject({ outcome, failure: false });
+    const restarted = createAgentOperations(provider, root, value => value as never);
+    await restarted.start(input);
+    expect(starts).toBe(1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("completion wake references are scoped to the exact operation, workspace and immutable Agent", async () => {
+  const db = testDb(), root = await mkdtemp("/tmp/chrona-settled-scope-");
+  registerLocalRuntime();
+  const workspace = await db.workspace.create({ data: { name: "completion" } });
+  const other = await db.workspace.create({ data: { name: "foreign" } });
+  const ports = { db, dataDir: root, now: () => new Date(), publicUrl: null };
+  let settled = false;
+  const registration = { operationId: "actual-run", settled: () => { settled = true; } };
+  const callback = retainProviderCallbacks(ports, workspace.id, registration);
+  registration.operationId = "other-run";
+  const event = { kind: "settled", operationId: "actual-run", outcome: { outcome: "finished", sessionId: null, error: null } };
+  const deliver = (workspaceId: string, value = event) => callSync(ports, kernelOrigin(workspaceId), "runtime-callback.event", { callbackId: callback.id, event: value });
+  try {
+    await expect(deliver(workspace.id, { ...event, operationId: "other-run" })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(deliver(other.id)).rejects.toMatchObject({ code: "not_found" });
+    expect(settled).toBe(false);
+    await deliver(workspace.id); expect(settled).toBe(true);
+    callback.release();
+    await expect(deliver(workspace.id)).rejects.toMatchObject({ code: "not_found" });
+  } finally { callback.release(); await db.$disconnect(); await rm(root, { recursive: true, force: true }); }
+});

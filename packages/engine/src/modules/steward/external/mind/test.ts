@@ -19,7 +19,7 @@ const module = await startModule("offline-entry.ts", { stubs: {
   "agent.get": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
   "agent.context": () => ({ contextId: "context-sdk" }),
   "agent.run": () => ({ contextId: "context-sdk", runId: "run-sdk", status: "running", active: true }),
-  "agent.stream": () => ({ transcript: [], interactions: [] }),
+  "agent.stream": () => ({ items: [], after: 0, interactions: [] }),
 } });
 const now = new Date().toISOString();
 const owner = { kind: "owner" as const, via: "test" };

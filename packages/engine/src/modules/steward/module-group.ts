@@ -26,14 +26,12 @@ import { assertExecutionModuleIdle } from "./execution-module-guard";
  * v2-15: one build may change several modules. Their candidates wait for one `activate_module` approval whose payload
  * (`kind: "activate_modules"`) binds every version; approving it activates all of them in one transaction and one generation.
  */
-const reviewKey = (versionId: string) => `module-review:${versionId}`;
 const reviewSchema = z.object({ prefix: z.string(), suffix: z.string(), codeDiff: z.string(), detail: z.string(), needsMigration: z.boolean() });
 
 /** The build conversation that submitted a version (recorded by `modules.propose`). */
 async function submittedBy(db: Prisma.TransactionClient, workspaceId: string, version: Pick<ModuleVersion, "moduleId" | "hash">) {
-  const rows = await db.audit.findMany({ where: { workspaceId, kind: "module_submission", subjectId: version.moduleId }, orderBy: { createdAt: "desc" } });
-  const found = rows.map(row => row.details as { hash?: unknown; sessionId?: unknown } | null).find(details => details?.hash === version.hash && typeof details.sessionId === "string");
-  return found ? String(found.sessionId) : null;
+  const row = await db.moduleVersion.findFirst({ where: { moduleId: version.moduleId, hash: version.hash, module: { workspaceId } }, select: { buildSessionId: true } });
+  return row?.buildSessionId ?? null;
 }
 /** Group candidates must never acquire a standalone approval, even if recording their review failed. */
 export async function isGroupCandidate(context: ModuleContext, version: ModuleVersion) {
@@ -45,8 +43,7 @@ export async function isGroupCandidate(context: ModuleContext, version: ModuleVe
 /** When the version belongs to a build that declared several modules, keep its review for the group approval and say so. */
 export async function recordGroupReview(context: ModuleContext, version: ModuleVersion, review: z.input<typeof reviewSchema>) {
   if (!await isGroupCandidate(context, version)) return false;
-  const row = { workspaceId: context.workspaceId, actorKey: "chrona", kind: "module_review", subjectId: version.id, details: json(review) };
-  await context.db.audit.upsert({ where: { id: reviewKey(version.id) }, update: { details: row.details }, create: { ...row, id: reviewKey(version.id) } });
+  await context.db.moduleReview.upsert({ where: { versionId: version.id }, create: { versionId: version.id, ...review }, update: review });
   return true;
 }
 
@@ -71,7 +68,7 @@ async function groupMember(db: Prisma.TransactionClient, workspaceId: string, se
   await assertExternalModule(db, workspaceId, module.id, "group");
   if (version.status !== "pending_review") throw new StewardError("conflict", `${name} ${hash} is ${version.status}, not waiting for review`);
   if (await submittedBy(db, workspaceId, version) !== sessionId) throw new StewardError("forbidden", `${name} ${hash} was not submitted by this build`);
-  const review = reviewSchema.safeParse((await db.audit.findUnique({ where: { id: reviewKey(version.id) } }))?.details).data;
+  const review = reviewSchema.safeParse(await db.moduleReview.findUnique({ where: { versionId: version.id }, select: { prefix: true, suffix: true, codeDiff: true, detail: true, needsMigration: true } })).data;
   if (!review) throw new StewardError("conflict", `${name} ${hash} has not been reviewed yet`);
   if (review.needsMigration) throw new StewardError("conflict", `${name} needs a data migration: build and approve it on its own first, then the rest together`);
   const active = module.activeHash ? await db.moduleVersion.findUnique({ where: { moduleId_hash: { moduleId: module.id, hash: module.activeHash } } }) : null;
@@ -110,7 +107,7 @@ export async function requestGroup(ports: StewardPorts, workspaceId: string, ses
       const generation = await recordGeneration(context, tx, "activate");
       await audit(tx, { workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { modules: members.map(member => member.module.id) } });
       for (const { module, version, hash } of members) {
-        await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id });
+        await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id, grouped: true });
         await audit(tx, { workspaceId, actor: "chrona", kind: "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash, generationId: generation.id } });
         await activationNotice(context, tx, version, !!module.activeHash);
       }
@@ -158,7 +155,7 @@ export async function activateGroupIn(context: ModuleContext, tx: Prisma.Transac
   const generation = await recordGeneration(context, tx, "activate");
   await audit(tx, { workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { modules: payload.versions.map(member => member.moduleId) } });
   for (const { moduleId, hash } of payload.versions) {
-    await recordModuleActivation(context, tx, { moduleId, previousHash: previous.get(moduleId) ?? null, hash, generationId: generation.id });
+    await recordModuleActivation(context, tx, { moduleId, previousHash: previous.get(moduleId) ?? null, hash, generationId: generation.id, grouped: true });
     await audit(tx, { workspaceId, actor: "chrona", kind: "module_activate", subjectId: moduleId, details: { hash, generationId: generation.id, approvalId: action.approvalId } });
   }
 }
@@ -210,7 +207,7 @@ async function fixedMembersIn(context: ModuleContext, tx: Prisma.TransactionClie
     if (module.status === "migrating" || version.status === "rejected") throw new StewardError("conflict", `${member.name} cannot activate with this candidate set`);
     if (["building", "testing"].includes(version.status)) { ready = false; continue; }
     if (version.status !== "pending_review") throw new StewardError("conflict", `${member.name} is no longer waiting for review`);
-    const review = reviewSchema.safeParse((await tx.audit.findUnique({ where: { id: reviewKey(version.id) } }))?.details).data;
+    const review = reviewSchema.safeParse(await tx.moduleReview.findUnique({ where: { versionId: version.id }, select: { prefix: true, suffix: true, codeDiff: true, detail: true, needsMigration: true } })).data;
     if (!review) { ready = false; continue; }
     if (review.needsMigration) throw new StewardError("conflict", `${member.name} needs a migration; fixed sets cannot partially migrate`);
     const addsCredentials = await fixedMemberCapabilities(context, tx, module, version, member.name);
@@ -241,7 +238,7 @@ async function activateFixedSetIn(context: ModuleContext, tx: Prisma.Transaction
   const generation = await recordGeneration(context, tx, "activate");
   await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: "module_group_activation", subjectId: generation.id, details: { receiptId: set.receiptId, modules: members.map(member => member.module.id) } });
   for (const { module, version, hash } of members) {
-    await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id });
+    await recordModuleActivation(context, tx, { moduleId: module.id, previousHash: module.activeHash, hash, generationId: generation.id, grouped: true });
     await audit(tx, { workspaceId: context.workspaceId, actor: "chrona", kind: approvalId ? "module_activate" : "module_auto_activated", subjectId: module.id, details: { versionId: version.id, hash, generationId: generation.id, ...(approvalId ? { approvalId } : {}) } });
     if (!approvalId) await activationNotice(context, tx, version, !!module.activeHash);
   }

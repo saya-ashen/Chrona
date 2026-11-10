@@ -11,7 +11,7 @@ beforeEach(async () => {
 afterEach(async () => { await db.$disconnect(); });
 async function build(key: string, workspace = workspaceId, source = "build", targets = true) {
   const session = await db.session.create({ data: { workspaceId: workspace, source, key, title: "private title", providerSessionId: "private-provider-continuation" } });
-  if (targets) await db.audit.create({ data: { id: `build-targets:${session.id}`, workspaceId: workspace, actorKey: "user", kind: "build_targets", subjectId: session.id, details: { name: "sample", modules: ["sample"] } } });
+  if (targets) await db.buildTargets.create({ data: { sessionId: session.id, name: "sample", modules: ["sample"] } });
   return session;
 }
 test("build facts replace legacy reads without exposing entry journals, Agent contexts or foreign builds", async () => {
@@ -20,7 +20,7 @@ test("build facts replace legacy reads without exposing entry journals, Agent co
   const missing = await build("build:missing", workspaceId, "build", false);
   const context = await build("module:context", workspaceId, "module");
   const marked = await build("build:marked");
-  for (const session of [context, marked]) await db.audit.create({ data: { id: `agent-context:${session.id}`, workspaceId, actorKey: "test", kind: "agent_context", subjectId: session.id, details: {} } });
+  for (const session of [context, marked]) await db.agentContext.create({ data: { sessionId: session.id, workspaceId, moduleId: "test", hash: "" } });
   const other = await db.workspace.create({ data: { name: "foreign" } });
   const foreign = await build("build:foreign", other.id);
   expect((await listBuildFacts(ports, workspaceId)).map(row => row.id)).toEqual([valid.id]);

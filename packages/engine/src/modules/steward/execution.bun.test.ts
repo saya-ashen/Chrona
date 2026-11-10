@@ -181,8 +181,8 @@ test.each([{ method: "select" as const, value: 0, options: ["first", "second"] }
   const waiting = channel.events.question({ method, title: "Fixture question", message: "choose", options: [...options], timeoutMs: 30_000 }, abort.signal);
   let requestId = "";
   for (let i = 0; i < 50; i++) {
-    const question = await db.audit.findFirst({ where: { kind: "provider_question", subjectId: run.id } });
-    if (question) { requestId = (question.details as { id: string }).id; break; }
+    const question = await db.runInteraction.findFirst({ where: { runId: run.id } });
+    if (question) { requestId = (question.request as { id: string }).id; break; }
     await Bun.sleep(5);
   }
   expect(requestId).not.toBe("");

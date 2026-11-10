@@ -13,8 +13,8 @@ import { ensureVersionMaterial } from "./module-source";
 
 async function assertMigrationOwner(context: ModuleContext, db: ModuleContext["db"] | Prisma.TransactionClient, prepared: PreparedMigration, reason: "activate" | "rollback") {
   const current = await assertExternalModule(db, context.workspaceId, prepared.module.id, reason);
-  const migration = await db.audit.findFirst({ where: { workspaceId: context.workspaceId, subjectId: current.id, kind: "module_migration_started" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
-  if (current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || (migration?.details as { hash?: unknown } | null)?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
+  const migration = await db.moduleMigration.findUnique({ where: { moduleId: current.id } });
+  if (current.status !== "migrating" || current.activeHash !== prepared.module.activeHash || migration?.hash !== prepared.version.hash) throw new StewardError("conflict", "Module changed during migration");
   return current;
 }
 
@@ -107,14 +107,14 @@ export async function recoverMigrations(context: ModuleContext, now = context.po
   const { db, workspaceId, platform } = context;
   for (const module of await db.module.findMany({ where: { workspaceId, status: "migrating" } })) {
     await assertExternalModule(db, workspaceId, module.id, "activate");
-    const started = await db.audit.findFirst({ where: { workspaceId, kind: "module_migration_started", subjectId: module.id }, orderBy: { createdAt: "desc" } });
+    const started = await db.moduleMigration.findUnique({ where: { moduleId: module.id } });
     if (!started || started.createdAt.getTime() >= now.getTime() - 15 * 60_000) continue;
     await rm(join(platform, "data-next", module.id), { recursive: true, force: true });
     const live = join(platform, "data", module.id), old = join(platform, "data-old", module.id);
     // Still migrating means activation never committed: data-old is pre-migration data.
     try { await lstat(old); await rm(live, { recursive: true, force: true }); await rename(old, live); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    const previousStatus = (started.details as { previousStatus?: unknown } | null)?.previousStatus === "paused" ? "paused" : "active";
+    const previousStatus = started.previousStatus === "paused" ? "paused" : "active";
     await db.module.updateMany({ where: { id: module.id, status: "migrating", activeHash: module.activeHash }, data: { status: previousStatus } });
   }
 }

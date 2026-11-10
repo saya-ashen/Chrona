@@ -65,7 +65,9 @@ test("explicit fetched merge uses a request key once and rejects stale selection
   const request = { action: "merge" as const, moduleId: f.moduleId, commit: update.commit, baseHash: f.git.commit, requestKey: "merge-once" };
   const result = await moduleUpstream(f.ports, f.workspaceId, request);
   expect(result.proposal?.status).toBe("building");
+  await f.ports.db.audit.deleteMany();
   expect(await moduleUpstream(f.ports, f.workspaceId, request)).toEqual(result);
+  expect(await f.ports.db.moduleUpstreamMerge.count()).toBe(1);
   await expect(moduleUpstream(f.ports, f.workspaceId, { ...request, commit: f.git.commit })).rejects.toMatchObject({ code: "conflict" });
   await expect(moduleUpstream(f.ports, f.workspaceId, { ...request, requestKey: "stale", baseHash: "f".repeat(40) })).rejects.toThrow("Active module version changed");
   expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).activeHash).toBe(f.git.commit);
@@ -81,6 +83,7 @@ test("merge conflict keeps local source and active version; retry does not rerun
   await recordModuleUpstream(f.ports, f.workspaceId, f.moduleId, { ...update, repository });
   const request = { action: "merge" as const, moduleId: f.moduleId, commit: update.commit, baseHash: f.git.commit, requestKey: "conflict-once" };
   await expect(moduleUpstream(f.ports, f.workspaceId, request)).rejects.toThrow("conflicts");
+  await f.ports.db.audit.deleteMany();
   await expect(moduleUpstream(f.ports, f.workspaceId, request)).rejects.toThrow("Original upstream merge");
   expect(await getModuleLocalHead(f.location)).toBe(local.hash);
   expect((await f.ports.db.module.findUniqueOrThrow({ where: { id: f.moduleId } })).activeHash).toBe(f.git.commit);

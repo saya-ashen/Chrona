@@ -10,7 +10,7 @@ import { candidateReceiptSchema } from "../../../../contracts/src/steward/module
 import { createScriptSandbox } from "../../../../integrations/src/steward/script-sandbox";
 import runtimes from "../../../../integrations/src/steward/runtimes.json";
 import type { ModuleGitFile } from "./module-git";
-import type { BuildReport } from "./module-context";
+import { moduleContext, type BuildReport } from "./module-context";
 import type { StewardPorts } from "./ports";
 
 const selected = ["modules.list", "modules.admit-candidates", "modules.submit", "approvals.resolve", "author.prepare", "author.source", "author.write", "author.submit", "author.receipt"];
@@ -61,7 +61,7 @@ test("current approved wildcard conversation routes SDK Author material into che
     const shared = await import("@chrona/db");
     const sharedDatabases = await shared.db.$queryRawUnsafe<{ name: string; file: string }[]>("PRAGMA database_list");
     if (sharedDatabases.find(item => item.name === "main")?.file === join(root, "test.db")) importedDatabase = shared.db;
-    const [{ admitContextPrimitive }, { callContextTool, contextRunTools, selectContextTools }, { admissionRecordSchema, candidateRecordSchema }, { checkoutModule, snapshotModule }, { commitModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }, { createRuns }] = await Promise.all([
+    const [{ admitContextPrimitive }, { callContextTool, contextRunTools, selectContextTools }, { readCandidateAdmissionIn, readCandidateSetIn }, { checkoutModule, snapshotModule }, { commitModuleSource }, { moduleSupervisor }, { createModules }, { registerLocalRuntime }, { registerSystemModules }, { createRuns }] = await Promise.all([
       import("./agent-context"), import("./agent-context-tools"), import("./module-candidate-records"), import("./module-files"), import("./module-git"), import("./module-supervisor"), import("./modules"), import("./local-runtime"), import("./system-modules"), import("./runs"),
     ]);
     await import("./module-effects");
@@ -127,11 +127,11 @@ test("current approved wildcard conversation routes SDK Author material into che
     const prepared = await invoke("author.prepare", input({ ...admissionInput, goal: "Write and install two local proof applications in this conversation", intent })) as { admission: typeof admissionInput; prompt: string };
     expect(prepared.admission).toEqual(admissionInput);
     expect(prepared.prompt).toContain("current conversation");
-    expect(await db.audit.count({ where: { kind: "candidate_admission" } })).toBe(0);
+    expect(await db.candidateAdmission.count()).toBe(0);
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
     const admission = await invoke("modules.admit-candidates", prepared.admission) as { admissionId: string };
     const issuer = { kind: "module" as const, module: entry.name, moduleId: entry.id, hash: entry.activeHash! };
-    const grant = admissionRecordSchema.parse((await db.audit.findUniqueOrThrow({ where: { id: admission.admissionId } })).details);
+    const grant = (await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, admission.admissionId));
     expect(grant).toEqual({ input: admissionInput, issuer, receiptId: null });
     // Author has only its narrow kernel contracts; it cannot select the admission tool itself.
     const authorPrincipal = { ...principal, caller: { kind: "module" as const, moduleId: author.id, hash: author.activeHash! } };
@@ -158,7 +158,7 @@ test("current approved wildcard conversation routes SDK Author material into che
       await expect(invoke("author.submit", input({ ...submission, items }))).rejects.toMatchObject({ code: "conflict" });
     }
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(0);
-    expect(await db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(0);
+    expect(await db.candidateReceipt.count()).toBe(0);
     expect((await db.module.findUniqueOrThrow({ where: { id: baseline.id } })).activeHash).toBe(baseline.activeHash);
     expect(await db.module.count({ where: { name: { in: ["proof-beta", "unadmitted-target"] } } })).toBe(0);
 
@@ -171,12 +171,12 @@ test("current approved wildcard conversation routes SDK Author material into che
       expect(member.materialDigest).toMatch(/^[a-f0-9]{64}$/);
       expect(member).toMatchObject({ status: "building", selected: false, expectedActiveHash: targets.find(target => target.name === member.name)!.expectedActiveHash });
       expect(await db.moduleVersion.findUniqueOrThrow({ where: { id: member.versionId } })).toMatchObject({ moduleId: member.moduleId, hash: member.hash, source: "candidate", status: "building", report: { tests: [], git: { commit: member.hash, tree: expect.any(String) } } });
-      expect((await db.audit.findUniqueOrThrow({ where: { id: `candidate-member:${member.versionId}` } })).details).toEqual({ receiptId: receipt.receiptId, moduleId: member.moduleId, hash: member.hash });
+      expect(await db.candidateMember.findUniqueOrThrow({ where: { versionId: member.versionId }, select: { receiptId: true, versionId: true } })).toEqual({ receiptId: receipt.receiptId, versionId: member.versionId });
     }
-    const receiptRow = await db.audit.findUniqueOrThrow({ where: { id: receipt.receiptId } });
-    expect(receiptRow.actorKey).toBe(`module:${author.id}`);
-    expect(candidateRecordSchema.parse(receiptRow.details).set.submitter).toEqual(submitter);
-    expect(admissionRecordSchema.parse((await db.audit.findUniqueOrThrow({ where: { id: admission.admissionId } })).details).receiptId).toBe(receipt.receiptId);
+    const receiptRow = await db.candidateReceipt.findUniqueOrThrow({ where: { id: receipt.receiptId }, include: { admission: true } });
+    expect(receiptRow.admission.submitterModuleId).toBe(author.id);
+    expect((await readCandidateSetIn(moduleContext(ports, workspaceId), db, receipt.receiptId))!.submitter).toEqual(submitter);
+    expect((await readCandidateAdmissionIn(moduleContext(ports, workspaceId), db, admission.admissionId)).receiptId).toBe(receipt.receiptId);
     // Mutate both live workspaces through the SDK: replay and the checker must use the already frozen Git material.
     for (const dir of ["alpha", "beta"]) await invoke("author.write", { path: `sources/${dir}/message.ts`, content: 'export const message = "mutable source must not execute";\n' });
     expect(await invoke("author.submit", input(submission))).toEqual(receipt);
@@ -184,7 +184,7 @@ test("current approved wildcard conversation routes SDK Author material into che
     await expect(invoke("author.submit", input({ ...submission, requestKey: "changed-key" }))).rejects.toMatchObject({ code: "conflict" });
     await expect(invoke("author.submit", input({ ...submission, items: [{ ...submission.items[0]!, intent: { ...intent, changes: ["Changed payload after submission"] } }, submission.items[1]!] }))).rejects.toMatchObject({ code: "conflict" });
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(2);
-    expect(await db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(1);
+    expect(await db.candidateReceipt.count()).toBe(1);
 
     // Actual queue checks: type checking, offline tests, copied-data continuity and authenticated SDK startup.
     await createModules(ports, workspaceId).buildPending(ports.now());
@@ -197,7 +197,7 @@ test("current approved wildcard conversation routes SDK Author material into che
       expect(report.git?.commit).toBe(member.hash);
       expect(await readFile(join(platform, "store", member.hash, "message.ts"), "utf8")).toContain(`candidate ${member.name}`);
       if (member.name === baseline.name) expect(report.continuity).toMatchObject({ status: "passed", fromSchema: 1, toSchema: 1, migrated: false, tests: [{ exitCode: 0, stdout: "", stderr: "" }] });
-      expect(await db.audit.count({ where: { id: `module-review:${member.versionId}`, kind: "module_review" } })).toBe(1);
+      expect(await db.moduleReview.count({ where: { versionId: member.versionId } })).toBe(1);
     }
     expect(JSON.parse(await readFile(liveData, "utf8"))).toEqual({ count: 7 });
     const waiting = candidateReceiptSchema.parse(await invoke("author.receipt", input({ receiptId: receipt.receiptId })));
@@ -215,7 +215,7 @@ test("current approved wildcard conversation routes SDK Author material into che
     expect(await db.generation.count({ where: { workspaceId } })).toBe(1);
     expect(await invoke("author.submit", input(submission))).toEqual(approved);
     expect(await db.moduleVersion.count({ where: { source: "candidate" } })).toBe(2);
-    expect(await db.audit.count({ where: { kind: "candidate_receipt" } })).toBe(1);
+    expect(await db.candidateReceipt.count()).toBe(1);
     const resolution = await db.audit.findFirstOrThrow({ where: { kind: "approval_resolved", subjectId: approval.id } });
     expect(resolution.details).toMatchObject({ decision: "approve", source: entry.name });
 

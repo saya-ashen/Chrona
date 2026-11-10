@@ -150,14 +150,14 @@ test("missing callbacks keep explicit never-sent attribution across several unav
   const original = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
   await f.db.module.delete({ where: { id: f.beta.id } });
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "missing-target" });
-  expect(await f.db.audit.findUnique({ where: { id: `module-invocation-target:${queued.callId}` } })).toMatchObject({ details: { moduleId: null, contractHash: null } });
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: null, targetContractHash: null });
   for (let i = 0; i < 2; i++) { await runDueCalls(f.ports, f.workspace.id); f.advance(120_000); }
   expect(calls).toBe(0);
   const replacement = await f.db.module.create({ data: { workspaceId: f.workspace.id, name: "beta", activeHash: "beta-v1" } });
   await f.db.moduleVersion.create({ data: { moduleId: replacement.id, hash: "beta-v1", manifest: moduleManifestSchema.parse(original.manifest), source: "user", intent: {}, report: {}, status: "approved" } });
   await runDueCalls(f.ports, f.workspace.id);
   expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "succeeded", attempts: 3, output: "late-bound" });
-  expect(await f.db.audit.findUnique({ where: { id: `module-invocation-target:${queued.callId}` } })).toMatchObject({ details: { moduleId: replacement.id, contractHash: expect.any(String) } });
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: replacement.id, targetContractHash: expect.any(String) });
   expect(calls).toBe(1);
 });
 
@@ -166,12 +166,12 @@ test("legacy unattributed callbacks fail closed on their first or recovered deli
     let calls = 0;
     const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "unexpected" }; } });
     const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: `legacy-${attempts}` });
-    await f.db.audit.delete({ where: { id: `module-invocation-target:${queued.callId}` } });
+    await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { targetBound: false } });
     await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { attempts } });
     await runDueCalls(f.ports, f.workspace.id);
     expect(await f.db.moduleInvocation.findUniqueOrThrow({ where: { id: queued.callId } })).toMatchObject({ status: "failed", error: expect.stringContaining("target identity or contract changed") });
     expect(calls).toBe(0);
-    expect(await f.db.audit.findUnique({ where: { id: `module-invocation-target:${queued.callId}` } })).toBeNull();
+    expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetBound: false });
   }
 });
 
@@ -180,7 +180,7 @@ test("paused callbacks bind their current tool contract before a later incompati
   const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: 42 }; } });
   await f.db.module.update({ where: { id: f.beta.id }, data: { status: "paused" } });
   const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: "beta.echo", raw: {} }, { key: "paused-target" });
-  expect(await f.db.audit.findUnique({ where: { id: `module-invocation-target:${queued.callId}` } })).toMatchObject({ details: { moduleId: f.beta.id, contractHash: expect.any(String) } });
+  expect(await f.db.moduleInvocation.findUnique({ where: { id: queued.callId } })).toMatchObject({ targetModuleId: f.beta.id, targetContractHash: expect.any(String) });
   const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
   const manifest = moduleManifestSchema.parse(version.manifest);
   manifest.tools[0]!.output = { type: "number" };
@@ -217,7 +217,7 @@ test("expired callbacks recover only attributed idempotent delivery; unknown wor
     let calls = 0;
     const f = await fixture({ alpha: async () => ({}), beta: async () => { calls++; return { result: "recovered" }; } });
     const queued = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspace.id), target: scenario === "unknown" ? "beta.echo" : "beta.again", raw: {} }, { key: `recovery-${scenario}` });
-    if (scenario === "legacy") await f.db.audit.delete({ where: { id: `module-invocation-target:${queued.callId}` } });
+    if (scenario === "legacy") await f.db.moduleInvocation.update({ where: { id: queued.callId }, data: { targetBound: false } });
     if (scenario === "changed") {
       const version = await f.db.moduleVersion.findUniqueOrThrow({ where: { moduleId_hash: { moduleId: f.beta.id, hash: "beta-v1" } } });
       const manifest = moduleManifestSchema.parse(version.manifest);

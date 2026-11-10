@@ -7,21 +7,30 @@ import { tool, json } from "./system/shared";
 import { isAgentApplication } from "./agent-application";
 import { agentDelegationTools, dispatchAgentDelegation } from "./agent-delegation-port";
 
-type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> };
+type CallbackTarget = Pick<ProviderRunInput, "events" | "detail"> & { operationId?: string; settled?: (outcome: import("@chrona/contracts/steward").RuntimeEvent & { kind: "settled" }) => void };
+type Callback = { target: Pick<ProviderRunInput, "events" | "detail">; settle(value: RuntimeEvent & { kind: "settled" }): void; workspaceId: string; controllers: Map<string, AbortController>; interrupted: Set<string> };
 // Match moduleSupervisor's scope: service-derived ports share its original ports' callbacks.
 const callbacks = new WeakMap<StewardPorts["db"], Map<string, Map<string, Callback>>>();
 
 /** Kernel-local subscribers are addressed by an opaque, workspace-bound reference; no callback crosses the wire. */
-export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string, input: Pick<ProviderRunInput, "events" | "detail">) {
+export function retainProviderCallbacks(ports: StewardPorts, workspaceId: string, input: CallbackTarget) {
   let scopes = callbacks.get(ports.db);
   if (!scopes) { scopes = new Map(); callbacks.set(ports.db, scopes); }
   let map = scopes.get(ports.dataDir);
   if (!map) { map = new Map(); scopes.set(ports.dataDir, map); }
   const id = randomUUID(), controllers = new Map<string, AbortController>(), interrupted = new Set<string>();
-  map.set(id, { target: input, workspaceId, controllers, interrupted });
+  const { operationId, settled } = input;
+  map.set(id, { target: input, workspaceId, controllers, interrupted, settle(value) {
+    if (value.operationId !== operationId || !settled) throw new CallError("forbidden", "Completion belongs to another Run");
+    settled(value);
+  } });
   return { id, release() { for (const controller of controllers.values()) controller.abort(); map.delete(id); } };
 }
 async function dispatchCallback(target: Pick<ProviderRunInput, "events" | "detail">, owner: Callback, value: RuntimeEvent): Promise<Json> {
+  if (value.kind === "settled") {
+    owner.settle(value);
+    return null;
+  }
   if (value.kind === "interrupt") {
     const controller = owner.controllers.get(value.requestId);
     if (controller) controller.abort();

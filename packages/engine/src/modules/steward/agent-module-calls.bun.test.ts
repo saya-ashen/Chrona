@@ -14,6 +14,7 @@ import { callSync, kernelOrigin } from "./module-calls";
 import { createRuns, liveRuns } from "./runs";
 import { createTools } from "./tools";
 import { createProviderChannel } from "./provider-channel";
+import { appendRunEventIn } from "./run-events";
 import { startLocalProvider } from "./local-runtime";
 
 test("ordinary SDK module calls Agent with real caller ownership and original model budget", async () => {
@@ -190,7 +191,7 @@ test("Agent contexts keep durable identity, scoped reads and interrupt evidence"
     expect(await relay("write", write)).toEqual({ accepted: true });
     expect(await relay("write", write)).toEqual({ accepted: true });
     expect(await relay("write", { ...write, text: "changed" })).toMatchObject({ error: "conflict" });
-    for (let seq = 1; seq <= 2; seq++) await f.ports.db.audit.create({ data: { id: `provider:${running.runId}:${String(seq).padStart(8, "0")}`, workspaceId: f.workspaceId, kind: "provider_event", actorKey: "test", subjectId: running.runId, details: { type: "progress", value: { phase: "working" } } } });
+    for (let seq = 1; seq <= 2; seq++) await f.ports.db.$transaction(tx => appendRunEventIn(tx, running.runId, "progress", { type: "progress", value: { phase: "working" } }, f.ports.now()));
     const logDir = join(f.ports.dataDir, "sessions", context.contextId, ".chrona", "sessions");
     await mkdir(logDir, { recursive: true });
     await writeFile(join(logDir, "fixture.jsonl"), [

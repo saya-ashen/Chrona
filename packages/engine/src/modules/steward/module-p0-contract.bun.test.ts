@@ -108,7 +108,7 @@ test("install is bounded, idempotent and explicit; uncertain receipts do not exe
   expect(moduleInstallRequestSchema.safeParse({ ...fixtures.install, package: "web" }).success).toBe(true);
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).map(item => item.name)).toEqual(["web", "notify", "qq", "author", "memory-local", "coding", "coding-web", "mcp", "files", "events", "remind", "mind", "remote-execution"]);
   // Other packages' history cannot push this package out of a global latest-N window.
-  for (let i = 0; i < 205; i++) await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "kernel", kind: "module_installation", details: { request: { package: "mind", mode: "install", requestKey: `noise-${i}` }, result: { ...fixtures.failedInstall, package: "mind", requestKey: `noise-${i}` } } } });
+  for (let i = 0; i < 205; i++) await f.db.moduleInstallation.create({ data: { id: `noise-${i}`, workspaceId: f.workspaceId, package: "mind", mode: "install", requestKey: `noise-${i}`, status: "failed" } });
   expect((await externalPackageCatalog(f.ports, f.workspaceId)).find(item => item.name === "qq")?.installation).toMatchObject({ requestKey: fixtures.install.requestKey, status: "failed" });
   const unavailable = await installExternal({ ...f.ports, moduleExternalInstaller: undefined }, f.workspaceId, { package: "notify", mode: "install", requestKey: "no-adapter" });
   expect(unavailable).toMatchObject({ status: "unavailable", error: { reason: "installer_unavailable" } });
@@ -151,7 +151,7 @@ test("queued callbacks cannot switch to a same-name reinstall or a changed tool 
     const row = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: "a".repeat(64) } });
     await f.db.moduleVersion.create({ data: { moduleId: row.id, hash: row.activeHash!, status: "approved", source: "user", manifest, intent: {}, report: {} } });
     const call = await enqueueCall({ tx: f.db, ports: f.ports, origin: kernelOrigin(f.workspaceId), target: "alpha.receive", raw: {} }, { key: "callback-one" });
-    expect(await f.db.audit.findUnique({ where: { id: `module-invocation-target:${call.callId}` } })).toMatchObject({ details: { moduleId: row.id, contractHash: moduleCallbackContractHash(manifest.tools[0]!) } });
+    expect(await f.db.moduleInvocation.findUnique({ where: { id: call.callId } })).toMatchObject({ targetModuleId: row.id, targetContractHash: moduleCallbackContractHash(manifest.tools[0]!) });
     if (change === "reinstall") {
       await f.db.module.delete({ where: { id: row.id } });
       const replacement = await f.db.module.create({ data: { workspaceId: f.workspaceId, name: "alpha", activeHash: row.activeHash } });
@@ -193,7 +193,7 @@ test("build claim refuses changed identities and continues to a valid queued bui
   for (const name of ["alpha", "beta"]) {
     const session = await createRunSession(f.db, f.workspaceId, "build", f.ports.now());
     queued.push((await runs.enqueue({ sessionId: session.id, lane: "build", trigger: "source", prompt: "Synthetic build", label: name })).id);
-    await f.db.audit.create({ data: { workspaceId: f.workspaceId, actorKey: "kernel", kind: "build_request", subjectId: session.id, details: { name } } });
+    await f.db.buildTargets.create({ data: { sessionId: session.id, name: name, modules: [name] } });
   }
   await f.db.module.update({ where: { id: module.id }, data: { builtin: true } });
   const tick = createTick(f.ports);

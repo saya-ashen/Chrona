@@ -8,7 +8,6 @@ import type { ExecutionPrincipal, ProviderAdapter, ProviderRunInput } from "@chr
 import { admitContextPrimitive } from "./agent-context";
 import { moduleSupervisor } from "./module-supervisor";
 import { testModuleSandbox } from "./module-test-process";
-import { providerCancelKey } from "./provider-journal";
 import { liveRuns } from "./runs";
 import { testDb } from "./test-db";
 import { createTick } from "./tick";
@@ -64,7 +63,7 @@ test.each([
     await db.$executeRawUnsafe("DROP TRIGGER fail_run_finish");
 
     // Cancellation can be persisted while the Provider's exit awaits finalization.
-    if (item.cancel) await db.audit.create({ data: { id: providerCancelKey(runId), workspaceId, kind: "provider_cancel", actorKey: "user", subjectId: runId, details: {} } });
+    if (item.cancel) await db.run.update({ where: { id: runId }, data: { cancelRequestedAt: ports.now() } });
     time = new Date(time.getTime() + 86400_000);
     expect((await tick()).failures).toEqual([]);
     await tick.settled({ includeRuns: true });

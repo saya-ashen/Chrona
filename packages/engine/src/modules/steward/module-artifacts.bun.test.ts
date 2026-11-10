@@ -10,8 +10,8 @@ import { MODULE_MATERIAL_FILE, MODULE_ARTIFACT_MAX_FILE_BYTES, moduleMaterialSch
 // Engine imports must never inherit a developer/live database URL.
 const databaseRoot = mkdtempSync(join(tmpdir(), "chrona-material-test-db-"));
 process.env.DATABASE_URL = `file:${join(databaseRoot, "test.db")}`;
-const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, exportModuleSource }, { snapshotModule, ModuleDirectory }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller }, { resolveExternalRelease }] = await Promise.all([
-  import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("./test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("./module-test-process"), import("./module-install"), import("./module-release"),
+const [{ snapshotModuleMaterial, moduleMaterialDigest, moduleSourceFiles, storeModuleArtifacts }, { commitModuleSource, moduleGitPath, readModuleSource, readModuleMaterial, exportModuleSource }, { snapshotModule, ModuleDirectory }, { admitCandidates, submitCandidates, candidateSource }, { testDb }, { moduleContext }, { buildPending }, { ensureVersionMaterial }, { rollback }, { testModuleProcess }, { createExternalModuleInstaller, installExternal }] = await Promise.all([
+  import("./module-artifacts"), import("./module-git"), import("./module-files"), import("./module-candidates"), import("./test-db"), import("./module-context"), import("./module-build"), import("./module-source"), import("./module-activation"), import("./module-test-process"), import("./module-install"),
 ]);
 const roots: string[] = [];
 const closes: (() => Promise<unknown>)[] = [];
@@ -211,8 +211,8 @@ test("official source-only bundles install and update complete verified artifact
   const first = await publish("first");
   const workspace = await db.workspace.create({ data: { name: "artifact release test" } });
   const ports = { db, dataDir: join(f.root, "runtime"), moduleExternalResources: resources, publicUrl: null, now: () => new Date() };
-  const installer = createExternalModuleInstaller(ports), release = await resolveExternalRelease(ports, "files");
-  const installed = await installer({ workspaceId: workspace.id, request: { package: "files", mode: "install", requestKey: "native-install" }, release });
+  const installerPorts = { ...ports, moduleExternalInstaller: createExternalModuleInstaller(ports) };
+  const installed = await installExternal(installerPorts, workspace.id, { package: "files", mode: "install", requestKey: "native-install" });
   expect(installed).toMatchObject({ status: "building", hash: first.commit });
   const location = { platform: join(ports.dataDir, "platform"), moduleId: installed.moduleId! };
   const material = await readModuleMaterial({ ...location, commit: first.commit });
@@ -224,8 +224,8 @@ test("official source-only bundles install and update complete verified artifact
   await writeFile(join(dir, "bin/program"), next);
   f.record.artifacts[0]!.sha256 = digest(next);
   await writeFile(join(dir, MODULE_MATERIAL_FILE), JSON.stringify(f.record));
-  const second = await publish("second"), nextRelease = await resolveExternalRelease(ports, "files");
-  const updated = await installer({ workspaceId: workspace.id, request: { package: "files", mode: "update", requestKey: "native-update" }, release: nextRelease });
+  const second = await publish("second");
+  const updated = await installExternal(installerPorts, workspace.id, { package: "files", mode: "update", requestKey: "native-update" });
   expect(updated).toMatchObject({ status: "building", hash: second.commit, moduleId: location.moduleId });
   expect((await readModuleMaterial({ ...location, commit: second.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(next);
   expect((await readModuleMaterial({ ...location, commit: first.commit })).find(file => file.path === "bin/program")!.bytes).toEqual(f.binary);
